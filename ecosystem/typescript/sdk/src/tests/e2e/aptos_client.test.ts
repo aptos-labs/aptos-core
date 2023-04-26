@@ -9,11 +9,13 @@ import {
   TransactionBuilderMultiEd25519,
   TransactionBuilderRemoteABI,
 } from "../../transaction_builder";
-import { TokenClient } from "../../plugins";
+import { AptosToken, TokenClient } from "../../plugins";
 import { HexString } from "../../utils";
-import { getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
+import { getFaucetClient, longTestTimeout, NODE_URL, PROVIDER_LOCAL_NETWORK_CONFIG } from "../unit/test_helper.test";
 import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
-import { Ed25519PublicKey } from "../../aptos_types";
+import { AccountAddress, Ed25519PublicKey, stringStructTag, TypeTagStruct } from "../../aptos_types";
+import { Provider } from "../../providers";
+import { BCS } from "../..";
 
 const account = "0x1::account::Account";
 
@@ -113,6 +115,64 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
+  },
+  longTestTimeout,
+);
+
+test(
+  "submits generic type bcs transaction",
+  async () => {
+    const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
+    const aptosToken = new AptosToken(provider);
+    const account1 = new AptosAccount();
+    const faucetClient = getFaucetClient();
+
+    await faucetClient.fundAccount(account1.address(), 100_000_000);
+    let resources = await provider.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("100000000");
+
+    let tokenAddress = "";
+
+    await provider.waitForTransaction(
+      await aptosToken.createCollection(account1, "Collection description", "Collection Name", "https://aptos.dev", 5, {
+        royaltyNumerator: 10,
+        royaltyDenominator: 10,
+      }),
+    );
+    const txn = await provider.waitForTransactionWithResult(
+      await aptosToken.mint(
+        account1,
+        "Collection Name",
+        "Token Description",
+        "Token Name",
+        "https://aptos.dev/img/nyan.jpeg",
+        ["key"],
+        ["bool"],
+        ["true"],
+      ),
+      { checkSuccess: true },
+    );
+    tokenAddress = (txn as Gen.UserTransaction).events[0].data.token;
+    console.log(tokenAddress);
+
+    const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x4::token::Token"));
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
+        "0x4::aptos_token",
+        "add_typed_property",
+        [token, new TypeTagStruct(stringStructTag)],
+        [
+          BCS.bcsToBytes(AccountAddress.fromHex(tokenAddress)),
+          BCS.bcsSerializeStr("bcsKey"),
+          BCS.bcsSerializeStr("bcs value"),
+        ],
+      ),
+    );
+    const rawTxn = await provider.generateRawTransaction(account1.address(), entryFunctionPayload);
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await provider.submitSignedBCSTransaction(bcsTxn);
+    await provider.waitForTransaction(transactionRes.hash, { checkSuccess: true });
   },
   longTestTimeout,
 );

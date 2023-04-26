@@ -397,10 +397,12 @@ export class TransactionBuilderRemoteABI {
     // Remove all `signer` and `&signer` from argument list because the Move VM injects those arguments. Clients do not
     // need to care about those args. `signer` and `&signer` are required be in the front of the argument list. But we
     // just loop through all arguments and filter out `signer` and `&signer`.
-    const originalArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
+    const abiArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
 
-    // Convert string arguments to TypeArgumentABI
-    const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
+    // Convert abi string arguments to TypeArgumentABI
+    const typeArgABIs = abiArgs.map(
+      (abiArg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(abiArg, ty_tags).parseTypeTag()),
+    );
 
     const entryFunctionABI = new EntryFunctionABI(
       funcAbi!.name,
