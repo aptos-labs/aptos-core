@@ -438,6 +438,7 @@ impl CliCommand<&'static str> for TestPackage {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
+            skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
             ..Default::default()
         };
 
