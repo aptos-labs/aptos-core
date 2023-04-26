@@ -62,11 +62,11 @@ module aptos_std::bulletproofs {
 
     /// Verifies a zero-knowledge range proof that the value `v` committed in `com` (under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`) satisfies $v \in [0, 2^{num_bits})$. Only works
-    /// for `num_bits` \in {8, 16, 32, 64}.
+    /// for `num_bits` \in {8, 16, 32, 64}. Additionally, checks that the prover used dst as a domain-separation 
+    /// tag (DST). This prevents proofs computed for one application (a.k.a. a domain) with dst_1 from verifying 
+    /// in a different application with dst_2 != dst_1.
     public fun verify_range_proof_pedersen(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
-        if(!features::bulletproofs_enabled()) {
-            abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-        };
+        assert(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),

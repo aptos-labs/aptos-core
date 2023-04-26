@@ -118,6 +118,10 @@ module aptos_std::pedersen {
     }
 
     /// Returns the randomness base compatible with the Bulletproofs module.
+    /// A Bulletproof attests, in zero-knowledge, that a value v inside a Pedersen commitment g^vh^r is 
+    /// sufficiently "small" (e.g., is 32-bits wide). Here, h is referred to as the "randomness base" 
+    /// of the commitment scheme. Bulletproof has a default choice for g and h and this function 
+    /// returns the default h as used in the Bulletproofs Move module.
     public fun randomness_base_for_bulletproof(): RistrettoPoint {
         std::option::extract(&mut ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE))
     }
