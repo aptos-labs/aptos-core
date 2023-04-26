@@ -120,8 +120,13 @@ module aptos_std::big_vector {
         let cur_bucket_index = i / v.bucket_size + 1;
         let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index - 1);
         let res = vector::remove(cur_bucket, i % v.bucket_size);
+        v.end_index = v.end_index - 1;
         move cur_bucket;
-        while (cur_bucket_index < num_buckets) {
+        while ({spec {
+            invariant cur_bucket_index <= num_buckets;
+            invariant table_with_length::spec_len(v.buckets) == num_buckets;
+        };
+            (cur_bucket_index < num_buckets)}) {
             // remove one element from the start of current vector
             let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
             let t = vector::remove(cur_bucket, 0);
@@ -131,6 +136,9 @@ module aptos_std::big_vector {
             vector::push_back(prev_bucket, t);
             cur_bucket_index = cur_bucket_index + 1;
         };
+        spec {
+            assert cur_bucket_index == num_buckets;
+        };
 
         // Shrink the table if the last vector is empty.
         let last_bucket = table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1);
@@ -138,7 +146,6 @@ module aptos_std::big_vector {
             move last_bucket;
             vector::destroy_empty(table_with_length::remove(&mut v.buckets, num_buckets - 1));
         };
-        v.end_index = v.end_index - 1;
 
         res
     }

@@ -23,10 +23,12 @@ aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
 backoff = { workspace = true }
+base64 = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 futures-core = { workspace = true }
 once_cell = { workspace = true }
+prost = { workspace = true }
 redis = { workspace = true }
 redis-test = { workspace = true }
 serde = { workspace = true }

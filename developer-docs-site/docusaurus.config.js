@@ -270,7 +270,8 @@ const config = {
               },
               {
                 label: "Contributors",
-                href: "/community/contributors",
+                type: "doc",
+                docId: "community/contributors",
               },
             ],
           },
