@@ -59,6 +59,7 @@ use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -165,7 +166,18 @@ impl FrameworkPackageArgs {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
         const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-core.git";
         const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
-        const DEFAULT_BRANCH: &str = "main";
+        // This should not be main, as it will likely conflict.  Testnet is a good balance between
+        // latest changes and a stable branch
+        const DEFAULT_BRANCH: &str = "testnet";
+
+        // Because people are using the tool to create packages, we enforce better names
+        // Names can only be upper and lower characters, with underscores and must start with
+        // a letter and not start or end with an underscore
+        let regex =
+            Regex::new(r"^[a-zA-Z]+[a-zA-Z0-9_]*[a-zA-Z0-9]+$").expect("Expect regex to process");
+        if !regex.is_match(name) {
+            return Err(CliError::CommandArgumentError(format!("Invalid name, must start with a letter, and only contain letters, numbers, and underscores '{}'", name)));
+        }
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -216,6 +228,74 @@ impl FrameworkPackageArgs {
                 .as_bytes(),
         )
     }
+
+    pub fn init_new_package(
+        &self,
+        package_dir: &Path,
+        name: &str,
+        mut addresses: BTreeMap<String, ManifestNamedAddress>,
+        prompt_options: PromptOptions,
+    ) -> CliTypedResult<()> {
+        // Ensure that there is the actual name of the package as a wildcard
+        if !addresses.contains_key(name) {
+            addresses.insert(name.to_string(), ManifestNamedAddress::placeholder());
+        }
+
+        self.init_move_dir(package_dir, name, addresses, prompt_options)?;
+
+        // This sets up a module with best practices of naming the module with a named address for
+        // deploying that is unique, as well as tests and error messages with comments
+        let source_contents = format!(
+            "\
+/// An initial module template with unit tests
+///
+/// You can specify the account to use by adding the following flag to a compile or test command
+/// `--named-addresses {name}=0x12345`
+///
+/// Publish with `aptos move publish --named-addresses {name}=<your account>`
+module {name}::{name} {{
+    use std::signer;
+
+    // Error message comes directly from the below message
+    /// Not authorized, must be the publisher of the contract
+    const ENOT_AUTHORIZED: u64 = 1;
+
+    /// A placeholder private entry function, always aborts if the caller is not the publisher
+    entry fun placeholder(account: signer) {{
+        // Account must be the publisher
+        assert!(signer::address_of(&account) == @{name}, ENOT_AUTHORIZED);
+    }}
+
+    #[test(account = @{name})]
+    /// A simple test checking that the placeholder function doesn't abort
+    ///
+    /// Run `aptos move test` to run it
+    fun test_implementation(account: signer) {{
+        placeholder(account)
+    }}
+
+    #[test(account = @0x1337)]
+    #[expected_failure(abort_code = ENOT_AUTHORIZED, location = Self)]
+    /// A simple test checking that the placeholder function aborts because it's not the publisher
+    ///
+    /// Run `aptos move test` to run it
+    fun test_authorization(account: signer) {{
+        placeholder(account)
+    }}
+}}
+",
+            name = name
+        );
+        let sources_dir = package_dir.join(SourcePackageLayout::Sources.path());
+        let source_filename = format!("{}.move", name);
+        let source_file = sources_dir.join(&source_filename);
+        check_if_file_exists(source_file.as_path(), prompt_options)?;
+        write_to_file(
+            source_file.as_path(),
+            &source_filename,
+            source_contents.as_bytes(),
+        )
+    }
 }
 
 /// Creates a new Move package at the given location
@@ -263,7 +343,7 @@ impl CliCommand<()> for InitPackage {
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
 
-        self.framework_package_args.init_move_dir(
+        self.framework_package_args.init_new_package(
             package_dir.as_path(),
             &self.name,
             addresses,

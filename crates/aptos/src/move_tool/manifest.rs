@@ -25,6 +25,12 @@ pub struct ManifestNamedAddress {
     pub address: Option<AccountAddress>,
 }
 
+impl ManifestNamedAddress {
+    pub fn placeholder() -> Self {
+        ManifestNamedAddress { address: None }
+    }
+}
+
 impl From<Option<AccountAddress>> for ManifestNamedAddress {
     fn from(opt: Option<AccountAddress>) -> Self {
         ManifestNamedAddress { address: opt }
