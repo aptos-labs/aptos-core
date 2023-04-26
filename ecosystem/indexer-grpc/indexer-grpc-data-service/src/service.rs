@@ -336,7 +336,7 @@ fn get_transactions_response_builder(
             .map(|(encoded, _)| {
                 let decoded_transaction = base64::decode(encoded).unwrap();
                 let transaction = Transaction::decode(&*decoded_transaction);
-                return transaction.unwrap();
+                transaction.unwrap()
             })
             .collect(),
     }
