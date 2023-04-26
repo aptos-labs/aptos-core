@@ -26,7 +26,10 @@ use aptos_sdk::{
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
-    fs, mem,
+    fs,
+    fs::File,
+    io::Write,
+    mem,
     num::NonZeroUsize,
     ops,
     path::{Path, PathBuf},
@@ -218,8 +221,13 @@ impl LocalSwarm {
         let encoded_root_key = hex::encode(root_key.to_bytes());
         info!(
             "The root (or mint) key for the swarm is: 0x{}",
-            encoded_root_key
+            &encoded_root_key
         );
+        let root_key_path = dir_actual.as_ref().join("root_key");
+        if let Ok(mut out) = File::create(root_key_path.clone()) {
+            out.write_all(encoded_root_key.as_bytes())?;
+            info!("Wrote root (or mint) key to: {}", root_key_path.display());
+        }
 
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(

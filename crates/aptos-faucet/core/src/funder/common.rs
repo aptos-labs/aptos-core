@@ -96,20 +96,25 @@ impl ApiConnectionConfig {
         if let Some(ref key) = self.key {
             Ok(key.private_key())
         } else {
-            aptos_sdk::bcs::from_bytes(&std::fs::read(self.key_file_path.as_path()).with_context(
-                || {
-                    format!(
-                        "Failed to read key file: {}",
-                        self.key_file_path.to_string_lossy()
-                    )
-                },
-            )?)
-            .with_context(|| {
+            let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
                 format!(
-                    "Failed to deserialize data in key file: {}",
+                    "Failed to read key file: {}",
                     self.key_file_path.to_string_lossy()
                 )
-            })
+            })?;
+            // decode as bcs first, fall back to a file of hex
+            let result: Result<Ed25519PrivateKey> =
+                aptos_sdk::bcs::from_bytes(&key_bytes).with_context(|| "bad bcs");
+            match result {
+                Err(_) => {
+                    let keystr = String::from_utf8(key_bytes)
+                        .with_context(|| "key file not bcs and is bad utf8")?;
+                    Ok(ConfigKey::from_encoded_string(keystr.as_str())
+                        .with_context(|| "key file failed as both bcs and hex")?
+                        .private_key())
+                },
+                Ok(x) => Ok(x),
+            }
         }
     }
 }
