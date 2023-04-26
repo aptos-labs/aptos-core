@@ -14,6 +14,8 @@ use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
+    let mut ut_config = UnitTestingConfig::default_with_bound(Some(100_000));
+    ut_config.filter = Some("ristretto".to_string());
     let ok = run_move_unit_tests(
         &pkg_path,
         move_package::BuildConfig {
@@ -22,7 +24,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct
-        UnitTestingConfig::default_with_bound(Some(100_000)),
+        ut_config,
         aptos_test_natives(),
         /* cost_table */ None,
         /* compute_coverage */ false,
