@@ -18,6 +18,8 @@ module fungible_asset_extension::coin_example {
             utf8(b"You only live once"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
+            utf8(b"http://example.com"), /* icon */
+            utf8(b"My issuer"), /* issuer */
         );
     }
 

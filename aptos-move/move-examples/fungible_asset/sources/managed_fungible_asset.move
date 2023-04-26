@@ -28,22 +28,27 @@ module fungible_asset_extension::managed_fungible_asset {
         maximum_supply: u128,
         name: String,
         symbol: String,
-        decimals: u8
+        decimals: u8,
+        icon_uri: String,
+        issuer: String,
     ) {
-        primary_fungible_store::create_primary_store_enabled_fungible_asset(
-            constructor_ref,
-            if (monitoring_supply) {
-                option::some(if (maximum_supply != 0) {
-                    option::some(maximum_supply)
-                } else {
-                    option::none()
-                })
+        let supply = if (monitoring_supply) {
+            option::some(if (maximum_supply != 0) {
+                option::some(maximum_supply)
             } else {
                 option::none()
-            },
+            })
+        } else {
+            option::none()
+        };
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(
+            constructor_ref,
+            supply,
             name,
             symbol,
             decimals,
+            icon_uri,
+            issuer,
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -159,6 +164,8 @@ module fungible_asset_extension::managed_fungible_asset {
             utf8(b"Aptos Token"), /* name */
             utf8(b"APT"), /* symbol */
             8, /* decimals */
+            utf8(b"http://example.com"), /* icon */
+            utf8(b"My issuer"), /* issuer */
         );
         object_from_constructor_ref<Metadata>(constructor_ref)
     }

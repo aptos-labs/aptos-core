@@ -21,14 +21,25 @@ module aptos_framework::primary_fungible_store {
         name: String,
         symbol: String,
         decimals: u8,
+        icon_uri: String,
+        issuer: String,
     ) {
-        fungible_asset::add_fungibility(constructor_ref, monitoring_supply_with_maximum, name, symbol, decimals);
+        fungible_asset::add_fungibility(
+            constructor_ref,
+            monitoring_supply_with_maximum,
+            name,
+            symbol,
+            decimals,
+            icon_uri,
+            issuer,
+        );
         let metadata_obj = &object::generate_signer(constructor_ref);
         move_to(metadata_obj, DeriveRefPod {
             metadata_derive_ref: object::generate_derive_ref(constructor_ref),
         });
     }
 
+    /// Ensure that the primary store object for the given address exists. If it doesn't, create it.
     public fun ensure_primary_store_exists<T: key>(
         owner: address,
         metadata: Object<T>,
@@ -57,18 +68,21 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[view]
+    /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
         object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
+    /// Get the primary store object for the given account.
     public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
         let store = primary_store_address(owner, metadata);
         object::address_to_object<FungibleStore>(store)
     }
 
     #[view]
+    /// Return whether the given account's primary store exists.
     public fun primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
         fungible_asset::store_exists(primary_store_address(account, metadata))
     }
@@ -134,7 +148,9 @@ module aptos_framework::primary_fungible_store {
             option::some(option::some(100)), // max supply
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
-            0
+            0,
+            string::utf8(b"http://example.com/icon"),
+            string::utf8(b"native"),
         );
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);
