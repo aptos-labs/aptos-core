@@ -4,7 +4,6 @@
 module aptos_std::bulletproofs {
     use std::features;
     use aptos_std::elgamal;
-    //use aptos_std::debug::print;
     use aptos_std::pedersen;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
 

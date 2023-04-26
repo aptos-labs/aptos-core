@@ -66,8 +66,8 @@ module aptos_std::ristretto255 {
     /// The basepoint (generator) of the Ristretto255 group
     const BASE_POINT: vector<u8> = x"e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76";
 
-    /// The hash of the basepoint of the Ristretto255 group using new_point_from_sha2_512(basepoint_compressed().data) 
-    const HASH_BASE_POINT: vector<u8> = x"90ca11cd6c6227cb0abc39e2710c444ae6617ea81898e716353f3410d9656605";
+    /// The hash of the basepoint of the Ristretto255 group using SHA3_512
+    const HASH_BASE_POINT: vector<u8> = x"8c9240b456a9e6dc65c377a1048d745f94a08cdb7f44cbcd7b46f34048871134";
 
     //
     // Reasons for error codes

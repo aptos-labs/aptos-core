@@ -14,7 +14,6 @@ module veiled_coin::veiled_coin {
     use std::option::Option;
     use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, Pubkey};
     use aptos_std::ristretto255::{RistrettoPoint, Self, Scalar, new_scalar_from_u64};
-    //use aptos_std::debug::print;
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};

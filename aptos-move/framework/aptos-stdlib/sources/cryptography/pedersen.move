@@ -43,7 +43,7 @@ module aptos_std::pedersen {
     }
 
     /// Returns a commitment val * basepoint + r * rand_base where `basepoint` is the Ristretto255 basepoint and `rand_base`
-    /// is the default randomness based used in the Bulletproof library (i.e., BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).
+    /// is the default randomness base used in the Bulletproof library (i.e., BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).
     public fun new_commitment_for_bulletproof(val: &Scalar, rand: &Scalar): Commitment {
         let rand_base = ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE);
         let rand_base = std::option::extract(&mut rand_base);
