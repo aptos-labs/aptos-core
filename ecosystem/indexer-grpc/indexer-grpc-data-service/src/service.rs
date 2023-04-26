@@ -55,12 +55,13 @@ const RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS: u64 = 1000;
 // the server will not fetch more data from the cache and file store until the channel is not full.
 const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
 
-pub struct RawDataServer {
+/// The implmentation of the Aptos RawData server.
+pub struct AptosRawDataServer {
     pub redis_client: Arc<redis::Client>,
     pub server_config: IndexerGrpcConfig,
 }
 
-impl RawDataServer {
+impl AptosRawDataServer {
     pub fn new(config: IndexerGrpcConfig) -> Self {
         Self {
             redis_client: Arc::new(
@@ -84,7 +85,7 @@ enum TransactionsDataStatus {
 
 /// RawDataServer handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
-impl RawData for RawDataServer {
+impl RawData for AptosRawDataServer {
     type GetTransactionsStream = ResponseStream;
 
     /// GetTransactionsStream is a streaming GRPC endpoint:
