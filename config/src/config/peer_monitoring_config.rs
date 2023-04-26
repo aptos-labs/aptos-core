@@ -19,7 +19,7 @@ pub struct PeerMonitoringServiceConfig {
     pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
     pub network_monitoring: NetworkMonitoringConfig,
     pub node_monitoring: NodeMonitoringConfig,
-    pub peer_monitor_interval_ms: u64, // The interval (ms) between peer monitor executions
+    pub peer_monitor_interval_usec: u64, // The interval (usec) between peer monitor executions
 }
 
 impl Default for PeerMonitoringServiceConfig {
@@ -34,7 +34,7 @@ impl Default for PeerMonitoringServiceConfig {
             metadata_update_interval_ms: 5000,
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
-            peer_monitor_interval_ms: 1000,
+            peer_monitor_interval_usec: 1_000_000, // 1 second
         }
     }
 }
