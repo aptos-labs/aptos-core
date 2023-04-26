@@ -1256,7 +1256,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
- "aptos-cached-packages",
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
