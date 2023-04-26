@@ -47,3 +47,14 @@ The overall structure of the Aptos Framework is as follows:
 ├── releases                                    # Move release bundles
 └── tests
 ```
+
+## Move unit test selection
+In this package, unit test run triggered by `cargo test <filter>` will only select rust test wrappers
+(for example, those marked as `#[test]` in `tests/move_unit_test.rs`).
+
+To select the actual test cases in Move, use the following command.
+```bash
+MOVE_TEST_FILTER=<move-test-filter> cargo test <the-rest-params>
+```
+A test case is selected if and only if its full name (e.g. `0x1::ristretto255::test_point_neg`)
+contains the value of `MOVE_TEST_FILTER` as a substring.
