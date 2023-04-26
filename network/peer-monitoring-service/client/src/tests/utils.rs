@@ -209,8 +209,9 @@ pub async fn elapse_node_info_update_interval(node_config: NodeConfig, mock_time
 /// Elapses enough time for the monitoring loop to execute
 pub async fn elapse_peer_monitor_interval(node_config: NodeConfig, mock_time: MockTimeService) {
     let peer_monitoring_config = node_config.peer_monitoring_service;
+    let peer_monitor_duration_ms = peer_monitoring_config.peer_monitor_interval_usec / 1000;
     mock_time
-        .advance_ms_async(peer_monitoring_config.peer_monitor_interval_ms + 1)
+        .advance_ms_async(peer_monitor_duration_ms + 1)
         .await;
 }
 
