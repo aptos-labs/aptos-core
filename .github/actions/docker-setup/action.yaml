@@ -27,6 +27,11 @@ inputs:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
 
+outputs:
+  CLOUDSDK_AUTH_ACCESS_TOKEN:
+    description: "GCP access token"
+    value: ${{ steps.auth.outputs.access_token }}
+
 runs:
   using: composite
   steps:
