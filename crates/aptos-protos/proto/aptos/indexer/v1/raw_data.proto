@@ -1,0 +1,31 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.indexer.v1;
+
+import "aptos/transaction/testing1/v1/transaction.proto";
+
+message GetTransactionsRequest {
+  // Required; start version of current stream.
+  optional uint64 starting_version = 1;
+
+  // Optional; number of transactions to return in current stream.
+  // If not present, return an infinite stream of transactions.
+  optional uint64 transactions_count = 2;
+}
+
+// TransactionsResponse is a batch of transactions.
+message TransactionsResponse {
+    // Required; transactions data.
+    repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
+    
+    // Required; chain id.
+    optional uint64 chain_id = 2;
+}
+
+service RawData {
+    // Get transactions batch without any filtering from starting version and end if transaction count is present.
+    rpc GetTransactions(GetTransactionsRequest) returns (stream TransactionsResponse);
+}

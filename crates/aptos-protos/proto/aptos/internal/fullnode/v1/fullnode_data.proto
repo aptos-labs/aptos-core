@@ -3,9 +3,9 @@
 
 syntax = "proto3";
 
-package aptos.datastream.v1;
+package aptos.internal.fullnode.v1;
 
-import "aptos/util/timestamp/timestamp.proto";
+import "aptos/transaction/testing1/v1/transaction.proto";
 
 // Transaction data is transferred via 1 stream with batches until terminated.
 // One stream consists:
@@ -15,14 +15,7 @@ import "aptos/util/timestamp/timestamp.proto";
 //    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
 
 message TransactionsOutput {
-  repeated TransactionOutput transactions  = 1;
-}
-
-message TransactionOutput {
-  // Encoded aptos.proto.v1.Transaction proto data.
-  string encoded_proto_data = 1;
-  uint64 version = 2;
-  aptos.util.timestamp.Timestamp timestamp = 3;
+  repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
 }
 
 message StreamStatus {
@@ -40,7 +33,7 @@ message StreamStatus {
   optional uint64 end_version = 3;
 }
 
-message RawDatastreamRequest {
+message GetTransactionsFromNodeRequest {
   // Required; start version of current stream.
   // If not set will panic somewhere
   optional uint64 starting_version = 1;
@@ -50,7 +43,7 @@ message RawDatastreamRequest {
   optional uint64 transactions_count = 2;
 }
 
-message RawDatastreamResponse {
+message TransactionsFromNodeResponse {
   oneof response {
     StreamStatus status = 1;
     TransactionsOutput data = 2;
@@ -59,6 +52,6 @@ message RawDatastreamResponse {
   uint32 chain_id = 3;
 }
 
-service IndexerStream {
-    rpc RawDatastream(RawDatastreamRequest) returns (stream RawDatastreamResponse);
+service FullnodeData {
+    rpc GetTransactionsFromNode(GetTransactionsFromNodeRequest) returns (stream TransactionsFromNodeResponse);
 }

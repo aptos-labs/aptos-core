@@ -75,7 +75,6 @@ thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 
 [dev-dependencies]
-aptos-cached-packages = { workspace = true }
 aptos-gas = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }

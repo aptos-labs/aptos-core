@@ -1221,3 +1221,39 @@ html[data-theme='dark'] .sidebar-divider {
   height: 60px;
   width: 60px;
 }
+
+.move-reference-body {
+}
+
+.move-reference-contents {
+  display: flex;
+  position: sticky;
+  top: 0;
+  height: 100%;
+}
+
+.move-content {
+  padding: 20px;
+  width: 80%;
+}
+
+.move-sidebar {
+  float: left;
+  height: 100%; /* 100% Full-height */
+  padding: 20px;
+  position: sticky; /* Stay in place */
+  top: 0; /* Stay at the top */
+  transition: 0.5s; /* 0.5 second transition effect to slide in the sidenav */
+  width: 100; /* 0 width - change this with JavaScript */
+  z-index: 1; /* Stay on top */
+/*  overflow-x: hidden; /* Disable horizontal scroll */
+}
+
+.move-top-bar {
+  display: flex;
+  padding: 20px;
+}
+
+.move-top-bar-button {
+  padding: 20px;
+}
