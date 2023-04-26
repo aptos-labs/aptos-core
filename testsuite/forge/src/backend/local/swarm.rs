@@ -7,6 +7,7 @@ use crate::{
     LocalNode, LocalVersion, Node, Swarm, SwarmChaos, SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
+use aptos::common::types::EncodingType;
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     keys::ConfigKey,
@@ -218,7 +219,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
 
         // We print out the root key to make it easy for users to deploy a local faucet
-        let encoded_root_key = hex::encode(root_key.to_bytes());
+        let encoded_root_key = hex::encode_upper(root_key.to_bytes());
         info!(
             "The root (or mint) key for the swarm is: 0x{}",
             &encoded_root_key
@@ -226,6 +227,12 @@ impl LocalSwarm {
         let root_key_path = dir_actual.as_ref().join("root_key");
         if let Ok(mut out) = File::create(root_key_path.clone()) {
             out.write_all(encoded_root_key.as_bytes())?;
+            info!("Wrote root (or mint) key to: {}", root_key_path.display());
+        }
+        let root_key_path = dir_actual.as_ref().join("root_key.bin");
+        if let Ok(mut out) = File::create(root_key_path.clone()) {
+            let encoded_root_key = EncodingType::BCS.encode_key("root_key", &root_key)?;
+            out.write_all(encoded_root_key.as_slice())?;
             info!("Wrote root (or mint) key to: {}", root_key_path.display());
         }
 
