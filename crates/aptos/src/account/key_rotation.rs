@@ -296,12 +296,10 @@ impl CliCommand<AccountAddress> for LookupAddress {
         let rest_client = self.rest_client()?;
 
         // TODO: Support arbitrary auth key to support other types like multie25519
-        let mut address = account_address_from_public_key(&self.public_key()?);
-        let authentication_key = self.auth_key()?;
-        if let Some(key) = authentication_key {
-            // override the address using auth_key provided
-            address = account_address_from_auth_key(&key)
-        }
+        let address = match self.auth_key()? {
+            Some(key) => account_address_from_auth_key(&key),
+            None => account_address_from_public_key(&self.public_key()?),
+        };
         Ok(lookup_address(&rest_client, address, true).await?)
     }
 }
