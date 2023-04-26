@@ -14,17 +14,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LoggerConfig {
-    // channel size for the asynchronous channel for node logging.
+    /// Channel size for asynchronous node logging
     pub chan_size: usize,
-    // Enables backtraces on error logs
+    /// Enables backtraces on error logs
     pub enable_backtrace: bool,
-    // Use async logging
+    /// Use asynchronous logging
     pub is_async: bool,
-    // The default logging level for slog.
+    /// The default logging level for the logger.
     pub level: Level,
+    /// Whether to enable remote telemetry logging
     pub enable_telemetry_remote_log: bool,
+    /// Whether to enable remote telemetry logging flushing
     pub enable_telemetry_flush: bool,
+    /// Level for telemetry logging
     pub telemetry_level: Level,
+    /// Tokio console port for local debugging
     pub tokio_console_port: Option<u16>,
 }
 
