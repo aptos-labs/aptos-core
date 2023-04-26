@@ -414,7 +414,6 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
     }
 
-    // TODO: Describe in comment
     /// Computes the challenge value as c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
     /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation 
     /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol

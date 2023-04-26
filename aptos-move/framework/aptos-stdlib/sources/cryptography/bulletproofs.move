@@ -66,7 +66,7 @@ module aptos_std::bulletproofs {
     /// tag (DST). This prevents proofs computed for one application (a.k.a. a domain) with dst_1 from verifying 
     /// in a different application with dst_2 != dst_1.
     public fun verify_range_proof_pedersen(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
-        assert(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
+        assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
