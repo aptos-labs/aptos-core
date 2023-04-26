@@ -120,13 +120,13 @@ describe("TypeTagParser", () => {
     });
   });
 
-  describe.only("supports generic types", () => {
+  describe("supports generic types", () => {
     test("throws an error when the type to use is not provided", () => {
       const typeTag = "T0";
       const parser = new TypeTagParser(typeTag);
       expect(() => {
         parser.parseTypeTag();
-      }).toThrow("Can't convert generic type to a tag type since typeTags array is empty.");
+      }).toThrow("Can't convert generic type since no typeTags were specified.");
     });
 
     test("successfully parses a generic type tag to the provided type", () => {
