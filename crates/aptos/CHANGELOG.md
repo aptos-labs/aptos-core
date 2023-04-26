@@ -2,9 +2,10 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [1.0.12]
+## [1.0.12] - 2023/04/25
 ### Added
 * Support for creating and interacting with multisig accounts v2. More details can be found at [AIP 12](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-12.md).
+* Added `disassemble` option to the CLI - This can be invoked using `aptos move disassemble` to disassemble the bytecode and save it to a file
 
 ## [1.0.11] - 2023/04/14
 ### Fixed

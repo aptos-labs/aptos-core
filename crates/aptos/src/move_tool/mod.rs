@@ -3,6 +3,7 @@
 
 mod aptos_debug_natives;
 pub mod coverage;
+mod disassembler;
 mod manifest;
 pub mod package_hooks;
 mod show;
@@ -25,6 +26,7 @@ use crate::{
     governance::CompileScriptFunction,
     move_tool::{
         coverage::SummaryCoverage,
+        disassembler::Disassemble,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     },
     CliCommand, CliResult,
@@ -84,6 +86,7 @@ pub enum MoveTool {
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Disassemble(Disassemble),
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
@@ -110,6 +113,7 @@ impl MoveTool {
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::Disassemble(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
