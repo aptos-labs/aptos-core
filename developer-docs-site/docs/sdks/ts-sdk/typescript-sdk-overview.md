@@ -1,5 +1,5 @@
 ---
-title: "Typescript SDK Architecture"
+title: "Architecture"
 slug: "typescript-sdk-overview"
 ---
 
@@ -30,7 +30,7 @@ sources={{
 
 ## Components of the TypeScript SDK
 
-- [Transport Layer](./sdk-transport-layer.md)
+- [API client Layer](./sdk-client-layer.md)
 - [Core Layer](./sdk-core-layer.md)
 - [Plugins Layer](./sdk-plugins-layer.md)
 

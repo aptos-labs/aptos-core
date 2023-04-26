@@ -1,5 +1,5 @@
 ---
-title: "Typescript SDK Core Layer"
+title: "Core Layer"
 slug: "typescript-sdk-core-layer"
 ---
 
@@ -12,13 +12,6 @@ The core SDK layer exposes the functionalities needed by most applications:
 - Transaction signing and submission
 - Transaction status querying
 - Information retrieval techniques
-
-### BCS Library
-
-The BCS serialization format is a key component of the Aptos blockchain ecosystem, providing a compact and efficient way to encode data on the blockchain. Its extensibility and support for custom data types make it a valuable tool for building blockchain applications on the Aptos network.
-BCS is a binary encoding format that is designed to be compact and efficient, making it ideal for use in blockchain applications where storage and bandwidth are at a premium. It is also designed to be extensible, allowing developers to define custom data types and structures.
-
-The TypeScript SDK implements a [Binary Canonical Serialization](https://docs.rs/bcs/latest/bcs/) (BCS) library for transaction signing and submission. The Aptos blockchain uses BCS for data serialization and deserialization. See the [Aptos SDK BCS](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk/src/bcs).
 
 ### Transaction Builder
 

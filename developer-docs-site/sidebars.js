@@ -443,7 +443,7 @@ const sidebars = {
           collapsed: true,
           items: [
             "sdks/ts-sdk/typescript-sdk-overview",
-            "sdks/ts-sdk/sdk-transport-layer",
+            "sdks/ts-sdk/sdk-client-layer",
             "sdks/ts-sdk/sdk-core-layer",
             "sdks/ts-sdk/sdk-plugins-layer",
             "sdks/ts-sdk/sdk-validation",

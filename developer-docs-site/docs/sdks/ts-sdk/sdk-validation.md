@@ -1,5 +1,5 @@
 ---
-title: "Typescript SDK Validation"
+title: "Validation"
 slug: "typescript-sdk-validation"
 ---
 

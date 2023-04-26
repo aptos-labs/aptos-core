@@ -1,5 +1,5 @@
 ---
-title: "Typescript SDK Plugins Layer"
+title: "Plugins Layer"
 slug: "typescript-sdk-plugins-layer"
 ---
 
