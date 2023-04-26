@@ -38,12 +38,9 @@ export class AptosAccount {
   /**
    * Test derive path
    */
-  static isValidPath = (path: string): boolean => {
-    if (!/^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path)) {
-      return false;
-    }
-    return true;
-  };
+  static isValidPath(path: string): boolean {
+    return /^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path);
+  }
 
   /**
    * Creates new account with bip44 path and mnemonics,
@@ -141,8 +138,8 @@ export class AptosAccount {
    * @returns A signature HexString
    */
   signBuffer(buffer: Uint8Array): HexString {
-    const signature = nacl.sign(buffer, this.signingKey.secretKey);
-    return HexString.fromUint8Array(signature.slice(0, 64));
+    const signature = nacl.sign.detached(buffer, this.signingKey.secretKey);
+    return HexString.fromUint8Array(signature);
   }
 
   /**
@@ -153,6 +150,17 @@ export class AptosAccount {
   signHexString(hexString: MaybeHexString): HexString {
     const toSign = HexString.ensure(hexString).toUint8Array();
     return this.signBuffer(toSign);
+  }
+
+  /**
+   * Verifies the signature of the message with the public key of the account
+   * @param message a signed message
+   * @param signature the signature of the message
+   */
+  verifySignature(message: MaybeHexString, signature: MaybeHexString): boolean {
+    const rawMessage = HexString.ensure(message).toUint8Array();
+    const rawSignature = HexString.ensure(signature).toUint8Array();
+    return nacl.sign.detached.verify(rawMessage, rawSignature, this.signingKey.publicKey);
   }
 
   /**
