@@ -333,7 +333,11 @@ fn get_transactions_response_builder(
         chain_id: Some(chain_id as u64),
         transactions: data
             .into_iter()
-            .map(|(encoded, _)| Transaction::decode(encoded.as_bytes()).unwrap())
+            .map(|(encoded, _)| {
+                let decoded_transaction = base64::decode(encoded).unwrap();
+                let transaction = Transaction::decode(&*decoded_transaction);
+                return transaction.unwrap();
+            })
             .collect(),
     }
 }

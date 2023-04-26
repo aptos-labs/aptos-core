@@ -80,12 +80,10 @@ fn main() {
     // Add authentication interceptor.
     runtime.spawn(async move {
         let server = RawDataServer::new(config);
-        let svc = ptos_protos::indexer::v1::raw_data_server::RawDataServer::with_interceptor(
-            server,
-            authentication_inceptor,
-        )
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
+        let svc_with_interceptor = InterceptedService::new(svc, authentication_inceptor);
         Server::builder()
             .add_service(reflection_service)
             .add_service(svc_with_interceptor)
