@@ -70,7 +70,7 @@ module fungible_asset_extension::managed_fungible_asset {
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
 
-    /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Transfer as the owner of metadata object ignoring `frozen` field.
     public entry fun transfer(
         admin: &signer,
         metadata: Object<Metadata>,
@@ -104,7 +104,7 @@ module fungible_asset_extension::managed_fungible_asset {
     ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, metadata);
-        fungible_asset::set_ungated_transfer(transfer_ref, wallet, false);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, true);
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
@@ -113,10 +113,10 @@ module fungible_asset_extension::managed_fungible_asset {
                                       account: address) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, metadata);
-        fungible_asset::set_ungated_transfer(transfer_ref, wallet, true);
+        fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
-    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Withdraw as the owner of metadata object ignoring `frozen` field.
     public fun withdraw(admin: &signer,
                         metadata: Object<Metadata>,
                         amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
@@ -125,7 +125,7 @@ module fungible_asset_extension::managed_fungible_asset {
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
-    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Deposit as the owner of metadata object ignoring `frozen` field.
     public fun deposit(admin: &signer,
                        metadata: Object<Metadata>,
                        to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
@@ -174,12 +174,12 @@ module fungible_asset_extension::managed_fungible_asset {
         mint(creator, metadata, 100, creator_address);
         assert!(primary_fungible_store::balance(creator_address, metadata) == 100, 4);
         freeze_account(creator, metadata, creator_address);
-        assert!(!primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
+        assert!(primary_fungible_store::is_frozen(creator_address, metadata), 5);
         transfer(creator, metadata, creator_address, aaron_address, 10);
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 10, 6);
 
         unfreeze_account(creator, metadata, creator_address);
-        assert!(primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
+        assert!(!primary_fungible_store::is_frozen(creator_address, metadata), 7);
         burn(creator, metadata, creator_address, 90);
     }
 

@@ -48,8 +48,6 @@ jobs:
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
 
       - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
-        with:
-          version: 7.13.4
 
       - name: Release Images
         env:

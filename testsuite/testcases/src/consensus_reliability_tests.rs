@@ -69,14 +69,33 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
         );
         // On every cycle, we will fail this many next nodes, and make this many previous nodes healthy again.
         let cycle_offset = max_fail_in_test / 4 + 1;
+        let num_destinations = if swarm.full_nodes().count() > 0 {
+            swarm.full_nodes().count()
+        } else if num_always_healthy > 0 {
+            num_always_healthy
+        } else {
+            swarm.validators().count()
+        };
         // Function that returns set of down nodes in a given cycle.
         let down_indices_f = move |cycle: usize| -> HashSet<usize> {
-            (0..max_fail_in_test)
+            let mut down_indices: HashSet<_> = (0..max_fail_in_test)
                 .map(|i| {
                     num_always_healthy
                         + (cycle * cycle_offset + i) % (num_validators - num_always_healthy)
                 })
-                .collect()
+                .collect();
+            // If there is a limited number of destinations and they may fail, we ensure at least one is up.
+            if num_always_healthy == 0
+                && max_fail_in_test >= num_destinations
+                && down_indices.contains(&0)
+                && down_indices.contains(&(num_destinations - 1))
+            {
+                // Replace one of the destinations with the next sequential index.
+                down_indices.remove(&((cycle * cycle_offset) % num_destinations));
+                // Notice the check will never pass with num_always_healthy > 0, so we don't consider it.
+                down_indices.insert((cycle * cycle_offset + max_fail_in_test) % num_validators);
+            };
+            down_indices
         };
         info!(
             "Always healthy {} nodes, every cycle having {} nodes out of {} down, rotating {} each cycle, expecting first {} validators to have 10x larger stake",

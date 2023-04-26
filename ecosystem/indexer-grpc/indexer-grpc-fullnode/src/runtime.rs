@@ -7,11 +7,11 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::{error, info};
 use aptos_mempool::MempoolClientSender;
 use aptos_moving_average::MovingAverage;
-use aptos_protos::datastream::v1::{
-    indexer_stream_server::{IndexerStream, IndexerStreamServer},
-    raw_datastream_response,
+use aptos_protos::internal::fullnode::v1::{
+    fullnode_data_server::{FullnodeData, FullnodeDataServer},
     stream_status::StatusType,
-    RawDatastreamRequest, RawDatastreamResponse, StreamStatus,
+    transactions_from_node_response, GetTransactionsFromNodeRequest, StreamStatus,
+    TransactionsFromNodeResponse,
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
@@ -27,10 +27,11 @@ pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
 
-type ResponseStream = Pin<Box<dyn Stream<Item = Result<RawDatastreamResponse, Status>> + Send>>;
+type ResponseStream =
+    Pin<Box<dyn Stream<Item = Result<TransactionsFromNodeResponse, Status>> + Send>>;
 
 // The GRPC server
-pub struct IndexerStreamService {
+pub struct FullnodeDataService {
     pub context: Arc<Context>,
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
@@ -61,7 +62,7 @@ pub fn bootstrap(
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
-        let server = IndexerStreamService {
+        let server = FullnodeDataService {
             context,
             processor_task_count,
             processor_batch_size,
@@ -69,7 +70,7 @@ pub fn bootstrap(
         };
 
         Server::builder()
-            .add_service(IndexerStreamServer::new(server))
+            .add_service(FullnodeDataServer::new(server))
             // Make port into a config
             .serve(address.to_socket_addrs().unwrap().next().unwrap())
             .await
@@ -80,20 +81,20 @@ pub fn bootstrap(
 }
 
 #[tonic::async_trait]
-impl IndexerStream for IndexerStreamService {
-    type RawDatastreamStream = ResponseStream;
+impl FullnodeData for FullnodeDataService {
+    type GetTransactionsFromNodeStream = ResponseStream;
 
     /// This function is required by the GRPC tonic server. It basically handles the request.
     /// Given we want to persist the stream for better performance, our approach is that when
     /// we receive a request, we will return a stream. Then as we process transactions, we
-    /// wrap those into a RawDatastreamResponse that we then push into the stream.
-    /// There are 2 types of RawDatastreamResponse:
+    /// wrap those into a TransactionsResponse that we then push into the stream.
+    /// There are 2 types of TransactionsResponse:
     /// Status - sends events back to the client, such as init stream and batch end
     /// Transaction - sends encoded transactions lightly wrapped
-    async fn raw_datastream(
+    async fn get_transactions_from_node(
         &self,
-        req: Request<RawDatastreamRequest>,
-    ) -> Result<Response<Self::RawDatastreamStream>, Status> {
+        req: Request<GetTransactionsFromNodeRequest>,
+    ) -> Result<Response<Self::GetTransactionsFromNodeStream>, Status> {
         // Gets configs for the stream, partly from the request and partly from the node config
         let r = req.into_inner();
         let starting_version = r.starting_version.expect("Starting version must be set");
@@ -123,8 +124,7 @@ impl IndexerStream for IndexerStreamService {
                 tx.clone(),
             );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
-            let init_status =
-                Self::get_status(StatusType::Init, starting_version, None, ledger_chain_id);
+            let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
@@ -148,7 +148,7 @@ impl IndexerStream for IndexerStreamService {
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
-                let batch_end_status = Self::get_status(
+                let batch_end_status = get_status(
                     StatusType::BatchEnd,
                     coordinator.current_version,
                     Some(max_version),
@@ -181,25 +181,25 @@ impl IndexerStream for IndexerStreamService {
         });
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
-            Box::pin(output_stream) as Self::RawDatastreamStream
+            Box::pin(output_stream) as Self::GetTransactionsFromNodeStream
         ))
     }
 }
 
-impl IndexerStreamService {
-    pub fn get_status(
-        status_type: StatusType,
-        start_version: u64,
-        end_version: Option<u64>,
-        ledger_chain_id: u8,
-    ) -> RawDatastreamResponse {
-        RawDatastreamResponse {
-            response: Some(raw_datastream_response::Response::Status(StreamStatus {
+pub fn get_status(
+    status_type: StatusType,
+    start_version: u64,
+    end_version: Option<u64>,
+    ledger_chain_id: u8,
+) -> TransactionsFromNodeResponse {
+    TransactionsFromNodeResponse {
+        response: Some(transactions_from_node_response::Response::Status(
+            StreamStatus {
                 r#type: status_type as i32,
                 start_version,
                 end_version,
-            })),
-            chain_id: ledger_chain_id as u32,
-        }
+            },
+        )),
+        chain_id: ledger_chain_id as u32,
     }
 }

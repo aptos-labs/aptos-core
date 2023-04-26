@@ -57,7 +57,7 @@ impl MetadataCacheOpt {
         }
     }
 
-    fn cache_dir(&self) -> PathBuf {
+    pub(crate) fn cache_dir(&self) -> PathBuf {
         self.dir
             .clone()
             .unwrap_or_else(|| TEMP_METADATA_CACHE_DIR.path().to_path_buf())
@@ -71,6 +71,28 @@ pub async fn initialize_identity(storage: &Arc<dyn BackupStorage>) -> Result<()>
     storage
         .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
         .await?;
+    Ok(())
+}
+
+async fn download_file(
+    storage_ref: &dyn BackupStorage,
+    file_handle: &FileHandle,
+    local_tmp_file: &Path,
+) -> Result<()> {
+    tokio::io::copy(
+        &mut storage_ref
+            .open_for_read(file_handle)
+            .await
+            .err_notes(file_handle)?,
+        &mut OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(local_tmp_file)
+            .await
+            .err_notes(local_tmp_file)?,
+    )
+    .await
+    .map_err(|e| anyhow!("Failed to download file: {}", e))?;
     Ok(())
 }
 
@@ -139,27 +161,15 @@ pub async fn sync_and_load(
     NUM_META_DOWNLOAD.set(0);
     let futs = new_remote_hashes.iter().enumerate().map(|(i, h)| {
         let fh_by_h_ref = &remote_file_handle_by_hash;
-        let storage_ref = &storage;
+        let storage_ref = storage.as_ref();
         let cache_dir_ref = &cache_dir;
 
         async move {
             let file_handle = fh_by_h_ref.get(*h).expect("In map.");
             let local_file = cache_dir_ref.join(*h);
             let local_tmp_file = cache_dir_ref.join(format!(".{}", *h));
-            // download to tmp file ".xxxxxx"
-            tokio::io::copy(
-                &mut storage_ref
-                    .open_for_read(file_handle)
-                    .await
-                    .err_notes(file_handle)?,
-                &mut OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&local_tmp_file)
-                    .await
-                    .err_notes(&local_file)?,
-            )
-            .await?;
+
+            download_file(storage_ref, file_handle, &local_tmp_file).await?;
             // rename to target file only if successful; stale tmp file caused by failure will be
             // reclaimed on next run
             tokio::fs::rename(local_tmp_file, local_file).await?;
