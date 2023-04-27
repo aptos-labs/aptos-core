@@ -5,7 +5,7 @@ use cfg_block::cfg_block;
 use serde::{Deserialize, Serialize};
 
 /// A peer monitoring service request
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum PeerMonitoringServiceRequest {
     GetNetworkInformation,    // Returns relevant network information for the peer
     GetNodeInformation,       // Returns relevant node information about the peer
@@ -32,7 +32,7 @@ impl PeerMonitoringServiceRequest {
 }
 
 /// The latency ping request
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct LatencyPingRequest {
     pub ping_counter: u64, // A monotonically increasing counter to verify latency ping responses
 }

@@ -102,7 +102,7 @@ impl PeerState {
                 peer_monitoring_client,
                 &peer_network_id,
                 request_id,
-                monitoring_service_request,
+                monitoring_service_request.clone(),
                 request_timeout_ms,
             )
             .await;
@@ -138,7 +138,7 @@ impl PeerState {
             peer_state_value.write().handle_monitoring_service_response(
                 &peer_network_id,
                 peer_metadata,
-                monitoring_service_request,
+                monitoring_service_request.clone(),
                 monitoring_service_response,
                 request_duration_secs,
             );
