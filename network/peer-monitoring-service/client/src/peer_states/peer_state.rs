@@ -243,6 +243,24 @@ impl PeerState {
             ))),
         }
     }
+
+    /// Returns a copy of the performance monitoring state
+    #[cfg(feature = "network-perf-test")] // Disabled by default
+    pub(crate) fn get_performance_monitoring_state(
+        &self,
+    ) -> Result<crate::peer_states::performance_monitoring::PerformanceMonitoringState, Error> {
+        let peer_state_value = self
+            .get_peer_state_value(&PeerStateKey::PerformanceMonitoring)?
+            .read()
+            .clone();
+        match peer_state_value {
+            PeerStateValue::PerformanceMonitoringState(performance_monitoring_state) => Ok(performance_monitoring_state),
+            peer_state_value => Err(Error::UnexpectedError(format!(
+                "Invalid peer state value found! Expected performance_monitoring_state but got: {:?}",
+                peer_state_value
+            ))),
+        }
+    }
 }
 
 /// Sanity checks that the monitoring service response size
