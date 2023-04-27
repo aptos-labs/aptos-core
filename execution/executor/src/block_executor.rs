@@ -232,7 +232,7 @@ where
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["apply_to_ledger"])
                 .start_timer();
-            let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
+            let (output, _, _) = chunk_output.apply_to_ledger_for_block(parent_view)?;
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
@@ -260,7 +260,7 @@ where
         }
 
         // Check for any potential retries
-        let committed_block = self.block_tree.root_block();
+        let mut committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
@@ -283,54 +283,58 @@ where
         }
 
         let blocks = self.block_tree.get_blocks(&block_ids)?;
-        let txns_to_commit: Vec<_> = {
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["get_txns_to_commit"])
-                .start_timer();
-            blocks
-                .into_iter()
-                .map(|block| block.output.transactions_to_commit())
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect()
-        };
-        let first_version = committed_block
+
+        let mut first_version = committed_block
             .output
             .result_view
             .txn_accumulator()
             .num_leaves();
-        let to_commit = txns_to_commit.len();
+
+        let to_commit = blocks
+            .iter()
+            .map(|block| block.output.to_commit.len())
+            .sum();
         let target_version = ledger_info_with_sigs.ledger_info().version();
-        if first_version + txns_to_commit.len() as u64 != target_version + 1 {
+        if first_version + to_commit as u64 != target_version + 1 {
             return Err(Error::BadNumTxnsToCommit {
                 first_version,
                 to_commit,
                 target_version,
             });
         }
-
-        let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-        APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
-
         fail_point!("executor::commit_blocks", |_| {
             Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
         });
-        let result_in_memory_state = self
-            .block_tree
-            .get_block(block_id_to_commit)?
-            .output
-            .result_view
-            .state()
-            .clone();
-        self.db.writer.save_transactions(
-            &txns_to_commit,
-            first_version,
-            committed_block.output.result_view.state().base_version,
-            Some(&ledger_info_with_sigs),
-            sync_commit,
-            result_in_memory_state,
-        )?;
+
+        for (i, block) in blocks.iter().enumerate() {
+            let txns_to_commit: Vec<_> = {
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["get_txns_to_commit"])
+                    .start_timer();
+                block.output.transactions_to_commit()?
+            };
+
+            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+
+            let result_in_memory_state = block.output.result_view.state().clone();
+            self.db.writer.save_transaction_block(
+                &txns_to_commit,
+                first_version,
+                committed_block.output.result_view.state().base_version,
+                if i == blocks.len() - 1 {
+                    Some(&ledger_info_with_sigs)
+                } else {
+                    None
+                },
+                sync_commit,
+                result_in_memory_state,
+                // TODO(grao): Avoid this clone.
+                block.output.block_state_updates.clone().unwrap(),
+            )?;
+            first_version += txns_to_commit.len() as u64;
+            committed_block = block.clone();
+        }
         self.block_tree
             .prune(ledger_info_with_sigs.ledger_info())
             .expect("Failure pruning block tree.");

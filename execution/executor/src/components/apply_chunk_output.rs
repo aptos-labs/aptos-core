@@ -5,7 +5,9 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::chunk_output::ChunkOutput,
+    components::{
+        chunk_output::ChunkOutput, in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
+    },
     metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
 };
 use anyhow::{ensure, Result};
@@ -30,7 +32,68 @@ use std::{collections::HashMap, iter::repeat, sync::Arc};
 pub struct ApplyChunkOutput;
 
 impl ApplyChunkOutput {
-    pub fn apply(
+    pub fn apply_block(
+        chunk_output: ChunkOutput,
+        base_view: &ExecutedTrees,
+    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
+        let ChunkOutput {
+            state_cache,
+            transactions,
+            transaction_outputs,
+        } = chunk_output;
+        let (new_epoch, status, to_keep, to_discard, to_retry) = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["sort_transactions"])
+                .start_timer();
+            // Separate transactions with different VM statuses.
+            Self::sort_transactions(transactions, transaction_outputs)?
+        };
+
+        // Apply the write set, get the latest state.
+        let (
+            state_updates_vec,
+            state_checkpoint_hashes,
+            result_state,
+            next_epoch_state,
+            block_state_updates,
+        ) = {
+            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                .with_label_values(&["apply_write_set"])
+                .start_timer();
+            InMemoryStateCalculatorV2::calculate_for_transaction_block(
+                base_view.state(),
+                state_cache,
+                &to_keep,
+                new_epoch,
+            )?
+        };
+
+        // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
+        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&["calculate_ledger_diff"])
+            .start_timer();
+        let (to_commit, transaction_info_hashes) =
+            Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
+        let result_view = ExecutedTrees::new(
+            result_state,
+            Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
+        );
+
+        Ok((
+            ExecutedChunk {
+                status,
+                to_commit,
+                result_view,
+                next_epoch_state,
+                ledger_info: None,
+                block_state_updates: Some(block_state_updates),
+            },
+            to_discard,
+            to_retry,
+        ))
+    }
+
+    pub fn apply_chunk(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
@@ -74,6 +137,7 @@ impl ApplyChunkOutput {
                 result_view,
                 next_epoch_state,
                 ledger_info: None,
+                block_state_updates: None,
             },
             to_discard,
             to_retry,
