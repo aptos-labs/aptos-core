@@ -18,7 +18,7 @@ pub enum PeerMonitoringServiceResponse {
     ServerProtocolVersion(ServerProtocolVersionResponse), // Returns the current server protocol version
 
     #[cfg(feature = "network-perf-test")] // Disabled by default
-    PerformanceMonitoringResponse(PerformanceMonitoringResponse), // A response for performance monitoring requests
+    PerformanceMonitoring(PerformanceMonitoringResponse), // A response for performance monitoring requests
 }
 
 impl PeerMonitoringServiceResponse {
@@ -31,7 +31,7 @@ impl PeerMonitoringServiceResponse {
             Self::ServerProtocolVersion(_) => "server_protocol_version",
 
             #[cfg(feature = "network-perf-test")] // Disabled by default
-            Self::PerformanceMonitoringResponse(_) => "performance_monitoring_response",
+            Self::PerformanceMonitoring(_) => "performance_monitoring_response",
         }
     }
 
@@ -169,7 +169,7 @@ cfg_block! {
 
             fn try_from(response: PeerMonitoringServiceResponse) -> crate::Result<Self, Self::Error> {
                 match response {
-                    PeerMonitoringServiceResponse::PerformanceMonitoringResponse(inner) => Ok(inner),
+                    PeerMonitoringServiceResponse::PerformanceMonitoring(inner) => Ok(inner),
                     _ => Err(UnexpectedResponseError(format!(
                         "expected performance_monitoring_response, found {}",
                         response.get_label()

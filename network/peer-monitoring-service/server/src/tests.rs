@@ -27,8 +27,6 @@ use aptos_network::{
     },
     transport::{ConnectionId, ConnectionMetadata},
 };
-#[cfg(feature = "network-perf-test")] // Disabled by default
-use aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest;
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
@@ -392,14 +390,14 @@ cfg_block! {
             // Process several performance monitoring requests
             for i in 0..10 {
                 let request = PeerMonitoringServiceRequest::PerformanceMonitoringRequest(
-                    PerformanceMonitoringRequest {
+                    aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest {
                         request_counter: i,
                         data: [0; 100].to_vec(), // 100 bytes of zero's
                     },
                 );
                 let response = mock_client.send_request(request).await.unwrap();
                 match response {
-                    PeerMonitoringServiceResponse::PerformanceMonitoringResponse(
+                    PeerMonitoringServiceResponse::PerformanceMonitoring(
                         performance_monitoring_response,
                     ) => {
                         assert_eq!(performance_monitoring_response.response_counter, i);
