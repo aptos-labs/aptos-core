@@ -45,4 +45,4 @@ mockall = { workspace = true }
 rand = { workspace = true }
 
 [features]
-network-perf-test = [ "aptos-peer-monitoring-service-types/network-perf-test" ]
+network-perf-test = ["aptos-peer-monitoring-service-types/network-perf-test"]
