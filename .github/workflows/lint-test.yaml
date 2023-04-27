@@ -156,6 +156,22 @@ jobs:
         env:
           RUST_MIN_STACK: 4297152
 
+  rust-network-perf-unit-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - run: | # Test the client and server
+          cargo nextest run --locked -p aptos-peer-monitoring-service-client --no-fail-fast -F network-perf-test
+          cargo nextest run --locked -p aptos-peer-monitoring-service-server --no-fail-fast -F network-perf-test
+
   rust-smoke-test:
     runs-on: high-perf-docker
     steps:
@@ -199,8 +215,33 @@ jobs:
           tool: nextest
       # prebuild aptos-node binary, so that tests don't start before node is built.
       # also prebuild aptos-node binary as a separate step to avoid feature unification issues
-      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
       - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
+
+      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
+      - name: Upload smoke test logs for failed and flaky tests
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() || success() }}
+        with:
+          name: failed-consensus-only-smoke-test-logs
+          # Retain all smoke test data except for the db (which may be large).
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 14
+
+  rust-network-perf-smoke-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      # prebuild aptos-node binary, so that tests don't start before node is built.
+      # also prebuild aptos-node binary as a separate step to avoid feature unification issues
+      - run: cargo build --locked --package=aptos-node -F network-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 NETWORK_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_network_performance_monitoring)" --run-ignored all
 
       # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
       - name: Upload smoke test logs for failed and flaky tests
