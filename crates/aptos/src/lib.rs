@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
 
 pub mod account;
 pub mod common;
@@ -23,6 +22,9 @@ use crate::common::{
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
+use std::ffi::CString;
+use futures::executor::block_on;
+use futures::TryFutureExt;
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
@@ -87,4 +89,14 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
         Ok(cli_build_information())
     }
+}
+
+#[no_mangle]
+pub extern "C" fn run_aptos_from_ts() -> *const std::os::raw::c_char {
+    println!("Hello from Rust!");
+    let result = "testing from Jin";
+    let c_str = CString::new(result).unwrap();
+
+    // Return a pointer to the C string
+    c_str.into_raw()
 }
