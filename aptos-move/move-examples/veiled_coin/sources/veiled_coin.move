@@ -854,7 +854,7 @@ module veiled_coin::veiled_coin {
     }
 
     #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
-    fun unwrap_test(
+    fun wrap_to_test(
         myself: signer,
         source_fx: signer,
         destination: signer
@@ -876,19 +876,71 @@ module veiled_coin::veiled_coin {
         // Split 500 and 500 between source and destination
         coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
 
+        // Wrap 150 normal coins to veiled coins from the source's normal coin account 
+        // to the destination's veiled coin account
+        let (_, destination_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
+        let destination_pubkey_bytes = elgamal::pubkey_to_bytes(&destination_pubkey);
+        register<coin::FakeMoney>(&destination, destination_pubkey_bytes);
+        wrap_to<coin::FakeMoney>(&source_fx, destination_addr, 150);
+        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
+        assert!(source_balance == 350, 1);
+        let destination_rand = ristretto255::scalar_zero(); 
+        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 150, &destination_rand, &destination_pubkey), 1); 
+
+        // Unwrap back 50 veiled coins from the destination's veiled coin account to
+        // the source's normal coin account
+        let (_, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_2);
+        let source_pubkey_bytes = elgamal::pubkey_to_bytes(&source_pubkey);
+        register<coin::FakeMoney>(&source_fx, source_pubkey_bytes);
+
+        let destination_new_balance = new_scalar_from_u64(100);
+
+        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&destination_new_balance, &destination_rand, &destination_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+        let new_balance_range_proof_bytes = bulletproofs::range_proof_to_bytes(&new_balance_range_proof);
+
+        unwrap_to<coin::FakeMoney>(&destination, source_addr, 50, new_balance_range_proof_bytes);
+        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
+        assert!(source_balance == 400, 1);
+        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 100, &destination_rand, &destination_pubkey), 1);
+    }
+
+    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
+    fun unwrap_test(
+        myself: signer,
+        source_fx: signer,
+        destination: signer
+    ) acquires VeiledCoinMinter, VeiledCoinStore {
+        // Initialize the `veiled_coin` module
+        init_module(&myself);
+
+        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
+
+        // Set up two accounts so we can register a new coin type on them
+        let source_addr = signer::address_of(&source_fx);
+        account::create_account_for_test(source_addr);
+        let destination_addr = signer::address_of(&destination);
+        account::create_account_for_test(destination_addr);
+
+        // Create 500 fake money inside 'source'
+        coin::create_fake_money(&source_fx, &destination, 500);
+
         // Mint 150 veiled coins at source (requires registering a veiled coin store at 'source')
         let (_, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
         let source_pubkey_bytes = elgamal::pubkey_to_bytes(&source_pubkey);
         register<coin::FakeMoney>(&source_fx, source_pubkey_bytes);
         wrap<coin::FakeMoney>(&source_fx, 150);
 
-        // The unwrap function doesn't use randomness
+        // The unwrap function doesn't change the veiled coin account randomness,
+        // so we use the zero scalar for it here
         let source_new_balance = new_scalar_from_u64(100);
         let new_balance_rand = ristretto255::scalar_zero();
 
         let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_balance, &new_balance_rand, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
         unwrap<coin::FakeMoney>(&source_fx, 50, bulletproofs::range_proof_to_bytes(&new_balance_range_proof));
         assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 100, &new_balance_rand, &source_pubkey), 1);
+
+        let nonveiled_balance = coin::balance<coin::FakeMoney>(source_addr);
+        assert!(nonveiled_balance == 400, 1);
     }
 
     #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
