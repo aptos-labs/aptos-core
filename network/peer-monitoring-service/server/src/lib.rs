@@ -13,10 +13,6 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::{BaseConfig, NodeConfig, RoleType};
 use aptos_logger::prelude::*;
 use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
-#[cfg(feature = "network-perf-test")] // Disabled by default
-use aptos_peer_monitoring_service_types::{
-    request::PerformanceMonitoringRequest, response::PerformanceMonitoringResponse,
-};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
@@ -299,16 +295,15 @@ impl<T: StorageReaderInterface> Handler<T> {
     #[cfg(feature = "network-perf-test")] // Disabled by default
     fn handle_performance_monitoring_request(
         &self,
-        performance_monitoring_request: &PerformanceMonitoringRequest,
+        performance_monitoring_request: &aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
-        let performance_monitoring_response = PerformanceMonitoringResponse {
-            response_counter: performance_monitoring_request.request_counter,
-        };
-        Ok(
-            PeerMonitoringServiceResponse::PerformanceMonitoringResponse(
-                performance_monitoring_response,
-            ),
-        )
+        let performance_monitoring_response =
+            aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
+                response_counter: performance_monitoring_request.request_counter,
+            };
+        Ok(PeerMonitoringServiceResponse::PerformanceMonitoring(
+            performance_monitoring_response,
+        ))
     }
 }
 
