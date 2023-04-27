@@ -95,17 +95,17 @@ impl SessionId {
 
 pub struct SessionExt<'r, 'l, S> {
     inner: Session<'r, 'l>,
-    remote: MoveResolverWithVMMetadata<'r, 'l, S>,
+    remote: Box<MoveResolverWithVMMetadata<'r, 'l, S>>,
 }
 
 impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
     S: MoveResolverExt + 'r,
 {
-    pub fn new(inner: Session<'r, 'l>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
+    pub fn new(inner: Session<'r, 'l>, remote: Box<MoveResolverWithVMMetadata<'r, 'l, S>>) -> Self {
         Self {
             inner,
-            remote: MoveResolverWithVMMetadata::new(remote, move_vm),
+            remote,
         }
     }
 

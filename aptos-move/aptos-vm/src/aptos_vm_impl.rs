@@ -613,11 +613,11 @@ impl AptosVMImpl {
         MoveResolverWithVMMetadata::new(r, &self.move_vm)
     }
 
-    pub fn new_session<'r, R: MoveResolverExt>(
-        &self,
-        r: &'r R,
+    pub fn new_session<'s, R: MoveResolverExt>(
+        &'s self,
+        r: &'s R,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_, R> {
+    ) -> SessionExt<'s, '_, R> {
         self.move_vm.new_session(r, session_id)
     }
 

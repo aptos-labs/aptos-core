@@ -22,11 +22,11 @@ pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
-    fn new_session<'r, R: MoveResolverExt>(
-        &self,
-        remote: &'r R,
+    fn new_session<'s, R: MoveResolverExt>(
+        &'s self,
+        remote: &'s R,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_, R>;
+    ) -> SessionExt<'s, '_, R>;
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.

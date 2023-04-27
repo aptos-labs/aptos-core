@@ -37,6 +37,7 @@ pub trait ResourceResolver {
         &self,
         address: &AccountAddress,
         typ: &StructTag,
+        metadata: Option<Runt>,
     ) -> Result<Option<Vec<u8>>, Error>;
 }
 
