@@ -17,6 +17,9 @@ pub mod node_info;
 pub mod peer_state;
 mod request_tracker;
 
+#[cfg(feature = "network-perf-test")] // Disabled by default
+mod performance_monitoring;
+
 /// Refreshes the states of the connected peers
 pub fn refresh_peer_states(
     monitoring_service_config: &PeerMonitoringServiceConfig,
