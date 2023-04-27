@@ -14,14 +14,16 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
       - name: Check and pin updates (if any)
-        run: python3 scripts/update_docker_images.py
+        id: check_update
+        run: python3 scripts/update_docker_images.py >> $"GITHUB_OUTPUT"
 
       - name: Create Pull Request
-        if: ${{ success() }}
+        if: ${{ steps.check_update.outputs.NEEDS_UPDATE == "True" }}
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.REPO_TOKEN }}

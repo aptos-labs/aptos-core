@@ -18,7 +18,7 @@ def update() -> int:
     script_dir = os.path.dirname(os.path.realpath(__file__))
     dockerfile_path = os.path.join(script_dir, "..", "docker", "rust-all.Dockerfile")
 
-    exit_code = 1  # 0 = an update exists, 1 = an update does not exist
+    update_exists = False
 
     for base_image, image_name in IMAGES.items():
         manifest = None
@@ -66,10 +66,11 @@ def update() -> int:
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
 
-        exit_code = 0
+        update_exists = True
 
-    return exit_code
+    return update_exists
 
 
 if __name__ == "__main__":
-    exit(update())
+    print("NEEDS_UPDATE={}".format(update()))
+    exit()
