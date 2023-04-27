@@ -41,6 +41,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use ouroboros::self_referencing;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -93,16 +94,19 @@ impl SessionId {
     }
 }
 
+#[self_referencing]
 pub struct SessionExt<'r, 'l, S> {
-    inner: Session<'r, 'l>,
     remote: Box<MoveResolverWithVMMetadata<'r, 'l, S>>,
+    #[borrows(remote)]
+    #[covariant]
+    inner: Session<'this, 'l>,
 }
 
 impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
     S: MoveResolverExt + 'r,
 {
-    pub fn new(inner: Session<'r, 'l>, remote: Box<MoveResolverWithVMMetadata<'r, 'l, S>>) -> Self {
+    pub fn create_new(inner: Session<'r, 'l>, remote: Box<MoveResolverWithVMMetadata<'r, 'l, S>>) -> Self {
         Self {
             inner,
             remote,
@@ -178,8 +182,7 @@ where
 
             for (struct_tag, blob_op) in resources {
                 let resource_group = remote
-                    .get_resource_group(&struct_tag)
-                    .map_err(|_| common_error.clone())?;
+                    .get_resource_group(&struct_tag);
                 if let Some(resource_group) = resource_group {
                     resource_groups
                         .entry(resource_group)

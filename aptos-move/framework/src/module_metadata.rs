@@ -112,7 +112,7 @@ impl KnownAttribute {
 
     pub fn get_resource_group_member(&self) -> Option<StructTag> {
         if self.kind == KnownAttributeKind::ResourceGroupMember as u8 {
-            self.args.get(0).and_then(|group| str::parse(group).ok())
+            self.args.get(0)?.parse().ok()
         } else {
             None
         }

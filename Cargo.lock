@@ -3198,6 +3198,7 @@ dependencies = [
  "move-vm-types",
  "num_cpus",
  "once_cell",
+ "ouroboros",
  "proptest",
  "rayon",
  "read-write-set-dynamic",
