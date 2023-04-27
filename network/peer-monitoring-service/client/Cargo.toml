@@ -43,4 +43,4 @@ maplit = { workspace = true }
 tokio-stream = { workspace = true }
 
 [features]
-network-perf-test = [ "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test" ]
+network-perf-test = ["aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]
