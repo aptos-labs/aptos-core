@@ -22,7 +22,6 @@ Pedersen commitment <code>com</code> satisfies $v \in [0, 2^{num_bits})$. Curren
 
 
 <pre><code><b>use</b> <a href="elgamal.md#0x1_elgamal">0x1::elgamal</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="pedersen.md#0x1_pedersen">0x1::pedersen</a>;
 <b>use</b> <a href="ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
@@ -205,7 +204,9 @@ Returns the byte-representation of a range proof.
 
 Verifies a zero-knowledge range proof that the value <code>v</code> committed in <code>com</code> (under the default Bulletproofs
 commitment key; see <code><a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">pedersen::new_commitment_for_bulletproof</a></code>) satisfies $v \in [0, 2^{num_bits})$. Only works
-for <code>num_bits</code> \in {8, 16, 32, 64}.
+for <code>num_bits</code> \in {8, 16, 32, 64}. Additionally, checks that the prover used dst as a domain-separation
+tag (DST). This prevents proofs computed for one application (a.k.a. a domain) with dst_1 from verifying
+in a different application with dst_2 != dst_1.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_pedersen">verify_range_proof_pedersen</a>(com: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">bulletproofs::RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
@@ -218,9 +219,7 @@ for <code>num_bits</code> \in {8, 16, 32, 64}.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_pedersen">verify_range_proof_pedersen</a>(com: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, proof: &<a href="bulletproofs.md#0x1_bulletproofs_RangeProof">RangeProof</a>, num_bits: u64, dst: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool {
-    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>()) {
-        <b>abort</b>(std::error::invalid_state(<a href="bulletproofs.md#0x1_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
-    };
+    <b>assert</b>!(<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>(), <a href="bulletproofs.md#0x1_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>);
 
     <a href="bulletproofs.md#0x1_bulletproofs_verify_range_proof_internal">verify_range_proof_internal</a>(
         <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="pedersen.md#0x1_pedersen_commitment_as_compressed_point">pedersen::commitment_as_compressed_point</a>(com)),

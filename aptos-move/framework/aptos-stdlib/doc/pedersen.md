@@ -192,7 +192,7 @@ Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code
 ## Function `new_commitment_for_bulletproof`
 
 Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code> is the Ristretto255 basepoint and <code>rand_base</code>
-is the default randomness based used in the Bulletproof library (i.e., BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).
+is the default randomness base used in the Bulletproof library (i.e., BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(val: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
@@ -507,6 +507,10 @@ Moves the Commitment into a CompressedRistretto point.
 ## Function `randomness_base_for_bulletproof`
 
 Returns the randomness base compatible with the Bulletproofs module.
+A Bulletproof attests, in zero-knowledge, that a value v inside a Pedersen commitment g^vh^r is
+sufficiently "small" (e.g., is 32-bits wide). Here, h is referred to as the "randomness base"
+of the commitment scheme. Bulletproof has a default choice for g and h and this function
+returns the default h as used in the Bulletproofs Move module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_randomness_base_for_bulletproof">randomness_base_for_bulletproof</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
