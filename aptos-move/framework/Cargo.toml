@@ -16,7 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
-aptos-gas-algebra-ext =  { workspace = true }
+aptos-gas-algebra-ext = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-sdk-builder = { workspace = true }
 aptos-state-view = { workspace = true }
@@ -42,17 +42,17 @@ libsecp256k1 = { workspace = true }
 log = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
-move-compiler ={ workspace = true }
-move-core-types ={ workspace = true }
-move-docgen ={ workspace = true }
-move-model ={ workspace = true }
-move-package ={ workspace = true }
-move-prover ={ workspace = true }
-move-prover-boogie-backend ={ workspace = true }
-move-stackless-bytecode ={ workspace = true }
-move-table-extension ={ workspace = true }
-move-vm-runtime ={ workspace = true }
-move-vm-types ={ workspace = true }
+move-compiler = { workspace = true }
+move-core-types = { workspace = true }
+move-docgen = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+move-prover = { workspace = true }
+move-prover-boogie-backend = { workspace = true }
+move-stackless-bytecode = { workspace = true }
+move-table-extension = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
@@ -85,7 +85,7 @@ move-unit-test = { workspace = true }
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing", "proptest", "proptest-derive"]
-testing = []
+testing = ["aptos-move-stdlib/testing"]
 
 [lib]
 doctest = false
