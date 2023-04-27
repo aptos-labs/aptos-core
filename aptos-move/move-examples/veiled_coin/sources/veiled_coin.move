@@ -824,6 +824,29 @@ module veiled_coin::veiled_coin {
     }
 
     #[test]
+    #[expected_failure(abort_code = 0x9, location = Self)]
+    fun sigma_proof_verify_fails_test() 
+    {
+       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
+       let balance_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+       let balance_val = new_scalar_from_u64(150);
+       let transfer_val = new_scalar_from_u64(50);
+       let (_, dest_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_3);
+       let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance_val, &balance_rand, &source_pubkey);
+       let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_4);
+       let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+       let new_balance_val = new_scalar_from_u64(100);
+       let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+
+       let sigma_proof = generate_sigma_proof<coin::FakeMoney>(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &deposit_ct, &transfer_rand, &source_priv_key, &transfer_val, &new_balance_val);
+
+       let random_point = ristretto255::new_point_from_sha2_512(SOME_RANDOMNESS_3);
+       sigma_proof.x1 = random_point;
+
+       verify_withdrawal_sigma_protocol(&source_pubkey, &dest_pubkey, &balance_ct, &withdraw_ct, &deposit_ct, &sigma_proof);
+    }
+
+    #[test]
     fun sigma_proof_serialize_test() 
     {
        let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
