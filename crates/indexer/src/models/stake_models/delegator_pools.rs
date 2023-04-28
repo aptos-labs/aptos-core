@@ -6,7 +6,7 @@
 
 use super::stake_utils::StakeResource;
 use crate::{
-    schema::{delegated_staking_pools, delegated_staking_pool_balances},
+    schema::{delegated_staking_pool_balances, delegated_staking_pools},
     util::standardize_address,
 };
 use aptos_api_types::{Transaction, WriteResource, WriteSetChange};
