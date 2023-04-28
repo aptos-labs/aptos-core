@@ -80,7 +80,7 @@ jobs:
   forge-land-blocking:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    uses: ./.github/workflows/workflow-run-forge.yaml
     secrets: inherit
     with:
       COMMENT_HEADER: forge-continuous
