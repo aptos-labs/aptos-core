@@ -488,6 +488,13 @@ module aptos_framework::voting {
     }
 
     #[view]
+    /// Return the next unassigned proposal id
+    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address,): u64 acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        voting_forum.next_proposal_id
+    }
+
+    #[view]
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow(&voting_forum.proposals, proposal_id);
@@ -532,6 +539,17 @@ module aptos_framework::voting {
     }
 
     #[view]
+    /// Return the proposal's creation time.
+    public fun get_proposal_creation_secs<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64 acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.creation_time_secs
+    }
+
+    #[view]
     /// Return the proposal's expiration time.
     public fun get_proposal_expiration_secs<ProposalType: store>(
         voting_forum_address: address,
@@ -551,6 +569,39 @@ module aptos_framework::voting {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
         proposal.execution_hash
+    }
+
+    #[view]
+    /// Return the proposal's minimum vote threshold
+    public fun get_min_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u128 acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.min_vote_threshold
+    }
+
+    #[view]
+    /// Return the proposal's early resolution minimum vote threshold (optionally set)
+    public fun get_early_resolution_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): Option<u128> acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.early_resolution_vote_threshold
+    }
+
+    #[view]
+    /// Return the proposal's current vote count
+    public fun get_votes<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): (u128, u128) acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        (proposal.yes_votes, proposal.no_votes)
     }
 
     #[view]
