@@ -31,6 +31,17 @@ pub struct DelegatorPool {
     pub first_transaction_version: i64,
 }
 
+// Metadata to fill pool balances and delegator balance
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DelegatorPoolBalanceMetadata {
+    pub transaction_version: i64,
+    pub staking_pool_address: String,
+    pub total_coins: BigDecimal,
+    pub total_shares: BigDecimal,
+    pub scaling_factor: BigDecimal,
+    pub active_share_table_handle: String,
+}
+
 // Pools balances
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(transaction_version, staking_pool_address))]
@@ -71,8 +82,7 @@ impl DelegatorPool {
                 if let WriteSetChange::WriteResource(write_resource) = wsc {
                     let maybe_write_resource =
                         Self::from_write_resource(write_resource, txn_version)?;
-                    if let Some((pool, pool_balances, current_pool_balances, _)) =
-                        maybe_write_resource
+                    if let Some((pool, pool_balances, current_pool_balances)) = maybe_write_resource
                     {
                         let staking_pool_address = pool.staking_pool_address.clone();
                         delegator_pool_map.insert(staking_pool_address.clone(), pool);
@@ -90,31 +100,48 @@ impl DelegatorPool {
         ))
     }
 
-    pub fn from_write_resource(
+    pub fn get_balance_metadata(
         write_resource: &WriteResource,
         txn_version: i64,
-    ) -> anyhow::Result<
-        Option<(
-            Self,
-            DelegatorPoolBalance,
-            CurrentDelegatorPoolBalance,
-            String,
-        )>,
-    > {
+    ) -> anyhow::Result<Option<DelegatorPoolBalanceMetadata>> {
         if let Some(StakeResource::DelegationPool(inner)) =
             StakeResource::from_write_resource(write_resource, txn_version)?
         {
             let staking_pool_address = standardize_address(&write_resource.address.to_string());
             let total_coins = inner.active_shares.total_coins;
             let total_shares =
-                inner.active_shares.total_shares / inner.active_shares.scaling_factor;
+                &inner.active_shares.total_shares / &inner.active_shares.scaling_factor;
+            Ok(Some(DelegatorPoolBalanceMetadata {
+                transaction_version: txn_version,
+                staking_pool_address,
+                total_coins,
+                total_shares,
+                scaling_factor: inner.active_shares.scaling_factor,
+                active_share_table_handle: standardize_address(
+                    &inner.active_shares.shares.inner.handle,
+                ),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<(Self, DelegatorPoolBalance, CurrentDelegatorPoolBalance)>> {
+        if let Some(balance) = Self::get_balance_metadata(write_resource, txn_version)? {
+            let staking_pool_address = balance.staking_pool_address.clone();
+            let total_coins = balance.total_coins.clone();
+            let total_shares = balance.total_shares.clone();
+            let transaction_version = balance.transaction_version;
             Ok(Some((
                 Self {
                     staking_pool_address: staking_pool_address.clone(),
-                    first_transaction_version: txn_version,
+                    first_transaction_version: transaction_version,
                 },
                 DelegatorPoolBalance {
-                    transaction_version: txn_version,
+                    transaction_version,
                     staking_pool_address: staking_pool_address.clone(),
                     total_coins: total_coins.clone(),
                     total_shares: total_shares.clone(),
@@ -123,9 +150,8 @@ impl DelegatorPool {
                     staking_pool_address,
                     total_coins,
                     total_shares,
-                    last_transaction_version: txn_version,
+                    last_transaction_version: transaction_version,
                 },
-                standardize_address(&inner.active_shares.shares.inner.handle),
             )))
         } else {
             Ok(None)

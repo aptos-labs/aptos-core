@@ -3,7 +3,7 @@
 // This is required because a diesel macro makes clippy sad
 #![allow(clippy::extra_unused_lifetimes)]
 
-use super::delegator_pools::{DelegatorPool, DelegatorPoolBalance};
+use super::delegator_pools::{DelegatorPool, DelegatorPoolBalanceMetadata};
 use crate::{schema::current_delegator_balances, util::standardize_address};
 use anyhow::Context;
 use aptos_api_types::{
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 pub type TableHandle = String;
 pub type Address = String;
-pub type ActiveShareMapping = HashMap<TableHandle, DelegatorPoolBalance>;
+pub type ActiveShareMapping = HashMap<TableHandle, DelegatorPoolBalanceMetadata>;
 pub type CurrentDelegatorBalancePK = (Address, Address, String);
 pub type CurrentDelegatorBalanceMap = HashMap<CurrentDelegatorBalancePK, CurrentDelegatorBalance>;
 
@@ -65,7 +65,7 @@ impl CurrentDelegatorBalance {
                     "cannot parse string as u64: {:?}, version {}",
                     data.value, txn_version
                 ))?;
-
+            let shares = shares / &pool_balance.scaling_factor;
             Ok(Some(Self {
                 delegator_address,
                 pool_address,
@@ -106,10 +106,11 @@ impl CurrentDelegatorBalance {
         write_resource: &APIWriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<ActiveShareMapping>> {
-        if let Some((_, pool_balance, _, table_handle)) =
-            DelegatorPool::from_write_resource(write_resource, txn_version)?
-        {
-            Ok(Some(HashMap::from([(table_handle, pool_balance)])))
+        if let Some(balance) = DelegatorPool::get_balance_metadata(write_resource, txn_version)? {
+            Ok(Some(HashMap::from([(
+                balance.active_share_table_handle.clone(),
+                balance,
+            )])))
         } else {
             Ok(None)
         }
