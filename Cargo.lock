@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
