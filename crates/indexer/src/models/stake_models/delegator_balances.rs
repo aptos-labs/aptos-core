@@ -135,21 +135,27 @@ impl CurrentDelegatorBalance {
             }
             // Now make a pass through table items to get the actual delegator balances
             for wsc in &user_txn.info.changes {
-                if let APIWriteSetChange::WriteTableItem(table_item) = wsc {
-                    let txn_version = user_txn.info.version.0 as i64;
-                    let maybe_delegator_balance =
+                let txn_version = user_txn.info.version.0 as i64;
+                let maybe_delegator_balance = match wsc {
+                    APIWriteSetChange::DeleteTableItem(table_item) => {
+                        Self::from_delete_table_item(table_item, txn_version, &active_share_mapping)
+                            .unwrap()
+                    },
+                    APIWriteSetChange::WriteTableItem(table_item) => {
                         Self::from_write_table_item(table_item, txn_version, &active_share_mapping)
-                            .unwrap();
-                    if let Some(delegator_balance) = maybe_delegator_balance {
-                        current_delegator_balances.insert(
-                            (
-                                delegator_balance.delegator_address.clone(),
-                                delegator_balance.pool_address.clone(),
-                                delegator_balance.pool_type.clone(),
-                            ),
-                            delegator_balance,
-                        );
-                    }
+                            .unwrap()
+                    },
+                    _ => None,
+                };
+                if let Some(delegator_balance) = maybe_delegator_balance {
+                    current_delegator_balances.insert(
+                        (
+                            delegator_balance.delegator_address.clone(),
+                            delegator_balance.pool_address.clone(),
+                            delegator_balance.pool_type.clone(),
+                        ),
+                        delegator_balance,
+                    );
                 }
             }
         }
