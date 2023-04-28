@@ -10,7 +10,7 @@ use crate::{
     construction::{
         parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
         parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
-        parse_unlock_stake_operation,
+        parse_unlock_stake_operation, parse_unlock_delegated_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -407,6 +407,23 @@ impl Operation {
             )),
         )
     }
+
+    pub fn unlock_delegated_stake(
+        operation_index: u64,
+        status: Option<OperationStatusType>,
+        delegator: AccountAddress,
+        pool_address: AccountIdentifier,
+        amount: Option<u64>,
+    ) -> Operation {
+        Operation::new(
+            OperationType::UnlockStake,
+            operation_index,
+            status,
+            AccountIdentifier::base_account(delegator),
+            None,
+            Some(OperationMetadata::unlock_delegated_stake(pool_address, amount)),
+        )
+    }
 }
 
 impl std::cmp::PartialOrd for Operation {
@@ -459,6 +476,8 @@ pub struct OperationMetadata {
     pub amount: Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub staker: Option<AccountIdentifier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pool_address: Option<AccountIdentifier>,
 }
 
 impl OperationMetadata {
@@ -527,6 +546,14 @@ impl OperationMetadata {
         OperationMetadata {
             operator: Some(operator),
             staker: Some(staker),
+            ..Default::default()
+        }
+    }
+
+    pub fn unlock_delegated_stake(pool_address: AccountIdentifier, amount: Option<u64>) -> Self {
+        OperationMetadata {
+            pool_address: Some(pool_address),
+            amount: amount.map(U64::from),
             ..Default::default()
         }
     }
@@ -851,6 +878,19 @@ fn parse_failed_operations_from_txn_payload(
                     }
                 } else {
                     warn!("Failed to parse distribute staking rewards {:?}", inner);
+                }
+            },
+            (AccountAddress::ONE, DELEGATION_POOL_MODULE, UNLOCK_DELEGATED_STAKE_FUNCTION) => {
+                if let Ok(mut ops) = parse_unlock_delegated_stake_operation(
+                    sender,
+                    inner.ty_args(),
+                    inner.args(),
+                ) {
+                    if let Some(operation) = ops.get_mut(0) {
+                        operation.status = Some(OperationStatusType::Failure.to_string());
+                    }
+                } else {
+                    warn!("Failed to parse unlock delegated stake {:?}", inner);
                 }
             },
             _ => {
@@ -1475,6 +1515,7 @@ pub enum InternalOperation {
     ResetLockup(ResetLockup),
     UnlockStake(UnlockStake),
     DistributeStakingRewards(DistributeStakingRewards),
+    UnlockDelegatedStake(UnlockDelegatedStake),
 }
 
 impl InternalOperation {
@@ -1638,6 +1679,23 @@ impl InternalOperation {
                                 ));
                             }
                         },
+                        Ok(OperationType::UnlockDelegatedStake) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    pool_address: Some(pool_address),
+                                    amount, 
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::UnlockDelegatedStake(UnlockDelegatedStake {
+                                    delegator: account.account_address()?,
+                                    pool_address: pool_address.account_address()?,
+                                    amount: amount.map(u64::from).unwrap_or_default(),
+                                }));
+                            }
+                        },
                         _ => {},
                     }
                 }
@@ -1667,6 +1725,7 @@ impl InternalOperation {
             Self::ResetLockup(inner) => inner.owner,
             Self::UnlockStake(inner) => inner.owner,
             Self::DistributeStakingRewards(inner) => inner.sender,
+            Self::UnlockDelegatedStake(inner) => inner.delegator,
         }
     }
 
@@ -1740,6 +1799,13 @@ impl InternalOperation {
                     distribute_staking_rewards.operator,
                 ),
                 distribute_staking_rewards.sender,
+            ),
+            InternalOperation::UnlockDelegatedStake(unlock_delegated_stake) => (
+                aptos_stdlib::delegation_pool_unlock(
+                    unlock_delegated_stake.pool_address,
+                    unlock_delegated_stake.amount,
+                ),
+                unlock_delegated_stake.delegator,
             ),
         })
     }
@@ -1912,4 +1978,11 @@ pub struct DistributeStakingRewards {
     pub sender: AccountAddress,
     pub operator: AccountAddress,
     pub staker: AccountAddress,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct UnlockDelegatedStake {
+    pub delegator: AccountAddress,
+    pub pool_address: AccountAddress,
+    pub amount: u64,
 }

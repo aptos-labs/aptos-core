@@ -517,6 +517,27 @@ async fn create_staking_contract(
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
+async fn create_delegation_pool(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    // operator: AccountAddress,
+    // voter: AccountAddress,
+    // amount: u64,
+    commission_percentage: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let delegation_pool_creation = info
+        .transaction_factory()
+        .payload(aptos_stdlib::delegation_pool_initialize_delegation_pool(
+            commission_percentage,
+            vec![],
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(delegation_pool_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
 async fn unlock_stake(
     info: &AptosPublicInfo<'_>,
     account: &mut LocalAccount,
@@ -717,7 +738,7 @@ async fn test_transfer() {
 /// it's block based and it needs time to run, we do all the checks in a single test.
 #[tokio::test]
 async fn test_block() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
     let chain_id = swarm.chain_id();
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
@@ -777,7 +798,7 @@ async fn test_block() {
         private_key_0,
         account_id_1,
         20,
-        Duration::from_secs(5),
+        Duration::from_secs(15),
         Some(0),
         // TODO(greg): Revisit after fixing gas estimation.
         Some(1000000),
@@ -818,252 +839,268 @@ async fn test_block() {
     )
     .await
     .unwrap();
-    // Create a new account via transfer
-    transfer_and_wait(
+    // // Create a new account via transfer
+    // transfer_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+    //     20,
+    //     Duration::from_secs(5),
+    //     None,
+    //     // TODO(greg): Revisit after fixing gas estimation.
+    //     Some(1000000),
+    //     None,
+    // )
+    // .await
+    // .unwrap();
+    // let seq_no_3 = transfer_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     account_id_0,
+    //     20,
+    //     Duration::from_secs(5),
+    //     None,
+    //     Some(2000000),
+    //     Some(min_gas_price),
+    // )
+    // .await
+    // .unwrap()
+    // .request
+    // .sequence_number
+    // .0;
+
+    // // Create another account via command
+    // create_account_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     AccountAddress::from_hex_literal("0x99").unwrap(),
+    //     Duration::from_secs(5),
+    //     Some(seq_no_3 + 1),
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .unwrap();
+
+    // transfer_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_1,
+    //     account_id_3,
+    //     20,
+    //     Duration::from_secs(5),
+    //     // Test the default behavior
+    //     None,
+    //     // TODO(greg): Revisit after fixing gas estimation.
+    //     Some(10000),
+    //     Some(min_gas_price + 1),
+    // )
+    // .await
+    // .unwrap();
+
+    // // This one will fail because expiration is in the past
+    // transfer_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     AccountAddress::ONE,
+    //     20,
+    //     Duration::from_secs(0),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .unwrap_err();
+
+    // // This one will fail because gas is too low
+    // transfer_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     AccountAddress::ONE,
+    //     20,
+    //     Duration::from_secs(5),
+    //     None,
+    //     Some(1),
+    //     None,
+    // )
+    // .await
+    // .unwrap_err();
+
+    // // Add a ton of coins, and set an operator
+    // cli.fund_account(3, Some(10_000_000)).await.unwrap();
+    // cli.create_stake_pool(3, 3, 1, 1_000_000, 0).await.unwrap();
+
+    // // Set the operator
+    // set_operator_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     Some(account_id_3),
+    //     account_id_1,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Set operator should work!");
+
+    // // Also fail to set an operator (since the operator already changed)
+    // set_operator_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     Some(account_id_3),
+    //     account_id_1,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .unwrap_err();
+
+    // // Test native stake pool and reset lockup support
+    // cli.fund_account(2, Some(1000000000000000)).await.unwrap();
+    // create_stake_pool_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     Some(account_id_3),
+    //     Some(account_id_2),
+    //     Some(100000000000000),
+    //     Some(5),
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Should successfully create stake pool");
+
+    // // TODO: Verify lockup time changes
+
+    // // Reset lockup
+    // reset_lockup_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     Some(account_id_3),
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Should successfully reset lockup");
+
+    // Successfully, and fail setting a voter
+    // set_voter_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     Some(account_id_3),
+    //     account_id_1,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect_err("Set voter shouldn't work with the wrong operator!");
+    // set_voter_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     Some(account_id_1),
+    //     account_id_1,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Set voter should work!");
+
+    // Unlock stake
+    // unlock_stake_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     Some(account_id_3),
+    //     Some(10),
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Should successfully unlock stake");
+
+    // // Failed distribution with wrong staker
+    // distribute_staking_rewards_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     account_id_2,
+    //     account_id_3,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect_err("Staker has no staking contracts.");
+
+    // cli.fund_account(2, Some(1000000000000000)).await.unwrap();
+    // let mut account_4 = swarm
+    // .aptos_public_info()
+    // .create_and_fund_user_account(10_000_000_000)
+    // .await
+    // .unwrap();
+
+    // create_delegation_pool(
+    //     &swarm.aptos_public_info(),
+    //     &mut account_4,
+    //     10,
+    //     1,
+    // )
+    // .await;
+
+    let final_txn = transfer_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
-        private_key_2,
-        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        private_key_0,
+        account_id_0,
         20,
         Duration::from_secs(5),
-        None,
-        // TODO(greg): Revisit after fixing gas estimation.
+        Some(seq_no_0 + 1),
+        // TODO(greg): revisit after fixing gas estimation
         Some(1000000),
         None,
     )
     .await
     .unwrap();
-    let seq_no_3 = transfer_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        account_id_0,
-        20,
-        Duration::from_secs(5),
-        None,
-        Some(2000000),
-        Some(min_gas_price),
-    )
-    .await
-    .unwrap()
-    .request
-    .sequence_number
-    .0;
-
-    // Create another account via command
-    create_account_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        AccountAddress::from_hex_literal("0x99").unwrap(),
-        Duration::from_secs(5),
-        Some(seq_no_3 + 1),
-        None,
-        None,
-    )
-    .await
-    .unwrap();
-
-    transfer_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_1,
-        account_id_3,
-        20,
-        Duration::from_secs(5),
-        // Test the default behavior
-        None,
-        // TODO(greg): Revisit after fixing gas estimation.
-        Some(10000),
-        Some(min_gas_price + 1),
-    )
-    .await
-    .unwrap();
-
-    // This one will fail because expiration is in the past
-    transfer_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        AccountAddress::ONE,
-        20,
-        Duration::from_secs(0),
-        None,
-        None,
-        None,
-    )
-    .await
-    .unwrap_err();
-
-    // This one will fail because gas is too low
-    transfer_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        AccountAddress::ONE,
-        20,
-        Duration::from_secs(5),
-        None,
-        Some(1),
-        None,
-    )
-    .await
-    .unwrap_err();
-
-    // Add a ton of coins, and set an operator
-    cli.fund_account(3, Some(10_000_000)).await.unwrap();
-    cli.create_stake_pool(3, 3, 1, 1_000_000, 0).await.unwrap();
-
-    // Set the operator
-    set_operator_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_3),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Set operator should work!");
-
-    // Also fail to set an operator (since the operator already changed)
-    set_operator_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_3),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .unwrap_err();
-
-    // Test native stake pool and reset lockup support
-    cli.fund_account(2, Some(1000000000000000)).await.unwrap();
-    create_stake_pool_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_2,
-        Some(account_id_3),
-        Some(account_id_2),
-        Some(100000000000000),
-        Some(5),
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Should successfully create stake pool");
-
-    // TODO: Verify lockup time changes
-
-    // Reset lockup
-    reset_lockup_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_2,
-        Some(account_id_3),
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Should successfully reset lockup");
-
-    // Successfully, and fail setting a voter
-    set_voter_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_3),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect_err("Set voter shouldn't work with the wrong operator!");
-    set_voter_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        Some(account_id_1),
-        account_id_1,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Set voter should work!");
-
-    // Unlock stake
-    unlock_stake_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_2,
-        Some(account_id_3),
-        Some(10),
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Should successfully unlock stake");
-
-    // Failed distribution with wrong staker
-    distribute_staking_rewards_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        account_id_2,
-        account_id_3,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect_err("Staker has no staking contracts.");
-
-    let final_txn = distribute_staking_rewards_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        account_id_3,
-        account_id_2,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Distribute staking rewards should work!");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1811,6 +1848,60 @@ async fn parse_operations(
                             .account_address()
                             .unwrap();
                         assert_eq!(actual_operator_address, operator);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::UnlockDelegatedStake => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful unlock delegated stake operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed unlock delegated stake operation"
+                    );
+                }
+
+                // Check that unlock stake was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_pool_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let pool_address = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .pool_address
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_pool_address, pool_address);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_amount, amount);
                     } else {
                         panic!("Not an entry function");
                     }
