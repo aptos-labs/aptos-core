@@ -507,10 +507,10 @@ Moves the Commitment into a CompressedRistretto point.
 ## Function `randomness_base_for_bulletproof`
 
 Returns the randomness base compatible with the Bulletproofs module.
-A Bulletproof attests, in zero-knowledge, that a value v inside a Pedersen commitment g^vh^r is
-sufficiently "small" (e.g., is 32-bits wide). Here, h is referred to as the "randomness base"
-of the commitment scheme. Bulletproof has a default choice for g and h and this function
-returns the default h as used in the Bulletproofs Move module.
+A Bulletproof attests, in zero-knowledge, that a value <code>v</code> inside a Pedersen commitment <code>v * g + r * h</code> is
+sufficiently "small" (e.g., is 32-bits wide). Here, <code>h</code> is referred to as the "randomness base"
+of the commitment scheme. Bulletproof has a default choice for <code>g</code> and <code>h</code> and this function
+returns the default <code>h</code> as used in the Bulletproofs Move module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_randomness_base_for_bulletproof">randomness_base_for_bulletproof</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>

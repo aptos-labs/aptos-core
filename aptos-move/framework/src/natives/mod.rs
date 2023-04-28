@@ -167,6 +167,7 @@ impl GasParameters {
                 point_from_64_uniform_bytes: 0.into(),
                 point_identity: 0.into(),
                 point_mul: 0.into(),
+                point_double_mul: 0.into(),
                 point_neg: 0.into(),
                 point_sub: 0.into(),
                 scalar_add: 0.into(),

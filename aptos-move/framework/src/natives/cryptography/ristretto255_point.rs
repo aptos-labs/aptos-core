@@ -546,7 +546,7 @@ pub(crate) fn native_double_scalar_mul(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(args.len(), 4);
 
-    context.charge(gas_params.multi_scalar_mul_gas(2))?;
+    context.charge( gas_params.point_double_mul * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();

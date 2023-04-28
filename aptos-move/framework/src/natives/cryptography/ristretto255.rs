@@ -40,6 +40,7 @@ pub struct GasParameters {
     pub point_from_64_uniform_bytes: InternalGasPerArg,
     pub point_identity: InternalGasPerArg,
     pub point_mul: InternalGasPerArg,
+    pub point_double_mul: InternalGasPerArg,
     pub point_neg: InternalGasPerArg,
     pub point_sub: InternalGasPerArg,
     pub point_parse_arg: InternalGasPerArg,
@@ -132,6 +133,15 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 ristretto255_point::native_point_mul,
+            ),
+        ),
+        (
+            "point_double_mul_internal",
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                ristretto255_point::native_double_scalar_mul,
             ),
         ),
         (

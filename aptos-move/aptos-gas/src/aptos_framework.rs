@@ -106,14 +106,14 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 440_000 * MUL],
 
     [.ristretto255.point_add, "ristretto255.point_add", 2_135 * MUL],
-    // Note: Current gas version is 7, so putting 8 here.
-    [.ristretto255.point_clone, { 8 => "ristretto255.point_clone" }, 150 * MUL],
+    [.ristretto255.point_clone, { 9.. => "ristretto255.point_clone" }, 150 * MUL],
     [.ristretto255.point_compress, "ristretto255.point_compress", 40_000 * MUL],
     [.ristretto255.point_decompress, "ristretto255.point_decompress", 40_500 * MUL],
     [.ristretto255.point_equals, "ristretto255.point_equals", 2_300 * MUL],
     [.ristretto255.point_from_64_uniform_bytes, "ristretto255.point_from_64_uniform_bytes", 81_500 * MUL],
     [.ristretto255.point_identity, "ristretto255.point_identity", 150 * MUL],
     [.ristretto255.point_mul, "ristretto255.point_mul", 471_000 * MUL],
+    [.ristretto255.point_double_mul, { 9.. => "ristretto255.point_double_mul" }, 508_680 * MUL],
     [.ristretto255.point_neg, "ristretto255.point_neg", 360 * MUL],
     [.ristretto255.point_sub, "ristretto255.point_sub", 2_130 * MUL],
     [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 150 * MUL],
@@ -141,9 +141,9 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.keccak256.base, { 1.. => "hash.keccak256.base" }, 4000 * MUL],
     [.hash.keccak256.per_byte, { 1.. => "hash.keccak256.per_byte" }, 45 * MUL],
 
-    [.bulletproofs.base, { 8 => "bulletproofs.base" }, 10_000 * MUL],
-    [.bulletproofs.per_byte_rangeproof_deserialize, { 8 => "bulletproofs.per_byte_rangeproof_deserialize" }, 150 * MUL],
-    [.bulletproofs.per_bit_rangeproof_verify, { 8 => "bulletproofs.per_bit_rangeproof_verify" }, 128_000 * MUL],
+    [.bulletproofs.base, { 9.. => "bulletproofs.base" }, 10_000 * MUL],
+    [.bulletproofs.per_byte_rangeproof_deserialize, { 9.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 150 * MUL],
+    [.bulletproofs.per_bit_rangeproof_verify, { 9.. => "bulletproofs.per_bit_rangeproof_verify" }, 128_000 * MUL],
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
     // TODO(Gas): the on-chain name is wrong...
