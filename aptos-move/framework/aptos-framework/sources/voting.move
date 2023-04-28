@@ -490,7 +490,7 @@ module aptos_framework::voting {
     #[view]
     /// Return the next unassigned proposal id
     public fun next_proposal_id<ProposalType: store>(voting_forum_address: address,): u64 acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         voting_forum.next_proposal_id
     }
 
@@ -544,8 +544,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.creation_time_secs
     }
 
@@ -555,8 +555,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.expiration_secs
     }
 
@@ -566,8 +566,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): vector<u8> acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.execution_hash
     }
 
@@ -577,8 +577,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u128 acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.min_vote_threshold
     }
 
@@ -588,8 +588,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): Option<u128> acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.early_resolution_vote_threshold
     }
 
@@ -599,8 +599,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): (u128, u128) acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         (proposal.yes_votes, proposal.no_votes)
     }
 
@@ -610,8 +610,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.is_resolved
     }
 
@@ -621,8 +621,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         let is_multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         assert!(simple_map::contains_key(&proposal.metadata, &is_multi_step_in_execution_key), error::invalid_argument(EPROPOSAL_IS_SINGLE_STEP));
         from_bcs::to_bool(*simple_map::borrow(&proposal.metadata, &is_multi_step_in_execution_key))
