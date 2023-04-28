@@ -594,7 +594,7 @@ module aptos_framework::voting {
     }
 
     #[view]
-    /// Return the proposal's current vote count
+    /// Return the proposal's current vote count (yes_votes, no_votes)
     public fun get_votes<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
