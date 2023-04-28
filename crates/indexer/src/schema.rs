@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -148,6 +146,7 @@ diesel::table! {
         amount -> Numeric,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        shares -> Numeric,
     }
 }
 
@@ -245,6 +244,16 @@ diesel::table! {
         pool_address -> Varchar,
         event_type -> Text,
         amount -> Numeric,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    delegated_staking_pool_balances (transaction_version, staking_pool_address) {
+        transaction_version -> Int8,
+        staking_pool_address -> Varchar,
+        total_coins -> Numeric,
+        total_shares -> Numeric,
         inserted_at -> Timestamp,
     }
 }
@@ -556,6 +565,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_token_ownerships,
     current_token_pending_claims,
     delegated_staking_activities,
+    delegated_staking_pool_balances,
     delegated_staking_pools,
     events,
     indexer_status,

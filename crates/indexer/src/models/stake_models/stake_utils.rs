@@ -21,6 +21,10 @@ pub struct DelegationPoolResource {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SharesResource {
     pub shares: SharesInnerResource,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub total_coins: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub total_shares: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
