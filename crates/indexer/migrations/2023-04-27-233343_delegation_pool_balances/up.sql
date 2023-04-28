@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS delegated_staking_pool_balances (
 );
 CREATE INDEX dspb_insat_index ON delegated_staking_pool_balances (inserted_at);
 ALTER TABLE current_delegator_balances
-ADD COLUMN IF NOT EXISTS shares NUMERIC NOT NULL DEFAULT 0;
+ADD COLUMN IF NOT EXISTS shares NUMERIC NOT NULL;
