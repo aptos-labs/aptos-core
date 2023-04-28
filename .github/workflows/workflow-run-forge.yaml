@@ -26,7 +26,7 @@ on:
         description: The Forge k8s cluster to be used for test
       FORGE_RUNNER_DURATION_SECS:
         required: false
-        type: string
+        type: number
         default: 480
         description: Duration of the forge test run
       FORGE_TEST_SUITE:
