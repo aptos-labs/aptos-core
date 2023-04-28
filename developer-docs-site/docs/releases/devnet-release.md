@@ -17,10 +17,10 @@ Aptos SDK Release v1.7.2
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.11](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.11)| `aptos-cli-v1.0.11` | `6b610f4fc36098662dd0742ecc16687b8b535bb3` |
+|[Aptos CLI Release v1.0.12](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.12)| `aptos-cli-v1.0.12` | `36c557a2258d67f46f5c8d8500a07956f9e62ccc` |
 
 ## Aptos Node
 
 |Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob SHA-256 | Waypoint | Chain ID|
 |---|---|---|---|---|---|
-|`8eb3f0bb8f335f76abea8955e06bad213d81f502`| `devnet_8eb3f0bb8f335f76abea8955e06bad213d81f502` | `sha256:ef77a6dc0af552c8502079b3e1aea123e86a2669e95413610ca07c48155d9c51` | `sha256: 9177001b58d2033baeeeb9c45b0725f3e2fd5352bcac836c461d162bf99cff11`| `0:c1cedb4fad19385f1b3ba7abc5300fb8fd07315968b2b1c1d09165617b1ce93f` | 56 |
+|`57f8b499aead5adf38276acb585cd2c0de398568`| `devnet_57f8b499aead5adf38276acb585cd2c0de398568` | `sha256:d1e9adefdf8b7308008cea9d7cb5a791ac1936ba10363c14ca2cb18368078a1c` | `sha256: 3e71b9694e165b2f193d737c4b0eeb71129effa8338aa78f33be59daf8830a9a`| `0:5b7611a645bd3de8f884d41f60203a80f2fdc7f51f04558a12b71eb5e36c4ca8` | 58 |
