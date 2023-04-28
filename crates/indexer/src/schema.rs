@@ -140,12 +140,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    current_delegated_staking_pool_balances (staking_pool_address) {
+        staking_pool_address -> Varchar,
+        total_coins -> Numeric,
+        total_shares -> Numeric,
+        last_transaction_version -> Int8,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     current_delegator_balances (delegator_address, pool_address, pool_type) {
         delegator_address -> Varchar,
         pool_address -> Varchar,
         pool_type -> Varchar,
         table_handle -> Varchar,
-        amount -> Numeric,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         shares -> Numeric,
@@ -560,6 +569,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     current_ans_lookup,
     current_coin_balances,
     current_collection_datas,
+    current_delegated_staking_pool_balances,
     current_delegator_balances,
     current_staking_pool_voter,
     current_table_items,

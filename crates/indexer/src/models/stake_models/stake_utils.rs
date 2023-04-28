@@ -25,6 +25,8 @@ pub struct SharesResource {
     pub total_coins: BigDecimal,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub total_shares: BigDecimal,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub scaling_factor: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

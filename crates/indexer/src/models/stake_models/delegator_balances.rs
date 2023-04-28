@@ -30,7 +30,6 @@ pub struct CurrentDelegatorBalance {
     pub pool_address: String,
     pub pool_type: String,
     pub table_handle: String,
-    pub amount: BigDecimal,
     pub last_transaction_version: i64,
     pub shares: BigDecimal,
 }
@@ -47,8 +46,6 @@ impl CurrentDelegatorBalance {
         // The mapping will tell us if the table item is an active share table
         if let Some(pool_balance) = active_share_mapping.get(&table_handle) {
             let pool_address = pool_balance.staking_pool_address.clone();
-            let total_coins = pool_balance.total_coins.clone();
-            let total_shares = pool_balance.total_shares.clone();
             let delegator_address = standardize_address(&write_table_item.key.to_string());
             let data = write_table_item.data.as_ref().unwrap_or_else(|| {
                 panic!(
@@ -68,18 +65,12 @@ impl CurrentDelegatorBalance {
                     "cannot parse string as u64: {:?}, version {}",
                     data.value, txn_version
                 ))?;
-            let amount = if total_shares.is_zero() {
-                BigDecimal::zero()
-            } else {
-                &shares / &total_shares * &total_coins
-            };
 
             Ok(Some(Self {
                 delegator_address,
                 pool_address,
                 pool_type: "active_shares".to_string(),
                 table_handle,
-                amount,
                 last_transaction_version: txn_version,
                 shares,
             }))
@@ -104,7 +95,6 @@ impl CurrentDelegatorBalance {
                 pool_address: pool_balance.staking_pool_address.clone(),
                 pool_type: "active_shares".to_string(),
                 table_handle,
-                amount: BigDecimal::zero(),
                 last_transaction_version: txn_version,
                 shares: BigDecimal::zero(),
             }));
@@ -116,7 +106,7 @@ impl CurrentDelegatorBalance {
         write_resource: &APIWriteResource,
         txn_version: i64,
     ) -> anyhow::Result<Option<ActiveShareMapping>> {
-        if let Some((_, pool_balance, table_handle)) =
+        if let Some((_, pool_balance, _, table_handle)) =
             DelegatorPool::from_write_resource(write_resource, txn_version)?
         {
             Ok(Some(HashMap::from([(table_handle, pool_balance)])))
@@ -130,7 +120,7 @@ impl CurrentDelegatorBalance {
     ) -> anyhow::Result<CurrentDelegatorBalanceMap> {
         let mut active_share_mapping: ActiveShareMapping = HashMap::new();
         let mut current_delegator_balances: CurrentDelegatorBalanceMap = HashMap::new();
-        // 1. A first pass to get the mapping of active_share table handles to staking pool resource
+        // Do a first pass to get the mapping of active_share table handles to staking pool resource
         if let APITransaction::UserTransaction(user_txn) = transaction {
             let txn_version = user_txn.info.version.0 as i64;
             for wsc in &user_txn.info.changes {
