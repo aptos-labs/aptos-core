@@ -72,6 +72,9 @@ env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+  GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
   AWS_REGION: us-west-2
   IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
   FORGE_IMAGE_TAG: ${{ inputs.FORGE_IMAGE_TAG }}
@@ -103,14 +106,46 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
+
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+
       - name: Install python deps
         run: pip3 install click==8.1.3 psutil==5.9.1
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: "Install GCloud SDK"
+        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: "Export GCloud auth token"
+        id: gcloud-auth
+        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: "Setup GCloud project"
+        shell: bash
+        run: |
+          gcloud container clusters get-credentials aptos-forge-0 --zone us-central1-c --project aptos-forge-gcp-0
+          gcloud config set project aptos-forge-gcp-0
+
       - name: Run pre-Forge checks
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
         run: testsuite/run_forge.sh
+
       - name: Post pre-Forge comment
         if: env.COMMENT_ON_PR == 'true' && github.event.number != null
         uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
@@ -123,6 +158,7 @@ jobs:
       - name: Run Forge
         shell: bash
         run: testsuite/run_forge.sh
+
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR
         if: env.COMMENT_ON_PR == 'true' && github.event.number != null && !cancelled()
@@ -132,6 +168,7 @@ jobs:
           hide_and_recreate: true
           hide_classify: "OUTDATED"
           path: ${{ env.FORGE_COMMENT }}
+
       - name: Post to a Slack channel on failure
         # Post a Slack comment if the run has not been cancelled and the envs are set
         if: env.POST_TO_SLACK == 'true' && failure()
