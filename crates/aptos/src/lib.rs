@@ -22,9 +22,7 @@ use crate::common::{
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
-use std::ffi::CString;
-use futures::executor::block_on;
-use futures::TryFutureExt;
+use std::ffi::{c_char, CStr, CString};
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
@@ -92,11 +90,27 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
 }
 
 #[no_mangle]
-pub extern "C" fn run_aptos_from_ts() -> *const std::os::raw::c_char {
+pub extern "C" fn print_from_ts() -> *const std::os::raw::c_char {
     println!("Hello from Rust!");
     let result = "testing from Jin";
     let c_str = CString::new(result).unwrap();
 
     // Return a pointer to the C string
+    c_str.into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn run_aptos_from_ts(s: *mut c_char) -> *mut c_char {
+    println!("Running aptos...");
+    // let cli = Tool::parse_from(args);
+    // let result = block_on(cli.execute());
+    // let c_str = CString::new(result.unwrap()).unwrap();
+
+    let c_str = unsafe {
+        assert!(!s.is_null());
+        CString::from_raw(s)
+    };
+
+    println!("Done running aptos");
     c_str.into_raw()
 }

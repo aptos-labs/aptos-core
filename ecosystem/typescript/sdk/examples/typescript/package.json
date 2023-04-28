@@ -19,7 +19,8 @@
   "dependencies": {
     "aptos": "latest",
     "dotenv": "16.0.1",
-    "ffi-napi": "^4.0.3"
+    "ffi-napi": "^4.0.3",
+    "ref-array-di": "^1.2.2"
   },
   "devDependencies": {
     "@types/ffi-napi": "^4.0.7",
