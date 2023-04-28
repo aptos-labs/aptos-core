@@ -48,7 +48,7 @@ export function deserializeVector(deserializer: Deserializer, cls: any): any[] {
 // Recursive function to serialize n-dimensional arrays
 function serializeNestedArrayWithFunc(value: any[], func: string, serializer: Serializer): void {
   // Verify value is null/undefined
-  if (value == null) {
+  if (!Array.isArray(value)) {
     throw new Error("Invalid value for serialization.")
   }
   serializer.serializeU32AsUleb128(value.length)
