@@ -123,16 +123,16 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
+      - name: "Export gcloud auth token"
+        id: gcloud-auth
+        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
+        shell: bash
+
       - name: "Set up Cloud SDK"
         uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"
-
-      - name: "Export gcloud auth token"
-        id: gcloud-auth
-        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
-        shell: bash
 
       - name: "Use gcloud CLI"
         shell: bash
