@@ -779,6 +779,7 @@ export class AptosClient {
    * @param packageMetadata package metadata bytes
    * @param modules bytecodes of modules
    * @param extraArgs
+   * @returns Transaction hash
    */
 
   async createResourceAccountAndPublishPackage(
