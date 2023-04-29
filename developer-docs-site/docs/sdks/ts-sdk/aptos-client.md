@@ -6,25 +6,25 @@ slug: "typescript-sdk-aptos-client-class"
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) class is a component of the aptos SDK that enables developers to interact with the network through the use of REST APIs generated from an [OpenAPI](https://aptos-labs.github.io/ts-sdk-doc/) specification.
 
 The `AptosClient` is used to communicate with the Aptos REST API and handling of errors and exceptions.
-In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads.
+In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library or Transaction Builder for constructing the transaction payloads.
 
 ### OpenAPI
 
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) uses the [OpenAPI](https://aptos-labs.github.io/ts-sdk-doc/) specification to generate a set of classes that represent the various endpoints and operations of the Aptos REST API.
 
-`OpenAPI` is a specification for building and documenting RESTful APIs. It provides a standard format for describing the structure of an API, including the available endpoints, methods, input and output parameters. By using the OpenAPI specification, developers integrated with the aptos SDK can ensure that their APIs are consistent, well-documented, and easily integrated with other applications.
+`OpenAPI` is a specification for building and documenting RESTful APIs. It provides a standard format for describing the structure of an API, including the available endpoints, methods, input and output parameters. By using the `OpenAPI` specification, developers integrated with the aptos SDK can ensure that their APIs are consistent, well-documented, and easily integrated with other applications.
 
 ### Usage
 
-To use the AptosClient class, you will need to create an instance of the AptosClient class and call the desired API method. The AptosClient object will handle the HTTP requests and responses and return the result to your application.
+To use the AptosClient class, you will need to create an instance of the `AptosClient` class and call the desired API method. The `AptosClient` object will handle the HTTP requests and responses and return the result to your application.
 
 ### Configuration
 
-Before using the AptosClient class, you will need to configure it with the necessary parameters. These parameters may include the network endpoint URL, custom configuration, and any other required settings. You can configure the AptosClient class by passing in the necessary parameters when you initialize the client object.
+Before using the `AptosClient` class, you will need to configure it with the necessary parameters. These parameters may include the network endpoint URL, custom configuration, and any other required settings. You can configure the `AptosClient` class by passing in the necessary parameters when you initialize the client object.
 
 ### Initialization
 
-To initialize the AptosClient class, you will need to pass in the necessary configuration parameters. Here is an example:
+To initialize the `AptosClient` class, you will need to pass in the necessary configuration parameters. Here is an example:
 
 ```js
 import { AptosClient } from "aptos";
@@ -34,10 +34,10 @@ const client = new AptosClient("https://fullnode.testnet.aptoslabs.com");
 
 ### Making API fetch calls
 
-To make an API call, you will need to call the appropriate method on the AptosClient object. The method name and parameters will depend on the specific API you are using. Here is an example:
+To make an API call, you will need to call the appropriate method on the `AptosClient` object. The method name and parameters will depend on the specific API you are using. Here is an example:
 
 ```js
-const accountResources = await provider.getAccountResources("0x123");
+const accountResources = await client.getAccountResources("0x123");
 ```
 
 In this example, we are using the `getAccountResources()` method to retrieve the resources of an account with the address `0x123`.

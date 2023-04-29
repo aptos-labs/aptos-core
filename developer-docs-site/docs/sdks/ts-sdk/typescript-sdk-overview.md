@@ -1,5 +1,5 @@
 ---
-title: "Architecture"
+title: "TypeScript SDK Architecture"
 slug: "typescript-sdk-overview"
 ---
 
@@ -10,11 +10,9 @@ This document describes the main features and components of the Aptos TypeScript
 
 The [Aptos TypeScript SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) provides APIs and interfaces you can use to interact with the Aptos blockchain for reading the blockchain state and for sending your transaction to the Aptos blockchain.
 
-# TypeScript SDK Architecture
-
 The Aptos TypeScript SDK has three logical layers:
 
-1. Transport layer - Responsible on communication with the blockchain server.
+1. Client layer - Responsible on communication with the blockchain server.
 2. Core SDK layer - Exposes the functionalities needed by most applications.
 3. Plugins layer - Implementation of different use cases such as Token, NFT, ANS, etc
 

@@ -443,7 +443,14 @@ const sidebars = {
           collapsed: true,
           items: [
             "sdks/ts-sdk/typescript-sdk-overview",
-            "sdks/ts-sdk/sdk-client-layer",
+            {
+              type: "category",
+              label: "API client layer",
+              link: { type: "doc", id: "sdks/ts-sdk/sdk-client-layer" },
+              collapsible: false,
+              collapsed: false,
+              items: ["sdks/ts-sdk/aptos-client", "sdks/ts-sdk/indexer-client"],
+            },
             "sdks/ts-sdk/sdk-core-layer",
             "sdks/ts-sdk/sdk-plugins-layer",
             "sdks/ts-sdk/sdk-validation",

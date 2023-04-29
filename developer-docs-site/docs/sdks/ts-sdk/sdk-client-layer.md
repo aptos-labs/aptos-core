@@ -8,7 +8,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 The API client layer in the SDK provides a robust and reliable communication channel between the client-side application and the blockchain server. It is a component of the SDK that enables developers to interact with the network through the use of application programming interfaces (APIs). The client layer is responsible for making API calls to the network, sending and receiving data to and from the network, and handling any errors or exceptions that may occur during the process.
 
-The client layer is an essential component of the SDK that enables developers to interact with the network through APIs.
 The client layer is used to communicate with the Aptos REST API the Aptos Indexer API and handling of errors and exceptions.
 In addition, the client layer component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads.
 
@@ -49,7 +48,7 @@ In this example, we are using the `getAccount()` method to retrieve information 
 
 ### Submit Transaction to chain
 
-There are 3 steps to submit a transaction to the Aptos network:
+To submit a transaction to the Aptos network we should:
 
 1. Generate a raw transaction
 2. Sign the generated raw transaction
@@ -80,12 +79,12 @@ const rawTxn = await provider.generateTransaction(alice.address(), entryFunction
 `arguments` - the arguments the function expects.
 
 :::tip
-To submit an entry function payload, the first option would be simpler to use as the developer do not need to deal with BCS serialization.
+To submit an entry function payload, using the Transaction Builder would be simpler to use as the developer do not need to deal with BCS serialization.
 :::
 
 **BCS Transaction**
 
-The `generateRawTransaction()` method, accept any transaction payload type (entry, script, multisig) and exepcts for the arguments passed in to be serialized. It then generates and returns a raw transaction that can be signed and submitted to chain.
+The `generateRawTransaction()` method, accept `any transaction payload type (entry, script, multisig)` and exepcts for the arguments passed in to be serialized. It then generates and returns a raw transaction that can be signed and submitted to chain.
 
 ```js
 const alice = new AptosAccount();
@@ -121,4 +120,4 @@ const transactionRes = await provider.submitSignedBCSTransaction(signedTxn);
 
 #### Learn more
 
-The Provider class extends both [AptosClient](./aptos-client.md) and [IndexerClient](./indexer-api.md) classes and gives the end user the option to simply create a Provider instance and call a method by hiding the underlying implementation. If, for any reason, you want to use AptosClient or IndexerClient directly without the Provider class, you are able to do it.
+The Provider class extends both [AptosClient](./aptos-client.md) and [IndexerClient](./indexer-client.md) classes and gives the end user the option to simply create a Provider instance and call a method by hiding the underlying implementation. If, for any reason, you want to use AptosClient or IndexerClient directly without the Provider class, you are able to do it.
