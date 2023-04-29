@@ -562,10 +562,7 @@ test(
       ],
     );
 
-    await client.waitForTransaction(txnHash);
-
-    const txn = await client.getTransactionByHash(txnHash);
-    expect((txn as any).success).toBeTruthy();
+    await client.waitForTransaction(txnHash,{ checkSuccess: true });
   },
   longTestTimeout,
 );
