@@ -545,7 +545,7 @@ test(
     await faucetClient.fundAccount(account1.address(), 100_000_000);
     const seed = "3030";
 
-    const txnHash = await client.createResourceAccountAndpublishPackage(
+    const txnHash = await client.createResourceAccountAndPublishPackage(
       account1,
       new TextEncoder().encode(seed),
       new HexString(
