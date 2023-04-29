@@ -781,7 +781,7 @@ export class AptosClient {
    * @param extraArgs
    */
 
-  async createResourceAccountAndpublishPackage(
+  async createResourceAccountAndPublishPackage(
     sender: AptosAccount,
     seed: Bytes,
     packageMetadata: Bytes,
