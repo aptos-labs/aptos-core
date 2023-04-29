@@ -14,13 +14,14 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
+use tokio::process::Command;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{App, Arg, Parser};
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
 
@@ -111,6 +112,47 @@ pub extern "C" fn run_aptos_from_ts(s: *mut c_char) -> *mut c_char {
         CString::from_raw(s)
     };
 
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            println!("Tokio runtime");
+            let cli = Tool::parse_from(c_str.to_str().unwrap().split_whitespace());
+            let result = cli.execute().await;
+            println!("Result: {:?}", result);
+        });
+
     println!("Done running aptos");
     c_str.into_raw()
 }
+
+// async fn run_cli_command(command: String, args: Vec<String>) -> Result<String, String> {
+//     let matches = App::new("my-cli")
+//         .arg(Arg::from_usage("[FILE] 'Input file'"))
+//         .get_matches_from(args);
+//
+//     let input_file = matches.value_of("FILE").unwrap_or("input.txt");
+//
+//     let output = Command::new(command)
+//         .arg(input_file)
+//         .output()
+//         .await
+//         .map_err(|e| format!("Failed to run command: {}", e))?;
+//
+//     let output_str = String::from_utf8(output.stdout)
+//         .map_err(|e| format!("Failed to convert output to string: {}", e))?;
+//
+//     Ok(output_str)
+// }
+
+// fn hello(mut cx: FunctionContext) -> JsResult<JsString> {
+//     Ok(cx.string("hello node - from Jin"))
+// }
+
+// #[neon::main]
+// fn start_neon_runtime(mut cx: ModuleContext) -> NeonResult<()> {
+//     cx.export_function("hello", hello)?;
+//     // export other functions or modules here
+//     Ok(())
+// }

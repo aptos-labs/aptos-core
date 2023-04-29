@@ -1,6 +1,5 @@
 import ffi from 'ffi-napi';
 import ref from 'ref-napi';
-var ArrayType = require('ref-array-di')(ref)
 
 
 const lib = ffi.Library('../../../../../target/release/libaptos', {
