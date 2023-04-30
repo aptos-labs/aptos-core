@@ -1,6 +1,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
 import time
 from typing import Any, Dict, List, Optional
 
@@ -323,7 +324,7 @@ class RestClient:
             assert (
                 count < self.client_config.transaction_wait_in_seconds
             ), f"transaction {txn_hash} timed out"
-            time.sleep(1)
+            await asyncio.sleep(1)
             count += 1
         response = await self.client.get(
             f"{self.base_url}/transactions/by_hash/{txn_hash}"
