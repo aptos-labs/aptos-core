@@ -35,7 +35,7 @@ impl SignedNodeDigestInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct SignedNodeDigest {
     epoch: u64,
     signed_node_digest_info: SignedNodeDigestInfo,
@@ -85,7 +85,7 @@ impl SignedNodeDigest {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct NodeCertificate {
     signed_node_digest_info: SignedNodeDigestInfo,
     multi_signature: AggregateSignature,
@@ -314,7 +314,7 @@ impl Node {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct CertifiedNode {
     header: Node,
     certificate: NodeCertificate,

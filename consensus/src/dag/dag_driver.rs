@@ -34,6 +34,7 @@ use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
+use crate::dag::reliable_broadcast::NaiveReliableBroadcastStorage;
 
 pub struct DagDriver {
     epoch: u64,
@@ -70,7 +71,7 @@ impl DagDriver {
     ) -> Self {
         let (rb_tx, rb_rx) = tokio::sync::mpsc::channel(config.channel_size);
 
-        let rb = ReliableBroadcast::new(
+        let rb = ReliableBroadcast::<NaiveReliableBroadcastStorage>::new(
             author,
             epoch,
             network_sender.clone(),

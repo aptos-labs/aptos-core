@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
@@ -10,13 +12,14 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::collections::{BTreeMap, HashSet};
-
+use serde::{Serialize, Deserialize};
 // pub(crate) trait MissingPeers {
 //     fn get_peers_signatures() -> HashSet<PeerId>;
 // }
 
 #[allow(dead_code)]
-pub(crate) struct IncrementalNodeCertificateState {
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct IncrementalNodeCertificateState {
     signed_node_digest_info: SignedNodeDigestInfo,
     aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
 }
@@ -69,18 +72,19 @@ impl IncrementalNodeCertificateState {
             .is_ok()
     }
 
-    pub(crate) fn take(self, validator_verifier: &ValidatorVerifier) -> NodeCertificate {
+    pub(crate) fn take(&self, validator_verifier: &ValidatorVerifier) -> NodeCertificate {
         let proof = match validator_verifier
-            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature))
+            .aggregate_signatures(&PartialSignatures::new(self.aggregated_signature.clone()))
         {
-            Ok(sig) => NodeCertificate::new(self.signed_node_digest_info, sig),
+            Ok(sig) => NodeCertificate::new(self.signed_node_digest_info.clone(), sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
         proof
     }
 }
 
-pub(crate) struct AckSet {
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct AckSet {
     digest: HashValue,
     set: HashSet<PeerId>,
 }
