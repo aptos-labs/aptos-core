@@ -693,13 +693,11 @@ module aptos_framework::account {
         source_address: address,
         recipient_address: address
     ) acquires Account {
-        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+        SignerCapabilityOfferProofChallengeV2 {
             sequence_number: borrow_global_mut<Account>(source_address).sequence_number,
             source_address,
             recipient_address,
-        };
-
-        return proof_challenge;
+        }
     } 
 
 
