@@ -95,7 +95,7 @@ class RestClient:
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
             ledger_version,
         )
-        return resource["data"]["coin"]["value"]
+        return int(resource["data"]["coin"]["value"])
 
     async def account_sequence_number(
         self, account_address: AccountAddress, ledger_version: int = None
