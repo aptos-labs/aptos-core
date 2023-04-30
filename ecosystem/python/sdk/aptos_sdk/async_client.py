@@ -377,11 +377,19 @@ class RestClient:
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
     async def create_bcs_transaction(
-        self, sender: Account, payload: TransactionPayload
+        self,
+        sender: Account,
+        payload: TransactionPayload,
+        sequence_number: Optional[int] = None,
     ) -> RawTransaction:
+        sequence_number = (
+            sequence_number
+            if sequence_number is not None
+            else await self.account_sequence_number(sender.address())
+        )
         return RawTransaction(
             sender.address(),
-            await self.account_sequence_number(sender.address()),
+            sequence_number,
             payload,
             self.client_config.max_gas_amount,
             self.client_config.gas_unit_price,
@@ -390,9 +398,14 @@ class RestClient:
         )
 
     async def create_bcs_signed_transaction(
-        self, sender: Account, payload: TransactionPayload
+        self,
+        sender: Account,
+        payload: TransactionPayload,
+        sequence_number: Optional[int] = None,
     ) -> SignedTransaction:
-        raw_transaction = await self.create_bcs_transaction(sender, payload)
+        raw_transaction = await self.create_bcs_transaction(
+            sender, payload, sequence_number
+        )
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -422,7 +435,11 @@ class RestClient:
 
     # :!:>bcs_transfer
     async def bcs_transfer(
-        self, sender: Account, recipient: AccountAddress, amount: int
+        self,
+        sender: Account,
+        recipient: AccountAddress,
+        amount: int,
+        sequence_number: Optional[int] = None,
     ) -> str:
         transaction_arguments = [
             TransactionArgument(recipient, Serializer.struct),
@@ -437,7 +454,7 @@ class RestClient:
         )
 
         signed_transaction = await self.create_bcs_signed_transaction(
-            sender, TransactionPayload(payload)
+            sender, TransactionPayload(payload), sequence_number=sequence_number
         )
         return await self.submit_bcs_transaction(signed_transaction)
 
