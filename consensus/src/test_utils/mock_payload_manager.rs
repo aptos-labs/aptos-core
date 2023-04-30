@@ -17,6 +17,7 @@ use aptos_types::{
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 use std::time::Duration;
+use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 #[allow(dead_code)]
 pub struct MockPayloadManager {
