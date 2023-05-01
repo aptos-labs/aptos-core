@@ -200,11 +200,11 @@ When your lockup period expires, it will be automatically renewed, so that you c
 You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. You will continue earning rewards on your stake until it becomes withdrawable. 
 
 The principal amount is updated when any of the following actions occur:
-1. Operator[requests commission unlock](../nodes/validator-node/operator/staking-pool-operations.md#requesting-commission)
+1. Operator [requests commission unlock](../nodes/validator-node/operator/staking-pool-operations.md#requesting-commission)
 2. Staker (owner) withdraws funds
 3. Staker (owner) switches operators
 
-When the staker unlocks stake, this also triggers a commission unlock. The full commission amount for any staking rewards earned is unlocked. This is not proportional to the unlock stake amount. Commission is distributed to the operator when `request commission` is called a second time or when staker withdraws (distributes) the unlocked stake. 
+When the staker unlocks stake, this also triggers a commission unlock. The full commission amount for any staking rewards earned is unlocked. This is not proportional to the unlock stake amount. Commission is distributed to the operator after the lockup ends when `request commission` is called a second time or when staker withdraws (distributes) the unlocked stake. 
 
 ### Resetting the lockup
 
