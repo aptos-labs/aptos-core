@@ -234,7 +234,7 @@ module aptos_std::bulletproofs {
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
         let r = std::option::extract(&mut r);
         let privkey = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS);
-        let pubkey = elgamal::get_pubkey_from_scalar(&privkey);
+        let pubkey = elgamal::pubkey_from_secret_key(&privkey);
         let num_bits = 8;
 
         let (proof, ct) = prove_range_elgamal(&v, &r, &pubkey, num_bits, A_DST);
@@ -268,7 +268,7 @@ module aptos_std::bulletproofs {
 
         let proof = &range_proof_from_bytes(vector[ ]);
         let privkey = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS);
-        let pubkey = elgamal::get_pubkey_from_scalar(&privkey);
+        let pubkey = elgamal::pubkey_from_secret_key(&privkey);
         let num_bits = 64;
         let ct = elgamal::new_ciphertext_with_basepoint(
             &ristretto255::scalar_one(),
@@ -301,7 +301,7 @@ module aptos_std::bulletproofs {
         let ct = std::option::extract(&mut ct);
 
         let privkey = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS);
-        let pubkey = elgamal::get_pubkey_from_scalar(&privkey);
+        let pubkey = elgamal::pubkey_from_secret_key(&privkey);
 
         assert!(verify_range_proof_elgamal(
             &ct,
@@ -339,7 +339,7 @@ module aptos_std::bulletproofs {
         let blinder = std::option::extract(&mut blinder);
 
         let privkey = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS);
-        let pubkey = elgamal::get_pubkey_from_scalar(&privkey);
+        let pubkey = elgamal::pubkey_from_secret_key(&privkey);
 
         let ct = elgamal::new_ciphertext_with_basepoint(&value, &blinder, &pubkey);
 
@@ -380,7 +380,7 @@ module aptos_std::bulletproofs {
         let ct = std::option::extract(&mut ct);
 
         let privkey = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS);
-        let pubkey = elgamal::get_pubkey_from_scalar(&privkey);
+        let pubkey = elgamal::pubkey_from_secret_key(&privkey);
 
         // Take a valid proof...
         let range_proof_invalid = A_RANGE_PROOF_ELGAMAL;

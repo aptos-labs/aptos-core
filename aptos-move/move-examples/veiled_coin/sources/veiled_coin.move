@@ -72,7 +72,7 @@ module veiled_coin::veiled_coin {
 
     /// Contains the data necessary to prove that a veiled coin transfer can occur,
     /// given also a sender and a recipient, and one ciphertext each for the sender
-    /// and recipient which encrypt the amount to be sent using each user's public key. 
+    /// and recipient which encrypt the amount to be sent using each user's public key.
     struct VeiledTransferProof<phantom CoinType> has drop {
         updated_balance_proof: RangeProof,
         transferred_amount_proof: RangeProof,
@@ -83,7 +83,7 @@ module veiled_coin::veiled_coin {
     /// A more detailed description can be found in the documentation of verify_withdrawal_sigma_protocol
     struct SigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
-        x2: RistrettoPoint, 
+        x2: RistrettoPoint,
         x3: RistrettoPoint,
         x4: RistrettoPoint,
         x5: RistrettoPoint,
@@ -93,7 +93,7 @@ module veiled_coin::veiled_coin {
         alpha4: Scalar,
     }
 
-    /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and 
+    /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and
     /// returns them in order
     fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
         let len = vector::length(vec);
@@ -109,8 +109,8 @@ module veiled_coin::veiled_coin {
 
     /// Deserializes and returns a VeiledWithdrawalProof given its byte representation.
     /// Elements at the end of the SigmaProof struct are expected to be at the start
-    /// of the byte vector, and serialized using the serialization formats in the 
-    /// ristretto255 module.  
+    /// of the byte vector, and serialized using the serialization formats in the
+    /// ristretto255 module.
     fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
         assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
@@ -120,28 +120,28 @@ module veiled_coin::veiled_coin {
         };
         let x1 = std::option::extract<RistrettoPoint>(&mut x1);
 
-        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x2 = ristretto255::new_point_from_bytes(x2_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x2)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
-        let x2 = std::option::extract<RistrettoPoint>(&mut x2);    
+        let x2 = std::option::extract<RistrettoPoint>(&mut x2);
 
-        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x3)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x3 = std::option::extract<RistrettoPoint>(&mut x3);
 
-        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x4 = ristretto255::new_point_from_bytes(x4_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x4)) {
             return std::option::none<SigmaProof<CoinType>>()
         };
         let x4 = std::option::extract<RistrettoPoint>(&mut x4);
 
-        let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);    
+        let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x5 = ristretto255::new_point_from_bytes(x5_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x5)) {
             return std::option::none<SigmaProof<CoinType>>()
@@ -239,9 +239,9 @@ module veiled_coin::veiled_coin {
     //
 
     /// Initializes a veiled coin store for the specified account. Requires an ElGamal public
-    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    /// encryption key to be provided. The user must retain their corresponding secret key.
     public entry fun register<CoinType>(sender: &signer, pubkey: vector<u8>) {
-        let pubkey = elgamal::new_pubkey_from_bytes(pubkey);    
+        let pubkey = elgamal::new_pubkey_from_bytes(pubkey);
         register_internal<CoinType>(sender, std::option::extract(&mut pubkey));
     }
 
@@ -266,8 +266,8 @@ module veiled_coin::veiled_coin {
     /// proof on the new balance of the sender, to ensure the sender has enough money to send.
     /// `amount` being the proper size is enforce by its being a u32.
     public entry fun unwrap<CoinType>(
-        sender: &signer, 
-        amount: u32, 
+        sender: &signer,
+        amount: u32,
         range_proof_updated_balance: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
         unwrap_to<CoinType>(sender, signer::address_of(sender), amount, range_proof_updated_balance)
@@ -278,32 +278,32 @@ module veiled_coin::veiled_coin {
     /// proof on the new balance of the sender, to ensure the sender has enough money to send.
     /// `amount` being the proper size is enforce by its being a u32.
     public entry fun unwrap_to<CoinType>(
-        sender: &signer, 
-        recipient: address, 
-        amount: u32, 
+        sender: &signer,
+        recipient: address,
+        amount: u32,
         range_proof_updated_balance: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
         let range_proof_updated_balance = bulletproofs::range_proof_from_bytes(range_proof_updated_balance);
-    
+
         let c = unwrap_to_coin<CoinType>(sender, amount, &range_proof_updated_balance);
         coin::deposit<CoinType>(recipient, c);
     }
 
     /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
-    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
-    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
-    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
-    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
-    /// with ciphertexts encrypted with their respective public keys. 
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a
+    /// range proof on the transferred amount. Also requires a sigma protocol to prove that
+    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'.
+    /// This value is the amount being transferred. These two ciphertexts are required as we need to update
+    /// both the sender's and the recipient's balances, which use different public keys and so must be updated
+    /// with ciphertexts encrypted with their respective public keys.
     public entry fun private_transfer_to_entry<CoinType>(
-        sender: &signer, 
-        recipient: address, 
-        withdraw_ct: vector<u8>, 
-        deposit_ct: vector<u8>, 
-        range_proof_updated_balance: vector<u8>, 
+        sender: &signer,
+        recipient: address,
+        withdraw_ct: vector<u8>,
+        deposit_ct: vector<u8>,
+        range_proof_updated_balance: vector<u8>,
         range_proof_transferred_amount: vector<u8>,
-        sigma_proof_bytes: vector<u8>) acquires VeiledCoinStore 
+        sigma_proof_bytes: vector<u8>) acquires VeiledCoinStore
     {
         let private_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
         assert!(std::option::is_some(&private_withdraw_amount), EDESERIALIZATION_FAILED);
@@ -350,20 +350,20 @@ module veiled_coin::veiled_coin {
 
     /// Verifies a sigma proof needed to perform a private withdrawal. The relation is described on
     /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
-    /// Specifically, this protocol proves that `withdrawal_ct` and `deposit_ct` encrypt the same 
-    /// amount b^* using the same randomness r, with `sender_pubkey` and `recipient_pubkey` 
-    /// respectively. It additionally proves that `sender_pubkey` was generated with the sender's 
-    /// secret key sk, and that `balance` equals the correct updated value b' once `withdrawal_ct` 
-    /// has been subtracted from it. 
-    /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's 
-    /// zero-knowledge property ensures they are not revealed. 
+    /// Specifically, this protocol proves that `withdrawal_ct` and `deposit_ct` encrypt the same
+    /// amount b^* using the same randomness r, with `sender_pubkey` and `recipient_pubkey`
+    /// respectively. It additionally proves that `sender_pubkey` was generated with the sender's
+    /// secret key sk, and that `balance` equals the correct updated value b' once `withdrawal_ct`
+    /// has been subtracted from it.
+    /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's
+    /// zero-knowledge property ensures they are not revealed.
     fun verify_withdrawal_sigma_protocol<CoinType>(
-        sender_pubkey: &Pubkey, 
-        recipient_pubkey: &Pubkey, 
-        balance_ct: &Ciphertext, 
-        withdrawal_ct: &Ciphertext, 
-        deposit_ct: &Ciphertext, 
-        proof: &SigmaProof<CoinType>) 
+        sender_pubkey: &Pubkey,
+        recipient_pubkey: &Pubkey,
+        balance_ct: &Ciphertext,
+        withdrawal_ct: &Ciphertext,
+        deposit_ct: &Ciphertext,
+        proof: &SigmaProof<CoinType>)
     {
         let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
         let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
@@ -373,9 +373,9 @@ module veiled_coin::veiled_coin {
 
         // TODO: Can be optimized so we don't re-serialize the proof for fiat-shamir
         let c = sigma_protocol_fiat_shamir<CoinType>(sender_pubkey, recipient_pubkey, withdrawal_ct, deposit_ct, balance_ct, &proof.x1, &proof.x2, &proof.x3, &proof.x4, &proof.x5);
-        
+
         // c * D + X1 =? \alpha_1 * g
-        let d_acc = ristretto255::point_mul(d, &c);    
+        let d_acc = ristretto255::point_mul(d, &c);
         ristretto255::point_add_assign(&mut d_acc, &proof.x1);
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
         assert!(ristretto255::point_equals(&d_acc, &g_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
@@ -386,7 +386,7 @@ module veiled_coin::veiled_coin {
         let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
         assert!(ristretto255::point_equals(&y_times_c, &g_alpha2), ESIGMA_PROTOCOL_VERIFY_FAILED);
 
-        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3); 
+        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
         // c * C + X3 =? \alpha_3 * g + \alpha_1 * y
         let big_c_acc = ristretto255::point_mul(big_c, &c);
         ristretto255::point_add_assign(&mut big_c_acc, &proof.x3);
@@ -415,7 +415,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Computes the challenge value as c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
-    /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation 
+    /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation
     /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol
     fun sigma_protocol_fiat_shamir<CoinType>(
         sender_pubkey: &Pubkey,
@@ -428,7 +428,7 @@ module veiled_coin::veiled_coin {
         x3: &RistrettoPoint,
         x4: &RistrettoPoint,
         x5: &RistrettoPoint): Scalar
-    { 
+    {
         let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
         let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
@@ -497,7 +497,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Initializes a veiled coin store for the specified account. Requires an ElGamal public
-    /// encryption key to be provided. The user must retain their corresponding secret key. 
+    /// encryption key to be provided. The user must retain their corresponding secret key.
     public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::Pubkey) {
         let account_addr = signer::address_of(account);
         assert!(
@@ -548,10 +548,10 @@ module veiled_coin::veiled_coin {
 
     /// Removes `amount` coins from the VeiledCoinStore balance of `sender`, by subtracting `amount_ct` from
     /// their VeiledCoinStore balance. It is not possible for this function to be made private. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a
     /// range proof on the transferred amount.
     public fun unwrap_to_coin<CoinType>(
-        sender: &signer, 
+        sender: &signer,
         amount: u32,
         updated_balance: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter {
         // resource account signer should exist as wrap_to_coin should already have been called
@@ -567,18 +567,18 @@ module veiled_coin::veiled_coin {
     }
 
     /// Sends the specified private amount to `recipient` and updates the private balance of `sender`. Requires a range
-    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a 
-    /// range proof on the transferred amount. Also requires a sigma protocol to prove that 
-    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'. 
-    /// This value is the amount being transferred. These two ciphertexts are required as we need to update 
-    /// both the sender's and the recipient's balances, which use different public keys and so must be updated 
-    /// with ciphertexts encrypted with their respective public keys. 
+    /// proof on the new balance of the sender, to ensure the sender has enough money to send, in addition to a
+    /// range proof on the transferred amount. Also requires a sigma protocol to prove that
+    /// 'private_withdraw_amount' encrypts the same value using the same randomness as 'private_deposit_amount'.
+    /// This value is the amount being transferred. These two ciphertexts are required as we need to update
+    /// both the sender's and the recipient's balances, which use different public keys and so must be updated
+    /// with ciphertexts encrypted with their respective public keys.
     public fun private_transfer_to<CoinType>(
         sender: &signer,
         recipient_addr: address,
         private_withdraw_amount: Ciphertext,
         private_deposit_amount: Ciphertext,
-        transfer_proof: &VeiledTransferProof<CoinType>) acquires VeiledCoinStore 
+        transfer_proof: &VeiledTransferProof<CoinType>) acquires VeiledCoinStore
     {
         let sender_addr = signer::address_of(sender);
 
@@ -621,7 +621,7 @@ module veiled_coin::veiled_coin {
     /// Withdraws the specifed private `amount` of veiled coin `CoinType` from the signing account.
     /// `range_proof_transferred_amount` is necessary for private VeiledCoin transactions as the
     /// amount sent will be private. If unwrapping some amount of VeiledCoin to Coin, the amount
-    /// is necessarily public and can be checked outside of a range proof, so that `range_proof_transferred_amount` should be None. 
+    /// is necessarily public and can be checked outside of a range proof, so that `range_proof_transferred_amount` should be None.
     public fun withdraw<CoinType>(
         account: &signer,
         withdraw_amount: Ciphertext,
@@ -649,13 +649,13 @@ module veiled_coin::veiled_coin {
 
         // This function is splitting a commitment 'bal' into a commitment 'amount' and a commitment 'new_bal' =
         // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{32}). To prevent underflow, we need to
-        // verify a range proof that 'new_bal' is in [0, 2^{32}). In addition we need to verify a range proof 
+        // verify a range proof that 'new_bal' is in [0, 2^{32}). In addition we need to verify a range proof
     // that the transferred amount 'amount' is in [0, 2^{32}). Otherwise, a sender could send 'amount' = p-1
-    // where p is the order of the scalar field, giving an updated balance of 
-    // 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0 
-    // and therefore that 'bal' >= 'amount'. Note that when unwrapping some amount of 
+    // where p is the order of the scalar field, giving an updated balance of
+    // 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0
+    // and therefore that 'bal' >= 'amount'. Note that when unwrapping some amount of
     // VeiledCoin, `amount` will be public and already enforced to be 32 bits so that checking
-        // the range proof for its size is unnecessary. 
+        // the range proof for its size is unnecessary.
         assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, updated_balance, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
         if (std::option::is_some(transferred_amount)) {
             assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, &std::option::extract(&mut *transferred_amount), pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
@@ -671,11 +671,11 @@ module veiled_coin::veiled_coin {
     const SOME_RANDOMNESS_3: vector<u8> = x"c7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
     const SOME_RANDOMNESS_4: vector<u8> = x"d7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
 
-    #[testonly]
+    #[test_only]
     fun generate_elgamal_keypair(seed: vector<u8>): (ristretto255::Scalar, elgamal::Pubkey) {
         // Hash the ristretto255 basepoint to get an arbitrary scalar for testing
         let priv_key = ristretto255::new_scalar_from_sha2_512(seed);
-        let pubkey = elgamal::get_pubkey_from_scalar(&priv_key);
+        let pubkey = elgamal::pubkey_from_secret_key(&priv_key);
         (priv_key, pubkey)
     }
 
@@ -684,19 +684,19 @@ module veiled_coin::veiled_coin {
     const SOME_RANDOMNESS_7: vector<u8> = x"c2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
     const SOME_RANDOMNESS_8: vector<u8> = x"d2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
 
-    #[test_only]                           
+    #[test_only]
     /// Proves the sigma protocol used for veiled coin transfers.
     /// A more detailed description can be found in the documentation for verify_withdrawal_sigma_protocol
     public fun generate_sigma_proof<CoinType>(
-        source_pubkey: &elgamal::Pubkey, 
-        dest_pubkey: &elgamal::Pubkey, 
-        source_balance_ct: &elgamal::Ciphertext, 
-        withdraw_ct: &elgamal::Ciphertext, 
+        source_pubkey: &elgamal::Pubkey,
+        dest_pubkey: &elgamal::Pubkey,
+        source_balance_ct: &elgamal::Ciphertext,
+        withdraw_ct: &elgamal::Ciphertext,
         deposit_ct: &elgamal::Ciphertext,
-        r: &ristretto255::Scalar, 
-        sk: &ristretto255::Scalar, 
+        r: &ristretto255::Scalar,
+        sk: &ristretto255::Scalar,
         transferred_amount: &ristretto255::Scalar,
-        updated_source_balance: &ristretto255::Scalar): SigmaProof<CoinType> 
+        updated_source_balance: &ristretto255::Scalar): SigmaProof<CoinType>
    {
         let x1 = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_1);
         let x2 = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
@@ -714,7 +714,7 @@ module veiled_coin::veiled_coin {
         let source_pubkey_point = elgamal::get_point_from_pubkey(source_pubkey);
         let source_pk_x1 = ristretto255::point_mul(&source_pubkey_point, &x1);
         ristretto255::point_add_assign(&mut big_x3, &source_pk_x1);
-        
+
         // X4 <- g^{x3}\bar{y}^{x1}
         let big_x4 = ristretto255::basepoint_mul(&x3);
         let dest_pubkey_point = elgamal::get_point_from_pubkey(dest_pubkey);
@@ -745,7 +745,7 @@ module veiled_coin::veiled_coin {
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
 
         // alpha_4 <- x4 + c * b'
-        let alpha4 = ristretto255::scalar_mul(&c, updated_source_balance); 
+        let alpha4 = ristretto255::scalar_mul(&c, updated_source_balance);
         ristretto255::scalar_add_assign(&mut alpha4, &x4);
 
         SigmaProof {
@@ -762,9 +762,9 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    /// Given a sigma proof, serializes it into byte form. 
+    /// Given a sigma proof, serializes it into byte form.
     /// Elements at the end of the SigmaProof struct are placed into the vector first,
-    /// using the serialization formats in the ristretto255 module. 
+    /// using the serialization formats in the ristretto255 module.
     public fun serialize_sigma_proof<CoinType>(proof: &SigmaProof<CoinType>): vector<u8> {
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
         let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
@@ -774,7 +774,7 @@ module veiled_coin::veiled_coin {
         let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
-        let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4); 
+        let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4);
 
         let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, alpha4_bytes);
@@ -805,9 +805,9 @@ module veiled_coin::veiled_coin {
     }
 
     #[test]
-    fun sigma_proof_verify_test() 
+    fun sigma_proof_verify_test()
     {
-       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
+       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
        let balance_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
        let balance_val = new_scalar_from_u64(150);
        let transfer_val = new_scalar_from_u64(50);
@@ -825,9 +825,9 @@ module veiled_coin::veiled_coin {
 
     #[test]
     #[expected_failure(abort_code = 0x9, location = Self)]
-    fun sigma_proof_verify_fails_test() 
+    fun sigma_proof_verify_fails_test()
     {
-       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
+       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
        let balance_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
        let balance_val = new_scalar_from_u64(150);
        let transfer_val = new_scalar_from_u64(50);
@@ -847,9 +847,9 @@ module veiled_coin::veiled_coin {
     }
 
     #[test]
-    fun sigma_proof_serialize_test() 
+    fun sigma_proof_serialize_test()
     {
-       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1); 
+       let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
        let rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
        let val = new_scalar_from_u64(50);
        let (_, dest_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_3);
@@ -864,7 +864,7 @@ module veiled_coin::veiled_coin {
        let sigma_proof_bytes = serialize_sigma_proof<coin::FakeMoney>(&sigma_proof);
 
        let deserialized_proof = std::option::extract<SigmaProof<coin::FakeMoney>>(&mut deserialize_sigma_proof<coin::FakeMoney>(sigma_proof_bytes));
-       
+
        assert!(ristretto255::point_equals(&sigma_proof.x1, &deserialized_proof.x1), 1);
        assert!(ristretto255::point_equals(&sigma_proof.x2, &deserialized_proof.x2), 1);
        assert!(ristretto255::point_equals(&sigma_proof.x3, &deserialized_proof.x3), 1);
@@ -899,7 +899,7 @@ module veiled_coin::veiled_coin {
         // Split 500 and 500 between source and destination
         coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
 
-        // Wrap 150 normal coins to veiled coins from the source's normal coin account 
+        // Wrap 150 normal coins to veiled coins from the source's normal coin account
         // to the destination's veiled coin account
         let (_, destination_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
         let destination_pubkey_bytes = elgamal::pubkey_to_bytes(&destination_pubkey);
@@ -907,8 +907,8 @@ module veiled_coin::veiled_coin {
         wrap_to<coin::FakeMoney>(&source_fx, destination_addr, 150);
         let source_balance = coin::balance<coin::FakeMoney>(source_addr);
         assert!(source_balance == 350, 1);
-        let destination_rand = ristretto255::scalar_zero(); 
-        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 150, &destination_rand, &destination_pubkey), 1); 
+        let destination_rand = ristretto255::scalar_zero();
+        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 150, &destination_rand, &destination_pubkey), 1);
 
         // Unwrap back 50 veiled coins from the destination's veiled coin account to
         // the source's normal coin account

@@ -1,23 +1,35 @@
 /// This module implements an ElGamal encryption API that can be used with the Bulletproofs module.
 ///
-/// An ElGamal encryption of a value v under a generator g and public key y = sk * g where sk is the corresponding secret key is (v * g + r * y, r * g), for a random scalar r. 
-/// Note we place the value v in the exponent of g so that ciphertexts are additively homomorphic, so that Enc(v,y) + Enc(v',y) = Enc(v+v', y) where v,v' are encrypted messages, y is a public key, and the same randomness is used across both encryptions. 
+/// An ElGamal *ciphertext* is an encryption of a value `v` under a basepoint `G` and public key `Y = sk * G`, where `sk`
+/// is the corresponding secret key, is `(v * G + r * Y, r * G), for a random scalar `r`.
+///
+/// Note that we place the value `v` "in the exponent" of `G` so that ciphertexts are additively homomorphic: i.e., so
+/// that `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')` where `v, v'` are plaintext messages, `Y` is a public key and `r, r'`
+/// are the randomness of the ciphertexts.
 
 module aptos_std::elgamal {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
     use std::vector;
 
+    //
+    // Error codes
+    //
+
     /// The wrong number of bytes was passed in for deserialization
     const EWRONG_BYTE_LENGTH: u64 = 1;
 
-    /// An ElGamal ciphertext to some value.
+    //
+    // Structs
+    //
+
+    /// An ElGamal ciphertext.
     struct Ciphertext has drop {
         left: RistrettoPoint,
         right: RistrettoPoint,
     }
 
-    /// A compressed ElGamal ciphertext to some value.
+    /// A compressed ElGamal ciphertext.
     struct CompressedCiphertext has store, copy, drop {
         left: CompressedRistretto,
         right: CompressedRistretto,
@@ -28,15 +40,20 @@ module aptos_std::elgamal {
         point: CompressedRistretto,
     }
 
-    /// Given a public key `pubkey`, returns the underlying RistrettoPoint representing that key
+    //
+    // Public functions
+    //
+
+    /// Given a public key `pubkey`, returns the underlying `RistrettoPoint` representing that key.
     public fun get_point_from_pubkey(pubkey: &Pubkey): RistrettoPoint {
         ristretto255::point_decompress(&pubkey.point)
     }
 
-    /// Given a ristretto255 `scalar`, returns as an ElGamal public key the ristretto255 basepoint multiplied
+    #[test_only]
+    /// Given a Ristretto255 `scalar`, returns as an ElGamal public key the ristretto255 basepoint multiplied
     /// by `scalar`
-    public fun get_pubkey_from_scalar(scalar: &ristretto255::Scalar): Pubkey {
-        let point = ristretto255::basepoint_mul(scalar);
+    public fun pubkey_from_secret_key(sk: &Scalar): Pubkey {
+        let point = ristretto255::basepoint_mul(sk);
         Pubkey {
             point: point_compress(&point)
         }
@@ -105,7 +122,7 @@ module aptos_std::elgamal {
         }
     }
 
-    /// Creates a new ciphertext (val * basepoint, id) where `basepoint` is the Ristretto255 basepoint and id is the identity point. 
+    /// Creates a new ciphertext (val * basepoint, id) where `basepoint` is the Ristretto255 basepoint and id is the identity point.
     public fun new_ciphertext_no_randomness(val: &Scalar): Ciphertext {
         Ciphertext {
             left: ristretto255::basepoint_mul(val),
