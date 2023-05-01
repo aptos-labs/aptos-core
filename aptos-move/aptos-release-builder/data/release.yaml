@@ -39,19 +39,6 @@ proposals:
           git_hash: ~
   - name: step_3
     metadata:
-      title: "Enable bls12381"
-      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      source_code_url: "TBD"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - cryptography_algebra_natives
-          - bls12381_structures
-        disabled: []
-  - name: step_4
-    metadata:
       title: "Enable ed25519_pubkey_validate_return_false_wrong_length"
       description: "AIP-23: Make ed25519 public key validation return none if key has the wrong length."
       source_code_url: "TBD"
@@ -62,7 +49,7 @@ proposals:
         enabled:
           - ed25519_pubkey_validate_return_false_wrong_length
         disabled: []
-  - name: step_5
+  - name: step_4
     metadata:
       title: "Enable Quorum Store"
       description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
@@ -87,7 +74,7 @@ proposals:
                 weight_by_voting_power: true
                 use_history_from_previous_epoch_max_count: 5
           max_failed_authors_to_store: 10
-  - name: step_6
+  - name: step_5
     metadata:
       title: "Enable Transaction Shuffling"
       description: "AIP-27: Sender Aware Transaction Shuffling"
