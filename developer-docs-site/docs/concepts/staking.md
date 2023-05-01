@@ -63,11 +63,12 @@ As an owner:
 - Only Bob can add, unlock or withdraw funds.
 - Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
+- Bob can set the operator commission percentage.
 - The reward will be deposited into Bob's (owner's) account.
 
 ### Operator
 
-A node operator is assigned by the fund owner to run the validator node. The two personas, the owner and the operator, can be two separate entities or the same. For example, Alice (operator) runs the validator node, operating at the behest of Bob, the fund owner.
+A node operator is assigned by the fund owner to run the validator node and receives commission as set by the owner. The two personas, the owner and the operator, can be two separate entities or the same. For example, Alice (operator) runs the validator node, operating at the behest of Bob, the fund owner.
 
 As an operator:
 
@@ -75,6 +76,7 @@ As an operator:
 - As a validator, Alice will perform the validating function.
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
 - However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource).
+- The operator commission is deducted from the staker (owner) rewards and deposited into the operator account.
 
 ### Voter
 
@@ -195,7 +197,14 @@ When your lockup period expires, it will be automatically renewed, so that you c
 
 ### Unlocking your stake
 
-You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. 
+You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. You will continue earning rewards on your stake until it becomes withdrawable. 
+
+The principal amount is updated when any of the following actions occur:
+1. Operator[requests commission unlock](../nodes/validator-node/operator/staking-pool-operations.md#requesting-commission)
+2. Staker (owner) withdraws funds
+3. Staker (owner) switches operators
+
+When the staker unlocks stake, this also triggers a commission unlock. The full commission amount for any staking rewards earned is unlocked. This is not proportional to the unlock stake amount. Commission is distributed to the operator when `request commission` is called a second time or when staker withdraws (distributes) the unlocked stake. 
 
 ### Resetting the lockup
 
@@ -262,6 +271,7 @@ Note that rewards are given only to the **leader-validators**, i.e., validators 
 :::tip Rewards are subject to lockup period
 All the validator rewards are also subject to lockup period as they are added to the original staked amount. 
 :::
+
 
 ## Leaving the validator set
 
