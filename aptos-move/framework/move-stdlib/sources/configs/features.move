@@ -284,7 +284,5 @@ module std::features {
         assert!(!is_enabled(9), 2);
         assert!(is_enabled(17), 3);
         assert!(is_enabled(23), 4);
-
-        let features = &mut borrow_global<Features>(@std).features;
     }
 }
