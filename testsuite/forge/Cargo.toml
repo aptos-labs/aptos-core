@@ -41,7 +41,9 @@ hyper = { workspace = true }
 hyper-tls = { workspace = true }
 itertools = { workspace = true }
 json-patch = { workspace = true }
-k8s-openapi = { workspace = true }
+k8s-openapi = { workspace = true, features = [
+    "v1_15",
+] }
 kube = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
