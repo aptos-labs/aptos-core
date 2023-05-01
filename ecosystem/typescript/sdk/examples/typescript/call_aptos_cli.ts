@@ -1,23 +1,23 @@
-import ffi from 'ffi-napi';
-import ref from 'ref-napi';
-
+const ffi = require('ffi-napi');
 
 const lib = ffi.Library('../../../../../target/release/libaptos', {
-    print_from_ts: [ref.types.CString, []],
-    run_aptos_from_ts: [ref.types.CString, ['string']],
+    run_aptos_from_ts: ['char *', ['string']],
+    free_cstring: ['void', ['char *']],
 });
 
-const args = ['aptos', 'node', 'run-local-testnet', '--with-faucet'];
-const args1 = ['aptos', 'info'];
+const args_run_local_testnet = ['aptos', 'node', 'run-local-testnet', '--with-faucet'];
+const args_aptos_info = ['aptos', 'info'];
 
 (async () => {
-    console.log("Running print from typescript");
-    const result = lib.print_from_ts();
-    console.log(result);
-    console.log("Finish");
+    console.log("Running aptos CLI from Typescript");
+    const result2 = lib.run_aptos_from_ts(args_run_local_testnet.join(' '));
+    try {
+        console.log(`Result: ${result2.readCString()}`);
+    } catch (error) {
+        console.error(error);
+    } finally {
+        lib.free_cstring(result2);
+    }
 
-    console.log("Running aptos from typescript");
-    const result2 = lib.run_aptos_from_ts(args1.join(' '));
-    console.log(`Result: ${result2}`);
-    console.log("Finish aptos");
+    console.log("Finish aptos CLI");
 })();

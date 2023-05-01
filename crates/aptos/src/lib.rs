@@ -24,6 +24,8 @@ use async_trait::async_trait;
 use clap::{App, Arg, Parser};
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
+use std::mem;
+use tokio::runtime::Runtime;
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
@@ -91,8 +93,9 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
 }
 
 #[no_mangle]
-pub extern "C" fn print_from_ts() -> *const std::os::raw::c_char {
+pub extern "C" fn hello_from_ts(s: *mut c_char) -> *const c_char {
     println!("Hello from Rust!");
+
     let result = "testing from Jin";
     let c_str = CString::new(result).unwrap();
 
@@ -101,58 +104,34 @@ pub extern "C" fn print_from_ts() -> *const std::os::raw::c_char {
 }
 
 #[no_mangle]
-pub extern "C" fn run_aptos_from_ts(s: *mut c_char) -> *mut c_char {
-    println!("Running aptos...");
-    // let cli = Tool::parse_from(args);
-    // let result = block_on(cli.execute());
-    // let c_str = CString::new(result.unwrap()).unwrap();
-
+pub extern "C" fn run_aptos_from_ts(s: *const c_char) -> *const c_char {
     let c_str = unsafe {
         assert!(!s.is_null());
-        CString::from_raw(s)
+        CStr::from_ptr(s)
     };
 
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
-            println!("Tokio runtime");
-            let cli = Tool::parse_from(c_str.to_str().unwrap().split_whitespace());
-            let result = cli.execute().await;
-            println!("Result: {:?}", result);
-        });
+    // split string by spaces
+    let input_string = c_str.to_str().unwrap().split_whitespace();
 
-    println!("Done running aptos");
-    c_str.into_raw()
+    // Create a new Tokio runtime and block on the execution of `cli.execute()`
+    let result_string = Runtime::new().unwrap().block_on(async move {
+        let cli = Tool::parse_from(input_string);
+        let result = cli.execute().await;
+        result
+    });
+
+    let res_cstr = CString::new(result_string.unwrap()).unwrap();
+
+    // Return a pointer to the C string
+    res_cstr.into_raw()
 }
 
-// async fn run_cli_command(command: String, args: Vec<String>) -> Result<String, String> {
-//     let matches = App::new("my-cli")
-//         .arg(Arg::from_usage("[FILE] 'Input file'"))
-//         .get_matches_from(args);
-//
-//     let input_file = matches.value_of("FILE").unwrap_or("input.txt");
-//
-//     let output = Command::new(command)
-//         .arg(input_file)
-//         .output()
-//         .await
-//         .map_err(|e| format!("Failed to run command: {}", e))?;
-//
-//     let output_str = String::from_utf8(output.stdout)
-//         .map_err(|e| format!("Failed to convert output to string: {}", e))?;
-//
-//     Ok(output_str)
-// }
-
-// fn hello(mut cx: FunctionContext) -> JsResult<JsString> {
-//     Ok(cx.string("hello node - from Jin"))
-// }
-
-// #[neon::main]
-// fn start_neon_runtime(mut cx: ModuleContext) -> NeonResult<()> {
-//     cx.export_function("hello", hello)?;
-//     // export other functions or modules here
-//     Ok(())
-// }
+#[no_mangle]
+pub extern "C" fn free_cstring(s: *mut c_char) {
+    unsafe {
+        if s.is_null() {
+            return;
+        }
+        CString::from_raw(s)
+    };
+}
