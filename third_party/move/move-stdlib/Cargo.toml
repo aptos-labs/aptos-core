@@ -27,6 +27,13 @@ sha2 = "0.9.3"
 sha3 = "0.9.1"
 smallvec = "1.6.1"
 walkdir = "2.3.1"
+######### 0L ########
+vdf = { git = "https://github.com/simsekgokhan/libra-v7", rev = "81c77dd" }
+rust_decimal= { version = "1.10.3", default-features = true, features = ["maths"] }
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+ethers = {version = "0.1.3"}
+# diem-metrics = { git = "https://github.com/simsekgokhan/libra-v7", rev = "81c77dd" }
+once_cell = "1.7.2"
 
 [dev-dependencies]
 dir-diff = "0.3.2"
