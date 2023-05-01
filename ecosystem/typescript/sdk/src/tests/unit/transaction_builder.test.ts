@@ -4,7 +4,7 @@
 /* eslint-disable max-len */
 import nacl from "tweetnacl";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
-import { bcsSerializeUint64, bcsToBytes, Bytes } from "../../bcs";
+import { bcsSerializeBool, bcsSerializeUint64, bcsToBytes, Bytes } from "../../bcs";
 import { HexString } from "../../utils";
 
 import { TransactionBuilderEd25519, TransactionBuilder } from "../../transaction_builder/index";
@@ -25,6 +25,7 @@ import {
   TransactionArgumentU32,
   TransactionArgumentU256,
   AccountAddress,
+  TypeTagBool,
 } from "../../aptos_types";
 
 const ADDRESS_1 = "0x1222";
@@ -135,6 +136,35 @@ test("serialize entry function payload with type args but no function args", () 
 
   expect(hexSignedTxn(signedTxn)).toBe(
     "000000000000000000000000000000000000000000000000000000000a550c18000000000000000002000000000000000000000000000000000000000000000000000000000000122204636f696e0966616b655f66756e63010700000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e0000d0070000000000000000000000000000ffffffffffffffff040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200400e2d1cc4a27893cbae36d8b6a7150977c7620e065f359840413c5478a25f20a383250a9cdcb4fd71f7d171856f38972da30a9d10072e164614d96379004aa500",
+  );
+});
+
+test("serialize entry function payload with generic type args and function args", () => {
+  const token = new TypeTagStruct(StructTag.fromString(`0x14::token::Token`));
+
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(
+      `${ADDRESS_1}::aptos_token`,
+      "fake_typed_func",
+      [token, new TypeTagBool()],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS_2)), bcsSerializeBool(true)],
+    ),
+  );
+
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(ADDRESS_3),
+    BigInt(0),
+    entryFunctionPayload,
+    BigInt(2000),
+    BigInt(0),
+    BigInt(TXN_EXPIRE),
+    new ChainId(4),
+  );
+
+  const signedTxn = sign(rawTxn);
+
+  expect(hexSignedTxn(signedTxn)).toBe(
+    "000000000000000000000000000000000000000000000000000000000a550c1800000000000000000200000000000000000000000000000000000000000000000000000000000012220b6170746f735f746f6b656e0f66616b655f74797065645f66756e630207000000000000000000000000000000000000000000000000000000000000001405746f6b656e05546f6b656e0000022000000000000000000000000000000000000000000000000000000000000000dd0101d0070000000000000000000000000000ffffffffffffffff040020b9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a4920040367085186aeef58a0256fc64ecb86b88a86f8a8e42151e0e9aae1ab6d426c4968f2cab664261ea6bb868869154fe6e946c082774741d5143e57a1d802fd1b700",
   );
 });
 

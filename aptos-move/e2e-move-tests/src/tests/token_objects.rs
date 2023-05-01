@@ -12,7 +12,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
     collection: AccountAddress,
-    collection_id: u64,
+    index: u64,
     description: String,
     name: String,
     uri: String,

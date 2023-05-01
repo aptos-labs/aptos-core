@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 /// Utility class for specifying transaction type with predefined configurations through CLI
 #[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
+    NoOp,
     CoinTransfer,
     CoinTransferWithInvalid,
     AccountGeneration,
     AccountGenerationLargePool,
     NftMintAndTransfer,
     PublishPackage,
-    CustomFunctionLargeModuleWorkingSet,
-    CreateNewResource,
+    LargeModuleWorkingSetNoOp,
+    CreateNewAccountResource,
     ModifyGlobalResource,
     ModifyTenGlobalResources,
-    NoOp,
     TokenV1NFTMintAndStoreSequential,
     TokenV1NFTMintAndTransferSequential,
     TokenV1NFTMintAndStoreParallel,
@@ -52,16 +52,14 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
+                use_account_pool: true,
+            },
+            TransactionTypeArg::LargeModuleWorkingSetNoOp => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Nop,
+                num_modules: 1000,
                 use_account_pool: false,
             },
-            TransactionTypeArg::CustomFunctionLargeModuleWorkingSet => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::Nop,
-                    num_modules: 1000,
-                    use_account_pool: false,
-                }
-            },
-            TransactionTypeArg::CreateNewResource => TransactionType::CallCustomModules {
+            TransactionTypeArg::CreateNewAccountResource => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
                 },

@@ -100,6 +100,7 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+ExternalMarkdown
 FAQ
 FLAC
 FT
@@ -150,6 +151,7 @@ MiB
 Modularity
 Monterey
 MoonCoin
+MoveReference
 MoveVM
 MultiEd
 Multinode

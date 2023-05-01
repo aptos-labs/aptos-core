@@ -98,12 +98,12 @@ module aptos_token_objects::collection {
     }
 
     struct BurnEvent has drop, store {
-        collection_id: u64,
+        index: u64,
         token: address,
     }
 
     struct MintEvent has drop, store {
-        collection_id: u64,
+        index: u64,
         token: address,
     }
 
@@ -266,7 +266,7 @@ module aptos_token_objects::collection {
             );
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
-                    collection_id: supply.total_minted,
+                    index: supply.total_minted,
                     token,
                 },
             );
@@ -278,7 +278,7 @@ module aptos_token_objects::collection {
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
-                    collection_id: supply.total_minted,
+                    index: supply.total_minted,
                     token,
                 },
             );
@@ -292,7 +292,7 @@ module aptos_token_objects::collection {
     public(friend) fun decrement_supply(
         collection: &Object<Collection>,
         token: address,
-        collection_id: Option<u64>,
+        index: Option<u64>,
     ) acquires FixedSupply, UnlimitedSupply {
         let collection_addr = object::object_address(collection);
         if (exists<FixedSupply>(collection_addr)) {
@@ -301,7 +301,7 @@ module aptos_token_objects::collection {
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
-                    collection_id: *option::borrow(&collection_id),
+                    index: *option::borrow(&index),
                     token,
                 },
             );
@@ -311,7 +311,7 @@ module aptos_token_objects::collection {
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
-                    collection_id: *option::borrow(&collection_id),
+                    index: *option::borrow(&index),
                     token,
                 },
             );

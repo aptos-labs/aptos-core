@@ -2,11 +2,20 @@
 
 // @generated
 pub mod aptos {
-    pub mod datastream {
-        // @@protoc_insertion_point(attribute:aptos.datastream.v1)
+    pub mod indexer {
+        // @@protoc_insertion_point(attribute:aptos.indexer.v1)
         pub mod v1 {
-            include!("aptos.datastream.v1.rs");
-            // @@protoc_insertion_point(aptos.datastream.v1)
+            include!("aptos.indexer.v1.rs");
+            // @@protoc_insertion_point(aptos.indexer.v1)
+        }
+    }
+    pub mod internal {
+        pub mod fullnode {
+            // @@protoc_insertion_point(attribute:aptos.internal.fullnode.v1)
+            pub mod v1 {
+                include!("aptos.internal.fullnode.v1.rs");
+                // @@protoc_insertion_point(aptos.internal.fullnode.v1)
+            }
         }
     }
     pub mod transaction {

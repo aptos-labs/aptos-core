@@ -19,6 +19,9 @@
 *.yaml text eol=lf 
 *.yml text eol=lf 
 
+# Ensure that powerscript files are not auto-converted
+*.ps1 binary
+
 # Use Move syntax highlighter for Move IR code
 *.mvir linguist-language=Move
 
