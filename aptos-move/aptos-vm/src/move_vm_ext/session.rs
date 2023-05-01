@@ -35,7 +35,6 @@ use move_core_types::{
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use ouroboros::self_referencing;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,

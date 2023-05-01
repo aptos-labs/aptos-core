@@ -3129,6 +3129,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-utils"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
@@ -3183,6 +3187,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
+ "aptos-utils",
  "aptos-vm-logging",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
@@ -3198,7 +3203,6 @@ dependencies = [
  "move-vm-types",
  "num_cpus",
  "once_cell",
- "ouroboros",
  "proptest",
  "rayon",
  "read-write-set-dynamic",
