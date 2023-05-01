@@ -129,10 +129,12 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 use_account_pool: false,
             },
-            TransactionTypeArg::TokenV1FTMintAndTransfer20Collections => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV1MintAndTransferFT,
-                num_modules: 20,
-                use_account_pool: false,
+            TransactionTypeArg::TokenV1FTMintAndTransfer20Collections => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                    num_modules: 20,
+                    use_account_pool: false,
+                }
             },
             TransactionTypeArg::Batch100Transfer => {
                 TransactionType::BatchTransfer { batch_size: 100 }
