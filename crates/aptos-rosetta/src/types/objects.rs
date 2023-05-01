@@ -958,6 +958,10 @@ async fn parse_operations_from_write_set(
             parse_staking_contract_resource_changes(address, data, events, operation_index, changes)
                 .await
         },
+        (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_RESOURCE, 0) => {
+            parse_delegation_pool_resource_changes(address, data, events, operation_index, changes)
+                .await
+        },
         (AccountAddress::ONE, COIN_MODULE, COIN_STORE_RESOURCE, 1) => {
             if let Some(type_tag) = struct_tag.type_params.first() {
                 // TODO: This will need to be updated to support more coins
@@ -1376,6 +1380,20 @@ async fn parse_staking_contract_resource_changes(
 
     Ok(operations)
 }
+
+// TODO: implement staking and withdrawals parsing
+async fn parse_delegation_pool_resource_changes(
+    _owner_address: AccountAddress,
+    _data: &[u8],
+    _events: &[ContractEvent],
+    _operation_index: u64,
+    _changes: &WriteSet,
+) -> ApiResult<Vec<Operation>> {
+    let operations = Vec::new();
+
+    Ok(operations)
+}
+
 async fn parse_coinstore_changes(
     currency: Currency,
     version: u64,
