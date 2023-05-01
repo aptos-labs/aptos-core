@@ -106,7 +106,7 @@ impl MoveVmExt {
         // cache needs to be flushed to work around those bugs.
         self.inner.flush_loader_cache_if_invalidated();
 
-        SessionExt::create_new(
+        SessionExt::new(
             self.inner.new_session_with_extensions(remote, extensions),
             remote,
         )

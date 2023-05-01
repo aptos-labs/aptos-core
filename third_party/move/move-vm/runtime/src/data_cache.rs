@@ -48,7 +48,7 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    pub(crate) remote: &'r dyn MoveResolver,
+    remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
@@ -181,10 +181,6 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
-
-            loader.get_metadata(ty_tag.module_id(), ty_tag.name.as_bytes());
-
-            // let metadata = get_resource_group_from_metadata(loader.get_metadata(ty_tag.module_id(), ty_tag.name.as_bytes()));
 
             let gv = match self.remote.get_resource(&addr, &ty_tag) {
                 Ok(Some(blob)) => {

@@ -99,7 +99,7 @@ pub struct SessionExt<'r, 'l> {
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
-    pub fn create_new(inner: Session<'r, 'l>, remote: &'r dyn MoveResolverExt) -> Self {
+    pub fn new(inner: Session<'r, 'l>, remote: &'r dyn MoveResolverExt) -> Self {
         Self { inner, remote }
     }
 
