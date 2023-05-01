@@ -111,6 +111,18 @@ Participating as a delegation validator node on the Aptos network works like thi
 For step-by-step instructions on how to join the validator set, see: [Joining Validator Set](../nodes/validator-node/operator/staking-pool-operations.md#joining-validator-set).
 :::
 
+### Automatic lockup duration
+
+When the operator joins the validator set, the delegation pool's stake will automatically be locked up for a fixed duration that is set by the Aptos governance. Delegators will follow the delegation pool's lockup cycle. 
+
+### Automatic lockup renewal
+
+When the lockup period expires, it will be automatically renewed, so that the validator can continue to validate and receive the rewards. 
+
+### Unlocking your stake
+
+Delegators can unlock stake at any time. However, the stake will only become withdrawable after the delegation pool's lockup period expires. Unlocked stake will continue earning rewards until the stake becomes withdrawable. 
+
 ### Resetting the lockup
 
 Lockup cannot be reset. 
