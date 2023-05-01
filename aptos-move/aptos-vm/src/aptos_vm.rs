@@ -44,6 +44,7 @@ use aptos_types::{
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
     write_set::WriteSet,
 };
+use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{
     init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
 };
@@ -917,30 +918,28 @@ impl AptosVM {
             // Publish the bundle and execute initializers
             // publish_module_bundle doesn't actually load the published module into
             // the loader cache. It only puts the module data in the data cache.
-            session
-                .publish_module_bundle_with_compat_config(
-                    bundle.into_inner(),
-                    destination,
-                    gas_meter,
-                    Compatibility::new(
-                        true,
-                        true,
-                        !self
-                            .0
-                            .get_features()
-                            .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                    ),
-                )
-                .and_then(|_| {
-                    self.execute_module_initialization(
-                        session,
-                        gas_meter,
-                        &modules,
-                        exists,
-                        &[destination],
-                        new_published_modules_loaded,
-                    )
-                })
+            return_on_failure!(session.publish_module_bundle_with_compat_config(
+                bundle.into_inner(),
+                destination,
+                gas_meter,
+                Compatibility::new(
+                    true,
+                    true,
+                    !self
+                        .0
+                        .get_features()
+                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+                ),
+            ));
+
+            self.execute_module_initialization(
+                session,
+                gas_meter,
+                &modules,
+                exists,
+                &[destination],
+                new_published_modules_loaded,
+            )
         } else {
             Ok(())
         }
@@ -1174,17 +1173,17 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
+    ) -> Result<ChangeSetExt, VMStatus> {
         let mut gas_meter = UnmeteredGasMeter;
         let change_set_configs =
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
-        Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => ChangeSetExt::new(
+        match writeset_payload {
+            WriteSetPayload::Direct(change_set) => Ok(ChangeSetExt::new(
                 DeltaChangeSet::empty(),
                 change_set.clone(),
                 Arc::new(change_set_configs),
-            ),
+            )),
             WriteSetPayload::Script { script, execute_as } => {
                 let resolver = self.0.new_move_resolver(storage);
                 let mut tmp_session = self.0.new_session(&resolver, session_id);
@@ -1195,7 +1194,7 @@ impl AptosVM {
 
                 let loaded_func = tmp_session
                     .load_script(script.code(), script.ty_args().to_vec())
-                    .map_err(|e| Err(e.into_vm_status()))?;
+                    .map_err(VMError::into_vm_status)?;
                 let args =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                         &mut tmp_session,
@@ -1205,20 +1204,21 @@ impl AptosVM {
                         self.0
                             .get_features()
                             .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-                    )
-                    .map_err(Err)?;
+                    )?;
 
-                tmp_session
+                return_on_failure!(tmp_session
                     .execute_script(
                         script.code(),
                         script.ty_args().to_vec(),
                         args,
                         &mut gas_meter,
                     )
-                    .and_then(|_| tmp_session.finish(&mut (), &change_set_configs))
-                    .map_err(|e| Err(e.into_vm_status()))?
+                    .map_err(VMError::into_vm_status));
+                tmp_session
+                    .finish(&mut (), &change_set_configs)
+                    .map_err(VMError::into_vm_status)
             },
-        })
+        }
     }
 
     fn read_writeset(
@@ -1267,15 +1267,12 @@ impl AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set_ext = match self.execute_writeset(
+        let change_set_ext = self.execute_writeset(
             storage,
             &writeset_payload,
             Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
-        ) {
-            Ok(cse) => cse,
-            Err(e) => return e,
-        };
+        )?;
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
         Self::validate_waypoint_change_set(&change_set, log_context)?;
@@ -1544,11 +1541,11 @@ impl VMValidator for AptosVM {
 }
 
 impl VMAdapter for AptosVM {
-    fn new_session<'s, R: MoveResolverExt>(
-        &'s self,
-        remote: &'s R,
+    fn new_session<'r>(
+        &'r self,
+        remote: &'r impl MoveResolverExt,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_> {
+    ) -> SessionExt<'r, '_> {
         self.0.new_session(remote, session_id)
     }
 
@@ -1759,40 +1756,40 @@ impl AptosSimulationVM {
                 if let Some(payload) = multisig.transaction_payload.clone() {
                     match payload {
                         MultisigTransactionPayload::EntryFunction(entry_function) => {
-                            self.0
-                                .execute_multisig_entry_function(
+                            aptos_try!({
+                                return_on_failure!(self.0.execute_multisig_entry_function(
                                     &mut session,
                                     &mut gas_meter,
                                     multisig.multisig_address,
                                     &entry_function,
                                     &mut new_published_modules_loaded,
+                                ));
+
+                                // TODO: Deduplicate this against execute_multisig_transaction
+                                // A bit tricky since we need to skip success/failure cleanups,
+                                // which is in the middle. Introducing a boolean would make the code
+                                // messier.
+                                let change_set_ext = session
+                                    .finish(&mut (), &storage_gas_params.change_set_configs)
+                                    .map_err(|e| e.into_vm_status())?;
+                                gas_meter.charge_io_gas_for_write_set(
+                                    change_set_ext.write_set().iter(),
+                                )?;
+                                gas_meter.charge_storage_fee_for_all(
+                                    change_set_ext.write_set().iter(),
+                                    change_set_ext.change_set().events(),
+                                    txn_data.transaction_size,
+                                    txn_data.gas_unit_price,
+                                )?;
+                                self.0.success_transaction_cleanup(
+                                    storage,
+                                    change_set_ext,
+                                    &mut gas_meter,
+                                    &txn_data,
+                                    log_context,
+                                    &storage_gas_params.change_set_configs,
                                 )
-                                .and_then(|_| {
-                                    // TODO: Deduplicate this against execute_multisig_transaction
-                                    // A bit tricky since we need to skip success/failure cleanups,
-                                    // which is in the middle. Introducing a boolean would make the code
-                                    // messier.
-                                    let change_set_ext = session
-                                        .finish(&mut (), &storage_gas_params.change_set_configs)
-                                        .map_err(|e| e.into_vm_status())?;
-                                    gas_meter.charge_io_gas_for_write_set(
-                                        change_set_ext.write_set().iter(),
-                                    )?;
-                                    gas_meter.charge_storage_fee_for_all(
-                                        change_set_ext.write_set().iter(),
-                                        change_set_ext.change_set().events(),
-                                        txn_data.transaction_size,
-                                        txn_data.gas_unit_price,
-                                    )?;
-                                    self.0.success_transaction_cleanup(
-                                        storage,
-                                        change_set_ext,
-                                        &mut gas_meter,
-                                        &txn_data,
-                                        log_context,
-                                        &storage_gas_params.change_set_configs,
-                                    )
-                                })
+                            })
                         },
                     }
                 } else {

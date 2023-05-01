@@ -18,15 +18,15 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
-pub trait VMAdapter {
+pub(crate) trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
-    fn new_session<'s, R: MoveResolverExt>(
-        &'s self,
-        remote: &'s R,
+    fn new_session<'r>(
+        &'r self,
+        remote: &'r impl MoveResolverExt,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_>;
+    ) -> SessionExt<'r, '_>;
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
