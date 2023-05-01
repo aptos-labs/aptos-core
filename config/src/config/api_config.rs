@@ -13,43 +13,60 @@ use std::net::SocketAddr;
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ApiConfig {
+    /// Enables the REST API endpoint
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Address for the REST API to listen on. Set to 0.0.0.0:<port> to allow all inbound connections.
     pub address: SocketAddr,
+    /// Path to a local TLS certificate to enable HTTPS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_cert_path: Option<String>,
+    /// Path to a local TLS key to enable HTTPS
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
-    // optional for compatible with old configuration
+    /// A maximum limit to the body of a POST request in bytes
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_length_limit: Option<u64>,
+    /// Enables failpoints for error testing
     #[serde(default = "default_disabled")]
     pub failpoints_enabled: bool,
+    /// Enables JSON output of APIs that support it
     #[serde(default = "default_enabled")]
     pub json_output_enabled: bool,
+    /// Enables BCS output of APIs that support it
     #[serde(default = "default_enabled")]
     pub bcs_output_enabled: bool,
+    /// Enables encode submission API
     #[serde(default = "default_enabled")]
     pub encode_submission_enabled: bool,
+    /// Enables transaction submission APIs
     #[serde(default = "default_enabled")]
     pub transaction_submission_enabled: bool,
+    /// Enables transaction simulation
     #[serde(default = "default_enabled")]
     pub transaction_simulation_enabled: bool,
-
+    /// Maximum number of transactions that can be sent with the Batch submit API
     pub max_submit_transaction_batch_size: usize,
-
-    // Maximum page size for paginated APIs
+    /// Maximum page size for transaction paginated APIs
     pub max_transactions_page_size: u16,
+    /// Maximum page size for event paginated APIs
     pub max_events_page_size: u16,
+    /// Maximum page size for resource paginated APIs
     pub max_account_resources_page_size: u16,
+    /// Maximum page size for module paginated APIs
     pub max_account_modules_page_size: u16,
-
-    /// Max gas unit for view function.
+    /// Maximum gas unit limit for view functions
+    ///
+    /// This limits the execution length of a view function to the given gas used.
     pub max_gas_view_function: u64,
-
-    // Performance functionality
-    pub max_runtime_workers: Option<usize>, // The maximum number of workers to use for the API runtime
-    pub runtime_worker_multiplier: usize, // If max_runtime_workers is None, use runtime_worker_multiplier * num CPU cores
+    /// Optional: Maximum number of worker threads for the API.
+    ///
+    /// If not set, `runtime_worker_multiplier` will multiply times the number of CPU cores on the machine
+    pub max_runtime_workers: Option<usize>,
+    /// Multiplier for number of worker threads with number of CPU cores
+    ///
+    /// If `max_runtime_workers` is set, this is ignored
+    pub runtime_worker_multiplier: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";

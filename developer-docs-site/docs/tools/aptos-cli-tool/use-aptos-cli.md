@@ -663,7 +663,9 @@ $ aptos key generate --key-type ed25519 --output-file output.key
 }
 ```
 
-If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address.
+### Generating a vanity prefix key
+
+If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address:
 
 ```bash
 $ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
@@ -676,8 +678,37 @@ $ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
 }
 ```
 
+This works for multisig accounts too:
+
+```bash
+% aptos key generate --output-file starts_with_bee.key --vanity-prefix 0xbee --vanity-multisig
+{
+  "Result": {
+    "PrivateKey Path": "starts_with_bee.key",
+    "PublicKey Path": "starts_with_bee.key.pub",
+    "Account Address:": "0x384cf987aab625f9727684d4dda8de668abedc18aa8dceabd7651a1cfb69196f",
+    "Multisig Account Address:": "0xbee0797c577428249125f6ed7f4a2a5939ddc34389294bd9f5d1627508832f56"
+  }
+}
+```
+
+Note the vanity flag documentation from the `aptos key generate` help:
+
+```
+--vanity-multisig
+    Use this flag when vanity prefix is for a multisig account. This mines a private key for
+    a single signer account that can, as its first transaction, create a multisig account
+    with the given vanity prefix
+
+--vanity-prefix <VANITY_PREFIX>
+    Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d.
+    Each additional character multiplies by a factor of 16 the computational difficulty
+    associated with generating an address, so try out shorter prefixes first and be prepared
+    to wait for longer ones
+```
+
 :::tip
-The more characters you specify, the longer it will take to generate a vanity account.
+If you want even faster vanity address generation for long prefixes, try out the parallelism-optimized [`optivanity`](https://github.com/econia-labs/optivanity) tool from [Econia Labs](https://www.econialabs.com/)
 :::
 
 ### Generating a peer config

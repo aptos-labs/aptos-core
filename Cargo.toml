@@ -589,7 +589,9 @@ move-compiler = { path = "third_party/move/move-compiler" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-docgen = { path = "third_party/move/move-prover/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
+move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
+move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-bytecode-source-map" }
 move-model = { path = "third_party/move/move-model" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-prover = { path = "third_party/move/move-prover" }

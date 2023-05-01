@@ -312,16 +312,47 @@ fn create_single_node_test_config(
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
+    node_config
+        .consensus
+        .quorum_store
+        .num_workers_for_remote_batches = 1;
+    node_config.consensus.quorum_store_poll_time_ms = 1000;
+
     node_config.execution.concurrency_level = 1;
     node_config.execution.num_proof_reading_threads = 1;
+    node_config.execution.paranoid_hot_potato_verification = false;
+    node_config.execution.paranoid_type_verification = false;
+    node_config
+        .execution
+        .processed_transactions_detailed_counters = false;
+
     node_config.peer_monitoring_service.max_concurrent_requests = 1;
+    node_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client = false;
+
     node_config
         .mempool
         .shared_mempool_max_concurrent_inbound_syncs = 1;
+    node_config.mempool.default_failovers = 1;
+    node_config.mempool.max_broadcasts_per_peer = 1;
+
     node_config
         .state_sync
         .state_sync_driver
         .enable_auto_bootstrapping = true;
+    node_config
+        .state_sync
+        .state_sync_driver
+        .max_connection_deadline_secs = 1;
+    node_config
+        .state_sync
+        .state_sync_driver
+        .progress_check_interval_ms = 10_000;
+    node_config
+        .state_sync
+        .data_streaming_service
+        .progress_check_interval_ms = 10_000;
 
     // Configure the validator network
     let validator_network = node_config.validator_network.as_mut().unwrap();
