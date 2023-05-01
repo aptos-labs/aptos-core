@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, data_cache::MoveResolverWithVMMetadata,
-    move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
+    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
+    transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,

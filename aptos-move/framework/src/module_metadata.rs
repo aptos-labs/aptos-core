@@ -25,8 +25,8 @@ pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
 /// The keys used to identify the metadata in the metadata section of the module bytecode.
 /// This is more or less arbitrary, besides we should use some unique key to identify
 /// Aptos specific metadata (`aptos::` here).
-pub static APTOS_METADATA_KEY: &'static [u8] = "aptos::metadata_v0".as_bytes();
-pub static APTOS_METADATA_KEY_V1: &'static [u8] = "aptos::metadata_v1".as_bytes();
+pub static APTOS_METADATA_KEY: &[u8] = "aptos::metadata_v0".as_bytes();
+pub static APTOS_METADATA_KEY_V1: &[u8] = "aptos::metadata_v1".as_bytes();
 
 /// Aptos specific metadata attached to the metadata section of file_format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,7 +168,7 @@ pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedErr
 pub fn get_metadata_from_compiled_module(
     module: &CompiledModule,
 ) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY_V1) {
+    if let Some(data) = find_metadata(module, APTOS_METADATA_KEY_V1) {
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
         // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
         // being used. Note, this should have been gated in the verify module metadata.
@@ -179,7 +179,7 @@ pub fn get_metadata_from_compiled_module(
             }
         }
         metadata
-    } else if let Some(data) = find_metadata(module, &APTOS_METADATA_KEY) {
+    } else if let Some(data) = find_metadata(module, APTOS_METADATA_KEY) {
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
@@ -201,7 +201,7 @@ pub fn get_metadata_from_compiled_module(
 pub fn get_metadata_from_compiled_script(
     script: &CompiledScript,
 ) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = find_metadata_in_script(script, &APTOS_METADATA_KEY_V1) {
+    if let Some(data) = find_metadata_in_script(script, APTOS_METADATA_KEY_V1) {
         let mut metadata = bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok();
         // Clear out metadata for v5, since it shouldn't have existed in the first place and isn't
         // being used. Note, this should have been gated in the verify module metadata.
@@ -212,7 +212,7 @@ pub fn get_metadata_from_compiled_script(
             }
         }
         metadata
-    } else if let Some(data) = find_metadata_in_script(script, &APTOS_METADATA_KEY) {
+    } else if let Some(data) = find_metadata_in_script(script, APTOS_METADATA_KEY) {
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())

@@ -35,7 +35,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
