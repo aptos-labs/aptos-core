@@ -1,6 +1,6 @@
 /// This module implements a Bulletproof-based zero-knowledge range proof: i.e., a proof that a Pedersen commitment
-/// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports $n \in
-/// \{8, 16, 32, 64\}$ for the number of bits.
+/// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports
+/// $n \in \{8, 16, 32, 64\}$ for the number of bits.
 module aptos_std::bulletproofs {
     use std::features;
     use aptos_std::elgamal;
@@ -34,7 +34,8 @@ module aptos_std::bulletproofs {
     // Structs
     //
 
-    /// Represents a zero-knowledge range proof that a value committed inside a Pedersen commitment lies in `[0, 2^{MAX_RANGE_BITS})`.
+    /// Represents a zero-knowledge range proof that a value committed inside a Pedersen commitment lies in
+    /// `[0, 2^{MAX_RANGE_BITS})`.
     struct RangeProof has copy, drop, store {
         bytes: vector<u8>
     }
@@ -128,7 +129,8 @@ module aptos_std::bulletproofs {
 
 
     #[test_only]
-    /// Computes a range proof for the ElGamal encryption of `val` with randomness `r`, under the default ristretto255  /// basepoint and provided ElGamal public key `pubkey`. Returnsboth the range proof and the encryption.
+    /// Computes a range proof for the ElGamal encryption of `val` with randomness `r`, under the default Ristretto255
+    /// basepoint and provided ElGamal public key `pubkey`. Returns both the range proof and the encryption.
     /// Only works for `num_bits` \in {8, 16, 32, 64}.
     public fun prove_range_elgamal(val: &Scalar, r: &Scalar, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): (RangeProof, elgamal::Ciphertext) {
         let compressed_pubkey_point = elgamal::get_compressed_point_from_pubkey(pubkey);
