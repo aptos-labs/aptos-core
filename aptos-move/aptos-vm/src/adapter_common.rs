@@ -36,10 +36,10 @@ pub trait VMAdapter {
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
 
     /// Runs the prologue for the given transaction.
-    fn run_prologue<S: MoveResolverExt>(
+    fn run_prologue(
         &self,
         session: &mut SessionExt,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -48,17 +48,17 @@ pub trait VMAdapter {
     fn should_restart_execution(output: &TransactionOutput) -> bool;
 
     /// Execute a single transaction.
-    fn execute_single_transaction<S: MoveResolverExt>(
+    fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &S,
+        data_cache: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 
-    fn validate_signature_checked_transaction<S: MoveResolverExt>(
+    fn validate_signature_checked_transaction(
         &self,
         session: &mut SessionExt,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         transaction: &SignatureCheckedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,

@@ -193,22 +193,22 @@ impl AptosVM {
     }
 
     /// Load a module into its internal MoveVM's code cache.
-    pub fn load_module<S: MoveResolverExt>(
+    pub fn load_module(
         &self,
         module_id: &ModuleId,
-        state: &S,
+        state: &impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
         self.0.load_module(module_id, state)
     }
 
     /// Generates a transaction output for a transaction that encountered errors during the
     /// execution process. This is public for now only for tests.
-    pub fn failed_transaction_cleanup<S: MoveResolverExt>(
+    pub fn failed_transaction_cleanup(
         &self,
         error_code: VMStatus,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> TransactionOutputExt {
@@ -223,12 +223,12 @@ impl AptosVM {
         .1
     }
 
-    fn failed_transaction_cleanup_and_keep_vm_status<S: MoveResolverExt>(
+    fn failed_transaction_cleanup_and_keep_vm_status(
         &self,
         error_code: VMStatus,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, TransactionOutputExt) {
@@ -285,9 +285,9 @@ impl AptosVM {
         }
     }
 
-    fn success_transaction_cleanup<S: MoveResolverExt>(
+    fn success_transaction_cleanup(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         user_txn_change_set_ext: ChangeSetExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -379,9 +379,9 @@ impl AptosVM {
             .map_err(|e| e.into_vm_status())
     }
 
-    fn execute_script_or_entry_function<S: MoveResolverExt>(
+    fn execute_script_or_entry_function(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -478,9 +478,9 @@ impl AptosVM {
     // failure object. In case of success, keep the session and also do any necessary module publish
     // cleanup.
     // 3. Call post transaction cleanup function in multisig account module with the result from (2)
-    fn execute_multisig_transaction<S: MoveResolverExt>(
+    fn execute_multisig_transaction(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -631,9 +631,9 @@ impl AptosVM {
         Ok(())
     }
 
-    fn success_multisig_payload_cleanup<S: MoveResolverExt>(
+    fn success_multisig_payload_cleanup(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -680,9 +680,9 @@ impl AptosVM {
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 
-    fn failure_multisig_payload_cleanup<S: MoveResolverExt>(
+    fn failure_multisig_payload_cleanup(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
@@ -807,9 +807,9 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules<S: MoveResolverExt>(
+    fn execute_modules(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -1009,17 +1009,13 @@ impl AptosVM {
         ))
     }
 
-    fn execute_user_transaction_impl<S, G>(
+    fn execute_user_transaction_impl(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-        gas_meter: &mut G,
-    ) -> (VMStatus, TransactionOutputExt)
-    where
-        G: AptosGasMeter,
-        S: MoveResolverExt,
-    {
+        gas_meter: &mut impl AptosGasMeter,
+    ) -> (VMStatus, TransactionOutputExt) {
         // Revalidate the transaction.
         let resolver = self.0.new_move_resolver(storage);
         let mut session = self.0.new_session(&resolver, SessionId::txn(txn));
@@ -1128,9 +1124,9 @@ impl AptosVM {
         }
     }
 
-    fn execute_user_transaction<S: MoveResolverExt>(
+    fn execute_user_transaction(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, TransactionOutputExt) {
@@ -1172,9 +1168,9 @@ impl AptosVM {
         Ok((status, output.into_transaction_output(&storage), gas_meter))
     }
 
-    fn execute_writeset<S: MoveResolverExt>(
+    fn execute_writeset(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
@@ -1263,9 +1259,9 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn process_waypoint_change_set<S: MoveResolverExt>(
+    pub(crate) fn process_waypoint_change_set(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         writeset_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
@@ -1294,9 +1290,9 @@ impl AptosVM {
         ))
     }
 
-    pub(crate) fn process_block_prologue<S: MoveResolverExt>(
+    pub(crate) fn process_block_prologue(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
@@ -1404,10 +1400,10 @@ impl AptosVM {
             .collect::<Vec<_>>())
     }
 
-    fn run_prologue_with_payload<S: MoveResolverExt>(
+    fn run_prologue_with_payload(
         &self,
         session: &mut SessionExt,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -1571,10 +1567,10 @@ impl VMAdapter for AptosVM {
         Ok(())
     }
 
-    fn run_prologue<S: MoveResolverExt>(
+    fn run_prologue(
         &self,
         session: &mut SessionExt,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -1597,10 +1593,10 @@ impl VMAdapter for AptosVM {
             .any(|event| *event.key() == new_epoch_event_key)
     }
 
-    fn execute_single_transaction<S: MoveResolverExt>(
+    fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &S,
+        data_cache: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
@@ -1682,10 +1678,10 @@ impl AsMut<AptosVMImpl> for AptosVM {
 }
 
 impl AptosSimulationVM {
-    fn validate_simulated_transaction<S: MoveResolverExt>(
+    fn validate_simulated_transaction(
         &self,
         session: &mut SessionExt,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         transaction: &SignedTransaction,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -1704,9 +1700,9 @@ impl AptosSimulationVM {
     /*
     Executes a SignedTransaction without performing signature verification
      */
-    fn simulate_signed_transaction<S: MoveResolverExt>(
+    fn simulate_signed_transaction(
         &self,
-        storage: &S,
+        storage: &impl MoveResolverExt,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, TransactionOutputExt) {
