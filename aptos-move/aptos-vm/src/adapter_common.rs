@@ -26,7 +26,7 @@ pub trait VMAdapter {
         &'s self,
         remote: &'s R,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_, R>;
+    ) -> SessionExt<'s, '_>;
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
@@ -36,9 +36,9 @@ pub trait VMAdapter {
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
 
     /// Runs the prologue for the given transaction.
-    fn run_prologue<S: MoveResolverExt, SS: MoveResolverExt>(
+    fn run_prologue<S: MoveResolverExt>(
         &self,
-        session: &mut SessionExt<SS>,
+        session: &mut SessionExt,
         storage: &S,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
@@ -55,9 +55,9 @@ pub trait VMAdapter {
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 
-    fn validate_signature_checked_transaction<S: MoveResolverExt, SS: MoveResolverExt>(
+    fn validate_signature_checked_transaction<S: MoveResolverExt>(
         &self,
-        session: &mut SessionExt<SS>,
+        session: &mut SessionExt,
         storage: &S,
         transaction: &SignatureCheckedTransaction,
         allow_too_new: bool,

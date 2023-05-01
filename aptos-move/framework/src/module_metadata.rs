@@ -26,10 +26,8 @@ pub const METADATA_V1_MIN_FILE_FORMAT_VERSION: u32 = 6;
 /// The keys used to identify the metadata in the metadata section of the module bytecode.
 /// This is more or less arbitrary, besides we should use some unique key to identify
 /// Aptos specific metadata (`aptos::` here).
-pub static APTOS_METADATA_KEY: Lazy<Vec<u8>> =
-    Lazy::new(|| "aptos::metadata_v0".as_bytes().to_vec());
-pub static APTOS_METADATA_KEY_V1: Lazy<Vec<u8>> =
-    Lazy::new(|| "aptos::metadata_v1".as_bytes().to_vec());
+pub static APTOS_METADATA_KEY: &'static [u8] = "aptos::metadata_v0".as_bytes();
+pub static APTOS_METADATA_KEY_V1: &'static [u8] = "aptos::metadata_v1".as_bytes();
 
 /// Aptos specific metadata attached to the metadata section of file_format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,20 +123,16 @@ impl KnownAttribute {
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
 pub fn get_vm_metadata(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = vm.get_module_metadata(module_id.clone(), &APTOS_METADATA_KEY_V1) {
+    if let Some(data) = vm.get_module_metadata(module_id.clone(), APTOS_METADATA_KEY_V1) {
         bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok()
-    } else if let Some(data) = vm.get_module_metadata(module_id, &APTOS_METADATA_KEY) {
-        // Old format available, upgrade to new one on the fly
-        let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
-        Some(data_v0.upgrade())
     } else {
-        None
+        get_vm_metadata_v0(vm, module_id)
     }
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = vm.get_module_metadata(module_id, &APTOS_METADATA_KEY) {
+fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
+    if let Some(data) = vm.get_module_metadata(module_id, APTOS_METADATA_KEY) {
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
     } else {

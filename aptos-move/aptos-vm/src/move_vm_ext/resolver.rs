@@ -25,6 +25,11 @@ fn get_resource_group_from_metadata(
         .find_map(|attr| attr.get_resource_group_member())
 }
 
+macro_rules! aptos_try {
+    ($e:expr) => {
+        (|| $e)()
+    };
+}
 
 pub trait MoveResolverExt:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
@@ -50,14 +55,14 @@ pub trait MoveResolverExt:
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {
-        (|| {
+        aptos_try!({
             self.get_module_metadata(struct_tag.module_id())?
                 .struct_attributes
                 .get(struct_tag.name.as_ident_str().as_str())?
                 .iter()
                 .find(|attr| attr.is_resource_group())?;
             Some(())
-        })()
+        })
         .is_some()
     }
 }

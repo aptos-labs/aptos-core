@@ -4,7 +4,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
+    data_cache::{AsMoveResolver, IntoMoveResolver, MoveResolverWithVMMetadata, StorageAdapter},
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
@@ -365,9 +365,9 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into either `SCRIPT_PROLOGUE_NAME` function
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_script_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_script_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -429,9 +429,9 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into `MODULE_PROLOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_module_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_module_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -471,9 +471,9 @@ impl AptosVMImpl {
     /// 2. It has received enough approvals to meet the signature threshold of the multisig account
     /// 3. If only the payload hash was stored on chain, the provided payload in execution should
     /// match that hash.
-    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_multisig_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         payload: &Multisig,
         log_context: &AdapterLogSchema,
@@ -506,9 +506,9 @@ impl AptosVMImpl {
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
+    pub(crate) fn run_success_epilogue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -546,9 +546,9 @@ impl AptosVMImpl {
 
     /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
     /// stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_failure_epilogue<S: MoveResolverExt>(
+    pub(crate) fn run_failure_epilogue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -599,11 +599,7 @@ impl AptosVMImpl {
         &self,
         module: &ModuleId,
     ) -> Option<RuntimeModuleMetadataV1> {
-        if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
-        } else {
-            aptos_framework::get_vm_metadata_v0(&self.move_vm, module.clone())
-        }
+        aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
     }
 
     pub fn new_move_resolver<'r, R: MoveResolverExt>(
@@ -617,7 +613,7 @@ impl AptosVMImpl {
         &'s self,
         r: &'s R,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_, R> {
+    ) -> SessionExt<'s, '_> {
         self.move_vm.new_session(r, session_id)
     }
 
@@ -658,9 +654,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
+pub(crate) fn get_transaction_output<A: AccessPathCache>(
     ap_cache: &mut A,
-    session: SessionExt<S>,
+    session: SessionExt,
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,

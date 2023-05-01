@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    data_cache::MoveResolverWithVMMetadata,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
@@ -21,7 +22,6 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::{ops::Deref, sync::Arc};
-use crate::data_cache::MoveResolverWithVMMetadata;
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -77,7 +77,7 @@ impl MoveVmExt {
         &'s self,
         remote: &'s S,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_, S> {
+    ) -> SessionExt<'s, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
@@ -107,11 +107,9 @@ impl MoveVmExt {
         // cache needs to be flushed to work around those bugs.
         self.inner.flush_loader_cache_if_invalidated();
 
-        let resolver_with_metadata_cache = Box::new(MoveResolverWithVMMetadata::new(remote, self));
-
-        SessionExt::new(
-            self.inner.new_session_with_extensions(resolver_with_metadata_cache.as_ref(), extensions),
-            resolver_with_metadata_cache,
+        SessionExt::create_new(
+            self.inner.new_session_with_extensions(remote, extensions),
+            remote,
         )
     }
 }

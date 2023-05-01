@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use std::collections::BTreeMap;
-use crate::move_vm_ext::{MoveResolverExt};
+use crate::move_vm_ext::MoveResolverExt;
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
@@ -23,7 +22,10 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
 
 pub(crate) fn get_any_resource(
     move_resolver: &impl MoveResolverExt,

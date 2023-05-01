@@ -9,7 +9,7 @@ use move_core_types::{
     effects::{AccountChangeSet, ChangeSet, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -19,7 +19,6 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
-use move_core_types::language_storage::StructTag;
 
 pub struct AccountDataCache {
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
@@ -49,7 +48,7 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+    pub(crate) remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
@@ -157,17 +156,6 @@ impl<'r> TransactionDataCache<'r> {
         map.get_mut(k).unwrap()
     }
 
-    fn get_resource_group_from_metadata(
-        struct_tag: &StructTag,
-        metadata: Option<aptos_framework::RuntimeModuleMetadataV1>,
-    ) -> Option<StructTag> {
-        metadata?
-            .struct_attributes
-            .get(struct_tag.name.as_ident_str().as_str())?
-            .iter()
-            .find_map(|attr| attr.get_resource_group_member())
-    }
-
     // Retrieve data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
@@ -194,8 +182,9 @@ impl<'r> TransactionDataCache<'r> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
 
-            let metadata = get_resource_group_from_metadata(loader.get_metadata(ty_tag.module_id(), ty_tag.name.as_bytes()));
+            loader.get_metadata(ty_tag.module_id(), ty_tag.name.as_bytes());
 
+            // let metadata = get_resource_group_from_metadata(loader.get_metadata(ty_tag.module_id(), ty_tag.name.as_bytes()));
 
             let gv = match self.remote.get_resource(&addr, &ty_tag) {
                 Ok(Some(blob)) => {
