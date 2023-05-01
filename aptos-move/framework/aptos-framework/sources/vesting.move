@@ -350,8 +350,9 @@ module aptos_framework::vesting {
     }
 
     #[view]
-    /// Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.
-    /// This excludes any unpaid commission that the operator has not collected.
+    /// Return the total accumulated rewards that can be unlocked for distribution to shareholders of the vesting contract.
+    /// This excludes any unpaid commission that the operator has not collected. 
+    /// Calling unlock_stake() will allow these rewards to be distributed.
     ///
     /// This errors out if the vesting contract with the provided address doesn't exist.
     public fun total_accumulated_rewards(vesting_contract_address: address): u64 acquires VestingContract {
@@ -364,7 +365,8 @@ module aptos_framework::vesting {
     }
 
     #[view]
-    /// Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass
+    /// Return the accumulated rewards that can be unlocked for shareholder distribution. 
+    /// Calling unlock_stake() will allow these rewards to be distributed. Caller can also pass
     /// the beneficiary address instead of shareholder address.
     ///
     /// This errors out if the vesting contract with the provided address doesn't exist.
