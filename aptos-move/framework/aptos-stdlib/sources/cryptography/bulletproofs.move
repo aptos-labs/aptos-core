@@ -84,12 +84,12 @@ module aptos_std::bulletproofs {
     /// with ElGamal public key `pubkey = sk * G`, where G is the ristretto255 basepoint obtained by
     /// ristretto255::basepoint() satisfies $v \in [0, 2^{num_bits})$. Only works
     /// for `num_bits` \in {8, 16, 32, 64}.
-    public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): bool {
+    public fun verify_range_proof_elgamal(ct: &elgamal::Ciphertext, proof: &RangeProof, pubkey: &elgamal::CompressedPubkey, num_bits: u64, dst: vector<u8>): bool {
         assert!(features::bulletproofs_enabled(), E_NATIVE_FUN_NOT_AVAILABLE);
 
         verify_range_proof_internal(
-            ristretto255::point_to_bytes(&elgamal::get_value_component_compressed(ct)),
-            &ristretto255::basepoint(), &elgamal::get_point_from_pubkey(pubkey),
+            ristretto255::point_to_bytes(&ristretto255::point_compress(elgamal::get_value_component(ct))),
+            &ristretto255::basepoint(), &elgamal::pubkey_to_point(pubkey),
             proof.bytes,
             num_bits,
             dst
@@ -132,8 +132,8 @@ module aptos_std::bulletproofs {
     /// Computes a range proof for the ElGamal encryption of `val` with randomness `r`, under the default Ristretto255
     /// basepoint and provided ElGamal public key `pubkey`. Returns both the range proof and the encryption.
     /// Only works for `num_bits` \in {8, 16, 32, 64}.
-    public fun prove_range_elgamal(val: &Scalar, r: &Scalar, pubkey: &elgamal::Pubkey, num_bits: u64, dst: vector<u8>): (RangeProof, elgamal::Ciphertext) {
-        let compressed_pubkey_point = elgamal::get_compressed_point_from_pubkey(pubkey);
+    public fun prove_range_elgamal(val: &Scalar, r: &Scalar, pubkey: &elgamal::CompressedPubkey, num_bits: u64, dst: vector<u8>): (RangeProof, elgamal::Ciphertext) {
+        let compressed_pubkey_point = elgamal::pubkey_to_compressed_point(pubkey);
         let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, &ristretto255::basepoint(), &ristretto255::point_decompress(&compressed_pubkey_point));
         let left = ristretto255::new_point_from_bytes(compressed_comm);
         let left = std::option::extract<RistrettoPoint>(&mut left);
