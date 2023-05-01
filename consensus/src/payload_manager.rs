@@ -1,18 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    batch_reader::BatchReader, quorum_store_coordinator::CoordinatorCommand,
+use crate::{
+    counters,
+    network::NetworkSender,
+    quorum_store::{
+        batch_store::{BatchReader, BatchStore},
+        quorum_store_coordinator::CoordinatorCommand,
+    },
 };
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload},
-    proof_of_store::{LogicalTime, ProofOfStore},
+    proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error::DataNotFound, *};
-use aptos_infallible::Mutex;
-use aptos_logger::{debug, warn};
+use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::{channel::mpsc::Sender, SinkExt};
 use std::sync::Arc;
@@ -22,43 +26,46 @@ use tokio::sync::oneshot;
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<BatchReader>, Mutex<Sender<CoordinatorCommand>>),
+    InQuorumStore(Arc<BatchStore<NetworkSender>>, Sender<CoordinatorCommand>),
 }
 
 impl PayloadManager {
     async fn request_transactions(
         proofs: Vec<ProofOfStore>,
-        logical_time: LogicalTime,
-        batch_reader: &BatchReader,
+        block_timestamp: u64,
+        batch_store: &BatchStore<NetworkSender>,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
     )> {
         let mut receivers = Vec::new();
         for pos in proofs {
-            debug!(
-                "QSE: requesting pos {:?}, digest {}, time = {:?}",
+            trace!(
+                "QSE: requesting pos {:?}, digest {}, time = {}",
                 pos,
                 pos.digest(),
-                logical_time
+                block_timestamp
             );
-            if logical_time <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_reader.get_batch(pos).await));
+            if block_timestamp <= pos.expiration() {
+                receivers.push((*pos.digest(), batch_store.get_batch(pos)));
             } else {
-                debug!("QS: skipped expired pos");
+                debug!("QSE: skipped expired pos {}", pos.digest());
             }
         }
         receivers
     }
 
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
-    pub async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
+    pub async fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
-                batch_reader.update_certified_round(logical_time).await;
+            PayloadManager::InQuorumStore(batch_store, coordinator_tx) => {
+                // TODO: move this to somewhere in quorum store, so this can be a batch reader
+                batch_store
+                    .update_certified_timestamp(block_timestamp)
+                    .await;
 
-                let digests: Vec<HashValue> = payloads
+                let batches: Vec<_> = payloads
                     .into_iter()
                     .flat_map(|payload| match payload {
                         Payload::DirectMempool(_) => {
@@ -66,16 +73,15 @@ impl PayloadManager {
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
                     })
-                    .map(|proof| *proof.digest())
+                    .map(|proof| proof.info().clone())
                     .collect();
 
-                let mut tx = coordinator_tx.lock().clone();
+                let mut tx = coordinator_tx.clone();
 
-                // TODO: don't even need to warn on fail?
                 if let Err(e) = tx
                     .send(CoordinatorCommand::CommitNotification(
-                        logical_time,
-                        digests,
+                        block_timestamp,
+                        batches,
                     ))
                     .await
                 {
@@ -96,13 +102,13 @@ impl PayloadManager {
         };
         match self {
             PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
+            PayloadManager::InQuorumStore(batch_store, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
-                            LogicalTime::new(block.epoch(), block.round()),
-                            batch_reader,
+                            block.timestamp_usecs(),
+                            batch_store,
                         )
                         .await;
                         proof_with_status
@@ -129,12 +135,13 @@ impl PayloadManager {
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok(txns.clone()),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_store, _),
                 Payload::InQuorumStore(proof_with_data),
             ) => {
                 let status = proof_with_data.status.lock().take();
                 match status.expect("Should have been updated before.") {
                     DataStatus::Cached(data) => {
+                        counters::QUORUM_BATCH_READY_COUNT.inc();
                         proof_with_data
                             .status
                             .lock()
@@ -142,8 +149,15 @@ impl PayloadManager {
                         Ok(data)
                     },
                     DataStatus::Requested(receivers) => {
+                        let _timer = counters::BATCH_WAIT_DURATION.start_timer();
                         let mut vec_ret = Vec::new();
-                        debug!("QSE: waiting for data on {} receivers", receivers.len());
+                        if !receivers.is_empty() {
+                            debug!(
+                                "QSE: waiting for data on {} receivers, block_round {}",
+                                receivers.len(),
+                                block.round()
+                            );
+                        }
                         for (digest, rx) in receivers {
                             match rx.await {
                                 Err(e) => {
@@ -151,8 +165,8 @@ impl PayloadManager {
                                     warn!("Oneshot channel to get a batch was dropped with error {:?}", e);
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
-                                        LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        block.timestamp_usecs(),
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again
@@ -168,8 +182,8 @@ impl PayloadManager {
                                 Ok(Err(e)) => {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
-                                        LogicalTime::new(block.epoch(), block.round()),
-                                        batch_reader,
+                                        block.timestamp_usecs(),
+                                        batch_store,
                                     )
                                     .await;
                                     // Could not get all data so requested again

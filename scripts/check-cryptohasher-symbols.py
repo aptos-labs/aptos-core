@@ -27,7 +27,7 @@ ignored_crates = set([
     'siphasher',
 ])
 
-proc = subprocess.run("cargo doc --workspace --document-private-items", shell=True)
+proc = subprocess.run("cargo doc --workspace --no-deps --document-private-items", shell=True)
 assert proc.returncode == 0
 assert os.path.exists('target/doc')
 
@@ -53,7 +53,7 @@ print()
 if len(symbol_to_paths_map)==0:
     print(f'WARNING: no CryptoHasher derive usage found. `CryptoHasher` macro may have been updated and this check needs a rework.')
     exit(1)
-    
+
 reused_symbol_names = {k:v for k,v in symbol_to_paths_map.items() if len(v)>=2 and k not in whitelisted_symbols}
 if reused_symbol_names:
     print(f'WARNING: the symbol name(s) below are used by 2+ structs/enums that implement `CryptoHasher`. Please ensure unique symbol names to avoid potential hash input collision across domains.')

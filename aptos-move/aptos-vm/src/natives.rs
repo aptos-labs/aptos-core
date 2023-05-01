@@ -2,11 +2,17 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
+use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 #[cfg(feature = "testing")]
 use aptos_types::chain_id::ChainId;
-use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::TimedFeatures};
+use aptos_types::{
+    account_config::CORE_CODE_ADDRESS,
+    on_chain_config::{Features, TimedFeatures},
+};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+use std::sync::Arc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -27,31 +33,23 @@ pub fn aptos_natives(
     abs_val_size_gas_params: AbstractValueSizeGasParameters,
     gas_feature_version: u64,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> NativeFunctionTable {
-    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib)
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, gas_params.move_stdlib.clone())
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
+            gas_params.move_stdlib,
             gas_params.aptos_framework,
             timed_features,
+            features,
             move |val| abs_val_size_gas_params.abstract_value_size(val, gas_feature_version),
         ))
         .chain(move_table_extension::table_natives(
             CORE_CODE_ADDRESS,
             gas_params.table,
         ))
-        // TODO(Gas): this isn't quite right yet...
-        .chain(
-            move_stdlib::natives::nursery_natives(
-                CORE_CODE_ADDRESS,
-                move_stdlib::natives::NurseryGasParameters::zeros(),
-            )
-            .into_iter()
-            .filter(|(addr, module_name, _, _)| {
-                !(*addr == CORE_CODE_ADDRESS && module_name.as_str() == "event")
-            }),
-        )
         .collect()
 }
 
@@ -61,7 +59,8 @@ pub fn assert_no_test_natives(err_msg: &str) {
             NativeGasParameters::zeros(),
             AbstractValueSizeGasParameters::zeros(),
             LATEST_GAS_FEATURE_VERSION,
-            TimedFeatures::enable_all()
+            TimedFeatures::enable_all(),
+            Arc::new(Features::default())
         )
         .into_iter()
         .all(|(_, module_name, func_name, _)| {
@@ -95,4 +94,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeTransactionContext::new(vec![1], ChainId::test().id())); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
+    exts.add(AlgebraContext::new());
 }

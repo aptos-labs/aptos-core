@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::types::{BatchId, PersistedValue};
+use crate::quorum_store::types::PersistedValue;
 use anyhow::Result;
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
     schema::{KeyCodec, Schema, ValueCodec},

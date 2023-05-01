@@ -19,5 +19,5 @@ setuptools.setup(
     packages=["aptos_sdk"],
     python_requires=">=3.7",
     url="https://github.com/aptos-labs/aptos-core",
-    version="0.5.0",
+    version="0.6.0",
 )

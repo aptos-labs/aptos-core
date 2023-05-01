@@ -20,8 +20,11 @@ from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
-from aptos_sdk.transactions import (EntryFunction, TransactionArgument,
-                                    TransactionPayload)
+from aptos_sdk.transactions import (
+    EntryFunction,
+    TransactionArgument,
+    TransactionPayload,
+)
 
 from .common import FAUCET_URL, NODE_URL
 

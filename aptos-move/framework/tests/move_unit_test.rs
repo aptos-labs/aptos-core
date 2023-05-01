@@ -4,11 +4,12 @@
 
 use aptos_framework::path_in_crate;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
@@ -42,6 +43,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         AbstractValueSizeGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         TimedFeatures::enable_all(),
+        Arc::new(Features::default()),
     )
 }
 
@@ -63,4 +65,9 @@ fn move_stdlib_unit_tests() {
 #[test]
 fn move_token_unit_tests() {
     run_tests_for_pkg("aptos-token");
+}
+
+#[test]
+fn move_token_objects_unit_tests() {
+    run_tests_for_pkg("aptos-token-objects");
 }

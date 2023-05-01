@@ -22,16 +22,16 @@ use crate::{
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::{Batch, BatchRequest, Fragment},
+    quorum_store::types::BatchMsg,
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Round},
     experimental::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{ProofOfStore, SignedDigest},
+    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -68,11 +68,9 @@ pub enum UnverifiedEvent {
     SyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    BatchMsg(Box<Batch>),
-    SignedDigestMsg(Box<SignedDigest>),
-    ProofOfStoreMsg(Box<ProofOfStore>),
+    BatchMsg(Box<BatchMsg>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
@@ -83,62 +81,67 @@ impl UnverifiedEvent {
         peer_id: PeerId,
         validator: &ValidatorVerifier,
         quorum_store_enabled: bool,
+        self_message: bool,
+        max_num_batches: usize,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                p.verify(validator, quorum_store_enabled)?;
+                if !self_message {
+                    p.verify(validator, quorum_store_enabled)?;
+                }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
-                v.verify(validator)?;
+                if !self_message {
+                    v.verify(validator)?;
+                }
                 VerifiedEvent::VoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::CommitVote(cv) => {
-                cv.verify(validator)?;
+                if !self_message {
+                    cv.verify(validator)?;
+                }
                 VerifiedEvent::CommitVote(cv)
             },
             UnverifiedEvent::CommitDecision(cd) => {
-                cd.verify(validator)?;
+                if !self_message {
+                    cd.verify(validator)?;
+                }
                 VerifiedEvent::CommitDecision(cd)
             },
-            UnverifiedEvent::FragmentMsg(f) => {
-                f.verify(peer_id)?;
-                VerifiedEvent::FragmentMsg(f)
-            },
-            UnverifiedEvent::BatchRequestMsg(br) => {
-                br.verify(peer_id)?;
-                VerifiedEvent::BatchRequestMsg(br)
-            },
-            // Only sender is verified. Remaining verification is on-demand (when it's used).
             UnverifiedEvent::BatchMsg(b) => {
-                b.verify(peer_id)?;
-                VerifiedEvent::UnverifiedBatchMsg(b)
+                if !self_message {
+                    b.verify(peer_id, max_num_batches)?;
+                }
+                VerifiedEvent::BatchMsg(b)
             },
-            UnverifiedEvent::SignedDigestMsg(sd) => {
-                sd.verify(validator)?;
-                VerifiedEvent::SignedDigestMsg(sd)
+            UnverifiedEvent::SignedBatchInfo(sd) => {
+                if !self_message {
+                    sd.verify(peer_id, max_num_batches, validator)?;
+                }
+                VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                p.verify(validator)?;
+                if !self_message {
+                    p.verify(max_num_batches, validator)?;
+                }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
     }
 
-    pub fn epoch(&self) -> u64 {
+    pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
-            UnverifiedEvent::ProposalMsg(p) => p.epoch(),
-            UnverifiedEvent::VoteMsg(v) => v.epoch(),
-            UnverifiedEvent::SyncInfo(s) => s.epoch(),
-            UnverifiedEvent::CommitVote(cv) => cv.epoch(),
-            UnverifiedEvent::CommitDecision(cd) => cd.epoch(),
-            UnverifiedEvent::FragmentMsg(f) => f.epoch(),
-            UnverifiedEvent::BatchRequestMsg(br) => br.epoch(),
+            UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
+            UnverifiedEvent::CommitVote(cv) => Ok(cv.epoch()),
+            UnverifiedEvent::CommitDecision(cd) => Ok(cd.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
-            UnverifiedEvent::SignedDigestMsg(sd) => sd.epoch(),
+            UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
         }
     }
@@ -152,10 +155,8 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::CommitVoteMsg(m) => UnverifiedEvent::CommitVote(m),
             ConsensusMsg::CommitDecisionMsg(m) => UnverifiedEvent::CommitDecision(m),
-            ConsensusMsg::FragmentMsg(m) => UnverifiedEvent::FragmentMsg(m),
-            ConsensusMsg::BatchRequestMsg(m) => UnverifiedEvent::BatchRequestMsg(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
-            ConsensusMsg::SignedDigestMsg(m) => UnverifiedEvent::SignedDigestMsg(m),
+            ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             _ => unreachable!("Unexpected conversion"),
         }
@@ -171,11 +172,9 @@ pub enum VerifiedEvent {
     UnverifiedSyncInfo(Box<SyncInfo>),
     CommitVote(Box<CommitVote>),
     CommitDecision(Box<CommitDecision>),
-    FragmentMsg(Box<Fragment>),
-    BatchRequestMsg(Box<BatchRequest>),
-    UnverifiedBatchMsg(Box<Batch>),
-    SignedDigestMsg(Box<SignedDigest>),
-    ProofOfStoreMsg(Box<ProofOfStore>),
+    BatchMsg(Box<BatchMsg>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener
@@ -452,7 +451,7 @@ impl RoundManager {
         }
     }
 
-    pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> Result<()> {
+    pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> anyhow::Result<()> {
         if proposal.round() != self.round_state.current_round() {
             bail!(
                 "Discarding stale delayed proposal {}, current round {}",
@@ -544,7 +543,7 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         if self.decoupled_execution() {
-            let sync_or_not = self.local_config.sync_only || self.block_store.back_pressure();
+            let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
             counters::OP_COUNTERS
                 .gauge("sync_only")
                 .set(sync_or_not as i64);
@@ -635,7 +634,7 @@ impl RoundManager {
     /// 3. Try to vote for it following the safety rules.
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
-    async fn process_proposal(&mut self, proposal: Block) -> Result<()> {
+    async fn process_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let author = proposal
             .author()
             .expect("Proposal should be verified having an author");
@@ -643,17 +642,25 @@ impl RoundManager {
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            payload_len as u64 <= self.local_config.max_receiving_block_txns,
+            payload_len as u64
+                <= self
+                    .local_config
+                    .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
             "Payload len {} exceeds the limit {}",
             payload_len,
-            self.local_config.max_receiving_block_txns,
+            self.local_config
+                .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
         );
 
         ensure!(
-            payload_size as u64 <= self.local_config.max_receiving_block_bytes,
+            payload_size as u64
+                <= self
+                    .local_config
+                    .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
             "Payload size {} exceeds the limit {}",
             payload_size,
-            self.local_config.max_receiving_block_bytes,
+            self.local_config
+                .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
         );
 
         ensure!(
@@ -689,7 +696,7 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        if self.decoupled_execution() && self.block_store.back_pressure() {
+        if self.decoupled_execution() && self.block_store.vote_back_pressure() {
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time. Even if processing proposal is delayed, we add
             // the block to the block store so that we don't need to fetch it from remote once we
@@ -728,7 +735,7 @@ impl RoundManager {
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
-                if !block_store.back_pressure() {
+                if !block_store.vote_back_pressure() {
                     if let Err(e) =
                         self_sender.push((author, discriminant(&event)), (author, event))
                     {
@@ -741,7 +748,7 @@ impl RoundManager {
         });
     }
 
-    pub async fn process_verified_proposal(&mut self, proposal: Block) -> Result<()> {
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
         let vote = self
             .execute_and_vote(proposal)

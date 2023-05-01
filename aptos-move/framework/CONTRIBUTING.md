@@ -4,10 +4,7 @@ This guide describes the process for adding, removing, and changing the Move mod
 
 ## Overview
 
-Every state change in the Aptos blockchain occurs via executing a Move *transaction script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). A transaction script invokes procedures of Move *modules* that update published *resources*. The Move standard library consists of:
-
-1. The [modules](modules/) published in the genesis transaction.
-2. The authorized [transaction scripts](transaction_scripts/) that can be included in a Aptos transaction. A transaction with an unauthorized script will be discarded by validators.
+Every state change in the Aptos blockchain occurs via executing a Move *entry function* or a *script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). Entry functions and scripts invoke procedures of Move *modules* that update published *resources*. The Move standard library consists of [modules](modules/) initially published in the genesis transaction.
 
 ## Environment Setup
 
@@ -25,13 +22,7 @@ inside `stdlib` to compile all of the standard library modules, transaction scri
 
 ### Testing
 
-Most tests for the standard library live [here](../move-compiler/functional-tests) and can be run with `cargo test`.
-
-These tests use the Move functional testing framework, which we will briefly explain here (more details can be found in this [blog post](https://aptos.dev/blog/2020/03/06/how-to-use-the-end-to-end-tests-framework-in-move).
-
-A functional test is a sequence of Move transaction scripts that are executed against the genesis state of the blockchain. Tests typically call functions of the module under test and then use `assert`s to check that the call had the expected effect. The framework includes directives for checking that a transaction executed successfully (`// check: EXECUTED`) or aborted (e.g., `// check: ABORTED`). In addition, there are configuration macros (written `//!`) for creating accounts with human-readable names (`//! account: alice`), begining a new transaction (`//! new-transaction`), and setting the sender of a transaction (`//! sender: alice`).
-
-The functional testing framework is very convenient, but can't express all of the tests we need to write. More heavyweight tests that create/execute transactions from Rust code live [here](../e2e-testsuite/src/tests) and can be run with `cargo test`.
+Most tests for the standard library live [here](../e2e-move-tests) and can be run with `cargo test`.
 
 ## Changing the standard library
 
@@ -39,19 +30,7 @@ The functional testing framework is very convenient, but can't express all of th
 
 - Add or edit the relevant `.move` file under [modules](modules/)
 - [Build](#building) your changes and address compiler errors as needed
-- Once the stdlib builds, add new functional [tests](#testing)
-- If you have added a new `public` function that is intended to be called from a user-submitted transaction, make sure you introduce a new transaction script and add it to the allowlist (see [below](#transaction-scripts))
-
-### Transaction Scripts
-
-**Note**: The process for adding new transaction scripts to the system is in
-flux. Below is the temporary. This will be updated once the new way of defining scripts is supported.
-
-- Add or edit the relevant `.move` file under [transaction scripts](transaction_scripts)
-- [Build](#building) your changes and address compiler errors as needed
-- **Temporary**: a Rust builder for this script will be generated in [`tmp_new_transaction_builders.rs`](compiled/src/tmp_new_transaction_script_builders.rs). Note that this is not stable and will be going away soon.
-- Add or modify tests for the script under the end-to-end [tests](../e2e-testsuite/src/tests/transaction_builder.rs). Make sure to use the `tmp_new_transaction_script_builders` builder for accessing the Rust builder for this script.
-- If you have added a new script, don't forget to `git add` the new script binary
+- Once the stdlib builds, add new end-to-end [tests](#testing)
 
 ## Coding conventions
 

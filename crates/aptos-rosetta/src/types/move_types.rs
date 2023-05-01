@@ -6,7 +6,6 @@
 use crate::AccountAddress;
 use aptos_types::event::EventHandle;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 pub const ACCOUNT_MODULE: &str = "account";
 pub const APTOS_ACCOUNT_MODULE: &str = "aptos_account";
@@ -33,6 +32,8 @@ pub const CREATE_STAKING_CONTRACT_FUNCTION: &str = "create_staking_contract";
 pub const SWITCH_OPERATOR_WITH_SAME_COMMISSION_FUNCTION: &str =
     "switch_operator_with_same_commission";
 pub const UPDATE_VOTER_FUNCTION: &str = "update_voter";
+pub const UNLOCK_STAKE_FUNCTION: &str = "unlock_stake";
+pub const DISTRIBUTE_STAKING_REWARDS_FUNCTION: &str = "distribute";
 
 pub const DECIMALS_FIELD: &str = "decimal";
 pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";
@@ -41,7 +42,7 @@ pub const SET_OPERATOR_EVENTS_FIELD: &str = "set_operator_events";
 pub const SEQUENCE_NUMBER_FIELD: &str = "sequence_number";
 pub const SYMBOL_FIELD: &str = "symbol";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StakingContract {
     pub principal: u64,
     pub pool_address: AccountAddress,
@@ -59,7 +60,7 @@ impl StakingContract {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Store {
-    pub staking_contracts: BTreeMap<AccountAddress, StakingContract>,
+    pub staking_contracts: Vec<(AccountAddress, StakingContract)>,
     pub create_staking_contract_events: EventHandle,
     pub update_voter_events: EventHandle,
     pub reset_lockup_events: EventHandle,
@@ -139,12 +140,12 @@ pub struct DistributeEvent {
     pub amount: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pool {
     pub shareholders_limit: u64,
     pub total_coins: u64,
     pub total_shares: u64,
-    pub shares: BTreeMap<AccountAddress, u64>,
+    pub shares: Vec<(AccountAddress, u64)>,
     pub shareholders: Vec<AccountAddress>,
     pub scaling_factor: u64,
 }
@@ -152,12 +153,13 @@ pub struct Pool {
 impl Pool {
     pub fn get_balance(&self, account_address: &AccountAddress) -> Option<u64> {
         self.shares
-            .get(account_address)
-            .map(|inner| (*inner * self.total_coins) / self.total_shares)
+            .iter()
+            .find(|(address, _)| address == account_address)
+            .map(|(_, shares)| (*shares * self.total_coins) / self.total_shares)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Capability {
     pub pool_address: AccountAddress,
 }

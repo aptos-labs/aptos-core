@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
+import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, Provider, Network, TokenClient } from "aptos";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
@@ -23,6 +23,7 @@ const {
 (async () => {
   const client = new AptosClient(NODE_URL);
   const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+  const tokenClient = new TokenClient(client);
 
   // Generates key pair for a new account
   const account1 = new AptosAccount();
@@ -92,4 +93,45 @@ const {
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);
+
+  const provider = new Provider(Network.DEVNET);
+  console.log("\n=== Checking if indexer devnet chainId same as fullnode chainId  ===");
+  const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+  const fullNodeChainId = await provider.getChainId();
+
+  console.log(`\n fullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo}`);
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\n fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return;
+  }
+
+  console.log("=== Creating account1's NFT Collection and Token ===");
+
+  const collectionName = "Alice's";
+  const tokenName = "Alice's first token";
+
+  // Create the collection.
+  // :!:>section_4
+  const txnHash1 = await tokenClient.createCollection(
+    account1,
+    collectionName,
+    "Alice's simple collection",
+    "https://alice.com",
+  ); // <:!:section_4
+  await client.waitForTransaction(txnHash1, { checkSuccess: true });
+
+  // Create a token in that collection.
+  // :!:>section_5
+  const txnHash2 = await tokenClient.createToken(
+    account1,
+    collectionName,
+    tokenName,
+    "Alice's simple token",
+    1,
+    "https://aptos.dev/img/nyan.jpeg",
+  ); // <:!:section_5
+  await client.waitForTransaction(txnHash2, { checkSuccess: true });
+
+  const nfts = await provider.getAccountNFTs(account1.address().hex());
+  console.log(`account1 current token ownership: ${nfts.current_token_ownerships[0].amount}. Should be 1`);
 })();

@@ -115,12 +115,56 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        // TODO: complex aborts conditions.
-        pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
+
+        include from_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
+        aborts_if from_scheme == ED25519_SCHEME && ({
+            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
+            account_resource.authentication_key != expected_auth_key
+        });
+        include from_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
+        aborts_if from_scheme == MULTI_ED25519_SCHEME && ({
+            let from_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
+            account_resource.authentication_key != from_auth_key
+        });
         aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
+
+        let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
+        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
+
+        let challenge = RotationProofChallenge {
+            sequence_number: account_resource.sequence_number,
+            originator: addr,
+            current_auth_key: curr_auth_key,
+            new_public_key: to_public_key_bytes,
+        };
+
+        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
+            scheme: from_scheme,
+            public_key_bytes: from_public_key_bytes,
+            signature: cap_rotate_key,
+            challenge: challenge,
+        };
+
+        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
+            scheme: to_scheme,
+            public_key_bytes: to_public_key_bytes,
+            signature: cap_update_table,
+            challenge: challenge,
+        };
+
+        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+
+        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
+        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf{
+        //     originating_addr: addr,
+        //     account_resource: account_resource,
+        //     new_auth_key_vector: new_auth_key
+        // };
+        pragma aborts_if_is_partial;
+
         modifies global<Account>(addr);
         modifies global<OriginatingAddress>(@aptos_framework);
     }
@@ -151,8 +195,9 @@ spec aptos_framework::account {
             signature: cap_update_table,
             challenge: challenge,
         };
-        let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
         // TODO: Need to investigate the issue of including UpdateAuthKeyAndOriginatingAddressTableAbortsIf here.
+        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
         pragma aborts_if_is_partial;
     }
 

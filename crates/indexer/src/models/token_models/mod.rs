@@ -3,6 +3,7 @@
 
 pub mod ans_lookup;
 pub mod collection_datas;
+pub mod nft_points;
 pub mod token_activities;
 pub mod token_claims;
 pub mod token_datas;

@@ -175,6 +175,7 @@ where
         block: (HashValue, Vec<T>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
+        let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
         let committed_block = self.block_tree.root_block();
         let mut block_vec = self
@@ -206,7 +207,6 @@ where
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                 "execute_block"
             );
-            let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
             let state_view = {
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["verified_state_view"])

@@ -5,7 +5,7 @@
 use crate::{
     backup_types::transaction::{
         backup::{TransactionBackupController, TransactionBackupOpt},
-        restore::{TransactionRestoreController, TransactionRestoreOpt},
+        restore::TransactionRestoreBatchController,
     },
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
@@ -20,6 +20,7 @@ use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
+use itertools::zip_eq;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
 use tokio::time::Duration;
 
@@ -56,9 +57,26 @@ fn end_to_end() {
     let first_ver_to_backup = (total_txns / 4) as Version;
     let num_txns_to_backup = total_txns - first_ver_to_backup as usize;
     let target_version = first_ver_to_backup + total_txns as Version / 2;
-    let num_txns_to_restore = (target_version - first_ver_to_backup + 1) as usize;
+    let mut backup_handles = vec![];
+    if first_ver_to_backup > 0 {
+        let transaction_backup_before_first_ver = rt
+            .block_on(
+                TransactionBackupController::new(
+                    TransactionBackupOpt {
+                        start_version: 0,
+                        num_transactions: first_ver_to_backup as usize,
+                    },
+                    GlobalBackupOpt { max_chunk_size },
+                    client.clone(),
+                    Arc::clone(&store),
+                )
+                .run(),
+            )
+            .unwrap();
+        backup_handles.push(transaction_backup_before_first_ver);
+    }
 
-    let manifest_handle = rt
+    let transaction_backup_after_first_ver = rt
         .block_on(
             TransactionBackupController::new(
                 TransactionBackupOpt {
@@ -72,13 +90,9 @@ fn end_to_end() {
             .run(),
         )
         .unwrap();
-
+    backup_handles.push(transaction_backup_after_first_ver);
     rt.block_on(
-        TransactionRestoreController::new(
-            TransactionRestoreOpt {
-                manifest_handle,
-                replay_from_version: None, // max
-            },
+        TransactionRestoreBatchController::new(
             GlobalRestoreOpt {
                 dry_run: false,
                 db_dir: Some(tgt_db_dir.path().to_path_buf()),
@@ -91,8 +105,11 @@ fn end_to_end() {
             .try_into()
             .unwrap(),
             store,
-            None, /* epoch_history */
+            backup_handles,
+            None,
+            None,
             VerifyExecutionMode::verify_all(),
+            None,
         )
         .run(),
     )
@@ -102,6 +119,24 @@ fn end_to_end() {
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.
     let tgt_db = AptosDB::new_readonly_for_test(&tgt_db_dir);
+    let ouptputlist = tgt_db
+        .get_transaction_outputs(0, target_version, target_version)
+        .unwrap();
+
+    for (restore_ws, org_ws) in zip_eq(
+        ouptputlist
+            .transactions_and_outputs
+            .iter()
+            .map(|(_, output)| output.write_set().clone()),
+        blocks
+            .iter()
+            .flat_map(|(txns, _li)| txns)
+            .take(target_version as usize)
+            .map(|txn_to_commit| txn_to_commit.write_set().clone()),
+    ) {
+        assert_eq!(restore_ws, org_ws);
+    }
+
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()
@@ -112,8 +147,8 @@ fn end_to_end() {
     );
     let recovered_transactions = tgt_db
         .get_transactions(
-            first_ver_to_backup,
-            num_txns_to_restore as u64,
+            0,
+            target_version,
             target_version,
             true, /* fetch_events */
         )
@@ -122,8 +157,7 @@ fn end_to_end() {
     assert_eq!(
         recovered_transactions.transactions,
         txns.into_iter()
-            .skip(first_ver_to_backup as usize)
-            .take(num_txns_to_restore)
+            .take(target_version as usize)
             .cloned()
             .collect::<Vec<_>>()
     );
@@ -136,8 +170,7 @@ fn end_to_end() {
                 txns.iter()
                     .map(|txn_to_commit| txn_to_commit.events().to_vec())
             })
-            .skip(first_ver_to_backup as usize)
-            .take(num_txns_to_restore)
+            .take(target_version as usize)
             .collect::<Vec<_>>()
     );
 

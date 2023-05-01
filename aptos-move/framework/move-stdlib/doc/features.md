@@ -27,12 +27,24 @@ the Move stdlib, the Aptos stdlib, and the Aptos framework.
 -  [Function `resource_groups_enabled`](#0x1_features_resource_groups_enabled)
 -  [Function `get_multisig_accounts_feature`](#0x1_features_get_multisig_accounts_feature)
 -  [Function `multisig_accounts_enabled`](#0x1_features_multisig_accounts_enabled)
+-  [Function `get_delegation_pools_feature`](#0x1_features_get_delegation_pools_feature)
+-  [Function `delegation_pools_enabled`](#0x1_features_delegation_pools_enabled)
+-  [Function `get_cryptography_algebra_natives_feature`](#0x1_features_get_cryptography_algebra_natives_feature)
+-  [Function `cryptography_algebra_enabled`](#0x1_features_cryptography_algebra_enabled)
+-  [Function `get_bls12_381_strutures_feature`](#0x1_features_get_bls12_381_strutures_feature)
+-  [Function `bls12_381_structures_enabled`](#0x1_features_bls12_381_structures_enabled)
+-  [Function `get_periodical_reward_rate_decrease_feature`](#0x1_features_get_periodical_reward_rate_decrease_feature)
+-  [Function `periodical_reward_rate_decrease_enabled`](#0x1_features_periodical_reward_rate_decrease_enabled)
+-  [Function `get_partial_governance_voting`](#0x1_features_get_partial_governance_voting)
+-  [Function `partial_governance_voting_enabled`](#0x1_features_partial_governance_voting_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
+    -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
+    -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
@@ -102,6 +114,18 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_BLS12_381_STRUCTURES"></a>
+
+Whether the generic algebra implementation for BLS12381 operations are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
+</code></pre>
+
+
+
 <a name="0x1_features_CODE_DEPENDENCY_CHECK"></a>
 
 Whether validation of package dependencies is enabled, and the related native function is
@@ -121,6 +145,40 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
+
+Whether generic algebra basic operation support in <code>crypto_algebra.<b>move</b></code> are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
+</code></pre>
+
+
+
+<a name="0x1_features_DELEGATION_POOLS"></a>
+
+Whether delegation pools are enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a>: u64 = 11;
+</code></pre>
+
+
+
+<a name="0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH"></a>
+
+Whether native_public_key_validate aborts when a public key of the wrong length is given
+Lifetime: ephemeral
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH">ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH</a>: u64 = 14;
 </code></pre>
 
 
@@ -157,6 +215,28 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
+
+Whether enable paritial governance voting.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>: u64 = 17;
+</code></pre>
+
+
+
+<a name="0x1_features_PERIODICAL_REWARD_RATE_DECREASE"></a>
+
+Whether reward rate decreases periodically.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>: u64 = 16;
+</code></pre>
+
+
+
 <a name="0x1_features_RESOURCE_GROUPS"></a>
 
 Whether resource groups are enabled.
@@ -180,11 +260,23 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_STRUCT_CONSTRUCTORS"></a>
+
+Whether struct constructors are enabled
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STRUCT_CONSTRUCTORS">STRUCT_CONSTRUCTORS</a>: u64 = 15;
+</code></pre>
+
+
+
 <a name="0x1_features_TREAT_FRIEND_AS_PRIVATE"></a>
 
 Whether during upgrade compatibility checking, friend functions should be treated similar like
 private functions.
-Lifetime: ephemeral
+Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TREAT_FRIEND_AS_PRIVATE">TREAT_FRIEND_AS_PRIVATE</a>: u64 = 2;
@@ -619,6 +711,236 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_delegation_pools_feature"></a>
+
+## Function `get_delegation_pools_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pools_feature">get_delegation_pools_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pools_feature">get_delegation_pools_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_delegation_pools_enabled"></a>
+
+## Function `delegation_pools_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pools_enabled">delegation_pools_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pools_enabled">delegation_pools_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_cryptography_algebra_natives_feature"></a>
+
+## Function `get_cryptography_algebra_natives_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_cryptography_algebra_natives_feature">get_cryptography_algebra_natives_feature</a>(): u64 { <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_cryptography_algebra_enabled"></a>
+
+## Function `cryptography_algebra_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_cryptography_algebra_enabled">cryptography_algebra_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_bls12_381_strutures_feature"></a>
+
+## Function `get_bls12_381_strutures_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bls12_381_strutures_feature">get_bls12_381_strutures_feature</a>(): u64 { <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_bls12_381_structures_enabled"></a>
+
+## Function `bls12_381_structures_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bls12_381_structures_enabled">bls12_381_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_periodical_reward_rate_decrease_feature"></a>
+
+## Function `get_periodical_reward_rate_decrease_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_periodical_reward_rate_decrease_feature">get_periodical_reward_rate_decrease_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_periodical_reward_rate_decrease_feature">get_periodical_reward_rate_decrease_feature</a>(): u64 { <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_periodical_reward_rate_decrease_enabled"></a>
+
+## Function `periodical_reward_rate_decrease_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_partial_governance_voting"></a>
+
+## Function `get_partial_governance_voting`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_partial_governance_voting">get_partial_governance_voting</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_partial_governance_voting">get_partial_governance_voting</a>(): u64 { <a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_partial_governance_voting_enabled"></a>
+
+## Function `partial_governance_voting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -779,6 +1101,53 @@ Helper to check whether a feature flag is enabled.
 
 
 
+<a name="@Specification_1_periodical_reward_rate_decrease_enabled"></a>
+
+### Function `periodical_reward_rate_decrease_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_periodical_reward_rate_decrease_enabled">periodical_reward_rate_decrease_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>();
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_partial_governance_voting_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_partial_governance_voting_enabled">spec_partial_governance_voting_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PARTIAL_GOVERNANCE_VOTING">PARTIAL_GOVERNANCE_VOTING</a>)
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_partial_governance_voting_enabled"></a>
+
+### Function `partial_governance_voting_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_partial_governance_voting_enabled">spec_partial_governance_voting_enabled</a>();
+</code></pre>
+
+
+
 <a name="@Specification_1_change_feature_flags"></a>
 
 ### Function `change_feature_flags`
@@ -820,6 +1189,17 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(feature: u64): bool;
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_periodical_reward_rate_decrease_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">spec_periodical_reward_rate_decrease_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>)
+}
 </code></pre>
 
 
@@ -872,4 +1252,4 @@ Helper to check whether a feature flag is enabled.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

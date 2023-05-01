@@ -24,6 +24,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 // Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
+pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
 pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
@@ -237,6 +238,15 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "Number of times the periodic garbage-collection event occurs, regardless of how many txns were actually removed",
         &["type"])
        .unwrap()
+});
+
+/// Counter for number of periodic client garbage-collection (=GC) events that happen with eager
+/// expiration, regardless of how many txns were actually cleaned up in this GC event
+pub static CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_gc_eager_expire_event_count",
+        "Number of times the periodic garbage-collection event triggers eager expiration, regardless of how many txns were actually removed")
+        .unwrap()
 });
 
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected

@@ -12,6 +12,7 @@ use crate::{
     },
     golden_outputs::GoldenOutputs,
 };
+use anyhow::Error;
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -285,7 +286,7 @@ impl FakeExecutor {
         self.data_store.add_module(module_id, module_blob)
     }
 
-    /// Reads the resource [`Value`] for an account from this executor's data store.
+    /// Reads the resource `Value` for an account from this executor's data store.
     pub fn read_account_resource(&self, account: &Account) -> Option<AccountResource> {
         self.read_account_resource_at_address(account.address())
     }
@@ -300,7 +301,7 @@ impl FakeExecutor {
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
-    /// Reads the resource [`Value`] for an account under the given address from
+    /// Reads the resource `Value` for an account under the given address from
     /// this executor's data store.
     pub fn read_account_resource_at_address(
         &self,
@@ -662,5 +663,23 @@ impl FakeExecutor {
         let (_delta_change_set, change_set) = change_set_ext.into_inner();
         let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
+    }
+
+    pub fn execute_view_function(
+        &mut self,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+    ) -> Result<Vec<Vec<u8>>, Error> {
+        // No gas limit
+        AptosVM::execute_view_function(
+            self.get_state_view(),
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            u64::MAX,
+        )
     }
 }

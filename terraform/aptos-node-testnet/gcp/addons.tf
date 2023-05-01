@@ -24,6 +24,8 @@ resource "helm_release" "chaos-mesh" {
     jsonencode({
       chaos-mesh = {
         chaosDaemon = {
+          runtime    = "containerd"
+          socketPath = "/run/containerd/containerd.sock"
         }
       }
     })

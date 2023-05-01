@@ -1,9 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use aptos_logger::warn;
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
+// Useful indexer environment variables
+const GAP_LOOKBACK_VERSIONS: &str = "GAP_LOOKBACK_VERSIONS";
+const INDEXER_DATABASE_URL: &str = "INDEXER_DATABASE_URL";
+const PROCESSOR_NAME: &str = "PROCESSOR_NAME";
+const STARTING_VERSION: &str = "STARTING_VERSION";
+
+// Useful indexer defaults
 pub const DEFAULT_BATCH_SIZE: u16 = 500;
 pub const DEFAULT_FETCH_TASKS: u8 = 5;
 pub const DEFAULT_PROCESSOR_TASKS: u8 = 5;
@@ -70,6 +80,10 @@ pub struct IndexerConfig {
     /// Which address does the ans contract live at. Only available for token_processor. If null, disable ANS indexing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ans_contract_address: Option<String>,
+
+    /// Custom NFT points contract
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_points_contract: Option<String>,
 }
 
 impl Debug for IndexerConfig {
@@ -94,11 +108,102 @@ impl Debug for IndexerConfig {
             .field("emit_every", &self.emit_every)
             .field("gap_lookback_versions", &self.gap_lookback_versions)
             .field("ans_contract_address", &self.ans_contract_address)
+            .field("nft_points_contract", &self.nft_points_contract)
             .finish()
     }
 }
 
-pub fn env_or_default<T: std::str::FromStr>(
+impl ConfigSanitizer for IndexerConfig {
+    /// Validate and process the indexer config according to the given node role and chain ID
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_role: RoleType,
+        _chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let indexer_config = &mut node_config.indexer;
+
+        // If the indexer is not enabled, there's nothing to validate
+        if !indexer_config.enabled {
+            return Ok(());
+        }
+
+        // Verify the postgres uri
+        indexer_config.postgres_uri = env_var_or_default(
+            INDEXER_DATABASE_URL,
+            indexer_config.postgres_uri.clone(),
+            Some(format!(
+                "Either 'config.indexer.postgres_uri' or '{}' must be set!",
+                INDEXER_DATABASE_URL
+            )),
+        );
+
+        // Verify the processor
+        indexer_config.processor = env_var_or_default(
+            PROCESSOR_NAME,
+            indexer_config
+                .processor
+                .clone()
+                .or_else(|| Some("default_processor".to_string())),
+            None,
+        );
+
+        // Verify the starting version
+        indexer_config.starting_version = match std::env::var(STARTING_VERSION).ok() {
+            None => indexer_config.starting_version,
+            Some(starting_version) => match starting_version.parse::<u64>() {
+                Ok(version) => Some(version),
+                Err(error) => {
+                    // This will allow a processor to have STARTING_VERSION undefined when deploying
+                    warn!(
+                        "Invalid STARTING_VERSION: {}. Error: {:?}. Using {:?} instead.",
+                        starting_version, error, indexer_config.starting_version
+                    );
+                    indexer_config.starting_version
+                },
+            },
+        };
+
+        // Set appropriate defaults
+        indexer_config.skip_migrations = indexer_config.skip_migrations.or(Some(false));
+        indexer_config.check_chain_id = indexer_config.check_chain_id.or(Some(true));
+        indexer_config.batch_size = default_if_zero(
+            indexer_config.batch_size.map(|v| v as u64),
+            DEFAULT_BATCH_SIZE as u64,
+        )
+        .map(|v| v as u16);
+        indexer_config.fetch_tasks = default_if_zero(
+            indexer_config.fetch_tasks.map(|v| v as u64),
+            DEFAULT_FETCH_TASKS as u64,
+        )
+        .map(|v| v as u8);
+        indexer_config.processor_tasks = default_if_zero(
+            indexer_config.processor_tasks.map(|v| v as u64),
+            DEFAULT_PROCESSOR_TASKS as u64,
+        )
+        .map(|value| value as u8);
+        indexer_config.emit_every = indexer_config.emit_every.or(Some(0));
+        indexer_config.gap_lookback_versions = env_var_or_default(
+            GAP_LOOKBACK_VERSIONS,
+            indexer_config.gap_lookback_versions.or(Some(1_500_000)),
+            None,
+        );
+
+        Ok(())
+    }
+}
+
+/// Returns the default if the value is 0, otherwise returns the value
+fn default_if_zero(value: Option<u64>, default: u64) -> Option<u64> {
+    match value {
+        None => Some(default),
+        Some(0) => Some(default),
+        Some(value) => Some(value),
+    }
+}
+
+/// Returns the value of the environment variable `env_var`
+/// if it is set, otherwise returns `default`.
+fn env_var_or_default<T: std::str::FromStr>(
     env_var: &'static str,
     default: Option<T>,
     expected_message: Option<String>,
@@ -114,28 +219,4 @@ pub fn env_or_default<T: std::str::FromStr>(
         }),
         Some(default_value) => partial.unwrap_or(Some(default_value)),
     }
-}
-
-pub fn default_if_zero_u8(value: Option<u8>, default: u8) -> Option<u8> {
-    default_if_zero(value.map(|v| v as u64), default as u64).map(|v| v as u8)
-}
-
-pub fn default_if_zero(value: Option<u64>, default: u64) -> Option<u64> {
-    match value {
-        None => Some(default),
-        Some(value) => {
-            if value == 0 {
-                Some(default)
-            } else {
-                Some(value)
-            }
-        },
-    }
-}
-
-pub fn must_be_set(config_var: &'static str, env_var: &'static str) -> Option<String> {
-    Some(format!(
-        "Either 'config.indexer.{}' or '{}' must be set!",
-        config_var, env_var
-    ))
 }

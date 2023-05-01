@@ -7,32 +7,49 @@ Provides the configuration for staking and rewards
 
 
 -  [Resource `StakingConfig`](#0x1_staking_config_StakingConfig)
+-  [Resource `StakingRewardsConfig`](#0x1_staking_config_StakingRewardsConfig)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_staking_config_initialize)
+-  [Function `initialize_rewards`](#0x1_staking_config_initialize_rewards)
 -  [Function `get`](#0x1_staking_config_get)
 -  [Function `get_allow_validator_set_change`](#0x1_staking_config_get_allow_validator_set_change)
 -  [Function `get_required_stake`](#0x1_staking_config_get_required_stake)
 -  [Function `get_recurring_lockup_duration`](#0x1_staking_config_get_recurring_lockup_duration)
 -  [Function `get_reward_rate`](#0x1_staking_config_get_reward_rate)
 -  [Function `get_voting_power_increase_limit`](#0x1_staking_config_get_voting_power_increase_limit)
+-  [Function `calculate_and_save_latest_epoch_rewards_rate`](#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate)
+-  [Function `calculate_and_save_latest_rewards_config`](#0x1_staking_config_calculate_and_save_latest_rewards_config)
 -  [Function `update_required_stake`](#0x1_staking_config_update_required_stake)
 -  [Function `update_recurring_lockup_duration_secs`](#0x1_staking_config_update_recurring_lockup_duration_secs)
 -  [Function `update_rewards_rate`](#0x1_staking_config_update_rewards_rate)
+-  [Function `update_rewards_config`](#0x1_staking_config_update_rewards_config)
 -  [Function `update_voting_power_increase_limit`](#0x1_staking_config_update_voting_power_increase_limit)
 -  [Function `validate_required_stake`](#0x1_staking_config_validate_required_stake)
+-  [Function `validate_rewards_config`](#0x1_staking_config_validate_rewards_config)
 -  [Specification](#@Specification_1)
     -  [Resource `StakingConfig`](#@Specification_1_StakingConfig)
+    -  [Resource `StakingRewardsConfig`](#@Specification_1_StakingRewardsConfig)
     -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `initialize_rewards`](#@Specification_1_initialize_rewards)
     -  [Function `get`](#@Specification_1_get)
+    -  [Function `get_reward_rate`](#@Specification_1_get_reward_rate)
+    -  [Function `calculate_and_save_latest_epoch_rewards_rate`](#@Specification_1_calculate_and_save_latest_epoch_rewards_rate)
+    -  [Function `calculate_and_save_latest_rewards_config`](#@Specification_1_calculate_and_save_latest_rewards_config)
     -  [Function `update_required_stake`](#@Specification_1_update_required_stake)
     -  [Function `update_recurring_lockup_duration_secs`](#@Specification_1_update_recurring_lockup_duration_secs)
     -  [Function `update_rewards_rate`](#@Specification_1_update_rewards_rate)
+    -  [Function `update_rewards_config`](#@Specification_1_update_rewards_config)
     -  [Function `update_voting_power_increase_limit`](#@Specification_1_update_voting_power_increase_limit)
     -  [Function `validate_required_stake`](#@Specification_1_validate_required_stake)
+    -  [Function `validate_rewards_config`](#@Specification_1_validate_rewards_config)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/math_fixed64.md#0x1_math_fixed64">0x1::math_fixed64</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
+<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 </code></pre>
 
 
@@ -101,9 +118,120 @@ Validator set configurations that will be stored with the @aptos_framework accou
 
 </details>
 
+<a name="0x1_staking_config_StakingRewardsConfig"></a>
+
+## Resource `StakingRewardsConfig`
+
+Staking reward configurations that will be stored with the @aptos_framework account.
+
+
+<pre><code><b>struct</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> <b>has</b> <b>copy</b>, drop, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>rewards_rate_period_in_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>last_rewards_rate_period_start_in_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
+
+
+<a name="0x1_staking_config_MAX_U64"></a>
+
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_BPS_DENOMINATOR"></a>
+
+Denominator of number in basis points. 1 bps(basis points) = 0.01%.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_BPS_DENOMINATOR">BPS_DENOMINATOR</a>: u64 = 10000;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EDEPRECATED_FUNCTION"></a>
+
+The function has been deprecated.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>: u64 = 10;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EDISABLED_FUNCTION"></a>
+
+The function is disabled or hasn't been enabled.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>: u64 = 11;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START"></a>
+
+Specified start time of last rewards rate period is invalid, which must be not late than the current timestamp.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START">EINVALID_LAST_REWARDS_RATE_PERIOD_START</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EINVALID_MIN_REWARDS_RATE"></a>
+
+Specified min rewards rate is invalid, which must be within [0, rewards_rate].
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_MIN_REWARDS_RATE">EINVALID_MIN_REWARDS_RATE</a>: u64 = 6;
+</code></pre>
+
 
 
 <a name="0x1_staking_config_EINVALID_REWARDS_RATE"></a>
@@ -112,6 +240,26 @@ Specified rewards rate is invalid, which must be within [0, MAX_REWARDS_RATE].
 
 
 <pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE">EINVALID_REWARDS_RATE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE"></a>
+
+Specified rewards rate decrease rate is invalid, which must be not greater than BPS_DENOMINATOR.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE">EINVALID_REWARDS_RATE_DECREASE_RATE</a>: u64 = 8;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD"></a>
+
+Specified rewards rate period is invalid, which must be 1 year at the moment.
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>: u64 = 9;
 </code></pre>
 
 
@@ -162,6 +310,16 @@ Limit the maximum value of <code>rewards_rate</code> in order to avoid any arith
 
 
 <pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>: u64 = 1000000;
+</code></pre>
+
+
+
+<a name="0x1_staking_config_ONE_YEAR_IN_SECS"></a>
+
+1 year => 365 * 24 * 60 * 60
+
+
+<pre><code><b>const</b> <a href="staking_config.md#0x1_staking_config_ONE_YEAR_IN_SECS">ONE_YEAR_IN_SECS</a>: u64 = 31536000;
 </code></pre>
 
 
@@ -223,6 +381,58 @@ Only called during genesis.
         rewards_rate,
         rewards_rate_denominator,
         voting_power_increase_limit,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_config_initialize_rewards"></a>
+
+## Function `initialize_rewards`
+
+Initialize rewards configurations.
+Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize_rewards">initialize_rewards</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, last_rewards_rate_period_start_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize_rewards">initialize_rewards</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    rewards_rate: FixedPoint64,
+    min_rewards_rate: FixedPoint64,
+    rewards_rate_period_in_secs: u64,
+    last_rewards_rate_period_start_in_secs: u64,
+    rewards_rate_decrease_rate: FixedPoint64,
+) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
+    <a href="staking_config.md#0x1_staking_config_validate_rewards_config">validate_rewards_config</a>(
+        rewards_rate,
+        min_rewards_rate,
+        rewards_rate_period_in_secs,
+        rewards_rate_decrease_rate,
+    );
+    <b>assert</b>!(
+        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= last_rewards_rate_period_start_in_secs,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START">EINVALID_LAST_REWARDS_RATE_PERIOD_START</a>)
+    );
+
+    <b>move_to</b>(aptos_framework, <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+        rewards_rate,
+        min_rewards_rate,
+        rewards_rate_period_in_secs,
+        last_rewards_rate_period_start_in_secs,
+        rewards_rate_decrease_rate,
     });
 }
 </code></pre>
@@ -335,7 +545,7 @@ withdraw all funds).
 
 ## Function `get_reward_rate`
 
-Return the reward rate.
+Return the reward rate of this epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>): (u64, u64)
@@ -347,8 +557,25 @@ Return the reward rate.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): (u64, u64) {
-    (config.rewards_rate, config.rewards_rate_denominator)
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): (u64, u64) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+    <b>let</b> (rewards_rate, rewards_rate_denominator) = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>()) {
+        <b>let</b> epoch_rewards_rate = <b>borrow_global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+        <b>if</b> (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_is_zero">fixed_point64::is_zero</a>(epoch_rewards_rate)) {
+            (0u64, 1u64)
+        } <b>else</b> {
+            // Maximize denominator for higher precision.
+            // Restriction: nominator &lt;= <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a> && denominator &lt;= <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>
+            <b>let</b> denominator = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_divide_u128">fixed_point64::divide_u128</a>((<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a> <b>as</b> u128), epoch_rewards_rate);
+            <b>if</b> (denominator &gt; <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>) {
+                denominator = <a href="staking_config.md#0x1_staking_config_MAX_U64">MAX_U64</a>
+            };
+            <b>let</b> nominator = (<a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_multiply_u128">fixed_point64::multiply_u128</a>(denominator, epoch_rewards_rate) <b>as</b> u64);
+            (nominator, (denominator <b>as</b> u64))
+        }
+    } <b>else</b> {
+        (config.rewards_rate, config.rewards_rate_denominator)
+    };
+    (rewards_rate, rewards_rate_denominator)
 }
 </code></pre>
 
@@ -374,6 +601,86 @@ Return the joining limit %.
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_voting_power_increase_limit">get_voting_power_increase_limit</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>): u64 {
     config.voting_power_increase_limit
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate"></a>
+
+## Function `calculate_and_save_latest_epoch_rewards_rate`
+
+Calculate and save the latest rewards rate.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate">calculate_and_save_latest_epoch_rewards_rate</a>(): <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate">calculate_and_save_latest_epoch_rewards_rate</a>(): FixedPoint64 <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="staking_config.md#0x1_staking_config_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
+    <b>let</b> staking_rewards_config = <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_rewards_config">calculate_and_save_latest_rewards_config</a>();
+    staking_rewards_config.rewards_rate
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_config_calculate_and_save_latest_rewards_config"></a>
+
+## Function `calculate_and_save_latest_rewards_config`
+
+Calculate and return the up-to-date StakingRewardsConfig.
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_rewards_config">calculate_and_save_latest_rewards_config</a>(): <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_rewards_config">calculate_and_save_latest_rewards_config</a>(): <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+    <b>let</b> staking_rewards_config = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+    <b>let</b> current_time_in_secs = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
+    <b>assert</b>!(
+        current_time_in_secs &gt;= staking_rewards_config.last_rewards_rate_period_start_in_secs,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_LAST_REWARDS_RATE_PERIOD_START">EINVALID_LAST_REWARDS_RATE_PERIOD_START</a>)
+    );
+    <b>if</b> (current_time_in_secs - staking_rewards_config.last_rewards_rate_period_start_in_secs &lt; staking_rewards_config.rewards_rate_period_in_secs) {
+        <b>return</b> *staking_rewards_config
+    };
+    // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_ceil">fixed_point64::ceil</a>(staking_rewards_config.rewards_rate_decrease_rate) &lt;= 1,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE">EINVALID_REWARDS_RATE_DECREASE_RATE</a>)
+    );
+    <b>let</b> new_rate = <a href="../../aptos-stdlib/doc/math_fixed64.md#0x1_math_fixed64_mul_div">math_fixed64::mul_div</a>(
+        staking_rewards_config.rewards_rate,
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_sub">fixed_point64::sub</a>(
+            <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>(1),
+            staking_rewards_config.rewards_rate_decrease_rate,
+        ),
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>(1),
+    );
+    new_rate = <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_max">fixed_point64::max</a>(new_rate, staking_rewards_config.min_rewards_rate);
+
+    staking_rewards_config.rewards_rate = new_rate;
+    staking_rewards_config.last_rewards_rate_period_start_in_secs =
+        staking_rewards_config.last_rewards_rate_period_start_in_secs +
+        staking_rewards_config.rewards_rate_period_in_secs;
+    <b>return</b> *staking_rewards_config
 }
 </code></pre>
 
@@ -453,6 +760,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 ## Function `update_rewards_rate`
 
+DEPRECATING
 Update the rewards rate.
 Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
 
@@ -471,6 +779,7 @@ Can only be called as part of the Aptos governance proposal process established 
     new_rewards_rate: u64,
     new_rewards_rate_denominator: u64,
 ) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
+    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_periodical_reward_rate_decrease_enabled">features::periodical_reward_rate_decrease_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="staking_config.md#0x1_staking_config_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(
         new_rewards_rate_denominator &gt; 0,
@@ -487,6 +796,49 @@ Can only be called as part of the Aptos governance proposal process established 
     <b>let</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
     <a href="staking_config.md#0x1_staking_config">staking_config</a>.rewards_rate = new_rewards_rate;
     <a href="staking_config.md#0x1_staking_config">staking_config</a>.rewards_rate_denominator = new_rewards_rate_denominator;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_config_update_rewards_config"></a>
+
+## Function `update_rewards_config`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_config">update_rewards_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_config">update_rewards_config</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    rewards_rate: FixedPoint64,
+    min_rewards_rate: FixedPoint64,
+    rewards_rate_period_in_secs: u64,
+    rewards_rate_decrease_rate: FixedPoint64,
+) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
+    <a href="staking_config.md#0x1_staking_config_validate_rewards_config">validate_rewards_config</a>(
+        rewards_rate,
+        min_rewards_rate,
+        rewards_rate_period_in_secs,
+        rewards_rate_decrease_rate,
+    );
+
+    <b>let</b> staking_rewards_config = <b>borrow_global_mut</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+    staking_rewards_config.rewards_rate = rewards_rate;
+    staking_rewards_config.min_rewards_rate = min_rewards_rate;
+    staking_rewards_config.rewards_rate_period_in_secs = rewards_rate_period_in_secs;
+    staking_rewards_config.rewards_rate_decrease_rate = rewards_rate_decrease_rate;
 }
 </code></pre>
 
@@ -547,6 +899,55 @@ Can only be called as part of the Aptos governance proposal process established 
 
 <pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_required_stake">validate_required_stake</a>(minimum_stake: u64, maximum_stake: u64) {
     <b>assert</b>!(minimum_stake &lt;= maximum_stake && maximum_stake &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_STAKE_RANGE">EINVALID_STAKE_RANGE</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_config_validate_rewards_config"></a>
+
+## Function `validate_rewards_config`
+
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_rewards_config">validate_rewards_config</a>(rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_rewards_config">validate_rewards_config</a>(
+    rewards_rate: FixedPoint64,
+    min_rewards_rate: FixedPoint64,
+    rewards_rate_period_in_secs: u64,
+    rewards_rate_decrease_rate: FixedPoint64,
+) {
+    // Bound rewards rate <b>to</b> avoid arithmetic overflow.
+    <b>assert</b>!(
+        less_or_equal(rewards_rate, <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_create_from_u128">fixed_point64::create_from_u128</a>((1u128))),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE">EINVALID_REWARDS_RATE</a>)
+    );
+    <b>assert</b>!(
+        less_or_equal(min_rewards_rate, rewards_rate),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_MIN_REWARDS_RATE">EINVALID_MIN_REWARDS_RATE</a>)
+    );
+    // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_ceil">fixed_point64::ceil</a>(rewards_rate_decrease_rate) &lt;= 1,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_DECREASE_RATE">EINVALID_REWARDS_RATE_DECREASE_RATE</a>)
+    );
+    // This field, rewards_rate_period_in_secs is added <b>as</b> a placeholder. In case we want <b>to</b> change
+    // the reward period, we don't have <b>to</b> add a new <b>struct</b>.
+    // To avoid complex logic, now rewards rate decrease interval must be 1 year.
+    <b>assert</b>!(
+        rewards_rate_period_in_secs == <a href="staking_config.md#0x1_staking_config_ONE_YEAR_IN_SECS">ONE_YEAR_IN_SECS</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_REWARDS_RATE_PERIOD">EINVALID_REWARDS_RATE_PERIOD</a>),
+    );
 }
 </code></pre>
 
@@ -631,6 +1032,61 @@ Can only be called as part of the Aptos governance proposal process established 
 
 
 
+<a name="@Specification_1_StakingRewardsConfig"></a>
+
+### Resource `StakingRewardsConfig`
+
+
+<pre><code><b>struct</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a> <b>has</b> <b>copy</b>, drop, key
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>rewards_rate_period_in_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>last_rewards_rate_period_start_in_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(
+    rewards_rate,
+    <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_create_from_u128">fixed_point64::spec_create_from_u128</a>((1u128)));
+<b>invariant</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_less_or_equal">fixed_point64::spec_less_or_equal</a>(min_rewards_rate, rewards_rate);
+<b>invariant</b> rewards_rate_period_in_secs == <a href="staking_config.md#0x1_staking_config_ONE_YEAR_IN_SECS">ONE_YEAR_IN_SECS</a>;
+<b>invariant</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_spec_ceil">fixed_point64::spec_ceil</a>(rewards_rate_decrease_rate) &lt;= 1;
+</code></pre>
+
+
+
 <a name="@Specification_1_initialize"></a>
 
 ### Function `initialize`
@@ -662,6 +1118,31 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 
+<a name="@Specification_1_initialize_rewards"></a>
+
+### Function `initialize_rewards`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_initialize_rewards">initialize_rewards</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, last_rewards_rate_period_start_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+last_rewards_rate_period_start_in_secs cannot be later than now.
+Abort at any condition in StakingRewardsConfigValidationAborts.
+StakingRewardsConfig does not exist under the aptos_framework before creating it.
+
+
+<pre><code><b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>aborts_if</b> last_rewards_rate_period_start_in_secs &gt; <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(addr);
+</code></pre>
+
+
+
 <a name="@Specification_1_get"></a>
 
 ### Function `get`
@@ -674,6 +1155,58 @@ StakingConfig does not exist under the aptos_framework before creating it.
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_get_reward_rate"></a>
+
+### Function `get_reward_rate`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_get_reward_rate">get_reward_rate</a>(config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>): (u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_calculate_and_save_latest_epoch_rewards_rate"></a>
+
+### Function `calculate_and_save_latest_epoch_rewards_rate`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate">calculate_and_save_latest_epoch_rewards_rate</a>(): <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_calculate_and_save_latest_rewards_config"></a>
+
+### Function `calculate_and_save_latest_rewards_config`
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_rewards_config">calculate_and_save_latest_rewards_config</a>(): <a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -738,12 +1271,35 @@ The <code>rewards_rate</code> which is the numerator is limited to be <code>&lt;
 rewards_rate/rewards_rate_denominator <= 1.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> new_rewards_rate_denominator &lt;= 0;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a>&gt;(@aptos_framework);
 <b>aborts_if</b> new_rewards_rate &gt; <a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>aborts_if</b> new_rewards_rate &gt; new_rewards_rate_denominator;
+</code></pre>
+
+
+
+<a name="@Specification_1_update_rewards_config"></a>
+
+### Function `update_rewards_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_config.md#0x1_staking_config_update_rewards_config">update_rewards_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+Caller must be @aptos_framework.
+StakingRewardsConfig is under the @aptos_framework.
+
+
+<pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">StakingRewardsConfigRequirement</a>;
+<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> addr != @aptos_framework;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">StakingRewardsConfig</a>&gt;(addr);
 </code></pre>
 
 
@@ -786,4 +1342,21 @@ The maximum_stake must be greater than maximum_stake in the range of Specified s
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+
+<a name="@Specification_1_validate_rewards_config"></a>
+
+### Function `validate_rewards_config`
+
+
+<pre><code><b>fun</b> <a href="staking_config.md#0x1_staking_config_validate_rewards_config">validate_rewards_config</a>(rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, min_rewards_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, rewards_rate_period_in_secs: u64, rewards_rate_decrease_rate: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>)
+</code></pre>
+
+
+Abort at any condition in StakingRewardsConfigValidationAborts.
+
+
+<pre><code><b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigValidationAbortsIf">StakingRewardsConfigValidationAbortsIf</a>;
+</code></pre>
+
+
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

@@ -1,6 +1,5 @@
 ---
 title: "Aptos White Paper"
-slug: "aptos-white-paper-index"
 ---
 
 # The Aptos Blockchain

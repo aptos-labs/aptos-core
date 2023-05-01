@@ -1,20 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::quorum_store_db::QuorumStoreStorage;
 use crate::{
-    network::NetworkSender,
+    error::error_kind,
+    network::{IncomingBatchRetrievalRequest, NetworkSender},
+    network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
-        batch_generator::{BatchGenerator, BatchGeneratorCommand},
-        batch_reader::{BatchReader, BatchReaderCommand},
-        batch_store::{BatchStore, BatchStoreCommand},
+        batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
+        batch_requester::BatchRequester,
+        batch_store::BatchStore,
+        counters,
         direct_mempool_quorum_store::DirectMempoolQuorumStore,
         network_listener::NetworkListener,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
-        quorum_store_db::QuorumStoreDB,
     },
     round_manager::VerifiedEvent,
 };
@@ -22,7 +25,6 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
 use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
 use aptos_global_constants::CONSENSUS_KEY;
-use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_secure_storage::{KVStorage, Storage};
@@ -31,8 +33,9 @@ use aptos_types::{
     account_address::AccountAddress, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
+use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
@@ -52,7 +55,12 @@ impl QuorumStoreBuilder {
         }
     }
 
-    pub fn start(self) -> Option<Sender<CoordinatorCommand>> {
+    pub fn start(
+        self,
+    ) -> Option<(
+        Sender<CoordinatorCommand>,
+        aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>,
+    )> {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => {
                 inner.start();
@@ -105,6 +113,7 @@ impl DirectMempoolInnerBuilder {
 pub struct InnerBuilder {
     epoch: u64,
     author: Author,
+    num_validators: u64,
     config: QuorumStoreConfig,
     consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -117,30 +126,25 @@ pub struct InnerBuilder {
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     batch_generator_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchGeneratorCommand>>,
-    batch_coordinator_cmd_tx: tokio::sync::mpsc::Sender<BatchCoordinatorCommand>,
-    batch_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: tokio::sync::mpsc::Sender<ProofCoordinatorCommand>,
     proof_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofCoordinatorCommand>>,
     proof_manager_cmd_tx: tokio::sync::mpsc::Sender<ProofManagerCommand>,
     proof_manager_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofManagerCommand>>,
-    batch_store_cmd_tx: tokio::sync::mpsc::Sender<BatchStoreCommand>,
-    batch_store_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchStoreCommand>>,
-    batch_reader_cmd_tx: tokio::sync::mpsc::Sender<BatchReaderCommand>,
-    batch_reader_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchReaderCommand>>,
-    back_pressure_tx: tokio::sync::mpsc::Sender<bool>,
-    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<bool>>,
-    quorum_store_storage_path: PathBuf,
-    quorum_store_storage: Option<Arc<QuorumStoreDB>>,
+    back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
+    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
+    quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
     remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
+    batch_store: Option<Arc<BatchStore<NetworkSender>>>,
 }
 
 impl InnerBuilder {
-    pub fn new(
+    pub(crate) fn new(
         epoch: u64,
         author: Author,
+        num_validators: u64,
         config: QuorumStoreConfig,
         consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -149,20 +153,14 @@ impl InnerBuilder {
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
         backend: SecureBackend,
-        quorum_store_storage_path: PathBuf,
+        quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
-        let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
-            tokio::sync::mpsc::channel(config.channel_size);
         let (proof_coordinator_cmd_tx, proof_coordinator_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
         let (proof_manager_cmd_tx, proof_manager_cmd_rx) =
-            tokio::sync::mpsc::channel(config.channel_size);
-        let (batch_store_cmd_tx, batch_store_cmd_rx) =
-            tokio::sync::mpsc::channel(config.channel_size);
-        let (batch_reader_cmd_tx, batch_reader_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
         let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
         let (quorum_store_msg_tx, quorum_store_msg_rx) =
@@ -173,7 +171,7 @@ impl InnerBuilder {
             );
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
-        for _ in 0..config.num_workers_for_remote_fragments {
+        for _ in 0..config.num_workers_for_remote_batches {
             let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
                 tokio::sync::mpsc::channel(config.channel_size);
             remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
@@ -183,6 +181,7 @@ impl InnerBuilder {
         Self {
             epoch,
             author,
+            num_validators,
             config,
             consensus_to_quorum_store_receiver,
             quorum_store_to_mempool_sender,
@@ -195,28 +194,22 @@ impl InnerBuilder {
             coordinator_rx: Some(coordinator_rx),
             batch_generator_cmd_tx,
             batch_generator_cmd_rx: Some(batch_generator_cmd_rx),
-            batch_coordinator_cmd_tx,
-            batch_coordinator_cmd_rx: Some(batch_coordinator_cmd_rx),
             proof_coordinator_cmd_tx,
             proof_coordinator_cmd_rx: Some(proof_coordinator_cmd_rx),
             proof_manager_cmd_tx,
             proof_manager_cmd_rx: Some(proof_manager_cmd_rx),
-            batch_store_cmd_tx,
-            batch_store_cmd_rx: Some(batch_store_cmd_rx),
-            batch_reader_cmd_tx,
-            batch_reader_cmd_rx: Some(batch_reader_cmd_rx),
             back_pressure_tx,
             back_pressure_rx: Some(back_pressure_rx),
-            quorum_store_storage_path,
-            quorum_store_storage: None,
+            quorum_store_storage,
             quorum_store_msg_tx,
             quorum_store_msg_rx: Some(quorum_store_msg_rx),
             remote_batch_coordinator_cmd_tx,
             remote_batch_coordinator_cmd_rx,
+            batch_store: None,
         }
     }
 
-    fn spawn_quorum_store(&mut self) -> Arc<BatchReader> {
+    fn create_batch_store(&mut self) -> Arc<BatchStore<NetworkSender>> {
         let backend = &self.backend;
         let storage: Storage = backend.try_into().expect("Unable to initialize storage");
         if let Err(error) = storage.available() {
@@ -232,67 +225,51 @@ impl InnerBuilder {
             .aptos_db
             .get_latest_ledger_info()
             .expect("could not get latest ledger info");
-        let last_committed_round = if latest_ledger_info_with_sigs
-            .ledger_info()
-            .commit_info()
-            .epoch()
-            == self.epoch
-        {
-            latest_ledger_info_with_sigs
-                .ledger_info()
-                .commit_info()
-                .round()
-        } else {
-            0
-        };
+        let last_committed_timestamp = latest_ledger_info_with_sigs.commit_info().timestamp_usecs();
 
-        let batch_store_cmd_rx = self.batch_store_cmd_rx.take().unwrap();
-        let batch_reader_cmd_rx = self.batch_reader_cmd_rx.take().unwrap();
-        let (batch_store, batch_reader) = BatchStore::new(
+        let batch_requester = BatchRequester::new(
             self.epoch,
-            last_committed_round,
             self.author,
-            self.network_sender.clone(),
-            self.batch_store_cmd_tx.clone(),
-            self.batch_reader_cmd_tx.clone(),
-            batch_reader_cmd_rx,
-            self.quorum_store_storage.as_ref().unwrap().clone(),
-            self.verifier.clone(),
-            Arc::new(signer),
-            self.config.batch_expiry_round_gap_when_init,
-            self.config.batch_expiry_round_gap_behind_latest_certified,
-            self.config.batch_expiry_round_gap_beyond_latest_certified,
-            self.config.batch_expiry_grace_rounds,
             self.config.batch_request_num_peers,
-            self.config.batch_request_timeout_ms,
+            self.config.batch_request_retry_limit,
+            self.config.batch_request_retry_interval_ms,
+            self.config.batch_request_rpc_timeout_ms,
+            self.network_sender.clone(),
+        );
+        let batch_store = Arc::new(BatchStore::new(
+            self.epoch,
+            last_committed_timestamp,
+            self.quorum_store_storage.clone(),
             self.config.memory_quota,
             self.config.db_quota,
-        );
-        spawn_named!(
-            "batch_store",
-            batch_store.start(batch_store_cmd_rx, self.proof_coordinator_cmd_tx.clone())
-        );
+            self.config.batch_quota,
+            batch_requester,
+            signer,
+            self.verifier.clone(),
+        ));
+        self.batch_store = Some(batch_store.clone());
 
-        batch_reader
+        batch_store
     }
 
-    fn spawn_quorum_store_wrapper(mut self) -> Sender<CoordinatorCommand> {
-        let quorum_store_storage = self.quorum_store_storage.as_ref().unwrap().clone();
-
+    fn spawn_quorum_store(
+        mut self,
+    ) -> (
+        Sender<CoordinatorCommand>,
+        aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>,
+    ) {
         // TODO: parameter? bring back back-off?
         let interval = tokio::time::interval(Duration::from_millis(
-            self.config.mempool_pulling_interval as u64,
+            self.config.batch_generation_poll_interval_ms as u64,
         ));
 
         let coordinator_rx = self.coordinator_rx.take().unwrap();
         let quorum_store_coordinator = QuorumStoreCoordinator::new(
             self.author,
             self.batch_generator_cmd_tx.clone(),
-            self.batch_coordinator_cmd_tx.clone(),
             self.remote_batch_coordinator_cmd_tx.clone(),
             self.proof_coordinator_cmd_tx.clone(),
             self.proof_manager_cmd_tx.clone(),
-            self.batch_store_cmd_tx.clone(),
             self.quorum_store_msg_tx.clone(),
         );
         spawn_named!(
@@ -304,66 +281,70 @@ impl InnerBuilder {
         let back_pressure_rx = self.back_pressure_rx.take().unwrap();
         let batch_generator = BatchGenerator::new(
             self.epoch,
+            self.author,
             self.config.clone(),
-            quorum_store_storage,
+            self.quorum_store_storage.clone(),
             self.quorum_store_to_mempool_sender,
-            self.batch_coordinator_cmd_tx.clone(),
             self.mempool_txn_pull_timeout_ms,
         );
         spawn_named!(
             "batch_generator",
-            batch_generator.start(batch_generator_cmd_rx, back_pressure_rx, interval)
+            batch_generator.start(
+                self.network_sender.clone(),
+                batch_generator_cmd_rx,
+                back_pressure_rx,
+                interval
+            )
         );
-
-        let batch_coordinator_cmd_rx = self.batch_coordinator_cmd_rx.take().unwrap();
-        let batch_coordinator = BatchCoordinator::new(
-            self.epoch,
-            self.author,
-            self.network_sender.clone(),
-            batch_coordinator_cmd_rx,
-            self.batch_store_cmd_tx.clone(),
-            self.proof_coordinator_cmd_tx.clone(),
-            self.config.max_batch_bytes,
-        );
-        spawn_named!("batch_coordinator", batch_coordinator.start());
 
         for (i, remote_batch_coordinator_cmd_rx) in
             self.remote_batch_coordinator_cmd_rx.into_iter().enumerate()
         {
             let batch_coordinator = BatchCoordinator::new(
-                self.epoch,
                 self.author,
                 self.network_sender.clone(),
-                remote_batch_coordinator_cmd_rx,
-                self.batch_store_cmd_tx.clone(),
-                self.proof_coordinator_cmd_tx.clone(),
-                self.config.max_batch_bytes,
+                self.batch_store.clone().unwrap(),
+                self.config.receiver_max_batch_txns as u64,
+                self.config.receiver_max_batch_bytes as u64,
+                self.config.receiver_max_total_txns as u64,
+                self.config.receiver_max_total_bytes as u64,
             );
             #[allow(unused_variables)]
-            let name = format!("batch_coordinator-{}", i).as_str();
-            spawn_named!(name, batch_coordinator.start());
+            let name = format!("batch_coordinator-{}", i);
+            spawn_named!(
+                name.as_str(),
+                batch_coordinator.start(remote_batch_coordinator_cmd_rx)
+            );
         }
 
         let proof_coordinator_cmd_rx = self.proof_coordinator_cmd_rx.take().unwrap();
-        let proof_coordinator = ProofCoordinator::new(self.config.proof_timeout_ms, self.author);
+        let proof_coordinator = ProofCoordinator::new(
+            self.config.proof_timeout_ms,
+            self.author,
+            self.batch_store.clone().unwrap(),
+            self.batch_generator_cmd_tx.clone(),
+        );
         spawn_named!(
             "proof_coordinator",
             proof_coordinator.start(
                 proof_coordinator_cmd_rx,
-                self.proof_manager_cmd_tx.clone(),
+                self.network_sender.clone(),
                 self.verifier.clone(),
             )
         );
 
         let proof_manager_cmd_rx = self.proof_manager_cmd_rx.take().unwrap();
         let proof_manager = ProofManager::new(
-            self.epoch,
+            self.author,
             self.config.back_pressure.backlog_txn_limit_count,
+            self.config
+                .back_pressure
+                .backlog_per_validator_batch_limit_count
+                * self.num_validators,
         );
         spawn_named!(
             "proof_manager",
             proof_manager.start(
-                self.network_sender.clone(),
                 self.back_pressure_tx.clone(),
                 self.consensus_to_quorum_store_receiver,
                 proof_manager_cmd_rx,
@@ -373,14 +354,41 @@ impl InnerBuilder {
         let network_msg_rx = self.quorum_store_msg_rx.take().unwrap();
         let net = NetworkListener::new(
             network_msg_rx,
-            self.batch_reader_cmd_tx.clone(),
             self.proof_coordinator_cmd_tx.clone(),
             self.remote_batch_coordinator_cmd_tx.clone(),
             self.proof_manager_cmd_tx.clone(),
         );
         spawn_named!("network_listener", net.start());
 
-        self.coordinator_tx
+        let batch_store = self.batch_store.clone().unwrap();
+        let epoch = self.epoch;
+        let (batch_retrieval_tx, mut batch_retrieval_rx) =
+            aptos_channel::new::<AccountAddress, IncomingBatchRetrievalRequest>(
+                QueueStyle::LIFO,
+                10,
+                Some(&counters::BATCH_RETRIEVAL_TASK_MSGS),
+            );
+        spawn_named!("batch_serve", async move {
+            info!(epoch = epoch, "Batch retrieval task starts");
+            while let Some(rpc_request) = batch_retrieval_rx.next().await {
+                counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
+                if let Ok(value) = batch_store.get_batch_from_local(&rpc_request.req.digest()) {
+                    let batch = value.try_into().unwrap();
+                    let msg = ConsensusMsg::BatchResponse(Box::new(batch));
+                    let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
+                    if let Err(e) = rpc_request
+                        .response_sender
+                        .send(Ok(bytes.into()))
+                        .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
+                    {
+                        warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                    }
+                }
+            }
+            info!(epoch = epoch, "Batch retrieval task stops");
+        });
+
+        (self.coordinator_tx, batch_retrieval_tx)
     }
 
     fn init_payload_manager(
@@ -389,23 +397,24 @@ impl InnerBuilder {
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        self.quorum_store_storage = Some(Arc::new(QuorumStoreDB::new(
-            self.quorum_store_storage_path.clone(),
-        )));
-
-        let batch_reader = self.spawn_quorum_store();
+        let batch_store = self.create_batch_store();
 
         (
             Arc::from(PayloadManager::InQuorumStore(
-                batch_reader,
+                batch_store,
                 // TODO: remove after splitting out clean requests
-                Mutex::new(self.coordinator_tx.clone()),
+                self.coordinator_tx.clone(),
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )
     }
 
-    fn start(self) -> Sender<CoordinatorCommand> {
-        self.spawn_quorum_store_wrapper()
+    fn start(
+        self,
+    ) -> (
+        Sender<CoordinatorCommand>,
+        aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>,
+    ) {
+        self.spawn_quorum_store()
     }
 }

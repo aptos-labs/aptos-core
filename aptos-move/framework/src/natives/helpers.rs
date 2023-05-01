@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::on_chain_config::{TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
@@ -171,29 +171,30 @@ macro_rules! safely_pop_type_arg {
 }
 
 #[allow(unused)]
-pub struct SafeNativeContext<'a, 'b, 'c> {
+pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     timed_features: &'c TimedFeatures,
-    inner: &'c mut NativeContext<'a, 'b>,
+    features: Arc<Features>,
+    inner: &'c mut NativeContext<'a, 'b, 'd>,
 
     gas_budget: InternalGas,
     gas_used: InternalGas,
 }
 
-impl<'a, 'b, 'c> Deref for SafeNativeContext<'a, 'b, 'c> {
-    type Target = NativeContext<'a, 'b>;
+impl<'a, 'b, 'c, 'd> Deref for SafeNativeContext<'a, 'b, 'c, 'd> {
+    type Target = NativeContext<'a, 'b, 'd>;
 
     fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> DerefMut for SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> DerefMut for SafeNativeContext<'a, 'b, 'c, 'd> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
     }
 }
 
-impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     /// Always remember: first charge gas, then execute!
     ///
     /// In other words, this function **MUST** always be called **BEFORE** executing **any**
@@ -211,6 +212,10 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
         } else {
             Ok(())
         }
+    }
+
+    pub fn get_feature_flags(&self) -> &Features {
+        self.features.deref()
     }
 }
 
@@ -233,6 +238,7 @@ pub type SafeNativeResult<T> = Result<T, SafeNativeError>;
 pub fn make_safe_native<G>(
     gas_params: G,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
     func: impl Fn(
             &G,
             &mut SafeNativeContext,
@@ -253,6 +259,7 @@ where
 
         let mut context = SafeNativeContext {
             timed_features: &timed_features,
+            features: features.clone(),
             inner: context,
 
             gas_budget,
@@ -272,4 +279,71 @@ where
     };
 
     Arc::new(closure)
+}
+
+/// For all $n > 0$, returns $\floor{\log_2{n}}$, contained within a `Some`.
+/// For $n = 0$, returns `None`.
+pub fn log2_floor(n: usize) -> Option<usize> {
+    if n == 0 {
+        return None;
+    }
+
+    // NOTE: n > 0, so n.leading_zeros() cannot equal usize::BITS. Therefore, we will never cast -1 to a usize.
+    Some(((usize::BITS - n.leading_zeros()) - 1) as usize)
+}
+
+#[test]
+fn test_log2_floor() {
+    assert_eq!(log2_floor(usize::MIN), None);
+    assert_eq!(log2_floor(0), None);
+    assert_eq!(log2_floor(1), Some(0));
+    assert_eq!(log2_floor(2), Some(1));
+    assert_eq!(log2_floor(3), Some(1));
+    assert_eq!(log2_floor(4), Some(2));
+    assert_eq!(log2_floor(5), Some(2));
+    assert_eq!(log2_floor(6), Some(2));
+    assert_eq!(log2_floor(7), Some(2));
+    assert_eq!(log2_floor(8), Some(3));
+    assert_eq!(log2_floor(9), Some(3));
+    assert_eq!(log2_floor(10), Some(3));
+    assert_eq!(log2_floor(11), Some(3));
+    assert_eq!(log2_floor(12), Some(3));
+    assert_eq!(log2_floor(13), Some(3));
+    assert_eq!(log2_floor(14), Some(3));
+    assert_eq!(log2_floor(15), Some(3));
+    assert_eq!(log2_floor(16), Some(4));
+    assert_eq!(log2_floor(usize::MAX), Some((usize::BITS - 1) as usize));
+}
+
+/// For all $n > 0$, returns $\ceil{\log_2{n}}$, contained within a `Some`.
+/// For $n = 0$, returns `None`.
+pub fn log2_ceil(n: usize) -> Option<usize> {
+    match n {
+        0 => None,
+        1 => Some(0),
+        _ => Some(log2_floor(n - 1).unwrap() + 1),
+    }
+}
+
+#[test]
+fn test_log2_ceil() {
+    assert_eq!(log2_ceil(usize::MIN), None);
+    assert_eq!(log2_ceil(0), None);
+    assert_eq!(log2_ceil(1), Some(0));
+    assert_eq!(log2_ceil(2), Some(1));
+    assert_eq!(log2_ceil(3), Some(2));
+    assert_eq!(log2_ceil(4), Some(2));
+    assert_eq!(log2_ceil(5), Some(3));
+    assert_eq!(log2_ceil(6), Some(3));
+    assert_eq!(log2_ceil(7), Some(3));
+    assert_eq!(log2_ceil(8), Some(3));
+    assert_eq!(log2_ceil(9), Some(4));
+    assert_eq!(log2_ceil(10), Some(4));
+    assert_eq!(log2_ceil(11), Some(4));
+    assert_eq!(log2_ceil(12), Some(4));
+    assert_eq!(log2_ceil(13), Some(4));
+    assert_eq!(log2_ceil(14), Some(4));
+    assert_eq!(log2_ceil(15), Some(4));
+    assert_eq!(log2_ceil(16), Some(4));
+    assert_eq!(log2_ceil(usize::MAX), Some(usize::BITS as usize));
 }

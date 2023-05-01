@@ -4,11 +4,13 @@
 extern crate core;
 
 mod backup;
+mod backup_maintenance;
 mod debugger;
 mod replay_verify;
 mod restore;
 #[cfg(test)]
 mod tests;
+mod utils;
 
 use anyhow::Result;
 use clap::Parser;
@@ -23,6 +25,8 @@ pub enum DBTool {
     ReplayVerify(replay_verify::Opt),
     #[clap(subcommand)]
     Debug(debugger::Command),
+    #[clap(subcommand)]
+    BackupMaintenance(backup_maintenance::Command),
 }
 
 impl DBTool {
@@ -31,6 +35,7 @@ impl DBTool {
             DBTool::Backup(cmd) => cmd.run().await,
             DBTool::Restore(cmd) => cmd.run().await,
             DBTool::ReplayVerify(cmd) => cmd.run().await,
+            DBTool::BackupMaintenance(cmd) => cmd.run().await,
             DBTool::Debug(cmd) => cmd.run(),
         }
     }

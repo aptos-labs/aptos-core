@@ -8,12 +8,12 @@ use crate::{
     safely_pop_arg,
 };
 use aptos_gas_algebra_ext::{AbstractValueSize, InternalGasPerAbstractValueUnit};
-use aptos_types::on_chain_config::TimedFeatures;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
  * native fun write_to_event_store
@@ -81,12 +81,14 @@ pub fn make_all(
     gas_params: GasParameters,
     calc_abstract_val_size: impl Fn(&Value) -> AbstractValueSize + Send + Sync + 'static,
     timed_features: TimedFeatures,
+    features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [(
         "write_to_event_store",
         make_safe_native(
             gas_params.write_to_event_store,
             timed_features,
+            features,
             make_native_write_to_event_store(calc_abstract_val_size),
         ),
     )];

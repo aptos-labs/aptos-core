@@ -368,7 +368,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "fieldConfig": {
         "defaults": {
           "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
@@ -403,7 +403,7 @@
       "targets": [
         {
           "connectionArgs": { "location": "US" },
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "key": "Q-2130acf3-cec5-4aec-89ab-c5ff823a6263-0",
@@ -543,7 +543,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "fieldConfig": {
         "defaults": {
           "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
@@ -576,7 +576,7 @@
       "targets": [
         {
           "connectionArgs": { "location": "US" },
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "key": "Q-2130acf3-cec5-4aec-89ab-c5ff823a6263-0",
@@ -1510,7 +1510,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "text": ["VictoriaMetrics Mainnet US"], "value": "VictoriaMetrics Mainnet US" },
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -1521,16 +1525,29 @@
         "query": "prometheus",
         "queryValue": "",
         "refresh": 1,
-        "regex": "",
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
         "skipUrlSync": false,
         "sort": 0,
+        "type": "datasource"
+      },
+      {
+        "description": "BigQuery data source",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "BigQuery",
+        "options": [],
+        "query": "grafana-bigquery-datasource",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
         "type": "datasource"
       },
       {
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["telemetry-service"], "value": "telemetry-service" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -1576,7 +1593,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "text": ["All"], "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -1704,8 +1721,8 @@
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
   },
   "timezone": "browser",
-  "title": "Transactions",
+  "title": "transactions",
   "uid": "p-8XUDI4z",
-  "version": 22,
+  "version": 3,
   "weekStart": ""
 }

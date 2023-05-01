@@ -375,62 +375,11 @@ pub struct ProtocolMetadata {
 }
 
 impl ProtocolMetadata {
-    /// Returns true iff the request can be serviced
-    pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
-        match &request.data_request {
-            GetNewTransactionsWithProof(_)
-            | GetNewTransactionOutputsWithProof(_)
-            | GetNewTransactionsOrOutputsWithProof(_)
-            | GetNumberOfStatesAtVersion(_)
-            | GetServerProtocolVersion
-            | GetStorageServerSummary => true,
-            GetStateValuesWithProof(request) => CompleteDataRange::new(
-                request.start_index,
-                request.end_index,
-            )
-            .map_or(false, |range| {
-                range
-                    .len()
-                    .map_or(false, |chunk_size| self.max_state_chunk_size >= chunk_size)
-            }),
-            GetEpochEndingLedgerInfos(request) => CompleteDataRange::new(
-                request.start_epoch,
-                request.expected_end_epoch,
-            )
-            .map_or(false, |range| {
-                range
-                    .len()
-                    .map_or(false, |chunk_size| self.max_epoch_chunk_size >= chunk_size)
-            }),
-            GetTransactionOutputsWithProof(request) => CompleteDataRange::new(
-                request.start_version,
-                request.end_version,
-            )
-            .map_or(false, |range| {
-                range.len().map_or(false, |chunk_size| {
-                    self.max_transaction_output_chunk_size >= chunk_size
-                })
-            }),
-            GetTransactionsWithProof(request) => CompleteDataRange::new(
-                request.start_version,
-                request.end_version,
-            )
-            .map_or(false, |range| {
-                range.len().map_or(false, |chunk_size| {
-                    self.max_transaction_chunk_size >= chunk_size
-                })
-            }),
-            GetTransactionsOrOutputsWithProof(request) => CompleteDataRange::new(
-                request.start_version,
-                request.end_version,
-            )
-            .map_or(false, |range| {
-                range.len().map_or(false, |chunk_size| {
-                    self.max_transaction_chunk_size >= chunk_size
-                        && self.max_transaction_output_chunk_size >= chunk_size
-                })
-            }),
-        }
+    /// We deem all requests serviceable, even if the requested chunk
+    /// sizes are larger than the maximum sizes that can be served (the
+    /// response will simply be truncated on the server side).
+    pub fn can_service(&self, _request: &StorageServiceRequest) -> bool {
+        true // TODO: figure out if should eventually remove this
     }
 }
 
@@ -594,7 +543,7 @@ impl DataSummary {
 /// inclusive) where data is complete (i.e. there are no missing pieces of data).
 ///
 /// This is used to provide a summary of the data currently held in storage, e.g.
-/// a CompleteDataRange<Version> of (A,B) means all versions A->B (inclusive).
+/// a `CompleteDataRange<Version>` of (A,B) means all versions A->B (inclusive).
 ///
 /// Note: `CompleteDataRanges` are never degenerate (lowest > highest) and the
 /// range length is always expressible without overflowing. Constructing a

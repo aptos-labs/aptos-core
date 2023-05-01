@@ -1,316 +1,222 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus_types::proof_of_store::LogicalTime;
-use aptos_crypto::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use bcs::to_bytes;
-use serde::{Deserialize, Serialize};
-use std::{
-    cmp::Ordering,
-    fmt::{Display, Formatter},
-    mem,
+use anyhow::ensure;
+use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
+use aptos_crypto::{
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
 };
-
-#[derive(
-    Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, CryptoHasher, BCSCryptoHash,
-)]
-pub struct BatchId {
-    pub id: u64,
-    /// A random number that is stored in the DB and updated only if the value does not exist in
-    /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
-    /// id starts again at 0.
-    pub nonce: u64,
-}
-
-impl BatchId {
-    pub fn new(nonce: u64) -> Self {
-        Self { id: 0, nonce }
-    }
-
-    pub fn new_for_test(id: u64) -> Self {
-        Self { id, nonce: 0 }
-    }
-
-    pub fn increment(&mut self) {
-        self.id += 1;
-    }
-}
-
-impl PartialOrd<Self> for BatchId {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for BatchId {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.id.cmp(&other.id) {
-            Ordering::Equal => {},
-            ordering => return ordering,
-        }
-        self.nonce.cmp(&other.nonce)
-    }
-}
-
-impl Display for BatchId {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "({}, {})", self.id, self.nonce)
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct SerializedTransaction {
-    // pub for testing purposes
-    #[serde(with = "serde_bytes")]
-    pub bytes: Vec<u8>,
-}
-
-impl SerializedTransaction {
-    #[cfg(test)]
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self { bytes }
-    }
-
-    pub fn from_signed_txn(txn: &SignedTransaction) -> Self {
-        Self {
-            bytes: to_bytes(&txn).unwrap(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.bytes.len()
-    }
-
-    pub fn bytes(&self) -> &Vec<u8> {
-        &self.bytes
-    }
-
-    pub fn take_bytes(&mut self) -> Vec<u8> {
-        mem::take(&mut self.bytes)
-    }
-}
+use aptos_crypto_derive::CryptoHasher;
+use aptos_types::{transaction::SignedTransaction, PeerId};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
-pub(crate) struct PersistedValue {
-    pub(crate) maybe_payload: Option<Vec<SignedTransaction>>,
-    pub(crate) expiration: LogicalTime,
-    pub(crate) author: PeerId,
-    pub(crate) num_bytes: usize,
+pub struct PersistedValue {
+    info: BatchInfo,
+    maybe_payload: Option<Vec<SignedTransaction>>,
+}
+
+#[derive(PartialEq, Debug)]
+pub(crate) enum StorageMode {
+    PersistedOnly,
+    MemoryAndPersisted,
 }
 
 impl PersistedValue {
-    pub(crate) fn new(
-        maybe_payload: Option<Vec<SignedTransaction>>,
-        expiration: LogicalTime,
-        author: PeerId,
-        num_bytes: usize,
-    ) -> Self {
+    pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
         Self {
+            info,
             maybe_payload,
-            expiration,
-            author,
-            num_bytes,
         }
+    }
+
+    pub(crate) fn payload_storage_mode(&self) -> StorageMode {
+        match self.maybe_payload {
+            Some(_) => StorageMode::MemoryAndPersisted,
+            None => StorageMode::PersistedOnly,
+        }
+    }
+
+    pub(crate) fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
+        self.maybe_payload.take()
     }
 
     pub(crate) fn remove_payload(&mut self) {
         self.maybe_payload = None;
     }
+
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
-pub struct FragmentInfo {
-    epoch: u64,
-    batch_id: BatchId,
-    fragment_id: usize,
-    payload: Vec<SerializedTransaction>,
-    maybe_expiration: Option<LogicalTime>,
+impl Deref for PersistedValue {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
+    }
 }
 
-impl FragmentInfo {
-    fn new(
-        epoch: u64,
-        batch_id: BatchId,
-        fragment_id: usize,
-        fragment_payload: Vec<SerializedTransaction>,
-        maybe_expiration: Option<LogicalTime>,
-    ) -> Self {
+impl TryFrom<PersistedValue> for Batch {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PersistedValue) -> Result<Self, Self::Error> {
+        let author = value.author();
+        Ok(Batch {
+            batch_info: value.info,
+            payload: BatchPayload::new(
+                author,
+                value
+                    .maybe_payload
+                    .ok_or_else(|| anyhow::anyhow!("Payload not exist"))?,
+            ),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
+pub struct BatchPayload {
+    author: PeerId,
+    txns: Vec<SignedTransaction>,
+    #[serde(skip)]
+    num_bytes: OnceCell<usize>,
+}
+
+impl CryptoHash for BatchPayload {
+    type Hasher = BatchPayloadHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::new();
+        let bytes = bcs::to_bytes(&self).expect("Unable to serialize batch payload");
+        self.num_bytes.get_or_init(|| bytes.len());
+        state.update(&bytes);
+        state.finish()
+    }
+}
+
+impl BatchPayload {
+    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
         Self {
-            epoch,
-            batch_id,
-            fragment_id,
-            payload: fragment_payload,
-            maybe_expiration,
+            author,
+            txns,
+            num_bytes: OnceCell::new(),
         }
     }
 
-    pub fn into_transactions(self) -> Vec<SerializedTransaction> {
-        self.payload
+    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+        self.txns
     }
 
-    pub fn fragment_id(&self) -> usize {
-        self.fragment_id
+    pub fn num_txns(&self) -> usize {
+        self.txns.len()
     }
 
-    pub fn batch_id(&self) -> BatchId {
-        self.batch_id
-    }
-
-    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
-        self.maybe_expiration
+    pub fn num_bytes(&self) -> usize {
+        *self
+            .num_bytes
+            .get_or_init(|| bcs::serialized_size(&self).expect("unable to serialize batch payload"))
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Fragment {
-    source: PeerId,
-    fragment_info: FragmentInfo,
-}
-
-impl Fragment {
-    pub fn new(
-        epoch: u64,
-        batch_id: BatchId,
-        fragment_id: usize,
-        fragment_payload: Vec<SerializedTransaction>,
-        maybe_expiration: Option<LogicalTime>,
-        peer_id: PeerId,
-    ) -> Self {
-        let fragment_info = FragmentInfo::new(
-            epoch,
-            batch_id,
-            fragment_id,
-            fragment_payload,
-            maybe_expiration,
-        );
-        Self {
-            source: peer_id,
-            fragment_info,
-        }
-    }
-
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if let Some(expiration) = &self.fragment_info.maybe_expiration() {
-            if expiration.epoch() != self.fragment_info.epoch {
-                return Err(anyhow::anyhow!(
-                    "Epoch mismatch: info: {}, expiration: {}",
-                    expiration.epoch(),
-                    self.fragment_info.epoch
-                ));
-            }
-        }
-        if self.source == peer_id {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Sender mismatch: peer_id: {}, source: {}",
-                self.source,
-                peer_id
-            ))
-        }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.fragment_info.epoch
-    }
-
-    pub fn into_transactions(self) -> Vec<SerializedTransaction> {
-        self.fragment_info.into_transactions()
-    }
-
-    pub fn source(&self) -> PeerId {
-        self.source
-    }
-
-    pub fn fragment_id(&self) -> usize {
-        self.fragment_info.fragment_id()
-    }
-
-    pub fn batch_id(&self) -> BatchId {
-        self.fragment_info.batch_id()
-    }
-
-    pub fn maybe_expiration(&self) -> Option<LogicalTime> {
-        self.fragment_info.maybe_expiration()
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct BatchInfo {
-    pub epoch: u64,
-    pub digest: HashValue,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct BatchRequest {
-    source: PeerId,
-    batch_info: BatchInfo,
-}
-
-impl BatchRequest {
-    pub fn new(source: PeerId, epoch: u64, digest: HashValue) -> Self {
-        let batch_info = BatchInfo { epoch, digest };
-        Self { source, batch_info }
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.batch_info.epoch
-    }
-
-    pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
-        if self.source == peer_id {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Sender mismatch: peer_id: {}, source: {}",
-                self.source,
-                peer_id
-            ))
-        }
-    }
-
-    pub fn source(&self) -> PeerId {
-        self.source
-    }
-
-    pub fn digest(&self) -> HashValue {
-        self.batch_info.digest
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Batch {
-    source: PeerId,
     batch_info: BatchInfo,
-    payload: Vec<SignedTransaction>,
+    payload: BatchPayload,
 }
 
 impl Batch {
     pub fn new(
-        source: PeerId,
-        epoch: u64,
-        digest: HashValue,
+        batch_id: BatchId,
         payload: Vec<SignedTransaction>,
+        epoch: u64,
+        expiration: u64,
+        batch_author: PeerId,
+        gas_bucket_start: u64,
     ) -> Self {
-        let batch_info = BatchInfo { epoch, digest };
+        let payload = BatchPayload::new(batch_author, payload);
+        let batch_info = BatchInfo::new(
+            batch_author,
+            batch_id,
+            epoch,
+            expiration,
+            payload.hash(),
+            payload.num_txns() as u64,
+            payload.num_bytes() as u64,
+            gas_bucket_start,
+        );
         Self {
-            source,
             batch_info,
             payload,
         }
     }
 
-    pub fn source(&self) -> PeerId {
-        self.source
+    pub fn verify(&self) -> anyhow::Result<()> {
+        ensure!(
+            self.payload.author == self.author(),
+            "Payload author doesn't match the info"
+        );
+        ensure!(
+            self.payload.hash() == *self.digest(),
+            "Payload hash doesn't match the digest"
+        );
+        ensure!(
+            self.payload.num_txns() as u64 == self.num_txns(),
+            "Payload num txns doesn't match batch info"
+        );
+        ensure!(
+            self.payload.num_bytes() as u64 == self.num_bytes(),
+            "Payload num bytes doesn't match batch info"
+        );
+        for txn in &self.payload.txns {
+            ensure!(
+                txn.gas_unit_price() >= self.gas_bucket_start(),
+                "Payload gas unit price doesn't match batch info"
+            )
+        }
+        Ok(())
+    }
+
+    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+        self.payload.txns
+    }
+
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.batch_info
+    }
+}
+
+impl Deref for Batch {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.batch_info
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct BatchRequest {
+    epoch: u64,
+    source: PeerId,
+    digest: HashValue,
+}
+
+impl BatchRequest {
+    pub fn new(source: PeerId, epoch: u64, digest: HashValue) -> Self {
+        Self {
+            epoch,
+            source,
+            digest,
+        }
     }
 
     pub fn epoch(&self) -> u64 {
-        self.batch_info.epoch
+        self.epoch
     }
 
-    // Check the source == the sender. To protect from DDoS we check is Payload matches digest later.
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.source == peer_id {
             Ok(())
@@ -323,11 +229,72 @@ impl Batch {
         }
     }
 
-    pub fn into_payload(self) -> Vec<SignedTransaction> {
-        self.payload
+    pub fn source(&self) -> PeerId {
+        self.source
     }
 
     pub fn digest(&self) -> HashValue {
-        self.batch_info.digest
+        self.digest
+    }
+}
+
+impl From<Batch> for PersistedValue {
+    fn from(value: Batch) -> Self {
+        let Batch {
+            batch_info,
+            payload,
+        } = value;
+        PersistedValue::new(batch_info, Some(payload.into_transactions()))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BatchMsg {
+    batches: Vec<Batch>,
+}
+
+impl BatchMsg {
+    pub fn new(batches: Vec<Batch>) -> Self {
+        Self { batches }
+    }
+
+    pub fn verify(&self, peer_id: PeerId, max_num_batches: usize) -> anyhow::Result<()> {
+        ensure!(!self.batches.is_empty(), "Empty message");
+        ensure!(
+            self.batches.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.batches.len(),
+            max_num_batches
+        );
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.author() == peer_id,
+                "Batch author doesn't match sender"
+            );
+            batch.verify()?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.batches.is_empty(), "Empty message");
+        let epoch = self.batches[0].epoch();
+        for batch in self.batches.iter() {
+            ensure!(
+                batch.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                batch.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
+    }
+
+    pub fn author(&self) -> PeerId {
+        self.batches[0].author()
+    }
+
+    pub fn take(self) -> Vec<Batch> {
+        self.batches
     }
 }

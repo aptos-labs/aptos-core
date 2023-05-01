@@ -1,17 +1,17 @@
-import { AptosAccount } from "../../aptos_account";
+import { AptosAccount } from "../../account/aptos_account";
 import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { Provider } from "../../providers/provider";
-import { FaucetClient } from "../../providers/faucet_client";
-import { TokenClient } from "../../token_client";
+import { FaucetClient } from "../../plugins/faucet_client";
+import { TokenClient } from "../../plugins/token_client";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
-import { API_TOKEN, longTestTimeout } from "../../utils/test_helper.test";
+import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 
 describe("Provider", () => {
   const faucetClient = new FaucetClient(
     "https://fullnode.testnet.aptoslabs.com",
     "https://faucet.testnet.aptoslabs.com",
-    { TOKEN: API_TOKEN },
+    { TOKEN: FAUCET_AUTH_TOKEN },
   );
   const alice = new AptosAccount();
 

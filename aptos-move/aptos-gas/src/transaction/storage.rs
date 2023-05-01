@@ -48,49 +48,32 @@ impl StoragePricingV1 {
             }
     }
 
-    fn calculate_write_set_gas<'a>(
-        &self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> InternalGas {
-        use WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
+        use aptos_types::write_set::WriteOp::*;
 
-        // Counting
-        let mut num_ops = NumArgs::zero();
-        let mut num_new_items = NumArgs::zero();
-        let mut num_bytes_key = NumBytes::zero();
-        let mut num_bytes_val = NumBytes::zero();
+        let mut cost = self.write_data_per_op * NumArgs::new(1);
 
-        for (key, op) in ops {
-            num_ops += 1.into();
-
-            if self.write_data_per_byte_in_key > 0.into() {
-                // TODO(Gas): Are we supposed to panic here?
-                num_bytes_key += NumBytes::new(
+        if self.write_data_per_byte_in_key > 0.into() {
+            cost += self.write_data_per_byte_in_key
+                * NumBytes::new(
                     key.encode()
                         .expect("Should be able to serialize state key")
                         .len() as u64,
                 );
-            }
-
-            match op {
-                Creation(data) | CreationWithMetadata { data, .. } => {
-                    num_new_items += 1.into();
-                    num_bytes_val += NumBytes::new(data.len() as u64);
-                },
-                Modification(data) | ModificationWithMetadata { data, .. } => {
-                    num_bytes_val += NumBytes::new(data.len() as u64);
-                },
-                Deletion | DeletionWithMetadata { .. } => (),
-            }
         }
 
-        // Calculate the costs
-        let cost_ops = self.write_data_per_op * num_ops;
-        let cost_new_items = self.write_data_per_new_item * num_new_items;
-        let cost_bytes = self.write_data_per_byte_in_key * num_bytes_key
-            + self.write_data_per_byte_in_val * num_bytes_val;
+        match op {
+            Creation(data) | CreationWithMetadata { data, .. } => {
+                cost += self.write_data_per_new_item * NumArgs::new(1)
+                    + self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+            },
+            Modification(data) | ModificationWithMetadata { data, .. } => {
+                cost += self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+            },
+            Deletion | DeletionWithMetadata { .. } => (),
+        }
 
-        cost_ops + cost_new_items + cost_bytes
+        cost
     }
 }
 
@@ -170,35 +153,20 @@ impl StoragePricingV2 {
             }
     }
 
-    fn calculate_write_set_gas<'a>(
-        &self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> InternalGas {
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
         use aptos_types::write_set::WriteOp::*;
 
-        let mut num_items_create = NumArgs::zero();
-        let mut num_items_write = NumArgs::zero();
-        let mut num_bytes_create = NumBytes::zero();
-        let mut num_bytes_write = NumBytes::zero();
-
-        for (key, op) in ops {
-            match &op {
-                Creation(data) | CreationWithMetadata { data, .. } => {
-                    num_items_create += 1.into();
-                    num_bytes_create += self.write_op_size(key, data);
-                },
-                Modification(data) | ModificationWithMetadata { data, .. } => {
-                    num_items_write += 1.into();
-                    num_bytes_write += self.write_op_size(key, data);
-                },
-                Deletion | DeletionWithMetadata { .. } => (),
-            }
+        match &op {
+            Creation(data) | CreationWithMetadata { data, .. } => {
+                self.per_item_create * NumArgs::new(1)
+                    + self.write_op_size(key, data) * self.per_byte_create
+            },
+            Modification(data) | ModificationWithMetadata { data, .. } => {
+                self.per_item_write * NumArgs::new(1)
+                    + self.write_op_size(key, data) * self.per_byte_write
+            },
+            Deletion | DeletionWithMetadata { .. } => 0.into(),
         }
-
-        num_items_create * self.per_item_create
-            + num_items_write * self.per_item_write
-            + num_bytes_create * self.per_byte_create
-            + num_bytes_write * self.per_byte_write
     }
 }
 
@@ -218,15 +186,12 @@ impl StoragePricing {
         }
     }
 
-    pub fn calculate_write_set_gas<'a>(
-        &self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> InternalGas {
+    pub fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_write_set_gas(&mut ops.into_iter()),
-            V2(v2) => v2.calculate_write_set_gas(&mut ops.into_iter()),
+            V1(v1) => v1.io_gas_per_write(key, op),
+            V2(v2) => v2.io_gas_per_write(key, op),
         }
     }
 }
@@ -309,12 +274,12 @@ impl CheckChangeSet for ChangeSetConfigs {
             if let Some(bytes) = op.bytes() {
                 let write_op_size = (bytes.len() + key.size()) as u64;
                 if write_op_size > self.max_bytes_per_write_op {
-                    return Err(VMStatus::Error(ERR));
+                    return Err(VMStatus::Error(ERR, None));
                 }
                 write_set_size += write_op_size;
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return Err(VMStatus::Error(ERR));
+                return Err(VMStatus::Error(ERR, None));
             }
         }
 
@@ -322,11 +287,11 @@ impl CheckChangeSet for ChangeSetConfigs {
         for event in change_set.events() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
-                return Err(VMStatus::Error(ERR));
+                return Err(VMStatus::Error(ERR, None));
             }
             total_event_size += size;
             if total_event_size > self.max_bytes_all_events_per_transaction {
-                return Err(VMStatus::Error(ERR));
+                return Err(VMStatus::Error(ERR, None));
             }
         }
 

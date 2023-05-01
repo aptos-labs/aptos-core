@@ -22,7 +22,7 @@ Install your preferred SDK from the below list:
 
 ## Step 2: Install the CLI
 
-[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
+[Install the precompiled binary for the Aptos CLI](../tools/install-cli/index.md).
 
 ---
 
@@ -197,8 +197,6 @@ Coins have several primitives:
 The entity that creates a new coin gains the capabilities for minting, burning, and freezing.
 :::
 
-In order to transfer, withdraw, or deposit coins, you must have a `CoinStore` registered for the specific coin. In this tutorial, this is `CoinStore<MoonCoin>`.
-
 ---
 
 #### Step 4.3.1: Initializing a coin
@@ -294,14 +292,14 @@ Aptos provides several building blocks to support coin transfers:
 
 - `coin::deposit<CoinType>`: Allows any entity to deposit a coin into an account that has already called `coin::register<CoinType>`.
 - `coin::withdraw<CoinType>`: Allows any entity to extract a coin amount from their account.
-- `coin::transfer<CoinType>`: Leverages withdraw and deposit to perform an end-to-end transfer.
+- `aptos_account::transfer_coins<CoinType>`: Transfer coins of specific CoinType to a receiver.
 
 :::tip important
-Aptos does not emit transfer events; instead it leverages withdraw and deposit events.
+There are two separate withdraw and deposit events instead of a single transfer event.
 :::
 
 ## Supporting documentation
-* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)

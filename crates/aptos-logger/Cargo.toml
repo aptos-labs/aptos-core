@@ -39,4 +39,4 @@ pretty_assertions = { workspace = true }
 
 [features]
 default = []
-aptos-console = ["console-subscriber"]
+tokio-console = ["console-subscriber"]

@@ -25,6 +25,7 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+aptos-vm-logging = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 itertools = { workspace = true }

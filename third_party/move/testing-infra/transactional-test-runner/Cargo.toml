@@ -1,0 +1,48 @@
+[package]
+name = "move-transactional-test-runner"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Transactional testing framework for Move"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.52"
+clap = { version = "3.1.8", features = ["derive"] }
+colored = "2.0.0"
+move-binary-format = { path = "../../move-binary-format" }
+move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-utils = { path = "../../tools/move-bytecode-utils" }
+move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
+move-cli = { path = "../../tools/move-cli" }
+move-command-line-common = { path = "../../move-command-line-common" }
+move-compiler = { path = "../../move-compiler" }
+move-core-types = { path = "../../move-core/types" }
+move-disassembler = { path = "../../tools/move-disassembler" }
+move-ir-compiler = { path = "../../move-ir-compiler" }
+move-ir-types = { path = "../../move-ir/types" }
+move-resource-viewer = { path = "../../tools/move-resource-viewer" }
+once_cell = "1.7.2"
+rayon = "1.5.0"
+regex = "1.1.9"
+tempfile = "3.2.0"
+
+move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
+move-symbol-pool = { path = "../../move-symbol-pool" }
+move-vm-runtime = { path = "../../move-vm/runtime" }
+move-vm-test-utils = { path = "../../move-vm/test-utils" }
+move-vm-types = { path = "../../move-vm/types" }
+
+[dev-dependencies]
+datatest-stable = "0.1.1"
+difference = "2.0.0"
+
+[[test]]
+name = "tests"
+harness = false
+
+[features]
+failpoints = ['move-vm-runtime/failpoints']

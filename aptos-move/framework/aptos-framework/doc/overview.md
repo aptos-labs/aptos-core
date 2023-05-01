@@ -25,7 +25,10 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::coin`](coin.md#0x1_coin)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
 -  [`0x1::create_signer`](create_signer.md#0x1_create_signer)
+-  [`0x1::delegation_pool`](delegation_pool.md#0x1_delegation_pool)
 -  [`0x1::event`](event.md#0x1_event)
+-  [`0x1::execution_config`](execution_config.md#0x1_execution_config)
+-  [`0x1::fungible_asset`](fungible_asset.md#0x1_fungible_asset)
 -  [`0x1::gas_schedule`](gas_schedule.md#0x1_gas_schedule)
 -  [`0x1::genesis`](genesis.md#0x1_genesis)
 -  [`0x1::governance_proposal`](governance_proposal.md#0x1_governance_proposal)
@@ -34,6 +37,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
+-  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
 -  [`0x1::reconfiguration`](reconfiguration.md#0x1_reconfiguration)
 -  [`0x1::resource_account`](resource_account.md#0x1_resource_account)
 -  [`0x1::stake`](stake.md#0x1_stake)
@@ -53,4 +57,4 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::voting`](voting.md#0x1_voting)
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

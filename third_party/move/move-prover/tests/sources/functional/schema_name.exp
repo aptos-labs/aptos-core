@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: Variable `c` conflicts with a specification variable in the schema TestSchemaName::TestNameConflict
+  ┌─ tests/sources/functional/schema_name.move:9:16
+  │
+9 │             x: c + 3
+  │                ^^^^^

@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-std = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
 bytes = { workspace = true }
@@ -35,12 +38,16 @@ serde = { workspace = true }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 x25519-dalek = { workspace = true }
 
 [dev-dependencies]
+ark-bls12-381 = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 bitvec = { workspace = true }
 blake2 = { workspace = true }
 blake2-rfc = { workspace = true }
@@ -57,6 +64,10 @@ default = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+
+[[bench]]
+name = "ark_bls12_381"
+harness = false
 
 [[bench]]
 name = "bls12381"
@@ -81,3 +92,4 @@ harness = false
 [[bench]]
 name = "secp256k1"
 harness = false
+

@@ -6,8 +6,8 @@
 import logging
 import subprocess
 import time
-from urllib.request import urlopen
 
+import requests
 from common import FAUCET_PORT, NODE_PORT, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
@@ -18,6 +18,18 @@ def run_node(network: Network, image_repo_with_project: str):
     image_name = build_image_name(image_repo_with_project, network)
     container_name = f"aptos-tools-{network}"
     LOG.info(f"Trying to run aptos CLI local testnet from image: {image_name}")
+
+    # Confirm that the Docker daemon is running.
+    try:
+        subprocess.run(
+            ["docker", "container", "ls"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+    except:
+        LOG.error("Failed to connect to Docker. Is it installed and running?")
+        raise
 
     # First delete the existing container if there is one with the same name.
     subprocess.run(
@@ -66,9 +78,14 @@ def wait_for_startup(container_name: str, timeout: int):
     faucet_response = None
     while True:
         try:
-            api_response = urlopen(f"http://127.0.0.1:{NODE_PORT}/v1")
-            faucet_response = urlopen(f"http://127.0.0.1:{FAUCET_PORT}/health")
-            if api_response.status != 200 or faucet_response.status != 200:
+            api_response = requests.get(f"http://127.0.0.1:{NODE_PORT}/v1")
+            # Try to query the legacy faucet health endpoint first. TODO: Remove this
+            # once all local testnet images we use have the new faucet in them.
+            faucet_response = requests.get(f"http://127.0.0.1:{FAUCET_PORT}/health")
+            if faucet_response.status_code == 404:
+                # If that fails, try the new faucet health endpoint.
+                faucet_response = requests.get(f"http://127.0.0.1:{FAUCET_PORT}/")
+            if api_response.status_code != 200 or faucet_response.status_code != 200:
                 raise RuntimeError(
                     f"API or faucet not ready. API response: {api_response}. "
                     f"Faucet response: {faucet_response}"

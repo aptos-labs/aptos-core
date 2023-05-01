@@ -4,7 +4,7 @@
 version: "3.8"
 services:
   haproxy:
-    image: haproxytech/haproxy-debian:2.2
+    image: haproxytech/haproxy-debian:2.2.29
     networks:
       - shared
     volumes:

@@ -6,7 +6,9 @@ hide_table_of_contents: true
 
 # Learn about Nodes
 
-The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake. This section describes everything you need to stake and participate in consensus and governance. Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. 
+The Aptos network is comprised of nodes of three types: validator node, validator fullnode and public fullnode. To participate in consensus, you are required to run both a validator node and a validator fullnode, and stake.
+
+Also learn how to run a public fullnode on a local network and connect to either a testnet or a devnet. This section describes everything you need to stake and participate in consensus and governance. See also the [external resources](../community/external-resources.md) offered by your fellow node operators.
 
 
 
@@ -182,7 +184,7 @@ The Aptos network is comprised of nodes of three types: validator node, validato
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="/nodes/aptos-deployments" class="list-group-item">
+          <a href="/nodes/deployments" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Aptos blockchain deployments</h4>
             </div>
@@ -200,7 +202,7 @@ The Aptos network is comprised of nodes of three types: validator node, validato
             </div>
             <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
           </a>
-          <a href="/guides/indexing" class="list-group-item">
+          <a href="/integration/indexing" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexing</h4>
             </div>

@@ -1,15 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    emitter::MAX_RETRIES,
-    transaction_generator::{TransactionExecutor, SEND_AMOUNT},
-    EmitJobRequest, EmitModeParams,
-};
-use anyhow::{anyhow, format_err, Context, Result};
+use crate::{EmitJobRequest, EmitModeParams};
+use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos::common::{types::EncodingType, utils::prompt_yes};
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -20,13 +16,14 @@ use aptos_sdk::{
         AccountKey, LocalAccount,
     },
 };
+use aptos_transaction_generator_lib::{CounterState, TransactionExecutor, SEND_AMOUNT};
 use core::{
     cmp::min,
     result::Result::{Err, Ok},
 };
 use futures::StreamExt;
 use rand::{rngs::StdRng, SeedableRng};
-use std::{path::Path, sync::atomic::AtomicUsize, time::Instant};
+use std::{path::Path, time::Instant};
 
 #[derive(Debug)]
 pub struct AccountMinter<'t> {
@@ -77,37 +74,45 @@ impl<'t> AccountMinter<'t> {
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
-        let coins_per_seed_account = (expected_children_per_seed_account as u64)
-            .checked_mul(
-                coins_per_account
-                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
-            )
-            .unwrap()
-            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
-            .unwrap();
-        println!("{:?}", req);
-        println!(">>> coins_per_seed_account {}", coins_per_seed_account);
-        println!(
-            ">>> expected_num_seed_accounts {}",
-            expected_num_seed_accounts
-        );
-        let coins_for_source = coins_per_seed_account
-            .checked_mul(expected_num_seed_accounts as u64)
-            .unwrap()
-            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
-            .unwrap();
         info!(
             "Account creation plan created for {} accounts with {} balance each.",
             num_accounts, coins_per_account
         );
         info!(
-            "    through {} seed accounts with {} each, each to fund {} accounts",
-            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
-        );
-        info!(
             "    because of expecting {} txns and {} gas at {} gas price for each ",
             req.expected_max_txns, req.expected_gas_per_txn, req.gas_price,
         );
+        let coins_per_seed_account = (expected_children_per_seed_account as u64)
+            .checked_mul(
+                coins_per_account
+                    + req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+            )
+            .unwrap_or_else(|| {
+                panic!(
+                    "coins_per_seed_account exceeds u64: {} * ({} + {} * {} * {})",
+                    expected_children_per_seed_account,
+                    coins_per_account,
+                    req.max_gas_per_txn,
+                    req.gas_price,
+                    req.init_gas_price_multiplier
+                )
+            })
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
+            .unwrap();
+        info!(
+            "    through {} seed accounts with {} each, each to fund {} accounts",
+            expected_num_seed_accounts, coins_per_seed_account, expected_children_per_seed_account,
+        );
+        let coins_for_source = coins_per_seed_account
+            .checked_mul(expected_num_seed_accounts as u64)
+            .unwrap_or_else(|| {
+                panic!(
+                    "coins_for_source exceeds u64: {} * {}",
+                    coins_per_seed_account, expected_num_seed_accounts
+                )
+            })
+            .checked_add(req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier)
+            .unwrap();
 
         if req.mint_to_root {
             self.mint_to_root(txn_executor, coins_for_source).await?;
@@ -150,32 +155,40 @@ impl<'t> AccountMinter<'t> {
             }
         }
 
+        let new_source_account = if !req.coordination_delay_between_instances.is_zero() {
+            Some(
+                self.create_new_source_account(txn_executor, coins_for_source)
+                    .await?,
+            )
+        } else {
+            None
+        };
+
         let start = Instant::now();
 
-        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
-            .take(MAX_RETRIES * 2)
-            .collect::<Vec<_>>();
+        let request_counters = txn_executor.create_counter_state();
 
         // Create seed accounts with which we can create actual accounts concurrently. Adding
         // additional fund for paying gas fees later.
         let seed_accounts = self
             .create_and_fund_seed_accounts(
+                new_source_account,
                 txn_executor,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 mode_params.max_submit_batch_size,
-                &failed_requests,
+                &request_counters,
             )
             .await?;
         let actual_num_seed_accounts = seed_accounts.len();
         let num_new_child_accounts =
             (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
         info!(
-            "Completed creating {} seed accounts in {}s, each with {} coins, had to retry {:?} transactions",
+            "Completed creating {} seed accounts in {}s, each with {} coins, request stats: {}",
             seed_accounts.len(),
             start.elapsed().as_secs(),
             coins_per_seed_account,
-            failed_requests_to_trimmed_vec(failed_requests),
+            request_counters.show_simple(),
         );
         info!(
             "Creating additional {} accounts with {} coins each",
@@ -184,9 +197,7 @@ impl<'t> AccountMinter<'t> {
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         let start = Instant::now();
-        let failed_requests = std::iter::repeat_with(|| AtomicUsize::new(0))
-            .take(MAX_RETRIES * 2)
-            .collect::<Vec<_>>();
+        let request_counters = txn_executor.create_counter_state();
 
         // For each seed account, create a future and transfer coins from that seed account to new accounts
         let account_futures = seed_accounts
@@ -207,7 +218,7 @@ impl<'t> AccountMinter<'t> {
                     } else {
                         StdRng::from_rng(self.rng()).unwrap()
                     },
-                    &failed_requests,
+                    &request_counters,
                 )
             });
 
@@ -232,10 +243,10 @@ impl<'t> AccountMinter<'t> {
             accounts.len()
         );
         info!(
-            "Successfully completed creating {} accounts in {}s, had to retry {:?} transactions",
+            "Successfully completed creating {} accounts in {}s, request stats: {}",
             actual_num_seed_accounts * num_new_child_accounts,
             start.elapsed().as_secs(),
-            failed_requests_to_trimmed_vec(failed_requests),
+            request_counters.show_simple(),
         );
         Ok(accounts)
     }
@@ -258,11 +269,12 @@ impl<'t> AccountMinter<'t> {
 
     pub async fn create_and_fund_seed_accounts(
         &mut self,
+        mut new_source_account: Option<LocalAccount>,
         txn_executor: &dyn TransactionExecutor,
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
-        failed_requests: &[AtomicUsize],
+        counters: &CounterState,
     ) -> Result<Vec<LocalAccount>> {
         info!("Creating and funding seeds accounts");
         let mut i = 0;
@@ -271,13 +283,16 @@ impl<'t> AccountMinter<'t> {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
-            let source_account = &mut self.source_account;
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
                     create_and_fund_account_request(
-                        source_account,
+                        if let Some(account) = &mut new_source_account {
+                            account
+                        } else {
+                            self.source_account
+                        },
                         coins_per_seed_account,
                         account.public_key(),
                         txn_factory,
@@ -285,7 +300,7 @@ impl<'t> AccountMinter<'t> {
                 })
                 .collect();
             txn_executor
-                .execute_transactions_with_counter(&create_requests, failed_requests)
+                .execute_transactions_with_counter(&create_requests, counters)
                 .await?;
 
             i += batch_size;
@@ -319,20 +334,42 @@ impl<'t> AccountMinter<'t> {
         Ok(LocalAccount::new(address, account_key, sequence_number))
     }
 
+    pub async fn create_new_source_account(
+        &mut self,
+        txn_executor: &dyn TransactionExecutor,
+        coins_for_source: u64,
+    ) -> Result<LocalAccount> {
+        for i in 0..3 {
+            *self.source_account.sequence_number_mut() = txn_executor
+                .query_sequence_number(self.source_account.address())
+                .await?;
+
+            let new_source_account = LocalAccount::generate(self.rng());
+            let txn = create_and_fund_account_request(
+                self.source_account,
+                coins_for_source,
+                new_source_account.public_key(),
+                &self.txn_factory,
+            );
+            if let Err(e) = txn_executor.execute_transactions(&[txn]).await {
+                error!(
+                    "Couldn't create new source account, {:?}, try {}, retrying",
+                    e, i
+                )
+            } else {
+                info!(
+                    "New source account created {}",
+                    new_source_account.address()
+                );
+                return Ok(new_source_account);
+            }
+        }
+        bail!("Couldn't create new source account");
+    }
+
     pub fn rng(&mut self) -> &mut StdRng {
         &mut self.rng
     }
-}
-
-fn failed_requests_to_trimmed_vec(failed_requests: Vec<AtomicUsize>) -> Vec<usize> {
-    let mut result = failed_requests
-        .into_iter()
-        .map(|c| c.into_inner())
-        .collect::<Vec<_>>();
-    while result.len() > 1 && *result.last().unwrap() == 0 {
-        result.pop();
-    }
-    result
 }
 
 fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
@@ -363,7 +400,7 @@ async fn create_and_fund_new_accounts<R>(
     txn_factory: &TransactionFactory,
     reuse_account: bool,
     mut rng: R,
-    failed_requests: &[AtomicUsize],
+    counters: &CounterState,
 ) -> Result<Vec<LocalAccount>>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
@@ -392,7 +429,7 @@ where
                 .collect();
 
             txn_executor
-                .execute_transactions_with_counter(&creation_requests, failed_requests)
+                .execute_transactions_with_counter(&creation_requests, counters)
                 .await
                 .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
 

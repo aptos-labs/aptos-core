@@ -23,15 +23,21 @@ import {
   TransactionPayloadEntryFunction,
   TransactionPayloadScript,
   ModuleId,
+  TypeTagParser,
 } from "../aptos_types";
 import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "../bcs";
 import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "../aptos_types/abi";
-import { HexString, MaybeHexString } from "../hex_string";
-import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
+import { argToTransactionArgument, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
-import { DEFAULT_TXN_EXP_SEC_FROM_NOW, DEFAULT_MAX_GAS_AMOUNT, MemoizeExpiring } from "../utils";
+import {
+  DEFAULT_TXN_EXP_SEC_FROM_NOW,
+  DEFAULT_MAX_GAS_AMOUNT,
+  HexString,
+  MaybeHexString,
+  MemoizeExpiring,
+} from "../utils";
 
-export { TypeTagParser } from "./builder_utils";
+export { TypeTagParser } from "../aptos_types";
 
 const RAW_TRANSACTION_SALT = "APTOS::RawTransaction";
 const RAW_TRANSACTION_WITH_DATA_SALT = "APTOS::RawTransactionWithData";
@@ -391,10 +397,12 @@ export class TransactionBuilderRemoteABI {
     // Remove all `signer` and `&signer` from argument list because the Move VM injects those arguments. Clients do not
     // need to care about those args. `signer` and `&signer` are required be in the front of the argument list. But we
     // just loop through all arguments and filter out `signer` and `&signer`.
-    const originalArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
+    const abiArgs = funcAbi!.params.filter((param) => param !== "signer" && param !== "&signer");
 
-    // Convert string arguments to TypeArgumentABI
-    const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
+    // Convert abi string arguments to TypeArgumentABI
+    const typeArgABIs = abiArgs.map(
+      (abiArg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(abiArg, ty_tags).parseTypeTag()),
+    );
 
     const entryFunctionABI = new EntryFunctionABI(
       funcAbi!.name,

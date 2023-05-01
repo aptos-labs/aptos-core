@@ -37,7 +37,7 @@ impl TryFrom<VMStatus> for ExecutionError {
 
     fn try_from(status: VMStatus) -> anyhow::Result<ExecutionError> {
         match status {
-            VMStatus::Error(error) => Ok(ExecutionError {
+            VMStatus::Error(error, _) => Ok(ExecutionError {
                 error_type: String::from("VMError"),
                 abort_location: String::from(""),
                 error_code: error as u64,
@@ -52,6 +52,7 @@ impl TryFrom<VMStatus> for ExecutionError {
                 location,
                 function: _,
                 code_offset: _,
+                message: _,
             } => Ok(ExecutionError {
                 error_type: String::from("MoveExecutionFailure"),
                 abort_location: format!("{:?}", location),

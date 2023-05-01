@@ -139,32 +139,18 @@ module aptos_std::smart_table {
         let new_bucket_index = table.num_buckets;
         // the next bucket to split is num_bucket without the most significant bit.
         let to_split = new_bucket_index ^ (1 << table.level);
-        let new_bucket = vector::empty();
         table.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
         if (to_split + 1 == 1 << table.level) {
             table.level = table.level + 1;
         };
         let old_bucket = table_with_length::borrow_mut(&mut table.buckets, to_split);
-        // partition the bucket. after the loop, i == j and [0..i) stays in old bucket, [j..len) goes to new bucket
-        let i = 0;
-        let j = vector::length(old_bucket);
-        let len = j;
-        while (i < j) {
-            let entry = vector::borrow(old_bucket, i);
-            let index = bucket_index(table.level, table.num_buckets, entry.hash);
-            if (index == new_bucket_index) {
-                j = j - 1;
-                vector::swap(old_bucket, i, j);
-            } else {
-                i = i + 1;
-            };
-        };
-        while (j < len) {
-            let entry = vector::pop_back(old_bucket);
-            vector::push_back(&mut new_bucket, entry);
-            len = len - 1;
-        };
+        // partition the bucket, [0..p) stays in old bucket, [p..len) goes to new bucket
+        let p = vector::partition(old_bucket, |e| {
+            let entry: &Entry<K, V> = e; // Explicit type to satisfy compiler
+            bucket_index(table.level, table.num_buckets, entry.hash) != new_bucket_index
+        });
+        let new_bucket = vector::trim_reverse(old_bucket, p);
         table_with_length::add(&mut table.buckets, new_bucket_index, new_bucket);
     }
 

@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](./blockchain.md#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 
@@ -60,7 +60,7 @@ The owner is the owner of the funds. For example, Bob creates an account on the 
 As an owner:
 
 - Bob owns the funds that will be used for staking.
-- Only Bob can add or unlock or withdraw funds.
+- Only Bob can add, unlock or withdraw funds.
 - Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
 - The reward will be deposited into Bob's (owner's) account.
@@ -74,7 +74,7 @@ As an operator:
 - Alice has permissions only to join or leave the validator set.
 - As a validator, Alice will perform the validating function.
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
-- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource.
+- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource).
 
 ### Voter
 
@@ -90,7 +90,7 @@ Throughout the duration of an epoch, the following flow of events occurs several
 
 - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
 - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
-- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
+- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validator, not to the voter validators.**
 - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Validator state and stake state
@@ -121,7 +121,7 @@ sources={{
 />
 
 There are two edge cases to call out:
-1. If a validator's stake drops below the required minimum, that validator can be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
+1. If a validator's stake drops below the required [minimum](#minimum-and-maximum-stake), that validator will be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
 2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
@@ -179,7 +179,7 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 
 ### Minimum and maximum stake
 
-You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. 
+You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. The current required minimum for staking is 1M APT tokens.
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
 
@@ -217,7 +217,7 @@ The Aptos mainnet epoch is set as 7200 seconds (two hours).
 ### Triggers at the epoch start
 
 :::tip
-See the [Triggers at epoch boundary section of `stake.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/stake.move#L982) for the full code.
+See the [Triggers at epoch boundary section of `stake.move`](https://github.com/aptos-labs/aptos-core/blob/256618470f2ad7d89757263fbdbae38ac7085317/aptos-move/framework/aptos-framework/sources/stake.move#L1036) for the full code.
 :::
 
 At the start of each epoch, the following key events are triggered:
@@ -281,6 +281,7 @@ When you leave a validator set, you can rejoin by depositing the minimum require
 
 * [Current on-chain data](https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingConfig)
 * [Staking Pool Operations](../nodes/validator-node/operator/staking-pool-operations.md)
+* [Delegation Pool Operations](../nodes/validator-node/operator/delegation-pool-operations.md)
 * [Configuration file `staking_config.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/configs/staking_config.move)
 * [Contract file `staking_contract.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move) covering requesting commissions
 * [All staking-related `.move files](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/framework/aptos-framework/sources)

@@ -1,0 +1,35 @@
+[package]
+name = "move-async-vm"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Wrapper for the Move VM for the asynchronous execution flavor"
+repository = "https://github.com/diem/move"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0.52"
+better_any = "0.1.1"
+itertools = "0.10.0"
+move-binary-format = { path = "../../../move-binary-format" }
+move-command-line-common = { path = "../../../move-command-line-common" }
+move-compiler = { path = "../../../move-compiler" }
+move-core-types = { path = "../../../move-core/types" }
+move-vm-runtime = { path = "../../../move-vm/runtime", features = ["debugging"] }
+move-vm-test-utils = { path = "../../../move-vm/test-utils" }
+move-vm-types = { path = "../../../move-vm/types" }
+sha3 = "0.9.1"
+smallvec = "1.6.1"
+walkdir = "2.3.1"
+
+bcs = { workspace = true }
+
+[dev-dependencies]
+datatest-stable = "0.1.1"
+move-prover-test-utils = { path = "../../../move-prover/test-utils" }
+move-stdlib = { path = "../../../move-stdlib", features = ["testing"] }
+
+[[test]]
+name = "testsuite"
+harness = false

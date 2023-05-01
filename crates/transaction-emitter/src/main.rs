@@ -26,6 +26,10 @@ enum TxnEmitterCommand {
     /// This runs the transaction emitter in diag mode, where the focus is on
     /// FullNodes instead of ValidatorNodes. This performs a simple health check.
     Diag(Diag),
+
+    /// Just pings a set of end points and determines if they are reachable and have
+    /// up to date ledger information
+    PingEndPoints(PingEndPoints),
 }
 
 #[derive(Parser, Debug)]
@@ -35,6 +39,12 @@ struct EmitTx {
 
     #[clap(flatten)]
     emit_args: EmitArgs,
+}
+
+#[derive(Parser, Debug)]
+struct PingEndPoints {
+    #[clap(flatten)]
+    cluster_args: ClusterArgs,
 }
 
 #[derive(Parser, Debug)]
@@ -54,7 +64,8 @@ pub async fn main() -> Result<()> {
         TxnEmitterCommand::EmitTx(args) => {
             let stats = emit_transactions(&args.cluster_args, &args.emit_args)
                 .await
-                .context("Emit transactions failed")?;
+                .map_err(|e| panic!("Emit transactions failed {:?}", e))
+                .unwrap();
             println!("Total stats: {}", stats);
             println!("Average rate: {}", stats.rate());
             Ok(())
@@ -64,6 +75,12 @@ pub async fn main() -> Result<()> {
                 .await
                 .context("Failed to build cluster")?;
             diag(&cluster).await.context("Diag failed")?;
+            Ok(())
+        },
+        TxnEmitterCommand::PingEndPoints(args) => {
+            Cluster::try_from_cluster_args(&args.cluster_args)
+                .await
+                .context("Failed to build cluster")?;
             Ok(())
         },
     }

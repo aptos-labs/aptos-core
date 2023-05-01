@@ -477,4 +477,4 @@ sequence, then <code>0</code> is returned.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

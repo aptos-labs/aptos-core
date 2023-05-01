@@ -9,6 +9,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
+use aptos_consensus_types::common::TransactionSummary;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
@@ -156,6 +157,10 @@ impl TTLIndex {
             address: txn.get_sender(),
             sequence_number: txn.sequence_info.transaction_sequence_number,
         }
+    }
+
+    pub(crate) fn iter(&self) -> Iter<TTLOrderingKey> {
+        self.data.iter()
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -462,9 +467,12 @@ impl ParkingLotIndex {
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
-        self.data
-            .choose(&mut rng)
-            .and_then(|(sender, txns)| txns.iter().rev().next().map(|seq_num| (*sender, *seq_num)))
+        self.data.choose(&mut rng).and_then(|(sender, txns)| {
+            txns.iter().rev().next().map(|seq_num| TxnPointer {
+                sender: *sender,
+                sequence_number: *seq_num,
+            })
+        })
     }
 
     pub(crate) fn size(&self) -> usize {
@@ -474,19 +482,22 @@ impl ParkingLotIndex {
 
 /// Logical pointer to `MempoolTransaction`.
 /// Includes Account's address and transaction sequence number.
-pub type TxnPointer = (AccountAddress, u64);
+pub type TxnPointer = TransactionSummary;
 
 impl From<&MempoolTransaction> for TxnPointer {
-    fn from(transaction: &MempoolTransaction) -> Self {
-        (
-            transaction.get_sender(),
-            transaction.sequence_info.transaction_sequence_number,
-        )
+    fn from(txn: &MempoolTransaction) -> Self {
+        Self {
+            sender: txn.get_sender(),
+            sequence_number: txn.sequence_info.transaction_sequence_number,
+        }
     }
 }
 
 impl From<&OrderedQueueKey> for TxnPointer {
     fn from(key: &OrderedQueueKey) -> Self {
-        (key.address, key.sequence_number.transaction_sequence_number)
+        Self {
+            sender: key.address,
+            sequence_number: key.sequence_number.transaction_sequence_number,
+        }
     }
 }

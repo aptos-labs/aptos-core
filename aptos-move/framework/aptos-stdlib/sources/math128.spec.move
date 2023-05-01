@@ -25,7 +25,7 @@ spec aptos_std::math128 {
         ensures [abstract] result == spec_pow(n, e);
     }
 
-    spec fun spec_pow(e: u128, n: u128): u128 {
+    spec fun spec_pow(n: u128, e: u128): u128 {
         if (e == 0) {
             1
         }

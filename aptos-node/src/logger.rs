@@ -40,7 +40,7 @@ pub fn create_logger(
         .level(node_config.logger.level)
         .telemetry_level(node_config.logger.telemetry_level)
         .enable_telemetry_flush(node_config.logger.enable_telemetry_flush)
-        .console_port(node_config.logger.console_port);
+        .tokio_console_port(node_config.logger.tokio_console_port);
     if node_config.logger.enable_backtrace {
         logger_builder.enable_backtrace();
     }

@@ -34,6 +34,7 @@ from cases.init import test_init
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
+from test_results import test_results
 
 logging.basicConfig(
     stream=sys.stderr,
@@ -137,15 +138,16 @@ def main():
     # Stop the node + faucet.
     stop_node(container_name)
 
-    if run_helper.passed_tests:
+    # Print out the results.
+    if test_results.passed:
         LOG.info("These tests passed:")
-        for test_name in run_helper.passed_tests:
+        for test_name in test_results.passed:
             LOG.info(test_name)
 
-    if run_helper.failed_tests:
+    if test_results.failed:
         LOG.error("These tests failed:")
-        for test_name in run_helper.failed_tests:
-            LOG.error(test_name)
+        for test_name, exception in test_results.failed:
+            LOG.error(f"{test_name}: {exception}")
         return False
 
     LOG.info("All tests passed!")

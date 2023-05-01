@@ -2,15 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult, PromptOptions},
+    common::types::{
+        account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
+        TransactionOptions, TransactionSummary,
+    },
     config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
-use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
+use aptos_types::{
+    account_address::create_multisig_account_address,
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, TransactionPayload},
+};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
@@ -24,7 +33,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 /// Prompts for confirmation until a yes or no is given explicitly
@@ -306,6 +315,53 @@ where
     Ok(map)
 }
 
+/// Generate a vanity account for Ed25519 single signer scheme, either standard or multisig.
+///
+/// The default authentication key for an Ed25519 account is the same as the account address. Hence
+/// for a standard account, this function generates Ed25519 private keys until finding one that has
+/// an authentication key (account address) that begins with the given vanity prefix.
+///
+/// For a multisig account, this function generates private keys until finding one that can create
+/// a multisig account with the given vanity prefix as its first transaction (sequence number 0).
+///
+/// Note that while a valid hex string must have an even number of characters, a vanity prefix can
+/// have an odd number of characters since account addresses are human-readable.
+///
+/// `vanity_prefix_ref` is a reference to a hex string vanity prefix, optionally prefixed with "0x".
+/// For example "0xaceface" or "d00d".
+pub fn generate_vanity_account_ed25519(
+    vanity_prefix_ref: &str,
+    multisig: bool,
+) -> CliTypedResult<Ed25519PrivateKey> {
+    let vanity_prefix_ref = vanity_prefix_ref
+        .strip_prefix("0x")
+        .unwrap_or(vanity_prefix_ref); // Optionally strip leading 0x from input string.
+    let mut to_check_if_is_hex = String::from(vanity_prefix_ref);
+    // If an odd number of characters append a 0 for verifying that prefix contains valid hex.
+    if to_check_if_is_hex.len() % 2 != 0 {
+        to_check_if_is_hex += "0"
+    };
+    hex::decode(to_check_if_is_hex).  // Check that the vanity prefix can be decoded into hex.
+        map_err(|error| CliError::CommandArgumentError(format!(
+            "The vanity prefix could not be decoded to hex: {}", error)))?;
+    let mut key_generator = KeyGen::from_os_rng(); // Get random key generator.
+    loop {
+        // Generate new keys until finding a match against the vanity prefix.
+        let private_key = key_generator.generate_ed25519_private_key();
+        let mut account_address =
+            account_address_from_public_key(&Ed25519PublicKey::from(&private_key));
+        if multisig {
+            account_address = create_multisig_account_address(account_address, 0)
+        };
+        if account_address
+            .short_str_lossless()
+            .starts_with(vanity_prefix_ref)
+        {
+            return Ok(private_key);
+        };
+    }
+}
+
 pub fn current_dir() -> CliTypedResult<PathBuf> {
     env::current_dir().map_err(|err| {
         CliError::UnexpectedError(format!("Failed to get current directory {}", err))
@@ -355,7 +411,9 @@ pub async fn fund_account(
         .body("{}")
         .send()
         .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
+        .map_err(|err| {
+            CliError::ApiError(format!("Failed to fund account with faucet: {:#}", err))
+        })?;
     if response.status() == 200 {
         let hashes: Vec<HashValue> = response
             .json()
@@ -370,8 +428,48 @@ pub async fn fund_account(
     }
 }
 
+/// Wait for transactions, returning an error if any of them fail.
+pub async fn wait_for_transactions(
+    client: &aptos_rest_client::Client,
+    hashes: Vec<HashValue>,
+) -> CliTypedResult<()> {
+    let sys_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
+        .as_secs()
+        + 30;
+    for hash in hashes {
+        client
+            .wait_for_transaction_by_hash(
+                hash.into(),
+                sys_time,
+                Some(Duration::from_secs(60)),
+                None,
+            )
+            .await?;
+    }
+    Ok(())
+}
+
 pub fn start_logger() {
     let mut logger = aptos_logger::Logger::new();
     logger.channel_size(1000).is_async(false).level(Level::Warn);
     logger.build();
+}
+
+/// For transaction payload and options, either get gas profile or submit for execution.
+pub async fn profile_or_submit(
+    payload: TransactionPayload,
+    txn_options_ref: &TransactionOptions,
+) -> CliTypedResult<TransactionSummary> {
+    // Profile gas if needed.
+    if txn_options_ref.profile_gas {
+        txn_options_ref.profile_gas(payload).await
+    } else {
+        // Otherwise submit the transaction.
+        txn_options_ref
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
 }

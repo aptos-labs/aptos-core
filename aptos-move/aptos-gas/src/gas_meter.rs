@@ -8,27 +8,33 @@ use crate::{
     algebra::{AbstractValueSize, Fee, Gas},
     instr::InstructionGasParameters,
     misc::MiscGasParameters,
-    transaction::{ChangeSetConfigs, TransactionGasParameters},
-    FeePerGasUnit, StorageGasParameters,
+    transaction::TransactionGasParameters,
+    FeePerGasUnit, GasScalingFactor, StorageGasParameters,
 };
 use aptos_logger::error;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOp,
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    file_format::CodeOffset,
+};
 use move_core_types::{
+    account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    gas::{GasMeter, SimpleInstruction},
+    gas::{GasMeter as MoveGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
 
 // Change log:
+// - V8
+//   - Added BLS12-381 operations.
 // - V7
 //   - Native support for exists<T>
 //   - New formulae for storage fees based on fixed APT costs
@@ -53,7 +59,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 7;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 8;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -85,7 +91,7 @@ pub trait InitialGasSchedule: Sized {
 /// Gas parameters for all native functions.
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
-    pub move_stdlib: move_stdlib::natives::GasParameters,
+    pub move_stdlib: aptos_move_stdlib::natives::GasParameters,
     pub aptos_framework: aptos_framework::natives::GasParameters,
     pub table: move_table_extension::GasParameters,
 }
@@ -127,7 +133,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
 impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
-            move_stdlib: move_stdlib::natives::GasParameters::zeros(),
+            move_stdlib: aptos_move_stdlib::natives::GasParameters::zeros(),
             aptos_framework: aptos_framework::natives::GasParameters::zeros(),
             table: move_table_extension::GasParameters::zeros(),
         }
@@ -209,10 +215,127 @@ impl InitialGasSchedule for AptosGasParameters {
     }
 }
 
+/// Trait representing a gas meter used inside the Aptos VM.
+///
+/// It extends Move VM's `GasMeter` trait with a few Aptos-specific callbacks, along with
+/// some primitives that would allow gas meters to be composable.
+pub trait AptosGasMeter: MoveGasMeter {
+    /// Returns the gas feature version.
+    fn feature_version(&self) -> u64;
+
+    /// Returns the remaining balance, measured in (external) gas units.
+    ///
+    /// The number should be rounded down when converting from internal to external gas units.
+    fn balance(&self) -> Gas;
+
+    /// Returns the scaling factor between internal and external gas units.
+    fn gas_unit_scaling_factor(&self) -> GasScalingFactor;
+
+    /// Charges gas for performing operations that fall under the execution category.
+    fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+
+    /// Charges gas for performing operations that fall under the IO category.
+    fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()>;
+
+    /// Charges fee for utlizing short-term or long-term storage.
+    ///
+    /// Since the fee is measured in APT/Octa, it needs to be converted into gas units
+    /// according to the given unit price.
+    fn charge_storage_fee(
+        &mut self,
+        amount: Fee,
+        gas_unit_price: FeePerGasUnit,
+    ) -> PartialVMResult<()>;
+
+    /// Charge an intrinsic cost for executing the transaction.
+    ///
+    /// The cost stays constant for transactions below a certain size, but will grow proportionally
+    /// for bigger ones.
+    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+    /// Calculates the IO gas cost required to perform a write operation.
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+
+    /// Charges IO gas for all items in the specified write set.
+    ///
+    /// The contract requires that this function behaviors in a way that is consistent to
+    /// `fn io_gas_per_write`.
+    /// Due to this reason, you should normally not override the default implementation,
+    /// unless you are doing something special, such as injecting additional logging logic.
+    fn charge_io_gas_for_write_set<'a>(
+        &mut self,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+    ) -> VMResult<()> {
+        for (key, op) in ops {
+            self.charge_io(self.io_gas_per_write(key, op))
+                .map_err(|e| e.finish(Location::Undefined))?;
+        }
+        Ok(())
+    }
+
+    /// Calculates the storage fee for a write operation.
+    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+
+    /// Calculates the storage fee for an event.
+    fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
+
+    /// Calculates the discount applied to the event storage fees, based on a free quota.
+    fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
+
+    /// Calculates the storage fee for the transaction.
+    fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
+
+    /// Charges the storage fees for writes, events & txn storage in a lump sum, minimizing the
+    /// loss of precision.
+    ///
+    /// The contract requires that this function behaviors in a way that is consistent to
+    /// the ones defining the costs.
+    /// Due to this reason, you should normally not override the default implementation,
+    /// unless you are doing something special, such as injecting additional logging logic.
+    fn charge_storage_fee_for_all<'a>(
+        &mut self,
+        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        events: impl IntoIterator<Item = &'a ContractEvent>,
+        txn_size: NumBytes,
+        gas_unit_price: FeePerGasUnit,
+    ) -> VMResult<()> {
+        // The new storage fee are only active since version 7.
+        if self.feature_version() < 7 {
+            return Ok(());
+        }
+
+        // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
+        // to avoid causing them issues. We should revisit the problem and figure out a
+        // better way to handle this.
+        if gas_unit_price.is_zero() {
+            return Ok(());
+        }
+
+        // Calculate the storage fees.
+        let write_fee = write_ops.into_iter().fold(Fee::new(0), |acc, (key, op)| {
+            acc + self.storage_fee_per_write(key, op)
+        });
+        let event_fee = events.into_iter().fold(Fee::new(0), |acc, event| {
+            acc + self.storage_fee_per_event(event)
+        });
+        let event_discount = self.storage_discount_for_events(event_fee);
+        let event_net_fee = event_fee
+            .checked_sub(event_discount)
+            .expect("discount should always be less than or equal to total amount");
+        let txn_fee = self.storage_fee_for_transaction_storage(txn_size);
+        let fee = write_fee + event_net_fee + txn_fee;
+
+        self.charge_storage_fee(fee, gas_unit_price)
+            .map_err(|err| err.finish(Location::Undefined))?;
+
+        Ok(())
+    }
+}
+
 /// The official gas meter used inside the Aptos VM.
 /// It maintains an internal gas counter, measured in internal gas units, and carries an environment
 /// consisting all the gas parameters, which it can lookup when performing gas calculations.
-pub struct AptosGasMeter {
+pub struct StandardGasMeter {
     feature_version: u64,
     gas_params: AptosGasParameters,
     storage_gas_params: StorageGasParameters,
@@ -226,7 +349,7 @@ pub struct AptosGasMeter {
     should_leak_memory_for_native: bool,
 }
 
-impl AptosGasMeter {
+impl StandardGasMeter {
     pub fn new(
         gas_feature_version: u64,
         gas_params: AptosGasParameters,
@@ -249,11 +372,6 @@ impl AptosGasMeter {
         }
     }
 
-    pub fn balance(&self) -> Gas {
-        self.balance
-            .to_unit_round_down_with_params(&self.gas_params.txn)
-    }
-
     #[inline]
     fn charge(&mut self, amount: InternalGas) -> PartialVMResult<()> {
         match self.balance.checked_sub(amount) {
@@ -265,32 +383,6 @@ impl AptosGasMeter {
                 self.balance = 0.into();
                 Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
             },
-        }
-    }
-
-    #[inline]
-    fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
-        self.charge(amount)?;
-
-        self.execution_gas_used += amount;
-        if self.feature_version >= 7
-            && self.execution_gas_used > self.gas_params.txn.max_execution_gas
-        {
-            Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))
-        } else {
-            Ok(())
-        }
-    }
-
-    #[inline]
-    fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()> {
-        self.charge(amount)?;
-
-        self.io_gas_used += amount;
-        if self.feature_version >= 7 && self.io_gas_used > self.gas_params.txn.max_io_gas {
-            Err(PartialVMError::new(StatusCode::IO_LIMIT_REACHED))
-        } else {
-            Ok(())
         }
     }
 
@@ -322,15 +414,27 @@ impl AptosGasMeter {
     pub fn feature_version(&self) -> u64 {
         self.feature_version
     }
-
-    pub fn change_set_configs(&self) -> &ChangeSetConfigs {
-        &self.storage_gas_params.change_set_configs
-    }
 }
 
-impl GasMeter for AptosGasMeter {
+impl MoveGasMeter for StandardGasMeter {
+    #[inline]
     fn balance_internal(&self) -> InternalGas {
         self.balance
+    }
+
+    #[inline]
+    fn charge_br_false(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.br_false)
+    }
+
+    #[inline]
+    fn charge_br_true(&mut self, _target_offset: Option<CodeOffset>) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.br_true)
+    }
+
+    #[inline]
+    fn charge_branch(&mut self, _target_offset: CodeOffset) -> PartialVMResult<()> {
+        self.charge_execution(self.gas_params.instr.branch)
     }
 
     #[inline]
@@ -383,6 +487,8 @@ impl GasMeter for AptosGasMeter {
     #[inline]
     fn charge_load_resource(
         &mut self,
+        _addr: AccountAddress,
+        _ty: impl TypeView,
         loaded: Option<(NumBytes, impl ValueView)>,
     ) -> PartialVMResult<()> {
         if self.feature_version != 0 {
@@ -808,47 +914,53 @@ impl GasMeter for AptosGasMeter {
     }
 }
 
-impl AptosGasMeter {
-    pub fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
-        let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
-        self.charge_execution(cost)
-            .map_err(|e| e.finish(Location::Undefined))
+impl AptosGasMeter for StandardGasMeter {
+    fn feature_version(&self) -> u64 {
+        self.feature_version
     }
 
-    pub fn charge_write_set_gas_for_io<'a>(
-        &mut self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-    ) -> VMResult<()> {
-        let cost = self.storage_gas_params.pricing.calculate_write_set_gas(ops);
-        self.charge_io(cost)
-            .map_err(|e| e.finish(Location::Undefined))
+    fn balance(&self) -> Gas {
+        self.balance
+            .to_unit_round_down_with_params(&self.gas_params.txn)
     }
 
-    pub fn charge_storage_fee<'a>(
+    fn gas_unit_scaling_factor(&self) -> GasScalingFactor {
+        self.gas_params.txn.gas_unit_scaling_factor
+    }
+
+    #[inline]
+    fn charge_execution(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.charge(amount)?;
+
+        self.execution_gas_used += amount;
+        if self.feature_version >= 7
+            && self.execution_gas_used > self.gas_params.txn.max_execution_gas
+        {
+            Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn charge_io(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        self.charge(amount)?;
+
+        self.io_gas_used += amount;
+        if self.feature_version >= 7 && self.io_gas_used > self.gas_params.txn.max_io_gas {
+            Err(PartialVMError::new(StatusCode::IO_LIMIT_REACHED))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn charge_storage_fee(
         &mut self,
-        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        events: impl IntoIterator<Item = &'a ContractEvent>,
-        txn_size: NumBytes,
+        amount: Fee,
         gas_unit_price: FeePerGasUnit,
-    ) -> VMResult<()> {
-        // The new storage fee are only active since version 7.
-        if self.feature_version < 7 {
-            return Ok(());
-        }
-
-        // TODO(Gas): right now, some of our tests use a unit price of 0 and this is a hack
-        // to avoid causing them issues. We should revisit the problem and figure out a
-        // better way to handle this.
-        if gas_unit_price.is_zero() {
-            return Ok(());
-        }
-
-        // Calculate the storage fees.
+    ) -> PartialVMResult<()> {
         let txn_params = &self.gas_params.txn;
-        let write_fee = txn_params.calculate_write_set_storage_fee(write_ops);
-        let event_fee = txn_params.calculate_event_storage_fee(events);
-        let txn_fee = txn_params.calculate_transaction_storage_fee(txn_size);
-        let fee = write_fee + event_fee + txn_fee;
 
         // Because the storage fees are defined in terms of fixed APT costs, we need
         // to convert them into gas units.
@@ -863,7 +975,7 @@ impl AptosGasMeter {
             }
         }
         let gas_consumed_internal = div_ceil(
-            (u64::from(fee) as u128) * (u64::from(txn_params.gas_unit_scaling_factor) as u128),
+            (u64::from(amount) as u128) * (u64::from(txn_params.gas_unit_scaling_factor) as u128),
             u64::from(gas_unit_price) as u128,
         );
         let gas_consumed_internal = InternalGas::new(
@@ -878,17 +990,42 @@ impl AptosGasMeter {
             },
         );
 
-        self.charge(gas_consumed_internal)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        self.charge(gas_consumed_internal)?;
 
-        self.storage_fee_used += fee;
+        self.storage_fee_used += amount;
         if self.feature_version >= 7 && self.storage_fee_used > self.gas_params.txn.max_storage_fee
         {
-            return Err(
-                PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED).finish(Location::Undefined)
-            );
+            return Err(PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED));
         }
 
         Ok(())
+    }
+
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
+        self.storage_gas_params.pricing.io_gas_per_write(key, op)
+    }
+
+    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
+        self.gas_params.txn.storage_fee_per_write(key, op)
+    }
+
+    fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {
+        self.gas_params.txn.storage_fee_per_event(event)
+    }
+
+    fn storage_discount_for_events(&self, total_cost: Fee) -> Fee {
+        self.gas_params.txn.storage_discount_for_events(total_cost)
+    }
+
+    fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee {
+        self.gas_params
+            .txn
+            .storage_fee_for_transaction_storage(txn_size)
+    }
+
+    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
+        self.charge_execution(cost)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 }

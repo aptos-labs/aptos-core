@@ -2,28 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
+pub mod coverage;
+mod disassembler;
 mod manifest;
 pub mod package_hooks;
-
-pub use package_hooks::*;
-
+mod show;
 pub mod stored_package;
 mod transactional_tests_runner;
 
 use crate::{
+    account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
             load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
-            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir, ProfileOptions,
+            PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            prompt_yes_with_override, write_to_file,
+            profile_or_submit, prompt_yes_with_override, write_to_file,
         },
     },
     governance::CompileScriptFunction,
-    move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
+    move_tool::{
+        coverage::SummaryCoverage,
+        disassembler::Disassemble,
+        manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
+    },
     CliCommand, CliResult,
 };
 use aptos_crypto::HashValue;
@@ -36,7 +41,7 @@ use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest}
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload},
+    transaction::{Script, TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
@@ -54,11 +59,11 @@ use move_core_types::{
 };
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
+pub use package_hooks::*;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    env,
     fmt::{Display, Formatter},
     ops::Deref,
     path::{Path, PathBuf},
@@ -75,58 +80,54 @@ use transactional_tests_runner::TransactionalTestOpts;
 /// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
+    Clean(CleanPackage),
     Compile(CompilePackage),
     CompileScript(CompileScript),
-    Init(InitPackage),
-    Publish(PublishPackage),
+    #[clap(subcommand)]
+    Coverage(coverage::CoveragePackage),
+    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Disassemble(Disassemble),
+    Document(DocumentPackage),
     Download(DownloadPackage),
+    Init(InitPackage),
     List(ListPackage),
-    Clean(CleanPackage),
-    VerifyPackage(VerifyPackage),
+    Prove(ProvePackage),
+    Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    #[clap(subcommand, hide = true)]
+    Show(show::ShowTool),
     Test(TestPackage),
-    Prove(ProvePackage),
-    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
-    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    VerifyPackage(VerifyPackage),
     View(ViewFunction),
 }
 
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            MoveTool::Clean(tool) => tool.execute_serialized().await,
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
-            MoveTool::Init(tool) => tool.execute_serialized_success().await,
-            MoveTool::Publish(tool) => tool.execute_serialized().await,
-            MoveTool::Download(tool) => tool.execute_serialized().await,
-            MoveTool::List(tool) => tool.execute_serialized().await,
-            MoveTool::Clean(tool) => tool.execute_serialized().await,
-            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
-            MoveTool::Run(tool) => tool.execute_serialized().await,
-            MoveTool::RunScript(tool) => tool.execute_serialized().await,
-            MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::Prove(tool) => tool.execute_serialized().await,
-            MoveTool::Document(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::Coverage(tool) => tool.execute().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::Disassemble(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
+            MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::Init(tool) => tool.execute_serialized_success().await,
+            MoveTool::List(tool) => tool.execute_serialized().await,
+            MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::RunScript(tool) => tool.execute_serialized().await,
+            MoveTool::Show(tool) => tool.execute_serialized().await,
+            MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
         }
-    }
-}
-
-const VAR_BYTECODE_VERSION: &str = "MOVE_BYTECODE_VERSION";
-
-pub(crate) fn set_bytecode_version(version: Option<u32>) {
-    // Note: this is a bit of a hack to get the compiler emit bytecode with the right
-    //       version. In the future, we should add an option to the Move package system
-    //       that would allow us to configure this directly instead of relying on
-    //       environment variables.
-    if let Some(ver) = version {
-        env::set_var(VAR_BYTECODE_VERSION, ver.to_string());
     }
 }
 
@@ -294,7 +295,6 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
@@ -356,7 +356,6 @@ impl CliCommand<CompileScriptOutput> for CompileScript {
 
 impl CompileScript {
     async fn compile_script(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..IncludedArtifacts::None.build_options(
@@ -418,6 +417,14 @@ pub struct TestPackage {
         long = "instructions"
     )]
     pub instruction_execution_bound: u64,
+
+    /// Collect coverage information for later use with the various `aptos move coverage` subcommands
+    #[clap(long = "coverage")]
+    pub compute_coverage: bool,
+
+    /// Dump storage state on failure.
+    #[clap(long = "dump")]
+    pub dump_state: bool,
 }
 
 #[async_trait]
@@ -427,11 +434,11 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
-        let config = BuildConfig {
+        let mut config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
+            skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
             ..Default::default()
         };
 
@@ -440,6 +447,7 @@ impl CliCommand<&'static str> for TestPackage {
             self.move_options.get_package_path()?.as_path(),
             self.move_options.named_addresses(),
             None,
+            self.move_options.bytecode_version,
         )?;
         let _ = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
@@ -451,13 +459,14 @@ impl CliCommand<&'static str> for TestPackage {
                 ));
             }
         }
-
+        let path = self.move_options.get_package_path()?;
         let result = move_cli::base::test::run_move_unit_tests(
-            self.move_options.get_package_path()?.as_path(),
-            config,
+            path.as_path(),
+            config.clone(),
             UnitTestingConfig {
-                filter: self.filter,
+                filter: self.filter.clone(),
                 report_stacktrace_on_abort: true,
+                report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
@@ -467,10 +476,24 @@ impl CliCommand<&'static str> for TestPackage {
                 AbstractValueSizeGasParameters::zeros(),
             ),
             None,
-            false,
+            self.compute_coverage,
             &mut std::io::stdout(),
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+
+        // Print coverage summary if --coverage is set
+        if self.compute_coverage {
+            config.test_mode = false;
+            let summary = SummaryCoverage {
+                summarize_functions: false,
+                output_csv: false,
+                filter: self.filter,
+                move_options: self.move_options,
+            };
+            summary.coverage()?;
+
+            println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
+        }
 
         match result {
             UnitTestResult::Success => Ok("Success"),
@@ -519,7 +542,6 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let ProvePackage {
             move_options,
             prover_options,
@@ -529,6 +551,7 @@ impl CliCommand<&'static str> for ProvePackage {
             prover_options.prove(
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
+                move_options.bytecode_version,
             )
         })
         .await
@@ -559,7 +582,6 @@ impl CliCommand<&'static str> for DocumentPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let DocumentPackage {
             move_options,
             docgen_options,
@@ -696,7 +718,6 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let PublishPackage {
             move_options,
             txn_options,
@@ -728,26 +749,28 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from)
+        profile_or_submit(payload, &txn_options).await
     }
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
 #[derive(Parser)]
 pub struct CreateResourceAccountAndPublishPackage {
-    #[clap(long)]
-    pub(crate) seed: String,
-
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the resource account and put it in this location
     #[clap(long)]
     pub(crate) address_name: String,
 
     /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
     #[clap(long)]
     pub(crate) override_size_check: bool,
 
+    #[clap(flatten)]
+    pub(crate) seed_args: ResourceAccountSeed,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -763,14 +786,13 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let CreateResourceAccountAndPublishPackage {
-            seed,
             address_name,
             mut move_options,
             txn_options,
             override_size_check,
             included_artifacts_args,
+            seed_args,
         } = self;
 
         let account = if let Some(Some(account)) = CliConfig::load_profile(
@@ -785,9 +807,9 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
                 "Please provide an account using --profile or run aptos init".to_string(),
             ));
         };
+        let seed = seed_args.seed()?;
 
-        let resource_address =
-            create_resource_address(account, &bcs::to_bytes(&seed.clone()).unwrap());
+        let resource_address = create_resource_address(account, &seed);
         move_options.add_named_address(address_name, resource_address.to_string());
 
         let package_path = move_options.get_package_path()?;
@@ -809,7 +831,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         prompt_yes_with_override(&message, txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
-            bcs::to_bytes(&seed)?,
+            seed,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );
@@ -917,7 +939,6 @@ impl CliCommand<&'static str> for VerifyPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         // First build the package locally to get the package metadata
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
@@ -965,7 +986,7 @@ pub struct ListPackage {
 
     /// Type of items to query
     ///
-    /// Current supported types [packages]
+    /// Current supported types `[packages]`
     #[clap(long, default_value_t = MoveListQuery::Packages)]
     query: MoveListQuery,
 
@@ -1040,7 +1061,6 @@ impl CliCommand<&'static str> for CleanPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
-        set_bytecode_version(self.move_options.bytecode_version);
         let path = self.move_options.get_package_path()?;
         let build_dir = path.join("build");
         // Only remove the build dir if it exists, allowing for users to still clean their cache
@@ -1070,26 +1090,8 @@ impl CliCommand<&'static str> for CleanPackage {
 /// Run a Move function
 #[derive(Parser)]
 pub struct RunFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1101,55 +1103,18 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let args: Vec<Vec<u8>> = self
-            .args
-            .into_iter()
-            .map(|arg_with_type| arg_with_type.arg)
-            .collect();
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        self.txn_options
-            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id,
-                self.function_id.member_id,
-                type_args,
-                args,
-            )))
-            .await
-            .map(TransactionSummary::from)
+        let payload = TransactionPayload::EntryFunction(
+            self.entry_function_args.create_entry_function_payload()?,
+        );
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
-/// Run a Move function
+/// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1162,16 +1127,16 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let mut args: Vec<serde_json::Value> = vec![];
-        for arg in self.args {
+        for arg in self.entry_function_args.args {
             args.push(arg.to_json()?);
         }
 
         let view_request = ViewRequest {
             function: EntryFunctionId {
-                module: self.function_id.module_id.into(),
-                name: self.function_id.member_id.into(),
+                module: self.entry_function_args.function_id.module_id.into(),
+                name: self.entry_function_args.function_id.member_id.into(),
             },
-            type_arguments: self.type_args,
+            type_arguments: self.entry_function_args.type_args,
             arguments: args,
         };
 
@@ -1225,13 +1190,9 @@ impl CliCommand<TransactionSummary> for RunScript {
             type_args.push(type_tag)
         }
 
-        let txn = self
-            .txn_options
-            .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode, type_args, args,
-            )))
-            .await?;
-        Ok(TransactionSummary::from(&txn))
+        let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
@@ -1342,6 +1303,9 @@ impl FunctionArgType {
                         hex::decode(arg)
                             .map_err(|err| CliError::UnableToParse("vector<hex>", err.to_string()))
                     }),
+                    // Note commas cannot be put into the strings.  But, this should be a less likely case,
+                    // and the utility from having this available should be worth it.
+                    FunctionArgType::String => parse_vector_arg(arg, |arg| Ok(String::from(arg))),
                     FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
@@ -1412,12 +1376,7 @@ impl FromStr for FunctionArgType {
                 if str.starts_with("vector<") && str.ends_with('>') {
                     let arg = FunctionArgType::from_str(&str[7..str.len() - 1])?;
 
-                    // String gets confusing on parsing by commas
-                    if arg == FunctionArgType::String {
-                        return Err(CliError::CommandArgumentError(
-                            "vector<string> is not supported".to_string(),
-                        ));
-                    } else if arg == FunctionArgType::Raw {
+                    if arg == FunctionArgType::Raw {
                         return Err(CliError::CommandArgumentError(
                             "vector<raw> is not supported".to_string(),
                         ));
@@ -1441,6 +1400,7 @@ impl FromStr for FunctionArgType {
 }
 
 /// A parseable arg with a type separated by a colon
+#[derive(Debug)]
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) arg: Vec<u8>,
@@ -1483,8 +1443,8 @@ impl ArgWithType {
             FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
             FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
             FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
-            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
-            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u8>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u16>(&self.arg)?),
             FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
             FunctionArgType::U64 => {
                 serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
@@ -1553,7 +1513,6 @@ impl FromStr for ArgWithType {
                 "Arguments must be pairs of <type>:<arg> e.g. bool:true".to_string(),
             ));
         }
-
         let ty = FunctionArgType::from_str(parts.first().unwrap())?;
         let arg = parts.last().unwrap();
         let arg = ty.parse_arg(arg)?;

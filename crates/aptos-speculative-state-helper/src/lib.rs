@@ -86,14 +86,14 @@ impl<E: Send + SpeculativeEvent + 'static> SpeculativeEvents<E> {
         Ok(())
     }
 
-    /// Logically clears events recorded so far for a given transaction.
+    /// Clears events recorded so far for a given transaction.
     pub fn clear_txn_events(&self, txn_idx: usize) -> anyhow::Result<()> {
         let events = self.events_with_checked_length(txn_idx + 1)?;
         events[txn_idx].lock().clear();
         Ok(())
     }
 
-    /// Logically clears all events.
+    /// Clears all events.
     pub fn clear_all_events(&self) {
         // TODO: Parallelize if needed.
         for event in &self.events {

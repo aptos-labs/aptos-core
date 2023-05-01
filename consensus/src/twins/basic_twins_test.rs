@@ -192,6 +192,7 @@ fn twins_vote_dedup_test() {
 ///
 /// Run the test:
 /// cargo xtest -p consensus twins_proposer_test -- --nocapture
+#[ignore]
 fn twins_proposer_test() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

@@ -7,7 +7,9 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_consensus::QUORUM_STORE_DB_NAME;
-use aptos_forge::{NodeExt, Swarm, SwarmExt, TransactionType};
+use aptos_forge::{
+    reconfig, wait_for_all_nodes_to_catchup, NodeExt, Swarm, SwarmExt, TransactionType,
+};
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
@@ -306,4 +308,95 @@ async fn test_batch_id_on_restart_same_db() {
 #[tokio::test]
 async fn test_batch_id_on_restart_wiped_db() {
     test_batch_id_on_restart(true).await;
+}
+
+#[tokio::test]
+async fn test_swarm_with_bad_non_qs_node() {
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.api.failpoints_enabled = true;
+        }))
+        // TODO: remove when quorum store becomes the in-code default
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.consensus_config =
+                OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        }))
+        .build()
+        .await;
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let dishonest_peer_id = validator_peer_ids[0];
+    let honest_peers: Vec<(String, Client)> = swarm
+        .validators()
+        .skip(1)
+        .map(|node| (node.name().to_string(), node.rest_client()))
+        .collect();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    let rest_client = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .rest_client();
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    generate_traffic_and_assert_committed(
+        &mut swarm,
+        &validator_peer_ids[1..],
+        Duration::from_secs(20),
+    )
+    .await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    let non_qs_validator_client = swarm.validator(dishonest_peer_id).unwrap().rest_client();
+    non_qs_validator_client
+        .set_failpoint(
+            "consensus::start_new_epoch::disable_qs".to_string(),
+            "return".to_string(),
+        )
+        .await
+        .unwrap();
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    wait_for_all_nodes_to_catchup(&honest_peers, Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
+
+    info!("generate traffic");
+    let tx_stat = generate_traffic(
+        &mut swarm,
+        &[dishonest_peer_id],
+        Duration::from_secs(20),
+        1,
+        vec![vec![
+            (TransactionType::default_coin_transfer(), 70),
+            (TransactionType::default_account_generation(), 20),
+        ]],
+    )
+    .await;
+    assert!(tx_stat.is_err());
+
+    generate_traffic_and_assert_committed(
+        &mut swarm,
+        &validator_peer_ids[1..],
+        Duration::from_secs(20),
+    )
+    .await;
+
+    wait_for_all_nodes_to_catchup(&honest_peers, Duration::from_secs(MAX_WAIT_SECS))
+        .await
+        .unwrap();
 }

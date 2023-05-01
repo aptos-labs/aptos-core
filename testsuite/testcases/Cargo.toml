@@ -28,8 +28,10 @@ aptos-sdk = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+csv = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+itertools = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }

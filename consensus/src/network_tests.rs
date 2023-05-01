@@ -104,6 +104,10 @@ impl NetworkPlayground {
         }
     }
 
+    pub fn handle(&self) -> Handle {
+        self.executor.clone()
+    }
+
     /// HashMap of supported protocols to initialize ConsensusNetworkClient.
     pub fn peer_protocols(&self) -> Arc<PeersAndMetadata> {
         self.peers_and_metadata.clone()
@@ -477,7 +481,7 @@ impl DropConfigRound {
 mod tests {
     use super::*;
     use crate::{
-        network::NetworkTask,
+        network::{IncomingRpcRequest, NetworkTask},
         network_interface::{DIRECT_SEND, RPC},
     };
     use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -749,9 +753,9 @@ mod tests {
         );
 
         // verify request block rpc
-        let mut block_retrieval = receiver_1.block_retrieval;
+        let mut rpc_rx = receiver_1.rpc_rx;
         let on_request_block = async move {
-            while let Some((_, request)) = block_retrieval.next().await {
+            while let Some((_, request)) = rpc_rx.next().await {
                 // make sure the network task is not blocked during RPC
                 // we limit the network notification queue size to 1 so if it's blocked,
                 // we can not process 2 votes and the test will timeout
@@ -764,7 +768,12 @@ mod tests {
                     BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
                 let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
                 let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
-                request.response_sender.send(Ok(bytes)).unwrap();
+                match request {
+                    IncomingRpcRequest::BlockRetrieval(request) => {
+                        request.response_sender.send(Ok(bytes)).unwrap()
+                    },
+                    _ => panic!("unexpected message"),
+                }
             }
         };
         runtime.handle().spawn(on_request_block);
@@ -824,13 +833,13 @@ mod tests {
             .unwrap();
 
         let f_check = async move {
-            assert!(network_receivers.block_retrieval.next().await.is_some());
+            assert!(network_receivers.rpc_rx.next().await.is_some());
 
             drop(peer_mgr_notifs_tx);
             drop(connection_notifs_tx);
             drop(self_sender);
 
-            assert!(network_receivers.block_retrieval.next().await.is_none());
+            assert!(network_receivers.rpc_rx.next().await.is_none());
             assert!(network_receivers.consensus_messages.next().await.is_none());
         };
         let f_network_task = network_task.start();

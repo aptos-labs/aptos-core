@@ -9,6 +9,7 @@ use crate::{
             PriorityQueueIter, TTLIndex,
         },
         transaction::{MempoolTransaction, TimelineState},
+        TxnPointer,
     },
     counters,
     counters::{
@@ -56,25 +57,30 @@ pub struct TransactionStore {
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
     system_ttl_index: TTLIndex,
+    // Broadcast-ready transactions, with a timeline per bucket.
     timeline_index: MultiBucketTimelineIndex,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
     parking_lot_index: ParkingLotIndex,
-
     // Index for looking up transaction by hash.
     // Transactions are stored by AccountAddress + sequence number.
     // This index stores map of transaction committed hash to (AccountAddress, sequence number) pair.
     // Using transaction commited hash because from end user's point view, a transaction should only have
     // one valid hash.
     hash_index: HashMap<HashValue, (AccountAddress, u64)>,
-
     // estimated size in bytes
     size_bytes: usize,
+    // keeps track of txns that were resubmitted with higher gas
+    gas_upgraded_index: HashMap<TxnPointer, u64>,
 
     // configuration
     capacity: usize,
     capacity_bytes: usize,
     capacity_per_user: usize,
     max_batch_bytes: u64,
+
+    // eager expiration
+    eager_expire_threshold: Option<Duration>,
+    eager_expire_time: Duration,
 }
 
 impl TransactionStore {
@@ -94,15 +100,19 @@ impl TransactionStore {
                 .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),
             hash_index: HashMap::new(),
-
             // estimated size in bytes
             size_bytes: 0,
+            gas_upgraded_index: HashMap::new(),
 
             // configuration
             capacity: config.capacity,
             capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
             max_batch_bytes: config.shared_mempool_max_batch_bytes,
+
+            // eager expiration
+            eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
+            eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
         }
     }
 
@@ -184,11 +194,16 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
+    pub(crate) fn get_gas_upgraded_txns(&self) -> &HashMap<TxnPointer, u64> {
+        &self.gas_upgraded_index
+    }
+
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
         let acc_seq_num = txn.sequence_info.account_sequence_number;
+        let mut gas_upgraded = false;
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -213,11 +228,12 @@ impl TransactionStore {
                         "Transaction already in mempool with a different max gas amount"
                             .to_string(),
                     );
-                } else if current_version.txn.gas_unit_price() < txn.get_gas_price() {
+                } else if current_version.get_gas_price() < txn.get_gas_price() {
                     // Update txn if gas unit price is a larger value than before
                     if let Some(txn) = txns.remove(&txn_seq_num) {
                         self.index_remove(&txn);
                     };
+                    gas_upgraded = true;
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
                         "Transaction already in mempool with a higher gas price".to_string(),
@@ -258,15 +274,17 @@ impl TransactionStore {
             }
 
             // insert into storage and other indexes
-            let sender = txn.get_sender();
             self.system_ttl_index.insert(&txn);
             self.expiration_time_index.insert(&txn);
             self.hash_index
-                .insert(txn.get_committed_hash(), (sender, txn_seq_num));
-            let txn_size_bytes = txn.get_estimated_bytes();
+                .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
+            self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
+            self.size_bytes += txn.get_estimated_bytes();
+            if gas_upgraded {
+                self.gas_upgraded_index
+                    .insert(TxnPointer::from(&txn), txn.get_gas_price());
+            }
             txns.insert(txn_seq_num, txn);
-            self.sequence_numbers.insert(sender, acc_seq_num);
-            self.size_bytes += txn_size_bytes;
             self.track_indices();
         }
         self.process_ready_transactions(&address, acc_seq_num);
@@ -312,11 +330,11 @@ impl TransactionStore {
     ) -> bool {
         if self.is_full() && self.check_txn_ready(txn, curr_sequence_number) {
             // try to free some space in Mempool from ParkingLot by evicting a non-ready txn
-            if let Some((address, sequence_number)) = self.parking_lot_index.get_poppable() {
+            if let Some(txn_pointer) = self.parking_lot_index.get_poppable() {
                 if let Some(txn) = self
                     .transactions
-                    .get_mut(&address)
-                    .and_then(|txns| txns.remove(&sequence_number))
+                    .get_mut(&txn_pointer.sender)
+                    .and_then(|txns| txns.remove(&txn_pointer.sequence_number))
                 {
                     debug!(
                         LogSchema::new(LogEntry::MempoolFullEvictedTxn).txns(TxnsLog::new_txn(
@@ -443,6 +461,7 @@ impl TransactionStore {
                     TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
+                        txn.was_parked = true;
                         parking_lot_txns += 1;
                     },
                 }
@@ -539,6 +558,7 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
+        self.gas_upgraded_index.remove(&TxnPointer::from(txn));
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
@@ -623,6 +643,37 @@ impl TransactionStore {
             .collect()
     }
 
+    /// If the oldest transaction (that never entered parking lot) is larger than
+    /// eager_expire_threshold, there is significant backlog so add eager_expire_time
+    fn eager_expire_time(&self, gc_time: Duration) -> Duration {
+        let eager_expire_threshold = match self.eager_expire_threshold {
+            None => {
+                return gc_time;
+            },
+            Some(v) => v,
+        };
+
+        let mut oldest_insertion_time = None;
+        // Limit the worst-case linear search to 20.
+        for key in self.system_ttl_index.iter().take(20) {
+            if let Some(txn) = self.get_mempool_txn(&key.address, key.sequence_number) {
+                if !txn.was_parked {
+                    oldest_insertion_time = Some(txn.insertion_time);
+                    break;
+                }
+            }
+        }
+        if let Some(insertion_time) = oldest_insertion_time {
+            if let Ok(age) = SystemTime::now().duration_since(insertion_time) {
+                if age > eager_expire_threshold {
+                    counters::CORE_MEMPOOL_GC_EAGER_EXPIRE_EVENT_COUNT.inc();
+                    return gc_time.saturating_add(self.eager_expire_time);
+                }
+            }
+        }
+        gc_time
+    }
+
     /// Garbage collect old transactions.
     pub(crate) fn gc_by_system_ttl(&mut self, gc_time: Duration) {
         self.gc(gc_time, true);
@@ -630,7 +681,7 @@ impl TransactionStore {
 
     /// Garbage collect old transactions based on client-specified expiration time.
     pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.gc(block_time, false);
+        self.gc(self.eager_expire_time(block_time), false);
     }
 
     fn gc(&mut self, now: Duration, by_system_ttl: bool) {
@@ -672,6 +723,7 @@ impl TransactionStore {
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
+                    t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {

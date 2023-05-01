@@ -569,7 +569,7 @@ package.
     };
 
     // Assign the upgrade counter.
-    *&<b>mut</b> pack.upgrade_number = upgrade_number;
+    pack.upgrade_number = upgrade_number;
 
     // Update registry
     <b>let</b> policy = pack.upgrade_policy;
@@ -1030,4 +1030,4 @@ Native function to initiate module loading, including a list of allowed dependen
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

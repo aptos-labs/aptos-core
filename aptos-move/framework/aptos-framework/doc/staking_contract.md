@@ -740,6 +740,16 @@ pool.
 ## Constants
 
 
+<a name="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
+
+Commission percentage has to be between 0 and 100.
+
+
+<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 2;
+</code></pre>
+
+
+
 <a name="0x1_staking_contract_ECANT_MERGE_STAKING_CONTRACTS"></a>
 
 Staking contracts can't be merged.
@@ -766,16 +776,6 @@ Store amount must be at least the min stake required for a stake pool to join th
 
 
 <pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINSUFFICIENT_STAKE_AMOUNT">EINSUFFICIENT_STAKE_AMOUNT</a>: u64 = 1;
-</code></pre>
-
-
-
-<a name="0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE"></a>
-
-Commission percentage has to be between 0 and 100.
-
-
-<pre><code><b>const</b> <a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>: u64 = 2;
 </code></pre>
 
 
@@ -1253,7 +1253,8 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 
 ## Function `update_commision`
 
-Convenience function to allow a staker to update the commision percentage paid to the operator.
+Convenience function to allow a staker to update the commission percentage paid to the operator.
+TODO: fix the typo in function name. commision -> commission
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64)
@@ -2000,7 +2001,7 @@ Staking_contract exists the stacker/operator pair.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>pragma</b> timeout = 80;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
 <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_StakingContractExistsAbortsIf">StakingContractExistsAbortsIf</a>;
@@ -2543,4 +2544,4 @@ a staking_contract exists for the staker/operator pair.
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

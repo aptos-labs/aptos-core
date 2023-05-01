@@ -37,10 +37,12 @@ hyper = { workspace = true }
 itertools = { workspace = true }
 mime = { workspace = true }
 move-core-types = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 paste = { workspace = true }
 poem = { workspace = true }
 poem-openapi = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

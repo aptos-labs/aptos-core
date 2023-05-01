@@ -37,10 +37,7 @@ use aptos_vm_validator::{
 };
 use futures::channel::mpsc;
 use maplit::hashmap;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::{Handle, Runtime};
 
 /// Mock of a running instance of shared mempool.
@@ -103,7 +100,7 @@ impl MockSharedMempool {
         mpsc::Sender<QuorumStoreRequest>,
         MempoolNotifier,
     ) {
-        let mut config = NodeConfig::random();
+        let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
         let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
@@ -183,7 +180,7 @@ impl MockSharedMempool {
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
         // assume txn size is less than 100kb
-        pool.get_batch(size, size * 102400, HashSet::new())
+        pool.get_batch(size, size * 102400, true, false, vec![])
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {

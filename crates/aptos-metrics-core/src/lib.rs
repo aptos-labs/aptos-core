@@ -11,5 +11,7 @@ pub use prometheus::{
     IntGaugeVec, TextEncoder,
 };
 
+mod avg_counter;
+pub use avg_counter::register_avg_counter;
 pub mod const_metric;
 pub mod op_counters;

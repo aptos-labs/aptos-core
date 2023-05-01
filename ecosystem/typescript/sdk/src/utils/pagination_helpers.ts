@@ -1,5 +1,5 @@
 import { AnyNumber } from "../bcs";
-import { HexString, MaybeHexString } from "../hex_string";
+import { HexString, MaybeHexString } from "./hex_string";
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<T>(

@@ -50,6 +50,34 @@ impl AccountIdentifier {
         }
     }
 
+    pub fn pending_active_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_pending_active_stake()),
+        }
+    }
+
+    pub fn active_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_active_stake()),
+        }
+    }
+
+    pub fn pending_inactive_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_pending_inactive_stake()),
+        }
+    }
+
+    pub fn inactive_stake_account(address: AccountAddress) -> Self {
+        AccountIdentifier {
+            address: to_hex_lower(&address),
+            sub_account: Some(SubAccountIdentifier::new_inactive_stake()),
+        }
+    }
+
     pub fn operator_stake_account(
         address: AccountAddress,
         operator_address: AccountAddress,
@@ -72,9 +100,45 @@ impl AccountIdentifier {
         }
     }
 
+    pub fn is_pending_active_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_pending_active_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_active_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_active_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_pending_inactive_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_pending_inactive_stake()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_inactive_stake(&self) -> bool {
+        if let Some(ref inner) = self.sub_account {
+            inner.is_inactive_stake()
+        } else {
+            false
+        }
+    }
+
     pub fn is_operator_stake(&self) -> bool {
         if let Some(ref inner) = self.sub_account {
-            !inner.is_total_stake()
+            !(inner.is_total_stake()
+                || inner.is_active_stake()
+                || inner.is_pending_active_stake()
+                || inner.is_inactive_stake()
+                || inner.is_pending_inactive_stake())
         } else {
             false
         }
@@ -97,8 +161,8 @@ fn str_to_account_address(address: &str) -> Result<AccountAddress, ApiError> {
 }
 
 /// There are two types of SubAccountIdentifiers
-/// 1. "stake" which is the total stake
-/// 2. "stake-<operator>" which is the stake on the operator
+/// 1. `stake` which is the total stake
+/// 2. `stake-<operator>` which is the stake on the operator
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SubAccountIdentifier {
     /// Hex encoded AccountAddress beginning with 0x
@@ -106,12 +170,40 @@ pub struct SubAccountIdentifier {
 }
 
 const STAKE: &str = "stake";
+const PENDING_ACTIVE_STAKE: &str = "pending_active_stake";
+const ACTIVE_STAKE: &str = "active_stake";
+const PENDING_INACTIVE_STAKE: &str = "pending_inactive_stake";
+const INACTIVE_STAKE: &str = "inactive_stake";
 const ACCOUNT_SEPARATOR: char = '-';
 
 impl SubAccountIdentifier {
     pub fn new_total_stake() -> SubAccountIdentifier {
         SubAccountIdentifier {
             address: STAKE.to_string(),
+        }
+    }
+
+    pub fn new_pending_active_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: PENDING_ACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_active_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: ACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_pending_inactive_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: PENDING_INACTIVE_STAKE.to_string(),
+        }
+    }
+
+    pub fn new_inactive_stake() -> SubAccountIdentifier {
+        SubAccountIdentifier {
+            address: INACTIVE_STAKE.to_string(),
         }
     }
 
@@ -123,6 +215,22 @@ impl SubAccountIdentifier {
 
     pub fn is_total_stake(&self) -> bool {
         self.address.as_str() == STAKE
+    }
+
+    pub fn is_pending_active_stake(&self) -> bool {
+        self.address.as_str() == PENDING_ACTIVE_STAKE
+    }
+
+    pub fn is_active_stake(&self) -> bool {
+        self.address.as_str() == ACTIVE_STAKE
+    }
+
+    pub fn is_pending_inactive_stake(&self) -> bool {
+        self.address.as_str() == PENDING_INACTIVE_STAKE
+    }
+
+    pub fn is_inactive_stake(&self) -> bool {
+        self.address.as_str() == INACTIVE_STAKE
     }
 
     pub fn operator_address(&self) -> ApiResult<AccountAddress> {
@@ -202,7 +310,7 @@ impl From<ChainId> for NetworkIdentifier {
     }
 }
 
-/// Identifies a specific [`crate::types::Operation`] within a [`Transaction`]
+/// Identifies a specific [`crate::types::Operation`] within a `Transaction`
 ///
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/OperationIdentifier.html)
@@ -287,10 +395,19 @@ mod test {
         let base_account = AccountIdentifier::base_account(account);
         let total_stake_account = AccountIdentifier::total_stake_account(account);
         let operator_stake_account = AccountIdentifier::operator_stake_account(account, operator);
+        let active_stake_account = AccountIdentifier::active_stake_account(account);
+        let pending_active_stake_account = AccountIdentifier::pending_active_stake_account(account);
+        let inactive_stake_account = AccountIdentifier::inactive_stake_account(account);
+        let pending_inactive_stake_account =
+            AccountIdentifier::pending_inactive_stake_account(account);
 
         assert!(base_account.is_base_account());
         assert!(!operator_stake_account.is_base_account());
         assert!(!total_stake_account.is_base_account());
+        assert!(!active_stake_account.is_base_account());
+        assert!(!pending_active_stake_account.is_base_account());
+        assert!(!inactive_stake_account.is_base_account());
+        assert!(!pending_inactive_stake_account.is_base_account());
 
         assert!(!base_account.is_operator_stake());
         assert!(operator_stake_account.is_operator_stake());
@@ -300,9 +417,21 @@ mod test {
         assert!(!operator_stake_account.is_total_stake());
         assert!(total_stake_account.is_total_stake());
 
+        assert!(active_stake_account.is_active_stake());
+        assert!(pending_active_stake_account.is_pending_active_stake());
+        assert!(inactive_stake_account.is_inactive_stake());
+        assert!(pending_inactive_stake_account.is_pending_inactive_stake());
+
         assert_eq!(Ok(account), base_account.account_address());
         assert_eq!(Ok(account), operator_stake_account.account_address());
         assert_eq!(Ok(account), total_stake_account.account_address());
+        assert_eq!(Ok(account), active_stake_account.account_address());
+        assert_eq!(Ok(account), pending_active_stake_account.account_address());
+        assert_eq!(Ok(account), inactive_stake_account.account_address());
+        assert_eq!(
+            Ok(account),
+            pending_inactive_stake_account.account_address()
+        );
 
         assert!(base_account.operator_address().is_err());
         assert_eq!(Ok(operator), operator_stake_account.operator_address());

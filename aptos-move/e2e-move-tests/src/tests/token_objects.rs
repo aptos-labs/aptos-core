@@ -11,20 +11,12 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
-    collection: String,
-    creator: AccountAddress,
+    collection: AccountAddress,
+    index: u64,
     description: String,
-    mutability_config: MutabilityConfig,
     name: String,
-    creation_name: Option<String>,
     uri: String,
-}
-
-#[derive(Debug, Deserialize, Eq, PartialEq)]
-struct MutabilityConfig {
-    description: bool,
-    name: bool,
-    uri: bool,
+    mutation_events: EventHandle,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -76,7 +68,7 @@ fn test_basic_token() {
         type_params: vec![],
     };
     let token_obj_tag = StructTag {
-        address: addr,
+        address: AccountAddress::from_hex_literal("0x4").unwrap(),
         module: Identifier::new("token").unwrap(),
         name: Identifier::new("Token").unwrap(),
         type_params: vec![],
@@ -92,7 +84,7 @@ fn test_basic_token() {
     let object_0: ObjectCore = h
         .read_resource_from_resource_group(&token_addr, obj_group_tag.clone(), obj_tag.clone())
         .unwrap();
-    let token_0: Token = h
+    let mut token_0: Token = h
         .read_resource_from_resource_group(
             &token_addr,
             obj_group_tag.clone(),
@@ -107,7 +99,7 @@ fn test_basic_token() {
 
     let result = h.run_entry_function(
         &account,
-        str::parse(&format!("0x{}::token::set_description_entry", addr)).unwrap(),
+        str::parse(&format!("0x{}::hero::set_hero_description", addr)).unwrap(),
         vec![],
         vec![
             bcs::to_bytes("Hero Quest!").unwrap(),
@@ -129,5 +121,6 @@ fn test_basic_token() {
     // Determine that the only difference is the mutated description
     assert_eq!(token_1.description, "Oh no!");
     token_1.description = "The best hero ever!".to_string();
+    *token_0.mutation_events.count_mut() = token_1.mutation_events.count();
     assert_eq!(token_0, token_1);
 }

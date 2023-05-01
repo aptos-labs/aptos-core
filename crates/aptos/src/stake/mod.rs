@@ -26,15 +26,15 @@ use clap::Parser;
 pub enum StakeTool {
     AddStake(AddStake),
     CreateStakingContract(CreateStakingContract),
-    UnlockStake(UnlockStake),
-    WithdrawStake(WithdrawStake),
+    DistributeVestedCoins(DistributeVestedCoins),
     IncreaseLockup(IncreaseLockup),
     InitializeStakeOwner(InitializeStakeOwner),
     RequestCommission(RequestCommission),
-    SetOperator(SetOperator),
     SetDelegatedVoter(SetDelegatedVoter),
+    SetOperator(SetOperator),
+    UnlockStake(UnlockStake),
     UnlockVestedCoins(UnlockVestedCoins),
-    DistributeVestedCoins(DistributeVestedCoins),
+    WithdrawStake(WithdrawStake),
 }
 
 impl StakeTool {
@@ -43,15 +43,15 @@ impl StakeTool {
         match self {
             AddStake(tool) => tool.execute_serialized().await,
             CreateStakingContract(tool) => tool.execute_serialized().await,
-            UnlockStake(tool) => tool.execute_serialized().await,
-            WithdrawStake(tool) => tool.execute_serialized().await,
+            DistributeVestedCoins(tool) => tool.execute_serialized().await,
             IncreaseLockup(tool) => tool.execute_serialized().await,
             InitializeStakeOwner(tool) => tool.execute_serialized().await,
             RequestCommission(tool) => tool.execute_serialized().await,
-            SetOperator(tool) => tool.execute_serialized().await,
             SetDelegatedVoter(tool) => tool.execute_serialized().await,
+            SetOperator(tool) => tool.execute_serialized().await,
+            UnlockStake(tool) => tool.execute_serialized().await,
             UnlockVestedCoins(tool) => tool.execute_serialized().await,
-            DistributeVestedCoins(tool) => tool.execute_serialized().await,
+            WithdrawStake(tool) => tool.execute_serialized().await,
         }
     }
 }

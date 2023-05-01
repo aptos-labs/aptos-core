@@ -233,7 +233,7 @@ pub async fn verify_mempool_and_event_notification(
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
         .map(|txn| CommittedTransaction {
-            sender: txn.as_signed_user_txn().unwrap().sender(),
+            sender: txn.try_as_signed_user_txn().unwrap().sender(),
             sequence_number: 0,
         })
         .collect();

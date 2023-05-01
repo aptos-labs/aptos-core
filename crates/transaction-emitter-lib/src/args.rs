@@ -6,9 +6,15 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::{ArgEnum, ArgGroup, Parser};
+use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, path::Path};
+use std::{
+    convert::TryFrom,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 use url::Url;
 
 const DEFAULT_API_PORT: u16 = 8080;
@@ -57,10 +63,13 @@ impl CoinSourceArgs {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct ClusterArgs {
-    /// Nodes the cluster should connect to, e.g. http://node.mysite.com:8080
+    /// Nodes the cluster should connect to, e.g. `http://node.mysite.com:8080`
     /// If the port is not provided, it is assumed to be 8080.
     #[clap(short, long, required = true, min_values = 1, parse(try_from_str = parse_target))]
-    pub targets: Vec<Url>,
+    pub targets: Option<Vec<Url>>,
+
+    #[clap(long, conflicts_with = "targets")]
+    pub targets_file: Option<String>,
 
     /// If set, try to use public peers instead of localhost.
     #[clap(long)]
@@ -73,21 +82,24 @@ pub struct ClusterArgs {
     pub coin_source_args: CoinSourceArgs,
 }
 
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
-pub enum TransactionTypeArg {
-    CoinTransfer,
-    AccountGeneration,
-    AccountGenerationLargePool,
-    NftMintAndTransfer,
-    PublishPackage,
-    CustomFunctionLargeModuleWorkingSet,
-    CreateNewResource,
-    NoOp,
-}
+impl ClusterArgs {
+    pub fn get_targets(&self) -> Result<Vec<Url>> {
+        return match (&self.targets, &self.targets_file) {
+            (Some(targets), _) => Ok(targets.clone()),
+            (None, Some(target_file)) => Self::get_targets_from_file(target_file),
+            (_, _) => Err(anyhow::anyhow!("Expected either targets or target_file")),
+        };
+    }
 
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
+    fn get_targets_from_file(path: &String) -> Result<Vec<Url>> {
+        let reader = BufReader::new(File::open(path)?);
+        let mut urls = Vec::new();
+
+        for line in reader.lines() {
+            let url_string = &line?;
+            urls.push(parse_target(url_string)?);
+        }
+        Ok(urls)
     }
 }
 
@@ -115,9 +127,6 @@ pub struct EmitArgs {
     /// Time to run --emit-tx for in seconds.
     #[clap(long, default_value = "60")]
     pub duration: u64,
-
-    #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
-    pub invalid_tx: usize,
 
     #[clap(
         long,
@@ -156,8 +165,15 @@ pub struct EmitArgs {
     // and want to make sure that initialization succeeds
     // (account minting and txn-specific initialization), before the
     // loadtest puts significant load, you can add a delay here.
+    //
+    // This also enables few other changes needed to run txn emitter
+    // from multiple machines simultaneously:
+    // - retrying minting phase before this delay expires
+    // - having a single transaction on root/source account
+    //   (to reduce contention and issues with sequence numbers across multiple txn emitters).
+    //   basically creating a new source account (to then create seed accounts from).
     #[clap(long)]
-    pub delay_after_minting: Option<u64>,
+    pub coordination_delay_between_instances: Option<u64>,
 }
 
 fn parse_target(target: &str) -> Result<Url> {

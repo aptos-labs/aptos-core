@@ -9,6 +9,7 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
+use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -22,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = vec![0];
     (CoreMempool::new(&config), ConsensusMock::new())
 }
@@ -30,7 +31,7 @@ pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
 pub(crate) fn setup_mempool_with_broadcast_buckets(
     buckets: Vec<u64>,
 ) -> (CoreMempool, ConsensusMock) {
-    let mut config = NodeConfig::random();
+    let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = buckets;
     (CoreMempool::new(&config), ConsensusMock::new())
 }
@@ -170,13 +171,21 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let block = mempool.get_batch(max_txns, max_bytes, self.0.clone());
+        let exclude_transactions: Vec<_> = self
+            .0
+            .iter()
+            .map(|txn| TransactionInProgress {
+                summary: *txn,
+                gas_unit_price: 0,
+            })
+            .collect();
+        let block = mempool.get_batch(max_txns, max_bytes, true, false, exclude_transactions);
         self.0 = self
             .0
             .union(
                 &block
                     .iter()
-                    .map(|t| (t.sender(), t.sequence_number()))
+                    .map(|t| TxnPointer::new(t.sender(), t.sequence_number()))
                     .collect(),
             )
             .cloned()

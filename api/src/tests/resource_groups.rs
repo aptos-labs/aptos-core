@@ -90,4 +90,37 @@ async fn test_gen_resource_group() {
 
     let response = context.gen_resource(&user.address(), &secondary).await;
     assert_eq!(response.unwrap()["data"]["value"], 55);
+
+    let resp = context
+        .get(format!("/accounts/{}/transactions", user.address()).as_str())
+        .await;
+    let secondary_tx = &resp.as_array().unwrap()[0];
+    assert_writeset_contains_secondary_changes(&resp.as_array().unwrap()[1]);
+    let resp = context
+        .get(
+            format!(
+                "/transactions/by_hash/{}",
+                secondary_tx["hash"].as_str().unwrap()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_writeset_contains_secondary_changes(&resp);
+    let resp = context
+        .get(
+            format!(
+                "/transactions/by_version/{}",
+                secondary_tx["version"].as_str().unwrap()
+            )
+            .as_str(),
+        )
+        .await;
+    assert_writeset_contains_secondary_changes(&resp);
+}
+
+fn assert_writeset_contains_secondary_changes(writeset: &serde_json::Value) {
+    let changes = &writeset["changes"].as_array().unwrap();
+    assert!(changes.iter().any(|c| c.get("data").map_or(false, |d| d
+        .get("type")
+        .map_or(false, |t| t.as_str().unwrap().contains("secondary")))));
 }

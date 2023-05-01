@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth, Test};
+use aptos_forge::{
+    GroupNetworkBandwidth, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetworkBandwidth,
+    Test,
+};
 
 pub struct NetworkBandwidthTest;
 
@@ -24,9 +27,12 @@ impl NetworkLoadTest for NetworkBandwidthTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         ctx.swarm()
             .inject_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-                rate: RATE_MBPS,
-                limit: LIMIT_BYTES,
-                buffer: BUFFER_BYTES,
+                group_network_bandwidths: vec![GroupNetworkBandwidth {
+                    name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                    rate: RATE_MBPS,
+                    limit: LIMIT_BYTES,
+                    buffer: BUFFER_BYTES,
+                }],
             }))?;
         let msg = format!(
             "Limited bandwidth to {}mbps with limit {} and buffer {} to namespace",
@@ -39,9 +45,12 @@ impl NetworkLoadTest for NetworkBandwidthTest {
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
         swarm.remove_chaos(SwarmChaos::Bandwidth(SwarmNetworkBandwidth {
-            rate: RATE_MBPS,
-            limit: LIMIT_BYTES,
-            buffer: BUFFER_BYTES,
+            group_network_bandwidths: vec![GroupNetworkBandwidth {
+                name: format!("forge-namespace-{}mbps-bandwidth", RATE_MBPS),
+                rate: RATE_MBPS,
+                limit: LIMIT_BYTES,
+                buffer: BUFFER_BYTES,
+            }],
         }))
     }
 }

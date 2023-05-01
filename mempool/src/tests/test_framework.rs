@@ -48,11 +48,7 @@ use aptos_types::{
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use futures::{channel::oneshot, SinkExt};
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    sync::Arc,
-};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
 
@@ -169,7 +165,10 @@ impl MempoolNode {
     /// Asynchronously waits for up to 1 second for txns to appear in mempool
     pub async fn wait_on_txns_in_mempool(&self, txns: &[TestTransaction]) {
         for _ in 0..10 {
-            let block = self.mempool.lock().get_batch(100, 102400, HashSet::new());
+            let block = self
+                .mempool
+                .lock()
+                .get_batch(100, 102400, true, false, vec![]);
 
             if block_contains_all_transactions(&block, txns) {
                 break;
@@ -219,7 +218,10 @@ impl MempoolNode {
         txns: &[TestTransaction],
         condition: Condition,
     ) -> Result<(), (Vec<(AccountAddress, u64)>, Vec<(AccountAddress, u64)>)> {
-        let block = self.mempool.lock().get_batch(100, 102400, HashSet::new());
+        let block = self
+            .mempool
+            .lock()
+            .get_batch(100, 102400, true, false, vec![]);
         if !condition(&block, txns) {
             let actual: Vec<_> = block
                 .iter()

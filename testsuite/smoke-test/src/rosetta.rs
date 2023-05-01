@@ -9,16 +9,14 @@ use aptos::{
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::{
-    config::{ApiConfig, PersistableConfig},
-    utils::get_available_port,
-};
+use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
     aptos_api_types::{TransactionOnChainData, UserTransaction},
     Response, Transaction,
@@ -57,7 +55,12 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
+) -> (
+    LocalSwarm,
+    CliTestFramework,
+    JoinHandle<anyhow::Result<()>>,
+    RosettaClient,
+) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
@@ -424,6 +427,7 @@ async fn test_account_balance() {
         account_2,
         1_000_000,
         10,
+        1,
     )
     .await;
 
@@ -436,6 +440,47 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::active_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
+
+    // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::pending_inactive_stake_account(account_4.address()),
+        1_000,
+        2,
+    )
+    .await
+    .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::inactive_stake_account(account_4.address()),
+        0,
+        2,
+    )
+    .await
+    .unwrap();
+
     /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
@@ -455,6 +500,7 @@ async fn create_staking_contract(
     voter: AccountAddress,
     amount: u64,
     commission_percentage: u64,
+    sequence_number: u64,
 ) -> Response<Transaction> {
     let staking_contract_creation = info
         .transaction_factory()
@@ -465,9 +511,27 @@ async fn create_staking_contract(
             commission_percentage,
             vec![],
         ))
-        .sequence_number(1);
+        .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn unlock_stake(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let unlock_stake = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_unlock_stake(
+            operator, amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(unlock_stake);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -546,20 +610,6 @@ async fn test_transfer() {
             break;
         }
     }
-    // Attempt to transfer all coins to another user (should fail)
-    rosetta_client
-        .transfer(
-            &network,
-            sender_private_key,
-            receiver,
-            sender_balance,
-            expiry_time(Duration::from_secs(5)).as_secs(),
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect_err("Should fail simulation since we can't transfer all coins");
 
     // Attempt to transfer more than balance to another user (should fail)
     rosetta_client
@@ -577,9 +627,11 @@ async fn test_transfer() {
         .expect_err("Should fail simulation since we can't transfer more than balance coins");
 
     // Attempt to transfer more than balance to another user (should fail)
-    // TODO(Gas): check this
     let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
+        // We purposely don't set gas unit price here so the builder uses the default.
+        // Note that the default is different in tests. See here:
+        // config/global-constants/src/lib.rs
+        .with_gas_unit_price(GAS_UNIT_PRICE)
         .with_max_gas_amount(1000);
     let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
     let unsigned_transaction = transaction_factory
@@ -598,7 +650,7 @@ async fn test_transfer() {
         .await
         .expect("Should succeed getting gas estimate")
         .into_inner();
-    let gas_usage = simulation_txn.info.gas_used();
+    let gas_usage = simulation_txn.info.gas_used() * GAS_UNIT_PRICE;
 
     // Attempt to transfer more than balance - gas to another user (should fail)
     rosetta_client
@@ -907,7 +959,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(account_id_2),
         Some(100000000000000),
         Some(5),
@@ -927,7 +979,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Duration::from_secs(5),
         None,
         None,
@@ -951,7 +1003,7 @@ async fn test_block() {
     )
     .await
     .expect_err("Set voter shouldn't work with the wrong operator!");
-    let final_txn = set_voter_and_wait(
+    set_voter_and_wait(
         &rosetta_client,
         &rest_client,
         &network_identifier,
@@ -965,6 +1017,53 @@ async fn test_block() {
     )
     .await
     .expect("Set voter should work!");
+
+    // Unlock stake
+    unlock_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Some(10),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully unlock stake");
+
+    // Failed distribution with wrong staker
+    distribute_staking_rewards_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_2,
+        account_id_3,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect_err("Staker has no staking contracts.");
+
+    let final_txn = distribute_staking_rewards_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        account_id_2,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Distribute staking rewards should work!");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1237,8 +1336,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1277,13 +1378,12 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta = u64::parse(
-                        amount
-                            .value
-                            .strip_prefix('-')
-                            .expect("Should have a negative number"),
-                    )
-                    .expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number")
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
                     let new_balance = *latest_balance - delta as i128;
@@ -1321,8 +1421,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1460,13 +1562,12 @@ async fn parse_operations(
                     native_coin(),
                     "Balance should be the native coin"
                 );
-                let delta = u64::parse(
-                    amount
-                        .value
-                        .strip_prefix('-')
-                        .expect("Should have a negative number"),
-                )
-                .expect("Should be able to parse amount value");
+                let delta = amount
+                    .value
+                    .strip_prefix('-')
+                    .expect("Should have a negative number")
+                    .parse::<u64>()
+                    .expect("Should be able to parse amount value");
 
                 // Subtract with panic on overflow in case of a negative balance
                 let new_balance = *latest_balance - delta as i128;
@@ -1608,6 +1709,115 @@ async fn parse_operations(
                     panic!("Not a user transaction");
                 }
             },
+            OperationType::UnlockStake => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful unlock stake operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed unlock stake operation"
+                    );
+                }
+
+                // Check that unlock stake was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::DistributeStakingRewards => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful distribute operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed distribute operation"
+                    );
+                }
+
+                // Check that distribute was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_staker_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let staker = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .staker
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_staker_address, staker);
+
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
         }
     }
 
@@ -1654,8 +1864,10 @@ async fn check_balances(
             );
             assert_eq!(
                 expected_balance,
-                u64::parse(&balance.value).expect("Should have a balance from account balance")
-                    as i128,
+                balance
+                    .value
+                    .parse::<u64>()
+                    .expect("Should have a balance from account balance") as i128,
                 "Expected {} to have a balance of {}, but was {} at block {}",
                 account,
                 expected_balance,
@@ -2076,6 +2288,70 @@ async fn reset_lockup_and_wait(
             network_identifier,
             sender_key,
             operator,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn unlock_stake_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: Option<AccountAddress>,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .unlock_stake(
+            network_identifier,
+            sender_key,
+            operator,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn distribute_staking_rewards_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: AccountAddress,
+    staker: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .distribute_staking_rewards(
+            network_identifier,
+            sender_key,
+            operator,
+            staker,
             expiry_time.as_secs(),
             sequence_number,
             max_gas,

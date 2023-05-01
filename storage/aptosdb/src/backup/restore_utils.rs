@@ -20,6 +20,7 @@ use aptos_types::{
         position::{FrozenSubTreeIterator, Position},
     },
     transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
+    write_set::WriteSet,
 };
 use std::sync::Arc;
 
@@ -99,6 +100,7 @@ pub fn save_transactions(
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
+    write_sets: Vec<WriteSet>,
     existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
     if let Some(existing_batch) = existing_batch {
@@ -110,6 +112,7 @@ pub fn save_transactions(
             txns,
             txn_infos,
             events,
+            write_sets.as_ref(),
             existing_batch,
         )?;
     } else {
@@ -122,6 +125,7 @@ pub fn save_transactions(
             txns,
             txn_infos,
             events,
+            write_sets.as_ref(),
             &mut batch,
         )?;
         db.write_schemas(batch)?;
@@ -183,6 +187,7 @@ pub fn save_transactions_impl(
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
+    write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
@@ -190,6 +195,10 @@ pub fn save_transactions_impl(
     }
     ledger_store.put_transaction_infos(first_version, txn_infos, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;
+    // insert changes in write set schema batch
+    for (idx, ws) in write_sets.iter().enumerate() {
+        transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
+    }
 
     Ok(())
 }

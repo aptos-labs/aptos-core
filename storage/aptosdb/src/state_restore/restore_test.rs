@@ -103,8 +103,8 @@ where
     K: TestKey,
     V: TestValue,
 {
-    fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node<K>>> {
-        self.tree_store.get_node_option(node_key)
+    fn get_node_option(&self, node_key: &NodeKey, tag: &str) -> Result<Option<Node<K>>> {
+        self.tree_store.get_node_option(node_key, tag)
     }
 
     fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode<K>)>> {

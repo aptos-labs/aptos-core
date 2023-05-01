@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
-    access_path::AccessPath,
-    state_store::state_key::{StateKey, StateKeyInner},
-    write_set::TransactionWrite,
+    executable::ModulePath,
+    write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -24,25 +24,10 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
-pub trait ModulePath {
-    fn module_path(&self) -> Option<AccessPath>;
-}
-
-impl ModulePath for StateKey {
-    fn module_path(&self) -> Option<AccessPath> {
-        if let StateKeyInner::AccessPath(ap) = self.inner() {
-            if ap.is_code() {
-                return Some(ap.clone());
-            }
-        }
-        None
-    }
-}
-
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath;
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + TransactionWrite;
 }
 
@@ -62,7 +47,7 @@ pub trait ExecutorTask: Sync {
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Clone + Send + Sync + Eq + 'static;
+    type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
     /// Type to intialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
@@ -76,13 +61,13 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
-        txn_idx: usize,
+        txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 
 /// Trait for execution result of a single transaction.
-pub trait TransactionOutput: Send + Sync {
+pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
@@ -99,4 +84,12 @@ pub trait TransactionOutput: Send + Sync {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
+
+    /// In parallel execution, will be called once per transaction when the output is
+    /// ready to be committed. In sequential execution, won't be called (deltas are
+    /// materialized and incorporated during execution).
+    fn incorporate_delta_writes(
+        &self,
+        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+    );
 }

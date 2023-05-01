@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::Round;
-use anyhow::Context;
+use anyhow::{bail, ensure, Context};
 use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -11,82 +10,195 @@ use aptos_types::{
 };
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+    hash::Hash,
+    ops::Deref,
+};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
-pub struct LogicalTime {
-    epoch: u64,
-    round: Round,
+#[derive(
+    Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, CryptoHasher, BCSCryptoHash,
+)]
+pub struct BatchId {
+    pub id: u64,
+    /// A number that is stored in the DB and updated only if the value does not exist in
+    /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
+    /// id starts again at 0. Using the current system time allows the nonce to be ordering.
+    pub nonce: u64,
 }
 
-impl LogicalTime {
-    pub fn new(epoch: u64, round: Round) -> Self {
-        Self { epoch, round }
+impl BatchId {
+    pub fn new(nonce: u64) -> Self {
+        Self { id: 0, nonce }
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
+    pub fn new_for_test(id: u64) -> Self {
+        Self { id, nonce: 0 }
     }
 
-    pub fn round(&self) -> Round {
-        self.round
+    pub fn increment(&mut self) {
+        self.id += 1;
+    }
+}
+
+impl PartialOrd<Self> for BatchId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BatchId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.nonce.cmp(&other.nonce) {
+            Ordering::Equal => {},
+            ordering => return ordering,
+        }
+        self.id.cmp(&other.id)
+    }
+}
+
+impl Display for BatchId {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "({}, {})", self.id, self.nonce)
     }
 }
 
 #[derive(
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
-pub struct SignedDigestInfo {
-    pub batch_author: PeerId,
-    pub digest: HashValue,
-    pub expiration: LogicalTime,
-    pub num_txns: u64,
-    pub num_bytes: u64,
+pub struct BatchInfo {
+    author: PeerId,
+    batch_id: BatchId,
+    epoch: u64,
+    expiration: u64,
+    digest: HashValue,
+    num_txns: u64,
+    num_bytes: u64,
+    gas_bucket_start: u64,
 }
 
-impl SignedDigestInfo {
+impl BatchInfo {
     pub fn new(
-        batch_author: PeerId,
+        author: PeerId,
+        batch_id: BatchId,
+        epoch: u64,
+        expiration: u64,
         digest: HashValue,
-        expiration: LogicalTime,
         num_txns: u64,
         num_bytes: u64,
+        gas_bucket_start: u64,
     ) -> Self {
         Self {
-            batch_author,
-            digest,
+            author,
+            batch_id,
+            epoch,
             expiration,
+            digest,
             num_txns,
             num_bytes,
+            gas_bucket_start,
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn author(&self) -> PeerId {
+        self.author
+    }
+
+    pub fn batch_id(&self) -> BatchId {
+        self.batch_id
+    }
+
+    pub fn expiration(&self) -> u64 {
+        self.expiration
+    }
+
+    pub fn digest(&self) -> &HashValue {
+        &self.digest
+    }
+
+    pub fn num_txns(&self) -> u64 {
+        self.num_txns
+    }
+
+    pub fn num_bytes(&self) -> u64 {
+        self.num_bytes
+    }
+
+    pub fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SignedDigest {
-    epoch: u64,
+pub struct SignedBatchInfoMsg {
+    signed_infos: Vec<SignedBatchInfo>,
+}
+
+impl SignedBatchInfoMsg {
+    pub fn new(signed_infos: Vec<SignedBatchInfo>) -> Self {
+        Self { signed_infos }
+    }
+
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
+        ensure!(
+            self.signed_infos.len() <= max_num_batches,
+            "Too many batches: {} > {}",
+            self.signed_infos.len(),
+            max_num_batches
+        );
+        for signed_info in &self.signed_infos {
+            signed_info.verify(sender, validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.signed_infos.is_empty(), "Empty message");
+        let epoch = self.signed_infos[0].epoch();
+        for info in self.signed_infos.iter() {
+            ensure!(
+                info.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                info.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
+    }
+
+    pub fn take(self) -> Vec<SignedBatchInfo> {
+        self.signed_infos
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SignedBatchInfo {
+    info: BatchInfo,
     signer: PeerId,
-    info: SignedDigestInfo,
     signature: bls12381::Signature,
 }
 
-impl SignedDigest {
+impl SignedBatchInfo {
     pub fn new(
-        batch_author: PeerId,
-        epoch: u64,
-        digest: HashValue,
-        expiration: LogicalTime,
-        num_txns: u64,
-        num_bytes: u64,
-        validator_signer: Arc<ValidatorSigner>,
+        batch_info: BatchInfo,
+        validator_signer: &ValidatorSigner,
     ) -> Result<Self, CryptoMaterialError> {
-        let info = SignedDigestInfo::new(batch_author, digest, expiration, num_txns, num_bytes);
-        let signature = validator_signer.sign(&info)?;
+        let signature = validator_signer.sign(&batch_info)?;
 
         Ok(Self {
-            epoch,
+            info: batch_info,
             signer: validator_signer.author(),
-            info,
             signature,
         })
     }
@@ -95,57 +207,98 @@ impl SignedDigest {
         self.signer
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
-
-    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
-    }
-
-    pub fn info(&self) -> &SignedDigestInfo {
-        &self.info
+    pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        if sender == self.signer {
+            Ok(validator.verify(self.signer, &self.info, &self.signature)?)
+        } else {
+            bail!("Sender {} mismatch signer {}", sender, self.signer);
+        }
     }
 
     pub fn signature(self) -> bls12381::Signature {
         self.signature
     }
 
-    pub fn digest(&self) -> HashValue {
-        self.info.digest
+    pub fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
+}
+
+impl Deref for SignedBatchInfo {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub enum SignedDigestError {
+pub enum SignedBatchInfoError {
+    WrongAuthor,
     WrongInfo,
     DuplicatedSignature,
+    InvalidAuthor,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProofOfStoreMsg {
+    proofs: Vec<ProofOfStore>,
+}
+
+impl ProofOfStoreMsg {
+    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+        Self { proofs }
+    }
+
+    pub fn verify(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        ensure!(!self.proofs.is_empty(), "Empty message");
+        ensure!(
+            self.proofs.len() <= max_num_proofs,
+            "Too many proofs: {} > {}",
+            self.proofs.len(),
+            max_num_proofs
+        );
+        for proof in &self.proofs {
+            proof.verify(validator)?
+        }
+        Ok(())
+    }
+
+    pub fn epoch(&self) -> anyhow::Result<u64> {
+        ensure!(!self.proofs.is_empty(), "Empty message");
+        let epoch = self.proofs[0].epoch();
+        for proof in self.proofs.iter() {
+            ensure!(
+                proof.epoch() == epoch,
+                "Epoch mismatch: {} != {}",
+                proof.epoch(),
+                epoch
+            );
+        }
+        Ok(epoch)
+    }
+
+    pub fn take(self) -> Vec<ProofOfStore> {
+        self.proofs
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofOfStore {
-    info: SignedDigestInfo,
+    info: BatchInfo,
     multi_signature: AggregateSignature,
 }
 
 impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo, multi_signature: AggregateSignature) -> Self {
+    pub fn new(info: BatchInfo, multi_signature: AggregateSignature) -> Self {
         Self {
             info,
             multi_signature,
         }
-    }
-
-    pub fn info(&self) -> &SignedDigestInfo {
-        &self.info
-    }
-
-    pub fn digest(&self) -> &HashValue {
-        &self.info.digest
-    }
-
-    pub fn expiration(&self) -> LogicalTime {
-        self.info.expiration
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -162,7 +315,15 @@ impl ProofOfStore {
         ret
     }
 
-    pub fn epoch(&self) -> u64 {
-        self.info.expiration.epoch
+    pub fn info(&self) -> &BatchInfo {
+        &self.info
+    }
+}
+
+impl Deref for ProofOfStore {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }

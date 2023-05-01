@@ -2,22 +2,81 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metadata::{
-    EpochEndingBackupMeta, IdentityMeta, Metadata, StateSnapshotBackupMeta, TransactionBackupMeta,
+use crate::{
+    metadata::{
+        CompactionTimestampsMeta, EpochEndingBackupMeta, IdentityMeta, Metadata,
+        StateSnapshotBackupMeta, TransactionBackupMeta,
+    },
+    storage::FileHandle,
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_infallible::duration_since_epoch;
 use aptos_types::transaction::Version;
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 
+#[derive(Debug)]
 pub struct MetadataView {
     epoch_ending_backups: Vec<EpochEndingBackupMeta>,
     state_snapshot_backups: Vec<StateSnapshotBackupMeta>,
     transaction_backups: Vec<TransactionBackupMeta>,
     _identity: Option<IdentityMeta>,
+    // The compaction timestamps of the file handles producing this view
+    compaction_timestamps: Option<CompactionTimestampsMeta>,
 }
 
 impl MetadataView {
+    pub(crate) fn new(metadata_vec: Vec<Metadata>, file_handles: Vec<FileHandle>) -> Self {
+        let mut epoch_ending_backups = Vec::new();
+        let mut state_snapshot_backups = Vec::new();
+        let mut transaction_backups = Vec::new();
+        let mut identity = None;
+        let mut compaction_timestamps = Vec::new();
+
+        for meta in metadata_vec {
+            match meta {
+                Metadata::EpochEndingBackup(e) => epoch_ending_backups.push(e),
+                Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
+                Metadata::TransactionBackup(t) => transaction_backups.push(t),
+                Metadata::Identity(i) => identity = Some(i),
+                Metadata::CompactionTimestamps(t) => compaction_timestamps.push(t),
+            }
+        }
+        epoch_ending_backups.sort_unstable();
+        epoch_ending_backups.dedup();
+        state_snapshot_backups.sort_unstable();
+        state_snapshot_backups.dedup();
+        transaction_backups.sort_unstable();
+        transaction_backups.dedup();
+
+        let mut compaction_meta_opt = compaction_timestamps.iter().max().cloned();
+        if let Some(ref mut compaction_meta) = compaction_meta_opt {
+            // insert new_files into the previous_compaction_timestamps
+            for file in file_handles.into_iter() {
+                // if file is not in timestamps, set it to None, otherwise, keep it the same
+                compaction_meta
+                    .compaction_timestamps
+                    .entry(file)
+                    .or_insert(None);
+            }
+        } else {
+            // Create new compaction timestamp meta with new files only
+            let compaction_timestamps = file_handles.into_iter().map(|file| (file, None)).collect();
+            compaction_meta_opt = Some(CompactionTimestampsMeta {
+                file_compacted_at: duration_since_epoch().as_secs(),
+                compaction_timestamps,
+            });
+        };
+
+        Self {
+            epoch_ending_backups,
+            state_snapshot_backups,
+            transaction_backups,
+            _identity: identity,
+            compaction_timestamps: compaction_meta_opt,
+        }
+    }
+
     pub fn get_storage_state(&self) -> Result<BackupStorageState> {
         let latest_epoch_ending_epoch =
             self.epoch_ending_backups.iter().map(|e| e.last_epoch).max();
@@ -39,6 +98,10 @@ impl MetadataView {
             latest_state_snapshot_version,
             latest_transaction_version,
         })
+    }
+
+    pub fn select_latest_compaction_timestamps(&self) -> Option<CompactionTimestampsMeta> {
+        self.compaction_timestamps.clone()
     }
 
     pub fn select_state_snapshot(
@@ -127,30 +190,50 @@ impl MetadataView {
 
         Ok(res)
     }
-}
 
-impl From<Vec<Metadata>> for MetadataView {
-    fn from(metadata_vec: Vec<Metadata>) -> Self {
-        let mut epoch_ending_backups = Vec::new();
-        let mut state_snapshot_backups = Vec::new();
-        let mut transaction_backups = Vec::new();
-        let mut identity = None;
+    /// Compact the epoch ending metdata files and merge compaction_cnt files into 1 metadata file
+    /// The generated chunks should be sorted based on version
+    pub fn compact_backups<T>(backups: &[T], compaction_cnt: usize) -> Result<Vec<&[T]>> {
+        // Initialize an empty vector to store the output
+        let mut output_vec = Vec::new();
 
-        for meta in metadata_vec {
-            match meta {
-                Metadata::EpochEndingBackup(e) => epoch_ending_backups.push(e),
-                Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
-                Metadata::TransactionBackup(t) => transaction_backups.push(t),
-                Metadata::Identity(i) => identity = Some(i),
-            }
+        // Iterate over the input vector in chunks of compaction_cnt
+        for chunk in backups.chunks(compaction_cnt) {
+            // Create a new vector containing the current chunk
+            let new_slice = chunk;
+            // Add the new vector to the output vector
+            output_vec.push(new_slice);
         }
+        // Return the output vector
+        Ok(output_vec)
+    }
 
-        Self {
-            epoch_ending_backups,
-            state_snapshot_backups,
-            transaction_backups,
-            _identity: identity,
-        }
+    pub fn compact_epoch_ending_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[EpochEndingBackupMeta]>> {
+        Self::compact_backups(&self.epoch_ending_backups, compaction_cnt)
+    }
+
+    pub fn compact_transaction_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[TransactionBackupMeta]>> {
+        Self::compact_backups(&self.transaction_backups, compaction_cnt)
+    }
+
+    pub fn compact_state_backups(
+        &mut self,
+        compaction_cnt: usize,
+    ) -> Result<Vec<&[StateSnapshotBackupMeta]>> {
+        Self::compact_backups(&self.state_snapshot_backups, compaction_cnt)
+    }
+
+    pub fn get_file_handles(&self) -> Vec<FileHandle> {
+        self.select_latest_compaction_timestamps()
+            .as_ref()
+            .map(|t| t.compaction_timestamps.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default()
     }
 }
 

@@ -49,7 +49,7 @@ fn test_mock_vm_different_senders() {
         .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
-        let sender = txn.as_signed_user_txn().unwrap().sender();
+        let sender = txn.try_as_signed_user_txn().unwrap().sender();
         assert_eq!(
             output
                 .write_set()

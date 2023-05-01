@@ -38,19 +38,12 @@ The documentation process is also integrated into the framework building process
 The overall structure of the Aptos Framework is as follows:
 
 ```
-├── compiled                                # Generated files and public rust interface to the Aptos Framework
-│   ├── error_descriptions/*.errmap         # Generated error descriptions for use by the Move Explain tool
-│   ├── src                                 # External Rust interface/library to use the Aptos Framework
-│   ├── stdlib                              # The compiled Move bytecode of the Aptos Framework source modules
-│   ├── script_abis                         # Generated ABIs for entry function transactions, and all new transactions
-│   └── legacy/transaction_scripts          # Legacy generated ABIs and bytecode for each transaction script in the allowlist
-│       ├── abi/*.abi                       # Directory containing generated ABIs for legacy transaction scripts
-│       └── *.mv
-├── modules                                 # Aptos Framework source modules, script modules, and generated documentation
-│   ├── *.move
-│   └── doc/*.md                            # Generated documentation for the Aptos Framework modules
-├── nursery/*.move                          # Move modules that are not published on-chain, but are used for testing and debugging locally
+├── aptos-framework                                 # Sources, testing and generated documentation for Aptos framework component
+├── aptos-token                                 # Sources, testing and generated documentation for Aptos token component
+├── aptos-stdlib                                 # Sources, testing and generated documentation for Aptos stdlib component
+├── move-stdlib                                 # Sources, testing and generated documentation for Move stdlib component
+├── cached-packages                                 # Tooling to generate SDK from mvoe sources.
 ├── src                                     # Compilation and generation of information from Move source files in the Aptos Framework. Not designed to be used as a Rust library
-├── tests
-└── script_documentation/*.md               # Generated documentation for allowed transaction scripts
+├── releases                                    # Move release bundles
+└── tests
 ```

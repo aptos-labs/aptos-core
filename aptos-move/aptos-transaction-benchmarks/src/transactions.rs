@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
+    account_universe::{AUTransactionGen, AccountUniverseGen},
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
 };
@@ -91,6 +91,45 @@ where
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
+    }
+
+    /// Runs the bencher.
+    pub fn blockstm_benchmark(
+        &self,
+        num_accounts: usize,
+        num_txn: usize,
+        run_par: bool,
+        run_seq: bool,
+        num_warmups: usize,
+        num_runs: usize,
+        concurrency_level: usize,
+    ) -> (Vec<usize>, Vec<usize>) {
+        let mut par_tps = Vec::new();
+        let mut seq_tps = Vec::new();
+
+        let total_runs = num_warmups + num_runs;
+        for i in 0..total_runs {
+            let state = TransactionBenchState::with_size(&self.strategy, num_accounts, num_txn);
+
+            if i < num_warmups {
+                println!("WARMUP - ignore results");
+                state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
+            } else {
+                println!(
+                    "RUN benchmark for: num_threads = {}, \
+                        num_account = {}, \
+                        block_size = {}",
+                    num_cpus::get(),
+                    num_accounts,
+                    num_txn,
+                );
+                let tps = state.execute_blockstm_benchmark(concurrency_level, run_par, run_seq);
+                par_tps.push(tps.0);
+                seq_tps.push(tps.1);
+            }
+        }
+
+        (par_tps, seq_tps)
     }
 }
 
@@ -201,15 +240,29 @@ impl TransactionBenchState {
         )
         .expect("VM should not fail to start");
     }
+
+    fn execute_blockstm_benchmark(
+        self,
+        concurrency_level: usize,
+        run_par: bool,
+        run_seq: bool,
+    ) -> (usize, usize) {
+        BlockAptosVM::execute_block_benchmark(
+            self.transactions,
+            self.executor.get_state_view(),
+            concurrency_level,
+            run_par,
+            run_seq,
+        )
+    }
 }
 
-/// Returns a strategy for the account universe customized for benchmarks.
+/// Returns a strategy for the account universe customized for benchmarks, i.e. having
+/// sufficiently large balance for gas.
 fn universe_strategy(
     num_accounts: usize,
     num_transactions: usize,
 ) -> impl Strategy<Value = AccountUniverseGen> {
-    // Multiply by 5 past the number of  to provide
-    let max_balance = TXN_RESERVED * num_transactions as u64 * 5;
-    let balance_strategy = log_balance_strategy(max_balance);
-    AccountUniverseGen::strategy(num_accounts, balance_strategy)
+    let balance = TXN_RESERVED * num_transactions as u64 * 5;
+    AccountUniverseGen::strategy(num_accounts, balance..(balance + 1))
 }

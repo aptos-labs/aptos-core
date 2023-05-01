@@ -16,7 +16,7 @@ use thiserror::Error;
 #[error("timeout elapsed")]
 pub struct Elapsed;
 
-/// Future returned by [`TimeService::timeout`](crate::TimeService::timeout).
+/// Future returned by [`TimeServiceTrait::timeout`](crate::TimeServiceTrait::timeout).
 ///
 /// Mostly taken from [`tokio::time::Timeout`] but uses our `Sleep` future.
 #[pin_project]

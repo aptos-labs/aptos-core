@@ -13,7 +13,7 @@ pub struct Features {
     pub disabled: Vec<FeatureFlag>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Hash)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum FeatureFlag {
@@ -27,6 +27,14 @@ pub enum FeatureFlag {
     Blake2b256Native,
     ResourceGroups,
     MultisigAccounts,
+    DelegationPools,
+    CryptographyAlgebraNatives,
+    Bls12381Structures,
+    Ed25519PubkeyValidateReturnFalseWrongLength,
+    StructConstructors,
+    PeriodicalRewardRateReduction,
+    PartialGovernanceVoting,
+    SignatureCheckerV2,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -126,6 +134,20 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Blake2b256Native => AptosFeatureFlag::BLAKE2B_256_NATIVE,
             FeatureFlag::ResourceGroups => AptosFeatureFlag::RESOURCE_GROUPS,
             FeatureFlag::MultisigAccounts => AptosFeatureFlag::MULTISIG_ACCOUNTS,
+            FeatureFlag::DelegationPools => AptosFeatureFlag::DELEGATION_POOLS,
+            FeatureFlag::CryptographyAlgebraNatives => {
+                AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES
+            },
+            FeatureFlag::Bls12381Structures => AptosFeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength => {
+                AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
+            },
+            FeatureFlag::StructConstructors => AptosFeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::PeriodicalRewardRateReduction => {
+                AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE
+            },
+            FeatureFlag::PartialGovernanceVoting => AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING,
+            FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
         }
     }
 }
@@ -150,6 +172,20 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BLAKE2B_256_NATIVE => FeatureFlag::Blake2b256Native,
             AptosFeatureFlag::RESOURCE_GROUPS => FeatureFlag::ResourceGroups,
             AptosFeatureFlag::MULTISIG_ACCOUNTS => FeatureFlag::MultisigAccounts,
+            AptosFeatureFlag::DELEGATION_POOLS => FeatureFlag::DelegationPools,
+            AptosFeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES => {
+                FeatureFlag::CryptographyAlgebraNatives
+            },
+            AptosFeatureFlag::BLS12_381_STRUCTURES => FeatureFlag::Bls12381Structures,
+            AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH => {
+                FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength
+            },
+            AptosFeatureFlag::STRUCT_CONSTRUCTORS => FeatureFlag::StructConstructors,
+            AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE => {
+                FeatureFlag::PeriodicalRewardRateReduction
+            },
+            AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING => FeatureFlag::PartialGovernanceVoting,
+            AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
         }
     }
 }

@@ -20,22 +20,24 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
+    modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
+    multi_region_simulation_test::MultiRegionMultiCloudSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
-    performance_with_fullnode_test::PerformanceBenchmarkWithFN,
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
         StateSyncValidatorPerformance,
     },
-    three_region_simulation_test::{ExecutionDelayConfig, ThreeRegionSimulationTest},
+    three_region_simulation_test::ThreeRegionSameCloudSimulationTest,
     twin_validator_test::TwinValidatorTest,
-    two_traffics_test::{ThreeRegionSimulationTwoTrafficsTest, TwoTrafficsTest},
+    two_traffics_test::TwoTrafficsTest,
     validator_join_leave_test::ValidatorJoinLeaveTest,
     validator_reboot_stress_test::ValidatorRebootStressTest,
+    CompositeNetworkTest,
 };
 use std::{
     env,
@@ -401,6 +403,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
         "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking_three_region" => Ok(land_blocking_three_region_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -491,6 +494,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             run_consensus_only_three_region_simulation(config)
         },
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(config),
+        "multi_region_multi_cloud_simulation_test" => {
+            multi_region_multi_cloud_simulation_test(config)
+        },
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -504,9 +510,7 @@ fn run_consensus_only_three_region_simulation(config: ForgeConfig) -> ForgeConfi
                 .mode(EmitJobMode::ConstTps { tps: 30000 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
-            add_execution_delay: None,
-        }])
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
@@ -726,7 +730,7 @@ fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&LoadVsPerfBenchmark {
-            test: &PerformanceBenchmarkWithFN,
+            test: &PerformanceBenchmark,
             workloads: Workloads::TPS(&[
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
             ]),
@@ -758,7 +762,7 @@ fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         //     mempool_backlog: 10000,
         // }))
         .with_network_tests(vec![&LoadVsPerfBenchmark {
-            test: &PerformanceBenchmarkWithFN,
+            test: &PerformanceBenchmark,
             workloads: Workloads::TRANSACTIONS(&[
                 TransactinWorkload::NoOp,
                 TransactinWorkload::NoOpUnique,
@@ -799,6 +803,11 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             inner_tps: 15000,
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             inner_init_gas_price_multiplier: 20,
+            // because it is static, cannot use ::default_coin_transfer() method
+            inner_transaction_type: TransactionType::CoinTransfer {
+                invalid_transaction_ratio: 0,
+                sender_use_account_pool: false,
+            },
             // Additionally - we are not really gracefully handling overlaods,
             // setting limits based on current reality, to make sure they
             // don't regress, but something to investigate
@@ -842,19 +851,22 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
         // something to potentially improve upon.
         // So having VFNs for all validators
         .with_initial_fullnode_count(20)
-        .with_network_tests(vec![&ThreeRegionSimulationTwoTrafficsTest {
-            traffic_test: TwoTrafficsTest {
+        .with_network_tests(vec![&CompositeNetworkTest {
+            wrapper: &ThreeRegionSameCloudSimulationTest,
+            test: &TwoTrafficsTest {
                 inner_tps: 15000,
                 inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
                 inner_init_gas_price_multiplier: 20,
+                // Cannot use default_coin_transfer(), as this needs to be static
+                inner_transaction_type: TransactionType::CoinTransfer {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool: false,
+                },
                 // Additionally - we are not really gracefully handling overlaods,
                 // setting limits based on current reality, to make sure they
                 // don't regress, but something to investigate
-                avg_tps: 3400,
+                avg_tps: 1400,
                 latency_thresholds: &[],
-            },
-            three_region_simulation_test: ThreeRegionSimulationTest {
-                add_execution_delay: None,
             },
         }])
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
@@ -890,7 +902,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
         mempool_backlog: 30000,
     });
     config
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_network_tests(vec![&PerformanceBenchmark])
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
         .with_initial_fullnode_count(3)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -980,16 +992,24 @@ fn validator_reboot_stress_test(config: ForgeConfig) -> ForgeConfig {
         }))
 }
 
+fn apply_quorum_store_configs_for_single_node(helm_values: &mut serde_yaml::Value) {
+    helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+        ["dynamic_max_txn_per_s"] = 5500.into();
+}
+
 fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(1).unwrap())
         .with_initial_fullnode_count(1)
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_network_tests(vec![&PerformanceBenchmark])
         .with_success_criteria(
             SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn setup_test(config: ForgeConfig) -> ForgeConfig {
@@ -1009,12 +1029,15 @@ fn three_region_simulation_with_different_node_speed(config: ForgeConfig) -> For
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_initial_fullnode_count(30)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
-            add_execution_delay: Some(ExecutionDelayConfig {
-                inject_delay_node_fraction: 0.5,
-                inject_delay_max_transaction_percentage: 40,
-                inject_delay_per_transaction_ms: 2,
-            }),
+        .with_network_tests(vec![&CompositeNetworkTest {
+            wrapper: &ExecutionDelayTest {
+                add_execution_delay: ExecutionDelayConfig {
+                    inject_delay_node_fraction: 0.5,
+                    inject_delay_max_transaction_percentage: 40,
+                    inject_delay_per_transaction_ms: 2,
+                },
+            },
+            test: &ThreeRegionSameCloudSimulationTest,
         }])
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["validator"]["config"]["api"]["failpoints_enabled"] = true.into();
@@ -1043,9 +1066,7 @@ fn three_region_simulation(config: ForgeConfig) -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
         .with_initial_fullnode_count(12)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .with_network_tests(vec![&ThreeRegionSimulationTest {
-            add_execution_delay: None,
-        }])
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
         // TODO(rustielin): tune these success criteria after we have a better idea of the test behavior
         .with_success_criteria(
             SuccessCriteria::new(3000)
@@ -1067,6 +1088,9 @@ fn network_partition(config: ForgeConfig) -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            apply_quorum_store_configs_for_single_node(helm_values);
+        }))
 }
 
 fn compat(config: ForgeConfig) -> ForgeConfig {
@@ -1122,7 +1146,7 @@ fn state_sync_perf_fullnodes_apply_outputs(
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ApplyTransactionOutputs".into();
         }))
-        .with_success_criteria(SuccessCriteria::new(10000))
+        .with_success_criteria(SuccessCriteria::new(9000))
 }
 
 /// The config for running a state sync performance test when executing
@@ -1215,7 +1239,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
-        .with_network_tests(vec![&PerformanceBenchmarkWithFN])
+        .with_network_tests(vec![&PerformanceBenchmark])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1223,9 +1247,9 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_success_criteria(
             SuccessCriteria::new(
                 if duration.as_secs() > 1200 {
-                    5000
+                    4500
                 } else {
-                    5500
+                    5000
                 },
             )
             .add_no_restarts()
@@ -1246,6 +1270,36 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         )
 }
 
+// TODO: Replace land_blocking when performance reaches on par with current land_blocking
+fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(3500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup, give 10% of the run for longer durations.
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
 fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
@@ -1257,9 +1311,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig<'static> {
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(vec![
             &NetworkBandwidthTest,
-            &ThreeRegionSimulationTest {
-                add_execution_delay: None,
-            },
+            &ThreeRegionSameCloudSimulationTest,
             &NetworkLossTest,
         ])
         .with_success_criteria(
@@ -1311,14 +1363,18 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
             helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] =
                 block_size.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_txns_quorum_store_override"] = block_size.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_txns_quorum_store_override"] = block_size.into();
             helm_values["validator"]["config"]["consensus"]["round_initial_timeout_ms"] =
                 500.into();
             helm_values["validator"]["config"]["consensus"]
                 ["round_timeout_backoff_exponent_base"] = 1.0.into();
-            helm_values["validator"]["config"]["consensus"]["quorum_store_poll_count"] = 1.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store_poll_time_ms"] =
+                100.into();
 
+            let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
             if use_chain_backoff {
                 // Generally if we are stress testing the consensus, we don't want to slow it down.
@@ -1328,10 +1384,15 @@ fn changing_working_quorum_test_helper(
                     // as we have lower TPS, make limits smaller
                     item.max_sending_block_txns_override =
                         (block_size / 2_u64.pow(i as u32 + 1)).max(2);
+                    min_block_txns = min_block_txns.min(item.max_sending_block_txns_override);
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
             }
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_txns"] = min_block_txns.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_txns"] = min_block_txns.into();
 
             helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
                 serde_yaml::to_value(chain_health_backoff).unwrap();
@@ -1439,6 +1500,33 @@ fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> Forg
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
+                }),
+        )
+}
+
+fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 200_000,
+                })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .with_network_tests(vec![&MultiRegionMultiCloudSimulationTest {}])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
+        .with_success_criteria(
+            SuccessCriteria::new(10000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 6,
                 }),
         )
 }

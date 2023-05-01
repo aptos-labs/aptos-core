@@ -361,7 +361,7 @@ impl DbWriter for FakeAptosDB {
                         .insert(txn_to_commit.transaction().hash(), ver);
 
                     // If it is a user transaction, also update the account sequence number
-                    if let Ok(user_txn) = txn_to_commit.transaction().as_signed_user_txn() {
+                    if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
                         self.account_seq_num
                             .entry(user_txn.sender())
                             .and_modify(|seq_num| {
@@ -811,8 +811,8 @@ impl DbReader for FakeAptosDB {
             .get_state_value_chunk_with_proof(version, start_idx, chunk_size)
     }
 
-    fn is_state_pruner_enabled(&self) -> Result<bool> {
-        self.inner.is_state_pruner_enabled()
+    fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
+        self.inner.is_state_merkle_pruner_enabled()
     }
 
     fn get_epoch_snapshot_prune_window(&self) -> Result<usize> {
@@ -951,7 +951,10 @@ mod tests {
 
             if !txn_to_commit.is_state_checkpoint() {
                 // Fetch and verify transaction itself.
-                let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+                let txn = txn_to_commit
+                    .transaction()
+                    .try_as_signed_user_txn()
+                    .unwrap();
                 let txn_with_proof = db
                     .get_transaction_by_hash(
                         txn_to_commit.transaction().hash(),
@@ -1007,7 +1010,10 @@ mod tests {
         sender: AccountAddress,
         sequence_number: u64,
     ) -> Result<()> {
-        let signed_transaction = transaction_with_proof.transaction.as_signed_user_txn()?;
+        let signed_transaction = transaction_with_proof
+            .transaction
+            .try_as_signed_user_txn()
+            .ok_or("not user transaction")?;
 
         ensure!(
             transaction_with_proof.version == version,

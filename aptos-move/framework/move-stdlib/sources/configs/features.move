@@ -18,7 +18,7 @@ module std::features {
     //   is typically associated with the introduction of new native Move functions, and is only used
     //   from Move code. The owner of this feature is obliged to remove it once this can be done.
     //
-    // - an *ephemeral* feature flag is required to stay around forever. Typically, those flags guard
+    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
     //   behavior in native code, and the behavior with or without the feature need to be preserved
     //   for playback.
     //
@@ -41,7 +41,7 @@ module std::features {
 
     /// Whether during upgrade compatibility checking, friend functions should be treated similar like
     /// private functions.
-    /// Lifetime: ephemeral
+    /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
     public fun treat_friend_as_private(): bool acquires Features {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
@@ -128,6 +128,59 @@ module std::features {
 
     public fun multisig_accounts_enabled(): bool acquires Features {
         is_enabled(MULTISIG_ACCOUNTS)
+    }
+
+    /// Whether delegation pools are enabled.
+    /// Lifetime: transient
+    const DELEGATION_POOLS: u64 = 11;
+
+    public fun get_delegation_pools_feature(): u64 { DELEGATION_POOLS }
+
+    public fun delegation_pools_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOLS)
+    }
+
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
+    ///
+    /// Lifetime: transient
+    const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
+    public fun get_cryptography_algebra_natives_feature(): u64 { CRYPTOGRAPHY_ALGEBRA_NATIVES }
+    public fun cryptography_algebra_enabled(): bool acquires Features {
+        is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
+    }
+
+    /// Whether the generic algebra implementation for BLS12381 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BLS12_381_STRUCTURES: u64 = 13;
+    public fun get_bls12_381_strutures_feature(): u64 { BLS12_381_STRUCTURES }
+    public fun bls12_381_structures_enabled(): bool acquires Features {
+        is_enabled(BLS12_381_STRUCTURES)
+    }
+
+    /// Whether native_public_key_validate aborts when a public key of the wrong length is given
+    /// Lifetime: ephemeral
+    const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
+
+    /// Whether struct constructors are enabled
+    ///
+    /// Lifetime: transient
+    const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+    public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
+
+    /// Whether enable paritial governance voting.
+    /// Lifetime: transient
+    const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+    public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+    public fun partial_governance_voting_enabled(): bool acquires Features {
+        is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
     // ============================================================================================

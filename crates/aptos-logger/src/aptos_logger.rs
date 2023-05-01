@@ -221,7 +221,7 @@ impl LogEntry {
 /// A builder for a `AptosData`, configures what, where, and how to write logs.
 pub struct AptosDataBuilder {
     channel_size: usize,
-    console_port: Option<u16>,
+    tokio_console_port: Option<u16>,
     enable_backtrace: bool,
     level: Level,
     remote_level: Level,
@@ -238,7 +238,7 @@ impl AptosDataBuilder {
     pub fn new() -> Self {
         Self {
             channel_size: CHANNEL_SIZE,
-            console_port: Some(6669),
+            tokio_console_port: None,
             enable_backtrace: false,
             level: Level::Info,
             remote_level: Level::Info,
@@ -281,8 +281,8 @@ impl AptosDataBuilder {
         self
     }
 
-    pub fn console_port(&mut self, console_port: Option<u16>) -> &mut Self {
-        self.console_port = console_port;
+    pub fn tokio_console_port(&mut self, tokio_console_port: Option<u16>) -> &mut Self {
+        self.tokio_console_port = tokio_console_port;
         self
     }
 
@@ -400,13 +400,13 @@ impl AptosDataBuilder {
     pub fn build(&mut self) -> Arc<AptosData> {
         let logger = self.build_logger();
 
-        let console_port = if cfg!(feature = "aptos-console") {
-            self.console_port
+        let tokio_console_port = if cfg!(feature = "tokio-console") {
+            self.tokio_console_port
         } else {
             None
         };
 
-        crate::logger::set_global_logger(logger.clone(), console_port);
+        crate::logger::set_global_logger(logger.clone(), tokio_console_port);
         logger
     }
 }

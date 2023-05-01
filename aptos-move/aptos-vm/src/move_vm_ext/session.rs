@@ -94,7 +94,7 @@ impl SessionId {
 }
 
 pub struct SessionExt<'r, 'l, S> {
-    inner: Session<'r, 'l, S>,
+    inner: Session<'r, 'l>,
     remote: MoveResolverWithVMMetadata<'r, 'l, S>,
 }
 
@@ -102,7 +102,7 @@ impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
     S: MoveResolverExt + 'r,
 {
-    pub fn new(inner: Session<'r, 'l, S>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
+    pub fn new(inner: Session<'r, 'l>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
         Self {
             inner,
             remote: MoveResolverWithVMMetadata::new(remote, move_vm),
@@ -322,13 +322,13 @@ where
 
         let write_set = write_set_mut
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
             .map(|(guid, seq_num, ty_tag, blob)| {
                 let key = bcs::from_bytes(guid.as_slice())
-                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
+                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH, None))?;
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
@@ -363,7 +363,7 @@ where
 }
 
 impl<'r, 'l, S> Deref for SessionExt<'r, 'l, S> {
-    type Target = Session<'r, 'l, S>;
+    type Target = Session<'r, 'l>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

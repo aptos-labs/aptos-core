@@ -122,13 +122,18 @@ async fn test_db_restore() {
     let mut node0_config = swarm.validator(node_to_restart).unwrap().config().clone();
     let genesis_waypoint = node0_config.base.waypoint.genesis_waypoint();
     insert_waypoint(&mut node0_config, genesis_waypoint);
-    node0_config.save(node0_config_path).unwrap();
+    node0_config.save_to_path(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
 
     info!("---------- 3. stopped node 0, gonna restore DB.");
     // restore db from backup
-    db_restore(backup_path.path(), db_dir.as_path(), &[]);
+    db_restore(
+        backup_path.path(),
+        db_dir.as_path(),
+        &[],
+        node0_config.storage.rocksdb_configs.use_state_kv_db,
+    );
 
     expected_balance_0 -= 3;
     expected_balance_1 += 3;
@@ -222,7 +227,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         cmd.arg(&w.to_string());
     });
 
-    let status = cmd
+    let replay = cmd
         .args([
             "--metadata-cache-dir",
             metadata_cache_path.path().to_str().unwrap(),
@@ -234,9 +239,13 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
             backup_path.to_str().unwrap(),
         ])
         .current_dir(workspace_root())
-        .status()
+        .output()
         .unwrap();
-    assert!(status.success(), "{}", status);
+    assert!(
+        replay.status.success(),
+        "{}",
+        std::str::from_utf8(&replay.stderr).unwrap()
+    );
 
     info!(
         "Backup replay-verified in {} seconds.",
@@ -364,13 +373,45 @@ pub(crate) fn db_backup(
         backup_path.path(),
         trusted_waypoints,
     );
+
+    // start the backup compaction
+    let compaction = Command::new(bin_path.as_path())
+        .current_dir(workspace_root())
+        .args([
+            "backup-maintenance",
+            "compact",
+            "--epoch-ending-file-compact-factor",
+            "2",
+            "--state-snapshot-file-compact-factor",
+            "2",
+            "--transaction-file-compact-factor",
+            "2",
+            "--metadata-cache-dir",
+            metadata_cache_path1.path().to_str().unwrap(),
+            "--concurrent-downloads",
+            "4",
+            "--local-fs-dir",
+            backup_path.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        compaction.status.success(),
+        "{}",
+        std::str::from_utf8(&compaction.stderr).unwrap()
+    );
     backup_coordinator.kill().unwrap();
     wait_res.unwrap();
     replay_verify(backup_path.path(), trusted_waypoints);
     backup_path
 }
 
-pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: &[Waypoint]) {
+pub(crate) fn db_restore(
+    backup_path: &Path,
+    db_path: &Path,
+    trusted_waypoints: &[Waypoint],
+    use_state_kv_db: bool,
+) {
     let now = Instant::now();
     let bin_path = workspace_builder::get_bin("aptos-db-tool");
     let metadata_cache_path = TempPath::new();
@@ -383,6 +424,10 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
     });
+
+    if use_state_kv_db {
+        cmd.arg("--use-state-kv-db");
+    }
 
     let status = cmd
         .args([

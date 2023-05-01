@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 //! Provides an mpsc (multi-producer single-consumer) channel wrapped in an
-//! [`IntGauge`](aptos_metrics::IntGauge) that counts the number of currently
+//! [`IntGauge`] that counts the number of currently
 //! queued items. While there is only one [`Receiver`], there can be
 //! many [`Sender`]s, which are also cheap to clone.
 //!

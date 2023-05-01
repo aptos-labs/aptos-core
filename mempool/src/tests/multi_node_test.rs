@@ -25,7 +25,7 @@ use aptos_network::{
 };
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use rand::{rngs::StdRng, SeedableRng};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// A struct holding a list of overriding configurations for mempool
 #[derive(Clone, Copy)]
@@ -128,7 +128,7 @@ impl TestHarness {
         idx: u32,
         mempool_config: Option<MempoolOverrideConfig>,
     ) -> NodeId {
-        let (validator, mut v_config) = validator_config(rng, idx);
+        let (validator, mut v_config) = validator_config(rng);
         Self::update_config(&mut v_config, mempool_config);
 
         let node_id = NodeId::new(NodeType::Validator, idx);
@@ -144,7 +144,7 @@ impl TestHarness {
         mempool_config: Option<MempoolOverrideConfig>,
         peer_id: PeerId,
     ) -> NodeId {
-        let (vfn, mut vfn_config) = vfn_config(rng, idx, peer_id);
+        let (vfn, mut vfn_config) = vfn_config(rng, peer_id);
         Self::update_config(&mut vfn_config, mempool_config);
 
         let node_id = NodeId::new(NodeType::ValidatorFullNode, idx);
@@ -159,7 +159,7 @@ impl TestHarness {
         idx: u32,
         mempool_config: Option<MempoolOverrideConfig>,
     ) -> NodeId {
-        let (full_node, mut fn_config) = public_full_node_config(rng, idx, PeerRole::Unknown);
+        let (full_node, mut fn_config) = public_full_node_config(rng, PeerRole::Unknown);
         Self::update_config(&mut fn_config, mempool_config);
 
         let node_id = NodeId::new(NodeType::FullNode, idx);
@@ -367,7 +367,9 @@ impl TestHarness {
                             let block = self.node(sender_id).mempool().get_batch(
                                 100,
                                 102400,
-                                HashSet::new(),
+                                true,
+                                false,
+                                vec![],
                             );
                             for txn in transactions.iter() {
                                 assert!(block.contains(txn));

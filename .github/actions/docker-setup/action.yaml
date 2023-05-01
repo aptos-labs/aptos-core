@@ -12,9 +12,6 @@ inputs:
   GCP_SERVICE_ACCOUNT_EMAIL:
     required: true
     description: "GCP service account email"
-  GCP_DOCKER_ARTIFACT_REPO:
-    required: true
-    description: "GCP GAR repo to authenticate to"
   # AWS auth
   AWS_ACCESS_KEY_ID:
     required: true
@@ -45,6 +42,17 @@ runs:
         version: v0.10.1
         custom-name: "core-builder"
         keep-state: true
+        config-inline: |
+          [worker.oci]
+            gc = true
+            gckeepstorage = 900000000000 # Use 900GB out of 1TB for builder storage
+            [[worker.oci.gcpolicy]]
+              keepBytes = 700000000000 # Use 700GB out of 900GB for cache storage
+              keepDuration = 604800 # Keep cache for 7 days
+              filters = [ "type==source.local", "type==exec.cachemount", "type==source.git.checkout"]
+            [[worker.oci.gcpolicy]]
+              all = true
+              keepBytes = 900000000000
 
     - uses: imjasonh/setup-crane@5146f708a817ea23476677995bf2133943b9be0b # pin@v0.1
 
@@ -58,10 +66,17 @@ runs:
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
 
-    - name: Login to Google Artifact Registry
+    - name: Login to us-west1 Google Artifact Registry
       uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
       with:
         registry: us-west1-docker.pkg.dev
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Login to US multi-region Google Artifact Registry
+      uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2
+      with:
+        registry: us-docker.pkg.dev
         username: oauth2accesstoken
         password: ${{ steps.auth.outputs.access_token }}
 

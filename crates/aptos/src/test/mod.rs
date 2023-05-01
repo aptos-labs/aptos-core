@@ -13,10 +13,10 @@ use crate::{
         init::{InitTool, Network},
         types::{
             account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-            EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
-            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
-            TransactionOptions, TransactionSummary,
+            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs,
+            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
+            SaveFile, TransactionOptions, TransactionSummary,
         },
         utils::write_to_file,
     },
@@ -161,6 +161,11 @@ impl CliTestFramework {
         let address = account_address_from_public_key(&private_key.public_key());
         self.account_addresses.push(address);
         self.account_keys.push(private_key);
+        println!(
+            "Account: {} (index: {})",
+            address.to_hex_literal(),
+            self.account_keys.len() - 1
+        );
         self.account_keys.len() - 1
     }
 
@@ -208,7 +213,11 @@ impl CliTestFramework {
         }
 
         self.fund_account(index, amount).await?;
-        warn!("Funded account {:?}", self.account_id(index));
+        warn!(
+            "Funded account {:?} with {:?} OCTA",
+            self.account_id(index),
+            amount.unwrap_or(DEFAULT_FUNDED_COINS)
+        );
         Ok(index)
     }
 
@@ -301,23 +310,25 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
-            function_id: MemberId {
-                module_id: ModuleId::new(
-                    AccountAddress::ONE,
-                    Identifier::from_str("coin").unwrap(),
-                ),
-                member_id: Identifier::from_str("transfer").unwrap(),
+            entry_function_args: EntryFunctionArguments {
+                function_id: MemberId {
+                    module_id: ModuleId::new(
+                        AccountAddress::ONE,
+                        Identifier::from_str("coin").unwrap(),
+                    ),
+                    member_id: Identifier::from_str("transfer").unwrap(),
+                },
+                args: vec![
+                    ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
+                    ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
+                ],
+                type_args: vec![MoveType::Struct(MoveStructTag::new(
+                    AccountAddress::ONE.into(),
+                    IdentifierWrapper::from_str("aptos_coin").unwrap(),
+                    IdentifierWrapper::from_str("AptosCoin").unwrap(),
+                    vec![],
+                ))],
             },
-            args: vec![
-                ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
-                ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
-            ],
-            type_args: vec![MoveType::Struct(MoveStructTag::new(
-                AccountAddress::ONE.into(),
-                IdentifierWrapper::from_str("aptos_coin").unwrap(),
-                IdentifierWrapper::from_str("AptosCoin").unwrap(),
-                vec![],
-            ))],
             txn_options: self.transaction_options(sender_index, gas_options),
         }
         .execute()
@@ -577,16 +588,18 @@ impl CliTestFramework {
         commission_percentage: u64,
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
-            function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
-                .unwrap(),
-            args: vec![
-                ArgWithType::address(self.account_id(operator_index)),
-                ArgWithType::address(self.account_id(voter_index)),
-                ArgWithType::u64(amount),
-                ArgWithType::u64(commission_percentage),
-                ArgWithType::bytes(vec![]),
-            ],
-            type_args: vec![],
+            entry_function_args: EntryFunctionArguments {
+                function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
+                    .unwrap(),
+                args: vec![
+                    ArgWithType::address(self.account_id(operator_index)),
+                    ArgWithType::address(self.account_id(voter_index)),
+                    ArgWithType::u64(amount),
+                    ArgWithType::u64(commission_percentage),
+                    ArgWithType::bytes(vec![]),
+                ],
+                type_args: vec![],
+            },
             txn_options: self.transaction_options(owner_index, None),
         }
         .execute()
@@ -711,6 +724,8 @@ impl CliTestFramework {
                 },
                 encoding_options: Default::default(),
             },
+            vanity_prefix: None,
+            vanity_multisig: false,
         }
         .execute()
         .await
@@ -826,6 +841,8 @@ impl CliTestFramework {
             move_options: self.move_options(account_strs),
             filter: filter.map(|str| str.to_string()),
             ignore_compile_warnings: false,
+            compute_coverage: false,
+            dump_state: false,
         }
         .execute()
         .await
@@ -893,9 +910,11 @@ impl CliTestFramework {
 
         RunFunction {
             txn_options: self.transaction_options(index, gas_options),
-            function_id,
-            args: parsed_args,
-            type_args: parsed_type_args,
+            entry_function_args: EntryFunctionArguments {
+                function_id,
+                args: parsed_args,
+                type_args: parsed_type_args,
+            },
         }
         .execute()
         .await

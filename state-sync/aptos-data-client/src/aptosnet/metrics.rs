@@ -4,14 +4,20 @@
 use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::_once_cell::sync::Lazy;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
-    HistogramVec, IntCounterVec, IntGaugeVec,
+    histogram_opts, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
+    HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 
 /// The special label TOTAL_COUNT stores the sum of all values in the counter.
 pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
 pub const PRIORITIZED_PEER: &str = "prioritized_peer";
 pub const REGULAR_PEER: &str = "regular_peer";
+
+// Latency buckets for network latencies (i.e., the defaults only go up
+// to 10 seconds, but we usually require more).
+const NETWORK_LATENCY_BUCKETS: [f64; 14] = [
+    0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0, 60.0,
+];
 
 // TOOD(joshlind): add peer priorities back to the requests
 
@@ -47,12 +53,12 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
 
 /// Counter for tracking request latencies
 pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
+    let histogram_opts = histogram_opts!(
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
-        &["request_type", "network"]
-    )
-    .unwrap()
+        NETWORK_LATENCY_BUCKETS.to_vec()
+    );
+    register_histogram_vec!(histogram_opts, &["request_type", "network"]).unwrap()
 });
 
 /// Gauge for tracking the number of in-flight polls

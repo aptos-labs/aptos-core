@@ -21,7 +21,14 @@ commands:
     aws s3 cp "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd
   save_metadata_line: |
     # save the line to a new file under the metadata folder
-    gzip -c | aws s3 cp - "s3://$BUCKET/$SUB_DIR/metadata/$FILE_NAME"
+    FILE_HANDLE="metadata/$FILE_NAME"
+    echo "$FILE_HANDLE"
+    exec 1>&-
+    gzip -c | aws s3 cp - "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE"
   list_metadata_files: |
     # list files under the metadata folder
     (aws s3 ls s3://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#.* \(.*\)#metadata/\1#p"
+  backup_metadata_file: |
+    # move metadata file to metadata backup folder
+    aws s3 mv s3://$BUCKET/$SUB_DIR/metadata/$FILE_NAME s3://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME --no-progress
+    

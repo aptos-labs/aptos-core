@@ -4,7 +4,7 @@
 use crate::Error;
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::Schema;
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceRequest;
+use aptos_peer_monitoring_service_types::request::PeerMonitoringServiceRequest;
 use serde::Serialize;
 
 #[derive(Schema)]
@@ -43,6 +43,7 @@ pub enum LogEntry {
     LatencyPing,
     MetadataUpdateLoop,
     NetworkInfoRequest,
+    NodeInfoRequest,
     PeerMonitorLoop,
     SendRequest,
 }

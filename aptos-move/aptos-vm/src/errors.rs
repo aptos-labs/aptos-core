@@ -2,9 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::logging::AdapterLogSchema;
-use aptos_logger::prelude::*;
+use aptos_logger::{enabled, Level};
 use aptos_types::account_config::TransactionValidation;
+use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -82,18 +82,18 @@ pub fn convert_prologue_error(
                     StatusCode::MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH
                 },
                 (category, reason) => {
-                    log_context.alert();
-                    error!(
-                        *log_context,
-                        "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                        location, code, category, reason,
-                    );
+                    speculative_error!(
+			log_context,
+			format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+				location, code, category, reason),
+		    );
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        None,
                     ));
                 },
             };
-            VMStatus::Error(new_major_status)
+            VMStatus::Error(new_major_status, None)
         },
         VMStatus::MoveAbort(location, code) => {
             let new_major_status = match error_split(code) {
@@ -119,26 +119,25 @@ pub fn convert_prologue_error(
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 },
                 (category, reason) => {
-                    log_context.alert();
-                    error!(
-                        *log_context,
-                        "[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                        location, code, category, reason,
+                    speculative_error!(
+                        log_context,
+                        format!("[aptos_vm] Unexpected prologue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+				location, code, category, reason),
                     );
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        None,
                     ));
                 },
             };
-            VMStatus::Error(new_major_status)
+            VMStatus::Error(new_major_status, None)
         },
-        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(_) => {
-            log_context.alert();
-            error!(
-                *log_context,
-                "[aptos_vm] Unexpected prologue error: {:?}", status
+        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(..) => {
+            speculative_error!(
+                log_context,
+                format!("[aptos_vm] Unexpected prologue error: {:?}", status),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }
@@ -158,35 +157,32 @@ pub fn convert_epilogue_error(
             if !transaction_validation.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
-            log_context.alert();
-            error!(
-                *log_context,
-                "[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                location, code, category, reason,
+            speculative_error!(
+                log_context,
+                format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+			location, code, category, reason),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
 
         VMStatus::MoveAbort(location, code) => match error_split(code) {
             (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort(location, code),
             (category, reason) => {
-                log_context.alert();
-                error!(
-                    *log_context,
-                    "[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
-                    location, code, category, reason,
+                speculative_error!(
+                    log_context,
+                    format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
+			    location, code, category, reason),
                 );
-                VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+                VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
             },
         },
 
         status => {
-            log_context.alert();
-            error!(
-                *log_context,
-                "[aptos_vm] Unexpected success epilogue error: {:?}", status,
+            speculative_error!(
+                log_context,
+                format!("[aptos_vm] Unexpected success epilogue error: {:?}", status),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }
@@ -206,13 +202,14 @@ pub fn expect_only_successful_execution(
         status => {
             // Only trigger a warning here as some errors could be a result of the speculative parallel execution.
             // We will report the errors after we obtained the final transaction output in update_counters_for_processed_chunk
-            warn!(
-                *log_context,
-                "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
-                function_name,
-                status,
+            speculative_warn!(
+                log_context,
+                format!(
+                    "[aptos_vm] Unexpected error from known Move function, '{}'. Error: {:?}",
+                    function_name, status
+                ),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }

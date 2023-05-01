@@ -9,18 +9,24 @@ use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{GasScheduleV2, OnChainConfig, OnChainConsensusConfig, Version},
+    on_chain_config::{
+        ExecutionConfigV1, GasScheduleV2, OnChainConfig, OnChainConsensusConfig,
+        OnChainExecutionConfig, TransactionShufflerType, Version,
+    },
 };
 use futures::executor::block_on;
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use url::Url;
 
 pub mod consensus_config;
+pub mod execution_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
@@ -29,27 +35,268 @@ pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ReleaseConfig {
-    pub testnet: bool,
     pub remote_endpoint: Option<Url>,
-    pub framework_release: Option<FrameworkReleaseConfig>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub gas_schedule: Option<GasScheduleV2>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<Version>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feature_flags: Option<Features>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub consensus_config: Option<OnChainConsensusConfig>,
-    #[serde(default)]
-    pub is_multi_step: bool,
-    /// Execute the framework releases after setting all other flags.
-    #[serde(default)]
-    pub framework_release_at_end: bool,
+    pub proposals: Vec<Proposal>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct Proposal {
+    pub name: String,
+    pub metadata: ProposalMetadata,
+    pub execution_mode: ExecutionMode,
+    pub update_sequence: Vec<ReleaseEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct ProposalMetadata {
+    title: String,
+    description: String,
+    source_code_url: String,
+    discussion_url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+pub enum ExecutionMode {
+    MultiStep,
+    SingleStep,
+    RootSigner,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub enum ReleaseEntry {
+    Framework(FrameworkReleaseConfig),
+    CustomGas(GasScheduleV2),
+    DefaultGas,
+    Version(Version),
+    FeatureFlag(Features),
+    Consensus(OnChainConsensusConfig),
+    Execution(OnChainExecutionConfig),
+    RawScript(PathBuf),
+}
+
+impl ReleaseEntry {
+    pub fn generate_release_script(
+        &self,
+        client: Option<&Client>,
+        result: &mut Vec<(String, String)>,
+        execution_mode: ExecutionMode,
+    ) -> Result<()> {
+        let (is_testnet, is_multi_step) = match execution_mode {
+            ExecutionMode::MultiStep => (false, true),
+            ExecutionMode::SingleStep => (false, false),
+            ExecutionMode::RootSigner => (true, false),
+        };
+        match self {
+            ReleaseEntry::Framework(framework_release) => {
+                result.append(
+                    &mut framework::generate_upgrade_proposals(
+                        framework_release,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )
+                    .unwrap(),
+                );
+            },
+            ReleaseEntry::CustomGas(gas_schedule) => {
+                if !fetch_and_equals::<GasScheduleV2>(client, gas_schedule)? {
+                    result.append(&mut gas::generate_gas_upgrade_proposal(
+                        gas_schedule,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::DefaultGas => {
+                let gas_schedule = aptos_gas::gen::current_gas_schedule();
+                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
+                    result.append(&mut gas::generate_gas_upgrade_proposal(
+                        &gas_schedule,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::Version(version) => {
+                if !fetch_and_equals::<Version>(client, version)? {
+                    result.append(&mut version::generate_version_upgrade_proposal(
+                        version,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::FeatureFlag(feature_flags) => {
+                let mut needs_update = true;
+                if let Some(client) = client {
+                    let features = block_on(async {
+                        client
+                            .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
+                                CORE_CODE_ADDRESS,
+                                "0x1::features::Features",
+                            )
+                            .await
+                    })?;
+                    // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
+                    // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
+                    // we would like to enable/disable, regardless of their current on chain state.
+                    needs_update = feature_flags.has_modified(features.inner());
+                }
+                if needs_update {
+                    result.append(&mut feature_flags::generate_feature_upgrade_proposal(
+                        feature_flags,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::Consensus(consensus_config) => {
+                if !fetch_and_equals(client, consensus_config)? {
+                    result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
+                        consensus_config,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::Execution(execution_config) => {
+                if !fetch_and_equals(client, execution_config)? {
+                    result.append(
+                        &mut execution_config::generate_execution_config_upgrade_proposal(
+                            execution_config,
+                            is_testnet,
+                            if is_multi_step {
+                                get_execution_hash(result)
+                            } else {
+                                "".to_owned().into_bytes()
+                            },
+                        )?,
+                    );
+                }
+            },
+            ReleaseEntry::RawScript(script_path) => {
+                let base_path =
+                    PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join(script_path.as_path());
+                let file_name = base_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| {
+                        anyhow!("Unable to obtain file name for proposal: {:?}", script_path)
+                    })?
+                    .to_string();
+                let file_content = std::fs::read_to_string(base_path)?;
+
+                if let ExecutionMode::MultiStep = execution_mode {
+                    // Render the hash for multi step proposal.
+                    // {{ script_hash }} in the provided move file will be replaced with the real hash.
+
+                    let mut handlebars = Handlebars::new();
+                    handlebars
+                        .register_template_string("move_template", file_content.as_str())
+                        .unwrap();
+
+                    let execution_hash = get_execution_hash(result);
+                    let mut hash_string = "vector[".to_string();
+                    for b in execution_hash.iter() {
+                        hash_string.push_str(format!("{}u8,", b).as_str());
+                    }
+                    hash_string.push(']');
+
+                    let mut data = HashMap::new();
+                    data.insert("script_hash", hash_string);
+
+                    result.push((
+                        file_name,
+                        handlebars
+                            .render("move_template", &data)
+                            .map_err(|err| anyhow!("Fail to render string: {:?}", err))?,
+                    ));
+                } else {
+                    result.push((file_name, file_content));
+                }
+            },
+        }
+        Ok(())
+    }
+
+    pub fn validate_upgrade(&self, client: &Client) -> Result<()> {
+        let client_opt = Some(client);
+        match self {
+            ReleaseEntry::Framework(_) => (),
+            ReleaseEntry::RawScript(_) => (),
+            ReleaseEntry::CustomGas(gas_schedule) => {
+                if !fetch_and_equals(client_opt, gas_schedule)? {
+                    bail!("Gas schedule config mismatch: Expected {:?}", gas_schedule);
+                }
+            },
+            ReleaseEntry::DefaultGas => {
+                if !fetch_and_equals(client_opt, &aptos_gas::gen::current_gas_schedule())? {
+                    bail!("Gas schedule config mismatch: Expected Default");
+                }
+            },
+            ReleaseEntry::Version(version) => {
+                if !fetch_and_equals(client_opt, version)? {
+                    bail!("Version config mismatch: Expected {:?}", version);
+                }
+            },
+            ReleaseEntry::FeatureFlag(features) => {
+                let on_chain_features = block_on(async {
+                    client
+                        .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
+                            CORE_CODE_ADDRESS,
+                            "0x1::features::Features",
+                        )
+                        .await
+                })?;
+                if features.has_modified(on_chain_features.inner()) {
+                    bail!(
+                        "Feature mismatch: Got {:?}, expected {:?}",
+                        on_chain_features.inner(),
+                        features
+                    );
+                }
+            },
+            ReleaseEntry::Consensus(consensus_config) => {
+                if !fetch_and_equals(client_opt, consensus_config)? {
+                    bail!("Consensus config mismatch: Expected {:?}", consensus_config);
+                }
+            },
+            ReleaseEntry::Execution(execution_config) => {
+                if !fetch_and_equals(client_opt, execution_config)? {
+                    bail!("Consensus config mismatch: Expected {:?}", execution_config);
+                }
+            },
+        }
+        Ok(())
+    }
 }
 
 // Compare the current on chain config with the value recorded on chain. Return false if there's a difference.
 fn fetch_and_equals<T: OnChainConfig + PartialEq>(
-    client: &Option<Client>,
+    client: Option<&Client>,
     expected: &T,
 ) -> Result<bool> {
     match client {
@@ -80,177 +327,76 @@ fn fetch_and_equals<T: OnChainConfig + PartialEq>(
 
 impl ReleaseConfig {
     pub fn generate_release_proposal_scripts(&self, base_path: &Path) -> Result<()> {
-        let mut result: Vec<(String, String)> = vec![];
-        let mut release_generation_functions: Vec<
-            &dyn Fn(&Self, &Option<Client>, &mut Vec<(String, String)>) -> Result<()>,
-        > = if self.framework_release_at_end {
-            vec![
-                &Self::generate_gas_schedule,
-                &Self::generate_version_file,
-                &Self::generate_feature_flag_file,
-                &Self::generate_consensus_file,
-                &Self::generate_framework_release,
-            ]
-        } else {
-            vec![
-                &Self::generate_framework_release,
-                &Self::generate_gas_schedule,
-                &Self::generate_version_file,
-                &Self::generate_feature_flag_file,
-                &Self::generate_consensus_file,
-            ]
-        };
         let client = self
             .remote_endpoint
             .as_ref()
             .map(|url| Client::new(url.clone()));
 
+        // Create directories for source and metadata.
+        let mut source_dir = base_path.to_path_buf();
+        source_dir.push("sources");
+
+        std::fs::create_dir(source_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
+
+        let mut metadata_dir = base_path.to_path_buf();
+        metadata_dir.push("metadata");
+
+        std::fs::create_dir(metadata_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
+
         // If we are generating multi-step proposal files, we generate the files in reverse order,
         // since we need to pass in the hash of the next file to the previous file.
-        if self.is_multi_step {
-            release_generation_functions.reverse();
-        }
+        for proposal in &self.proposals {
+            let mut proposal_dir = base_path.to_path_buf();
+            proposal_dir.push("sources");
+            proposal_dir.push(proposal.name.as_str());
 
-        for f in &release_generation_functions {
-            (f)(self, &client, &mut result)?;
-        }
+            std::fs::create_dir(proposal_dir.as_path())
+                .map_err(|err| anyhow!("Fail to create folder for proposal: {:?}", err))?;
 
-        // Here we are reversing the results back, so the result would be in order.
-        if self.is_multi_step {
-            result.reverse();
-        }
-
-        for (idx, (script_name, script)) in result.into_iter().enumerate() {
-            let mut script_path = base_path.to_path_buf();
-            let proposal_name = format!("{}-{}", idx, script_name);
-            script_path.push(&proposal_name);
-            script_path.set_extension("move");
-
-            std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
-                .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
-        }
-
-        Ok(())
-    }
-
-    fn generate_framework_release(
-        &self,
-        _client: &Option<Client>,
-        result: &mut Vec<(String, String)>,
-    ) -> Result<()> {
-        if let Some(framework_release) = &self.framework_release {
-            result.append(
-                &mut framework::generate_upgrade_proposals(
-                    framework_release,
-                    self.testnet,
-                    if self.is_multi_step {
-                        get_execution_hash(result)
-                    } else {
-                        "".to_owned().into_bytes()
-                    },
-                )
-                .unwrap(),
-            );
-        }
-        Ok(())
-    }
-
-    fn generate_gas_schedule(
-        &self,
-        client: &Option<Client>,
-        result: &mut Vec<(String, String)>,
-    ) -> Result<()> {
-        if let Some(gas_schedule) = &self.gas_schedule {
-            if !fetch_and_equals::<GasScheduleV2>(client, gas_schedule)? {
-                result.append(&mut gas::generate_gas_upgrade_proposal(
-                    gas_schedule,
-                    self.testnet,
-                    if self.is_multi_step {
-                        get_execution_hash(result)
-                    } else {
-                        "".to_owned().into_bytes()
-                    },
-                )?);
+            let mut result: Vec<(String, String)> = vec![];
+            if let ExecutionMode::MultiStep = &proposal.execution_mode {
+                for entry in proposal.update_sequence.iter().rev() {
+                    entry.generate_release_script(
+                        client.as_ref(),
+                        &mut result,
+                        proposal.execution_mode,
+                    )?;
+                }
+                result.reverse();
+            } else {
+                for entry in proposal.update_sequence.iter() {
+                    entry.generate_release_script(
+                        client.as_ref(),
+                        &mut result,
+                        proposal.execution_mode,
+                    )?;
+                }
             }
-        }
-        Ok(())
-    }
 
-    fn generate_version_file(
-        &self,
-        client: &Option<Client>,
-        result: &mut Vec<(String, String)>,
-    ) -> Result<()> {
-        if let Some(version) = &self.version {
-            if !fetch_and_equals::<Version>(client, version)? {
-                result.append(&mut version::generate_version_upgrade_proposal(
-                    version,
-                    self.testnet,
-                    if self.is_multi_step {
-                        get_execution_hash(result)
-                    } else {
-                        "".to_owned().into_bytes()
-                    },
-                )?);
-            }
-        }
-        Ok(())
-    }
+            for (idx, (script_name, script)) in result.into_iter().enumerate() {
+                let mut script_path = proposal_dir.clone();
+                let proposal_name = format!("{}-{}", idx, script_name);
+                script_path.push(&proposal_name);
+                script_path.set_extension("move");
 
-    fn generate_feature_flag_file(
-        &self,
-        client: &Option<Client>,
-        result: &mut Vec<(String, String)>,
-    ) -> Result<()> {
-        if let Some(feature_flags) = &self.feature_flags {
-            let mut needs_update = true;
-            if let Some(client) = client {
-                let features = block_on(async {
-                    client
-                        .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
-                            CORE_CODE_ADDRESS,
-                            "0x1::features::Features",
-                        )
-                        .await
-                })?;
-                // Only update the feature flags section when there's a divergence between the local configs and on chain configs.
-                // If any flag in the release config diverges from the on chain value, we will emit a script that includes all flags
-                // we would like to enable/disable, regardless of their current on chain state.
-                needs_update = feature_flags.has_modified(features.inner());
+                std::fs::write(script_path.as_path(), append_script_hash(script).as_bytes())
+                    .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
             }
-            if needs_update {
-                result.append(&mut feature_flags::generate_feature_upgrade_proposal(
-                    feature_flags,
-                    self.testnet,
-                    if self.is_multi_step {
-                        get_execution_hash(result)
-                    } else {
-                        "".to_owned().into_bytes()
-                    },
-                )?);
-            }
-        }
-        Ok(())
-    }
 
-    fn generate_consensus_file(
-        &self,
-        client: &Option<Client>,
-        result: &mut Vec<(String, String)>,
-    ) -> Result<()> {
-        if let Some(consensus_config) = &self.consensus_config {
-            if !fetch_and_equals(client, consensus_config)? {
-                result.append(&mut consensus_config::generate_consensus_upgrade_proposal(
-                    consensus_config,
-                    self.testnet,
-                    if self.is_multi_step {
-                        get_execution_hash(result)
-                    } else {
-                        "".to_owned().into_bytes()
-                    },
-                )?);
-            }
+            let mut metadata_path = base_path.to_path_buf();
+            metadata_path.push("metadata");
+            metadata_path.push(proposal.name.as_str());
+            metadata_path.set_extension("json");
+
+            std::fs::write(
+                metadata_path.as_path(),
+                serde_json::to_string_pretty(&proposal.metadata)?,
+            )
+            .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
         }
+
         Ok(())
     }
 
@@ -294,37 +440,9 @@ impl ReleaseConfig {
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
     pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
         let client = Client::new(endpoint);
-        if let Some(features) = &self.feature_flags {
-            let on_chain_features = block_on(async {
-                client
-                    .get_account_resource_bcs::<aptos_types::on_chain_config::Features>(
-                        CORE_CODE_ADDRESS,
-                        "0x1::features::Features",
-                    )
-                    .await
-            })?;
-            if features.has_modified(on_chain_features.inner()) {
-                bail!(
-                    "Feature mismatch: Got {:?}, expected {:?}",
-                    on_chain_features.inner(),
-                    features
-                );
-            }
-        }
-        let client_opt = Some(client);
-        if let Some(config) = &self.consensus_config {
-            if !fetch_and_equals(&client_opt, config)? {
-                bail!("Consensus config mismatch: Expected {:?}", config);
-            }
-        }
-        if let Some(config) = &self.gas_schedule {
-            if !fetch_and_equals(&client_opt, config)? {
-                bail!("Gas schedule config mismatch: Expected {:?}", config);
-            }
-        }
-        if let Some(config) = &self.version {
-            if !fetch_and_equals(&client_opt, config)? {
-                bail!("Version mismatch: Expected {:?}", config);
+        for proposal in &self.proposals {
+            for entry in &proposal.update_sequence {
+                entry.validate_upgrade(&client)?;
             }
         }
         Ok(())
@@ -334,24 +452,53 @@ impl ReleaseConfig {
 impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
-            testnet: true,
-            framework_release: Some(FrameworkReleaseConfig {
-                bytecode_version: 6, // TODO: remove explicit bytecode version from sources
-                git_hash: None,
-            }),
-            gas_schedule: Some(aptos_gas::gen::current_gas_schedule()),
-            version: None,
-            feature_flags: Some(Features {
-                enabled: aptos_vm_genesis::default_features()
-                    .into_iter()
-                    .map(crate::components::feature_flags::FeatureFlag::from)
-                    .collect(),
-                disabled: vec![],
-            }),
-            consensus_config: Some(OnChainConsensusConfig::default()),
-            is_multi_step: false,
             remote_endpoint: None,
-            framework_release_at_end: false,
+            proposals: vec![
+                Proposal {
+                    execution_mode: ExecutionMode::SingleStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "custom".to_string(),
+                    update_sequence: vec![ReleaseEntry::RawScript(PathBuf::from(
+                        "data/proposals/empty.move",
+                    ))],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "framework".to_string(),
+                    update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
+                        bytecode_version: 6, // TODO: remove explicit bytecode version from sources
+                        git_hash: None,
+                    })],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "gas".to_string(),
+                    update_sequence: vec![ReleaseEntry::DefaultGas],
+                },
+                Proposal {
+                    execution_mode: ExecutionMode::MultiStep,
+                    metadata: ProposalMetadata::default(),
+                    name: "feature_flags".to_string(),
+                    update_sequence: vec![
+                        ReleaseEntry::FeatureFlag(Features {
+                            enabled: aptos_vm_genesis::default_features()
+                                .into_iter()
+                                .map(crate::components::feature_flags::FeatureFlag::from)
+                                .collect(),
+                            disabled: vec![],
+                        }),
+                        ReleaseEntry::Consensus(OnChainConsensusConfig::default()),
+                        ReleaseEntry::Execution(OnChainExecutionConfig::V1(ExecutionConfigV1 {
+                            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+                        })),
+                        ReleaseEntry::RawScript(PathBuf::from(
+                            "data/proposals/empty_multi_step.move",
+                        )),
+                    ],
+                },
+            ],
         }
     }
 }

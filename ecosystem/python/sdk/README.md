@@ -3,13 +3,14 @@
 [![PyPI Package Version][pypi-image-version]][pypi-url]
 [![PyPI Package Downloads][pypi-image-downloads]][pypi-url]
 
-You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
-yourself locally.
+This provides basic functionalities to interact with [Aptos](https:/github.com/aptos-labs/aptos-core/). Get started [here](https://aptos.dev/guides/system-integrators-guide/#getting-started).
 
-Currently this is still in development and is unsuitable for directly interfacing with Aptos.
+Currently this is still in development and may not be suitable for production purposes.
+
+Note: The sync client is deprecated, please only start new projects using the async client. Feature contributions to the sync client will be rejected.
 
 ## Requirements
-We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:
+This SDK uses [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:
 
 ```
 curl -sSL https://install.python-poetry.org | python3 -

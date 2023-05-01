@@ -4,40 +4,36 @@ module 0xCAFE::test {
     use std::string::String;
     use std::vector;
 
-    struct ModuleData has key, store {
-        state: String,
-    }
-
-    struct GenericModuleData<T: copy + store> has key, store {
+    struct ModuleData<T> has key, store {
         state: T,
     }
 
     public entry fun hi(sender: &signer, msg: String) acquires ModuleData {
         let addr = signer::address_of(sender);
-        if (!exists<ModuleData>(addr)) {
-            move_to(sender, ModuleData{state: msg});
+        if (!exists<ModuleData<String>>(addr)) {
+            move_to(sender, ModuleData<String>{state: msg});
         } else {
-            borrow_global_mut<ModuleData>(addr).state = msg;
+            borrow_global_mut<ModuleData<String>>(addr).state = msg;
         }
     }
 
     public entry fun str_vec(sender: &signer, msgs: vector<String>, i: u64) acquires ModuleData {
         find_hello_in_msgs(&msgs);
         let addr = signer::address_of(sender);
-        if (!exists<ModuleData>(addr)) {
-            move_to(sender, ModuleData{state: *vector::borrow(&msgs, i)});
+        if (!exists<ModuleData<String>>(addr)) {
+            move_to(sender, ModuleData<String>{state: *vector::borrow(&msgs, i)});
         } else {
-            borrow_global_mut<ModuleData>(addr).state = *vector::borrow(&msgs, i);
+            borrow_global_mut<ModuleData<String>>(addr).state = *vector::borrow(&msgs, i);
         }
     }
 
     public entry fun str_vec_vec(sender: &signer, msgs: vector<vector<String>>, i: u64, j: u64) acquires ModuleData {
         find_hello_in_msgs_of_msgs(&msgs);
         let addr = signer::address_of(sender);
-        if (!exists<ModuleData>(addr)) {
-            move_to(sender, ModuleData{state: *vector::borrow(vector::borrow(&msgs, i), j)});
+        if (!exists<ModuleData<String>>(addr)) {
+            move_to(sender, ModuleData<String>{state: *vector::borrow(vector::borrow(&msgs, i), j)});
         } else {
-            borrow_global_mut<ModuleData>(addr).state = *vector::borrow(vector::borrow(&msgs, i), j);
+            borrow_global_mut<ModuleData<String>>(addr).state = *vector::borrow(vector::borrow(&msgs, i), j);
         }
     }
 
@@ -59,10 +55,28 @@ module 0xCAFE::test {
 
         let addr = signer::address_of(sender);
         let msg = *vector::borrow(vector::borrow(&msgs, i), j);
-        if (!exists<ModuleData>(addr)) {
-            move_to(sender, ModuleData{state: msg});
+        if (!exists<ModuleData<String>>(addr)) {
+            move_to(sender, ModuleData<String>{state: msg});
         } else {
-            borrow_global_mut<ModuleData>(addr).state = msg;
+            borrow_global_mut<ModuleData<String>>(addr).state = msg;
+        }
+    }
+
+    public entry fun non_generic_call(sender: &signer, msg: String) acquires ModuleData {
+        let addr = signer::address_of(sender);
+        if (!exists<ModuleData<String>>(addr)) {
+            move_to<ModuleData<String>>(sender, ModuleData<String> { state: msg });
+        } else {
+            borrow_global_mut<ModuleData<String>>(addr).state = msg;
+        }
+    }
+
+    public entry fun generic_call<T: copy + drop + store>(sender: &signer, msg: T) acquires ModuleData {
+        let addr = signer::address_of(sender);
+        if (!exists<ModuleData<T>>(addr)) {
+            move_to<ModuleData<T>>(sender, ModuleData { state: msg });
+        } else {
+            borrow_global_mut<ModuleData<T>>(addr).state = msg;
         }
     }
 
@@ -76,7 +90,7 @@ module 0xCAFE::test {
         val2: T,
         i: u64,
         j: u64,
-    ) acquires GenericModuleData {
+    ) acquires ModuleData {
         assert!(vector::length(&w_ies) > 0, 30);
         assert!(vector::length(&t_ies) > 0, 31);
         assert!(vector::length(&vec1) >= 0, 32);
@@ -87,16 +101,16 @@ module 0xCAFE::test {
         let v2 = *vector::borrow(vector::borrow(&t_ies, i), j);
         let check = (&v1 == &val1) || (&v2 == &val2);
         if (check) {
-            if (!exists<ModuleData>(addr)) {
-                move_to<GenericModuleData<T>>(sender, GenericModuleData { state: v2 });
+            if (!exists<ModuleData<T>>(addr)) {
+                move_to<ModuleData<T>>(sender, ModuleData { state: v2 });
             } else {
-                borrow_global_mut<GenericModuleData<T>>(addr).state = v2;
+                borrow_global_mut<ModuleData<T>>(addr).state = v2;
             }
         } else {
-            if (!exists<ModuleData>(addr)) {
-                move_to<GenericModuleData<T>>(sender, GenericModuleData { state: v2 });
+            if (!exists<ModuleData<T>>(addr)) {
+                move_to<ModuleData<T>>(sender, ModuleData { state: v2 });
             } else {
-                borrow_global_mut<GenericModuleData<T>>(addr).state = v2;
+                borrow_global_mut<ModuleData<T>>(addr).state = v2;
             }
         };
     }

@@ -4,210 +4,159 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_aggregator::BatchAggregator,
-        batch_store::{BatchStoreCommand, PersistRequest},
+        batch_store::BatchStore,
         counters,
-        proof_coordinator::{ProofCoordinatorCommand, ProofReturnChannel},
-        types::{BatchId, Fragment, SerializedTransaction},
+        types::{Batch, PersistedValue},
     },
 };
-use aptos_consensus_types::proof_of_store::{LogicalTime, SignedDigestInfo};
+use anyhow::ensure;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
-use std::collections::HashMap;
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
-};
+use std::sync::Arc;
+use tokio::sync::{mpsc::Receiver, oneshot};
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
-    AppendToBatch(Vec<SerializedTransaction>, BatchId),
-    EndBatch(
-        Vec<SerializedTransaction>,
-        BatchId,
-        LogicalTime,
-        ProofReturnChannel,
-    ),
     Shutdown(oneshot::Sender<()>),
-    RemoteFragment(Box<Fragment>),
+    NewBatches(Vec<Batch>),
 }
 
 pub struct BatchCoordinator {
-    epoch: u64,
     my_peer_id: PeerId,
     network_sender: NetworkSender,
-    command_rx: Receiver<BatchCoordinatorCommand>,
-    batch_store_tx: Sender<BatchStoreCommand>,
-    proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-    max_batch_bytes: usize,
-    remote_batch_aggregators: HashMap<PeerId, BatchAggregator>,
-    local_batch_aggregator: BatchAggregator,
-    local_fragment_id: usize,
+    batch_store: Arc<BatchStore<NetworkSender>>,
+    max_batch_txns: u64,
+    max_batch_bytes: u64,
+    max_total_txns: u64,
+    max_total_bytes: u64,
 }
 
 impl BatchCoordinator {
     pub(crate) fn new(
-        epoch: u64, //TODO: pass the epoch config
         my_peer_id: PeerId,
         network_sender: NetworkSender,
-        wrapper_command_rx: Receiver<BatchCoordinatorCommand>,
-        batch_store_tx: Sender<BatchStoreCommand>,
-        proof_coordinator_tx: Sender<ProofCoordinatorCommand>,
-        max_batch_bytes: usize,
+        batch_store: Arc<BatchStore<NetworkSender>>,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
+        max_total_txns: u64,
+        max_total_bytes: u64,
     ) -> Self {
         Self {
-            epoch,
             my_peer_id,
             network_sender,
-            command_rx: wrapper_command_rx,
-            batch_store_tx,
-            proof_coordinator_tx,
+            batch_store,
+            max_batch_txns,
             max_batch_bytes,
-            remote_batch_aggregators: HashMap::new(),
-            local_batch_aggregator: BatchAggregator::new(max_batch_bytes),
-            local_fragment_id: 0,
+            max_total_txns,
+            max_total_bytes,
         }
     }
 
-    /// Aggregate & compute rolling digest, synchronously by worker.
-    fn handle_append_to_batch(
-        &mut self,
-        fragment_payload: Vec<SerializedTransaction>,
-        batch_id: BatchId,
-    ) -> Fragment {
-        match self.local_batch_aggregator.append_transactions(
+    async fn handle_batch(&mut self, batch: Batch) -> Option<PersistedValue> {
+        let author = batch.author();
+        let batch_id = batch.batch_id();
+        trace!(
+            "QS: got batch message from {} batch_id {}",
+            author,
             batch_id,
-            self.local_fragment_id,
-            fragment_payload.clone(),
-        ) {
-            Ok(()) => Fragment::new(
-                self.epoch,
-                batch_id,
-                self.local_fragment_id,
-                fragment_payload,
-                None,
-                self.my_peer_id,
-            ),
-            Err(e) => {
-                unreachable!(
-                    "[QuorumStore] Aggregation failed for own fragments with error {:?}",
-                    e
-                );
-            },
-        }
-    }
-
-    /// Finalize the batch & digest, synchronously by worker.
-    async fn handle_end_batch(
-        &mut self,
-        fragment_payload: Vec<SerializedTransaction>,
-        batch_id: BatchId,
-        expiration: LogicalTime,
-        proof_tx: ProofReturnChannel,
-    ) -> (BatchStoreCommand, Fragment) {
-        match self.local_batch_aggregator.end_batch(
-            batch_id,
-            self.local_fragment_id,
-            fragment_payload.clone(),
-        ) {
-            Ok((num_bytes, payload, digest)) => {
-                let fragment = Fragment::new(
-                    self.epoch,
-                    batch_id,
-                    self.local_fragment_id,
-                    fragment_payload,
-                    Some(expiration),
-                    self.my_peer_id,
-                );
-
-                self.proof_coordinator_tx
-                    .send(ProofCoordinatorCommand::InitProof(
-                        SignedDigestInfo::new(
-                            self.my_peer_id,
-                            digest,
-                            expiration,
-                            payload.len() as u64,
-                            num_bytes as u64,
-                        ),
-                        fragment.batch_id(),
-                        proof_tx,
-                    ))
-                    .await
-                    .expect("Failed to send to ProofBuilder");
-
-                let persist_request = PersistRequest::new(
-                    self.my_peer_id,
-                    payload.clone(),
-                    digest,
-                    num_bytes,
-                    expiration,
-                );
-                (BatchStoreCommand::Persist(persist_request), fragment)
-            },
-            Err(e) => {
-                unreachable!(
-                    "[QuorumStore] Aggregation failed for own fragments with error {:?}",
-                    e
-                );
-            },
-        }
-    }
-
-    async fn handle_fragment(&mut self, fragment: Fragment) {
-        let source = fragment.source();
-        let entry = self
-            .remote_batch_aggregators
-            .entry(source)
-            .or_insert_with(|| BatchAggregator::new(self.max_batch_bytes));
-        if let Some(expiration) = fragment.maybe_expiration() {
-            counters::DELIVERED_END_BATCH_COUNT.inc();
-            // end batch message
-            debug!(
-                "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
-                source,
-                fragment.batch_id(),
-                fragment.fragment_id(),
+        );
+        counters::RECEIVED_BATCH_COUNT.inc();
+        if batch.num_txns() > self.max_batch_txns {
+            warn!(
+                "Batch from {} exceeds txn limit {}, actual txns: {}",
+                author,
+                self.max_batch_txns,
+                batch.num_txns(),
             );
-            if expiration.epoch() == self.epoch {
-                match entry.end_batch(
-                    fragment.batch_id(),
-                    fragment.fragment_id(),
-                    fragment.into_transactions(),
-                ) {
-                    Ok((num_bytes, payload, digest)) => {
-                        let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
-                            source, payload, digest, num_bytes, expiration,
-                        ));
-                        self.batch_store_tx
-                            .send(persist_cmd)
-                            .await
-                            .expect("BatchStore receiver not available");
-                    },
-                    Err(e) => {
-                        debug!("Could not append batch from {:?}, error {:?}", source, e);
-                    },
-                }
-            }
-            // Malformed request with an inconsistent expiry epoch.
-            else {
-                debug!(
-                    "QS: got end batch message epoch {} {}",
-                    expiration.epoch(),
-                    self.epoch
-                );
-            }
-        } else if let Err(e) = entry.append_transactions(
-            fragment.batch_id(),
-            fragment.fragment_id(),
-            fragment.into_transactions(),
-        ) {
-            debug!("Could not append batch from {:?}, error {:?}", source, e);
+            return None;
         }
+        if batch.num_bytes() > self.max_batch_bytes {
+            warn!(
+                "Batch from {} exceeds size limit {}, actual size: {}",
+                author,
+                self.max_batch_bytes,
+                batch.num_bytes(),
+            );
+            return None;
+        }
+        Some(batch.into())
     }
 
-    pub(crate) async fn start(mut self) {
-        while let Some(command) = self.command_rx.recv().await {
+    fn persist_and_send_digests(&self, persist_requests: Vec<PersistedValue>) {
+        if persist_requests.is_empty() {
+            return;
+        }
+
+        let batch_store = self.batch_store.clone();
+        let network_sender = self.network_sender.clone();
+        let my_peer_id = self.my_peer_id;
+        tokio::spawn(async move {
+            let peer_id = persist_requests[0].author();
+            let signed_batch_infos = batch_store.persist(persist_requests);
+            if !signed_batch_infos.is_empty() {
+                if my_peer_id != peer_id {
+                    counters::RECEIVED_REMOTE_BATCHES_COUNT.inc_by(signed_batch_infos.len() as u64);
+                }
+                network_sender
+                    .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
+                    .await;
+            }
+        });
+    }
+
+    fn ensure_max_limits(&self, batches: &[Batch]) -> anyhow::Result<()> {
+        let mut total_txns = 0;
+        let mut total_bytes = 0;
+        for batch in batches.iter() {
+            ensure!(
+                batch.num_txns() <= self.max_batch_txns,
+                "Exceeds batch txn limit {} > {}",
+                batch.num_txns(),
+                self.max_batch_txns,
+            );
+            ensure!(
+                batch.num_bytes() <= self.max_batch_bytes,
+                "Exceeds batch bytes limit {} > {}",
+                batch.num_bytes(),
+                self.max_batch_bytes,
+            );
+
+            total_txns += batch.num_txns();
+            total_bytes += batch.num_bytes();
+        }
+        ensure!(
+            total_txns <= self.max_total_txns,
+            "Exceeds total txn limit {} > {}",
+            total_txns,
+            self.max_total_txns,
+        );
+        ensure!(
+            total_bytes <= self.max_total_bytes,
+            "Exceeds total bytes limit: {} > {}",
+            total_bytes,
+            self.max_total_bytes,
+        );
+
+        Ok(())
+    }
+
+    async fn handle_batches_msg(&mut self, batches: Vec<Batch>) {
+        if let Err(e) = self.ensure_max_limits(&batches) {
+            warn!("Batch from {}: {}", batches.first().unwrap().author(), e);
+            return;
+        }
+
+        let mut persist_requests = vec![];
+        for batch in batches.into_iter() {
+            if let Some(persist_request) = self.handle_batch(batch).await {
+                persist_requests.push(persist_request);
+            }
+        }
+        self.persist_and_send_digests(persist_requests);
+    }
+
+    pub(crate) async fn start(mut self, mut command_rx: Receiver<BatchCoordinatorCommand>) {
+        while let Some(command) = command_rx.recv().await {
             match command {
                 BatchCoordinatorCommand::Shutdown(ack_tx) => {
                     ack_tx
@@ -215,37 +164,8 @@ impl BatchCoordinator {
                         .expect("Failed to send shutdown ack to QuorumStoreCoordinator");
                     break;
                 },
-                BatchCoordinatorCommand::AppendToBatch(fragment_payload, batch_id) => {
-                    debug!("QS: append to batch cmd received, batch id {}", batch_id);
-                    let msg = self.handle_append_to_batch(fragment_payload, batch_id);
-                    self.network_sender.broadcast_fragment(msg).await;
-
-                    self.local_fragment_id += 1;
-                },
-                BatchCoordinatorCommand::EndBatch(
-                    fragment_payload,
-                    batch_id,
-                    logical_time,
-                    proof_tx,
-                ) => {
-                    debug!("QS: end batch cmd received, batch id = {}", batch_id);
-                    let (batch_store_command, fragment) = self
-                        .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
-                        .await;
-
-                    self.network_sender.broadcast_fragment(fragment).await;
-
-                    self.batch_store_tx
-                        .send(batch_store_command)
-                        .await
-                        .expect("Failed to send to BatchStore");
-
-                    counters::NUM_FRAGMENT_PER_BATCH.observe((self.local_fragment_id + 1) as f64);
-
-                    self.local_fragment_id = 0;
-                },
-                BatchCoordinatorCommand::RemoteFragment(fragment) => {
-                    self.handle_fragment(*fragment).await;
+                BatchCoordinatorCommand::NewBatches(batches) => {
+                    self.handle_batches_msg(batches).await;
                 },
             }
         }

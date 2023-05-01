@@ -12,6 +12,7 @@
 
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(clippy::too_many_arguments)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -97,25 +98,25 @@ pub enum EntryFunctionCall {
     /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
     /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-    /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
+    /// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
     /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
     /// `originating address` refers to an account's original/first address.
     ///
     /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
-    /// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
-    /// OriginatingAddress[new_addr_a] -> addr_a
+    /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
+    /// `OriginatingAddress[new_addr_a]` -> `addr_a`
     /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
-    /// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+    /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
     ///
     /// But Bob likes to mess with Alice.
-    /// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+    /// Bob creates an account `addr_b` and maliciously rotates it to Alice's new address `new_addr_a`. Since we are no longer checking a PoK,
     /// Bob can easily do this.
     ///
-    /// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
-    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
-    /// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+    /// Now, the table will be updated to make Alice's new address point to Bob's address: `OriginatingAddress[new_addr_a]` -> `addr_b`.
+    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) `addr_b` as her address.
+    /// Now Alice will give `addr_b` to everyone to pay her, but the money will go to Bob.
     ///
     /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
     /// to rotate his address to Alice's address in the first place.
@@ -240,6 +241,56 @@ pub enum EntryFunctionCall {
     /// available.
     CoinUpgradeSupply {
         coin_type: TypeTag,
+    },
+
+    /// Add `amount` of coins to the delegation pool `pool_address`.
+    DelegationPoolAddStake {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
+    /// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
+    /// to host the delegation pool resource and own the underlying stake pool.
+    /// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
+    DelegationPoolInitializeDelegationPool {
+        operator_commission_percentage: u64,
+        delegation_pool_creation_seed: Vec<u8>,
+    },
+
+    /// Move `amount` of coins from pending_inactive to active.
+    DelegationPoolReactivateStake {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Allows an owner to change the delegated voter of the underlying stake pool.
+    DelegationPoolSetDelegatedVoter {
+        new_voter: AccountAddress,
+    },
+
+    /// Allows an owner to change the operator of the underlying stake pool.
+    DelegationPoolSetOperator {
+        new_operator: AccountAddress,
+    },
+
+    /// Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
+    /// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
+    DelegationPoolSynchronizeDelegationPool {
+        pool_address: AccountAddress,
+    },
+
+    /// Unlock `amount` from the active + pending_active stake of `delegator` or
+    /// at most how much active stake there is on the stake pool.
+    DelegationPoolUnlock {
+        pool_address: AccountAddress,
+        amount: u64,
+    },
+
+    /// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
+    DelegationPoolWithdraw {
+        pool_address: AccountAddress,
+        amount: u64,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -423,7 +474,7 @@ pub enum EntryFunctionCall {
     /// account, and rotates the authentication key to either the optional auth key if it is
     /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
     /// this function adds additional resource ownership to the resource account and should only be
-    /// used for resource accounts that need access to Coin<AptosCoin>.
+    /// used for resource accounts that need access to `Coin<AptosCoin>`.
     ResourceAccountCreateResourceAccountAndFund {
         seed: Vec<u8>,
         optional_auth_key: Vec<u8>,
@@ -579,7 +630,8 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    /// Convenience function to allow a staker to update the commision percentage paid to the operator.
+    /// Convenience function to allow a staker to update the commission percentage paid to the operator.
+    /// TODO: fix the typo in function name. commision -> commission
     StakingContractUpdateCommision {
         operator: AccountAddress,
         new_commission_percentage: u64,
@@ -846,6 +898,38 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            DelegationPoolAddStake {
+                pool_address,
+                amount,
+            } => delegation_pool_add_stake(pool_address, amount),
+            DelegationPoolInitializeDelegationPool {
+                operator_commission_percentage,
+                delegation_pool_creation_seed,
+            } => delegation_pool_initialize_delegation_pool(
+                operator_commission_percentage,
+                delegation_pool_creation_seed,
+            ),
+            DelegationPoolReactivateStake {
+                pool_address,
+                amount,
+            } => delegation_pool_reactivate_stake(pool_address, amount),
+            DelegationPoolSetDelegatedVoter { new_voter } => {
+                delegation_pool_set_delegated_voter(new_voter)
+            },
+            DelegationPoolSetOperator { new_operator } => {
+                delegation_pool_set_operator(new_operator)
+            },
+            DelegationPoolSynchronizeDelegationPool { pool_address } => {
+                delegation_pool_synchronize_delegation_pool(pool_address)
+            },
+            DelegationPoolUnlock {
+                pool_address,
+                amount,
+            } => delegation_pool_unlock(pool_address, amount),
+            DelegationPoolWithdraw {
+                pool_address,
+                amount,
+            } => delegation_pool_withdraw(pool_address, amount),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -1293,25 +1377,25 @@ pub fn account_revoke_signer_capability(
 /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
 /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
 /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-/// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
+/// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
 /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
 /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
 /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
 /// `originating address` refers to an account's original/first address.
 ///
 /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
-/// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
-/// OriginatingAddress[new_addr_a] -> addr_a
+/// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
+/// `OriginatingAddress[new_addr_a]` -> `addr_a`
 /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
-/// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+/// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
 ///
 /// But Bob likes to mess with Alice.
-/// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+/// Bob creates an account `addr_b` and maliciously rotates it to Alice's new address `new_addr_a`. Since we are no longer checking a PoK,
 /// Bob can easily do this.
 ///
-/// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
-/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
-/// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+/// Now, the table will be updated to make Alice's new address point to Bob's address: `OriginatingAddress[new_addr_a]` -> `addr_b`.
+/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) `addr_b` as her address.
+/// Now Alice will give `addr_b` to everyone to pay her, but the money will go to Bob.
 ///
 /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
 /// to rotate his address to Alice's address in the first place.
@@ -1688,6 +1772,162 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Add `amount` of coins to the delegation pool `pool_address`.
+pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("add_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Initialize a delegation pool of custom fixed `operator_commission_percentage`.
+/// A resource account is created from `owner` signer and its supplied `delegation_pool_creation_seed`
+/// to host the delegation pool resource and own the underlying stake pool.
+/// Ownership over setting the operator/voter is granted to `owner` who has both roles initially.
+pub fn delegation_pool_initialize_delegation_pool(
+    operator_commission_percentage: u64,
+    delegation_pool_creation_seed: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("initialize_delegation_pool").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&operator_commission_percentage).unwrap(),
+            bcs::to_bytes(&delegation_pool_creation_seed).unwrap(),
+        ],
+    ))
+}
+
+/// Move `amount` of coins from pending_inactive to active.
+pub fn delegation_pool_reactivate_stake(
+    pool_address: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("reactivate_stake").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Allows an owner to change the delegated voter of the underlying stake pool.
+pub fn delegation_pool_set_delegated_voter(new_voter: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("set_delegated_voter").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_voter).unwrap()],
+    ))
+}
+
+/// Allows an owner to change the operator of the underlying stake pool.
+pub fn delegation_pool_set_operator(new_operator: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("set_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_operator).unwrap()],
+    ))
+}
+
+/// Synchronize delegation and stake pools: distribute yet-undetected rewards to the corresponding internal
+/// shares pools, assign commission to operator and eventually prepare delegation pool for a new lockup cycle.
+pub fn delegation_pool_synchronize_delegation_pool(
+    pool_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("synchronize_delegation_pool").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+/// Unlock `amount` from the active + pending_active stake of `delegator` or
+/// at most how much active stake there is on the stake pool.
+pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("unlock").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// Withdraw `amount` of owned inactive stake from the delegation pool at `pool_address`.
+pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("withdraw").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&pool_address).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
     ))
 }
 
@@ -2177,7 +2417,7 @@ pub fn resource_account_create_resource_account(
 /// account, and rotates the authentication key to either the optional auth key if it is
 /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
 /// this function adds additional resource ownership to the resource account and should only be
-/// used for resource accounts that need access to Coin<AptosCoin>.
+/// used for resource accounts that need access to `Coin<AptosCoin>`.
 pub fn resource_account_create_resource_account_and_fund(
     seed: Vec<u8>,
     optional_auth_key: Vec<u8>,
@@ -2669,7 +2909,8 @@ pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> T
     ))
 }
 
-/// Convenience function to allow a staker to update the commision percentage paid to the operator.
+/// Convenience function to allow a staker to update the commission percentage paid to the operator.
+/// TODO: fix the typo in function name. commision -> commission
 pub fn staking_contract_update_commision(
     operator: AccountAddress,
     new_commission_percentage: u64,
@@ -3481,6 +3722,99 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinUpgradeSupply {
                 coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolAddStake {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_initialize_delegation_pool(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolInitializeDelegationPool {
+                operator_commission_percentage: bcs::from_bytes(script.args().get(0)?).ok()?,
+                delegation_pool_creation_seed: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_reactivate_stake(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolReactivateStake {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_set_delegated_voter(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSetDelegatedVoter {
+                new_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSetOperator {
+                new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_synchronize_delegation_pool(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSynchronizeDelegationPool {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolUnlock {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolWithdraw {
+                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -4464,6 +4798,38 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "delegation_pool_add_stake".to_string(),
+            Box::new(decoder::delegation_pool_add_stake),
+        );
+        map.insert(
+            "delegation_pool_initialize_delegation_pool".to_string(),
+            Box::new(decoder::delegation_pool_initialize_delegation_pool),
+        );
+        map.insert(
+            "delegation_pool_reactivate_stake".to_string(),
+            Box::new(decoder::delegation_pool_reactivate_stake),
+        );
+        map.insert(
+            "delegation_pool_set_delegated_voter".to_string(),
+            Box::new(decoder::delegation_pool_set_delegated_voter),
+        );
+        map.insert(
+            "delegation_pool_set_operator".to_string(),
+            Box::new(decoder::delegation_pool_set_operator),
+        );
+        map.insert(
+            "delegation_pool_synchronize_delegation_pool".to_string(),
+            Box::new(decoder::delegation_pool_synchronize_delegation_pool),
+        );
+        map.insert(
+            "delegation_pool_unlock".to_string(),
+            Box::new(decoder::delegation_pool_unlock),
+        );
+        map.insert(
+            "delegation_pool_withdraw".to_string(),
+            Box::new(decoder::delegation_pool_withdraw),
         );
         map.insert(
             "managed_coin_burn".to_string(),
