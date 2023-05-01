@@ -23,7 +23,7 @@ pub(crate) trait VMAdapter {
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
     fn new_session<'r>(
-        &'r self,
+        &self,
         remote: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_>;

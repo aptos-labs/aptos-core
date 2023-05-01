@@ -73,11 +73,11 @@ impl MoveVmExt {
         })
     }
 
-    pub fn new_session<'s, S: MoveResolverExt>(
-        &'s self,
-        remote: &'s S,
+    pub fn new_session<'r, S: MoveResolverExt>(
+        &self,
+        remote: &'r S,
         session_id: SessionId,
-    ) -> SessionExt<'s, '_> {
+    ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()

@@ -1542,7 +1542,7 @@ impl VMValidator for AptosVM {
 
 impl VMAdapter for AptosVM {
     fn new_session<'r>(
-        &'r self,
+        &self,
         remote: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
