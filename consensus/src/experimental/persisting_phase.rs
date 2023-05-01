@@ -59,7 +59,7 @@ impl StatelessPipeline for PersistingPhase {
     type Request = PersistingRequest;
     type Response = PersistingResponse;
 
-    async fn process(&self, req: PersistingRequest) -> PersistingResponse {
+    async fn process(&mut self, req: PersistingRequest) -> PersistingResponse {
         let PersistingRequest {
             blocks,
             commit_ledger_info,

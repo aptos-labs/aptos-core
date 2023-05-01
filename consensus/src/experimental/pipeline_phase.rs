@@ -15,7 +15,7 @@ use std::sync::{
 pub trait StatelessPipeline: Send + Sync {
     type Request;
     type Response;
-    async fn process(&self, req: Self::Request) -> Self::Response;
+    async fn process(&mut self, req: Self::Request) -> Self::Response;
 }
 
 struct TaskGuard {

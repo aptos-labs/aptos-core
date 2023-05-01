@@ -55,6 +55,10 @@ impl ExecutedBlock {
         &self.block
     }
 
+    pub fn into_block(self) -> Block {
+        self.block
+    }
+
     pub fn id(&self) -> HashValue {
         self.block().id()
     }

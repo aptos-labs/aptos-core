@@ -6,7 +6,7 @@ use crate::{experimental::pipeline_phase::StatelessPipeline, state_replication::
 use anyhow::Result;
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::Error as ExecutionError;
+use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
 use async_trait::async_trait;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -42,11 +42,15 @@ pub struct ExecutionResponse {
 
 pub struct ExecutionPhase {
     execution_proxy: Arc<dyn StateComputer>,
+    last_output: Option<StateComputeResult>,
 }
 
 impl ExecutionPhase {
     pub fn new(execution_proxy: Arc<dyn StateComputer>) -> Self {
-        Self { execution_proxy }
+        Self {
+            execution_proxy,
+            last_output: None,
+        }
     }
 }
 
@@ -55,7 +59,7 @@ impl StatelessPipeline for ExecutionPhase {
     type Request = ExecutionRequest;
     type Response = ExecutionResponse;
 
-    async fn process(&self, req: ExecutionRequest) -> ExecutionResponse {
+    async fn process(&mut self, req: ExecutionRequest) -> ExecutionResponse {
         let ExecutionRequest { ordered_blocks } = req;
 
         if ordered_blocks.is_empty() {
@@ -70,9 +74,17 @@ impl StatelessPipeline for ExecutionPhase {
         let mut result = vec![];
 
         for b in ordered_blocks {
+            // bypass reconfig suffix blocks with the same result
+            if let Some(prev_output) = &self.last_output {
+                if prev_output.has_reconfiguration() {
+                    result.push(ExecutedBlock::new(b.into_block(), prev_output.clone()));
+                    continue;
+                }
+            }
             match self.execution_proxy.compute(b.block(), b.parent_id()).await {
                 Ok(compute_result) => {
-                    result.push(ExecutedBlock::new(b.block().clone(), compute_result));
+                    self.last_output = Some(compute_result.clone());
+                    result.push(ExecutedBlock::new(b.into_block(), compute_result));
                 },
                 Err(e) => {
                     return ExecutionResponse {

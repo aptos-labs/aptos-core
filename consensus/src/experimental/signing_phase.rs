@@ -61,7 +61,7 @@ impl StatelessPipeline for SigningPhase {
     type Request = SigningRequest;
     type Response = SigningResponse;
 
-    async fn process(&self, req: SigningRequest) -> SigningResponse {
+    async fn process(&mut self, req: SigningRequest) -> SigningResponse {
         let SigningRequest {
             ordered_ledger_info,
             commit_ledger_info,
