@@ -47,6 +47,7 @@ members = [
     "crates/aptos-faucet/core",
     "crates/aptos-faucet/metrics-server",
     "crates/aptos-faucet/service",
+    "crates/aptos-api-gateway",
     "crates/aptos-genesis",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
@@ -273,6 +274,7 @@ aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
+aptos-api-gateway = { path = "crates/aptos-api-gateway" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }

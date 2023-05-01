@@ -18,6 +18,16 @@ pub struct MetricsServerConfig {
     pub listen_port: u16,
 }
 
+impl Default for MetricsServerConfig {
+    fn default() -> Self {
+        Self {
+            disable: Self::default_disable(),
+            listen_address: Self::default_listen_address(),
+            listen_port: Self::default_listen_port(),
+        }
+    }
+}
+
 impl MetricsServerConfig {
     fn default_disable() -> bool {
         false
