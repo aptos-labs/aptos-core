@@ -89,15 +89,15 @@ use once_cell::sync::Lazy;
     .expect("Use directive failed");
 
     // write out package metadata
-    write_pacakge_simple(&mut generic_mod);
+    write_pacakge(&mut generic_mod, "simple");
     Ok(())
 }
 
-// Write out package `Simple`
-fn write_pacakge_simple(file: &mut File) {
+// Write out given package
+fn write_pacakge(file: &mut File, package_name: &str) {
     // build GenericModule
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let path = base_dir.join("src/packages/simple/");
+    let path = base_dir.join(format!("src/packages/{}/", package_name));
     let package =
         BuiltPackage::build(path, BuildOptions::default()).expect("building package must succeed");
     let code = package.extract_code();
@@ -105,7 +105,9 @@ fn write_pacakge_simple(file: &mut File) {
     let metadata = bcs::to_bytes(&package_metadata).expect("Metadata must serialize");
 
     // write out package metadata
-    write_lazy(file, "PACKAGE_METADATA_SIMPLE", &metadata);
+    write_lazy(file, "PACKAGE_METADATA", &metadata);
+
+    let mut module_names = Vec::new();
 
     // write out all modules
     for module in &code {
@@ -117,7 +119,23 @@ fn write_pacakge_simple(file: &mut File) {
         let name = format!("MODULE_{}", module_name.to_uppercase());
         writeln!(file).expect("Empty line failed");
         write_lazy(file, name.as_str(), module);
+        module_names.push(name);
     }
+
+    writeln!(file).expect("Empty line failed");
+    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
+    // Write accessors:
+    writeln!(
+        file,
+        "pub static MODULES: Lazy<Vec<Vec<u8>>> = Lazy::new(|| {{ vec![",
+    )
+    .expect("Lazy MODULES declaration failed");
+
+    for module_name in module_names {
+        writeln!(file, "\t{}.to_vec(),", module_name).expect("Module name declaration failed");
+    }
+
+    writeln!(file, "]}});").expect("Lazy declaration closing } failed");
 }
 
 // Write out a `Lazy` declaration

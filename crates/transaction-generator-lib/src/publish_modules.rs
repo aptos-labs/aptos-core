@@ -74,7 +74,7 @@ impl PublishPackageCreator {
     pub fn new(txn_factory: TransactionFactory) -> Self {
         Self {
             txn_factory,
-            package_handler: Arc::new(RwLock::new(PackageHandler::new())),
+            package_handler: Arc::new(RwLock::new(PackageHandler::new("simple"))),
         }
     }
 }

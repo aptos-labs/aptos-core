@@ -84,7 +84,7 @@ impl CallCustomModulesCreator {
         let mut rng = StdRng::from_entropy();
         assert!(accounts.len() >= num_modules);
         let mut publish_requests = Vec::with_capacity(accounts.len());
-        let mut package_handler = PackageHandler::new();
+        let mut package_handler = PackageHandler::new(entry_point.package_name());
         let mut packages = Vec::new();
         for account in accounts.iter_mut().take(num_modules) {
             let package = package_handler.pick_package(&mut rng, account);
