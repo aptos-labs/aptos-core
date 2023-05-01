@@ -415,6 +415,31 @@ module aptos_framework::vesting {
     }
 
     #[view]
+    /// Return the total amount of upcoming rewards.
+    /// In order to receive all upcoming rewards, the rewards may need to be unlocked via unlock_rewards(), 
+    /// and will need to be distributed via distribute().
+    /// 
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun total_upcoming_rewards(vesting_contract_address: address): u64 acquires VestingContract {
+        let total_distributable_rewards = total_distributable_rewards(vesting_contract_address);
+        let total_accumulated_rewards = total_accumulated_rewards(vesting_contract_address);
+        total_distributable_rewards + total_accumulated_rewards
+    }
+
+    #[view]
+    /// Return the amount of upcoming rewards that can be received by the sharholder/beneficiary.
+    /// In order to receive all upcoming rewards, the rewards may need to be unlocked via unlock_rewards(), 
+    /// and will need to be distributed via distribute().
+    /// 
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun upcoming_rewards(
+        vesting_contract_address: address, shareholder_or_beneficiary: address): u64 acquires VestingContract {
+        let distributable_rewards = distributable_rewards(vesting_contract_address, shareholder_or_beneficiary);
+        let accumulated_rewards = accumulated_rewards(vesting_contract_address, shareholder_or_beneficiary);
+        distributable_rewards + accumulated_rewards
+    }
+
+    #[view]
     /// Return the list of all shareholders in the vesting contract.
     public fun shareholders(vesting_contract_address: address): vector<address> acquires VestingContract {
         assert_active_vesting_contract(vesting_contract_address);
