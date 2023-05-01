@@ -1,15 +1,20 @@
 ---
-title: "Delegation Staking"
-slug: " Delegation staking"
+title: "Delegated Staking"
+slug: " Delegated staking"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Delegation Staking
+# Delegated Staking
 
-## Delegation Staking on the Aptos blockchain
+## Delegated Staking on the Aptos blockchain
 
-Delegation staking is an extension of the staking protocol on Aptos. A delegation pool abstracts the stake owner to an entity capable of collecting stake from delegators and adding it on their behalf to the native stake pool attached to the validator. This means that multiple entities can stake to a stake pool to reach the minimum requirement for the validator to join the validator set. Delegators can add stake to an inactive pool, but the delegation pool will not earn rewards until it is active. 
+:::tip Consensus We strongly recommend that you read the consensus section of Aptos Blockchain Deep Dive before proceeding further. :::
+
+Delegated staking is an extension of the staking protocol on Aptos. A delegation pool abstracts the stake owner to an entity capable of collecting stake from delegators and adding it on their behalf to the native stake pool attached to the validator. This means that multiple entities can stake to a stake pool to reach the minimum requirement for the validator to join the validator set. Delegators can add stake to an inactive pool, but the delegation pool will not earn rewards until it is active. 
+
+:::danger Delegation pools are permissionless and anyone can stake to the validator. You cannot change the type of stake pool once it's created. For full ownership of the stake pool, see [Staking](../concepts/staking.md)
+::: 
 
 See [delegation_pool.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/delegation_pool.move) 
 
@@ -113,7 +118,7 @@ Lockup cannot be reset.
 
 ## Rewards
 
-Rewards for delegation staking are calculated by using:
+Rewards for delegated staking are calculated by using:
 
 1. The rewards_rate, an annual percentage yield (APY), i.e., rewards accrue as a compound interest on your current staked amount.
 2. Delegator stake
