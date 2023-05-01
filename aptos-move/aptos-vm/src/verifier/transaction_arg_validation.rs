@@ -6,10 +6,7 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{
-    move_vm_ext::{MoveResolverExt, SessionExt},
-    VMStatus,
-};
+use crate::{move_vm_ext::SessionExt, VMStatus};
 use move_binary_format::{errors::VMError, file_format_common::read_uleb128_as_u64};
 use move_core_types::{
     account_address::AccountAddress,

@@ -4,7 +4,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::{AsMoveResolver, IntoMoveResolver, MoveResolverWithVMMetadata, StorageAdapter},
+    data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
@@ -22,8 +22,8 @@ use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
-        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
+        ApprovedExecutionHashes, ConfigurationResource, Features, GasSchedule, GasScheduleV2,
+        OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},

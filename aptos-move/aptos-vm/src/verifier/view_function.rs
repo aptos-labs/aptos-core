@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{MoveResolverExt, SessionExt},
+    move_vm_ext::SessionExt,
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
 use aptos_framework::RuntimeModuleMetadataV1;

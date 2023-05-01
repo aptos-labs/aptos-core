@@ -5,15 +5,13 @@ use aptos_framework::{natives::state_storage::StateStorageUsageResolver, Runtime
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::aptos_try;
-use move_binary_format::errors::{Location, PartialVMError, VMError};
+use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     resolver::MoveResolver,
-    vm_status::StatusCode,
 };
 use move_table_extension::TableResolver;
-use std::collections::BTreeMap;
 
 fn get_resource_group_from_metadata(
     struct_tag: &StructTag,

@@ -15,7 +15,6 @@ use move_core_types::{
     metadata::Metadata,
 };
 use move_vm_runtime::move_vm::MoveVM;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;

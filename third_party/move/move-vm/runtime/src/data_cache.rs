@@ -9,7 +9,7 @@ use move_core_types::{
     effects::{AccountChangeSet, ChangeSet, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, TypeTag},
     resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,

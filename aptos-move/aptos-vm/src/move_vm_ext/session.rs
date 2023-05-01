@@ -34,7 +34,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
