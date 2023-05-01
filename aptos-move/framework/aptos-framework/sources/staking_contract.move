@@ -215,11 +215,47 @@ module aptos_framework::staking_contract {
     #[view]
     /// Return the number of pending distributions (e.g. commission, withdrawals from stakers).
     ///
-    /// This errors out the staking contract with the provided staker and operator doesn't exist.
+    /// This errors out if the staking contract with the provided staker and operator doesn't exist.
     public fun pending_distribution_counts(staker: address, operator: address): u64 acquires Store {
         assert_staking_contract_exists(staker, operator);
         let staking_contracts = &borrow_global<Store>(staker).staking_contracts;
         pool_u64::shareholders_count(&simple_map::borrow(staking_contracts, &operator).distribution_pool)
+    }
+
+    #[view]
+    /// Return the amount that will be split between all stakers the next time distribute() is called.
+    ///
+    /// This errors out if the staking contract with the provided staker and operator doesn't exist.
+    public fun total_distributable_amount(staker: address, operator: address): u64 acquires Store {
+        assert_staking_contract_exists(staker, operator);
+        let store = borrow_global_mut<Store>(staker);
+        let staking_contract = simple_map::borrow(&store.staking_contracts, &operator);
+        let pool_address = staking_contract.pool_address;
+        let (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
+        inactive + pending_inactive
+    }
+
+    #[view]
+    /// Return the amount that will be disbursed to the staker the next time distribute() is called.
+    ///
+    /// This errors out if the staking contract with the provided staker and operator doesn't exist.
+    public fun distributable_amount(staker: address, operator: address): u64 acquires Store {
+        let total_distributable_amount = total_distributable_amount(staker, copy operator);
+        assert_staking_contract_exists(staker, operator);
+        let store = borrow_global_mut<Store>(staker);
+        let staking_contract = simple_map::borrow(&store.staking_contracts, &operator);
+        let shares = pool_u64::shares(&staking_contract.distribution_pool, staker);     
+        let new_staker_balance =
+            pool_u64::shares_to_amount_with_total_coins(
+                &staking_contract.distribution_pool, 
+                shares, 
+                total_distributable_amount
+            );
+
+        let old_staker_balance = pool_u64::balance(&staking_contract.distribution_pool, staker);
+        let commission = 
+            (new_staker_balance - old_staker_balance) * staking_contract.commission_percentage / 100;
+        new_staker_balance - commission
     }
 
     #[view]
@@ -825,10 +861,13 @@ module aptos_framework::staking_contract {
         expected_commission_1 = with_rewards(expected_commission_1);
         new_balance = with_rewards(new_balance);
         stake::assert_stake_pool(pool_address, new_balance, expected_commission_1, 0, 0);
+
+        let predicted_distribution_1 = total_distributable_amount(staker_address, operator_address);
         distribute(staker_address, operator_address);
         let operator_balance = coin::balance<AptosCoin>(operator_address);
         let expected_operator_balance = INITIAL_BALANCE + expected_commission_1;
         assert!(operator_balance == expected_operator_balance, operator_balance);
+        assert!(predicted_distribution_1 == expected_commission_1, predicted_distribution_1);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
         assert_no_pending_distributions(staker_address, operator_address);
 
@@ -851,10 +890,13 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
         stake::fast_forward_to_unlock(pool_address);
         expected_commission_2 = with_rewards(expected_commission_2);
+
+        let predicted_distribution_2 = total_distributable_amount(staker_address, operator_address);
         distribute(staker_address, operator_address);
         operator_balance = coin::balance<AptosCoin>(operator_address);
         expected_operator_balance = expected_operator_balance + expected_commission_2;
         assert!(operator_balance == expected_operator_balance, operator_balance);
+        assert!(predicted_distribution_2 == expected_commission_2, predicted_distribution_2);
         assert_no_pending_distributions(staker_address, operator_address);
         new_balance = with_rewards(new_balance);
 
@@ -881,6 +923,7 @@ module aptos_framework::staking_contract {
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE, 0);
 
         // Distribute and verify balances.
+        let predicted_distribution_3 = total_distributable_amount(staker_address, operator_address);
         distribute(staker_address, operator_address);
         assert_no_pending_distributions(staker_address, operator_address);
         operator_balance = coin::balance<AptosCoin>(operator_address);
@@ -888,6 +931,7 @@ module aptos_framework::staking_contract {
         let staker_balance = coin::balance<AptosCoin>(staker_address);
         // Staker receives the extra dust due to rounding error.
         assert!(staker_balance == withdrawn_amount + 1, staker_balance);
+        assert!(predicted_distribution_3 == unpaid_commission + withdrawn_amount + 1, predicted_distribution_3);
         assert_no_pending_distributions(staker_address, operator_address);
     }
 

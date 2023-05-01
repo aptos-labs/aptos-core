@@ -28,6 +28,26 @@ spec aptos_framework::staking_contract {
         include GetStakingContractAmountsAbortsIf{staking_contract};
     }
 
+    spec total_distributable_amount(staker: address, operator: address): u64 {
+        let staking_contracts = global<Store>(staker).staking_contracts;
+        let staking_contract = simple_map::spec_get(staking_contracts, operator);
+        let pool_address = staking_contract.pool_address;
+        let stake_pool = global<stake::StakePool>(pool_address);
+        let pending_active = coin::value(stake_pool.pending_inactive);
+        let inactive = coin::value(stake_pool.inactive);
+
+        aborts_if !exists<Store>(staker);
+        aborts_if !exists<stake::StakePool>(pool_address);
+        aborts_if inactive + pending_active > MAX_U64;
+        include StakingContractExistsAbortsIf;
+        ensures result == pending_active + inactive;
+    }
+
+    spec distributable_amount(staker: address, operator: address): u64 {
+        // TODO: Verification timeout
+        pragma verify = false;
+    }
+
     /// Staking_contract exists the stacker/operator pair.
     spec pending_distribution_counts(staker: address, operator: address): u64 {
         include StakingContractExistsAbortsIf;

@@ -225,6 +225,10 @@ spec aptos_framework::stake {
         ensures (forall i in old(len(v1))..len(v1): v1[i] == old(v2[len(v2) - (i - len(v1)) - 1]));
     }
 
+    spec get_stake(pool_address: address): (u64, u64, u64, u64) {
+        aborts_if !stake_pool_exists(pool_address);
+    }
+
     spec remove_validators {
         requires chain_status::is_operating();
     }

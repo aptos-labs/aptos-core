@@ -380,6 +380,41 @@ module aptos_framework::vesting {
     }
 
     #[view]
+    /// Return the total amount of rewards that will be disbursed by the vesting contract the next time distribute() is called.
+    /// 
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun total_distributable_rewards(vesting_contract_address: address): u64 acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        staking_contract::distributable_amount(vesting_contract_address, vesting_contract.staking.operator)
+    }
+
+    #[view]
+    /// Return the amount of rewards that will be disbursed by the vesting contract the next time distribute() is called. 
+    /// This function only returns rewards disbursed by the vesting contract, which means if the operator
+    /// is also a shareholder, the result will not include commission.
+    /// Caller can pass in the beneficiary address or the shareholder address.
+    /// 
+    /// This errors out if the vesting contract with the provided address doesn't exist.
+    public fun distributable_rewards(
+        vesting_contract_address: address, shareholder_or_beneficiary: address): u64 acquires VestingContract {
+        assert_active_vesting_contract(vesting_contract_address);
+        
+        let shareholder = shareholder(vesting_contract_address, shareholder_or_beneficiary);
+        let vesting_contract = borrow_global<VestingContract>(vesting_contract_address);
+        let operator = vesting_contract.staking.operator;
+
+        let vesting_contract_distributable_rewards = staking_contract::distributable_amount(vesting_contract_address, operator);        
+        let staker_share_of_vesting_contract = pool_u64::shares(&vesting_contract.grant_pool, shareholder);
+        pool_u64::shares_to_amount_with_total_coins(
+            &vesting_contract.grant_pool, 
+            staker_share_of_vesting_contract, 
+            vesting_contract_distributable_rewards
+        )
+    }
+
+    #[view]
     /// Return the list of all shareholders in the vesting contract.
     public fun shareholders(vesting_contract_address: address): vector<address> acquires VestingContract {
         assert_active_vesting_contract(vesting_contract_address);
@@ -1413,10 +1448,72 @@ module aptos_framework::vesting {
         let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
         staker_rewards = with_rewards(staker_rewards) - commission_on_staker_rewards;
         commission = with_rewards(commission) + commission_on_staker_rewards;
+
+        let predicted_total_distributable_rewards = total_distributable_rewards(contract_address);
+        let predicted_shareholder_distributable_rewards = distributable_rewards(contract_address, shareholder_address);
         distribute(contract_address);
+
         // Rounding error leads to a dust amount of 1 transferred to the staker.
         assert!(coin::balance<AptosCoin>(shareholder_address) == staker_rewards + 1, 0);
         assert!(coin::balance<AptosCoin>(operator_address) == commission - 1, 1);
+        assert!(predicted_total_distributable_rewards == staker_rewards, 2);
+        assert!(predicted_shareholder_distributable_rewards == staker_rewards, 3);
+    }
+
+    #[test(aptos_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x789, operator = @0x345)]
+    public entry fun test_distributable_rewards_with_multiple_stakers(
+        aptos_framework: &signer,
+        admin: &signer,
+        shareholder_1: &signer,
+        shareholder_2: &signer,
+        operator: &signer,
+    ) acquires AdminStore, VestingContract {
+        let admin_address = signer::address_of(admin);
+        let operator_address = signer::address_of(operator);
+        let shareholder_1_address = signer::address_of(shareholder_1);
+        let shareholder_2_address = signer::address_of(shareholder_2);
+        setup(aptos_framework, &vector[admin_address, shareholder_1_address, shareholder_2_address, operator_address]);
+        let contract_address = setup_vesting_contract(
+            admin, &vector[shareholder_1_address, shareholder_2_address], &vector[GRANT_AMOUNT / 4, GRANT_AMOUNT * 3 / 4], admin_address, 0);
+        assert!(operator_commission_percentage(contract_address) == 0, 0);
+
+        // 10% commission will be paid to the operator.
+        update_operator(admin, contract_address, operator_address, 10);
+        assert!(operator_commission_percentage(contract_address) == 10, 0);
+
+        // Operator needs to join the validator set for the stake pool to earn rewards.
+        let stake_pool_address = stake_pool_address(contract_address);
+        let (_sk, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+
+        // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
+        stake::end_epoch();
+        let accumulated_rewards = get_accumulated_rewards(contract_address);
+        let commission = accumulated_rewards / 10; // 10%.
+        let staker_rewards = accumulated_rewards - commission;
+        unlock_rewards(contract_address);
+        stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, accumulated_rewards);
+        assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
+
+        // Distribution should pay commission to operator first and remaining amount to shareholders.
+        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
+        // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
+        let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
+        staker_rewards = with_rewards(staker_rewards) - commission_on_staker_rewards;
+        commission = with_rewards(commission) + commission_on_staker_rewards;
+
+        let predicted_total_distributable_rewards = total_distributable_rewards(contract_address);
+        let predicted_shareholder_1_distributable_rewards = distributable_rewards(contract_address, shareholder_1_address);
+        let predicted_shareholder_2_distributable_rewards = distributable_rewards(contract_address, shareholder_2_address);
+        distribute(contract_address);
+    
+        // Rounding error leads to a dust amount of 1 transferred to the staker.
+        assert!(coin::balance<AptosCoin>(operator_address) == commission - 1, 1);
+        assert!(predicted_total_distributable_rewards == staker_rewards, 2);
+        assert!(staker_rewards == predicted_shareholder_1_distributable_rewards + predicted_shareholder_2_distributable_rewards, 4);
+        assert!(coin::balance<AptosCoin>(shareholder_1_address) == predicted_shareholder_1_distributable_rewards, 5);
+        assert!(coin::balance<AptosCoin>(shareholder_2_address) == predicted_shareholder_2_distributable_rewards, 6);        
     }
 
     #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234, operator = @0x345)]

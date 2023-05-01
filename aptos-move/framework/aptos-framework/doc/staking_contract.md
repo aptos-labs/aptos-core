@@ -51,6 +51,7 @@ pool.
 -  [Function `commission_percentage`](#0x1_staking_contract_commission_percentage)
 -  [Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
 -  [Function `pending_distribution_counts`](#0x1_staking_contract_pending_distribution_counts)
+-  [Function `total_distributable_amount`](#0x1_staking_contract_total_distributable_amount)
 -  [Function `staking_contract_exists`](#0x1_staking_contract_staking_contract_exists)
 -  [Function `create_staking_contract`](#0x1_staking_contract_create_staking_contract)
 -  [Function `create_staking_contract_with_coins`](#0x1_staking_contract_create_staking_contract_with_coins)
@@ -78,6 +79,7 @@ pool.
     -  [Function `commission_percentage`](#@Specification_1_commission_percentage)
     -  [Function `staking_contract_amounts`](#@Specification_1_staking_contract_amounts)
     -  [Function `pending_distribution_counts`](#@Specification_1_pending_distribution_counts)
+    -  [Function `total_distributable_amount`](#@Specification_1_total_distributable_amount)
     -  [Function `staking_contract_exists`](#@Specification_1_staking_contract_exists)
     -  [Function `create_staking_contract`](#@Specification_1_create_staking_contract)
     -  [Function `create_staking_contract_with_coins`](#@Specification_1_create_staking_contract_with_coins)
@@ -968,7 +970,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 Return the number of pending distributions (e.g. commission, withdrawals from stakers).
 
-This errors out the staking contract with the provided staker and operator doesn't exist.
+This errors out if the staking contract with the provided staker and operator doesn't exist.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
@@ -984,6 +986,38 @@ This errors out the staking contract with the provided staker and operator doesn
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
     <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
     <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders_count">pool_u64::shareholders_count</a>(&<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(staking_contracts, &operator).distribution_pool)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_staking_contract_total_distributable_amount"></a>
+
+## Function `total_distributable_amount`
+
+Return the amount that will be split between all stakers the next time distribute() is called.
+
+This errors out if the staking contract with the provided staker and operator doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_total_distributable_amount">total_distributable_amount</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_total_distributable_amount">total_distributable_amount</a>(staker: <b>address</b>, operator: <b>address</b>): u64 <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+    <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
+    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&store.staking_contracts, &operator);
+    <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
+    <b>let</b> (_, inactive, _, pending_inactive) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
+    inactive + pending_inactive
 }
 </code></pre>
 
@@ -2023,6 +2057,31 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>include</b> <a href="staking_contract.md#0x1_staking_contract_StakingContractExistsAbortsIf">StakingContractExistsAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_total_distributable_amount"></a>
+
+### Function `total_distributable_amount`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_total_distributable_amount">total_distributable_amount</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+<b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(staking_contracts, operator);
+<b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
+<b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>let</b> pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.pending_inactive);
+<b>let</b> inactive = <a href="coin.md#0x1_coin_value">coin::value</a>(stake_pool.inactive);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>aborts_if</b> inactive + pending_active &gt; MAX_U64;
+<b>include</b> <a href="staking_contract.md#0x1_staking_contract_StakingContractExistsAbortsIf">StakingContractExistsAbortsIf</a>;
 </code></pre>
 
 

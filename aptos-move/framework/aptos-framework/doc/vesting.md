@@ -33,6 +33,10 @@
 -  [Function `vesting_schedule`](#0x1_vesting_vesting_schedule)
 -  [Function `total_accumulated_rewards`](#0x1_vesting_total_accumulated_rewards)
 -  [Function `accumulated_rewards`](#0x1_vesting_accumulated_rewards)
+-  [Function `total_distributable_rewards`](#0x1_vesting_total_distributable_rewards)
+-  [Function `distributable_rewards`](#0x1_vesting_distributable_rewards)
+-  [Function `total_upcoming_rewards`](#0x1_vesting_total_upcoming_rewards)
+-  [Function `upcoming_rewards`](#0x1_vesting_upcoming_rewards)
 -  [Function `shareholders`](#0x1_vesting_shareholders)
 -  [Function `shareholder`](#0x1_vesting_shareholder)
 -  [Function `create_vesting_schedule`](#0x1_vesting_create_vesting_schedule)
@@ -1402,8 +1406,9 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `total_accumulated_rewards`
 
-Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.
+Return the total accumulated rewards that can be unlocked for distribution to shareholders of the vesting contract.
 This excludes any unpaid commission that the operator has not collected.
+Calling unlock_stake() will allow these rewards to be distributed.
 
 This errors out if the vesting contract with the provided address doesn't exist.
 
@@ -1435,7 +1440,8 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 ## Function `accumulated_rewards`
 
-Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass
+Return the accumulated rewards that can be unlocked for shareholder distribution.
+Calling unlock_stake() will allow these rewards to be distributed. Caller can also pass
 the beneficiary address instead of shareholder address.
 
 This errors out if the vesting contract with the provided address doesn't exist.
@@ -1459,6 +1465,134 @@ This errors out if the vesting contract with the provided address doesn't exist.
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
     <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(&vesting_contract.grant_pool, shareholder);
     <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount_with_total_coins">pool_u64::shares_to_amount_with_total_coins</a>(&vesting_contract.grant_pool, shares, total_accumulated_rewards)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vesting_total_distributable_rewards"></a>
+
+## Function `total_distributable_rewards`
+
+Return the total amount of rewards that will be disbursed the next time distribute() is called.
+
+This errors out if the vesting contract with the provided address doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_distributable_rewards">total_distributable_rewards</a>(vesting_contract_address: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_distributable_rewards">total_distributable_rewards</a>(vesting_contract_address: <b>address</b>): u64 <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <a href="vesting.md#0x1_vesting_assert_active_vesting_contract">assert_active_vesting_contract</a>(vesting_contract_address);
+
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+    <a href="staking_contract.md#0x1_staking_contract_total_distributable_amount">staking_contract::total_distributable_amount</a>(vesting_contract_address, vesting_contract.staking.operator)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vesting_distributable_rewards"></a>
+
+## Function `distributable_rewards`
+
+Return the amount of rewards that will be disbursed the next time distribute() is called. Caller can pass in
+the beneficiary address or the shareholder address.
+
+This errors out if the vesting contract with the provided address doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_distributable_rewards">distributable_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_distributable_rewards">distributable_rewards</a>(
+    vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64 <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <a href="vesting.md#0x1_vesting_assert_active_vesting_contract">assert_active_vesting_contract</a>(vesting_contract_address);
+
+    <b>let</b> total_distributable_rewards = <a href="vesting.md#0x1_vesting_total_distributable_rewards">total_distributable_rewards</a>(vesting_contract_address); // minus commission ???
+    <b>let</b> shareholder = <a href="vesting.md#0x1_vesting_shareholder">shareholder</a>(vesting_contract_address, shareholder_or_beneficiary);
+    <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
+    <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(&vesting_contract.grant_pool, shareholder);
+    <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount_with_total_coins">pool_u64::shares_to_amount_with_total_coins</a>(&vesting_contract.grant_pool, shares, total_distributable_rewards)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vesting_total_upcoming_rewards"></a>
+
+## Function `total_upcoming_rewards`
+
+Return the total amount of upcoming rewards.
+In order to receive all upcoming rewards, the rewards may need to be unlocked via unlock_rewards(),
+and will need to be distributed via distribute().
+
+This errors out if the vesting contract with the provided address doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_upcoming_rewards">total_upcoming_rewards</a>(vesting_contract_address: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_total_upcoming_rewards">total_upcoming_rewards</a>(vesting_contract_address: <b>address</b>): u64 <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> total_distributable_rewards = <a href="vesting.md#0x1_vesting_total_distributable_rewards">total_distributable_rewards</a>(vesting_contract_address);
+    <b>let</b> total_accumulated_rewards = <a href="vesting.md#0x1_vesting_total_accumulated_rewards">total_accumulated_rewards</a>(vesting_contract_address);
+    total_distributable_rewards + total_accumulated_rewards
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vesting_upcoming_rewards"></a>
+
+## Function `upcoming_rewards`
+
+Return the amount of upcoming rewards that can be received by the sharholder/beneficiary.
+In order to receive all upcoming rewards, the rewards may need to be unlocked via unlock_rewards(),
+and will need to be distributed via distribute().
+
+This errors out if the vesting contract with the provided address doesn't exist.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_upcoming_rewards">upcoming_rewards</a>(vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vesting.md#0x1_vesting_upcoming_rewards">upcoming_rewards</a>(
+    vesting_contract_address: <b>address</b>, shareholder_or_beneficiary: <b>address</b>): u64 <b>acquires</b> <a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a> {
+    <b>let</b> distributable_rewards = <a href="vesting.md#0x1_vesting_distributable_rewards">distributable_rewards</a>(vesting_contract_address, shareholder_or_beneficiary);
+    <b>let</b> accumulated_rewards = <a href="vesting.md#0x1_vesting_accumulated_rewards">accumulated_rewards</a>(vesting_contract_address, shareholder_or_beneficiary);
+    distributable_rewards + accumulated_rewards
 }
 </code></pre>
 
