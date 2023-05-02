@@ -14,10 +14,10 @@ if (ExecutionEnvironment.canUseViewport) {
   window.addEventListener("hashchange", shiftWindow);
 }
 
-const root = "https://raw.githubusercontent.com/aptos-labs/aptos-core/";
+const root = "https://raw.githubusercontent.com/stefanmendoza/aptos-core/";
 const url_root = "/reference/move";
 
-const branches = ["mainnet", "testnet", "devnet", "main"];
+const branches = ["mainnet", "testnet", "devnet", "stefanmendoza/update-delegation-pool-docs"];
 
 const branch_titles = ["Mainnet", "Testnet", "Devnet", "Main"];
 
@@ -40,7 +40,12 @@ const TopNav = ({ branch }: TopNavProps) => {
       <div branch="devnet" className="move-top-bar-button" key="devnet" onClick={adjustBranch}>
         Devnet
       </div>
-      <div branch="main" className="move-top-bar-button" key="main" onClick={adjustBranch}>
+      <div
+        branch="stefanmendoza/update-delegation-pool-docs"
+        className="move-top-bar-button"
+        key="stefanmendoza/update-delegation-pool-docs"
+        onClick={adjustBranch}
+      >
         Main
       </div>
     </div>
@@ -173,7 +178,7 @@ interface ContentProps {
 }
 
 const Main = () => {
-  let branch = "main";
+  let branch = "stefanmendoza/update-delegation-pool-docs";
   let page = null;
   if (ExecutionEnvironment.canUseViewport) {
     const params = new URLSearchParams(location.search);
