@@ -1,6 +1,11 @@
-/// This module provides a veiled coin type, denoted `VeiledCoin<T>` that hides the value/denomination of a coin.
+/// WARNING: This is an experimental module! One should in NO WAY deploy this module without auditing the cryptography
+/// implemented in this module. Doing so will likely lead to lost funds.
 ///
-/// Our implementation relies on a secondary so-called "resource account" which helps us mint a `VeiledCoin<T>` from a
+/// This module provides a veiled coin type, denoted `VeiledCoin<T>` that hides the value/denomination of a coin. An
+/// important limitation is that transactions that send veiled coins, much like normal coins, still leak the sender and
+/// recipient.
+///
+/// This module leverages a secondary so-called "resource account," which helps us mint a `VeiledCoin<T>` from a
 /// traditional `coin::Coin<T>` by transferring this latter coin into a `coin::CoinStore<T>` resource stored in the
 /// resource account. Later on, when someone wants to convert their `VeiledCoin<T>` into a traditional `coin::Coin<T>`
 /// the resource account can be used to transfer out said `coin::Coin<T>` from its coin store. This is where the
