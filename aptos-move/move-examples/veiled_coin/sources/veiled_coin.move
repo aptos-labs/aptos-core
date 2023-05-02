@@ -49,11 +49,8 @@ module veiled_coin::veiled_coin {
     /// Sigma protocol for withdrawals failed
     const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 9;
 
-    /// Ciphertext has wrong value when unwrapping
-    const ECIPHERTEXT_WRONG_VALUE: u64 = 10;
-
     /// Value used was larger than vector size in vector cut
-    const EEINDEX_OUT_OF_BOUNDS: u64 = 11;
+    const EEINDEX_OUT_OF_BOUNDS: u64 = 10;
 
     //
     // Constants
