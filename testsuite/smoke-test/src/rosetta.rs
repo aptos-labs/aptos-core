@@ -46,6 +46,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{task::JoinHandle, time::Instant};
+use aptos_rosetta::types::TransactionIdentifier;
 
 const DEFAULT_MAX_WAIT_MS: u64 = 5000;
 const DEFAULT_INTERVAL_MS: u64 = 100;
@@ -95,8 +96,8 @@ pub async fn setup_test(
         )),
         cli.addresses(),
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // Ensure rosetta can take requests
     try_until_ok_default(|| rosetta_client.network_list())
@@ -146,8 +147,8 @@ async fn test_block_transactions() {
         )),
         cli.addresses(),
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // Ensure rosetta can take requests
     try_until_ok_default(|| rosetta_client.network_list())
@@ -164,11 +165,11 @@ async fn test_block_transactions() {
         AccountIdentifier::base_account(account_1),
         Some(0),
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     assert_eq!(response.block_identifier, BlockIdentifier {
         index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string()
+        hash: BlockHash::new(chain_id, 0).to_string(),
     });
 
     // First fund account 1 with lots more gas
@@ -227,7 +228,7 @@ async fn test_network() {
     assert_eq!(
         BlockIdentifier {
             index: 0,
-            hash: BlockHash::new(chain_id, 0).to_string()
+            hash: BlockHash::new(chain_id, 0).to_string(),
         },
         status.genesis_block_identifier
     );
@@ -293,11 +294,11 @@ async fn test_account_balance() {
         AccountIdentifier::base_account(account_1),
         Some(0),
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     assert_eq!(response.block_identifier, BlockIdentifier {
         index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string()
+        hash: BlockHash::new(chain_id, 0).to_string(),
     });
 
     // First fund account 1 with lots more gas
@@ -317,8 +318,8 @@ async fn test_account_balance() {
             0,
         )
     })
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     try_until_ok_default(|| {
         account_has_balance(
             &rosetta_client,
@@ -328,8 +329,8 @@ async fn test_account_balance() {
             0,
         )
     })
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // Send money, and expect the gas and fees to show up accordingly
     const TRANSFER_AMOUNT: u64 = 5000;
@@ -346,8 +347,8 @@ async fn test_account_balance() {
         account_1_balance,
         1,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     account_has_balance(
         &rosetta_client,
         chain_id,
@@ -355,8 +356,8 @@ async fn test_account_balance() {
         account_2_balance,
         0,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // Failed transaction spends gas
     let _ = cli
@@ -390,8 +391,8 @@ async fn test_account_balance() {
             account_1_balance,
             2,
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
     }
 
     // Check that the balance hasn't changed (and should be 0) in the invalid account
@@ -402,8 +403,8 @@ async fn test_account_balance() {
         0,
         0,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // Let's now check the staking balance with the original staking contract, it should not be supported
     cli.fund_account(2, Some(10_000_000)).await.unwrap();
@@ -417,8 +418,8 @@ async fn test_account_balance() {
         1_000_000,
         1,
     )
-    .await
-    .expect_err("Original staking contract is not supported");
+        .await
+        .expect_err("Original staking contract is not supported");
 
     create_staking_contract(
         &swarm.aptos_public_info(),
@@ -429,7 +430,7 @@ async fn test_account_balance() {
         10,
         1,
     )
-    .await;
+        .await;
 
     account_has_balance(
         &rosetta_client,
@@ -438,8 +439,8 @@ async fn test_account_balance() {
         1_000_000,
         1,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     account_has_balance(
         &rosetta_client,
@@ -448,8 +449,8 @@ async fn test_account_balance() {
         1_000_000,
         1,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     unlock_stake(
         &swarm.aptos_public_info(),
@@ -458,7 +459,7 @@ async fn test_account_balance() {
         1_000,
         2,
     )
-    .await;
+        .await;
 
     // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
     account_has_balance(
@@ -468,8 +469,8 @@ async fn test_account_balance() {
         1_000,
         2,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     account_has_balance(
         &rosetta_client,
@@ -478,8 +479,8 @@ async fn test_account_balance() {
         0,
         2,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     /* TODO: Support operator stake account in the future
     account_has_balance(
@@ -762,7 +763,7 @@ async fn test_block() {
         &gas_schedule.to_btree_map(),
         feaure_version,
     )
-    .unwrap();
+        .unwrap();
     let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
 
     let private_key_0 = cli.private_key(0);
@@ -783,11 +784,11 @@ async fn test_block() {
         Some(1000000),
         None,
     )
-    .await
-    .unwrap()
-    .request
-    .sequence_number
-    .0;
+        .await
+        .unwrap()
+        .request
+        .sequence_number
+        .0;
     transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -801,8 +802,8 @@ async fn test_block() {
         Some(1000000),
         None,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -816,8 +817,8 @@ async fn test_block() {
         Some(1000000),
         None,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     // Create a new account via transfer
     transfer_and_wait(
         &rosetta_client,
@@ -832,8 +833,8 @@ async fn test_block() {
         Some(1000000),
         None,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     let seq_no_3 = transfer_and_wait(
         &rosetta_client,
         &rest_client,
@@ -846,11 +847,11 @@ async fn test_block() {
         Some(2000000),
         Some(min_gas_price),
     )
-    .await
-    .unwrap()
-    .request
-    .sequence_number
-    .0;
+        .await
+        .unwrap()
+        .request
+        .sequence_number
+        .0;
 
     // Create another account via command
     create_account_and_wait(
@@ -864,8 +865,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     transfer_and_wait(
         &rosetta_client,
@@ -881,8 +882,8 @@ async fn test_block() {
         Some(10000),
         Some(min_gas_price + 1),
     )
-    .await
-    .unwrap();
+        .await
+        .unwrap();
 
     // This one will fail because expiration is in the past
     transfer_and_wait(
@@ -897,8 +898,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .unwrap_err();
+        .await
+        .unwrap_err();
 
     // This one will fail because gas is too low
     transfer_and_wait(
@@ -913,8 +914,8 @@ async fn test_block() {
         Some(1),
         None,
     )
-    .await
-    .unwrap_err();
+        .await
+        .unwrap_err();
 
     // Add a ton of coins, and set an operator
     cli.fund_account(3, Some(10_000_000)).await.unwrap();
@@ -933,8 +934,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Set operator should work!");
+        .await
+        .expect("Set operator should work!");
 
     // Also fail to set an operator (since the operator already changed)
     set_operator_and_wait(
@@ -949,8 +950,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .unwrap_err();
+        .await
+        .unwrap_err();
 
     // Test native stake pool and reset lockup support
     cli.fund_account(2, Some(1000000000000000)).await.unwrap();
@@ -968,8 +969,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Should successfully create stake pool");
+        .await
+        .expect("Should successfully create stake pool");
 
     // TODO: Verify lockup time changes
 
@@ -985,8 +986,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Should successfully reset lockup");
+        .await
+        .expect("Should successfully reset lockup");
 
     // Successfully, and fail setting a voter
     set_voter_and_wait(
@@ -1001,8 +1002,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect_err("Set voter shouldn't work with the wrong operator!");
+        .await
+        .expect_err("Set voter shouldn't work with the wrong operator!");
     set_voter_and_wait(
         &rosetta_client,
         &rest_client,
@@ -1015,8 +1016,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Set voter should work!");
+        .await
+        .expect("Set voter should work!");
 
     // Unlock stake
     unlock_stake_and_wait(
@@ -1031,8 +1032,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Should successfully unlock stake");
+        .await
+        .expect("Should successfully unlock stake");
 
     // Failed distribution with wrong staker
     distribute_staking_rewards_and_wait(
@@ -1047,8 +1048,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect_err("Staker has no staking contracts.");
+        .await
+        .expect_err("Staker has no staking contracts.");
 
     let final_txn = distribute_staking_rewards_and_wait(
         &rosetta_client,
@@ -1062,8 +1063,8 @@ async fn test_block() {
         None,
         None,
     )
-    .await
-    .expect("Distribute staking rewards should work!");
+        .await
+        .expect("Distribute staking rewards should work!");
 
     let final_block_to_check = rest_client
         .get_block_by_version(final_txn.info.version.0, false)
@@ -1215,7 +1216,7 @@ async fn parse_block_transactions(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::GenesisTransaction(_)
                 ));
-            },
+            }
             TransactionType::User => {
                 assert!(matches!(
                     actual_txn.transaction,
@@ -1223,21 +1224,21 @@ async fn parse_block_transactions(
                 ));
                 // Must have a gas fee
                 assert!(!transaction.operations.is_empty());
-            },
+            }
             TransactionType::BlockMetadata => {
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::BlockMetadata(_)
                 ));
                 assert!(transaction.operations.is_empty());
-            },
+            }
             TransactionType::StateCheckpoint => {
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
                 ));
                 assert!(transaction.operations.is_empty());
-            },
+            }
         }
 
         parse_operations(
@@ -1246,7 +1247,7 @@ async fn parse_block_transactions(
             transaction,
             actual_txn,
         )
-        .await;
+            .await;
 
         for (_, account_balance) in balances.iter() {
             if let Some(amount) = account_balance.get(&cur_version) {
@@ -1278,7 +1279,7 @@ async fn parse_operations(
                 .as_ref()
                 .expect("Should have an operation status"),
         )
-        .expect("Operation status should be known");
+            .expect("Operation status should be known");
         let operation_type = OperationType::from_str(&operation.operation_type)
             .expect("Operation type should be known");
         let actual_successful = actual_txn.info.status().is_success();
@@ -1310,7 +1311,7 @@ async fn parse_operations(
                         "Failed transaction should have failed create account operation"
                     );
                 }
-            },
+            }
             OperationType::Deposit => {
                 let account = operation
                     .account
@@ -1351,7 +1352,7 @@ async fn parse_operations(
                         "Failed transaction should have failed deposit operation"
                     );
                 }
-            },
+            }
             OperationType::Withdraw => {
                 // Gas is always successful
                 if actual_successful {
@@ -1395,7 +1396,7 @@ async fn parse_operations(
                         "Failed transaction should have failed withdraw operation"
                     );
                 }
-            },
+            }
             OperationType::StakingReward => {
                 let account = operation
                     .account
@@ -1436,7 +1437,7 @@ async fn parse_operations(
                         "Failed transaction should have failed stake reward operation"
                     );
                 }
-            },
+            }
             OperationType::SetOperator => {
                 if actual_successful {
                     assert_eq!(
@@ -1494,7 +1495,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
             OperationType::SetVoter => {
                 if actual_successful {
                     assert_eq!(
@@ -1536,7 +1537,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
             OperationType::Fee => {
                 has_gas_op = true;
                 assert_eq!(OperationStatusType::Success, status);
@@ -1582,12 +1583,12 @@ async fn parse_operations(
                             delta,
                             "Gas operation should always match gas used * gas unit price"
                         )
-                    },
+                    }
                     _ => {
                         panic!("Gas transactions should be user transactions!")
-                    },
+                    }
                 };
-            },
+            }
             OperationType::ResetLockup => {
                 if actual_successful {
                     assert_eq!(
@@ -1629,7 +1630,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
             OperationType::InitializeStakePool => {
                 if actual_successful {
                     assert_eq!(
@@ -1708,7 +1709,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
             OperationType::UnlockStake => {
                 if actual_successful {
                     assert_eq!(
@@ -1762,7 +1763,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
             OperationType::DistributeStakingRewards => {
                 if actual_successful {
                     assert_eq!(
@@ -1817,7 +1818,7 @@ async fn parse_operations(
                 } else {
                     panic!("Not a user transaction");
                 }
-            },
+            }
         }
     }
 
@@ -1981,11 +1982,11 @@ fn assert_failed_transfer_transaction(
                         receiver,
                         actual_txn.info.success,
                     );
-                },
+                }
                 OperationType::Withdraw => {
                     seen_withdraw = true;
                     assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
-                },
+                }
                 _ => panic!("Shouldn't get any other operations"),
             }
         } else if !seen_deposit {
@@ -2071,22 +2072,22 @@ fn assert_transfer(
     } else {
         OperationStatusType::Failure
     }
-    .to_string();
+        .to_string();
     assert_eq!(&expected_status, operation.status.as_ref().unwrap());
 }
 
 /// Try for 2 seconds to get a response.  This handles the fact that it's starting async
 async fn try_until_ok_default<F, Fut, T>(function: F) -> anyhow::Result<T>
-where
-    F: Fn() -> Fut,
-    Fut: Future<Output = anyhow::Result<T>>,
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output=anyhow::Result<T>>,
 {
     try_until_ok(
         DEFAULT_MAX_WAIT_DURATION,
         DEFAULT_INTERVAL_DURATION,
         function,
     )
-    .await
+        .await
 }
 
 async fn try_until_ok<F, Fut, T>(
@@ -2094,9 +2095,9 @@ async fn try_until_ok<F, Fut, T>(
     interval: Duration,
     function: F,
 ) -> anyhow::Result<T>
-where
-    F: Fn() -> Fut,
-    Fut: Future<Output = anyhow::Result<T>>,
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output=anyhow::Result<T>>,
 {
     let mut result = Err(anyhow::Error::msg("Failed to get response"));
     let start = Instant::now();
@@ -2121,22 +2122,18 @@ async fn create_account_and_wait(
     sequence_number: Option<u64>,
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
-) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .create_account(
             network_identifier,
             sender_key,
             new_account,
-            expiry_time.as_secs(),
+            expiry_time,
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .expect("Expect transfer to successfully submit to mempool")
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash).await
 }
 
 async fn transfer_and_wait(
@@ -2151,8 +2148,7 @@ async fn transfer_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .transfer(
             network_identifier,
             sender_key,
@@ -2162,13 +2158,8 @@ async fn transfer_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn set_operator_and_wait(
@@ -2183,8 +2174,7 @@ async fn set_operator_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .set_operator(
             network_identifier,
             sender_key,
@@ -2194,13 +2184,7 @@ async fn set_operator_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
-        .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
+        )).await
 }
 
 async fn set_voter_and_wait(
@@ -2215,8 +2199,7 @@ async fn set_voter_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .set_voter(
             network_identifier,
             sender_key,
@@ -2226,13 +2209,8 @@ async fn set_voter_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn create_stake_pool_and_wait(
@@ -2249,8 +2227,7 @@ async fn create_stake_pool_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .create_stake_pool(
             network_identifier,
             sender_key,
@@ -2262,13 +2239,8 @@ async fn create_stake_pool_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn reset_lockup_and_wait(
@@ -2282,8 +2254,7 @@ async fn reset_lockup_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .reset_lockup(
             network_identifier,
             sender_key,
@@ -2292,13 +2263,8 @@ async fn reset_lockup_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn unlock_stake_and_wait(
@@ -2313,8 +2279,7 @@ async fn unlock_stake_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .unlock_stake(
             network_identifier,
             sender_key,
@@ -2324,13 +2289,8 @@ async fn unlock_stake_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
-        .map_err(ErrorWrapper::BeforeSubmission)?
-        .hash;
-    wait_for_transaction(rest_client, expiry_time, txn_hash)
-        .await
-        .map_err(ErrorWrapper::AfterSubmission)
 }
 
 async fn distribute_staking_rewards_and_wait(
@@ -2345,8 +2305,7 @@ async fn distribute_staking_rewards_and_wait(
     max_gas: Option<u64>,
     gas_unit_price: Option<u64>,
 ) -> Result<Box<UserTransaction>, ErrorWrapper> {
-    let expiry_time = expiry_time(txn_expiry_duration);
-    let txn_hash = rosetta_client
+    submit_transaction(rest_client, txn_expiry_duration, |expiry_time| rosetta_client
         .distribute_staking_rewards(
             network_identifier,
             sender_key,
@@ -2356,8 +2315,18 @@ async fn distribute_staking_rewards_and_wait(
             sequence_number,
             max_gas,
             gas_unit_price,
-        )
+        ))
         .await
+}
+
+async fn submit_transaction<Fut: Future<Output=anyhow::Result<TransactionIdentifier>>, F: FnOnce(u64) -> Fut>(
+    rest_client: &aptos_rest_client::Client,
+    txn_expiry_duration: Duration,
+    transaction_builder: F,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+
+    let txn_hash = transaction_builder(expiry_time.as_secs()).await
         .map_err(ErrorWrapper::BeforeSubmission)?
         .hash;
     wait_for_transaction(rest_client, expiry_time, txn_hash)
@@ -2386,7 +2355,7 @@ async fn wait_for_transaction(
             } else {
                 panic!("Transaction is supposed to be a UserTransaction!")
             }
-        },
+        }
         Err(_) => {
             if let Transaction::UserTransaction(txn) = rest_client
                 .get_transaction_by_hash(hash_value)
@@ -2398,7 +2367,7 @@ async fn wait_for_transaction(
             } else {
                 panic!("Failed transaction is supposed to be a UserTransaction!");
             }
-        },
+        }
     }
 }
 
