@@ -30,35 +30,32 @@ module veiled_coin::veiled_coin {
     // Errors.
     //
 
-    /// The range proof system needs to support proofs for any number \in [0, 2^{32})
+    /// The range proof system does not support proofs for any number \in [0, 2^{32})
     const ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE : u64 = 1;
 
     /// A range proof failed to verify.
     const ERANGE_PROOF_VERIFICATION_FAILED : u64 = 2;
 
-    /// Account already has `VeiledCoinStore` registered for `CoinType`
+    /// Account already has `VeiledCoinStore<CoinType>` registered.
     const EVEILED_COIN_STORE_ALREADY_PUBLISHED: u64 = 4;
 
-    /// Account hasn't registered `VeiledCoinStore` for `CoinType`
+    /// Account hasn't registered `VeiledCoinStore<CoinType>`.
     const EVEILED_COIN_STORE_NOT_PUBLISHED: u64 = 5;
 
-    /// Not enough coins to complete transaction
+    /// Not enough coins to complete transaction.
     const EINSUFFICIENT_BALANCE: u64 = 6;
 
-    /// Byte vector failed to deserialize to ciphertexts
+    /// Failed deserializing bytes into either ElGamal ciphertext or Sigma protocol proof.
     const EDESERIALIZATION_FAILED: u64 = 7;
 
-    /// Byte vector given for deserialization was the wrong length
+    /// Byte vector given for deserialization was the wrong length.
     const EBYTES_WRONG_LENGTH: u64 = 8;
 
-    /// Sigma protocol for withdrawals failed
+    /// Sigma protocol proof for withdrawals did not verify.
     const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 9;
 
-    /// Ciphertext has wrong value when unwrapping
-    const ECIPHERTEXT_WRONG_VALUE: u64 = 10;
-
-    /// Value used was larger than vector size in vector cut
-    const EEINDEX_OUT_OF_BOUNDS: u64 = 11;
+    /// Index used was larger than vector size in vector cut.
+    const EEINDEX_OUT_OF_BOUNDS: u64 = 10;
 
     //
     // Constants
@@ -72,119 +69,8 @@ module veiled_coin::veiled_coin {
     const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"SigmaFiatShamir";
 
     //
-    // Core data structures.
+    // Structs
     //
-
-    /// Contains the data necessary to prove that a veiled coin transfer can occur,
-    /// given also a sender and a recipient, and one ciphertext each for the sender
-    /// and recipient which encrypt the amount to be sent using each user's public key.
-    struct VeiledTransferProof<phantom CoinType> has drop {
-        updated_balance_proof: RangeProof,
-        transferred_amount_proof: RangeProof,
-        sigma_proof: SigmaProof<CoinType>,
-    }
-
-    /// Contains the data necessary for a sigma protocol proof used for veiled coin transfers.
-    /// A more detailed description can be found in the documentation of verify_withdrawal_sigma_protocol
-    struct SigmaProof<phantom CoinType> has drop {
-        x1: RistrettoPoint,
-        x2: RistrettoPoint,
-        x3: RistrettoPoint,
-        x4: RistrettoPoint,
-        x5: RistrettoPoint,
-        alpha1: Scalar,
-        alpha2: Scalar,
-        alpha3: Scalar,
-        alpha4: Scalar,
-    }
-
-    /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and
-    /// returns them in order
-    fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
-        let len = vector::length(vec);
-        let res = vector::empty();
-        assert!(len >= cut_len, EEINDEX_OUT_OF_BOUNDS);
-        while (cut_len > 0) {
-            vector::push_back(&mut res, vector::pop_back(vec));
-            cut_len = cut_len - 1;
-        };
-        vector::reverse(&mut res);
-        res
-    }
-
-    /// Deserializes and returns a VeiledWithdrawalProof given its byte representation.
-    /// Elements at the end of the SigmaProof struct are expected to be at the start
-    /// of the byte vector, and serialized using the serialization formats in the
-    /// ristretto255 module.
-    fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
-        assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
-        let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x1 = ristretto255::new_point_from_bytes(x1_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x1)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let x1 = std::option::extract<RistrettoPoint>(&mut x1);
-
-        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x2 = ristretto255::new_point_from_bytes(x2_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x2)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let x2 = std::option::extract<RistrettoPoint>(&mut x2);
-
-        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x3)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let x3 = std::option::extract<RistrettoPoint>(&mut x3);
-
-        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x4 = ristretto255::new_point_from_bytes(x4_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x4)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let x4 = std::option::extract<RistrettoPoint>(&mut x4);
-
-        let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let x5 = ristretto255::new_point_from_bytes(x5_bytes);
-        if (!std::option::is_some<RistrettoPoint>(&x5)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let x5 = std::option::extract<RistrettoPoint>(&mut x5);
-
-        let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
-        if (!std::option::is_some(&alpha1)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let alpha1 = std::option::extract(&mut alpha1);
-
-        let alpha2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha2 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
-        if (!std::option::is_some(&alpha2)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let alpha2 = std::option::extract(&mut alpha2);
-
-        let alpha3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
-        if (!std::option::is_some(&alpha3)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let alpha3 = std::option::extract(&mut alpha3);
-
-        let alpha4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
-        let alpha4 = ristretto255::new_scalar_from_bytes(alpha4_bytes);
-        if (!std::option::is_some(&alpha4)) {
-            return std::option::none<SigmaProof<CoinType>>()
-        };
-        let alpha4 = std::option::extract(&mut alpha4);
-
-        std::option::some(SigmaProof {
-            x1, x2, x3, x4, x5, alpha1, alpha2, alpha3, alpha4
-        })
-    }
 
     /// Main structure representing a coin in an account's custody.
     struct VeiledCoin<phantom CoinType> {
@@ -207,6 +93,29 @@ module veiled_coin::veiled_coin {
     /// coin::CoinStore<T> for every type of coin T that is veiled.
     struct VeiledCoinMinter has store, key {
         signer_cap: account::SignerCapability,
+    }
+
+    /// Contains the data necessary to prove that a veiled coin transfer can occur,
+    /// given also a sender and a recipient, and one ciphertext each for the sender
+    /// and recipient which encrypt the amount to be sent using each user's public key.
+    struct VeiledTransferProof<phantom CoinType> has drop {
+        updated_balance_proof: RangeProof,
+        transferred_amount_proof: RangeProof,
+        sigma_proof: SigmaProof<CoinType>,
+    }
+
+    /// Contains the data necessary for a sigma protocol proof used for veiled coin transfers.
+    /// A more detailed description can be found in the documentation of verify_withdrawal_sigma_protocol
+    struct SigmaProof<phantom CoinType> has drop {
+        x1: RistrettoPoint,
+        x2: RistrettoPoint,
+        x3: RistrettoPoint,
+        x4: RistrettoPoint,
+        x5: RistrettoPoint,
+        alpha1: Scalar,
+        alpha2: Scalar,
+        alpha3: Scalar,
+        alpha4: Scalar,
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
@@ -329,162 +238,6 @@ module veiled_coin::veiled_coin {
             std::option::extract(&mut private_deposit_amount),
             &transfer_proof,
         )
-    }
-
-
-    //
-    // Private functions.
-    //
-
-    /// Returns a signer for the resource account.
-    fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
-    }
-
-    /// Used internally to drop veiled coins that were split or joined.
-    fun drop_veiled_coin<CoinType>(c: VeiledCoin<CoinType>) {
-        let VeiledCoin<CoinType> { private_value: _ } = c;
-    }
-
-    /// Given an address, returns the public key in the VeiledCoinStore associated with that address
-    fun get_pubkey_from_addr<CoinType>(addr: address): CompressedPubkey acquires VeiledCoinStore {
-        assert!(has_veiled_coin_store<CoinType>(addr), EVEILED_COIN_STORE_NOT_PUBLISHED);
-        let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
-        coin_store.pubkey
-    }
-
-    /// Verifies a sigma proof needed to perform a private withdrawal. The relation is described on
-    /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
-    /// Specifically, this protocol proves that `withdrawal_ct` and `deposit_ct` encrypt the same
-    /// amount b^* using the same randomness r, with `sender_pubkey` and `recipient_pubkey`
-    /// respectively. It additionally proves that `sender_pubkey` was generated with the sender's
-    /// secret key sk, and that `balance` equals the correct updated value b' once `withdrawal_ct`
-    /// has been subtracted from it.
-    /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's
-    /// zero-knowledge property ensures they are not revealed.
-    fun verify_withdrawal_sigma_protocol<CoinType>(
-        sender_pubkey: &CompressedPubkey,
-        recipient_pubkey: &CompressedPubkey,
-        balance_ct: &Ciphertext,
-        withdrawal_ct: &Ciphertext,
-        deposit_ct: &Ciphertext,
-        proof: &SigmaProof<CoinType>)
-    {
-        let sender_pubkey_point = elgamal::pubkey_to_point(sender_pubkey);
-        let recipient_pubkey_point = elgamal::pubkey_to_point(recipient_pubkey);
-        let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
-        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
-        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
-
-        // TODO: Can be optimized so we don't re-serialize the proof for fiat-shamir
-        let c = sigma_protocol_fiat_shamir<CoinType>(sender_pubkey, recipient_pubkey, withdrawal_ct, deposit_ct, balance_ct, &proof.x1, &proof.x2, &proof.x3, &proof.x4, &proof.x5);
-
-        // c * D + X1 =? \alpha_1 * g
-        let d_acc = ristretto255::point_mul(d, &c);
-        ristretto255::point_add_assign(&mut d_acc, &proof.x1);
-        let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
-        assert!(ristretto255::point_equals(&d_acc, &g_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
-
-        // c * y + X2 =? \alpha_2 * g
-        let y_times_c = ristretto255::point_mul(&sender_pubkey_point, &c);
-        ristretto255::point_add_assign(&mut y_times_c, &proof.x2);
-        let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
-        assert!(ristretto255::point_equals(&y_times_c, &g_alpha2), ESIGMA_PROTOCOL_VERIFY_FAILED);
-
-        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
-        // c * C + X3 =? \alpha_3 * g + \alpha_1 * y
-        let big_c_acc = ristretto255::point_mul(big_c, &c);
-        ristretto255::point_add_assign(&mut big_c_acc, &proof.x3);
-        let y_alpha1 = ristretto255::point_mul(&sender_pubkey_point, &proof.alpha1);
-        ristretto255::point_add_assign(&mut y_alpha1, &g_alpha3);
-        assert!(ristretto255::point_equals(&big_c_acc, &y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
-
-        // c * \bar{C} + X4 =? \alpha_3 * g + \alpha_1 * \bar{y}
-        let bar_c = ristretto255::point_mul(bar_c, &c);
-        ristretto255::point_add_assign(&mut bar_c, &proof.x4);
-        let bar_y_alpha1 = ristretto255::point_mul(&recipient_pubkey_point, &proof.alpha1);
-        ristretto255::point_add_assign(&mut bar_y_alpha1, &g_alpha3);
-        assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
-
-        // c * (C_L + -C) + X5 =? \alpha_4 * g + \alpha_2 * (C_R + -D)
-        let neg_C = ristretto255::point_neg(big_c);
-        ristretto255::point_add_assign(&mut neg_C, c_L);
-        ristretto255::point_mul_assign(&mut neg_C, &c);
-        ristretto255::point_add_assign(&mut neg_C, &proof.x5);
-        let neg_D = ristretto255::point_neg(d);
-        ristretto255::point_add_assign(&mut neg_D, c_R);
-        ristretto255::point_mul_assign(&mut neg_D, &proof.alpha2);
-        let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
-        ristretto255::point_add_assign(&mut neg_D, &g_alpha4);
-        assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
-    }
-
-    /// Computes the challenge value as c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
-    /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation
-    /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol
-    fun sigma_protocol_fiat_shamir<CoinType>(
-        sender_pubkey: &CompressedPubkey,
-        recipient_pubkey: &CompressedPubkey,
-        withdrawal_ct: &Ciphertext,
-        deposit_ct: &Ciphertext,
-        balance_ct: &Ciphertext,
-        x1: &RistrettoPoint,
-        x2: &RistrettoPoint,
-        x3: &RistrettoPoint,
-        x4: &RistrettoPoint,
-        x5: &RistrettoPoint): Scalar
-    {
-        let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
-        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
-        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
-
-        // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
-        let hash_input = vector::empty<u8>();
-
-        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
-        vector::append<u8>(&mut hash_input, basepoint_bytes);
-
-        let y = elgamal::pubkey_to_compressed_point(sender_pubkey);
-        let y_bytes = ristretto255::point_to_bytes(&y);
-        vector::append<u8>(&mut hash_input, y_bytes);
-
-        let y_bar = elgamal::pubkey_to_compressed_point(recipient_pubkey);
-        let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
-        vector::append<u8>(&mut hash_input, y_bar_bytes);
-
-        let c_L_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_L));
-        vector::append<u8>(&mut hash_input, c_L_bytes);
-
-        let c_R_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_R));
-        vector::append<u8>(&mut hash_input, c_R_bytes);
-
-        let big_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_c));
-        vector::append<u8>(&mut hash_input, big_c_bytes);
-
-        let d_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(d));
-        vector::append<u8>(&mut hash_input, d_bytes);
-
-        let bar_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c));
-        vector::append<u8>(&mut hash_input, bar_c_bytes);
-
-        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x1));
-        vector::append<u8>(&mut hash_input, x_1_bytes);
-
-        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x2));
-        vector::append<u8>(&mut hash_input, x_2_bytes);
-
-        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x3));
-        vector::append<u8>(&mut hash_input, x_3_bytes);
-
-        let x_4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x4));
-        vector::append<u8>(&mut hash_input, x_4_bytes);
-
-        let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x5));
-        vector::append<u8>(&mut hash_input, x_5_bytes);
-
-        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
-
-        ristretto255::new_scalar_from_sha2_512(hash_input)
     }
 
     //
@@ -655,17 +408,260 @@ module veiled_coin::veiled_coin {
         // This function is splitting a commitment 'bal' into a commitment 'amount' and a commitment 'new_bal' =
         // = 'bal' - 'amount'. We assume that 'bal' is in [0, 2^{32}). To prevent underflow, we need to
         // verify a range proof that 'new_bal' is in [0, 2^{32}). In addition we need to verify a range proof
-    // that the transferred amount 'amount' is in [0, 2^{32}). Otherwise, a sender could send 'amount' = p-1
-    // where p is the order of the scalar field, giving an updated balance of
-    // 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0
-    // and therefore that 'bal' >= 'amount'. Note that when unwrapping some amount of
-    // VeiledCoin, `amount` will be public and already enforced to be 32 bits so that checking
+        // that the transferred amount 'amount' is in [0, 2^{32}). Otherwise, a sender could send 'amount' = p-1
+        // where p is the order of the scalar field, giving an updated balance of
+        // 'bal' - (p-1) mod p = 'bal' + 1. These checks ensure that 'bal' - 'amount' >= 0
+        // and therefore that 'bal' >= 'amount'. Note that when unwrapping some amount of
+        // VeiledCoin, `amount` will be public and already enforced to be 32 bits so that checking
         // the range proof for its size is unnecessary.
         assert!(bulletproofs::verify_range_proof_elgamal(&private_balance, updated_balance, pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
         if (std::option::is_some(transferred_amount)) {
             assert!(bulletproofs::verify_range_proof_elgamal(&withdraw_amount, &std::option::extract(&mut *transferred_amount), pubkey, MAX_BITS_IN_VALUE, VEILED_COIN_DST), ERANGE_PROOF_VERIFICATION_FAILED);
         };
         coin_store.private_balance = elgamal::compress_ciphertext(&private_balance);
+    }
+
+    //
+    // Private functions.
+    //
+
+    /// Returns a signer for the resource account.
+    fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
+        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
+    }
+
+    /// Used internally to drop veiled coins that were split or joined.
+    fun drop_veiled_coin<CoinType>(c: VeiledCoin<CoinType>) {
+        let VeiledCoin<CoinType> { private_value: _ } = c;
+    }
+
+    /// Given an address, returns the public key in the VeiledCoinStore associated with that address
+    fun get_pubkey_from_addr<CoinType>(addr: address): CompressedPubkey acquires VeiledCoinStore {
+        assert!(has_veiled_coin_store<CoinType>(addr), EVEILED_COIN_STORE_NOT_PUBLISHED);
+        let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
+        coin_store.pubkey
+    }
+
+    /// Given a vector `vec`, removes the last `cut_len` elements of `vec` and
+    /// returns them in order
+    fun cut_vector<T>(vec: &mut vector<T>, cut_len: u64): vector<T> {
+        let len = vector::length(vec);
+        let res = vector::empty();
+        assert!(len >= cut_len, EEINDEX_OUT_OF_BOUNDS);
+        while (cut_len > 0) {
+            vector::push_back(&mut res, vector::pop_back(vec));
+            cut_len = cut_len - 1;
+        };
+        vector::reverse(&mut res);
+        res
+    }
+
+    /// Deserializes and returns a VeiledWithdrawalProof given its byte representation.
+    /// Elements at the end of the SigmaProof struct are expected to be at the start
+    /// of the byte vector, and serialized using the serialization formats in the
+    /// ristretto255 module.
+    fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
+        assert!(vector::length<u8>(&proof_bytes) == 288, EBYTES_WRONG_LENGTH);
+        let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x1 = ristretto255::new_point_from_bytes(x1_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x1)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let x1 = std::option::extract<RistrettoPoint>(&mut x1);
+
+        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x2 = ristretto255::new_point_from_bytes(x2_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x2)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let x2 = std::option::extract<RistrettoPoint>(&mut x2);
+
+        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x3)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let x3 = std::option::extract<RistrettoPoint>(&mut x3);
+
+        let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x4 = ristretto255::new_point_from_bytes(x4_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x4)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let x4 = std::option::extract<RistrettoPoint>(&mut x4);
+
+        let x5_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x5 = ristretto255::new_point_from_bytes(x5_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x5)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let x5 = std::option::extract<RistrettoPoint>(&mut x5);
+
+        let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
+        if (!std::option::is_some(&alpha1)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let alpha1 = std::option::extract(&mut alpha1);
+
+        let alpha2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha2 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
+        if (!std::option::is_some(&alpha2)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let alpha2 = std::option::extract(&mut alpha2);
+
+        let alpha3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
+        if (!std::option::is_some(&alpha3)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let alpha3 = std::option::extract(&mut alpha3);
+
+        let alpha4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha4 = ristretto255::new_scalar_from_bytes(alpha4_bytes);
+        if (!std::option::is_some(&alpha4)) {
+            return std::option::none<SigmaProof<CoinType>>()
+        };
+        let alpha4 = std::option::extract(&mut alpha4);
+
+        std::option::some(SigmaProof {
+            x1, x2, x3, x4, x5, alpha1, alpha2, alpha3, alpha4
+        })
+    }
+
+    /// Verifies a sigma proof needed to perform a private withdrawal. The relation is described on
+    /// page 14 of the Zether paper: https://crypto.stanford.edu/~buenz/papers/zether.pdf
+    /// Specifically, this protocol proves that `withdrawal_ct` and `deposit_ct` encrypt the same
+    /// amount b^* using the same randomness r, with `sender_pubkey` and `recipient_pubkey`
+    /// respectively. It additionally proves that `sender_pubkey` was generated with the sender's
+    /// secret key sk, and that `balance` equals the correct updated value b' once `withdrawal_ct`
+    /// has been subtracted from it.
+    /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's
+    /// zero-knowledge property ensures they are not revealed.
+    fun verify_withdrawal_sigma_protocol<CoinType>(
+        sender_pubkey: &CompressedPubkey,
+        recipient_pubkey: &CompressedPubkey,
+        balance_ct: &Ciphertext,
+        withdrawal_ct: &Ciphertext,
+        deposit_ct: &Ciphertext,
+        proof: &SigmaProof<CoinType>)
+    {
+        let sender_pubkey_point = elgamal::pubkey_to_point(sender_pubkey);
+        let recipient_pubkey_point = elgamal::pubkey_to_point(recipient_pubkey);
+        let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
+        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
+        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
+
+        // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
+        let c = sigma_protocol_fiat_shamir<CoinType>(sender_pubkey, recipient_pubkey, withdrawal_ct, deposit_ct, balance_ct, &proof.x1, &proof.x2, &proof.x3, &proof.x4, &proof.x5);
+
+        // c * D + X1 =? \alpha_1 * g
+        let d_acc = ristretto255::point_mul(d, &c);
+        ristretto255::point_add_assign(&mut d_acc, &proof.x1);
+        let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
+        assert!(ristretto255::point_equals(&d_acc, &g_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+        // c * y + X2 =? \alpha_2 * g
+        let y_times_c = ristretto255::point_mul(&sender_pubkey_point, &c);
+        ristretto255::point_add_assign(&mut y_times_c, &proof.x2);
+        let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
+        assert!(ristretto255::point_equals(&y_times_c, &g_alpha2), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+        let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
+        // c * C + X3 =? \alpha_3 * g + \alpha_1 * y
+        let big_c_acc = ristretto255::point_mul(big_c, &c);
+        ristretto255::point_add_assign(&mut big_c_acc, &proof.x3);
+        let y_alpha1 = ristretto255::point_mul(&sender_pubkey_point, &proof.alpha1);
+        ristretto255::point_add_assign(&mut y_alpha1, &g_alpha3);
+        assert!(ristretto255::point_equals(&big_c_acc, &y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+        // c * \bar{C} + X4 =? \alpha_3 * g + \alpha_1 * \bar{y}
+        let bar_c = ristretto255::point_mul(bar_c, &c);
+        ristretto255::point_add_assign(&mut bar_c, &proof.x4);
+        let bar_y_alpha1 = ristretto255::point_mul(&recipient_pubkey_point, &proof.alpha1);
+        ristretto255::point_add_assign(&mut bar_y_alpha1, &g_alpha3);
+        assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), ESIGMA_PROTOCOL_VERIFY_FAILED);
+
+        // c * (C_L + -C) + X5 =? \alpha_4 * g + \alpha_2 * (C_R + -D)
+        let neg_C = ristretto255::point_neg(big_c);
+        ristretto255::point_add_assign(&mut neg_C, c_L);
+        ristretto255::point_mul_assign(&mut neg_C, &c);
+        ristretto255::point_add_assign(&mut neg_C, &proof.x5);
+        let neg_D = ristretto255::point_neg(d);
+        ristretto255::point_add_assign(&mut neg_D, c_R);
+        ristretto255::point_mul_assign(&mut neg_D, &proof.alpha2);
+        let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
+        ristretto255::point_add_assign(&mut neg_D, &g_alpha4);
+        assert!(ristretto255::point_equals(&neg_C, &neg_D), ESIGMA_PROTOCOL_VERIFY_FAILED);
+    }
+
+    /// Computes the challenge value as c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
+    /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation
+    /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol
+    fun sigma_protocol_fiat_shamir<CoinType>(
+        sender_pubkey: &CompressedPubkey,
+        recipient_pubkey: &CompressedPubkey,
+        withdrawal_ct: &Ciphertext,
+        deposit_ct: &Ciphertext,
+        balance_ct: &Ciphertext,
+        x1: &RistrettoPoint,
+        x2: &RistrettoPoint,
+        x3: &RistrettoPoint,
+        x4: &RistrettoPoint,
+        x5: &RistrettoPoint): Scalar
+    {
+        let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
+        let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
+        let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
+
+        // c <- H(g,y,\bar{y},C_L,C_R,C,D,\bar{C},X_1,X_2,X_3,X_4,X_5)
+        let hash_input = vector::empty<u8>();
+
+        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
+        vector::append<u8>(&mut hash_input, basepoint_bytes);
+
+        let y = elgamal::pubkey_to_compressed_point(sender_pubkey);
+        let y_bytes = ristretto255::point_to_bytes(&y);
+        vector::append<u8>(&mut hash_input, y_bytes);
+
+        let y_bar = elgamal::pubkey_to_compressed_point(recipient_pubkey);
+        let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
+        vector::append<u8>(&mut hash_input, y_bar_bytes);
+
+        let c_L_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_L));
+        vector::append<u8>(&mut hash_input, c_L_bytes);
+
+        let c_R_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c_R));
+        vector::append<u8>(&mut hash_input, c_R_bytes);
+
+        let big_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(big_c));
+        vector::append<u8>(&mut hash_input, big_c_bytes);
+
+        let d_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(d));
+        vector::append<u8>(&mut hash_input, d_bytes);
+
+        let bar_c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(bar_c));
+        vector::append<u8>(&mut hash_input, bar_c_bytes);
+
+        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x1));
+        vector::append<u8>(&mut hash_input, x_1_bytes);
+
+        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x2));
+        vector::append<u8>(&mut hash_input, x_2_bytes);
+
+        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x3));
+        vector::append<u8>(&mut hash_input, x_3_bytes);
+
+        let x_4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x4));
+        vector::append<u8>(&mut hash_input, x_4_bytes);
+
+        let x_5_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x5));
+        vector::append<u8>(&mut hash_input, x_5_bytes);
+
+        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
+
+        ristretto255::new_scalar_from_sha2_512(hash_input)
     }
 
     //
