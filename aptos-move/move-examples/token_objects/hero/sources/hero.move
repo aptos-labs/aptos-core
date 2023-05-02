@@ -8,6 +8,7 @@ module token_objects::hero {
 
     use aptos_token_objects::collection;
     use aptos_token_objects::token;
+    use aptos_std::string_utils;
 
     const ENOT_A_HERO: u64 = 1;
     const ENOT_A_WEAPON: u64 = 2;
@@ -15,6 +16,7 @@ module token_objects::hero {
     const ENOT_CREATOR: u64 = 4;
     const EINVALID_WEAPON_UNEQUIP: u64 = 5;
     const EINVALID_GEM_UNEQUIP: u64 = 6;
+    const EINVALID_TYPE: u64 = 7;
 
     struct OnChainConfig has key {
         collection: String,
@@ -158,7 +160,7 @@ module token_objects::hero {
             defense_modifier,
             magic_attribute,
         };
-				move_to(&token_signer, gem);
+        move_to(&token_signer, gem);
 
         object::address_to_object(signer::address_of(&token_signer))
     }
@@ -210,16 +212,58 @@ module token_objects::hero {
         name: String,
         description: String,
     ) acquires Hero {
-        let token_address = token::create_token_address(
+        let (hero_obj, hero) = get_hero(
             &signer::address_of(creator),
             &collection,
             &name,
         );
-        let hero_obj = object::address_to_object<Hero>(token_address);
-        let hero = borrow_global<Hero>(token_address);
         let creator_addr = token::creator(hero_obj);
         assert!(creator_addr == signer::address_of(creator), error::permission_denied(ENOT_CREATOR));
         token::set_description(&hero.mutator_ref, description);
+    }
+
+    // View functions
+    #[view]
+    fun view_hero(creator: address, collection: String, name: String): Hero acquires Hero {
+        let token_address = token::create_token_address(
+            &creator,
+            &collection,
+            &name,
+        );
+        move_from<Hero>(token_address)
+    }
+
+    #[view]
+    fun view_hero_by_object(hero_obj: Object<Hero>): Hero acquires Hero {
+        let token_address = object::object_address(&hero_obj);
+        move_from<Hero>(token_address)
+    }
+
+    #[view]
+    fun view_object<T: key>(obj: Object<T>): String acquires Armor, Gem, Hero, Shield, Weapon {
+        let token_address = object::object_address(&obj);
+        if (exists<Armor>(token_address)) {
+            string_utils::to_string(borrow_global<Armor>(token_address))
+        } else if (exists<Gem>(token_address)) {
+            string_utils::to_string(borrow_global<Gem>(token_address))
+        } else if (exists<Hero>(token_address)) {
+            string_utils::to_string(borrow_global<Hero>(token_address))
+        } else if (exists<Shield>(token_address)) {
+            string_utils::to_string(borrow_global<Shield>(token_address))
+        } else if (exists<Weapon>(token_address)) {
+            string_utils::to_string(borrow_global<Weapon>(token_address))
+        } else {
+            abort EINVALID_TYPE
+        }
+    }
+
+    inline fun get_hero(creator: &address, collection: &String, name: &String): (Object<Hero>, &Hero) {
+        let token_address = token::create_token_address(
+            creator,
+            collection,
+            name,
+        );
+        (object::address_to_object<Hero>(token_address), borrow_global<Hero>(token_address))
     }
 
     #[test(account = @0x3)]
