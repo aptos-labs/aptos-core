@@ -1,4 +1,5 @@
-/// This module implements an ElGamal encryption API that can be used with the Bulletproofs module.
+/// This module implements an ElGamal encryption API, over the Ristretto255 curve, that can be used with the
+/// Bulletproofs module.
 ///
 /// An ElGamal *ciphertext* is an encryption of a value `v` under a basepoint `G` and public key `Y = sk * G`, where `sk`
 /// is the corresponding secret key, is `(v * G + r * Y, r * G), for a random scalar `r`.

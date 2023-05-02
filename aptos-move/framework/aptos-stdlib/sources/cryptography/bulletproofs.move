@@ -1,6 +1,11 @@
-/// This module implements a Bulletproof-based zero-knowledge range proof: i.e., a proof that a Pedersen commitment
+/// This module implements a Bulletproof range proof verifier on the Ristretto255 curve.
+///
+/// A Bulletproof-based zero-knowledge range proof is a proof that a Pedersen commitment
 /// $c = v G + r H$ commits to an $n$-bit value $v$ (i.e., $v \in [0, 2^n)$). Currently, this module only supports
 /// $n \in \{8, 16, 32, 64\}$ for the number of bits.
+///
+/// Additionally, this module also supports range proofs over ElGamal ciphertexts, which can be viewed as a Pedersen
+/// commitment.
 module aptos_std::bulletproofs {
     use std::features;
     use aptos_std::elgamal;

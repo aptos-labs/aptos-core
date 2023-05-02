@@ -12,7 +12,7 @@ module veiled_coin::veiled_coin {
     use std::features;
     use std::vector;
     use std::option::Option;
-    use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, Pubkey};
+    use aptos_std::elgamal::{Self, Ciphertext, CompressedCiphertext, CompressedPubkey};
     use aptos_std::ristretto255::{RistrettoPoint, Self, Scalar, new_scalar_from_u64};
 
     use aptos_framework::account;
@@ -195,7 +195,7 @@ module veiled_coin::veiled_coin {
         private_balance: CompressedCiphertext,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
-        pubkey: elgamal::Pubkey,
+        pubkey: elgamal::CompressedPubkey,
     }
 
     /// Holds a signer capability for the resource account created when initializing this module. This account houses a
@@ -342,7 +342,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Given an address, returns the public key in the VeiledCoinStore associated with that address
-    fun get_pubkey_from_addr<CoinType>(addr: address): Pubkey acquires VeiledCoinStore {
+    fun get_pubkey_from_addr<CoinType>(addr: address): CompressedPubkey acquires VeiledCoinStore {
         assert!(has_veiled_coin_store<CoinType>(addr), EVEILED_COIN_STORE_NOT_PUBLISHED);
         let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
         coin_store.pubkey
@@ -358,15 +358,15 @@ module veiled_coin::veiled_coin {
     /// Note that r, sk, b^*, b' are all secret values given only to the prover. The protocol's
     /// zero-knowledge property ensures they are not revealed.
     fun verify_withdrawal_sigma_protocol<CoinType>(
-        sender_pubkey: &Pubkey,
-        recipient_pubkey: &Pubkey,
+        sender_pubkey: &CompressedPubkey,
+        recipient_pubkey: &CompressedPubkey,
         balance_ct: &Ciphertext,
         withdrawal_ct: &Ciphertext,
         deposit_ct: &Ciphertext,
         proof: &SigmaProof<CoinType>)
     {
-        let sender_pubkey_point = elgamal::get_point_from_pubkey(sender_pubkey);
-        let recipient_pubkey_point = elgamal::get_point_from_pubkey(recipient_pubkey);
+        let sender_pubkey_point = elgamal::pubkey_to_point(sender_pubkey);
+        let recipient_pubkey_point = elgamal::pubkey_to_point(recipient_pubkey);
         let (big_c, d) = elgamal::ciphertext_as_points(withdrawal_ct);
         let (bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
         let (c_L, c_R) = elgamal::ciphertext_as_points(balance_ct);
@@ -418,8 +418,8 @@ module veiled_coin::veiled_coin {
     /// for the transfer relation sigma protocol using the fiat-shamir transform, where the notation
     /// used above is that in the Zether paper as described in the documentation for verify_withdrawal_sigma_protocol
     fun sigma_protocol_fiat_shamir<CoinType>(
-        sender_pubkey: &Pubkey,
-        recipient_pubkey: &Pubkey,
+        sender_pubkey: &CompressedPubkey,
+        recipient_pubkey: &CompressedPubkey,
         withdrawal_ct: &Ciphertext,
         deposit_ct: &Ciphertext,
         balance_ct: &Ciphertext,
@@ -439,11 +439,11 @@ module veiled_coin::veiled_coin {
         let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
         vector::append<u8>(&mut hash_input, basepoint_bytes);
 
-        let y = elgamal::get_compressed_point_from_pubkey(sender_pubkey);
+        let y = elgamal::pubkey_to_compressed_point(sender_pubkey);
         let y_bytes = ristretto255::point_to_bytes(&y);
         vector::append<u8>(&mut hash_input, y_bytes);
 
-        let y_bar = elgamal::get_compressed_point_from_pubkey(recipient_pubkey);
+        let y_bar = elgamal::pubkey_to_compressed_point(recipient_pubkey);
         let y_bar_bytes = ristretto255::point_to_bytes(&y_bar);
         vector::append<u8>(&mut hash_input, y_bar_bytes);
 
@@ -498,7 +498,7 @@ module veiled_coin::veiled_coin {
 
     /// Initializes a veiled coin store for the specified account. Requires an ElGamal public
     /// encryption key to be provided. The user must retain their corresponding secret key.
-    public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::Pubkey) {
+    public fun register_internal<CoinType>(account: &signer, pubkey: elgamal::CompressedPubkey) {
         let account_addr = signer::address_of(account);
         assert!(
             !has_veiled_coin_store<CoinType>(account_addr),
@@ -506,7 +506,7 @@ module veiled_coin::veiled_coin {
         );
 
         let coin_store = VeiledCoinStore<CoinType> {
-            private_balance: elgamal::new_ciphertext_from_compressed(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
+            private_balance: elgamal::new_ciphertext_from_compressed_points(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
             deposit_events: account::new_event_handle<DepositEvent>(account),
             withdraw_events: account::new_event_handle<WithdrawEvent>(account),
             pubkey: pubkey,
@@ -672,7 +672,7 @@ module veiled_coin::veiled_coin {
     const SOME_RANDOMNESS_4: vector<u8> = x"d7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
 
     #[test_only]
-    fun generate_elgamal_keypair(seed: vector<u8>): (ristretto255::Scalar, elgamal::Pubkey) {
+    fun generate_elgamal_keypair(seed: vector<u8>): (ristretto255::Scalar, elgamal::CompressedPubkey) {
         // Hash the ristretto255 basepoint to get an arbitrary scalar for testing
         let priv_key = ristretto255::new_scalar_from_sha2_512(seed);
         let pubkey = elgamal::pubkey_from_secret_key(&priv_key);
@@ -688,8 +688,8 @@ module veiled_coin::veiled_coin {
     /// Proves the sigma protocol used for veiled coin transfers.
     /// A more detailed description can be found in the documentation for verify_withdrawal_sigma_protocol
     public fun generate_sigma_proof<CoinType>(
-        source_pubkey: &elgamal::Pubkey,
-        dest_pubkey: &elgamal::Pubkey,
+        source_pubkey: &elgamal::CompressedPubkey,
+        dest_pubkey: &elgamal::CompressedPubkey,
         source_balance_ct: &elgamal::Ciphertext,
         withdraw_ct: &elgamal::Ciphertext,
         deposit_ct: &elgamal::Ciphertext,
@@ -711,13 +711,13 @@ module veiled_coin::veiled_coin {
 
         // X3 <- g^{x3}y^{x1}
         let big_x3 = ristretto255::basepoint_mul(&x3);
-        let source_pubkey_point = elgamal::get_point_from_pubkey(source_pubkey);
+        let source_pubkey_point = elgamal::pubkey_to_point(source_pubkey);
         let source_pk_x1 = ristretto255::point_mul(&source_pubkey_point, &x1);
         ristretto255::point_add_assign(&mut big_x3, &source_pk_x1);
 
         // X4 <- g^{x3}\bar{y}^{x1}
         let big_x4 = ristretto255::basepoint_mul(&x3);
-        let dest_pubkey_point = elgamal::get_point_from_pubkey(dest_pubkey);
+        let dest_pubkey_point = elgamal::pubkey_to_point(dest_pubkey);
         let dest_pk_x1 = ristretto255::point_mul(&dest_pubkey_point, &x1);
         ristretto255::point_add_assign(&mut big_x4, &dest_pk_x1);
 
@@ -793,7 +793,7 @@ module veiled_coin::veiled_coin {
     #[test_only]
     /// Returns true if the balance at address `owner` equals `value`.
     /// Requires the ElGamal encryption randomness and public key as auxiliary inputs.
-    public fun verify_opened_balance<CoinType>(owner: address, value: u64, randomness: &Scalar, pubkey: &Pubkey): bool acquires VeiledCoinStore {
+    public fun verify_opened_balance<CoinType>(owner: address, value: u64, randomness: &Scalar, pubkey: &CompressedPubkey): bool acquires VeiledCoinStore {
         // compute the expected committed balance
         let value = new_scalar_from_u64(value);
         let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, randomness, pubkey);

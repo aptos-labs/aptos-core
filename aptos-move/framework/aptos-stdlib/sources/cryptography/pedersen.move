@@ -1,4 +1,5 @@
-/// This module implements a Pedersen commitment API that can be used with the Bulletproofs module.
+/// This module implements a Pedersen commitment API, over the Ristretto255 curve, that can be used with the
+/// Bulletproofs module.
 ///
 /// A Pedersen commitment to a value v under a _commitment key_ (g, h) is v * g + r * h, for a random scalar r.
 
