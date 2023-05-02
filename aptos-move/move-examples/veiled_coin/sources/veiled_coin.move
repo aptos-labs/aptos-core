@@ -37,25 +37,25 @@ module veiled_coin::veiled_coin {
     const ERANGE_PROOF_VERIFICATION_FAILED : u64 = 2;
 
     /// Account already has `VeiledCoinStore<CoinType>` registered.
-    const EVEILED_COIN_STORE_ALREADY_PUBLISHED: u64 = 4;
+    const EVEILED_COIN_STORE_ALREADY_PUBLISHED: u64 = 3;
 
     /// Account hasn't registered `VeiledCoinStore<CoinType>`.
-    const EVEILED_COIN_STORE_NOT_PUBLISHED: u64 = 5;
+    const EVEILED_COIN_STORE_NOT_PUBLISHED: u64 = 4;
 
     /// Not enough coins to complete transaction.
-    const EINSUFFICIENT_BALANCE: u64 = 6;
+    const EINSUFFICIENT_BALANCE: u64 = 5;
 
     /// Failed deserializing bytes into either ElGamal ciphertext or Sigma protocol proof.
-    const EDESERIALIZATION_FAILED: u64 = 7;
+    const EDESERIALIZATION_FAILED: u64 = 6;
 
     /// Byte vector given for deserialization was the wrong length.
-    const EBYTES_WRONG_LENGTH: u64 = 8;
+    const EBYTES_WRONG_LENGTH: u64 = 7;
 
     /// Sigma protocol proof for withdrawals did not verify.
-    const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 9;
+    const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 8;
 
     /// Index used was larger than vector size in vector cut.
-    const EEINDEX_OUT_OF_BOUNDS: u64 = 10;
+    const EEINDEX_OUT_OF_BOUNDS: u64 = 9;
 
     //
     // Constants
@@ -825,7 +825,7 @@ module veiled_coin::veiled_coin {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x9, location = Self)]
+    #[expected_failure(abort_code = 0x8, location = Self)]
     fun sigma_proof_verify_fails_test()
     {
        let (source_priv_key, source_pubkey) = generate_elgamal_keypair(SOME_RANDOMNESS_1);
