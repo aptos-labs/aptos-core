@@ -285,7 +285,7 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 
 <dl>
 <dt>
-<code>collection_id: u64</code>
+<code>index: u64</code>
 </dt>
 <dd>
 
@@ -318,7 +318,7 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 
 <dl>
 <dt>
-<code>collection_id: u64</code>
+<code>index: u64</code>
 </dt>
 <dd>
 
@@ -660,7 +660,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
         );
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                collection_id: supply.total_minted,
+                index: supply.total_minted,
                 <a href="token.md#0x4_token">token</a>,
             },
         );
@@ -672,7 +672,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                collection_id: supply.total_minted,
+                index: supply.total_minted,
                 <a href="token.md#0x4_token">token</a>,
             },
         );
@@ -694,7 +694,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
 Called by token on burn to decrement supply if there's an appropriate Supply struct.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="collection.md#0x4_collection_decrement_supply">decrement_supply</a>(<a href="collection.md#0x4_collection">collection</a>: &<a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="collection.md#0x4_collection_Collection">collection::Collection</a>&gt;, <a href="token.md#0x4_token">token</a>: <b>address</b>, collection_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="collection.md#0x4_collection_decrement_supply">decrement_supply</a>(<a href="collection.md#0x4_collection">collection</a>: &<a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="collection.md#0x4_collection_Collection">collection::Collection</a>&gt;, <a href="token.md#0x4_token">token</a>: <b>address</b>, index: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -706,7 +706,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="collection.md#0x4_collection_decrement_supply">decrement_supply</a>(
     <a href="collection.md#0x4_collection">collection</a>: &Object&lt;<a href="collection.md#0x4_collection_Collection">Collection</a>&gt;,
     <a href="token.md#0x4_token">token</a>: <b>address</b>,
-    collection_id: Option&lt;u64&gt;,
+    index: Option&lt;u64&gt;,
 ) <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a> {
     <b>let</b> collection_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="collection.md#0x4_collection">collection</a>);
     <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_addr)) {
@@ -715,7 +715,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                collection_id: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&collection_id),
+                index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
                 <a href="token.md#0x4_token">token</a>,
             },
         );
@@ -725,7 +725,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
-                collection_id: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&collection_id),
+                index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
                 <a href="token.md#0x4_token">token</a>,
             },
         );

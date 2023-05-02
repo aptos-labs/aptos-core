@@ -5,6 +5,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
     location: 0x42::M,
-    indices: [(FieldDefinition, 0), (StructDefinition, 0)],
+    indices: [(StructDefinition, 0)],
     offsets: [],
 }

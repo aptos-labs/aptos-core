@@ -1,6 +1,6 @@
 ---
 title: "Contribute to the Aptos Ecosystem"
-slug: "help-index"
+slug: ./
 ---
 
 # Contribute to the Aptos Ecosystem
@@ -42,10 +42,8 @@ Help organize events, develop content and more for the ecosystem by joining the 
 
 We at Aptos love direct contributions in the form of [pull requests](https://github.com/aptos-labs/aptos-core/pulls). Help us make small fixes to code. Follow our coding conventions for:
 
-* [Move](../guides/move-guides/book/coding-conventions.md)
+* [Move](../move/book/coding-conventions.md)
 * [Rust](./rust-coding-guidelines.md)
-
-For larger changes, [report the issue](#report-issues-request-enhancements) for discussion with the Aptos team before beginning your coding work. And when done, add your enhancement to the [Community Highlights](./contributions/index.md) list.
 
 ## Update the documentation
 

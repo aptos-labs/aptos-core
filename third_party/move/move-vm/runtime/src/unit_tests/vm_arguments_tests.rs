@@ -4,7 +4,7 @@
 
 use crate::move_vm::MoveVM;
 use move_binary_format::{
-    errors::{VMError, VMResult},
+    errors::VMResult,
     file_format::{
         empty_module, AbilitySet, AddressIdentifierIndex, Bytecode, CodeUnit, CompiledModule,
         CompiledScript, FieldDefinition, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
@@ -248,21 +248,17 @@ impl RemoteStore {
 }
 
 impl ModuleResolver for RemoteStore {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
 impl ResourceResolver for RemoteStore {
-    type Error = VMError;
-
     fn get_resource(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(None)
     }
 }

@@ -24,6 +24,7 @@ use std::{
 pub mod account_generator;
 pub mod accounts_pool_wrapper;
 pub mod args;
+pub mod batch_transfer;
 pub mod call_custom_modules;
 pub mod nft_mint_and_transfer;
 pub mod p2p_transaction_generator;
@@ -37,7 +38,10 @@ use self::{
     publish_modules::PublishPackageCreator,
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
-use crate::accounts_pool_wrapper::AccountsPoolWrapperCreator;
+use crate::{
+    accounts_pool_wrapper::AccountsPoolWrapperCreator,
+    batch_transfer::BatchTransferTransactionGeneratorCreator,
+};
 pub use publishing::module_simple::EntryPoints;
 
 pub const SEND_AMOUNT: u64 = 1;
@@ -61,6 +65,9 @@ pub enum TransactionType {
         entry_point: EntryPoints,
         num_modules: usize,
         use_account_pool: bool,
+    },
+    BatchTransfer {
+        batch_size: usize,
     },
 }
 
@@ -296,6 +303,14 @@ pub async fn create_txn_generator_creator(
                     *use_account_pool,
                     accounts_pool.clone(),
                 ),
+                TransactionType::BatchTransfer { batch_size } => {
+                    Box::new(BatchTransferTransactionGeneratorCreator::new(
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        addresses_pool.clone(),
+                        *batch_size,
+                    ))
+                },
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));
         }

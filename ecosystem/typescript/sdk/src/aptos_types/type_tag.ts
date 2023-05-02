@@ -218,6 +218,13 @@ export class StructTag {
   }
 }
 
+export const stringStructTag = new StructTag(
+  AccountAddress.fromHex("0x1"),
+  new Identifier("string"),
+  new Identifier("String"),
+  [],
+);
+
 function bail(message: string) {
   throw new TypeTagParserError(message);
 }
@@ -231,6 +238,14 @@ function isWhiteSpace(c: string): boolean {
 
 function isValidAlphabetic(c: string): boolean {
   if (c.match(/[_A-Za-z0-9]/g)) {
+    return true;
+  }
+  return false;
+}
+
+// Generic format is T<digits> - for example T1, T2, T10
+function isGeneric(c: string): boolean {
+  if (c.match(/T\d+/g)) {
     return true;
   }
   return false;
@@ -275,6 +290,9 @@ function nextToken(tagStr: string, pos: number): [Token, number] {
         break;
       }
     }
+    if (isGeneric(res)) {
+      return [["GENERIC", res], res.length];
+    }
     return [["IDENT", res], res.length];
   }
   throw new Error("Unrecognized token.");
@@ -299,8 +317,11 @@ function tokenize(tagStr: string): Token[] {
 export class TypeTagParser {
   private readonly tokens: Token[];
 
-  constructor(tagStr: string) {
+  private readonly typeTags: string[] = [];
+
+  constructor(tagStr: string, typeTags?: string[]) {
     this.tokens = tokenize(tagStr);
+    this.typeTags = typeTags || [];
   }
 
   private consume(targetToken: string) {
@@ -373,6 +394,9 @@ export class TypeTagParser {
       this.consume(">");
       return new TypeTagVector(res);
     }
+    if (tokenVal === "string") {
+      return new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []);
+    }
     if (tokenTy === "IDENT" && (tokenVal.startsWith("0x") || tokenVal.startsWith("0X"))) {
       const address = tokenVal;
       this.consume("::");
@@ -384,6 +408,15 @@ export class TypeTagParser {
       const [nameTokenTy, name] = this.tokens.shift()!;
       if (nameTokenTy !== "IDENT") {
         bail("Invalid type tag.");
+      }
+
+      // an Object `0x1::object::Object<T>` doesn't hold a real type, it points to an address
+      // therefore, we parse it as an address and dont need to care/parse the `T` type
+      if (module === "object" && name === "Object") {
+        // to support a nested type tag, i.e 0x1::some_module::SomeResource<0x1::object::Object<T>>, we want
+        // to remove the `<T>` part from the tokens list so we dont parse it and can keep parse the type tag.
+        this.tokens.splice(0, 3);
+        return new TypeTagAddress();
       }
 
       let tyTags: TypeTag[] = [];
@@ -401,6 +434,16 @@ export class TypeTagParser {
         tyTags,
       );
       return new TypeTagStruct(structTag);
+    }
+    if (tokenTy === "GENERIC") {
+      if (this.typeTags.length === 0) {
+        bail("Can't convert generic type since no typeTags were specified.");
+      }
+      // a generic tokenVal has the format of `T<digit>`, for example `T1`.
+      // The digit (i.e 1) indicates the the index of this type in the typeTags array.
+      // For a tokenVal == T1, should be parsed as the type in typeTags[1]
+      const idx = parseInt(tokenVal.substring(1), 10);
+      return new TypeTagParser(this.typeTags[idx]).parseTypeTag();
     }
 
     throw new Error("Invalid type tag.");

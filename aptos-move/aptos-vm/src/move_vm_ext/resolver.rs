@@ -15,7 +15,7 @@ use move_table_extension::TableResolver;
 use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
-    MoveResolver<Err = VMError> + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 

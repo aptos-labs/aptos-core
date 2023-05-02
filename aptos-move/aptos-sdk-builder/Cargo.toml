@@ -1,7 +1,7 @@
 [package]
 name = "aptos-sdk-builder"
 description = "Aptos transaction-builder"
-version = "0.1.0"
+version = "0.2.0"
 
 # Workspace inherited keys
 authors = { workspace = true }

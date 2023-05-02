@@ -219,7 +219,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                     // Update num_oper for the node for the temporary variable
                     global_state.update_node_oper(*id, *oper, true);
                 },
-                ExpData::Block(id, _, exp) => {
+                ExpData::Block(id, _, _, exp) => {
                     let exp_oper = global_state.get_node_num_oper(exp.node_id());
                     global_state.update_node_oper(*id, exp_oper, true);
                 },

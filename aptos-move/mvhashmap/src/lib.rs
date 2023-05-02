@@ -12,7 +12,7 @@ use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
     write_set::TransactionWrite,
 };
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 
 pub mod types;
 pub mod versioned_code;
@@ -36,7 +36,9 @@ pub struct MVHashMap<K, V: TransactionWrite, X: Executable> {
     code: VersionedCode<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> MVHashMap<K, V, X> {
+impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executable>
+    MVHashMap<K, V, X>
+{
     // -----------------------------------
     // Functions shared for data and code.
 
@@ -92,6 +94,24 @@ impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> MVHa
         self.data.add_delta(key, txn_idx, delta);
     }
 
+    pub fn materialize_delta(&self, key: &K, txn_idx: TxnIndex) -> Result<u128, DeltaOp> {
+        debug_assert!(
+            key.module_path().is_none(),
+            "Delta must be stored at a path corresponding to data"
+        );
+
+        self.data.materialize_delta(key, txn_idx)
+    }
+
+    pub fn set_aggregator_base_value(&self, key: &K, value: u128) {
+        debug_assert!(
+            key.module_path().is_none(),
+            "Delta must be stored at a path corresponding to data"
+        );
+
+        self.data.set_aggregator_base_value(key, value);
+    }
+
     /// Read data at access path 'key', from the perspective of transaction 'txn_idx'.
     pub fn fetch_data(
         &self,
@@ -120,7 +140,7 @@ impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> MVHa
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> Default
+impl<K: ModulePath + Hash + Clone + Debug + Eq, V: TransactionWrite, X: Executable> Default
     for MVHashMap<K, V, X>
 {
     fn default() -> Self {

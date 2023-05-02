@@ -424,7 +424,7 @@ to the most correct value up to last digit
 <a name="0x1_math64_spec_pow"></a>
 
 
-<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(e: u64, n: u64): u64 {
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
    <b>if</b> (e == 0) {
        1
    }

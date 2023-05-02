@@ -21,14 +21,10 @@ Make sure that this step is performed by the owner. See [Initialize staking pool
 
 ## Joining validator set
 
-:::danger Errors? 
-**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](../../../issues-and-workarounds.md).
-:::
-
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../aptos-deployments.md) to see how profiles can be configured based on the network.
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### 1. Initialize Aptos CLI
@@ -100,7 +96,7 @@ aptos node join-validator-set \
 The validator set is updated at every epoch change. You will see your validator node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
 :::tip When is next epoch?
-Run the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information). You can also follow these steps: [How to find out when the next epoch starts](../../../issues-and-workarounds.md#how-to-find-out-when-the-next-epoch-starts).
+You can see it on the [Aptos Explorer](https://explorer.aptoslabs.com/validators) or by running the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information).
 :::
 
 ### 6. Check the validator set
@@ -128,7 +124,7 @@ To check the details of your stake pool, run the below CLI command with the `get
 The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
 
 :::tip
-For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../aptos-deployments.md).
+For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../deployments.md).
 :::
 
 ```bash

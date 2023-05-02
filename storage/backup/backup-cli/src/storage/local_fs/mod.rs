@@ -179,7 +179,9 @@ impl BackupStorage for LocalFs {
             },
             _ => bail!("Unexpected Error in saving metadata file {}", name.as_ref()),
         }
-
-        Ok(path.to_string_lossy().into_owned())
+        let fh = PathBuf::from(Self::METADATA_DIR)
+            .join(name.as_ref())
+            .path_to_string()?;
+        Ok(fh)
     }
 }

@@ -159,13 +159,7 @@ fn test_two_by_two_transfer() {
 #[test]
 fn test_post_mint_reveal_nft() {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let named_address = BTreeMap::from([
-        (
-            String::from("post_mint_reveal_nft"),
-            create_resource_address(addr, &[]),
-        ),
-        (String::from("source_addr"), addr),
-    ]);
+    let named_address = BTreeMap::from([(String::from("post_mint_reveal_nft"), addr)]);
     run_tests_for_pkg("post_mint_reveal_nft", named_address);
 }
 

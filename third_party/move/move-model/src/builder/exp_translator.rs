@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{
-        Exp, ExpData, LocalVarDecl, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind,
-        Value,
-    },
+    ast::{Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Value},
     builder::{
         model_builder::{ConstEntry, LocalVarEntry, SpecFunEntry},
         module_builder::ModuleBuilder,
@@ -399,6 +396,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.internal_define_local(loc, name, type_, None, None)
     }
 
+    /// Defines all locals bound by pattern.
+    pub fn define_locals_of_pat(&mut self, pat: &Pattern) {
+        for (id, name) in pat.vars() {
+            let var_ty = self.get_node_type(id);
+            let var_loc = self.get_node_loc(id);
+            self.define_let_local(&var_loc, name, var_ty);
+        }
+    }
+
     fn internal_define_local(
         &mut self,
         loc: &Loc,
@@ -573,7 +579,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         Vector => Type::Vector(Box::new(self.translate_hlir_base_type(&args[0]))),
                         Bool => Type::new_prim(PrimitiveType::Bool),
                         Fun => Type::Fun(
-                            self.translate_hlir_base_types(&args[0..args.len() - 1]),
+                            Box::new(Type::tuple(
+                                self.translate_hlir_base_types(&args[0..args.len() - 1]),
+                            )),
                             Box::new(self.translate_hlir_base_type(&args[args.len() - 1])),
                         ),
                     },
@@ -695,7 +703,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             },
             Ref(is_mut, ty) => Type::Reference(*is_mut, Box::new(self.translate_type(ty))),
             Fun(args, result) => Type::Fun(
-                self.translate_types(args),
+                Box::new(Type::tuple(self.translate_types(args))),
                 Box::new(self.translate_type(result)),
             ),
             Unit => Type::Tuple(vec![]),
@@ -1016,7 +1024,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // Check whether the local has the expected function type.
                 let sym_ty = entry.type_.clone();
                 let (arg_types, args) = self.translate_exp_list(args, false);
-                let fun_t = Type::Fun(arg_types, Box::new(expected_type.clone()));
+                let fun_t = Type::Fun(
+                    Box::new(Type::tuple(arg_types)),
+                    Box::new(expected_type.clone()),
+                );
                 let sym_ty = self.check_type(loc, &sym_ty, &fun_t, "in expression");
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
                 let local_var = ExpData::LocalVar(local_id, sym);
@@ -1214,7 +1225,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         } else {
             use EA::SequenceItem_::*;
             let item = items[0];
-            let item_loc = self.to_loc(&item.loc);
             match &item.value {
                 Bind(lvlist, _) | Declare(lvlist, _) => {
                     // Determine type and binding for this declaration
@@ -1231,11 +1241,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let pat = self.translate_lvalue_list(lvlist, &ty);
                     // Declare the variables in the pattern
                     self.enter_scope();
-                    for (id, name) in pat.vars() {
-                        let var_ty = self.get_node_type(id);
-                        let var_loc = self.get_node_loc(id);
-                        self.define_local(&var_loc, name, var_ty, None, None);
-                    }
+                    self.define_locals_of_pat(&pat);
                     // Translate the rest of the sequence, if there is any
                     let rest = if items.len() == 1 {
                         // If the bind item has no successor, assume an empty block.
@@ -1247,7 +1253,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     };
                     // Return result
                     self.exit_scope();
-                    self.new_bind_exp(loc, &item_loc, pat, binding, rest.into_exp())
+                    self.new_bind_exp(loc, pat, binding, rest.into_exp())
                 },
                 Seq(exp) if matches!(exp.value, EA::Exp_::Spec(..)) => {
                     // Skip specification blocks
@@ -1274,44 +1280,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Create binding expression.
-    // TODO: refactor ExpData::Block to support patterns. For now, map to
-    //   LocalVarDecl or create an error if that is not possible.
     fn new_bind_exp(
         &mut self,
         loc: &Loc,
-        bind_loc: &Loc,
         pat: Pattern,
         binding: Option<Exp>,
         body: Exp,
     ) -> ExpData {
-        let mut lvars = vec![];
-        let mut errors = false;
-        match pat {
-            Pattern::Var(id, name) => lvars.push(LocalVarDecl { id, name, binding }),
-            Pattern::Tuple(_, args) if binding.is_none() => {
-                for arg in args {
-                    if let Pattern::Var(id, name) = arg {
-                        lvars.push(LocalVarDecl {
-                            id,
-                            name,
-                            binding: None,
-                        });
-                    } else {
-                        errors = true
-                    }
-                }
-            },
-            _ => errors = true,
-        }
-        if errors {
-            self.error(bind_loc, "unpack style binding not yet implemented");
-            self.new_error_exp()
-        } else {
-            // The type of the result is the type of the body
-            let ty = self.get_node_type(body.node_id());
-            let id = self.new_node_id_with_type_loc(&ty, loc);
-            ExpData::Block(id, lvars, body)
-        }
+        // The type of the result is the type of the body
+        let ty = self.get_node_type(body.node_id());
+        let id = self.new_node_id_with_type_loc(&ty, loc);
+        ExpData::Block(id, pat, binding, body)
     }
 
     /// Translates a name. Reports an error if the name is not found.
@@ -2059,53 +2038,32 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_lambda(
         &mut self,
         loc: &Loc,
-        bindings: &EA::LValueList,
+        args: &EA::LValueList,
         body: &EA::Exp,
         expected_type: &Type,
     ) -> ExpData {
-        // Enter the lambda variables into a new local scope and collect their declarations.
+        // Translate the argument list
+        let arg_type = self.fresh_type_var();
+        let pat = self.translate_lvalue_list(args, &arg_type);
+        //let arg_types = self.subs.specialize(&arg_type).flatten();
+
+        // Declare the variables in the pattern
         self.enter_scope();
-        let mut decls = vec![];
-        let mut arg_types = vec![];
-        for bind in &bindings.value {
-            let loc = self.to_loc(&bind.loc);
-            match &bind.value {
-                EA::LValue_::Var(
-                    Spanned {
-                        value: EA::ModuleAccess_::Name(n),
-                        ..
-                    },
-                    _,
-                ) => {
-                    let name = self.symbol_pool().make(&n.value);
-                    let ty = self.fresh_type_var();
-                    let id = self.new_node_id_with_type_loc(&ty, &loc);
-                    self.define_local(&loc, name, ty.clone(), None, None);
-                    arg_types.push(ty);
-                    decls.push(LocalVarDecl {
-                        id,
-                        name,
-                        binding: None,
-                    });
-                },
-                EA::LValue_::Unpack(..) | EA::LValue_::Var(..) => {
-                    self.error(&loc, "[current restriction] tuples not supported in lambda")
-                },
-            }
-        }
+        self.define_locals_of_pat(&pat);
+
         // Create a fresh type variable for the body and check expected type before analyzing
         // body. This aids type inference for the lambda parameters.
         let ty = self.fresh_type_var();
         let rty = self.check_type(
             loc,
-            &Type::Fun(arg_types, Box::new(ty.clone())),
+            &Type::Fun(Box::new(arg_type), Box::new(ty.clone())),
             expected_type,
             "in lambda",
         );
         let rbody = self.translate_exp(body, &ty);
         self.exit_scope();
         let id = self.new_node_id_with_type_loc(&rty, loc);
-        ExpData::Lambda(id, decls, rbody.into_exp())
+        ExpData::Lambda(id, pat, rbody.into_exp())
     }
 
     fn translate_quant(
@@ -2130,17 +2088,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let mut rranges = vec![];
         for range in &ranges.value {
             // The quantified variable and its domain expression.
-            let (bind, exp) = &range.value;
+            let (bind, domain_exp) = &range.value;
             let loc = self.to_loc(&bind.loc);
-            let (exp_ty, rexp) = self.translate_exp_free(exp);
-            let ty = self.fresh_type_var();
+            let (exp_ty, rdomain_exp) = self.translate_exp_free(domain_exp);
+            let elem_ty = self.fresh_type_var();
             let exp_ty = self.subs.specialize(&exp_ty);
             match &exp_ty {
                 Type::Vector(..) => {
                     self.check_type(
                         &loc,
                         &exp_ty,
-                        &Type::Vector(Box::new(ty.clone())),
+                        &Type::Vector(Box::new(elem_ty.clone())),
                         "in quantification over vector",
                     );
                 },
@@ -2148,14 +2106,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.check_type(
                         &loc,
                         &exp_ty,
-                        &Type::TypeDomain(Box::new(ty.clone())),
+                        &Type::TypeDomain(Box::new(elem_ty.clone())),
                         "in quantification over domain",
                     );
                 },
                 Type::Primitive(PrimitiveType::Range) => {
                     self.check_type(
                         &loc,
-                        &ty,
+                        &elem_ty,
                         &Type::Primitive(PrimitiveType::Num),
                         "in quantification over range",
                     );
@@ -2165,29 +2123,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     return self.new_error_exp();
                 },
             }
-            match &bind.value {
-                EA::LValue_::Var(
-                    Spanned {
-                        value: EA::ModuleAccess_::Name(n),
-                        ..
-                    },
-                    _,
-                ) => {
-                    let name = self.symbol_pool().make(&n.value);
-                    let id = self.new_node_id_with_type_loc(&ty, &loc);
-                    self.define_local(&loc, name, ty.clone(), None, None);
-                    let rbind = LocalVarDecl {
-                        id,
-                        name,
-                        binding: None,
-                    };
-                    rranges.push((rbind, rexp.into_exp()));
-                },
-                EA::LValue_::Unpack(..) | EA::LValue_::Var(..) => self.error(
-                    &loc,
-                    "[current restriction] tuples not supported in quantifiers",
-                ),
-            }
+            let rpat = self.translate_lvalue(bind, &elem_ty);
+            self.define_locals_of_pat(&rpat);
+            rranges.push((rpat, rdomain_exp.into_exp()));
         }
         let rtriggers = triggers
             .iter()
@@ -2204,7 +2142,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|cond| self.translate_exp(cond, &BOOL_TYPE).into_exp());
         self.exit_scope();
         let quant_ty = if rkind.is_choice() {
-            self.parent.parent.env.get_node_type(rranges[0].0.id)
+            self.parent.parent.env.get_node_type(rranges[0].0.node_id())
         } else {
             BOOL_TYPE.clone()
         };

@@ -17,7 +17,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `BurnRef`](#0x1_fungible_asset_BurnRef)
 -  [Struct `DepositEvent`](#0x1_fungible_asset_DepositEvent)
 -  [Struct `WithdrawEvent`](#0x1_fungible_asset_WithdrawEvent)
--  [Struct `SetUngatedTransferEvent`](#0x1_fungible_asset_SetUngatedTransferEvent)
+-  [Struct `FrozenEvent`](#0x1_fungible_asset_FrozenEvent)
 -  [Constants](#@Constants_0)
 -  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
@@ -33,7 +33,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `store_metadata`](#0x1_fungible_asset_store_metadata)
 -  [Function `amount`](#0x1_fungible_asset_amount)
 -  [Function `balance`](#0x1_fungible_asset_balance)
--  [Function `ungated_balance_transfer_allowed`](#0x1_fungible_asset_ungated_balance_transfer_allowed)
+-  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
 -  [Function `asset_metadata`](#0x1_fungible_asset_asset_metadata)
 -  [Function `mint_ref_metadata`](#0x1_fungible_asset_mint_ref_metadata)
 -  [Function `transfer_ref_metadata`](#0x1_fungible_asset_transfer_ref_metadata)
@@ -45,7 +45,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `deposit`](#0x1_fungible_asset_deposit)
 -  [Function `mint`](#0x1_fungible_asset_mint)
 -  [Function `mint_to`](#0x1_fungible_asset_mint_to)
--  [Function `set_ungated_transfer`](#0x1_fungible_asset_set_ungated_transfer)
+-  [Function `set_frozen_flag`](#0x1_fungible_asset_set_frozen_flag)
 -  [Function `burn`](#0x1_fungible_asset_burn)
 -  [Function `burn_from`](#0x1_fungible_asset_burn_from)
 -  [Function `withdraw_with_ref`](#0x1_fungible_asset_withdraw_with_ref)
@@ -184,10 +184,10 @@ The store object that holds fungible assets of a specific type associated with a
  The balance of the fungible metadata.
 </dd>
 <dt>
-<code>allow_ungated_balance_transfer: bool</code>
+<code>frozen: bool</code>
 </dt>
 <dd>
- Fungible Assets transferring is a common operation, this allows for freezing/unfreezing accounts.
+ If true, owner transfer is disabled that only <code><a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a></code> can move in/out from this store.
 </dd>
 </dl>
 
@@ -223,7 +223,7 @@ The store object that holds fungible assets of a specific type associated with a
 
 </dd>
 <dt>
-<code>set_ungated_transfer_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">fungible_asset::SetUngatedTransferEvent</a>&gt;</code>
+<code>frozen_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">fungible_asset::FrozenEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -409,14 +409,14 @@ Emitted when fungible assets are withdrawn from a store.
 
 </details>
 
-<a name="0x1_fungible_asset_SetUngatedTransferEvent"></a>
+<a name="0x1_fungible_asset_FrozenEvent"></a>
 
-## Struct `SetUngatedTransferEvent`
+## Struct `FrozenEvent`
 
-Emitted when a store's ungated transfer permission is updated.
+Emitted when a store's frozen status is updated.
 
 
-<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">SetUngatedTransferEvent</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -427,7 +427,7 @@ Emitted when a store's ungated transfer permission is updated.
 
 <dl>
 <dt>
-<code>transfer_allowed: bool</code>
+<code>frozen: bool</code>
 </dt>
 <dd>
 
@@ -572,6 +572,16 @@ Account is not the store's owner.
 
 
 
+<a name="0x1_fungible_asset_ESTORE_IS_FROZEN"></a>
+
+Store is disabled from sending and receiving this fungible asset.
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_fungible_asset_ESUPPLY_UNDERFLOW"></a>
 
 Cannot burn more tokens than the remaining supply.
@@ -608,16 +618,6 @@ Transfer ref and store do not match.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_STORE_MISMATCH">ETRANSFER_REF_AND_STORE_MISMATCH</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED"></a>
-
-Store is disabled from sending and receiving this fungible asset.
-
-
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>: u64 = 3;
 </code></pre>
 
 
@@ -1056,16 +1056,16 @@ Get the balance of a given store.
 
 </details>
 
-<a name="0x1_fungible_asset_ungated_balance_transfer_allowed"></a>
+<a name="0x1_fungible_asset_is_frozen"></a>
 
-## Function `ungated_balance_transfer_allowed`
+## Function `is_frozen`
 
-Return whether a store can freely send or receive fungible assets.
+Return whether a store is frozen.
 
-If the store has not been created, we default to returning true so deposits can be sent to it.
+If the store has not been created, we default to returning false so deposits can be sent to it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
 </code></pre>
 
 
@@ -1074,9 +1074,8 @@ If the store has not been created, we default to returning true so deposits can 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    !<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)) ||
-        borrow_store_resource(&store).allow_ungated_balance_transfer
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)) && borrow_store_resource(&store).frozen
 }
 </code></pre>
 
@@ -1241,13 +1240,13 @@ Applications can use this to create multiple stores for isolating fungible asset
     <b>move_to</b>(store_obj, <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
         metadata,
         balance: 0,
-        allow_ungated_balance_transfer: <b>true</b>,
+        frozen: <b>false</b>,
     });
     <b>move_to</b>(store_obj,
         <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
             deposit_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_DepositEvent">DepositEvent</a>&gt;(store_obj),
             withdraw_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_WithdrawEvent">WithdrawEvent</a>&gt;(store_obj),
-            set_ungated_transfer_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">SetUngatedTransferEvent</a>&gt;(store_obj),
+            frozen_events: <a href="object.md#0x1_object_new_event_handle">object::new_event_handle</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a>&gt;(store_obj),
         }
     );
 
@@ -1278,17 +1277,17 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_remove_store">remove_store</a>(delete_ref: &DeleteRef) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>let</b> store = &<a href="object.md#0x1_object_object_from_delete_ref">object::object_from_delete_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(delete_ref);
     <b>let</b> addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(store);
-    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata: _, balance, allow_ungated_balance_transfer: _ }
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> { metadata: _, balance, frozen: _ }
         = <b>move_from</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr);
     <b>assert</b>!(balance == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBALANCE_IS_NOT_ZERO">EBALANCE_IS_NOT_ZERO</a>));
     <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
         deposit_events,
         withdraw_events,
-        set_ungated_transfer_events,
+        frozen_events,
     } = <b>move_from</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(addr);
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
     <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
-    <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(set_ungated_transfer_events);
+    <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(frozen_events);
 }
 </code></pre>
 
@@ -1318,7 +1317,7 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
     amount: u64,
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(<a href="object.md#0x1_object_owns">object::owns</a>(store, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_STORE_OWNER">ENOT_STORE_OWNER</a>));
-    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>));
+    <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
 }
 </code></pre>
@@ -1344,7 +1343,7 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
-    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_ungated_balance_transfer_allowed">ungated_balance_transfer_allowed</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EUNGATED_TRANSFER_IS_NOT_ALLOWED">EUNGATED_TRANSFER_IS_NOT_ALLOWED</a>));
+    <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>(store, fa);
 }
 </code></pre>
@@ -1411,14 +1410,14 @@ Mint the specified <code>amount</code> of the fungible asset to a destination st
 
 </details>
 
-<a name="0x1_fungible_asset_set_ungated_transfer"></a>
+<a name="0x1_fungible_asset_set_frozen_flag"></a>
 
-## Function `set_ungated_transfer`
+## Function `set_frozen_flag`
 
 Enable/disable a store's ability to do direct transfers of the fungible asset.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_ungated_transfer">set_ungated_transfer</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, allow: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_frozen_flag">set_frozen_flag</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, frozen: bool)
 </code></pre>
 
 
@@ -1427,20 +1426,20 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_ungated_transfer">set_ungated_transfer</a>&lt;T: key&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_frozen_flag">set_frozen_flag</a>&lt;T: key&gt;(
     ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a>,
     store: Object&lt;T&gt;,
-    allow: bool,
+    frozen: bool,
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>assert</b>!(
         ref.metadata == <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ETRANSFER_REF_AND_STORE_MISMATCH">ETRANSFER_REF_AND_STORE_MISMATCH</a>),
     );
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
-    <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).allow_ungated_balance_transfer = allow;
+    <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen = frozen;
 
     <b>let</b> events = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(store_addr);
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.set_ungated_transfer_events, <a href="fungible_asset.md#0x1_fungible_asset_SetUngatedTransferEvent">SetUngatedTransferEvent</a> { transfer_allowed: allow });
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> events.frozen_events, <a href="fungible_asset.md#0x1_fungible_asset_FrozenEvent">FrozenEvent</a> { frozen });
 }
 </code></pre>
 
@@ -1514,7 +1513,7 @@ Burn the <code>amount</code> of the fungible asset from the given store.
 
 ## Function `withdraw_with_ref`
 
-Withdraw <code>amount</code> of the fungible asset from the <code>store</code> ignoring <code>allow_ungated_transfer</code>.
+Withdraw <code>amount</code> of the fungible asset from the <code>store</code> ignoring <code>frozen</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_withdraw_with_ref">withdraw_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
@@ -1547,7 +1546,7 @@ Withdraw <code>amount</code> of the fungible asset from the <code>store</code> i
 
 ## Function `deposit_with_ref`
 
-Deposit the fungible asset into the <code>store</code> ignoring <code>allow_ungated_transfer</code>.
+Deposit the fungible asset into the <code>store</code> ignoring <code>frozen</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_with_ref">deposit_with_ref</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>)
@@ -1580,7 +1579,7 @@ Deposit the fungible asset into the <code>store</code> ignoring <code>allow_unga
 
 ## Function `transfer_with_ref`
 
-Transfer <code>amount</code> of the fungible asset with <code><a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a></code> even ungated transfer is disabled.
+Transfer <code>amount</code> of the fungible asset with <code><a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a></code> even it is frozen.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_with_ref">transfer_with_ref</a>&lt;T: key&gt;(transfer_ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>, from: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, <b>to</b>: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64)

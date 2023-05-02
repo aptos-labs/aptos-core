@@ -186,3 +186,29 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 2400
       FORGE_TEST_SUITE: validator_reboot_stress_test
       POST_TO_SLACK: true
+
+  # Recently calibrated for Quorum Store. Should be moved to stable asap.
+  run-forge-land-blocking-three-region:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-land-blocking-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: land_blocking_three_region
+      POST_TO_SLACK: true
+
+  # Recently calibrated for Quorum Store. Should be moved to stable asap.
+  run-forge-three-region-graceful-overload:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-three-region-graceful-overload-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_TEST_SUITE: three_region_simulation_graceful_overload
+      POST_TO_SLACK: true
