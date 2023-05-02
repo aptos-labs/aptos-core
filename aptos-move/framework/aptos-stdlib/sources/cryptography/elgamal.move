@@ -104,7 +104,7 @@ module aptos_std::elgamal {
     }
 
     /// Moves a pair of Ristretto points into an ElGamal ciphertext.
-    public fun new_ciphertext_from_points(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
+    public fun ciphertext_from_points(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
         Ciphertext {
             left,
             right,
@@ -112,7 +112,7 @@ module aptos_std::elgamal {
     }
 
     /// Moves a pair of `CompressedRistretto` points into an ElGamal ciphertext.
-    public fun new_ciphertext_from_compressed_points(left: CompressedRistretto, right: CompressedRistretto): CompressedCiphertext {
+    public fun ciphertext_from_compressed_points(left: CompressedRistretto, right: CompressedRistretto): CompressedCiphertext {
         CompressedCiphertext {
             left,
             right,

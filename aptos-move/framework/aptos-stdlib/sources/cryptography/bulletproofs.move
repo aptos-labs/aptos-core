@@ -128,7 +128,7 @@ module aptos_std::bulletproofs {
 
         (
             RangeProof { bytes },
-            pedersen::new_commitment_from_compressed(point)
+            pedersen::commitment_from_compressed(point)
         )
     }
 
@@ -145,7 +145,7 @@ module aptos_std::bulletproofs {
         let right = ristretto255::basepoint_mul(r);
         (
             RangeProof { bytes },
-            elgamal::new_ciphertext_from_points(left, right)
+            elgamal::ciphertext_from_points(left, right)
         )
     }
 
@@ -207,7 +207,7 @@ module aptos_std::bulletproofs {
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
-        let comm = pedersen::new_commitment_from_point(comm);
+        let comm = pedersen::commitment_from_point(comm);
 
         assert!(verify_range_proof_pedersen(
             &comm,
@@ -291,7 +291,7 @@ module aptos_std::bulletproofs {
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
-        let comm = pedersen::new_commitment_from_point(comm);
+        let comm = pedersen::commitment_from_point(comm);
 
         assert!(verify_range_proof_pedersen(
             &comm,
@@ -362,7 +362,7 @@ module aptos_std::bulletproofs {
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
-        let comm = pedersen::new_commitment_from_point(comm);
+        let comm = pedersen::commitment_from_point(comm);
 
         // Take a valid proof...
         let range_proof_invalid = A_RANGE_PROOF_PEDERSEN;
