@@ -34,33 +34,31 @@ impl PublishPackageGenerator {
 impl TransactionGenerator for PublishPackageGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
-        for account in accounts {
-            // First publish the module and then use it
-            let package = self
-                .package_handler
-                .write()
-                .pick_package(&mut self.rng, account);
-            let txn = package.publish_transaction(account, &self.txn_factory);
-            requests.push(txn);
-            // use module published
-            // for _ in 1..transactions_per_account - 1 {
-            for _ in 1..transactions_per_account {
-                let request =
-                    package.use_random_transaction(&mut self.rng, account, &self.txn_factory);
-                requests.push(request);
-            }
-            // republish
-            // let package = self
-            //     .package_handler
-            //     .write()
-            //     .pick_package(&mut self.rng, account);
-            // let txn = package.publish_transaction(account, &self.txn_factory);
-            // requests.push(txn);
+        let mut requests = Vec::with_capacity(num_to_create);
+
+        // First publish the module and then use it
+        let package = self
+            .package_handler
+            .write()
+            .pick_package(&mut self.rng, account);
+        let txn = package.publish_transaction(account, &self.txn_factory);
+        requests.push(txn);
+        // use module published
+        // for _ in 1..transactions_per_account - 1 {
+        for _ in 1..num_to_create {
+            let request = package.use_random_transaction(&mut self.rng, account, &self.txn_factory);
+            requests.push(request);
         }
+        // republish
+        // let package = self
+        //     .package_handler
+        //     .write()
+        //     .pick_package(&mut self.rng, account);
+        // let txn = package.publish_transaction(account, &self.txn_factory);
+        // requests.push(txn);
         requests
     }
 }
