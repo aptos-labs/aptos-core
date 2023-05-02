@@ -53,8 +53,7 @@ const DEFAULT_INTERVAL_MS: u64 = 100;
 static DEFAULT_MAX_WAIT_DURATION: Duration = Duration::from_millis(DEFAULT_MAX_WAIT_MS);
 static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTERVAL_MS);
 
-pub async fn setup_test(
-    num_nodes: usize,
+async fn setup_test(
     num_accounts: usize,
 ) -> (
     LocalSwarm,
@@ -62,7 +61,7 @@ pub async fn setup_test(
     JoinHandle<anyhow::Result<()>>,
     RosettaClient,
 ) {
-    let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
+    let (swarm, cli, faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
         }))
@@ -198,7 +197,7 @@ async fn test_block_transactions() {
 
 #[tokio::test]
 async fn test_network() {
-    let (swarm, _, _, rosetta_client) = setup_test(1, 1).await;
+    let (swarm, _, _, rosetta_client) = setup_test(1).await;
     let chain_id = swarm.chain_id();
 
     // We only support one network, this network
@@ -261,7 +260,7 @@ async fn test_network() {
 
 #[tokio::test]
 async fn test_account_balance() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 3).await;
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(3).await;
 
     let account_1 = cli.account_id(0);
     let account_2 = cli.account_id(1);
@@ -581,7 +580,7 @@ async fn get_balance(
 
 #[tokio::test]
 async fn test_transfer() {
-    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1).await;
     let chain_id = swarm.chain_id();
     let public_info = swarm.aptos_public_info();
     let client = public_info.client();
@@ -718,7 +717,7 @@ async fn test_transfer() {
 /// it's block based and it needs time to run, we do all the checks in a single test.
 #[tokio::test]
 async fn test_block() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(5).await;
     let chain_id = swarm.chain_id();
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
@@ -1881,7 +1880,7 @@ async fn check_balances(
 
 #[tokio::test]
 async fn test_invalid_transaction_gas_charged() {
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1).await;
     let chain_id = swarm.chain_id();
 
     // Make sure first that there's money to transfer
