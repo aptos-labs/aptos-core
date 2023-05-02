@@ -318,9 +318,7 @@ impl AptosVM {
         self.0
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
 
-        let epilogue_change_set_ext = session
-            .finish(&mut (), change_set_configs)
-            .map_err(|e| e.into_vm_status())?;
+        let epilogue_change_set_ext = session.finish(&mut (), change_set_configs)?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
             .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
@@ -369,15 +367,13 @@ impl AptosVM {
             &function,
             struct_constructors,
         )?;
-        session
-            .execute_entry_function(
-                script_fn.module(),
-                script_fn.function(),
-                script_fn.ty_args().to_vec(),
-                args,
-                gas_meter,
-            )
-            .map_err(|e| e.into_vm_status())
+        Ok(session.execute_entry_function(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args().to_vec(),
+            args,
+            gas_meter,
+        )?)
     }
 
     fn execute_script_or_entry_function(
@@ -400,9 +396,7 @@ impl AptosVM {
 
         // Run the execution logic
         {
-            gas_meter
-                .charge_intrinsic_gas_for_transaction(txn_data.transaction_size())
-                .map_err(|e| e.into_vm_status())?;
+            gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
 
             match payload {
                 TransactionPayload::Script(script) => {
@@ -420,9 +414,12 @@ impl AptosVM {
                                 .get_features()
                                 .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                         )?;
-                    session
-                        .execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)
-                        .map_err(|e| e.into_vm_status())?;
+                    session.execute_script(
+                        script.code(),
+                        script.ty_args().to_vec(),
+                        args,
+                        gas_meter,
+                    )?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
@@ -449,9 +446,7 @@ impl AptosVM {
                 new_published_modules_loaded,
             )?;
 
-            let change_set_ext = session
-                .finish(&mut (), change_set_configs)
-                .map_err(|e| e.into_vm_status())?;
+            let change_set_ext = session.finish(&mut (), change_set_configs)?;
             gas_meter.charge_io_gas_for_write_set(change_set_ext.write_set().iter())?;
             gas_meter.charge_storage_fee_for_all(
                 change_set_ext.write_set().iter(),
@@ -497,9 +492,7 @@ impl AptosVM {
             ))
         });
 
-        gas_meter
-            .charge_intrinsic_gas_for_transaction(txn_data.transaction_size())
-            .map_err(|e| e.into_vm_status())?;
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error =
@@ -644,9 +637,7 @@ impl AptosVM {
         // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
-        let inner_function_change_set_ext = session
-            .finish(&mut (), change_set_configs)
-            .map_err(|e| e.into_vm_status())?;
+        let inner_function_change_set_ext = session.finish(&mut (), change_set_configs)?;
         gas_meter.charge_io_gas_for_write_set(inner_function_change_set_ext.write_set().iter())?;
         gas_meter.charge_storage_fee_for_all(
             inner_function_change_set_ext.write_set().iter(),
@@ -672,9 +663,7 @@ impl AptosVM {
             cleanup_args,
             &mut UnmeteredGasMeter,
         )?;
-        let cleanup_change_set_ext = cleanup_session
-            .finish(&mut (), change_set_configs)
-            .map_err(|e| e.into_vm_status())?;
+        let cleanup_change_set_ext = cleanup_session.finish(&mut (), change_set_configs)?;
         // Merge the inner function writeset with cleanup writeset.
         inner_function_change_set_ext
             .squash(cleanup_change_set_ext)
@@ -706,9 +695,7 @@ impl AptosVM {
             cleanup_args,
             &mut UnmeteredGasMeter,
         )?;
-        cleanup_session
-            .finish(&mut (), change_set_configs)
-            .map_err(|e| e.into_vm_status())
+        Ok(cleanup_session.finish(&mut (), change_set_configs)?)
     }
 
     fn verify_module_bundle(
@@ -829,26 +816,22 @@ impl AptosVM {
             ))
         });
 
-        gas_meter
-            .charge_intrinsic_gas_for_transaction(txn_data.transaction_size())
-            .map_err(|e| e.into_vm_status())?;
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
 
         Self::verify_module_bundle(&mut session, modules)?;
-        session
-            .publish_module_bundle_with_compat_config(
-                modules.clone().into_inner(),
-                txn_data.sender(),
-                gas_meter,
-                Compatibility::new(
-                    true,
-                    true,
-                    !self
-                        .0
-                        .get_features()
-                        .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-                ),
-            )
-            .map_err(|e| e.into_vm_status())?;
+        session.publish_module_bundle_with_compat_config(
+            modules.clone().into_inner(),
+            txn_data.sender(),
+            gas_meter,
+            Compatibility::new(
+                true,
+                true,
+                !self
+                    .0
+                    .get_features()
+                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
+            ),
+        )?;
 
         // call init function of the each module
         self.execute_module_initialization(
@@ -860,9 +843,7 @@ impl AptosVM {
             new_published_modules_loaded,
         )?;
 
-        let change_set_ext = session
-            .finish(&mut (), change_set_configs)
-            .map_err(|e| e.into_vm_status())?;
+        let change_set_ext = session.finish(&mut (), change_set_configs)?;
         gas_meter.charge_io_gas_for_write_set(change_set_ext.write_set().iter())?;
         gas_meter.charge_storage_fee_for_all(
             change_set_ext.write_set().iter(),
@@ -1192,9 +1173,8 @@ impl AptosVM {
                     Some(sender) => vec![sender, *execute_as],
                 };
 
-                let loaded_func = tmp_session
-                    .load_script(script.code(), script.ty_args().to_vec())
-                    .map_err(VMError::into_vm_status)?;
+                let loaded_func =
+                    tmp_session.load_script(script.code(), script.ty_args().to_vec())?;
                 let args =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                         &mut tmp_session,
@@ -1206,17 +1186,13 @@ impl AptosVM {
                             .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                     )?;
 
-                return_on_failure!(tmp_session
-                    .execute_script(
-                        script.code(),
-                        script.ty_args().to_vec(),
-                        args,
-                        &mut gas_meter,
-                    )
-                    .map_err(VMError::into_vm_status));
-                tmp_session
-                    .finish(&mut (), &change_set_configs)
-                    .map_err(VMError::into_vm_status)
+                return_on_failure!(tmp_session.execute_script(
+                    script.code(),
+                    script.ty_args().to_vec(),
+                    args,
+                    &mut gas_meter,
+                ));
+                Ok(tmp_session.finish(&mut (), &change_set_configs)?)
             },
         }
     }
@@ -1764,23 +1740,24 @@ impl AptosSimulationVM {
                                     &entry_function,
                                     &mut new_published_modules_loaded,
                                 ));
-
                                 // TODO: Deduplicate this against execute_multisig_transaction
                                 // A bit tricky since we need to skip success/failure cleanups,
                                 // which is in the middle. Introducing a boolean would make the code
                                 // messier.
                                 let change_set_ext = session
-                                    .finish(&mut (), &storage_gas_params.change_set_configs)
-                                    .map_err(|e| e.into_vm_status())?;
-                                gas_meter.charge_io_gas_for_write_set(
+                                    .finish(&mut (), &storage_gas_params.change_set_configs)?;
+
+                                return_on_failure!(gas_meter.charge_io_gas_for_write_set(
                                     change_set_ext.write_set().iter(),
-                                )?;
-                                gas_meter.charge_storage_fee_for_all(
+                                ));
+
+                                return_on_failure!(gas_meter.charge_storage_fee_for_all(
                                     change_set_ext.write_set().iter(),
                                     change_set_ext.change_set().events(),
                                     txn_data.transaction_size,
                                     txn_data.gas_unit_price,
-                                )?;
+                                ));
+
                                 self.0.success_transaction_cleanup(
                                     storage,
                                     change_set_ext,
