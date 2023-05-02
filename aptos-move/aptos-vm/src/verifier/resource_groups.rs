@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{MoveResolverExt, SessionExt};
+use crate::move_vm_ext::SessionExt;
 use aptos_framework::{ResourceGroupScope, RuntimeModuleMetadataV1};
 use move_binary_format::{
     errors::{Location, PartialVMError, VMError, VMResult},
@@ -29,8 +29,8 @@ fn metadata_validation_error(msg: &str) -> VMError {
 /// * Ensure that each member has a membership and it does not change
 /// * Ensure that each group has a scope and that it does not become more restrictive
 /// * For any new members, verify that they are in a valid resource group
-pub(crate) fn validate_resource_groups<S: MoveResolverExt>(
-    session: &mut SessionExt<S>,
+pub(crate) fn validate_resource_groups(
+    session: &mut SessionExt,
     modules: &[CompiledModule],
 ) -> Result<(), VMError> {
     let mut groups = BTreeMap::new();
@@ -72,8 +72,8 @@ pub(crate) fn validate_resource_groups<S: MoveResolverExt>(
 /// * Extract the resource group metadata
 /// * Verify all changes are compatible upgrades
 /// * Return any new members to validate correctness and all groups to assist in validation
-pub(crate) fn validate_module_and_extract_new_entries<S: MoveResolverExt>(
-    session: &mut SessionExt<S>,
+pub(crate) fn validate_module_and_extract_new_entries(
+    session: &mut SessionExt,
     module: &CompiledModule,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
@@ -111,8 +111,8 @@ pub(crate) fn validate_module_and_extract_new_entries<S: MoveResolverExt>(
 }
 
 /// Given a module id extract all resource group metadata
-pub(crate) fn extract_resource_group_metadata_from_module<S: MoveResolverExt>(
-    session: &mut SessionExt<S>,
+pub(crate) fn extract_resource_group_metadata_from_module(
+    session: &mut SessionExt,
     module_id: &ModuleId,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,

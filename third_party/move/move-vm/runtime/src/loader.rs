@@ -72,7 +72,8 @@ where
     }
 
     fn get(&self, key: &K) -> Option<&Arc<V>> {
-        self.id_map.get(key).and_then(|idx| self.binaries.get(*idx))
+        let index = self.id_map.get(key)?;
+        self.binaries.get(*index)
     }
 }
 
@@ -580,8 +581,11 @@ impl Loader {
         let cache = self.module_cache.read();
         cache
             .modules
-            .get(&module)
-            .and_then(|module| module.module.metadata.iter().find(|md| md.key == key))
+            .get(&module)?
+            .module
+            .metadata
+            .iter()
+            .find(|md| md.key == key)
             .cloned()
     }
 
