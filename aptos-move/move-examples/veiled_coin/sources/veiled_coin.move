@@ -1,9 +1,12 @@
-/// WARNING: This is an experimental module! One should in NO WAY deploy this module without auditing the cryptography
+/// WARNING: This is an **experimental** module! One should in NO WAY deploy this module without auditing the cryptography
 /// implemented in this module. Doing so will likely lead to lost funds.
 ///
 /// This module provides a veiled coin type, denoted `VeiledCoin<T>` that hides the value/denomination of a coin. An
 /// important limitation is that transactions that send veiled coins, much like normal coins, still leak the sender and
 /// recipient.
+///
+/// WARNING: This module is **experimental**! It is *NOT* production-ready. For example, the current implementation is
+/// vulnerable to _front-running attacks_ as described in the Zether paper [BAZB+20].
 ///
 /// This module leverages a secondary so-called "resource account," which helps us mint a `VeiledCoin<T>` from a
 /// traditional `coin::Coin<T>` by transferring this latter coin into a `coin::CoinStore<T>` resource stored in the
@@ -11,6 +14,10 @@
 /// the resource account can be used to transfer out said `coin::Coin<T>` from its coin store. This is where the
 /// "resource account" becomes important, since transfering out a coin like this requires a `signer` for the resource
 /// account, which this module can obtain via a `SignerCapability`.
+///
+/// # References
+/// [BAZB20] Zether: Towards Privacy in a Smart Contract World; by Bünz, Benedikt and Agrawal, Shashank and Zamani,
+/// Mahdi and Boneh, Dan; in Financial Cryptography and Data Security; 2020
 module veiled_coin::veiled_coin {
     use std::error;
     use std::signer;
