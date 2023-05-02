@@ -47,6 +47,20 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
+Multicluster labels
+*/}}
+{{- define "aptos-validator.multiclusterLabels" -}}
+{{- $ctx := index $ 0 -}}
+{{- if $ctx.Values.multicluster.enabled }}
+{{- $index := index $ 1 -}}
+{{- $numClusters := len $ctx.Values.multicluster.targetClusters }}
+{{- $clusterIndex := mod $index $numClusters }}
+{{- $cluster := index $ctx.Values.multicluster.targetClusters $clusterIndex }}
+multicluster/targetcluster: {{ $cluster }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Selector labels
 */}}
 {{- define "aptos-validator.selectorLabels" -}}
