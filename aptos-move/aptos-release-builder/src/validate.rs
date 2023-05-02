@@ -216,7 +216,7 @@ impl NetworkConfig {
                 "0x1::aptos_governance::GovernanceEvents",
                 "create_proposal_events",
                 None,
-                Some(100),
+                Some(1),
             )
             .await?
             .into_inner()
