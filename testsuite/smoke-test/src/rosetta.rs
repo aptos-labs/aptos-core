@@ -1818,6 +1818,64 @@ async fn parse_operations(
                     panic!("Not a user transaction");
                 }
             },
+            OperationType::WithdrawUndelegated => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful distribute operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed distribute operation"
+                    );
+                }
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_delegator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_delegator_address, operator);
+                        // public entry fun withdraw(delegator: &signer, pool_address: address, amount: u64) acquires DelegationPool {
+                        //     assert!(amount > 0, error::invalid_argument(EWITHDRAW_ZERO_STAKE));
+                        //     // synchronize delegation and stake pools before any user operation
+                        //     synchronize_delegation_pool(pool_address);
+                        //     withdraw_internal(borrow_global_mut<DelegationPool>(pool_address), signer::address_of(delegator), amount);
+                        // }
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(2).unwrap()).unwrap();
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                }
+
+            },
         }
     }
 

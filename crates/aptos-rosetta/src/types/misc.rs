@@ -102,6 +102,7 @@ pub enum OperationType {
     InitializeStakePool,
     ResetLockup,
     UnlockStake,
+    WithdrawUndelegated,
     DistributeStakingRewards,
     // Fee must always be last for ordering
     Fee,
@@ -119,6 +120,7 @@ impl OperationType {
     const STAKING_REWARD: &'static str = "staking_reward";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
     const WITHDRAW: &'static str = "withdraw";
+    const WITHDRAW_UNDELEGATED: &'static str = "withdraw_undelegated";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
@@ -133,6 +135,7 @@ impl OperationType {
             InitializeStakePool,
             ResetLockup,
             UnlockStake,
+            WithdrawUndelegated,
             DistributeStakingRewards,
         ]
     }
@@ -153,6 +156,7 @@ impl FromStr for OperationType {
             Self::INITIALIZE_STAKE_POOL => Ok(OperationType::InitializeStakePool),
             Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
             Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
+            Self::WITHDRAW_UNDELEGATED => Ok(OperationType::WithdrawUndelegated),
             Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
@@ -175,6 +179,7 @@ impl Display for OperationType {
             InitializeStakePool => Self::INITIALIZE_STAKE_POOL,
             ResetLockup => Self::RESET_LOCKUP,
             UnlockStake => Self::UNLOCK_STAKE,
+            WithdrawUndelegated => Self::WITHDRAW_UNDELEGATED,
             DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
             Fee => Self::FEE,
         })

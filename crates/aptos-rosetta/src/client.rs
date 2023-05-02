@@ -387,6 +387,50 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn withdraw_delegate(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        operator: AccountAddress,
+        amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        // operation_index: u64,
+        // status: Option<OperationStatusType>,
+        // owner: AccountAddress,
+        // operator: Option<AccountIdentifier>,
+        // amount: Option<u64>,
+        let operations = vec![Operation::withdraw_delegate(
+            0,
+            None,
+            sender,
+            AccountIdentifier::base_account(operator),
+            amount,
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            false,
+        )
+        .await
+    }
+
     pub async fn distribute_staking_rewards(
         &self,
         network_identifier: &NetworkIdentifier,
