@@ -35,8 +35,6 @@ CREATE INDEX IF NOT EXISTS co_insat_idx ON current_objects (inserted_at);
 -- Add this so that we can find resource groups by their state_key_hash
 ALTER TABLE move_resources
 ADD COLUMN IF NOT EXISTS state_key_hash VARCHAR(66) NOT NULL DEFAULT '';
---TODO: remove default
-CREATE INDEX IF NOT EXISTS mr_skh_idx ON move_resources (state_key_hash);
 -- NFT stuff
 -- tracks who owns tokens
 CREATE TABLE IF NOT EXISTS token_ownerships_v2 (

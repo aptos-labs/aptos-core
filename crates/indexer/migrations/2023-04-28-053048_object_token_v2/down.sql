@@ -10,7 +10,6 @@ DROP INDEX IF EXISTS co_object_skh_idx;
 DROP INDEX IF EXISTS co_skh_idx;
 DROP INDEX IF EXISTS co_insat_idx;
 ALTER TABLE move_resources DROP COLUMN IF EXISTS state_key_hash;
-DROP INDEX IF EXISTS mr_skh_idx;
 DROP TABLE IF EXISTS token_ownerships_v2;
 DROP INDEX IF EXISTS to2_id_index;
 DROP INDEX IF EXISTS to2_owner_index;
