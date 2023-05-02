@@ -20,7 +20,6 @@ use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
-    pop_arg,
     values::{Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
