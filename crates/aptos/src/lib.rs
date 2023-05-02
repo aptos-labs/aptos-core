@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-
 pub mod account;
 pub mod common;
 pub mod config;
+pub mod ffi;
 pub mod genesis;
 pub mod governance;
 pub mod move_tool;
@@ -14,18 +14,14 @@ pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 pub mod update;
-use tokio::process::Command;
 
 use crate::common::{
     types::{CliCommand, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
 use async_trait::async_trait;
-use clap::{App, Arg, Parser};
+use clap::Parser;
 use std::collections::BTreeMap;
-use std::ffi::{c_char, CStr, CString};
-use std::mem;
-use tokio::runtime::Runtime;
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
@@ -90,48 +86,4 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
         Ok(cli_build_information())
     }
-}
-
-#[no_mangle]
-pub extern "C" fn hello_from_ts(s: *mut c_char) -> *const c_char {
-    println!("Hello from Rust!");
-
-    let result = "testing from Jin";
-    let c_str = CString::new(result).unwrap();
-
-    // Return a pointer to the C string
-    c_str.into_raw()
-}
-
-#[no_mangle]
-pub extern "C" fn run_aptos_from_ts(s: *const c_char) -> *const c_char {
-    let c_str = unsafe {
-        assert!(!s.is_null());
-        CStr::from_ptr(s)
-    };
-
-    // split string by spaces
-    let input_string = c_str.to_str().unwrap().split_whitespace();
-
-    // Create a new Tokio runtime and block on the execution of `cli.execute()`
-    let result_string = Runtime::new().unwrap().block_on(async move {
-        let cli = Tool::parse_from(input_string);
-        let result = cli.execute().await;
-        result
-    });
-
-    let res_cstr = CString::new(result_string.unwrap()).unwrap();
-
-    // Return a pointer to the C string
-    res_cstr.into_raw()
-}
-
-#[no_mangle]
-pub extern "C" fn free_cstring(s: *mut c_char) {
-    unsafe {
-        if s.is_null() {
-            return;
-        }
-        CString::from_raw(s)
-    };
 }
