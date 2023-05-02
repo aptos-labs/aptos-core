@@ -28,7 +28,8 @@ permissions:
 
 jobs:
   copy-images:
-    runs-on: ubuntu-latest
+    # Run on a machine with more local storage for large docker images
+    runs-on: medium-perf-docker-with-local-ssd
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
@@ -46,6 +47,10 @@ jobs:
         with:
           username: ${{ secrets.ENV_DOCKERHUB_USERNAME }}
           password: ${{ secrets.ENV_DOCKERHUB_PASSWORD }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
 
       - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
 

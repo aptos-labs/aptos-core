@@ -1,0 +1,77 @@
+//# publish
+module 0x1.m1 {
+    struct Foo<T1, T2: copy> { x: T1, y: T2 }
+
+    // function def -- locals
+    f<T1, T2>() {
+        let foo: Self.Foo<T1, T2>;
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x1.m2 {
+    struct Foo<T1, T2: copy> { x: T1, y: T2 }
+
+    // function handle
+    f<T1, T2>(foo: Self.Foo<T1, T2>) {
+    label b0:
+        return;
+    }
+}
+
+//# publish
+module 0x1.m3 {
+    struct Foo<T1, T2: copy> { x: T1, y: T2 }
+
+    // struct def
+    struct Bar<A> { x: Self.Foo<A, A> }
+}
+
+//# publish
+module 0x1.m4 {
+    struct Foo<T1, T2: copy> { x: T1, y: T2 }
+
+    // struct def
+    struct Bar<A> { x: vector<Self.Foo<A, A>> }
+}
+
+//# publish
+module 0x1.m5 {
+    struct Foo<T> has key { x: T }
+
+    // function def -- global op
+    f<T>() {
+    label b0:
+        _ = exists<Foo<T>>();
+        return;
+    }
+}
+
+//# publish
+module 0x1.m6 {
+    g<T: copy>() {
+    label b0:
+        return;
+    }
+
+    // function def -- call generic
+    f<T>() {
+    label b0:
+        Self.g<T>();
+        return;
+    }
+}
+
+//# publish
+module 0x1.m7 {
+    struct Foo<T: copy> has copy { x: T }
+
+    // function def -- pack
+    f<T>() {
+    label b0:
+        _ = Foo<vector<T>> { x: vec_pack_0<T>() };
+        return;
+    }
+}

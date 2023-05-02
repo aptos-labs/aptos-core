@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, data_cache::MoveResolverWithVMMetadata,
-    move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
+    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
+    transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
@@ -34,7 +34,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -93,20 +93,14 @@ impl SessionId {
     }
 }
 
-pub struct SessionExt<'r, 'l, S> {
+pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
-    remote: MoveResolverWithVMMetadata<'r, 'l, S>,
+    remote: &'r dyn MoveResolverExt,
 }
 
-impl<'r, 'l, S> SessionExt<'r, 'l, S>
-where
-    S: MoveResolverExt + 'r,
-{
-    pub fn new(inner: Session<'r, 'l>, move_vm: &'l MoveVM, remote: &'r S) -> Self {
-        Self {
-            inner,
-            remote: MoveResolverWithVMMetadata::new(remote, move_vm),
-        }
+impl<'r, 'l> SessionExt<'r, 'l> {
+    pub fn new(inner: Session<'r, 'l>, remote: &'r dyn MoveResolverExt) -> Self {
+        Self { inner, remote }
     }
 
     pub fn finish<C: AccessPathCache>(
@@ -116,7 +110,7 @@ where
     ) -> VMResult<ChangeSetExt> {
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(&self.remote, change_set)?;
+            Self::split_and_merge_resource_groups(self.remote, change_set)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -162,7 +156,7 @@ where
     ///   * If elements remain, Modify
     ///   * Otherwise delete
     fn split_and_merge_resource_groups(
-        remote: &MoveResolverWithVMMetadata<S>,
+        remote: &dyn MoveResolverExt,
         change_set: MoveChangeSet,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -177,9 +171,7 @@ where
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group = remote
-                    .get_resource_group(&struct_tag)
-                    .map_err(|_| common_error.clone())?;
+                let resource_group = remote.get_resource_group(&struct_tag);
                 if let Some(resource_group) = resource_group {
                     resource_groups
                         .entry(resource_group)
@@ -362,7 +354,7 @@ where
     }
 }
 
-impl<'r, 'l, S> Deref for SessionExt<'r, 'l, S> {
+impl<'r, 'l> Deref for SessionExt<'r, 'l> {
     type Target = Session<'r, 'l>;
 
     fn deref(&self) -> &Self::Target {
@@ -370,7 +362,7 @@ impl<'r, 'l, S> Deref for SessionExt<'r, 'l, S> {
     }
 }
 
-impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
+impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

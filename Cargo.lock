@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.12"
+version = "1.0.13"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -2615,7 +2615,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-sdk-builder"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "aptos-cached-packages",
@@ -3135,6 +3135,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-utils"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
@@ -3189,6 +3193,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
+ "aptos-utils",
  "aptos-vm-logging",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
@@ -7824,6 +7829,7 @@ dependencies = [
  "move-borrow-graph",
  "move-core-types",
  "petgraph 0.5.1",
+ "typed-arena",
 ]
 
 [[package]]
@@ -12057,9 +12063,9 @@ dependencies = [
 
 [[package]]
 name = "typed-arena"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"
+checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
 
 [[package]]
 name = "typenum"
