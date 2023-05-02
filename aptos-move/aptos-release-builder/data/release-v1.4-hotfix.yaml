@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+proposals:
+  - name: upgrade_of_framework_v1_4_0_with_token_v2_hot_fix
+    metadata:
+      title: "Fix the issue of wrong events emit from collection.move"
+      description: "This is a hot fix of framework v.1.4.0 to emit token v2 BurnEvent"
+      source_code_url: "TBD"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/8011"
+    execution_mode: MultiStep
+    update_sequence:
+      - Framework:
+          bytecode_version: 6
+          git_hash: a4db3a9bbe090946d7cc90f94b56fcee5615622a
