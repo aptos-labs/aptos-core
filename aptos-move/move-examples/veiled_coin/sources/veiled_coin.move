@@ -16,7 +16,7 @@
 /// account, which this module can obtain via a `SignerCapability`.
 ///
 /// # References
-/// [BAZB20] Zether: Towards Privacy in a Smart Contract World; by Bünz, Benedikt and Agrawal, Shashank and Zamani,
+/// [BAZB20] Zether: Towards Privacy in a Smart Contract World; by Bunz, Benedikt and Agrawal, Shashank and Zamani,
 /// Mahdi and Boneh, Dan; in Financial Cryptography and Data Security; 2020
 module veiled_coin::veiled_coin {
     use std::error;
@@ -72,8 +72,10 @@ module veiled_coin::veiled_coin {
     const MAX_BITS_IN_VALUE : u64 = 32;
 
     /// The domain separation tag (DST) used for the Bulletproofs prover.
-    const VEILED_COIN_DST : vector<u8> = b"AptosVeiledCoinExample";
-    const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"SigmaFiatShamir";
+    const VEILED_COIN_DST : vector<u8> = b"AptosVeiledCoin/BulletproofRangeProof";
+
+    /// The domain separation tag (DST) used in the Fiat-Shamir transform of our Sigma protocol.
+    const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"AptosVeiledCoin/WithdrawalProofFiatShamir";
 
     //
     // Structs
