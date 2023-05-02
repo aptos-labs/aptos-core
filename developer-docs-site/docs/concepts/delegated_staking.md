@@ -7,20 +7,20 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Delegated Staking
 
-## Delegated Staking on the Aptos blockchain
+## Delegated Staking on the Aptos Blockchain
 
-:::tip Consensus We strongly recommend that you read the consensus section of Aptos Blockchain Deep Dive before proceeding further. :::
+:::tip Consensus We strongly recommend that you read about [Staking](../concepts/staking.md) on the Aptos Blockchain first. :::
 
 Delegated staking is an extension of the staking protocol on Aptos. A delegation pool abstracts the stake owner to an entity capable of collecting stake from delegators and adding it on their behalf to the native stake pool attached to the validator. This means that multiple entities can stake to a stake pool to reach the minimum requirement for the validator to join the validator set. Delegators can add stake to an inactive pool, but the delegation pool will not earn rewards until it is active. 
 
-:::danger Delegation pools are permissionless and anyone can stake to the validator. You cannot change the type of stake pool once it's created. For full ownership of the stake pool, see [Staking](../concepts/staking.md)
+:::danger Delegation pools are permissionless and anyone can stake to the validator. You cannot change the type of stake pool once it's created. For full details of the stake pool, see [Staking](../concepts/staking.md)
 ::: 
 
-See [delegation_pool.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/delegation_pool.move) 
+For the full delegation pool smart contract, see [delegation_pool.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/delegation_pool.move) 
 
-A delegation pool can be initialized without adding stake. A resource account is created along with an empty stake pool it owns from that point on.This account will manage the stake of the underlying stake pool on behalf of the delegators by forwarding their stake-management operations to it (add, unlock, reactivate, withdraw) while the resource account cannot be directly accessed nor externally owned.
+Unlike a stake pool, a delegation pool can be initialized with zero stake. A resource account is created along with an empty stake pool it owns from that point on.This account will manage the stake of the underlying stake pool on behalf of the delegators by forwarding their stake-management operations to it (add, unlock, reactivate, withdraw) while the resource account cannot be directly accessed nor externally owned.
 
-See [Delegation Pool Operations](../nodes/validator-node/operator/delegation-pool-operations.md)
+See full list of [Delegation Pool Operations](../nodes/validator-node/operator/delegation-pool-operations.md)
 
 ![image](https://user-images.githubusercontent.com/120680608/234953723-ae6cc89e-76d8-4014-89f3-ec8799c7b281.png)
 
@@ -41,7 +41,7 @@ Using this model, the owner does not have to stake on the Aptos blockchain in or
 
 ### Owner
 
-The delegation pool owner performs the following operations:
+The delegation pool owner has the following capabilities:
 
 1. Creates delegation pool
 2. Assigns operator for the delegation pool
@@ -51,7 +51,7 @@ The delegation pool owner performs the following operations:
 
 ### Operator
 
-A node operator is assigned by the pool owner to run the validator node. The operator performs the following operations:
+A node operator is assigned by the pool owner to run the validator node. The operator has the following capabilities:
 
 1. Join or leave the validator set once the delegation pool reaches 1M APT
 2. Perform validating functions
