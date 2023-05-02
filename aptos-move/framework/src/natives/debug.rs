@@ -135,7 +135,7 @@ pub fn make_all(
                 native_stack_trace,
             ),
         ),
-        // For replayability on-chain we need dummy implementations of these functions
+        // For re-playability on-chain we still implement the old versions of these functions
         (
             "print",
             make_safe_native(
