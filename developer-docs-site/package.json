@@ -1,5 +1,6 @@
 {
   "name": "aptos-docs",
+  "packageManager": "pnpm@8.3.1",
   "version": "0.0.0",
   "private": true,
   "scripts": {
