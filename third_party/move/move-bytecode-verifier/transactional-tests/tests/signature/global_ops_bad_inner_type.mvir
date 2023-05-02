@@ -1,0 +1,79 @@
+//# publish
+module 0x1.m1 {
+    struct Baz<T> has key { x: T }
+
+    struct Foo<T: key> has key, store { x: T }
+
+    struct Bar has store { x: bool }
+
+    f(addr: address) acquires Baz {
+    label b0:
+        // The inner type Foo<Bar> is not well-formed since Bar does not have key
+        _ = borrow_global<Baz<Self.Foo<Self.Bar>>>(move(addr));
+        return;
+    }
+}
+
+//# publish
+module 0x1.m2 {
+    struct Baz<T> has key { x: T }
+
+    struct Foo<T: key> has key, store { x: T }
+
+    struct Bar has store { x: bool }
+
+    f(addr: address) acquires Baz {
+    label b0:
+        // The inner type Foo<Bar> is not well-formed since Bar does not have key
+        _ = borrow_global_mut<Baz<Self.Foo<Self.Bar>>>(move(addr));
+        return;
+    }
+}
+
+//# publish
+module 0x1.m3 {
+    struct Baz<T> has key { x: T }
+
+    struct Foo<T: key> has key, store { x: T }
+
+    struct Bar has store { x: bool }
+
+    f(addr: address) acquires Baz {
+    label b0:
+        // The inner type Foo<Bar> is not well-formed since Bar does not have key
+        _ = exists<Baz<Self.Foo<Self.Bar>>>(move(addr));
+        return;
+    }
+}
+
+//# publish
+module 0x1.m4 {
+    struct Baz<T> has key { x: T }
+
+    struct Foo<T: key> has key, store { x: T }
+
+    struct Bar has store { x: bool }
+
+    f(addr: address) acquires Baz {
+    label b0:
+        // The inner type Foo<Bar> is not well-formed since Bar does not have key
+        _ = move_from<Baz<Self.Foo<Self.Bar>>>(move(addr));
+        return;
+    }
+}
+
+//# publish
+module 0x1.m5 {
+    struct Baz<T> has key { x: T }
+
+    struct Foo<T: key> has key, store { x: T }
+
+    struct Bar has store { x: bool }
+
+    f(addr: address) acquires Baz {
+    label b0:
+        // The inner type Foo<Bar> is not well-formed since Bar does not have key
+        move_to<Baz<Self.Foo<Self.Bar>>>(move(addr), Baz { x: Foo { x: Bar { x: true } } });
+        return;
+    }
+}

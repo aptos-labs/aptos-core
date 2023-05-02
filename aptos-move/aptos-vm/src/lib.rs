@@ -103,7 +103,7 @@
 
 mod access_path_cache;
 #[macro_use]
-mod counters;
+pub mod counters;
 pub mod data_cache;
 
 #[cfg(feature = "mirai-contracts")]

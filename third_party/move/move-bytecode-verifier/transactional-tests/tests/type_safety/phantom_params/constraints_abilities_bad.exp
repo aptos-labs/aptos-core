@@ -5,7 +5,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M2,
-    indices: [(FieldDefinition, 0), (StructDefinition, 1)],
+    indices: [(StructDefinition, 1)],
     offsets: [],
 }
 
@@ -14,7 +14,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M3,
-    indices: [(FieldDefinition, 0), (StructDefinition, 5)],
+    indices: [(StructDefinition, 5)],
     offsets: [],
 }
 
@@ -23,7 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M4,
-    indices: [(Signature, 0), (FunctionDefinition, 1)],
+    indices: [(Signature, 1)],
     offsets: [],
 }
 
@@ -32,6 +32,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M5,
-    indices: [(Signature, 0), (FunctionDefinition, 1)],
+    indices: [(Signature, 1)],
     offsets: [],
 }

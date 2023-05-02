@@ -29,7 +29,7 @@ use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{TimedFeatureOverride, TimedFeatures},
+    on_chain_config::{Features, TimedFeatureOverride, TimedFeatures},
     proof::TransactionInfoWithProof,
     state_store::{
         state_key::{StateKey, StateKeyInner},
@@ -228,7 +228,7 @@ impl StateSnapshotRestoreController {
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
         let config = verifier_config(
-            false,
+            &Features::default(),
             // FIXME: feed chain id & timestamp from the state.
             &TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Replay),
         );

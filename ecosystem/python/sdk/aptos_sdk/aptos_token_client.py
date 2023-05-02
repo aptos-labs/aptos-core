@@ -14,7 +14,6 @@ from .type_tag import StructTag, TypeTag
 
 
 class Object:
-
     allow_ungated_transfer: bool
     owner: AccountAddress
 
@@ -36,7 +35,6 @@ class Object:
 
 
 class Collection:
-
     creator: AccountAddress
     description: str
     name: str
@@ -64,7 +62,6 @@ class Collection:
 
 
 class Royalty:
-
     numerator: int
     denominator: int
     payee_address: AccountAddress
@@ -89,9 +86,8 @@ class Royalty:
 
 
 class Token:
-
     collection: AccountAddress
-    collection_id: int
+    index: int
     description: str
     name: str
     uri: str
@@ -101,25 +97,25 @@ class Token:
     def __init__(
         self,
         collection: AccountAddress,
-        collection_id: int,
+        index: int,
         description: str,
         name: str,
         uri: str,
     ):
         self.collection = collection
-        self.collection_id = collection_id
+        self.index = index
         self.description = description
         self.name = name
         self.uri = uri
 
     def __str__(self) -> str:
-        return f"Token[collection: {self.collection}, collection_id: {self.collection_id}, description: {self.description}, name: {self.name}, uri: {self.uri}]"
+        return f"Token[collection: {self.collection}, index: {self.index}, description: {self.description}, name: {self.name}, uri: {self.uri}]"
 
     @staticmethod
     def parse(resource: dict[str, Any]):
         return Token(
             AccountAddress.from_hex(resource["collection"]["inner"]),
-            int(resource["collection_id"]),
+            int(resource["index"]),
             resource["description"],
             resource["name"],
             resource["uri"],
@@ -138,7 +134,6 @@ class InvalidPropertyType(Exception):
 
 
 class Property:
-
     name: str
     property_type: str
     value: Any
@@ -259,7 +254,6 @@ class Property:
 
 
 class PropertyMap:
-
     properties: List[Property]
 
     struct_tag: str = "0x4::property_map::PropertyMap"

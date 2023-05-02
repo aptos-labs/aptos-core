@@ -25,6 +25,13 @@
 -  [Function `length`](#0x1_smart_vector_length)
 -  [Function `is_empty`](#0x1_smart_vector_is_empty)
 -  [Specification](#@Specification_1)
+    -  [Struct `SmartVector`](#@Specification_1_SmartVector)
+    -  [Function `empty`](#@Specification_1_empty)
+    -  [Function `empty_with_config`](#@Specification_1_empty_with_config)
+    -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `pop_back`](#@Specification_1_pop_back)
+    -  [Function `swap_remove`](#@Specification_1_swap_remove)
     -  [Function `swap`](#@Specification_1_swap)
 
 
@@ -753,6 +760,168 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 ## Specification
 
 
+<a name="@Specification_1_SmartVector"></a>
+
+### Struct `SmartVector`
+
+
+<pre><code><b>struct</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">SmartVector</a>&lt;T&gt; <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>inline_vec: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>big_vec: <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>inline_capacity: <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>bucket_size: <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size)
+    || (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size) && <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(bucket_size) != 0);
+<b>invariant</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity)
+    || (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(inline_vec) &lt;= <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(inline_capacity));
+<b>invariant</b> (<a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(inline_capacity) && <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(bucket_size))
+    || (<a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(inline_capacity) && <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(bucket_size));
+</code></pre>
+
+
+
+<a name="@Specification_1_empty"></a>
+
+### Function `empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty">empty</a>&lt;T: store&gt;(): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_empty_with_config"></a>
+
+### Function `empty_with_config`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_empty_with_config">empty_with_config</a>&lt;T: store&gt;(inline_capacity: u64, bucket_size: u64): <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> bucket_size == 0;
+</code></pre>
+
+
+
+<a name="@Specification_1_destroy_empty"></a>
+
+### Function `destroy_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_destroy_empty">destroy_empty</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !(<a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v));
+<b>aborts_if</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) != 0
+    || <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec);
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, i: u64): &T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
+    (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+);
+</code></pre>
+
+
+
+<a name="@Specification_1_pop_back"></a>
+
+### Function `pop_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_pop_back">pop_back</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;): T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b>  <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec)
+    &&
+    (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec).buckets) == 0);
+<b>aborts_if</b> <a href="smart_vector.md#0x1_smart_vector_is_empty">is_empty</a>(v);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
+    (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+);
+<b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == <a href="smart_vector.md#0x1_smart_vector_length">length</a>(<b>old</b>(v)) - 1;
+</code></pre>
+
+
+
+<a name="@Specification_1_swap_remove"></a>
+
+### Function `swap_remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_swap_remove">swap_remove</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, i: u64): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v);
+<b>aborts_if</b> <a href="../../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(v.big_vec) && (
+    (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(v.inline_vec) + <a href="big_vector.md#0x1_big_vector_length">big_vector::length</a>&lt;T&gt;(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(v.big_vec))) &gt; MAX_U64
+);
+<b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_length">length</a>(v) == <a href="smart_vector.md#0x1_smart_vector_length">length</a>(<b>old</b>(v)) - 1;
+</code></pre>
+
+
+
 <a name="@Specification_1_swap"></a>
 
 ### Function `swap`
@@ -764,7 +933,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>pragma</b> opaque;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

@@ -9,7 +9,7 @@ use crate::{
     instantiation_loops::InstantiationLoopChecker, instruction_consistency::InstructionConsistency,
     limits::LimitsVerifier, script_signature,
     script_signature::no_additional_script_signature_checks, signature::SignatureChecker,
-    struct_defs::RecursiveStructDefChecker,
+    signature_v2, struct_defs::RecursiveStructDefChecker,
 };
 use move_binary_format::{
     check_bounds::BoundsChecker,
@@ -37,6 +37,7 @@ pub struct VerifierConfig {
     pub max_basic_blocks_in_script: Option<usize>,
     pub max_per_fun_meter_units: Option<u128>,
     pub max_per_mod_meter_units: Option<u128>,
+    pub use_signature_checker_v2: bool,
 }
 
 /// Helper for a "canonical" verification of a module.
@@ -94,11 +95,20 @@ pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModul
         })?;
         LimitsVerifier::verify_module(config, module)?;
         DuplicationChecker::verify_module(module)?;
-        SignatureChecker::verify_module(module)?;
+
+        if config.use_signature_checker_v2 {
+            signature_v2::verify_module(module)?;
+        } else {
+            SignatureChecker::verify_module(module)?;
+        }
+
         InstructionConsistency::verify_module(module)?;
         constants::verify_module(module)?;
         friends::verify_module(module)?;
-        ability_field_requirements::verify_module(module)?;
+        if !config.use_signature_checker_v2 {
+            // This has been merged into the new signature checker so no need to run it if that one is enabled.
+            ability_field_requirements::verify_module(module)?;
+        }
         RecursiveStructDefChecker::verify_module(module)?;
         InstantiationLoopChecker::verify_module(module)?;
         CodeUnitVerifier::verify_module(config, module)?;
@@ -138,7 +148,13 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
         BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;
         LimitsVerifier::verify_script(config, script)?;
         DuplicationChecker::verify_script(script)?;
-        SignatureChecker::verify_script(script)?;
+
+        if config.use_signature_checker_v2 {
+            signature_v2::verify_script(script)?;
+        } else {
+            SignatureChecker::verify_script(script)?;
+        }
+
         InstructionConsistency::verify_script(script)?;
         constants::verify_script(script)?;
         CodeUnitVerifier::verify_script(config, script)?;
@@ -190,6 +206,8 @@ impl Default for VerifierConfig {
             // max_per_mod_meter_units: Some(1000 * 8000),
             max_per_fun_meter_units: None,
             max_per_mod_meter_units: None,
+
+            use_signature_checker_v2: true,
         }
     }
 }
@@ -227,6 +245,8 @@ impl VerifierConfig {
             // Same as the default.
             max_per_fun_meter_units: Some(1000 * 8000),
             max_per_mod_meter_units: Some(1000 * 8000),
+
+            use_signature_checker_v2: true,
         }
     }
 }

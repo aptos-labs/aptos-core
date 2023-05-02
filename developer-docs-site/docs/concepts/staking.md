@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](./blockchain.md#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 

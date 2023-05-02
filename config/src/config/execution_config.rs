@@ -19,12 +19,19 @@ const GENESIS_DEFAULT: &str = "genesis.blob";
 #[serde(default, deny_unknown_fields)]
 pub struct ExecutionConfig {
     #[serde(skip)]
+    /// For testing purposes, the ability to add a genesis transaction directly
     pub genesis: Option<Transaction>,
+    /// Location of the genesis file
     pub genesis_file_location: PathBuf,
+    /// Number of threads to run execution
     pub concurrency_level: u16,
+    /// Number of threads to read proofs
     pub num_proof_reading_threads: u16,
+    /// Enables paranoid mode for types, which adds extra runtime VM checks
     pub paranoid_type_verification: bool,
+    /// Enables paranoid mode for hot potatoes, which adds extra runtime VM checks
     pub paranoid_hot_potato_verification: bool,
+    /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
 }
 

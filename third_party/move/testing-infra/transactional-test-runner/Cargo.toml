@@ -30,7 +30,6 @@ rayon = "1.5.0"
 regex = "1.1.9"
 tempfile = "3.2.0"
 
-move-stackless-bytecode-interpreter = { path = "../../move-prover/interpreter" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-vm-runtime = { path = "../../move-vm/runtime" }
