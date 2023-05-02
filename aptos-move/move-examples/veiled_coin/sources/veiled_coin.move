@@ -506,7 +506,7 @@ module veiled_coin::veiled_coin {
         );
 
         let coin_store = VeiledCoinStore<CoinType> {
-            private_balance: elgamal::new_ciphertext_from_compressed_points(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
+            private_balance: elgamal::ciphertext_from_compressed_points(ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed()),
             deposit_events: account::new_event_handle<DepositEvent>(account),
             withdraw_events: account::new_event_handle<WithdrawEvent>(account),
             pubkey: pubkey,
