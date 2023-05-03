@@ -463,10 +463,6 @@ jemallocator = { version = "0.3.2", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-k8s-openapi = { version = "0.11.0", default-features = false, features = [
-    "v1_15",
-] }
-kube = { version = "0.51.0", features = ["jsonpatch"] }
 libfuzzer-sys = "=0.3.2"
 libsecp256k1 = "0.7.0"
 log = "0.4.17"
