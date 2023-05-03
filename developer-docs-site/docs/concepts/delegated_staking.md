@@ -124,7 +124,6 @@ Delegators can unlock stake at any time. However, the stake will only become wit
 
 Lockup cannot be reset. 
 
-
 ## Rewards
 
 Rewards for delegated staking are calculated by using:
