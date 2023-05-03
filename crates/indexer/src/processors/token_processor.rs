@@ -9,36 +9,32 @@ use crate::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::{
-        coin_models::coin_activities::MAX_ENTRY_FUNCTION_LENGTH,
-        token_models::{
-            ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
-            collection_datas::{CollectionData, CurrentCollectionData},
-            nft_points::NftPoints,
-            token_activities::TokenActivity,
-            token_claims::CurrentTokenPendingClaim,
-            token_datas::{CurrentTokenData, TokenData},
-            token_ownerships::{CurrentTokenOwnership, TokenOwnership},
-            tokens::{
-                CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableHandleToOwner,
-                TableMetadataForToken, Token, TokenDataIdHash,
-            },
-            v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
-            v2_token_activities::TokenActivityV2,
-            v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
-            v2_token_ownerships::{
-                CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, TokenOwnershipV2,
-            },
-            v2_token_utils::{
-                AptosCollection, FixedSupply, FungibleAssetMetadata, ObjectCore,
-                TokenV2AggregatedData, TokenV2AggregatedDataMapping, UnlimitedSupply,
-            },
+    models::token_models::{
+        ans_lookup::{CurrentAnsLookup, CurrentAnsLookupPK},
+        collection_datas::{CollectionData, CurrentCollectionData},
+        nft_points::NftPoints,
+        token_activities::TokenActivity,
+        token_claims::CurrentTokenPendingClaim,
+        token_datas::{CurrentTokenData, TokenData},
+        token_ownerships::{CurrentTokenOwnership, TokenOwnership},
+        tokens::{
+            CurrentTokenOwnershipPK, CurrentTokenPendingClaimPK, TableHandleToOwner,
+            TableMetadataForToken, Token, TokenDataIdHash,
+        },
+        v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
+        v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
+        v2_token_ownerships::{
+            CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, TokenOwnershipV2,
+        },
+        v2_token_utils::{
+            AptosCollection, FixedSupply, FungibleAssetMetadata, ObjectCore, TokenV2AggregatedData,
+            TokenV2AggregatedDataMapping, UnlimitedSupply,
         },
     },
     schema,
-    util::{parse_timestamp, standardize_address, truncate_str},
+    util::{parse_timestamp, standardize_address},
 };
-use aptos_api_types::{Transaction, TransactionPayload, WriteSetChange};
+use aptos_api_types::{Transaction, WriteSetChange};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
@@ -96,7 +92,6 @@ fn insert_to_db_impl(
         collections_v2,
         token_datas_v2,
         token_ownerships_v2,
-        token_activities_v2,
         current_collections_v2,
         current_token_datas_v2,
         current_token_ownerships_v2,
@@ -104,7 +99,6 @@ fn insert_to_db_impl(
         &[CollectionV2],
         &[TokenDataV2],
         &[TokenOwnershipV2],
-        &[TokenActivityV2],
         &[CurrentCollectionV2],
         &[CurrentTokenDataV2],
         &[CurrentTokenOwnershipV2],
@@ -127,7 +121,6 @@ fn insert_to_db_impl(
     insert_collections_v2(conn, collections_v2)?;
     insert_token_datas_v2(conn, token_datas_v2)?;
     insert_token_ownerships_v2(conn, token_ownerships_v2)?;
-    insert_token_activities_v2(conn, token_activities_v2)?;
     insert_current_collections_v2(conn, current_collections_v2)?;
     insert_current_token_datas_v2(conn, current_token_datas_v2)?;
     insert_current_token_ownerships_v2(conn, current_token_ownerships_v2)?;
@@ -158,7 +151,6 @@ fn insert_to_db(
         collections_v2,
         token_datas_v2,
         token_ownerships_v2,
-        token_activities_v2,
         current_collections_v2,
         current_token_datas_v2,
         current_token_ownerships_v2,
@@ -166,7 +158,6 @@ fn insert_to_db(
         Vec<CollectionV2>,
         Vec<TokenDataV2>,
         Vec<TokenOwnershipV2>,
-        Vec<TokenActivityV2>,
         Vec<CurrentCollectionV2>,
         Vec<CurrentTokenDataV2>,
         Vec<CurrentTokenOwnershipV2>,
@@ -201,7 +192,6 @@ fn insert_to_db(
                     &collections_v2,
                     &token_datas_v2,
                     &token_ownerships_v2,
-                    &token_activities_v2,
                     &current_collections_v2,
                     &current_token_datas_v2,
                     &current_token_ownerships_v2,
@@ -227,7 +217,6 @@ fn insert_to_db(
                 let collections_v2 = clean_data_for_db(collections_v2, true);
                 let token_datas_v2 = clean_data_for_db(token_datas_v2, true);
                 let token_ownerships_v2 = clean_data_for_db(token_ownerships_v2, true);
-                let token_activities_v2 = clean_data_for_db(token_activities_v2, true);
                 let current_collections_v2 = clean_data_for_db(current_collections_v2, true);
                 let current_token_datas_v2 = clean_data_for_db(current_token_datas_v2, true);
                 let current_token_ownerships_v2 =
@@ -249,7 +238,6 @@ fn insert_to_db(
                         &collections_v2,
                         &token_datas_v2,
                         &token_ownerships_v2,
-                        &token_activities_v2,
                         &current_collections_v2,
                         &current_token_datas_v2,
                         &current_token_ownerships_v2,
@@ -647,27 +635,6 @@ fn insert_token_ownerships_v2(
     Ok(())
 }
 
-fn insert_token_activities_v2(
-    conn: &mut PgConnection,
-    items_to_insert: &[TokenActivityV2],
-) -> Result<(), diesel::result::Error> {
-    use schema::token_activities_v2::dsl::*;
-
-    let chunks = get_chunks(items_to_insert.len(), TokenActivityV2::field_count());
-
-    for (start_ind, end_ind) in chunks {
-        execute_with_better_error(
-            conn,
-            diesel::insert_into(schema::token_activities_v2::table)
-                .values(&items_to_insert[start_ind..end_ind])
-                .on_conflict((transaction_version, event_index))
-                .do_nothing(),
-            None,
-        )?;
-    }
-    Ok(())
-}
-
 fn insert_current_collections_v2(
     conn: &mut PgConnection,
     items_to_insert: &[CurrentCollectionV2],
@@ -910,7 +877,6 @@ impl TransactionProcessor for TokenTransactionProcessor {
             collections_v2,
             token_datas_v2,
             token_ownerships_v2,
-            token_activities_v2,
             current_collections_v2,
             current_token_ownerships_v2,
             current_token_datas_v2,
@@ -941,7 +907,6 @@ impl TransactionProcessor for TokenTransactionProcessor {
                 collections_v2,
                 token_datas_v2,
                 token_ownerships_v2,
-                token_activities_v2,
                 current_collections_v2,
                 current_token_ownerships_v2,
                 current_token_datas_v2,
@@ -975,7 +940,6 @@ fn parse_v2_token(
     Vec<CollectionV2>,
     Vec<TokenDataV2>,
     Vec<TokenOwnershipV2>,
-    Vec<TokenActivityV2>,
     Vec<CurrentCollectionV2>,
     Vec<CurrentTokenDataV2>,
     Vec<CurrentTokenOwnershipV2>,
@@ -984,7 +948,6 @@ fn parse_v2_token(
     let mut collections_v2 = vec![];
     let mut token_datas_v2 = vec![];
     let mut token_ownerships_v2 = vec![];
-    let mut token_activities_v2 = vec![];
     let mut current_collections_v2: HashMap<CurrentCollectionV2PK, CurrentCollectionV2> =
         HashMap::new();
     let mut current_token_datas_v2: HashMap<CurrentTokenDataV2PK, CurrentTokenDataV2> =
@@ -1001,14 +964,6 @@ fn parse_v2_token(
         if let Transaction::UserTransaction(user_txn) = txn {
             let txn_version = user_txn.info.version.0 as i64;
             let txn_timestamp = parse_timestamp(user_txn.timestamp.0, txn_version);
-
-            let entry_function_id_str = match &user_txn.request.payload {
-                TransactionPayload::EntryFunctionPayload(payload) => Some(truncate_str(
-                    &payload.function.to_string(),
-                    MAX_ENTRY_FUNCTION_LENGTH,
-                )),
-                _ => None,
-            };
 
             // Need to do a first pass to get all the objects
             for (_, wsc) in user_txn.info.changes.iter().enumerate() {
@@ -1219,20 +1174,6 @@ fn parse_v2_token(
                     _ => {},
                 }
             }
-
-            for (index, event) in user_txn.events.iter().enumerate() {
-                if let Some(event) = TokenActivityV2::get_v1_from_parsed_event(
-                    event,
-                    txn_version,
-                    txn_timestamp,
-                    index as i64,
-                    &entry_function_id_str,
-                )
-                .unwrap()
-                {
-                    token_activities_v2.push(event);
-                }
-            }
         }
     }
 
@@ -1269,7 +1210,6 @@ fn parse_v2_token(
         collections_v2,
         token_datas_v2,
         token_ownerships_v2,
-        token_activities_v2,
         current_collections_v2,
         current_token_datas_v2,
         current_token_ownerships_v2,
