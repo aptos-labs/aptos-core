@@ -404,6 +404,51 @@ impl PropertyMap {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OptionalSupply {
+    vec: Vec<Supply>,
+}
+
+impl OptionalSupply {
+    pub fn get_supply(&self) -> BigDecimal {
+        if let Some(supply) = self.vec.first() {
+            supply.get_supply()
+        } else {
+            None
+        }
+    }
+
+    pub fn get_maximum(&self) -> Option<BigDecimal> {
+        if let Some(supply) = self.vec.first() {
+            supply.get_maximum()
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Supply {
+    current: BigDecimalWrapper,
+    maximum: Vec<BigDecimalVectorWrapper>,
+}
+
+impl Supply {
+    /// TODO: Extract maximum from Supply. Not sure how to do that right this moment
+    pub fn get_maximum(&self) -> Option<BigDecimal> {
+        None
+    }
+
+    /// TODO: Not sure how to handle aggregator right now (tracked in a table?). Can only read from
+    /// Integer portion of OptionalAggregator
+    pub fn get_supply(&self) -> BigDecimal {
+        self.current.0.get_supply()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenResource {
     AptosCollection(AptosCollection),
     Collection(Collection),
