@@ -9,11 +9,11 @@ use crate::{
         transaction::backup::{TransactionBackupController, TransactionBackupOpt},
     },
     metadata,
-    metadata::cache::MetadataCacheOpt,
+    metadata::{cache::MetadataCacheOpt, view::MetadataView, CompactionTimestampsMeta, Metadata},
     metrics::backup::{
         EPOCH_ENDING_EPOCH, HEARTBEAT_TS, STATE_SNAPSHOT_EPOCH, TRANSACTION_VERSION,
     },
-    storage::BackupStorage,
+    storage::{BackupStorage, FileHandle},
     utils::{
         backup_service_client::BackupServiceClient, unix_timestamp_sec, ConcurrentDownloadsOpt,
         GlobalBackupOpt,
@@ -21,11 +21,16 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_db::backup::backup_handler::DbState;
+use aptos_infallible::duration_since_epoch;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use futures::{stream, Future, StreamExt};
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
 use tokio::{
     sync::watch,
     time::{interval, Duration},
@@ -244,7 +249,7 @@ impl BackupCoordinator {
             self.state_snapshot_interval_epochs,
         );
 
-        // <= becuse db_state.epoch is still open
+        // <= because db_state.epoch is still open
         if db_state.epoch <= epoch {
             // wait for the next db_state update
             return Ok(last_snapshot_epoch_in_backup);
@@ -325,6 +330,139 @@ impl BackupCoordinator {
                 }
             },
         )
+    }
+}
+
+pub struct BackupCompactor {
+    storage: Arc<dyn BackupStorage>,
+    metadata_cache_opt: MetadataCacheOpt,
+    epoch_ending_file_compact_factor: usize,
+    state_snapshot_file_compact_factor: usize,
+    transaction_file_compact_factor: usize,
+    concurrent_downloads: usize,
+    remove_compacted_files_after_secs: u64,
+}
+
+impl BackupCompactor {
+    pub fn new(
+        epoch_ending_file_compact_factor: usize,
+        state_snapshot_file_compact_factor: usize,
+        transaction_file_compact_factor: usize,
+        metadata_cache_opt: MetadataCacheOpt,
+        storage: Arc<dyn BackupStorage>,
+        concurrent_downloads: usize,
+        remove_compacted_files_after_secs: u64,
+    ) -> Self {
+        BackupCompactor {
+            storage,
+            metadata_cache_opt,
+            epoch_ending_file_compact_factor,
+            state_snapshot_file_compact_factor,
+            transaction_file_compact_factor,
+            concurrent_downloads,
+            remove_compacted_files_after_secs,
+        }
+    }
+
+    /// Update the existing mapping and return the files to be moved out of metadata folder
+    fn update_compaction_timestamps(
+        &self,
+        meta_view: &mut MetadataView,
+        files: Vec<FileHandle>,
+        new_files: HashSet<FileHandle>,
+    ) -> Result<(Vec<FileHandle>, CompactionTimestampsMeta)> {
+        // Get the current timestamp
+        let now = duration_since_epoch().as_secs();
+        // Iterate the metadata_compaction_timestamps and remove the expired files
+        let mut expired_files: Vec<FileHandle> = Vec::new();
+        let mut to_save_files: HashMap<FileHandle, Option<u64>> = HashMap::new();
+        let compaction_timestamps = meta_view
+            .select_latest_compaction_timestamps()
+            .as_ref()
+            .map(|meta| meta.compaction_timestamps.clone())
+            .unwrap_or_default();
+        for file in files {
+            // exclude newly compacted files
+            if new_files.contains(&file) {
+                continue;
+            }
+            if let Some(timestamp) = compaction_timestamps.get(&file.to_string()) {
+                if let Some(time_value) = timestamp {
+                    // file is in metadata_compaction_timestamps and expired
+                    if now > (*time_value + self.remove_compacted_files_after_secs) {
+                        expired_files.push(file);
+                    } else {
+                        to_save_files.insert(file.to_string(), *timestamp);
+                    }
+                } else {
+                    to_save_files.insert(file.to_string(), Some(now));
+                }
+            } else {
+                to_save_files.insert(file.to_string(), Some(now));
+            }
+        }
+        // update the metaview compaction timestamps
+        let compaction_meta =
+            CompactionTimestampsMeta::new(to_save_files, duration_since_epoch().as_secs());
+        Ok((expired_files, compaction_meta))
+    }
+
+    pub async fn run(self) -> Result<()> {
+        info!("Backup compaction started");
+        // sync the metadata from backup storage
+        let mut metaview = metadata::cache::sync_and_load(
+            &self.metadata_cache_opt,
+            Arc::clone(&self.storage),
+            self.concurrent_downloads,
+        )
+        .await?;
+
+        let files = metaview.get_file_handles();
+
+        info!("Start compacting backup metadata files.");
+        let mut new_files: HashSet<FileHandle> = HashSet::new(); // record overwrite file names
+        for range in metaview.compact_epoch_ending_backups(self.epoch_ending_file_compact_factor)? {
+            let (epoch_range, file_name) =
+                Metadata::compact_epoch_ending_backup_range(range.to_vec())?;
+            let file_handle = self
+                .storage
+                .save_metadata_lines(&file_name, epoch_range.as_slice())
+                .await?;
+            new_files.insert(file_handle);
+        }
+        for range in metaview.compact_transaction_backups(self.transaction_file_compact_factor)? {
+            let (txn_range, file_name) =
+                Metadata::compact_transaction_backup_range(range.to_vec())?;
+            let file_handle = self
+                .storage
+                .save_metadata_lines(&file_name, txn_range.as_slice())
+                .await?;
+            new_files.insert(file_handle);
+        }
+        for range in metaview.compact_state_backups(self.state_snapshot_file_compact_factor)? {
+            let (state_range, file_name) =
+                Metadata::compact_statesnapshot_backup_range(range.to_vec())?;
+            let file_handle = self
+                .storage
+                .save_metadata_lines(&file_name, state_range.as_slice())
+                .await?;
+            new_files.insert(file_handle);
+        }
+
+        // Move expired files to the metadata backup folder
+        let (to_move, compaction_meta) =
+            self.update_compaction_timestamps(&mut metaview, files, new_files)?;
+        for file in to_move {
+            // directly return if any of the backup task fails
+            info!(file = file, "Backup metadata file.");
+            self.storage.backup_metadata_file(&file).await?
+        }
+        // save the metadata compaction timestamps
+        let metadata = Metadata::new_compaction_timestamps(compaction_meta);
+        self.storage
+            .save_metadata_line(&metadata.name(), &metadata.to_text_line()?)
+            .await?;
+        Ok(())
     }
 }
 

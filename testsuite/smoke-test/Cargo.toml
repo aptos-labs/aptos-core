@@ -21,7 +21,7 @@ aptos-config = { workspace = true }
 aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-debugger = { workspace = true }
-aptos-faucet = { workspace = true }
+aptos-faucet-core = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
@@ -35,6 +35,7 @@ aptos-sdk = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-genesis = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true }
@@ -45,6 +46,7 @@ reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+walkdir = { workspace = true }
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }

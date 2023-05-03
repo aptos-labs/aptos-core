@@ -1,0 +1,18 @@
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_unqualified_function.move:3:9
+  │
+3 │         bar();
+  │         ^^^ Invalid function usage. Unbound variable 'bar'
+
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_unqualified_function.move:4:17
+  │
+4 │         let x = bar();
+  │                 ^^^ Invalid function usage. Unbound variable 'bar'
+
+error[E03009]: unbound variable
+  ┌─ tests/move_check/naming/unbound_unqualified_function.move:5:10
+  │
+5 │         *bar() = 0;
+  │          ^^^ Invalid function usage. Unbound variable 'bar'
+

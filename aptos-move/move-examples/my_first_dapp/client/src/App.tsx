@@ -6,7 +6,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 
 import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 import { CheckboxChangeEvent } from "antd/es/checkbox";
-import { AptosClient } from "aptos";
+import { Network, Provider } from "aptos";
 
 type Task = {
   address: string;
@@ -15,8 +15,7 @@ type Task = {
   task_id: string;
 };
 
-export const NODE_URL = "https://fullnode.devnet.aptoslabs.com";
-export const client = new AptosClient(NODE_URL);
+export const provider = new Provider(Network.DEVNET);
 // change this to be your module account address
 export const moduleAddress = "0xcbddf398841353776903dbab2fdaefc54f181d07e114ae818b1a67af28d1b018";
 
@@ -35,7 +34,10 @@ function App() {
   const fetchList = async () => {
     if (!account) return [];
     try {
-      const todoListResource = await client.getAccountResource(account?.address, `${moduleAddress}::main::TodoList`);
+      const todoListResource = await provider.getAccountResource(
+        account?.address,
+        `${moduleAddress}::todolist::TodoList`,
+      );
       setAccountHasList(true);
       // tasks table handle
       const tableHandle = (todoListResource as any).data.tasks.handle;
@@ -47,10 +49,10 @@ function App() {
       while (counter <= taskCounter) {
         const tableItem = {
           key_type: "u64",
-          value_type: `${moduleAddress}::main::Task`,
+          value_type: `${moduleAddress}::todolist::Task`,
           key: `${counter}`,
         };
-        const task = await client.getTableItem(tableHandle, tableItem);
+        const task = await provider.getTableItem(tableHandle, tableItem);
         tasks.push(task);
         counter++;
       }
@@ -67,7 +69,7 @@ function App() {
     // build a transaction payload to be submited
     const payload = {
       type: "entry_function_payload",
-      function: `${moduleAddress}::main::create_list`,
+      function: `${moduleAddress}::todolist::create_list`,
       type_arguments: [],
       arguments: [],
     };
@@ -75,7 +77,7 @@ function App() {
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
       setAccountHasList(true);
     } catch (error: any) {
       setAccountHasList(false);
@@ -91,7 +93,7 @@ function App() {
     // build a transaction payload to be submited
     const payload = {
       type: "entry_function_payload",
-      function: `${moduleAddress}::main::create_task`,
+      function: `${moduleAddress}::todolist::create_task`,
       type_arguments: [],
       arguments: [newTask],
     };
@@ -111,7 +113,7 @@ function App() {
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
 
       // Create a new array based on current state:
       let newTasks = [...tasks];
@@ -135,7 +137,7 @@ function App() {
     setTransactionInProgress(true);
     const payload = {
       type: "entry_function_payload",
-      function: `${moduleAddress}::main::complete_task`,
+      function: `${moduleAddress}::todolist::complete_task`,
       type_arguments: [],
       arguments: [taskId],
     };
@@ -144,7 +146,7 @@ function App() {
       // sign and submit transaction to chain
       const response = await signAndSubmitTransaction(payload);
       // wait for transaction
-      await client.waitForTransaction(response.hash);
+      await provider.waitForTransaction(response.hash);
 
       setTasks((prevState) => {
         const newState = prevState.map((obj) => {
@@ -232,7 +234,7 @@ function App() {
                       ]}
                     >
                       <List.Item.Meta
-                        title={task.task_id}
+                        title={task.content}
                         description={
                           <a
                             href={`https://explorer.aptoslabs.com/account/${task.address}/`}

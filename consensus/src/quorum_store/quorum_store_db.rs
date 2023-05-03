@@ -5,10 +5,11 @@ use crate::{
     error::DbError,
     quorum_store::{
         schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME},
-        types::{BatchId, PersistedValue},
+        types::PersistedValue,
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::proof_of_store::BatchId;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
@@ -19,13 +20,14 @@ pub(crate) trait QuorumStoreStorage: Sync + Send {
 
     fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>>;
 
-    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError>;
+    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError>;
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError>;
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
 
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError>;
+
     fn save_batch_id(&self, epoch: u64, batch_id: BatchId) -> Result<(), DbError>;
 }
 
@@ -76,13 +78,13 @@ impl QuorumStoreStorage for QuorumStoreDB {
         iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()
     }
 
-    fn save_batch(&self, digest: HashValue, batch: PersistedValue) -> Result<(), DbError> {
+    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError> {
         trace!(
             "QS: db persists digest {} expiration {:?}",
-            digest,
-            batch.expiration
+            batch.digest(),
+            batch.expiration()
         );
-        Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
+        Ok(self.db.put::<BatchSchema>(batch.digest(), &batch)?)
     }
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError> {
@@ -136,7 +138,7 @@ impl QuorumStoreStorage for MockQuorumStoreDB {
         Ok(HashMap::new())
     }
 
-    fn save_batch(&self, _: HashValue, _: PersistedValue) -> Result<(), DbError> {
+    fn save_batch(&self, _: PersistedValue) -> Result<(), DbError> {
         Ok(())
     }
 

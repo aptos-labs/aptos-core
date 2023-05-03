@@ -65,7 +65,12 @@ const IMAGES_TO_RELEASE = {
     release: [
       Features.Default,
     ],
-  }
+  },
+  "indexer-grpc": {
+    release: [
+      Features.Default,
+    ],
+  },
 };
 
 import { execSync } from "node:child_process";
@@ -158,8 +163,11 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
         const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
         console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
         await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-        await $`${crane} copy ${imageSource} ${imageTarget}`;
-        await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+        // use docker pull/tag/push instead of crane copy for now to circumvent bug: https://github.com/google/go-containerregistry/issues/1679
+        await dockerMirrorRepo(imageSource, imageTarget);
+        await dockerMirrorRepo(imageSource, joinTagSegments(imageTarget, parsedArgs.GIT_SHA));
+        // await $`${crane} copy ${imageSource} ${imageTarget}`;
+        // await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
       }
     }
   }
@@ -168,6 +176,14 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
 // joinTagSegments joins tag segments with a dash, but only if the segment is not empty
 function joinTagSegments(...segments) {
   return segments.filter((s) => s).join("_");
+}
+
+// dockerMirrorRepo mirrors a docker image from one repo to another
+// Simply does what crane copy does, but with docker pull/tag/push
+async function dockerMirrorRepo(imageSource, imageTarget) {
+  await $`docker pull ${imageSource}`;
+  await $`docker tag ${imageSource} ${imageTarget}`;
+  await $`docker push ${imageTarget}`;
 }
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {

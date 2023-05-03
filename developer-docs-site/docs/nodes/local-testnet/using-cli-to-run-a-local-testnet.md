@@ -13,7 +13,7 @@ If you want to use Docker or `aptos-core` source to start and run a local testne
 You can run a local testnet of the Aptos blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes. A local testnet is a great tool for doing local development against a known version of the codebase without having to interact with a live network or deal with the real world costs of a live network.
 
 :::tip Aptos CLI documentation
-If you are new to the Aptos CLI, then see this comprehensive [Aptos CLI user documentation](../../cli-tools/aptos-cli-tool/use-aptos-cli.md).
+If you are new to the Aptos CLI, then see this comprehensive [Aptos CLI user documentation](../../tools/aptos-cli-tool/use-aptos-cli.md).
 :::
 
 ## Starting a local testnet with a faucet
@@ -38,7 +38,7 @@ Completed generating configuration:
 
 Aptos is running, press ctrl-c to exit
 
-Faucet is running.  Faucet endpoint: 0.0.0.0:8081
+Faucet is running.  Faucet endpoint: http://0.0.0.0:8081
 ```
 
 The above command will use the default configuration for the validator node.

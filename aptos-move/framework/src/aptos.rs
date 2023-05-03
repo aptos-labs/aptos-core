@@ -67,6 +67,10 @@ impl ReleaseTarget {
                 "aptos-token",
                 Some("cached-packages/src/aptos_token_sdk_builder.rs"),
             ),
+            (
+                "aptos-token-objects",
+                Some("cached-packages/src/aptos_token_objects_sdk_builder.rs"),
+            ),
         ];
         // Currently we don't have experimental packages only included in particular targets.
         result
@@ -168,12 +172,14 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     let mut result = BTreeMap::new();
     let zero = NumericalAddress::parse_str("0x0").unwrap();
     let one = NumericalAddress::parse_str("0x1").unwrap();
-    let two = NumericalAddress::parse_str("0x2").unwrap();
+    let three = NumericalAddress::parse_str("0x3").unwrap();
+    let four = NumericalAddress::parse_str("0x4").unwrap();
     let resources = NumericalAddress::parse_str("0xA550C18").unwrap();
     result.insert("std".to_owned(), one);
     result.insert("aptos_std".to_owned(), one);
     result.insert("aptos_framework".to_owned(), one);
-    result.insert("aptos_token".to_owned(), two);
+    result.insert("aptos_token".to_owned(), three);
+    result.insert("aptos_token_objects".to_owned(), four);
     result.insert("core_resources".to_owned(), resources);
     result.insert("vm_reserved".to_owned(), zero);
     result

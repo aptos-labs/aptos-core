@@ -1,0 +1,33 @@
+//# publish
+module 0x42.A {
+    struct A has store{
+        f: u64,
+    }
+}
+
+//# publish
+module 0x43.B {
+    import 0x42.A;
+    struct B has store{
+        a: A.A,
+    }
+}
+
+//# publish
+module 0x44.C {
+    import 0x43.B;
+    struct C has store{
+        b: B.B,
+    }
+}
+
+//# publish
+module 0x42.A {
+    import 0x44.C;
+    struct A has store{
+        f: u64,
+    }
+    struct A2 has store{
+        c: C.C,
+    }
+}

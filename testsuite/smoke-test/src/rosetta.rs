@@ -9,16 +9,14 @@ use aptos::{
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::{
-    config::{ApiConfig, PersistableConfig},
-    utils::get_available_port,
-};
+use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_global_constants::GAS_UNIT_PRICE;
 use aptos_rest_client::{
     aptos_api_types::{TransactionOnChainData, UserTransaction},
     Response, Transaction,
@@ -57,7 +55,12 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
+) -> (
+    LocalSwarm,
+    CliTestFramework,
+    JoinHandle<anyhow::Result<()>>,
+    RosettaClient,
+) {
     let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = 5;
@@ -424,6 +427,7 @@ async fn test_account_balance() {
         account_2,
         1_000_000,
         10,
+        1,
     )
     .await;
 
@@ -436,6 +440,47 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::active_stake_account(account_4.address()),
+        1_000_000,
+        1,
+    )
+    .await
+    .unwrap();
+
+    unlock_stake(
+        &swarm.aptos_public_info(),
+        &mut account_4,
+        account_1,
+        1_000,
+        2,
+    )
+    .await;
+
+    // Since unlock_stake was initiated, 1000 APT should be in pending inactive state until lockup ends
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::pending_inactive_stake_account(account_4.address()),
+        1_000,
+        2,
+    )
+    .await
+    .unwrap();
+
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountIdentifier::inactive_stake_account(account_4.address()),
+        0,
+        2,
+    )
+    .await
+    .unwrap();
+
     /* TODO: Support operator stake account in the future
     account_has_balance(
         &rosetta_client,
@@ -455,6 +500,7 @@ async fn create_staking_contract(
     voter: AccountAddress,
     amount: u64,
     commission_percentage: u64,
+    sequence_number: u64,
 ) -> Response<Transaction> {
     let staking_contract_creation = info
         .transaction_factory()
@@ -465,9 +511,27 @@ async fn create_staking_contract(
             commission_percentage,
             vec![],
         ))
-        .sequence_number(1);
+        .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(staking_contract_creation);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn unlock_stake(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    operator: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let unlock_stake = info
+        .transaction_factory()
+        .payload(aptos_stdlib::staking_contract_unlock_stake(
+            operator, amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(unlock_stake);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -546,20 +610,6 @@ async fn test_transfer() {
             break;
         }
     }
-    // Attempt to transfer all coins to another user (should fail)
-    rosetta_client
-        .transfer(
-            &network,
-            sender_private_key,
-            receiver,
-            sender_balance,
-            expiry_time(Duration::from_secs(5)).as_secs(),
-            None,
-            None,
-            None,
-        )
-        .await
-        .expect_err("Should fail simulation since we can't transfer all coins");
 
     // Attempt to transfer more than balance to another user (should fail)
     rosetta_client
@@ -577,9 +627,11 @@ async fn test_transfer() {
         .expect_err("Should fail simulation since we can't transfer more than balance coins");
 
     // Attempt to transfer more than balance to another user (should fail)
-    // TODO(Gas): check this
     let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
+        // We purposely don't set gas unit price here so the builder uses the default.
+        // Note that the default is different in tests. See here:
+        // config/global-constants/src/lib.rs
+        .with_gas_unit_price(GAS_UNIT_PRICE)
         .with_max_gas_amount(1000);
     let txn_payload = aptos_stdlib::aptos_account_transfer(receiver, 100);
     let unsigned_transaction = transaction_factory
@@ -598,7 +650,7 @@ async fn test_transfer() {
         .await
         .expect("Should succeed getting gas estimate")
         .into_inner();
-    let gas_usage = simulation_txn.info.gas_used();
+    let gas_usage = simulation_txn.info.gas_used() * GAS_UNIT_PRICE;
 
     // Attempt to transfer more than balance - gas to another user (should fail)
     rosetta_client
@@ -907,7 +959,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(account_id_2),
         Some(100000000000000),
         Some(5),
@@ -927,7 +979,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Duration::from_secs(5),
         None,
         None,
@@ -972,7 +1024,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_2,
-        Some(account_id_2),
+        Some(account_id_3),
         Some(10),
         Duration::from_secs(5),
         None,
@@ -988,7 +1040,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_1,
+        account_id_2,
         account_id_3,
         Duration::from_secs(5),
         None,
@@ -1003,7 +1055,7 @@ async fn test_block() {
         &rest_client,
         &network_identifier,
         private_key_3,
-        account_id_2,
+        account_id_3,
         account_id_2,
         Duration::from_secs(5),
         None,
@@ -1284,8 +1336,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1324,13 +1378,12 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta = u64::parse(
-                        amount
-                            .value
-                            .strip_prefix('-')
-                            .expect("Should have a negative number"),
-                    )
-                    .expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number")
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Subtract with panic on overflow in case of a negative balance
                     let new_balance = *latest_balance - delta as i128;
@@ -1368,8 +1421,10 @@ async fn parse_operations(
                         native_coin(),
                         "Balance should be the native coin"
                     );
-                    let delta =
-                        u64::parse(&amount.value).expect("Should be able to parse amount value");
+                    let delta = amount
+                        .value
+                        .parse::<u64>()
+                        .expect("Should be able to parse amount value");
 
                     // Add with panic on overflow in case of too high of a balance
                     let new_balance = *latest_balance + delta as i128;
@@ -1507,13 +1562,12 @@ async fn parse_operations(
                     native_coin(),
                     "Balance should be the native coin"
                 );
-                let delta = u64::parse(
-                    amount
-                        .value
-                        .strip_prefix('-')
-                        .expect("Should have a negative number"),
-                )
-                .expect("Should be able to parse amount value");
+                let delta = amount
+                    .value
+                    .strip_prefix('-')
+                    .expect("Should have a negative number")
+                    .parse::<u64>()
+                    .expect("Should be able to parse amount value");
 
                 // Subtract with panic on overflow in case of a negative balance
                 let new_balance = *latest_balance - delta as i128;
@@ -1732,21 +1786,8 @@ async fn parse_operations(
                         ref payload,
                     ) = txn.payload()
                     {
-                        let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
-                        let operator = operation
-                            .metadata
-                            .as_ref()
-                            .unwrap()
-                            .operator
-                            .as_ref()
-                            .unwrap()
-                            .account_address()
-                            .unwrap();
-                        assert_eq!(actual_operator_address, operator);
-
                         let actual_staker_address: AccountAddress =
-                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let staker = operation
                             .metadata
                             .as_ref()
@@ -1757,6 +1798,19 @@ async fn parse_operations(
                             .account_address()
                             .unwrap();
                         assert_eq!(actual_staker_address, staker);
+
+                        let actual_operator_address: AccountAddress =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+                        let operator = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .operator
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+                        assert_eq!(actual_operator_address, operator);
                     } else {
                         panic!("Not an entry function");
                     }
@@ -1810,8 +1864,10 @@ async fn check_balances(
             );
             assert_eq!(
                 expected_balance,
-                u64::parse(&balance.value).expect("Should have a balance from account balance")
-                    as i128,
+                balance
+                    .value
+                    .parse::<u64>()
+                    .expect("Should have a balance from account balance") as i128,
                 "Expected {} to have a balance of {}, but was {} at block {}",
                 account,
                 expected_balance,

@@ -1,16 +1,15 @@
-/**
- * AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
- * current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
- * the stake pool's lockup needs to be at least as long as the proposal's duration.
- *
- * It provides the following flow:
- * 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
- * needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
- * track proposal creation and proposal ids.
- * 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
- * only be used to vote on each proposal exactly once.
- *
- */
+///
+/// AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
+/// current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
+/// the stake pool's lockup needs to be at least as long as the proposal's duration.
+///
+/// It provides the following flow:
+/// 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
+/// needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
+/// track proposal creation and proposal ids.
+/// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
+/// only be used to vote on each proposal exactly once.
+///
 module aptos_framework::aptos_governance {
     use std::error;
     use std::option;

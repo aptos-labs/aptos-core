@@ -176,7 +176,7 @@ Get the non-privileged ID associated with a GUID
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id">id</a>(<a href="guid.md#0x1_guid">guid</a>: &<a href="guid.md#0x1_guid_GUID">GUID</a>): <a href="guid.md#0x1_guid_ID">ID</a> {
-    *&<a href="guid.md#0x1_guid">guid</a>.id
+    <a href="guid.md#0x1_guid">guid</a>.id
 }
 </code></pre>
 
@@ -337,4 +337,4 @@ Return true if the GUID's ID is <code>id</code>
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

@@ -11,11 +11,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         tcpdump \
         iproute2 \
         netcat \
-        procps  
+        procps
 
 RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
+COPY --link --from=tools-builder /aptos/dist/aptos-faucet-service /usr/local/bin/aptos-faucet-service
 
 # Mint proxy listening address
 EXPOSE 8000

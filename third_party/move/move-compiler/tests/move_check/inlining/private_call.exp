@@ -1,0 +1,6 @@
+error[E14002]: Inlined code invalid in this context
+  ┌─ tests/move_check/inlining/private_call.move:4:9
+  │
+4 │         bar()
+  │         ^^^^^ After inlining: indirectly called function `0x42::m::bar` is private in this context
+

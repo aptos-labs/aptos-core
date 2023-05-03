@@ -62,12 +62,13 @@ services:
             sleep 1
           else
             sleep 1
-            /usr/local/bin/aptos-faucet \\
-              --address 0.0.0.0 \\
-              --port 8000 \\
+            /usr/local/bin/aptos-faucet-service \\
+              run-simple \\
+              --listen-address 0.0.0.0 \\
+              --listen-port 8000 \\
               --chain-id TESTING \\
-              --mint-key-file-path /opt/aptos/var/mint.key \\
-              --server-url http://172.16.1.10:8080
+              --key-file-path /opt/aptos/var/mint.key \\
+              --node-url http://172.16.1.10:8080
             echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'
           fi
         done

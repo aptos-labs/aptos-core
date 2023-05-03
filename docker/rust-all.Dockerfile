@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9 AS debian-base
+FROM debian:bullseye@sha256:4effa16ae79ab36347d55ebb6bb4aad411077b72ad735054e684b3eeba373a35 AS debian-base
 
 # Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
 ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
@@ -129,10 +129,12 @@ FROM debian-base AS tools
 RUN echo "deb http://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list && \
     echo "Package: *\nPin: release n=bullseye\nPin-Priority: 50" > /etc/apt/preferences.d/bullseye
 
-RUN apt-get update && apt-get --no-install-recommends -y \
+RUN apt-get update && apt-get --no-install-recommends --allow-downgrades -y \
     install \
     wget \
     curl \
+    perl-base=5.32.1-4+deb11u1 \
+    git \
     libssl1.1 \
     ca-certificates \
     socat \
@@ -183,7 +185,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
+COPY --link --from=builder /aptos/dist/aptos-faucet-service /usr/local/bin/aptos-faucet-service
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
@@ -292,6 +294,7 @@ RUN apt-get update && apt-get install -y \
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
 COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
+COPY --link --from=builder /aptos/dist/aptos-indexer-grpc-parser /usr/local/bin/aptos-indexer-grpc-parser
 
 # The health check port
 EXPOSE 8080
@@ -310,7 +313,7 @@ ENV GIT_SHA ${GIT_SHA}
 
 ### EXPERIMENTAL ###
 
-FROM debian-base as validator-testing-base 
+FROM debian-base as validator-testing-base
 
 RUN apt-get update && apt-get install -y \
     libssl1.1 \
@@ -367,9 +370,9 @@ RUN make install
 WORKDIR ..
 
 ### Validator Image ###
-# We will build a base testing image with the necessary packages and 
-# duplicate steps from validator step. This will, however, reduce 
-# cache invalidation and reduce build times. 
+# We will build a base testing image with the necessary packages and
+# duplicate steps from validator step. This will, however, reduce
+# cache invalidation and reduce build times.
 FROM validator-testing-base  AS validator-testing
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos

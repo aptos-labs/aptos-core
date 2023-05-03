@@ -6,7 +6,8 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::{ArgEnum, ArgGroup, Parser};
+use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -62,7 +63,7 @@ impl CoinSourceArgs {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct ClusterArgs {
-    /// Nodes the cluster should connect to, e.g. http://node.mysite.com:8080
+    /// Nodes the cluster should connect to, e.g. `http://node.mysite.com:8080`
     /// If the port is not provided, it is assumed to be 8080.
     #[clap(short, long, required = true, min_values = 1, parse(try_from_str = parse_target))]
     pub targets: Option<Vec<Url>>,
@@ -102,24 +103,6 @@ impl ClusterArgs {
     }
 }
 
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
-pub enum TransactionTypeArg {
-    CoinTransfer,
-    AccountGeneration,
-    AccountGenerationLargePool,
-    NftMintAndTransfer,
-    PublishPackage,
-    CustomFunctionLargeModuleWorkingSet,
-    CreateNewResource,
-    NoOp,
-}
-
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
-    }
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 #[clap(group(
     ArgGroup::new("mode")
@@ -144,9 +127,6 @@ pub struct EmitArgs {
     /// Time to run --emit-tx for in seconds.
     #[clap(long, default_value = "60")]
     pub duration: u64,
-
-    #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
-    pub invalid_tx: usize,
 
     #[clap(
         long,

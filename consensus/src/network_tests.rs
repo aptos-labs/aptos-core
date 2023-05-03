@@ -104,6 +104,10 @@ impl NetworkPlayground {
         }
     }
 
+    pub fn handle(&self) -> Handle {
+        self.executor.clone()
+    }
+
     /// HashMap of supported protocols to initialize ConsensusNetworkClient.
     pub fn peer_protocols(&self) -> Arc<PeersAndMetadata> {
         self.peers_and_metadata.clone()

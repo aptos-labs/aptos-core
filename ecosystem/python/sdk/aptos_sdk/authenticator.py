@@ -146,8 +146,12 @@ class MultiAgentAuthenticator:
 
 
 class MultiEd25519Authenticator:
-    def __init__(self):
-        raise NotImplementedError
+    public_key: ed25519.MultiPublicKey
+    signature: ed25519.MultiSignature
+
+    def __init__(self, public_key, signature):
+        self.public_key = public_key
+        self.signature = signature
 
     def verify(self, data: bytes) -> bool:
         raise NotImplementedError
@@ -157,4 +161,5 @@ class MultiEd25519Authenticator:
         raise NotImplementedError
 
     def serialize(self, serializer: Serializer):
-        raise NotImplementedError
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)

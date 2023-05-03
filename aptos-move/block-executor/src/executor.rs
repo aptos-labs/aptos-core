@@ -9,24 +9,39 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    output_delta_resolver::OutputDeltaResolver,
-    scheduler::{Scheduler, SchedulerTask, Version, Wave},
+    scheduler::{Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
+use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::debug;
-use aptos_mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
+use aptos_mvhashmap::{
+    types::{MVDataError, MVDataOutput, TxnIndex, Version},
+    MVHashMap,
+};
 use aptos_state_view::TStateView;
-use aptos_types::write_set::WriteOp;
+use aptos_types::{
+    executable::ExecutableTestType, // TODO: fix up with the proper generics.
+    write_set::WriteOp,
+};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{
     collections::btree_map::BTreeMap,
     marker::PhantomData,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    },
 };
+
+#[derive(Debug)]
+enum CommitRole {
+    Coordinator(Vec<Sender<TxnIndex>>, usize),
+    Worker(Receiver<TxnIndex>),
+}
 
 pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -68,16 +83,16 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let (idx_to_execute, incarnation) = version;
-        let txn = &signature_verified_block[idx_to_execute];
+        let txn = &signature_verified_block[idx_to_execute as usize];
 
-        let speculative_view = MVHashMapView::new(versioned_data_cache, scheduler);
+        let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
         let execute_result = executor.execute_transaction(
@@ -97,7 +112,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_data_cache.add_write(&k, write_version, v);
+                versioned_cache.write(&k, write_version, v);
             }
 
             // Then, apply deltas.
@@ -105,7 +120,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_data_cache.add_delta(&k, idx_to_execute, d);
+                versioned_cache.add_delta(&k, idx_to_execute, d);
             }
         };
 
@@ -132,7 +147,7 @@ where
 
         // Remove entries from previous write/delta set that were not overwritten.
         for k in prev_modified_keys {
-            versioned_data_cache.delete(&k, idx_to_execute);
+            versioned_cache.delete(&k, idx_to_execute);
         }
 
         last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
@@ -144,11 +159,11 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
-        use MVHashMapError::*;
-        use MVHashMapOutput::*;
+        use MVDataError::*;
+        use MVDataOutput::*;
 
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
@@ -157,11 +172,13 @@ where
             .expect("Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
-            match versioned_data_cache.read(r.path(), idx_to_validate) {
-                Ok(Version(version, _)) => r.validate_version(version),
+            match versioned_cache.fetch_data(r.path(), idx_to_validate) {
+                Ok(Versioned(version, _)) => r.validate_version(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
-                Err(Dependency(_)) => false, // Dependency implies a validation failure.
-                Err(Unresolved(delta)) => r.validate_unresolved(delta),
+                // Dependency implies a validation failure, and if the original read were to
+                // observe an unresolved delta, it would set the aggregator base value in the
+                // multi-versioned data-structure, resolve, and record the resolved value.
+                Err(Dependency(_)) | Err(Unresolved(_)) => false,
                 Err(NotFound) => r.validate_storage(),
                 // We successfully validate when read (again) results in a delta application
                 // failure. If the failure is speculative, a later validation will fail due to
@@ -179,11 +196,11 @@ where
             counters::SPECULATIVE_ABORT_COUNT.inc();
 
             // Any logs from the aborted execution should be cleared and not reported.
-            clear_speculative_txn_logs(idx_to_validate);
+            clear_speculative_txn_logs(idx_to_validate as usize);
 
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
             for k in last_input_output.modified_keys(idx_to_validate) {
-                versioned_data_cache.mark_estimate(&k, idx_to_validate);
+                versioned_cache.mark_estimate(&k, idx_to_validate);
             }
 
             scheduler.finish_abort(idx_to_validate, incarnation)
@@ -193,46 +210,106 @@ where
         }
     }
 
+    fn commit_hook(
+        &self,
+        txn_idx: TxnIndex,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        base_view: &S,
+    ) {
+        let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
+        let mut delta_writes = Vec::with_capacity(num_deltas);
+        for k in delta_keys {
+            // Note that delta materialization happens concurrenty, but under concurrent
+            // commit_hooks (which may be dispatched by the coordinator), threads may end up
+            // contending on delta materialization of the same aggregator. However, the
+            // materialization is based on previously materialized values and should not
+            // introduce long critical sections. Moreover, with more aggregators, and given
+            // that the commit_hook will be performed at dispersed times based on the
+            // completion of the respetive previous tasks of threads, this should not be
+            // an immediate bottleneck - confirmed by an experiment with 32 core and a
+            // single materialized aggregator. If needed, the contention may be further
+            // mitigated by batching consecutive commit_hooks.
+            let committed_delta = versioned_cache
+                .materialize_delta(&k, txn_idx)
+                .unwrap_or_else(|op| {
+                    let storage_value = base_view
+                        .get_state_value_bytes(&k)
+                        .expect("No base value for committed delta in storage")
+                        .map(|bytes| deserialize(&bytes))
+                        .expect("Cannot deserialize base value for committed delta");
+
+                    versioned_cache.set_aggregator_base_value(&k, storage_value);
+                    op.apply_to(storage_value)
+                        .expect("Materializing delta w. base value set must succeed")
+                });
+
+            // Must contain committed value as we set the base value above.
+            delta_writes.push((
+                k.clone(),
+                WriteOp::Modification(serialize(&committed_delta)),
+            ));
+        }
+        last_input_output.record_delta_writes(txn_idx, delta_writes);
+    }
+
     fn work_task_with_scope(
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_data_cache: &MVHashMap<T::Key, T::Value>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
         scheduler: &Scheduler,
         base_view: &S,
-        committing: bool,
+        role: CommitRole,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
+        let committing = matches!(role, CommitRole::Coordinator(_, _));
+
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
-            // Only one thread try_commit to avoid contention.
-            if committing {
-                // Keep committing txns until there is no more that can be committed now.
-                loop {
-                    if scheduler.try_commit().is_none() {
-                        break;
+            // Only one thread does try_commit to avoid contention.
+            match &role {
+                CommitRole::Coordinator(post_commit_txs, mut idx) => {
+                    while let Some(txn_idx) = scheduler.try_commit() {
+                        post_commit_txs[idx]
+                            .send(txn_idx)
+                            .expect("Worker must be available");
+                        // Iterate round robin over workers to do commit_hook.
+                        idx = (idx + 1) % post_commit_txs.len();
+
+                        if txn_idx as usize + 1 == block.len() {
+                            // Committed the last transaction / everything.
+                            scheduler_task = SchedulerTask::Done;
+                            break;
+                        }
                     }
-                }
+                },
+                CommitRole::Worker(rx) => {
+                    while let Ok(txn_idx) = rx.try_recv() {
+                        self.commit_hook(txn_idx, versioned_cache, last_input_output, base_view);
+                    }
+                },
             }
+
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, wave) => self.validate(
                     version_to_validate,
                     wave,
                     last_input_output,
-                    versioned_data_cache,
+                    versioned_cache,
                     scheduler,
                 ),
                 SchedulerTask::ExecutionTask(version_to_execute, None) => self.execute(
                     version_to_execute,
                     block,
                     last_input_output,
-                    versioned_data_cache,
+                    versioned_cache,
                     scheduler,
                     &executor,
                     base_view,
@@ -248,6 +325,18 @@ where
                 },
                 SchedulerTask::NoTask => scheduler.next_task(committing),
                 SchedulerTask::Done => {
+                    // Make sure to drain any remaining commit tasks assigned by the coordinator.
+                    if let CommitRole::Worker(rx) = &role {
+                        // Until the sender drops the tx, an index for commit_hook might be sent.
+                        while let Ok(txn_idx) = rx.recv() {
+                            self.commit_hook(
+                                txn_idx,
+                                versioned_cache,
+                                last_input_output,
+                                base_view,
+                            );
+                        }
+                    }
                     break;
                 },
             }
@@ -259,39 +348,58 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
+        // Using parallel execution with 1 thread currently will not work as it
+        // will only have a coordinator role but no workers for rolling commit.
+        // Need to special case no roles (commit hook by thread itself) to run
+        // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        let versioned_data_cache = MVHashMap::new();
+        let versioned_cache = MVHashMap::new(None);
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
         }
 
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.len() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
-        let committing = AtomicBool::new(true);
         let scheduler = Scheduler::new(num_txns);
+
+        let mut roles: Vec<CommitRole> = vec![];
+        let mut senders = Vec::with_capacity(self.concurrency_level - 1);
+        for _ in 0..(self.concurrency_level - 1) {
+            let (tx, rx) = mpsc::channel();
+            roles.push(CommitRole::Worker(rx));
+            senders.push(tx);
+        }
+        // Add the coordinator role. Coordinator is responsible for committing
+        // indices and assigning post-commit work per index to other workers.
+        // Note: It is important that the Coordinator is the first thread that
+        // picks up a role will be a coordinator. Hence, if multiple parallel
+        // executors are running concurrently, they will all havean active coordinator.
+        roles.push(CommitRole::Coordinator(senders, 0));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
+                let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
                     self.work_task_with_scope(
                         &executor_initial_arguments,
                         signature_verified_block,
                         &last_input_output,
-                        &versioned_data_cache,
+                        &versioned_cache,
                         &scheduler,
                         base_view,
-                        committing.swap(false, Ordering::SeqCst),
+                        role,
                     );
                 });
             }
         });
         drop(timer);
 
+        let num_txns = num_txns as usize;
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 
@@ -301,7 +409,7 @@ where
         } else {
             let mut ret = None;
             for idx in 0..num_txns {
-                match last_input_output.take_output(idx) {
+                match last_input_output.take_output(idx as TxnIndex) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);
@@ -320,19 +428,15 @@ where
             // Explicit async drops.
             drop(last_input_output);
             drop(scheduler);
+            // TODO: re-use the code cache.
+            drop(versioned_cache);
         });
 
         match maybe_err {
             Some(err) => Err(err),
             None => {
                 final_results.resize_with(num_txns, E::Output::skip_output);
-                let delta_resolver: OutputDeltaResolver<T> =
-                    OutputDeltaResolver::new(versioned_data_cache);
-                // TODO: parallelize when necessary.
-                Ok(final_results
-                    .into_iter()
-                    .zip(delta_resolver.resolve(base_view, num_txns).into_iter())
-                    .collect())
+                Ok(final_results)
             },
         }
     }
@@ -342,7 +446,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let mut data_map = BTreeMap::new();
@@ -350,9 +454,9 @@ where
         let mut ret = Vec::with_capacity(num_txns);
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
-                &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx),
+                &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
-                idx,
+                idx as TxnIndex,
                 true,
             );
 
@@ -383,7 +487,7 @@ where
         }
 
         ret.resize_with(num_txns, E::Output::skip_output);
-        Ok(ret.into_iter().map(|out| (out, vec![])).collect())
+        Ok(ret)
     }
 
     pub fn execute_block(
@@ -391,7 +495,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: Vec<T>,
         base_view: &S,
-    ) -> Result<Vec<(E::Output, Vec<(T::Key, WriteOp)>)>, E::Error> {
+    ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,

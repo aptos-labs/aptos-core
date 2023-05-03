@@ -18,6 +18,8 @@ use aptos_schemadb::{
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
+type ShardId = usize;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub(crate) enum DbMetadataValue {
@@ -50,8 +52,11 @@ pub enum DbMetadataKey {
     StateKvPrunerProgress,
     StateSnapshotRestoreProgress(Version),
     LedgerCommitProgress,
-    StateKVCommitProgress,
+    StateKvCommitProgress,
     OverallCommitProgress,
+    StateKvShardCommitProgress(ShardId),
+    StateMerkleCommitProgress,
+    StateMerkleShardCommitProgress(ShardId),
 }
 
 define_schema!(

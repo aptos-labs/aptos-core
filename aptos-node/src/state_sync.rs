@@ -21,7 +21,7 @@ use aptos_state_sync_driver::{
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::{
-    network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer,
+    network::StorageServiceNetworkEvents, storage::StorageReader, StorageServiceServer,
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
@@ -98,7 +98,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the data streaming service
     let (streaming_service_client, streaming_service_runtime) =
-        setup_data_streaming_service(node_config.state_sync.clone(), aptos_data_client.clone())?;
+        setup_data_streaming_service(node_config.state_sync, aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -179,7 +179,6 @@ fn setup_aptos_data_client(
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
-        node_config.state_sync.storage_service,
         TimeService::real(),
         storage_service_client,
         Some(aptos_data_client_runtime.handle().clone()),

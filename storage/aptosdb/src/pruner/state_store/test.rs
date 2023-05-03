@@ -2,16 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    new_sharded_kv_schema_batch,
     pruner::{state_merkle_pruner_worker::StateMerklePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager,
 };
-use aptos_config::config::{StateKvPrunerConfig, StateMerklePrunerConfig};
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::HashValue;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -46,20 +48,20 @@ fn put_value_set(
         .unwrap();
 
     let ledger_batch = SchemaBatch::new();
-    let state_kv_batch = SchemaBatch::new();
+    let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     state_store
         .put_value_sets(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
             &ledger_batch,
-            &state_kv_batch,
+            &sharded_state_kv_batches,
         )
         .unwrap();
     state_store.ledger_db.write_schemas(ledger_batch).unwrap();
     state_store
         .state_kv_db
-        .write_schemas(state_kv_batch)
+        .commit(version, sharded_state_kv_batches)
         .unwrap();
 
     root
@@ -79,7 +81,7 @@ fn verify_state_in_store(
 }
 
 fn create_state_merkle_pruner_manager(
-    state_merkle_db: &Arc<DB>,
+    state_merkle_db: &Arc<StateMerkleDb>,
     prune_batch_size: usize,
 ) -> StateMerklePrunerManager<StaleNodeIndexSchema> {
     StateMerklePrunerManager::new(Arc::clone(state_merkle_db), StateMerklePrunerConfig {
@@ -250,9 +252,12 @@ fn test_state_store_pruner_partial_version() {
     }
 
     // Make sure all stale indices are gone.
+    //
+    // TODO(grao): Support sharding here.
     assert_eq!(
         aptos_db
             .state_merkle_db
+            .metadata_db()
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())
             .unwrap()
             .count(),
@@ -378,10 +383,11 @@ fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
 
     let mut version = 0;
     let mut current_state_values = HashMap::new();
-    let pruner = StateKvPrunerManager::new(Arc::clone(&db.state_kv_db), StateKvPrunerConfig {
+    let pruner = StateKvPrunerManager::new(Arc::clone(&db.state_kv_db), LedgerPrunerConfig {
         enable: true,
         prune_window: 0,
         batch_size: 1,
+        user_pruning_window_offset: 0,
     });
     for batch in inputs {
         update_store(store, batch.clone().into_iter(), version);
@@ -419,6 +425,7 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
         if pruned {
             assert!(state_store
                 .state_kv_db
+                .db_shard(k.get_shard_id())
                 .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
                     stale_since_version: version,
                     version: *old_version,

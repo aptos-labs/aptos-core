@@ -17,6 +17,7 @@ mod tests;
 
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
+use aptos_build_info::build_information;
 use aptos_config::config::{NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
@@ -45,7 +46,13 @@ const EPOCH_LENGTH_SECS: u64 = 60;
 #[clap(name = "Aptos Node", author, version)]
 pub struct AptosNodeArgs {
     /// Path to node configuration file (or template for local test mode).
-    #[clap(short = 'f', long, parse(from_os_str), required_unless = "test")]
+    #[clap(
+        short = 'f',
+        long,
+        parse(from_os_str),
+        required_unless = "test",
+        required_unless = "info"
+    )]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
@@ -76,11 +83,25 @@ pub struct AptosNodeArgs {
     /// only commit a block when there are user transactions in mempool.
     #[clap(long, requires("test"))]
     lazy: bool,
+
+    /// Display information about the build of this node
+    #[clap(long)]
+    info: bool,
 }
 
 impl AptosNodeArgs {
     /// Runs an Aptos node based on the given command line arguments and config flags
     pub fn run(self) {
+        if self.info {
+            let build_information = build_information!();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&build_information)
+                    .expect("Failed to print build information")
+            );
+            return;
+        }
+
         if self.test {
             println!("WARNING: Entering test mode! This should never be used in production!");
 
@@ -116,9 +137,9 @@ impl AptosNodeArgs {
             }
 
             // A config file exists, attempt to parse the config
-            let config = NodeConfig::load(config_path.clone()).unwrap_or_else(|error| {
+            let config = NodeConfig::load_from_path(config_path.clone()).unwrap_or_else(|error| {
                 panic!(
-                    "Failed to parse node config file! Given file path: {:?}. Error: {:?}",
+                    "Failed to load the node config file! Given file path: {:?}. Error: {:?}",
                     config_path.display(),
                     error
                 )
@@ -157,7 +178,7 @@ pub fn start(
     utils::create_global_rayon_pool(create_global_rayon_pool);
 
     // Initialize the global aptos-node-identity
-    aptos_node_identity::init(config.peer_id())?;
+    aptos_node_identity::init(config.get_peer_id())?;
 
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
@@ -218,7 +239,7 @@ where
 
     // If there's already a config, use it. Otherwise create a test one.
     let config = if validator_config_path.exists() {
-        NodeConfig::load(&validator_config_path)
+        NodeConfig::load_from_path(&validator_config_path)
             .map_err(|error| anyhow!("Unable to load config: {:?}", error))?
     } else {
         // Create a test only config for a single validator node
@@ -287,20 +308,51 @@ fn create_single_node_test_config(
     enable_lazy_mode: bool,
 ) -> NodeConfig {
     // Build a single validator network with a generated config
-    let mut node_config = NodeConfig::default_for_validator();
+    let mut node_config = NodeConfig::get_default_validator_config();
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
+    node_config
+        .consensus
+        .quorum_store
+        .num_workers_for_remote_batches = 1;
+    node_config.consensus.quorum_store_poll_time_ms = 1000;
+
     node_config.execution.concurrency_level = 1;
     node_config.execution.num_proof_reading_threads = 1;
+    node_config.execution.paranoid_hot_potato_verification = false;
+    node_config.execution.paranoid_type_verification = false;
+    node_config
+        .execution
+        .processed_transactions_detailed_counters = false;
+
     node_config.peer_monitoring_service.max_concurrent_requests = 1;
+    node_config
+        .peer_monitoring_service
+        .enable_peer_monitoring_client = false;
+
     node_config
         .mempool
         .shared_mempool_max_concurrent_inbound_syncs = 1;
+    node_config.mempool.default_failovers = 1;
+    node_config.mempool.max_broadcasts_per_peer = 1;
+
     node_config
         .state_sync
         .state_sync_driver
         .enable_auto_bootstrapping = true;
+    node_config
+        .state_sync
+        .state_sync_driver
+        .max_connection_deadline_secs = 1;
+    node_config
+        .state_sync
+        .state_sync_driver
+        .progress_check_interval_ms = 10_000;
+    node_config
+        .state_sync
+        .data_streaming_service
+        .progress_check_interval_ms = 10_000;
 
     // Configure the validator network
     let validator_network = node_config.validator_network.as_mut().unwrap();
@@ -322,7 +374,7 @@ fn create_single_node_test_config(
     if let Some(config_path) = config_path {
         node_config = NodeConfig::load_config(&config_path).unwrap_or_else(|error| {
             panic!(
-                "Failed to load config at path: {:?}. Error: {:?}",
+                "Failed to load persisted config at path: {:?}. Error: {:?}",
                 config_path, error
             )
         });
@@ -338,7 +390,7 @@ fn create_single_node_test_config(
 
     // Set the correct poll count for mempool
     if enable_lazy_mode {
-        node_config.consensus.quorum_store_poll_count = u64::MAX;
+        node_config.consensus.quorum_store_poll_time_ms = 3_600_000;
     }
 
     node_config
@@ -401,6 +453,7 @@ pub fn setup_environment_and_start_node(
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
         &node_config,
         peer_monitoring_service_network_interfaces,
+        db_rw.reader.clone(),
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus

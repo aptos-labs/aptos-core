@@ -9,12 +9,16 @@ import httpx
 from . import ed25519
 from .account import Account
 from .account_address import AccountAddress
-from .authenticator import (Authenticator, Ed25519Authenticator,
-                            MultiAgentAuthenticator)
+from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
-from .transactions import (EntryFunction, MultiAgentRawTransaction,
-                           RawTransaction, SignedTransaction,
-                           TransactionArgument, TransactionPayload)
+from .transactions import (
+    EntryFunction,
+    MultiAgentRawTransaction,
+    RawTransaction,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
 from .type_tag import StructTag, TypeTag
 
 U64_MAX = 18446744073709551615
@@ -363,7 +367,7 @@ class RestClient:
 
         payload = {
             "type": "entry_function_payload",
-            "function": "0x1::coin::transfer",
+            "function": "0x1::aptos_account::transfer_coins",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"{recipient}",
@@ -382,8 +386,8 @@ class RestClient:
         ]
 
         payload = EntryFunction.natural(
-            "0x1::coin",
-            "transfer",
+            "0x1::aptos_account",
+            "transfer_coins",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
             transaction_arguments,
         )

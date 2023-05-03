@@ -46,7 +46,6 @@
 
 # Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
 /crates/aptos-faucet @banool @gregnazario
-/crates/aptos-faucet-cli @gregnazario
 /crates/aptos-genesis @gregnazario
 
 # Owners for the aptos-logger crate

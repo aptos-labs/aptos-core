@@ -2,28 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
+pub mod coverage;
+mod disassembler;
 mod manifest;
 pub mod package_hooks;
-
-pub use package_hooks::*;
-
+mod show;
 pub mod stored_package;
 mod transactional_tests_runner;
 
 use crate::{
+    account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
             load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
-            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir, ProfileOptions,
+            PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            prompt_yes_with_override, write_to_file,
+            profile_or_submit, prompt_yes_with_override, write_to_file,
         },
     },
     governance::CompileScriptFunction,
-    move_tool::manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
+    move_tool::{
+        coverage::SummaryCoverage,
+        disassembler::Disassemble,
+        manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
+    },
     CliCommand, CliResult,
 };
 use aptos_crypto::HashValue;
@@ -36,7 +41,7 @@ use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest}
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{EntryFunction, Script, TransactionArgument, TransactionPayload},
+    transaction::{Script, TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
@@ -45,24 +50,16 @@ use codespan_reporting::{
     term::termcolor::{ColorChoice, StandardStream},
 };
 use itertools::Itertools;
-use move_cli::{
-    self,
-    base::{coverage::CoverageSummaryOptions, test::UnitTestResult},
-};
+use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     u256::U256,
 };
-use move_coverage::{
-    coverage_map::CoverageMap, format_csv_summary, format_human_summary,
-    source_coverage::SourceCoverageBuilder, summary::summarize_inst_cov,
-};
-use move_disassembler::disassembler::Disassembler;
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
+pub use package_hooks::*;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -83,47 +80,53 @@ use transactional_tests_runner::TransactionalTestOpts;
 /// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
+    Clean(CleanPackage),
     Compile(CompilePackage),
     CompileScript(CompileScript),
-    Init(InitPackage),
-    Publish(PublishPackage),
+    #[clap(subcommand)]
+    Coverage(coverage::CoveragePackage),
+    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    Disassemble(Disassemble),
+    Document(DocumentPackage),
     Download(DownloadPackage),
+    Init(InitPackage),
     List(ListPackage),
-    Clean(CleanPackage),
-    VerifyPackage(VerifyPackage),
+    Prove(ProvePackage),
+    Publish(PublishPackage),
     Run(RunFunction),
     RunScript(RunScript),
+    #[clap(subcommand, hide = true)]
+    Show(show::ShowTool),
     Test(TestPackage),
-    Prove(ProvePackage),
-    Document(DocumentPackage),
     TransactionalTest(TransactionalTestOpts),
-    CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
+    VerifyPackage(VerifyPackage),
     View(ViewFunction),
-    Coverage(CoveragePackage),
 }
 
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            MoveTool::Clean(tool) => tool.execute_serialized().await,
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
-            MoveTool::Init(tool) => tool.execute_serialized_success().await,
-            MoveTool::Publish(tool) => tool.execute_serialized().await,
-            MoveTool::Download(tool) => tool.execute_serialized().await,
-            MoveTool::List(tool) => tool.execute_serialized().await,
-            MoveTool::Clean(tool) => tool.execute_serialized().await,
-            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
-            MoveTool::Run(tool) => tool.execute_serialized().await,
-            MoveTool::RunScript(tool) => tool.execute_serialized().await,
-            MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::Prove(tool) => tool.execute_serialized().await,
-            MoveTool::Document(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::Coverage(tool) => tool.execute().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
+            MoveTool::Disassemble(tool) => tool.execute_serialized().await,
+            MoveTool::Document(tool) => tool.execute_serialized().await,
+            MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::Init(tool) => tool.execute_serialized_success().await,
+            MoveTool::List(tool) => tool.execute_serialized().await,
+            MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::RunScript(tool) => tool.execute_serialized().await,
+            MoveTool::Show(tool) => tool.execute_serialized().await,
+            MoveTool::Test(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
+            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
-            MoveTool::Coverage(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -414,9 +417,14 @@ pub struct TestPackage {
         long = "instructions"
     )]
     pub instruction_execution_bound: u64,
+
     /// Collect coverage information for later use with the various `aptos move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
+
+    /// Dump storage state on failure.
+    #[clap(long = "dump")]
+    pub dump_state: bool,
 }
 
 #[async_trait]
@@ -430,6 +438,7 @@ impl CliCommand<&'static str> for TestPackage {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
+            skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
             ..Default::default()
         };
 
@@ -457,6 +466,7 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestingConfig {
                 filter: self.filter.clone(),
                 report_stacktrace_on_abort: true,
+                report_storage_on_error: self.dump_state,
                 ignore_compile_warnings: self.ignore_compile_warnings,
                 ..UnitTestingConfig::default_with_bound(None)
             },
@@ -474,12 +484,15 @@ impl CliCommand<&'static str> for TestPackage {
         // Print coverage summary if --coverage is set
         if self.compute_coverage {
             config.test_mode = false;
-            let summary = CoverageSummaryOptions::Summary {
-                functions: false,
+            let summary = SummaryCoverage {
+                summarize_functions: false,
                 output_csv: false,
+                filter: self.filter,
+                move_options: self.move_options,
             };
-            generate_coverage_info(summary, path.as_path(), config, self.filter).unwrap();
-            println!("Please use `aptos move coverage -h` for more detailed test coverage of this package");
+            summary.coverage()?;
+
+            println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
         }
 
         match result {
@@ -546,116 +559,6 @@ impl CliCommand<&'static str> for ProvePackage {
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
-        }
-    }
-}
-
-/// Generate coverage info
-fn generate_coverage_info(
-    options: CoverageSummaryOptions,
-    path: &Path,
-    config: BuildConfig,
-    filter: Option<String>,
-) -> anyhow::Result<()> {
-    let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"))?;
-    let package = config.compile_package(path, &mut Vec::new())?;
-    match options {
-        CoverageSummaryOptions::Source { module_name } => {
-            let unit = package.get_module_by_name_from_root(&module_name)?;
-            let source_path = &unit.source_path;
-            let (module, source_map) = match &unit.unit {
-                CompiledUnit::Module(NamedCompiledModule {
-                    module, source_map, ..
-                }) => (module, source_map),
-                _ => panic!("Should all be modules"),
-            };
-            let source_coverage = SourceCoverageBuilder::new(module, &coverage_map, source_map);
-            source_coverage
-                .compute_source_coverage(source_path)
-                .output_source_coverage(&mut std::io::stdout())
-                .unwrap();
-        },
-        CoverageSummaryOptions::Summary {
-            functions,
-            output_csv,
-            ..
-        } => {
-            let modules: Vec<_> = package
-                .root_modules()
-                .filter_map(|unit| {
-                    let mut retain = true;
-                    if let Some(filter_str) = &filter {
-                        if !&unit.unit.name().as_str().contains(filter_str.as_str()) {
-                            retain = false;
-                        }
-                    }
-                    match &unit.unit {
-                        CompiledUnit::Module(NamedCompiledModule { module, .. }) if retain => {
-                            Some(module.clone())
-                        },
-                        _ => None,
-                    }
-                })
-                .collect();
-            let coverage_map = coverage_map.to_unified_exec_map();
-            if output_csv {
-                format_csv_summary(
-                    modules.as_slice(),
-                    &coverage_map,
-                    summarize_inst_cov,
-                    &mut std::io::stdout(),
-                )
-            } else {
-                format_human_summary(
-                    modules.as_slice(),
-                    &coverage_map,
-                    summarize_inst_cov,
-                    &mut std::io::stdout(),
-                    functions,
-                )
-            }
-        },
-        CoverageSummaryOptions::Bytecode { module_name } => {
-            let unit = package.get_module_by_name_from_root(&module_name)?;
-            let mut disassembler = Disassembler::from_unit(&unit.unit);
-            disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
-            println!("{}", disassembler.disassemble()?);
-        },
-    }
-    Ok(())
-}
-
-/// Computes coverage for a package
-///
-/// Computes coverage on a previous unit test run for a package.  Coverage input must
-/// first be built with `aptos move test --coverage`
-#[derive(Parser)]
-pub struct CoveragePackage {
-    #[clap(flatten)]
-    move_options: MovePackageDir,
-
-    #[clap(subcommand)]
-    pub coverage_options: CoverageSummaryOptions,
-}
-
-#[async_trait]
-impl CliCommand<&'static str> for CoveragePackage {
-    fn command_name(&self) -> &'static str {
-        "CoveragePackage"
-    }
-
-    async fn execute(self) -> CliTypedResult<&'static str> {
-        let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            test_mode: false,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-        let path = self.move_options.get_package_path()?;
-        let result = generate_coverage_info(self.coverage_options, path.as_path(), config, None);
-        match result {
-            Ok(_) => Ok("Success"),
-            Err(e) => Err(CliError::CoverageError(format!("{:#}", e))),
         }
     }
 }
@@ -846,26 +749,28 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        txn_options
-            .submit_transaction(payload)
-            .await
-            .map(TransactionSummary::from)
+        profile_or_submit(payload, &txn_options).await
     }
 }
 
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
 #[derive(Parser)]
 pub struct CreateResourceAccountAndPublishPackage {
-    #[clap(long)]
-    pub(crate) seed: String,
-
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the resource account and put it in this location
     #[clap(long)]
     pub(crate) address_name: String,
 
     /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
     #[clap(long)]
     pub(crate) override_size_check: bool,
 
+    #[clap(flatten)]
+    pub(crate) seed_args: ResourceAccountSeed,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -882,12 +787,12 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let CreateResourceAccountAndPublishPackage {
-            seed,
             address_name,
             mut move_options,
             txn_options,
             override_size_check,
             included_artifacts_args,
+            seed_args,
         } = self;
 
         let account = if let Some(Some(account)) = CliConfig::load_profile(
@@ -902,9 +807,9 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
                 "Please provide an account using --profile or run aptos init".to_string(),
             ));
         };
+        let seed = seed_args.seed()?;
 
-        let resource_address =
-            create_resource_address(account, &bcs::to_bytes(&seed.clone()).unwrap());
+        let resource_address = create_resource_address(account, &seed);
         move_options.add_named_address(address_name, resource_address.to_string());
 
         let package_path = move_options.get_package_path()?;
@@ -926,7 +831,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         prompt_yes_with_override(&message, txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account_and_publish_package(
-            bcs::to_bytes(&seed)?,
+            seed,
             bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
             compiled_units,
         );
@@ -1081,7 +986,7 @@ pub struct ListPackage {
 
     /// Type of items to query
     ///
-    /// Current supported types [packages]
+    /// Current supported types `[packages]`
     #[clap(long, default_value_t = MoveListQuery::Packages)]
     query: MoveListQuery,
 
@@ -1185,26 +1090,8 @@ impl CliCommand<&'static str> for CleanPackage {
 /// Run a Move function
 #[derive(Parser)]
 pub struct RunFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1216,55 +1103,18 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let args: Vec<Vec<u8>> = self
-            .args
-            .into_iter()
-            .map(|arg_with_type| arg_with_type.arg)
-            .collect();
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        self.txn_options
-            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id,
-                self.function_id.member_id,
-                type_args,
-                args,
-            )))
-            .await
-            .map(TransactionSummary::from)
+        let payload = TransactionPayload::EntryFunction(
+            self.entry_function_args.create_entry_function_payload()?,
+        );
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
-/// Run a Move function
+/// Run a view function
 #[derive(Parser)]
 pub struct ViewFunction {
-    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
-    ///
-    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub(crate) function_id: MemberId,
-
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub(crate) args: Vec<ArgWithType>,
-
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
-
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -1277,16 +1127,16 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let mut args: Vec<serde_json::Value> = vec![];
-        for arg in self.args {
+        for arg in self.entry_function_args.args {
             args.push(arg.to_json()?);
         }
 
         let view_request = ViewRequest {
             function: EntryFunctionId {
-                module: self.function_id.module_id.into(),
-                name: self.function_id.member_id.into(),
+                module: self.entry_function_args.function_id.module_id.into(),
+                name: self.entry_function_args.function_id.member_id.into(),
             },
-            type_arguments: self.type_args,
+            type_arguments: self.entry_function_args.type_args,
             arguments: args,
         };
 
@@ -1340,13 +1190,9 @@ impl CliCommand<TransactionSummary> for RunScript {
             type_args.push(type_tag)
         }
 
-        let txn = self
-            .txn_options
-            .submit_transaction(TransactionPayload::Script(Script::new(
-                bytecode, type_args, args,
-            )))
-            .await?;
-        Ok(TransactionSummary::from(&txn))
+        let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
+
+        profile_or_submit(payload, &self.txn_options).await
     }
 }
 
@@ -1457,6 +1303,9 @@ impl FunctionArgType {
                         hex::decode(arg)
                             .map_err(|err| CliError::UnableToParse("vector<hex>", err.to_string()))
                     }),
+                    // Note commas cannot be put into the strings.  But, this should be a less likely case,
+                    // and the utility from having this available should be worth it.
+                    FunctionArgType::String => parse_vector_arg(arg, |arg| Ok(String::from(arg))),
                     FunctionArgType::U8 => parse_vector_arg(arg, |arg| {
                         u8::from_str(arg)
                             .map_err(|err| CliError::UnableToParse("vector<u8>", err.to_string()))
@@ -1527,12 +1376,7 @@ impl FromStr for FunctionArgType {
                 if str.starts_with("vector<") && str.ends_with('>') {
                     let arg = FunctionArgType::from_str(&str[7..str.len() - 1])?;
 
-                    // String gets confusing on parsing by commas
-                    if arg == FunctionArgType::String {
-                        return Err(CliError::CommandArgumentError(
-                            "vector<string> is not supported".to_string(),
-                        ));
-                    } else if arg == FunctionArgType::Raw {
+                    if arg == FunctionArgType::Raw {
                         return Err(CliError::CommandArgumentError(
                             "vector<raw> is not supported".to_string(),
                         ));
@@ -1556,6 +1400,7 @@ impl FromStr for FunctionArgType {
 }
 
 /// A parseable arg with a type separated by a colon
+#[derive(Debug)]
 pub struct ArgWithType {
     pub(crate) _ty: FunctionArgType,
     pub(crate) arg: Vec<u8>,
@@ -1598,8 +1443,8 @@ impl ArgWithType {
             FunctionArgType::Bool => serde_json::to_value(bcs::from_bytes::<bool>(&self.arg)?),
             FunctionArgType::Hex => serde_json::to_value(bcs::from_bytes::<Vec<u8>>(&self.arg)?),
             FunctionArgType::String => serde_json::to_value(bcs::from_bytes::<String>(&self.arg)?),
-            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
-            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
+            FunctionArgType::U8 => serde_json::to_value(bcs::from_bytes::<u8>(&self.arg)?),
+            FunctionArgType::U16 => serde_json::to_value(bcs::from_bytes::<u16>(&self.arg)?),
             FunctionArgType::U32 => serde_json::to_value(bcs::from_bytes::<u32>(&self.arg)?),
             FunctionArgType::U64 => {
                 serde_json::to_value(bcs::from_bytes::<u64>(&self.arg)?.to_string())
@@ -1668,7 +1513,6 @@ impl FromStr for ArgWithType {
                 "Arguments must be pairs of <type>:<arg> e.g. bool:true".to_string(),
             ));
         }
-
         let ty = FunctionArgType::from_str(parts.first().unwrap())?;
         let arg = parts.last().unwrap();
         let arg = ty.parse_arg(arg)?;

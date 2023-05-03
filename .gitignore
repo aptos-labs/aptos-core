@@ -65,6 +65,14 @@ build/
 !aptos-move/framework/experimental/releases/artifacts/**
 !aptos-move/framework/aptos-framework/releases/artifacts/**
 
+# Do not ignore the Move script for the faucet.
+# https://stackoverflow.com/a/16318111/3846032
+!aptos-move/move-examples/scripts/minter/build
+aptos-move/move-examples/scripts/minter/build/*
+!aptos-move/move-examples/scripts/minter/build/Minter
+aptos-move/move-examples/scripts/minter/build/Minter/*
+!aptos-move/move-examples/scripts/minter/build/Minter/bytecode_scripts
+
 # Docker incremental build temporary files and directories
 target-out-docker
 **/Dockerfile.tmp

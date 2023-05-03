@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, PayloadFilter},
     request_response::GetPayloadCommand,
 };
 use aptos_types::{
@@ -16,17 +16,18 @@ use aptos_types::{
 };
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
+use std::time::Duration;
 
 #[allow(dead_code)]
 pub struct MockPayloadManager {
-    // used non-mocked TxnManager to test interaction with shared mempool
+    // used non-mocked PayloadClient to test interaction with shared mempool
     _quorum_store_client: Option<QuorumStoreClient>,
 }
 
 impl MockPayloadManager {
     pub fn new(consensus_to_quorum_store_sender: Option<mpsc::Sender<GetPayloadCommand>>) -> Self {
         let quorum_store_client =
-            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1, 1.1, 100));
+            consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1.1, 100));
         Self {
             _quorum_store_client: quorum_store_client,
         }
@@ -52,7 +53,7 @@ impl PayloadClient for MockPayloadManager {
     /// The returned future is fulfilled with the vector of SignedTransactions
     async fn pull_payload(
         &self,
-        _round: Round,
+        _max_poll_time: Duration,
         _max_size: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,
@@ -67,7 +68,6 @@ impl PayloadClient for MockPayloadManager {
 
     async fn pull_payload_for_dag(
         &self,
-        _round: Round,
         _max_items: u64,
         _max_bytes: u64,
         _exclude: PayloadFilter,

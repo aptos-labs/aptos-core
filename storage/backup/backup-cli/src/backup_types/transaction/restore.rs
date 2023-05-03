@@ -5,7 +5,10 @@
 use crate::{
     backup_types::{
         epoch_ending::restore::EpochHistory,
-        transaction::manifest::{TransactionBackup, TransactionChunk},
+        transaction::{
+            analysis::TransactionAnalysis,
+            manifest::{TransactionBackup, TransactionChunk},
+        },
     },
     metrics::{
         restore::{TRANSACTION_REPLAY_VERSION, TRANSACTION_SAVE_VERSION},
@@ -46,6 +49,7 @@ use futures::{
 use itertools::{izip, Itertools};
 use std::{
     cmp::{max, min},
+    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Instant,
@@ -152,6 +156,27 @@ impl LoadedChunk {
             write_sets,
         })
     }
+
+    fn unpack(
+        self,
+    ) -> (
+        Vec<Transaction>,
+        Vec<TransactionInfo>,
+        Vec<Vec<ContractEvent>>,
+        Vec<WriteSet>,
+    ) {
+        let Self {
+            manifest: _,
+            txns,
+            txn_infos,
+            event_vecs,
+            write_sets,
+            range_proof: _,
+            ledger_info: _,
+        } = self;
+
+        (txns, txn_infos, event_vecs, write_sets)
+    }
 }
 
 impl TransactionRestoreController {
@@ -169,6 +194,7 @@ impl TransactionRestoreController {
             opt.replay_from_version,
             epoch_history,
             verify_execution_mode,
+            None,
         );
 
         Self { inner }
@@ -189,6 +215,7 @@ pub struct TransactionRestoreBatchController {
     replay_from_version: Option<Version>,
     epoch_history: Option<Arc<EpochHistory>>,
     verify_execution_mode: VerifyExecutionMode,
+    output_transaction_analysis: Option<PathBuf>,
 }
 
 impl TransactionRestoreBatchController {
@@ -199,6 +226,7 @@ impl TransactionRestoreBatchController {
         replay_from_version: Option<Version>,
         epoch_history: Option<Arc<EpochHistory>>,
         verify_execution_mode: VerifyExecutionMode,
+        output_transaction_analysis: Option<PathBuf>,
     ) -> Self {
         Self {
             global_opt,
@@ -207,6 +235,7 @@ impl TransactionRestoreBatchController {
             replay_from_version,
             epoch_history,
             verify_execution_mode,
+            output_transaction_analysis,
         }
     }
 
@@ -235,6 +264,10 @@ impl TransactionRestoreBatchController {
             .await?;
 
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
+            ensure!(
+                self.output_transaction_analysis.is_none(),
+                "Bug: requested to output transaction output sizing info in restore mode.",
+            );
             AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
@@ -245,7 +278,8 @@ impl TransactionRestoreBatchController {
                     .await?;
             }
         } else {
-            Self::go_through_verified_chunks(loaded_chunk_stream, first_version).await?;
+            self.go_through_verified_chunks(loaded_chunk_stream, first_version)
+                .await?;
         }
         Ok(())
     }
@@ -349,7 +383,7 @@ impl TransactionRestoreBatchController {
         let restore_handler_clone = restore_handler.clone();
         // DB doesn't allow replaying anything before what's in DB already.
         //
-        // TODO: notice that ideals we detect and avoid calling rh.save_transactions() for txns
+        // TODO: notice that ideally we detect and avoid calling rh.save_transactions() for txns
         //       before `first_to_replay` calculated below, but we don't deal with it for now,
         //       because unlike replaying, that's allowed by the DB. Need to follow up later.
         let first_to_replay = max(
@@ -362,21 +396,9 @@ impl TransactionRestoreBatchController {
             .and_then(move |chunk| {
                 let restore_handler = restore_handler_clone.clone();
                 future::ok(async move {
-                    let LoadedChunk {
-                        manifest:
-                            TransactionChunk {
-                                first_version,
-                                mut last_version,
-                                transactions: _,
-                                proof: _,
-                            },
-                        mut txns,
-                        mut txn_infos,
-                        mut event_vecs,
-                        mut write_sets,
-                        range_proof: _,
-                        ledger_info: _,
-                    } = chunk;
+                    let first_version = chunk.manifest.first_version;
+                    let mut last_version = chunk.manifest.last_version;
+                    let (mut txns, mut txn_infos, mut event_vecs, mut write_sets) = chunk.unpack();
 
                     if target_version < last_version {
                         let num_to_keep = (target_version - first_version + 1) as usize;
@@ -393,7 +415,7 @@ impl TransactionRestoreBatchController {
                         let txns_to_save: Vec<_> = txns.drain(..num_to_save).collect();
                         let txn_infos_to_save: Vec<_> = txn_infos.drain(..num_to_save).collect();
                         let event_vecs_to_save: Vec<_> = event_vecs.drain(..num_to_save).collect();
-                        write_sets.drain(..num_to_save);
+                        let write_sets_to_save = write_sets.drain(..num_to_save).collect();
 
                         tokio::task::spawn_blocking(move || {
                             restore_handler.save_transactions(
@@ -401,6 +423,7 @@ impl TransactionRestoreBatchController {
                                 &txns_to_save,
                                 &txn_infos_to_save,
                                 &event_vecs_to_save,
+                                write_sets_to_save,
                             )
                         })
                         .await??;
@@ -408,8 +431,9 @@ impl TransactionRestoreBatchController {
                         TRANSACTION_SAVE_VERSION.set(last_saved as i64);
                         info!(
                             version = last_saved,
-                            accumulative_tps = (last_saved - global_first_version + 1) as f64
-                                / start.elapsed().as_secs_f64(),
+                            accumulative_tps = ((last_saved - global_first_version + 1) as f64
+                                / start.elapsed().as_secs_f64())
+                                as u64,
                             "Transactions saved."
                         );
                     }
@@ -494,8 +518,9 @@ impl TransactionRestoreBatchController {
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(
                             version = v,
-                            accumulative_tps =
-                                total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
+                            accumulative_tps = (total_replayed as f64
+                                / replay_start.elapsed().as_secs_f64())
+                                as u64,
                             "Transactions replayed."
                         );
                         Ok(v)
@@ -507,29 +532,47 @@ impl TransactionRestoreBatchController {
             .await?;
         info!(
             total_replayed = total_replayed,
-            accumulative_tps = total_replayed as f64 / replay_start.elapsed().as_secs_f64(),
+            accumulative_tps =
+                (total_replayed as f64 / replay_start.elapsed().as_secs_f64()) as u64,
             "Replay finished."
         );
         Ok(())
     }
 
     async fn go_through_verified_chunks(
+        &self,
         loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>>,
         first_version: Version,
     ) -> Result<()> {
+        let analysis = self
+            .output_transaction_analysis
+            .as_ref()
+            .map(|dir| TransactionAnalysis::new(dir))
+            .transpose()?;
         let start = Instant::now();
         loaded_chunk_stream
-            .try_fold((), |(), chunk| {
-                let v = chunk.manifest.last_version;
-                VERIFY_TRANSACTION_VERSION.set(v as i64);
+            .try_fold(analysis, |mut analysis, chunk| async move {
+                let mut version = chunk.manifest.first_version;
+                let last_version = chunk.manifest.last_version;
+
+                for (txn, txn_info, events, write_set) in itertools::multizip(chunk.unpack()) {
+                    if let Some(analysis) = &mut analysis {
+                        analysis.add_transaction(version, &txn, &txn_info, &events, &write_set)?;
+                    }
+                    version += 1;
+                }
+
+                VERIFY_TRANSACTION_VERSION.set(last_version as i64);
                 info!(
-                    version = v,
-                    accumulative_tps =
-                        (v - first_version + 1) as f64 / start.elapsed().as_secs_f64(),
+                    version = last_version,
+                    accumulative_tps = ((last_version - first_version + 1) as f64
+                        / start.elapsed().as_secs_f64())
+                        as u64,
                     "Transactions verified."
                 );
-                future::ok(())
+                Ok(analysis)
             })
-            .await
+            .await?;
+        Ok(())
     }
 }

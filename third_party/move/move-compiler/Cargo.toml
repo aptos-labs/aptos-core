@@ -1,0 +1,42 @@
+[package]
+name = "move-compiler"
+version = "0.0.1"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "The definition of the Move source language, and its compiler"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1.0.52"
+clap = { version = "3.1.8", features = ["derive"] }
+codespan-reporting = "0.11.1"
+difference = "2.0.0"
+hex = "0.4.3"
+num-bigint = "0.4.0"
+once_cell = "1.7.2"
+petgraph = "0.5.1"
+regex = "1.5.5"
+sha3 = "0.9.1"
+tempfile = "3.2.0"
+walkdir = "2.3.1"
+
+bcs = { workspace = true }
+
+move-binary-format = { path = "../move-binary-format" }
+move-borrow-graph = { path = "../move-borrow-graph" }
+move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
+move-bytecode-verifier = { path = "../move-bytecode-verifier" }
+move-command-line-common = { path = "../move-command-line-common" }
+move-core-types = { path = "../move-core/types" }
+move-ir-to-bytecode = { path = "../move-ir-compiler/move-ir-to-bytecode" }
+move-ir-types = { path = "../move-ir/types" }
+move-symbol-pool = { path = "../move-symbol-pool" }
+
+[dev-dependencies]
+datatest-stable = "0.1.1"
+move-stdlib = { path = "../move-stdlib" }
+
+[[test]]
+name = "move_check_testsuite"
+harness = false

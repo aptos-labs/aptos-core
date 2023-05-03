@@ -18,6 +18,13 @@
 
 ## Function `borrow_address`
 
+Borrows the address of the signer
+Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper arround an
+address
+```
+struct signer has drop { addr: address }
+```
+<code>borrow_address</code> borrows this inner field
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>
@@ -84,4 +91,4 @@ Return true only if <code>a</code> is a transaction signer address. This is a sp
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

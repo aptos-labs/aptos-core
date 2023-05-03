@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
@@ -22,6 +23,7 @@ crossbeam = { workspace = true }
 dashmap = { workspace = true }
 
 [dev-dependencies]
+claims = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }

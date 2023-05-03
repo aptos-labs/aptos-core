@@ -1,0 +1,333 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": { "limit": 100, "matchAny": false, "tags": [], "type": "dashboard" },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": false, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "properties": [{ "id": "custom.width", "value": 269 }]
+          },
+          { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "custom.width", "value": 76 }] },
+          { "matcher": { "id": "byName", "options": "brand" }, "properties": [{ "id": "custom.width", "value": 369 }] }
+        ]
+      },
+      "gridPos": { "h": 13, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": false, "displayName": "kubernetes_pod_name" }]
+      },
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_del(node_system_cpu_info{metrics_source=\"$metrics_source\", chain_name=\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}, \"metrics_source\", \"chain_name\", \"namespace\", \"__name__\")",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "CPU Info",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-GrYlRd" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 13, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": {
+        "displayMode": "lcd",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count by(brand) (node_system_cpu_info{metrics_source=\"$metrics_source\", chain_name=\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "format": "time_series",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "CPU Info",
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 0, "y": 13 },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": false, "displayName": "kubernetes_pod_name" }]
+      },
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count by (kubernetes_pod_name, role) (node_system_cpu_usage{metrics_source=\"$metrics_source\", chain_name=\"$chain_name\"}) - 1",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "CPU Cores",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "kbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 13 },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_del(node_system_mem_total{chain_name=\"$chain_name\", metrics_source=\"$metrics_source\"}, \"__name__\", \"metrics_source\", \"namespace\", \"chain_name\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{kubernetes_pod_name}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Total System Memory",
+      "type": "table"
+    }
+  ],
+  "refresh": false,
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["aptos-core"],
+  "templating": {
+    "list": [
+      {
+        "allFormat": "",
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "multiFormat": "",
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": ".*Prometheus.*|.*Victoria.*|.*Telemetry.*",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": true, "text": "telemetry-service", "value": "telemetry-service" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "label_values(node_process_start_time{}, metrics_source)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "metrics_source",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{}, metrics_source)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "51", "value": "51" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\"}, chain_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "peer_id:Chainbase(#2)//0x70ce1a605120b0836a4927bc9bdfc02755fb952b210cd0aba5772d2fc4a41928",
+            "peer_id:CryptoJack(#1)//0xd75c7a593890371074617d31ef47dc36aa0c683cc830c2ab28beea2b3b69b73",
+            "peer_id:CryptoJack(#2)//0xf5b66612f72a2d9a70d74a8bc8971abc47229714849f91d1fc7736f6a268518f",
+            "peer_id:DSRV//0x3556cdadc9697e7e416b90866f22fd32cd5281acdd669d6c07d24efbecc7ae7d",
+            "peer_id:DeSpread//0xc0bc5fe1cf2749394cc5c36ae84bfeac90f25229275900fc4357f1aef2335e35",
+            "peer_id:DoraFactory//0x23f422eb4212100c47cdc28c242cab052b65ace49d1429c1197f4a1b153b178e",
+            "peer_id:annamaria//0x9510cd9610c813a828e6781bddb93df5f0c15a7eb9902bd4a8900945bb3e43d0",
+            "peer_id:Nodes.Guru//0x6e32195c7a48ba9a388a7505850eec4eb754ae4aeddfe93b160fc233fe6c502a",
+            "peer_id:Nodes.Center(#3)//0xc10b340e92806d6aac8fd6f536d7cdbf9f4d20432dd74163e323fb6f037742ae",
+            "peer_id:Nodes.Center(#2)//0xdb3881b2191079bab4c975cc88fc8d982205fff1b984bfd0ff6f7e2a6fa11caa",
+            "peer_id:Nodes.Center(#1)//0xadead309516b68fefc5afe99fcb306b8e6fd30a424fc104a7d1c63db247e89c",
+            "peer_id:Nodeinfra//0xa44181b8c5a1b9d8bf346793cea0d6a41e90af516233e8c23c8f62a768a26a5",
+            "peer_id:NodeReal//0xab7e1b1882e4085e8452eae353603484e641471c177678f99f4cee6a29765c47",
+            "peer_id:Nelrann//0x5f27350d7df6fd2f9f50319d29f5d00890da337c2a655f86a6f8d3092414899c"
+          ],
+          "value": [
+            "peer_id:Chainbase(#2)//0x70ce1a605120b0836a4927bc9bdfc02755fb952b210cd0aba5772d2fc4a41928",
+            "peer_id:CryptoJack(#1)//0xd75c7a593890371074617d31ef47dc36aa0c683cc830c2ab28beea2b3b69b73",
+            "peer_id:CryptoJack(#2)//0xf5b66612f72a2d9a70d74a8bc8971abc47229714849f91d1fc7736f6a268518f",
+            "peer_id:DSRV//0x3556cdadc9697e7e416b90866f22fd32cd5281acdd669d6c07d24efbecc7ae7d",
+            "peer_id:DeSpread//0xc0bc5fe1cf2749394cc5c36ae84bfeac90f25229275900fc4357f1aef2335e35",
+            "peer_id:DoraFactory//0x23f422eb4212100c47cdc28c242cab052b65ace49d1429c1197f4a1b153b178e",
+            "peer_id:annamaria//0x9510cd9610c813a828e6781bddb93df5f0c15a7eb9902bd4a8900945bb3e43d0",
+            "peer_id:Nodes.Guru//0x6e32195c7a48ba9a388a7505850eec4eb754ae4aeddfe93b160fc233fe6c502a",
+            "peer_id:Nodes.Center(#3)//0xc10b340e92806d6aac8fd6f536d7cdbf9f4d20432dd74163e323fb6f037742ae",
+            "peer_id:Nodes.Center(#2)//0xdb3881b2191079bab4c975cc88fc8d982205fff1b984bfd0ff6f7e2a6fa11caa",
+            "peer_id:Nodes.Center(#1)//0xadead309516b68fefc5afe99fcb306b8e6fd30a424fc104a7d1c63db247e89c",
+            "peer_id:Nodeinfra//0xa44181b8c5a1b9d8bf346793cea0d6a41e90af516233e8c23c8f62a768a26a5",
+            "peer_id:NodeReal//0xab7e1b1882e4085e8452eae353603484e641471c177678f99f4cee6a29765c47",
+            "peer_id:Nelrann//0x5f27350d7df6fd2f9f50319d29f5d00890da337c2a655f86a6f8d3092414899c"
+          ]
+        },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},kubernetes_pod_name)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "kubernetes_pod_name",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},kubernetes_pod_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "validator", "value": "validator" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+        "definition": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},role)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "role",
+        "options": [],
+        "query": {
+          "query": "label_values(node_process_start_time{metrics_source=~\"$metrics_source\", chain_name=~\"$chain_name\"},role)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "node-system-info",
+  "uid": "w9MxpDaVz",
+  "version": 7,
+  "weekStart": ""
+}

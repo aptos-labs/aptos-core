@@ -41,26 +41,34 @@ kill -9 <Node 0 PID>
 cargo run -p aptos-node -- -f <Location to the node 0 configuration file displayed above>
 ```
 
-## Faucet and Minting
+## Faucet and minting
 
-In addition, the swarm output also displays the root (or mint) key for the network. This allows
-you to run a local faucet and start minting test tokens in the network. For this, simply run the
-faucet command using the mint key and point it to the REST API of one of the nodes, e.g. node `0`:
+In order to mint coins in this test network you need to run a faucet. You can do that with this command:
 
-```
-cargo run --bin aptos-faucet -- -c TESTING --mint-key <Root/mint key displayed above> -s <URL for node 0 REST API> -p 8081   
+```bash
+cargo run -p aptos-faucet-service -- run-simple --key <key> --node-url <node_url>
 ```
 
-The above command will run a faucet locally, listening on port `8081`. Using this faucet, you could
-then mint tokens to your test accounts, e.g.,:
+You can get the values above like this:
+- `key`: When you started the swarm, there was output like this: `The root (or mint) key for the swarm is: 0xf9f...`. This is the `key`.
+- `node_url`: When you started the swarm, there was output like this: `REST API is listening at: http://127.0.0.1:64566`. This is the `node_url`.
 
-```
-curl -X POST http://127.0.0.1:8081/mint\?amount\=<amount to mint>\&pub_key\=<public key to mint tokens to>\&return_txns\=true
-01000000000000000000000000000000dd05a600000000000001e001a11ceb0b01000...
+The above command will run a faucet locally, listening on port `8081`. Using this faucet, you can then mint tokens to your test accounts, for example:
+
+```bash
+curl -X POST http://127.0.0.1:8081/mint?amount=<amount to mint>&pub_key=<public key to mint tokens to>
 ```
 
-See more about how the faucet works in the [README](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet).
-Likewise, see the documentation about how to use the [Aptos CLI](https://aptos.dev/cli-tools/aptos-cli-tool/use-aptos-cli) with an existing faucet.
+As an alternative to using the faucet service, you may use the faucet CLI directly:
+```
+cargo run -p aptos-faucet-cli -- --amount 10 --accounts <account_address> --key <private_key>
+```
+
+:::tip Faucet and Aptos CLI
+See more on how the faucet works in the [README](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-faucet).
+
+Also see how to use the [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md#account-examples) with an existing faucet.
+:::
 
 ## Validator fullnodes
 

@@ -13,6 +13,20 @@ All doc updates should be thorough and tested. This includes external contributi
 
 So when reviewing changes, do not merge them in unless all feedback has been addressed.
 
+## Single source in Markdown
+
+There should be one external upstream source of truth for Aptos development. And we aim for that to be Aptos.dev. Edit away in [Markdown](https://www.markdownguide.org/basic-syntax/) format using our instructions for making [site updates](./site-updates.md).
+
+Note, you can easily convert Google Docs to Markdown format using the [Docs to Markdown](https://workspace.google.com/marketplace/app/docs_to_markdown/700168918607) add-on.
+
+## Link from product to docs
+
+Whether you work on an external product or an internal tool, your work likely has an interface. From it, you should link to your user docs, along with bug queues and contact information.
+
+## Peer review docs
+
+Your users should not be the first people to use your documentation. Have your peers review your docs just as they review your code. Walk through the flow. If they cannot, your users can't either.
+
 ## Form links properly
 
 When linking to absolute files (code, reference) not on Aptos.dev, always use the fully qualified domain. Else, use relative links. Always include the file extension (`.md` for Markdown).
@@ -38,6 +52,15 @@ The second example will work in [Aptos.dev](http://Aptos.dev) but not when navig
 ## Use permanent links to code
 
 When linking to code files in GitHub, use a [permanent link](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-a-permanent-link-to-a-code-snippet) to the relative line or set of lines.
+
+## Link check your pages
+
+It never hurts to run a link check against your pages or entire site. Here are some freely available and useful tools for **public** site checking:
+
+  * https://validator.w3.org/checklink
+  * https://www.drlinkcheck.com/
+
+Set recursion depth accordingly to delve into sub-links.
 
 ## Add images to `static` directory
 
@@ -176,6 +199,12 @@ A section heading is the title for an individual section within a document page.
     
     - **Preferred**: Execute on your macOS or Linux system
     - **Avoid**: Execute on your macOS/Linux system
+
+## Avoid duplication
+
+We face too many challenges to tackle the same one from scratch again or split our efforts into silos. We must collaborate to make best use of our diverse and growing skillset.
+
+Search and navigate across this site to see if an existing document already serves your purpose and garners an update before starting anew. As with code, [don't repeat yourself](https://www.wikipedia.org/wiki/Don%27t_repeat_yourself).
     
 ## Use these Aptos words and phrases consistently
 

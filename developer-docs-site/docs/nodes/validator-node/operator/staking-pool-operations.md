@@ -5,38 +5,34 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform staking pool operations. Note that you can stake only when you meet the minimal staking requirement. 
+This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that you can stake only when you meet the minimal staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions.
 
 :::tip Minimum staking requirement
-The current required minimum for staking is 1M APT tokens.
+The current required minimum for staking is 1 million APT.
 :::
 
 ## Connect to Aptos network
 
-[Connect to the Aptos](./connect-to-aptos-network.md) and start your node has with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
+[Connect to the Aptos network](./connect-to-aptos-network.md) and start your node with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
 
 ## Initializing the stake pool
 
-Make sure that this initializing the stake pool step was performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
+Make sure that this step is performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
 
 ## Joining validator set
-
-:::danger Errors? 
-**The validator node cannot sync until the stake pool becomes active.** If you see errors, see the [Issues and Workarounds](../../../issues-and-workarounds.md).
-:::
 
 Follow the below steps to set up the validator node using the operator account and join the validator set.
 
 :::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. See the `--rest-url` value for testnet or devnet in [Aptos Blockchain Deployments](../../aptos-deployments.md).
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
 
 ### 1. Initialize Aptos CLI
 
   ```bash
   aptos init --profile mainnet-operator \
+  --network mainnet \
   --private-key <operator_account_private_key> \
-  --rest-url https://fullnode.mainnet.aptoslabs.com/v1 \
   --skip-faucet
   ```
   
@@ -46,7 +42,7 @@ The `account_private_key` for the operator can be found in the `private-keys.yam
 
 ### 2. Check your validator account balance 
 
-Make sure you have enough APT coins to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
+Make sure you have enough APT to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
 
 - On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or 
 - Use the CLI:
@@ -100,7 +96,7 @@ aptos node join-validator-set \
 The validator set is updated at every epoch change. You will see your validator node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
 
 :::tip When is next epoch?
-Run the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information). You can also follow these steps: [How to find out when the next epoch starts](../../../issues-and-workarounds.md#how-to-find-out-when-the-next-epoch-starts).
+You can see it on the [Aptos Explorer](https://explorer.aptoslabs.com/validators) or by running the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information).
 :::
 
 ### 6. Check the validator set
@@ -128,7 +124,7 @@ To check the details of your stake pool, run the below CLI command with the `get
 The below command is for an example owner address `e7be097a90c18f6bdd53efe0e74bf34393cac2f0ae941523ea196a47b6859edb`. 
 
 :::tip
-For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../aptos-deployments.md).
+For testnet or devnet `--url` field values, see [Aptos Blockchain Deployments](../../deployments.md).
 :::
 
 ```bash

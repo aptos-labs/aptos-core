@@ -76,6 +76,11 @@ impl AccountCache {
         }
     }
 
+    pub fn split(mut self, index: usize) -> (Vec<LocalAccount>, Vec<LocalAccount>) {
+        let other = self.accounts.split_off(index);
+        (self.accounts.into(), other.into())
+    }
+
     pub fn len(&self) -> usize {
         self.accounts.len()
     }

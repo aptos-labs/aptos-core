@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, AptosPackageHooks};
+use anyhow::Error;
 use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -547,6 +548,16 @@ impl MoveHarness {
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
         self.default_gas_unit_price = gas_unit_price;
     }
+
+    pub fn execute_view_function(
+        &mut self,
+        fun: MemberId,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+    ) -> Result<Vec<Vec<u8>>, Error> {
+        self.executor
+            .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
+    }
 }
 
 impl Default for MoveHarness {
@@ -607,11 +618,26 @@ macro_rules! assert_abort {
 /// Helper to assert vm status code.
 #[macro_export]
 macro_rules! assert_vm_status {
-    ($s:expr, $c:pat) => {{
+    ($s:expr, $c:expr) => {{
         use aptos_types::transaction::*;
-        assert!(matches!(
+        assert_eq!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
-        ));
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! assert_move_abort {
+    ($s:expr, $c:ident) => {{
+        use aptos_types::transaction::*;
+        assert!(match $s {
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: _,
+                code: _,
+                info,
+            }) => info == $c,
+            _ => false,
+        });
     }};
 }

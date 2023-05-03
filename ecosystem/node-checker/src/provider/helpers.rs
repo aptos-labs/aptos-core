@@ -3,13 +3,13 @@
 
 pub const MISSING_PROVIDER_MESSAGE: &str = "Incomplete request";
 
-/// This macro helps you turn an Option<P> where P is a Provider or Arc<Provider>
-/// into a &P, returning a CheckResult if the Option is None and required is true,
-/// or just an empty vec if required is false.
+/// This macro helps you turn an `Option<P>` where `P` is a `Provider` or `Arc<Provider>`
+/// into a `&P`, returning a `CheckResult` if the `Option` is `None` and `required` is `true`,
+/// or just an empty vec if required is `false`.
 ///
 /// Example invocations:
 ///
-/// ```
+/// ```ignore
 /// # use std::io;
 /// let target_metrics_provider = aptos_node_checker_lib::get_provider!(
 ///     input.target_metrics_provider,

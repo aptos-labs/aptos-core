@@ -9,7 +9,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Run a Validator
 
-To participate in the consensus process in the Aptos mainnet, you must deploy and run a validator node and a validator fullnode. Optionally you can also run a public fullnode. This document presents a high-level conceptual overview of the important steps involved in deploying the nodes for validation. 
+To participate in the consensus process in the Aptos mainnet, you must deploy and run a validator node and a validator fullnode. Optionally you can also run a public fullnode. This document presents a high-level conceptual overview of the important steps involved in deploying the nodes for validation.
+
+See also the [external resources](../../community/external-resources.md) offered by your fellow node operators.
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-5 g-4">

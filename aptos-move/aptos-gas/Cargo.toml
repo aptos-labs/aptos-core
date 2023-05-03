@@ -18,6 +18,7 @@ aptos-framework = { workspace = true }
 aptos-gas-algebra-ext = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-move-stdlib = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
@@ -25,7 +26,6 @@ clap = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
-move-stdlib = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
 
@@ -33,7 +33,7 @@ move-vm-types = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-testing = ["move-stdlib/testing", "aptos-global-constants/testing"]
+testing = ["aptos-move-stdlib/testing", "aptos-global-constants/testing"]
 
 [[bin]]
 name = "aptos-gas-gen-update-proposal"

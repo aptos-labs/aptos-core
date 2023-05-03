@@ -8,6 +8,7 @@ module aptos_framework::optional_aggregator {
     use aptos_framework::aggregator::{Self, Aggregator};
 
     friend aptos_framework::coin;
+    friend aptos_framework::fungible_asset;
 
     /// The value of aggregator underflows (goes below zero). Raised by native code.
     const EAGGREGATOR_OVERFLOW: u64 = 1;

@@ -19,6 +19,8 @@ module std::option {
     /// The `Option` is in an invalid state for the operation attempted.
     /// The `Option` is `None` while it should be `Some`.
     const EOPTION_NOT_SET: u64 = 0x40001;
+    /// Cannot construct an option from a vector with 2 or more elements.
+    const EOPTION_VEC_TOO_LONG: u64 = 0x40002;
 
     /// Return an empty `Option`
     public fun none<Element>(): Option<Element> {
@@ -44,6 +46,15 @@ module std::option {
     }
     spec fun spec_some<Element>(e: Element): Option<Element> {
         Option{ vec: vec(e) }
+    }
+
+    public fun from_vec<Element>(vec: vector<Element>): Option<Element> {
+        assert!(vector::length(&vec) <= 1, EOPTION_VEC_TOO_LONG);
+        Option { vec }
+    }
+
+    spec from_vec {
+        aborts_if vector::length(vec) > 1;
     }
 
     /// Return true if `t` does not hold a value
@@ -164,9 +175,9 @@ module std::option {
         vector::borrow_mut(&mut t.vec, 0)
     }
     spec borrow_mut {
-        pragma opaque;
         include AbortsIfNone<Element>;
         ensures result == spec_borrow(t);
+        ensures t == old(t);
     }
 
     /// Swap the old value inside `t` with `e` and return the old value

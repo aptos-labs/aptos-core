@@ -36,7 +36,6 @@ pub fn run_prover_for_pkg(
     .unwrap();
 }
 
-#[ignore]
 #[test]
 fn test_hello_prover() {
     let named_address = BTreeMap::new();

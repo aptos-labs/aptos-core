@@ -10,6 +10,7 @@ use crate::{
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
+    state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
     state_store::buffered_state::BufferedState,
@@ -18,8 +19,9 @@ use crate::{
         truncation_helper::{truncate_ledger_db, truncate_state_kv_db},
     },
     version_data::VersionDataSchema,
-    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
-    StateKvPrunerManager, StateMerklePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    AptosDbError, LedgerStore, ShardedStateKvSchemaBatch, StaleNodeIndexCrossEpochSchema,
+    StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{
@@ -83,7 +85,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub state_kv_db: Arc<DB>,
+    pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
     pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
     pub state_kv_pruner: StateKvPrunerManager,
@@ -187,7 +189,10 @@ impl StateDb {
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.state_kv_db.iter::<StateValueSchema>(read_opts)?;
+        let mut iter = self
+            .state_kv_db
+            .db_shard(state_key.get_shard_id())
+            .iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
         Ok(iter
             .next()
@@ -275,13 +280,12 @@ impl StateDb {
 impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
-        state_merkle_db: Arc<DB>,
-        state_kv_db: Arc<DB>,
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
         epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
         state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
-        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
         Self::sync_commit_progress(
@@ -289,10 +293,6 @@ impl StateStore {
             Arc::clone(&state_kv_db),
             /*crash_if_difference_is_too_large=*/ true,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(
-            state_merkle_db,
-            max_nodes_per_lru_cache_shard,
-        ));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
@@ -321,7 +321,7 @@ impl StateStore {
     // commit progress.
     pub fn sync_commit_progress(
         ledger_db: Arc<DB>,
-        state_kv_db: Arc<DB>,
+        state_kv_db: Arc<StateKvDb>,
         crash_if_difference_is_too_large: bool,
     ) {
         if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
@@ -340,7 +340,8 @@ impl StateStore {
             assert_ge!(ledger_commit_progress, overall_commit_progress);
 
             let state_kv_commit_progress = state_kv_db
-                .get::<DbMetadataSchema>(&DbMetadataKey::StateKVCommitProgress)
+                .metadata_db()
+                .get::<DbMetadataSchema>(&DbMetadataKey::StateKvCommitProgress)
                 .expect("Failed to read state K/V commit progress.")
                 .expect("State K/V commit progress cannot be None.")
                 .expect_version();
@@ -389,24 +390,22 @@ impl StateStore {
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<DB>,
-        state_merkle_db: DB,
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
         use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 
-        let arc_state_merkle_rocksdb = Arc::new(state_merkle_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
         let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&arc_state_merkle_rocksdb),
+            Arc::clone(&state_merkle_db),
             NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
         );
-        let state_merkle_db = Arc::new(StateMerkleDb::new(arc_state_merkle_rocksdb, 0));
-        let state_kv_db = Arc::clone(&ledger_db);
         let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_kv_pruner_config,
+            NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
         );
         let state_db = Arc::new(StateDb {
             ledger_db,
@@ -553,8 +552,9 @@ impl StateStore {
         first_key_opt: Option<&StateKey>,
         desired_version: Version,
     ) -> Result<PrefixedStateValueIterator> {
+        // TODO(grao): Support sharding here.
         PrefixedStateValueIterator::new(
-            &self.state_kv_db,
+            self.state_kv_db.metadata_db(),
             key_prefix.clone(),
             first_key_opt.cloned(),
             desired_version,
@@ -577,7 +577,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         ledger_batch: &SchemaBatch,
-        state_kv_batch: &SchemaBatch,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_value_sets"])
@@ -588,7 +588,7 @@ impl StateStore {
             first_version,
             expected_usage,
             ledger_batch,
-            state_kv_batch,
+            sharded_state_kv_batches,
         )?;
 
         let _timer = OTHER_TIMERS_SECONDS
@@ -601,7 +601,8 @@ impl StateStore {
             .flat_map_iter(|(i, kvs)| {
                 let version = first_version + i as Version;
                 kvs.iter().map(move |(k, v)| {
-                    state_kv_batch.put::<StateValueSchema>(&(k.clone(), version), v)
+                    sharded_state_kv_batches[k.get_shard_id() as usize]
+                        .put::<StateValueSchema>(&(k.clone(), version), v)
                 })
             })
             .collect()
@@ -629,7 +630,7 @@ impl StateStore {
         first_version: Version,
         expected_usage: StateStorageUsage,
         batch: &SchemaBatch,
-        state_kv_batch: &SchemaBatch,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -637,6 +638,7 @@ impl StateStore {
 
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
+        let base_version_usage = usage;
         let cache = Arc::new(DashMap::<StateKey, (Version, Option<StateValue>)>::new());
 
         if let Some(base_version) = base_version {
@@ -681,7 +683,8 @@ impl StateStore {
                     usage.add_item(key.size() + value.size());
                 } else {
                     // stale index of the tombstone at current version.
-                    state_kv_batch.put::<StaleStateValueIndexSchema>(
+                    sharded_state_kv_batches[key.get_shard_id() as usize]
+                        .put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version,
@@ -702,7 +705,8 @@ impl StateStore {
                 if let Some((old_version, old_value)) = old_version_and_value_opt {
                     usage.remove_item(key.size() + old_value.size());
                     // stale index of the old value at its version.
-                    state_kv_batch.put::<StaleStateValueIndexSchema>(
+                    sharded_state_kv_batches[key.get_shard_id() as usize]
+                        .put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version: old_version,
@@ -721,9 +725,12 @@ impl StateStore {
         if !expected_usage.is_untracked() {
             ensure!(
                 expected_usage == usage,
-                "Calculated state db usage not expected. expected: {:?}, calculated: {:?}",
+                "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
+                first_version + value_state_sets.len() as u64 - 1,
                 expected_usage,
                 usage,
+                base_version,
+                base_version_usage,
             );
         }
 
@@ -740,14 +747,15 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        let (batch, hash) = self.state_merkle_db.merklize_value_set(
+        let (top_levels_batch, sharded_batch, hash) = self.state_merkle_db.merklize_value_set(
             value_set,
             node_hashes,
             version,
             base_version,
             None, // previous epoch ending version
         )?;
-        self.state_merkle_db.write_schemas(batch)?;
+        self.state_merkle_db
+            .commit(version, top_levels_batch, sharded_batch)?;
         Ok(hash)
     }
 
@@ -846,10 +854,11 @@ impl StateStore {
 
     #[cfg(test)]
     pub fn get_all_jmt_nodes(&self) -> Result<Vec<aptos_jellyfish_merkle::node_type::NodeKey>> {
+        // TODO(grao): Support sharding here.
         let mut iter = self
             .state_db
             .state_merkle_db
-            .db
+            .metadata_db()
             .iter::<crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema>(
             Default::default(),
         )?;
@@ -878,7 +887,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataKey::StateSnapshotRestoreProgress(version),
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
-        self.state_kv_db.write_schemas(batch)
+        // TODO(grao): Support sharding here.
+        self.state_kv_db.commit_raw_batch(batch)
     }
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
@@ -889,6 +899,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
         Ok(self
             .state_kv_db
+            .metadata_db()
             .get::<DbMetadataSchema>(&DbMetadataKey::StateSnapshotRestoreProgress(version))?
             .map(|v| v.expect_state_snapshot_progress()))
     }

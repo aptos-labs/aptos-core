@@ -26,8 +26,15 @@ commands:
     azcopy cp --from-to BlobPipe "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/$FILE_HANDLE$SAS" < /dev/null | gzip -cd
   save_metadata_line: |
     # save the line to a new file under the metadata folder
-    gzip -c | azcopy cp --from-to PipeBlob "https://$ACCOUNT.blob.core.windows.net/$SUBDIR/metadata/$FILE_NAME$SAS"
+    FILE_HANDLE="metadata/$FILE_NAME"
+    echo "$FILE_HANDLE"
+    exec 1>&-
+    gzip -c | azcopy cp --from-to PipeBlob "https://$ACCOUNT.blob.core.windows.net/$SUBDIR/$FILE_HANDLE$SAS" > /dev/null
   list_metadata_files: |
     # list files under the metadata folder
     (azcopy ls "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata/$SAS" ||:) \
     | sed -ne "s#; .*##;s#INFO: \(.*\.meta\)#metadata/\1#p"
+  backup_metadata_file: |
+    # move metadata files 
+    azcopy sync "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata/$FILE_NAME$SAS" "https://$ACCOUNT.blob.core.windows.net/$CONTAINER/$SUB_DIR/metadata_backup/$FILE_NAME$SAS" --move=true
+

@@ -62,10 +62,15 @@ impl LocalNode {
         account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     ) -> Result<Self> {
         let config_path = directory.join("node.yaml");
-        let config = NodeConfig::load(&config_path)
-            .with_context(|| format!("Failed to load NodeConfig from file: {:?}", config_path))?;
+        let config = NodeConfig::load_from_path(&config_path).map_err(|error| {
+            anyhow!(
+                "Failed to load NodeConfig from file: {:?}. Error: {:?}",
+                config_path,
+                error
+            )
+        })?;
         let peer_id = config
-            .peer_id()
+            .get_peer_id()
             .ok_or_else(|| anyhow!("unable to retrieve PeerId from config"))?;
 
         Ok(Self {
@@ -284,7 +289,7 @@ impl Node for LocalNode {
         let node_config = self.config();
         let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
         let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
-        let secure_storage_path = node_config.working_dir().join("secure_storage.json");
+        let secure_storage_path = node_config.get_working_dir().join("secure_storage.json");
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
 
         debug!(

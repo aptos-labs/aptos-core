@@ -3,20 +3,22 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
-    datastream::v1::{
-        raw_datastream_response, RawDatastreamResponse, TransactionOutput, TransactionsOutput,
+    internal::fullnode::v1::{
+        transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
     },
     transaction::testing1::v1::Transaction as TransactionPB,
 };
-use prost::Message;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::sync::mpsc;
 use tonic::Status;
 
@@ -30,7 +32,7 @@ pub struct IndexerStreamCoordinator {
     pub output_batch_size: u16,
     pub highest_known_version: u64,
     pub context: Arc<Context>,
-    pub transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
+    pub transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
 }
 
 // Single batch of transactions to fetch, convert, and stream
@@ -47,7 +49,7 @@ impl IndexerStreamCoordinator {
         processor_task_count: u16,
         processor_batch_size: u16,
         output_batch_size: u16,
-        transactions_sender: mpsc::Sender<Result<RawDatastreamResponse, tonic::Status>>,
+        transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -84,12 +86,12 @@ impl IndexerStreamCoordinator {
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
+                api_txns.first().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
-                let encoded = Self::encode_pb_txns(pb_txns);
                 // Wrap in stream response object and send to channel
-                for chunk in encoded.chunks(output_batch_size as usize) {
-                    let item = RawDatastreamResponse {
-                        response: Some(raw_datastream_response::Response::Data(
+                for chunk in pb_txns.chunks(output_batch_size as usize) {
+                    let item = TransactionsFromNodeResponse {
+                        response: Some(transactions_from_node_response::Response::Data(
                             TransactionsOutput {
                                 transactions: chunk.to_vec(),
                             },
@@ -104,7 +106,7 @@ impl IndexerStreamCoordinator {
                         },
                     }
                 }
-                Ok(encoded.last().unwrap().version)
+                Ok(pb_txns.last().unwrap().version)
             });
             tasks.push(task);
         }
@@ -243,9 +245,7 @@ impl IndexerStreamCoordinator {
             // Do not update block_height if first block is block metadata
             if ind > 0 {
                 // Update the timestamp if the next block occurs
-                if let aptos_types::transaction::Transaction::BlockMetadata(ref txn) =
-                    raw_txn.transaction
-                {
+                if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                     epoch = txn.epoch();
                     epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -328,27 +328,6 @@ impl IndexerStreamCoordinator {
             .collect()
     }
 
-    fn encode_pb_txns(pb_txns: Vec<TransactionPB>) -> Vec<TransactionOutput> {
-        pb_txns
-            .iter()
-            .map(|txn| {
-                let mut buf = vec![];
-                txn.encode(&mut buf).unwrap_or_else(|_| {
-                    panic!(
-                        "Could not convert protobuf transaction to bytes '{:?}'",
-                        txn
-                    )
-                });
-                let encoded_proto_data = base64::encode(buf);
-                TransactionOutput {
-                    encoded_proto_data,
-                    version: txn.version,
-                    timestamp: txn.timestamp.clone(),
-                }
-            })
-            .collect()
-    }
-
     pub fn set_highest_known_version(&mut self) -> anyhow::Result<()> {
         let info = self.context.get_latest_ledger_info_wrapped()?;
         self.highest_known_version = info.ledger_version.0;
@@ -380,5 +359,19 @@ impl IndexerStreamCoordinator {
                 );
             }
         }
+    }
+}
+
+/// Record the transaction fetched from the storage latency.
+fn record_fetched_transaction_latency(txn: &aptos_api_types::Transaction) {
+    let current_time_in_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Current time is before UNIX_EPOCH")
+        .as_secs_f64();
+    let txn_timestamp = txn.timestamp();
+
+    if txn_timestamp > 0 {
+        let txn_timestemp_in_secs = txn_timestamp as f64 / 1_000_000.0;
+        FETCHED_LATENCY_IN_SECS.set(current_time_in_secs - txn_timestemp_in_secs);
     }
 }

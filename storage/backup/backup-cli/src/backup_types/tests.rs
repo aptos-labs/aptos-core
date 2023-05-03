@@ -115,7 +115,6 @@ fn test_end_to_end_impl(d: TestData) {
             .run(),
         )
         .unwrap();
-
     // Restore
     let global_restore_opt: GlobalRestoreOptions = GlobalRestoreOpt {
         dry_run: false,

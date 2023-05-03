@@ -28,25 +28,7 @@ impl OnChainConsensusConfig {
 
     /// Decouple execution from consensus or not.
     pub fn decoupled_execution(&self) -> bool {
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.decoupled_execution
-            },
-        }
-    }
-
-    /// Backpressure controls
-    /// 1. how much gaps can be between ordered and committed blocks in decoupled execution setup.
-    /// 2. how much gaps can be between the root and the remote sync info ledger.
-    pub fn back_pressure_limit(&self) -> u64 {
-        if !self.decoupled_execution() {
-            return 10;
-        }
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.back_pressure_limit
-            },
-        }
+        true
     }
 
     // Trim the list of failed authors from immediatelly preceeding rounds
@@ -79,7 +61,7 @@ impl OnChainConsensusConfig {
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V1(ConsensusConfigV1::default())
+        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
     }
 }
 
@@ -104,6 +86,7 @@ impl OnChainConfig for OnChainConsensusConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub decoupled_execution: bool,
+    // Deprecated and unused, cannot be renamed easily, due to yaml on framework_upgrade test
     pub back_pressure_limit: u64,
     pub exclude_round: u64,
     pub proposer_election_type: ProposerElectionType,
@@ -115,7 +98,7 @@ impl Default for ConsensusConfigV1 {
         Self {
             decoupled_execution: true,
             back_pressure_limit: 10,
-            exclude_round: 20,
+            exclude_round: 40,
             max_failed_authors_to_store: 10,
             proposer_election_type: ProposerElectionType::LeaderReputation(
                 LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {

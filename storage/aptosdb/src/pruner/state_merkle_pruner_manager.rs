@@ -13,11 +13,12 @@ use crate::{
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     pruner_utils,
+    state_merkle_db::StateMerkleDb,
 };
 use aptos_config::config::StateMerklePrunerConfig;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{schema::KeyCodec, DB};
+use aptos_schemadb::schema::KeyCodec;
 use aptos_types::transaction::Version;
 use std::{sync::Arc, thread::JoinHandle};
 
@@ -102,8 +103,8 @@ where
     StaleNodeIndex: KeyCodec<S>,
 {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(state_merkle_rocksdb: Arc<DB>, config: StateMerklePrunerConfig) -> Self {
-        let state_db_clone = Arc::clone(&state_merkle_rocksdb);
+    pub fn new(state_merkle_db: Arc<StateMerkleDb>, config: StateMerklePrunerConfig) -> Self {
+        let state_db_clone = Arc::clone(&state_merkle_db);
         let pruner = pruner_utils::create_state_merkle_pruner(state_db_clone);
 
         if config.enable {

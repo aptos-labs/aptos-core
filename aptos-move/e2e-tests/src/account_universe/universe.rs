@@ -18,7 +18,7 @@ use proptest_derive::Arbitrary;
 
 /// A set of accounts which can be used to construct an initial state.
 ///
-/// For more, see the [`account_universe` module documentation][self].
+/// For more, see the [`account_universe` module documentation].
 #[derive(Clone, Debug)]
 pub struct AccountUniverseGen {
     accounts: Vec<AccountData>,
@@ -27,7 +27,7 @@ pub struct AccountUniverseGen {
 
 /// A set of accounts that has been set up and can now be used to conduct transactions on.
 ///
-/// For more, see the [`account_universe` module documentation][self].
+/// For more, see the [`account_universe` module documentation].
 #[derive(Clone, Debug)]
 pub struct AccountUniverse {
     accounts: Vec<AccountCurrent>,

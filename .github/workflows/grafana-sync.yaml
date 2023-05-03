@@ -11,7 +11,7 @@ on:
     - cron: "0 */3 * * *"
 
 env:
-  GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+  GRAFANA_API_KEY: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
 
 jobs:
   grafana-sync:
@@ -20,7 +20,6 @@ jobs:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
       - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
         with:
-          version: 7.13.4
           run_install: |
             - recursive: false
               args: [--frozen-lockfile]

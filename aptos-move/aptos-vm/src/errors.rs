@@ -89,10 +89,11 @@ pub fn convert_prologue_error(
 		    );
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        None,
                     ));
                 },
             };
-            VMStatus::Error(new_major_status)
+            VMStatus::Error(new_major_status, None)
         },
         VMStatus::MoveAbort(location, code) => {
             let new_major_status = match error_split(code) {
@@ -125,17 +126,18 @@ pub fn convert_prologue_error(
                     );
                     return Err(VMStatus::Error(
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
+                        None,
                     ));
                 },
             };
-            VMStatus::Error(new_major_status)
+            VMStatus::Error(new_major_status, None)
         },
-        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(_) => {
+        status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(..) => {
             speculative_error!(
                 log_context,
                 format!("[aptos_vm] Unexpected prologue error: {:?}", status),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }
@@ -160,7 +162,7 @@ pub fn convert_epilogue_error(
                 format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			location, code, category, reason),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
 
         VMStatus::MoveAbort(location, code) => match error_split(code) {
@@ -171,7 +173,7 @@ pub fn convert_epilogue_error(
                     format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			    location, code, category, reason),
                 );
-                VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+                VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
             },
         },
 
@@ -180,7 +182,7 @@ pub fn convert_epilogue_error(
                 log_context,
                 format!("[aptos_vm] Unexpected success epilogue error: {:?}", status),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }
@@ -207,7 +209,7 @@ pub fn expect_only_successful_execution(
                     function_name, status
                 ),
             );
-            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION)
+            VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
         },
     })
 }

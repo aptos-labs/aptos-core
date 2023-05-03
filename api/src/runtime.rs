@@ -9,7 +9,8 @@ use crate::{
     view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_config::config::NodeConfig;
+use aptos_api_types::X_APTOS_CLIENT;
+use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
@@ -33,7 +34,8 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
-    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), None);
+    let max_runtime_workers = get_max_runtime_workers(&config.api);
+    let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
 
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
@@ -168,7 +170,11 @@ pub fn attach_poem_to_runtime(
             // https://stackoverflow.com/a/24689738/3846032
             .allow_credentials(true)
             .allow_methods(vec![Method::GET, Method::POST])
-            .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
+            .allow_headers(vec![
+                header::HeaderName::from_static(X_APTOS_CLIENT),
+                header::CONTENT_TYPE,
+                header::ACCEPT,
+            ]);
 
         // Build routes for the API
         let route = Route::new()
@@ -201,11 +207,21 @@ pub fn attach_poem_to_runtime(
     Ok(actual_address)
 }
 
+/// Returns the maximum number of runtime workers to be given to the
+/// API runtime. Defaults to 2 * number of CPU cores if not specified
+/// via the given config.
+fn get_max_runtime_workers(api_config: &ApiConfig) -> usize {
+    api_config
+        .max_runtime_workers
+        .unwrap_or_else(|| num_cpus::get() * api_config.runtime_worker_multiplier)
+}
+
 #[cfg(test)]
 mod tests {
     use super::bootstrap;
+    use crate::runtime::get_max_runtime_workers;
     use aptos_api_test_context::{new_test_context, TestContext};
-    use aptos_config::config::NodeConfig;
+    use aptos_config::config::{ApiConfig, NodeConfig};
     use aptos_types::chain_id::ChainId;
     use std::time::Duration;
 
@@ -218,6 +234,43 @@ mod tests {
         let mut cfg = NodeConfig::default();
         cfg.randomize_ports();
         bootstrap_with_config(cfg);
+    }
+
+    #[test]
+    fn test_max_runtime_workers() {
+        // Specify the number of workers for the runtime
+        let max_runtime_workers = 100;
+        let api_config = ApiConfig {
+            max_runtime_workers: Some(max_runtime_workers),
+            ..Default::default()
+        };
+
+        // Verify the correct number of workers is returned
+        assert_eq!(get_max_runtime_workers(&api_config), max_runtime_workers);
+
+        // Don't specify the number of workers for the runtime
+        let api_config = ApiConfig {
+            max_runtime_workers: None,
+            ..Default::default()
+        };
+
+        // Verify the correct number of workers is returned
+        assert_eq!(
+            get_max_runtime_workers(&api_config),
+            num_cpus::get() * api_config.runtime_worker_multiplier
+        );
+
+        // Update the multiplier
+        let api_config = ApiConfig {
+            runtime_worker_multiplier: 10,
+            ..Default::default()
+        };
+
+        // Verify the correct number of workers is returned
+        assert_eq!(
+            get_max_runtime_workers(&api_config),
+            num_cpus::get() * api_config.runtime_worker_multiplier
+        );
     }
 
     pub fn bootstrap_with_config(cfg: NodeConfig) {

@@ -140,10 +140,10 @@ backup_verify:
   resources:
     limits:
       cpu: 4
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 4
-      memory: 4Gi
+      memory: 8Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}

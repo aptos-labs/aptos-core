@@ -16,11 +16,11 @@ module aptos_std::smart_vector {
     const EZERO_BUCKET_SIZE: u64 = 4;
 
     /// A Scalable vector implementation based on tables, elements are grouped into buckets with `bucket_size`.
-    /// The vector wrapping BigVector represents an option w/o `Drop` ability requirement of T to save space in the
-    /// metadata associated with BigVector when smart_vector is so small that inline_vec vector can hold all the data.
+    /// The option wrapping BigVector saves space in the metadata associated with BigVector when smart_vector is
+    /// so small that inline_vec vector can hold all the data.
     struct SmartVector<T> has store {
         inline_vec: vector<T>,
-        big_vec: vector<BigVector<T>>,
+        big_vec: Option<BigVector<T>>,
         inline_capacity: Option<u64>,
         bucket_size: Option<u64>,
     }
@@ -32,7 +32,7 @@ module aptos_std::smart_vector {
     public fun empty<T: store>(): SmartVector<T> {
         SmartVector {
             inline_vec: vector[],
-            big_vec: vector[],
+            big_vec: option::none(),
             inline_capacity: option::none(),
             bucket_size: option::none(),
         }
@@ -44,7 +44,7 @@ module aptos_std::smart_vector {
         assert!(bucket_size > 0, error::invalid_argument(EZERO_BUCKET_SIZE));
         SmartVector {
             inline_vec: vector[],
-            big_vec: vector[],
+            big_vec: option::none(),
             inline_capacity: option::some(inline_capacity),
             bucket_size: option::some(bucket_size),
         }
@@ -63,7 +63,7 @@ module aptos_std::smart_vector {
         assert!(is_empty(&v), error::invalid_argument(EVECTOR_NOT_EMPTY));
         let SmartVector { inline_vec, big_vec, inline_capacity: _, bucket_size: _} = v;
         vector::destroy_empty(inline_vec);
-        vector::destroy_empty(big_vec);
+        option::destroy_none(big_vec);
     }
 
     /// Acquire an immutable reference to the `i`th element of the vector `v`.
@@ -74,7 +74,7 @@ module aptos_std::smart_vector {
         if (i < inline_len) {
             vector::borrow(&v.inline_vec, i)
         } else {
-            big_vector::borrow(vector::borrow(&v.big_vec, 0), i - inline_len)
+            big_vector::borrow(option::borrow(&v.big_vec), i - inline_len)
         }
     }
 
@@ -86,7 +86,7 @@ module aptos_std::smart_vector {
         if (i < inline_len) {
             vector::borrow_mut(&mut v.inline_vec, i)
         } else {
-            big_vector::borrow_mut(vector::borrow_mut(&mut v.big_vec, 0), i - inline_len)
+            big_vector::borrow_mut(option::borrow_mut(&mut v.big_vec), i - inline_len)
         }
     }
 
@@ -129,9 +129,9 @@ module aptos_std::smart_vector {
                 let estimated_avg_size = max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
                 max(1024 /* free_write_quota */ / estimated_avg_size, 1)
             };
-            vector::push_back(&mut v.big_vec, big_vector::empty(bucket_size));
+            option::fill(&mut v.big_vec, big_vector::empty(bucket_size));
         };
-        big_vector::push_back(vector::borrow_mut(&mut v.big_vec, 0), val);
+        big_vector::push_back(option::borrow_mut(&mut v.big_vec), val);
     }
 
     /// Pop an element from the end of vector `v`. It does shrink the buckets if they're empty.
@@ -139,13 +139,13 @@ module aptos_std::smart_vector {
     public fun pop_back<T>(v: &mut SmartVector<T>): T {
         assert!(!is_empty(v), error::invalid_state(EVECTOR_EMPTY));
         let big_vec_wrapper = &mut v.big_vec;
-        if (vector::length(big_vec_wrapper) != 0) {
-            let big_vec = vector::pop_back(big_vec_wrapper);
+        if (option::is_some(big_vec_wrapper)) {
+            let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::pop_back(&mut big_vec);
             if (big_vector::is_empty(&big_vec)) {
                 big_vector::destroy_empty(big_vec)
             } else {
-                vector::push_back(big_vec_wrapper, big_vec);
+                option::fill(big_vec_wrapper, big_vec);
             };
             val
         } else {
@@ -164,12 +164,12 @@ module aptos_std::smart_vector {
             vector::remove(&mut v.inline_vec, i)
         } else {
             let big_vec_wrapper = &mut v.big_vec;
-            let big_vec = vector::pop_back(big_vec_wrapper);
+            let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::remove(&mut big_vec, i - inline_len);
             if (big_vector::is_empty(&big_vec)) {
                 big_vector::destroy_empty(big_vec)
             } else {
-                vector::push_back(big_vec_wrapper, big_vec);
+                option::fill(big_vec_wrapper, big_vec);
             };
             val
         }
@@ -185,22 +185,22 @@ module aptos_std::smart_vector {
         let big_vec_wrapper = &mut v.big_vec;
         let inline_vec = &mut v.inline_vec;
         if (i >= inline_len) {
-            let big_vec = vector::pop_back(big_vec_wrapper);
+            let big_vec = option::extract(big_vec_wrapper);
             let val = big_vector::swap_remove(&mut big_vec, i - inline_len);
             if (big_vector::is_empty(&big_vec)) {
                 big_vector::destroy_empty(big_vec)
             } else {
-                vector::push_back(big_vec_wrapper, big_vec);
+                option::fill(big_vec_wrapper, big_vec);
             };
             val
         } else {
             if (inline_len < len) {
-                let big_vec = vector::pop_back(big_vec_wrapper);
+                let big_vec = option::extract(big_vec_wrapper);
                 let last_from_big_vec = big_vector::pop_back(&mut big_vec);
                 if (big_vector::is_empty(&big_vec)) {
                     big_vector::destroy_empty(big_vec)
                 } else {
-                    vector::push_back(big_vec_wrapper, big_vec);
+                    option::fill(big_vec_wrapper, big_vec);
                 };
                 vector::push_back(inline_vec, last_from_big_vec);
             };
@@ -218,11 +218,11 @@ module aptos_std::smart_vector {
         assert!(j < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
         let inline_len = vector::length(&v.inline_vec);
         if (i >= inline_len) {
-            big_vector::swap(vector::borrow_mut(&mut v.big_vec, 0), i - inline_len, j - inline_len);
+            big_vector::swap(option::borrow_mut(&mut v.big_vec), i - inline_len, j - inline_len);
         } else if (j < inline_len) {
             vector::swap(&mut v.inline_vec, i, j);
         } else {
-            let big_vec = vector::borrow_mut(&mut v.big_vec, 0);
+            let big_vec = option::borrow_mut(&mut v.big_vec);
             let inline_vec = &mut v.inline_vec;
             let element_i = vector::swap_remove(inline_vec, i);
             let element_j = big_vector::swap_remove(big_vec, j - inline_len);
@@ -246,8 +246,8 @@ module aptos_std::smart_vector {
         };
         vector::reverse(&mut new_inline_vec);
         // Reverse the big_vector left if exists.
-        if (!vector::is_empty(&v.big_vec)) {
-            big_vector::reverse(vector::borrow_mut(&mut v.big_vec, 0));
+        if (option::is_some(&v.big_vec)) {
+            big_vector::reverse(option::borrow_mut(&mut v.big_vec));
         };
         // Mem::swap the two vectors.
         let temp_vec = vector[];
@@ -273,8 +273,8 @@ module aptos_std::smart_vector {
         let (found, i) = vector::index_of(&v.inline_vec, val);
         if (found) {
             (true, i)
-        } else if (!vector::is_empty(&v.big_vec)) {
-            let (found, i) = big_vector::index_of(vector::borrow(&v.big_vec, 0), val);
+        } else if (option::is_some(&v.big_vec)) {
+            let (found, i) = big_vector::index_of(option::borrow(&v.big_vec), val);
             (found, i + vector::length(&v.inline_vec))
         } else {
             (false, 0)
@@ -291,10 +291,10 @@ module aptos_std::smart_vector {
 
     /// Return the length of the vector.
     public fun length<T>(v: &SmartVector<T>): u64 {
-        vector::length(&v.inline_vec) + if (vector::is_empty(&v.big_vec)) {
+        vector::length(&v.inline_vec) + if (option::is_none(&v.big_vec)) {
             0
         } else {
-            big_vector::length(vector::borrow(&v.big_vec, 0))
+            big_vector::length(option::borrow(&v.big_vec))
         }
     }
 
@@ -449,7 +449,7 @@ module aptos_std::smart_vector {
         i = 0;
         let len = length(&v);
         while (i + 1 < len) {
-            assert!(*big_vector::borrow(vector::borrow(&v.big_vec, 0), i) == *big_vector::borrow(vector::borrow(&v.big_vec, 0), i + 1) + 1, 0);
+            assert!(*big_vector::borrow(option::borrow(&v.big_vec), i) == *big_vector::borrow(option::borrow(&v.big_vec), i + 1) + 1, 0);
             i = i + 1;
         };
         destroy(v);
@@ -486,22 +486,6 @@ module aptos_std::smart_vector {
             assert!(found && idx == i, 0);
             i = i + 1;
         };
-        destroy(v);
-    }
-
-    #[test]
-    fun smart_vector_broken_invariant() {
-        let v = empty_with_config(4, 4);
-
-        push_back(&mut v, 1);
-        push_back(&mut v, 1);
-        push_back(&mut v, 1);
-        push_back(&mut v, 1);
-
-        push_back(&mut v, 1);
-        remove(&mut v, 4);
-        push_back(&mut v, 1);
-        assert!(vector::length(&v.big_vec) < 2, 0);
         destroy(v);
     }
 }

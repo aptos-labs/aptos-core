@@ -1,0 +1,67 @@
+moveUrl = "https://github.com/move-language/move.git"
+aptosUrl = "https://github.com/aptos-labs/aptos-core.git"
+
+# Workflow to pull from Move to Aptos. This creates a draft PR at the fixed branch `from_move`
+# which should be further massaged before sending out.
+core.workflow(
+    name = "pull_move",
+    origin = git.github_origin(
+        url = moveUrl,
+        ref = "aptos-main",
+    ),
+    destination = git.destination(
+        url = "NOT_SET", # use --git-destination-url to set this
+        fetch = "from_move",
+        push = "from_move",
+        integrates = [],
+    ),
+    mode = "ITERATIVE",
+    origin_files = glob(["language/**"]),
+    destination_files = glob(["third_party/move/**"]),
+    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    transformations = [
+        core.move("language", "third_party/move"),
+    ],
+)
+
+# Workflow to push from Aptos to Move. This directly pushes without PR.
+core.workflow(
+    name = "push_move",
+    origin = git.github_origin(
+        url = aptosUrl,
+        ref = "main",
+    ),
+    destination = git.destination(
+        url = "NOT_SET", # use --git-destination-url to set this
+        fetch = "aptos-main",
+        push = "to_move",
+        integrates = [],
+    ),
+    mode = "ITERATIVE",
+    origin_files = glob(["third_party/move/**"]),
+    destination_files = glob(["language/**"]),
+    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    transformations = [
+        core.move("third_party/move", "language"),
+    ],
+)
+
+# Workflow to push from Aptos to Move. This directly pushes without PR.
+core.workflow(
+    name = "push_move_direct",
+    origin = git.github_origin(
+        url = aptosUrl,
+        ref = "main",
+    ),
+    destination = git.github_destination(
+        url = moveUrl,
+        push = "aptos-main",
+    ),
+    mode = "ITERATIVE",
+    origin_files = glob(["third_party/move/**"]),
+    destination_files = glob(["language/**"]),
+    authoring = authoring.pass_thru("Wolfgang <wg@aptoslabs.com>"),
+    transformations = [
+        core.move("third_party/move", "language"),
+    ],
+)

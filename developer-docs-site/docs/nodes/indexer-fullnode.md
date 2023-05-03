@@ -5,7 +5,7 @@ slug: "indexer-fullnode"
 
 # Run an Aptos Indexer
 
-This document describes how to operate an indexer fullnode on the Aptos network. To understand and ingest the indexer data in your app, see [Use the Aptos Indexer](../guides/indexing.md).
+This document describes how to operate an indexer fullnode on the Aptos network. To understand and ingest the indexer data in your app, see [Use the Aptos Indexer](../integration/indexing.md).
 
 :::danger On macOS with Apple silicon only
 The below installation steps are verified only on macOS with Apple silicon. They might require minor tweaking when running on other builds.
@@ -22,7 +22,7 @@ To run an indexer fullnode, these are the steps in summary:
 
 ## Prerequisites
 
-Install the packages below. Note, you may have already installed many of these while [preparing your development environment](../guides/getting-started.md#prepare-development-environment). You can confirm by running `which command-name` and ensuring the package appears in the output (although `libpq` will not be returned even when installed).
+Install the packages below. Note, you may have already installed many of these while [preparing your development environment](../guides/building-from-source). You can confirm by running `which command-name` and ensuring the package appears in the output (although `libpq` will not be returned even when installed).
 
 > Important: If you are on macOS, you will need to [install Docker following the official guidance](https://docs.docker.com/desktop/install/mac-install/) rather than `brew`.
 

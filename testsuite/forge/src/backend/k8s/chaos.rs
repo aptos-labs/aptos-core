@@ -139,13 +139,19 @@ impl K8sSwarm {
         &self,
         swarm_network_bandwidth: &SwarmNetworkBandwidth,
     ) -> Result<String> {
-        Ok(format!(
-            include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
-            namespace = self.kube_namespace,
-            rate = swarm_network_bandwidth.rate,
-            limit = swarm_network_bandwidth.limit,
-            buffer = swarm_network_bandwidth.buffer
-        ))
+        let mut network_chaos_specs = vec![];
+
+        for group_network_bandwidth in &swarm_network_bandwidth.group_network_bandwidths {
+            network_chaos_specs.push(format!(
+                include_str!(BANDWIDTH_NETWORK_CHAOS_TEMPLATE!()),
+                namespace = self.kube_namespace,
+                rate = group_network_bandwidth.rate,
+                limit = group_network_bandwidth.limit,
+                buffer = group_network_bandwidth.buffer,
+            ));
+        }
+
+        Ok(network_chaos_specs.join("\n---\n"))
     }
 
     fn create_network_loss_template(

@@ -450,6 +450,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
     map_del_must_exist = remove,
     map_borrow = borrow,
     map_borrow_mut = borrow_mut,
+    map_borrow_mut_with_default = borrow_mut_with_default,
     map_spec_get = spec_get,
     map_spec_set = spec_set,
     map_spec_del = spec_remove,
@@ -582,8 +583,8 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<pre><code><b>pragma</b> opaque, verify=<b>false</b>;
-<b>aborts_if</b> <b>false</b>;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>pragma</b> intrinsic;
 </code></pre>
 
 
@@ -680,4 +681,4 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 </code></pre>
 
 
-[move-book]: https://move-language.github.io/move/introduction.html
+[move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

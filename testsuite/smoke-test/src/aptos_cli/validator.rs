@@ -179,7 +179,7 @@ async fn test_onchain_config_change() {
         .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 400;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
@@ -432,7 +432,7 @@ async fn test_nodes_rewards() {
         .with_init_config(Arc::new(|i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
 
             // make sure we have quorum
@@ -861,7 +861,7 @@ async fn test_join_and_leave_validator() {
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             *genesis_stake_amount = 100000;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
@@ -1023,7 +1023,7 @@ async fn test_owner_create_and_delegate_flow() {
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
-            conf.consensus.quorum_store_poll_count = 4;
+            conf.consensus.quorum_store_poll_time_ms = 100;
             // enough for quorum
             *genesis_stake_amount = 5000000;
         }))
@@ -1054,11 +1054,12 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap();
+    println!("owner CLI index: {}", owner_cli_index);
 
     cli.assert_account_balance_now(owner_cli_index, owner_initial_coins)
         .await;
 
-    // faucet can make our root LocalAccount sequence number get out of sync.
+    // Faucet can make our root LocalAccount sequence number get out of sync.
     swarm
         .chain_info()
         .resync_root_account_seq_num(&rest_client)
@@ -1078,6 +1079,7 @@ async fn test_owner_create_and_delegate_flow() {
     // Fetch amount of gas used for the above account creations
     let mut owner_gas =
         owner_initial_coins - cli.account_balance_now(owner_cli_index).await.unwrap();
+    println!("owner_gas1: {}", owner_gas);
 
     // Voter and operator start with no coins
     // Owner needs to send small amount of coins to operator and voter, to create their accounts and so they have enough for gas fees.
@@ -1085,7 +1087,7 @@ async fn test_owner_create_and_delegate_flow() {
         .transfer_coins(owner_cli_index, voter_cli_index, voter_initial_coins, None)
         .await
         .unwrap()
-        .gas_used;
+        .octa_spent();
     owner_gas += cli
         .transfer_coins(
             owner_cli_index,
@@ -1095,7 +1097,7 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap()
-        .gas_used;
+        .octa_spent();
 
     cli.assert_account_balance_now(
         owner_cli_index,
@@ -1120,6 +1122,7 @@ async fn test_owner_create_and_delegate_flow() {
         .unwrap(),
     );
 
+    println!("before4");
     cli.assert_account_balance_now(
         owner_cli_index,
         owner_initial_coins
@@ -1129,6 +1132,7 @@ async fn test_owner_create_and_delegate_flow() {
             - owner_gas,
     )
     .await;
+    println!("after4");
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
     assert_eq!(
@@ -1163,8 +1167,10 @@ async fn test_owner_create_and_delegate_flow() {
         .unwrap(),
     );
 
+    println!("before5");
     cli.assert_account_balance_now(operator_cli_index, operator_initial_coins - operator_gas)
         .await;
+    println!("after5");
 
     cli.join_validator_set(operator_cli_index, Some(owner_cli_index))
         .await

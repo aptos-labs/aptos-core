@@ -11,7 +11,7 @@ use prometheus::{
 /// package will not have much use for it in regular operations. However, when
 /// implementing custom Collectors, it is useful as a throw-away metric that is
 /// generated on the fly to send it to Prometheus in the Collect method.
-/// Reference: https://github.com/prometheus/client_golang/blob/main/prometheus/value.go#L106
+/// Reference: <https://github.com/prometheus/client_golang/blob/main/prometheus/value.go#L106>
 #[derive(Debug)]
 pub struct ConstMetric {
     desc: Desc,

@@ -64,18 +64,21 @@ pub(crate) fn update_store(
             )
             .unwrap();
         let ledger_batch = SchemaBatch::new();
-        let state_kv_batch = SchemaBatch::new();
+        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
         store
             .put_value_sets(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
                 &ledger_batch,
-                &state_kv_batch,
+                &sharded_state_kv_batches,
             )
             .unwrap();
         store.ledger_db.write_schemas(ledger_batch).unwrap();
-        store.state_kv_db.write_schemas(state_kv_batch).unwrap();
+        store
+            .state_kv_db
+            .commit(version, sharded_state_kv_batches)
+            .unwrap();
     }
     root_hash
 }
@@ -612,13 +615,13 @@ fn verify_account_txns(
         .map(|(account, txns_and_events)| {
             let account = *account;
             let first_seq_num = if let Some((txn, _)) = txns_and_events.first() {
-                txn.as_signed_user_txn().unwrap().sequence_number()
+                txn.try_as_signed_user_txn().unwrap().sequence_number()
             } else {
                 return (account, Vec::new());
             };
 
             let last_txn = &txns_and_events.last().unwrap().0;
-            let last_seq_num = last_txn.as_signed_user_txn().unwrap().sequence_number();
+            let last_seq_num = last_txn.try_as_signed_user_txn().unwrap().sequence_number();
             let limit = last_seq_num + 1;
 
             let acct_txns_with_proof = db
@@ -659,7 +662,7 @@ fn group_txns_by_account(
 ) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
     let mut account_to_txns = HashMap::new();
     for txn in txns_to_commit {
-        if let Ok(signed_txn) = txn.transaction().as_signed_user_txn() {
+        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
             let account = signed_txn.sender();
             account_to_txns
                 .entry(account)
@@ -763,7 +766,10 @@ pub fn verify_committed_transactions(
 
         if !txn_to_commit.is_state_checkpoint() {
             // Fetch and verify transaction itself.
-            let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
+            let txn = txn_to_commit
+                .transaction()
+                .try_as_signed_user_txn()
+                .unwrap();
             let txn_with_proof = db
                 .get_transaction_by_hash(txn_to_commit.transaction().hash(), ledger_version, true)
                 .unwrap()
@@ -853,6 +859,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
     db.state_merkle_db
+        .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     let smt = SparseMerkleTree::<StateValue>::default()

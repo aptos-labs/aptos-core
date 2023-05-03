@@ -5,7 +5,6 @@ pub mod counters;
 /// Equivalent to directly fetching blocks from mempool without a quorum store.
 pub mod direct_mempool_quorum_store;
 
-pub(crate) mod batch_aggregator;
 pub(crate) mod batch_coordinator;
 pub(crate) mod batch_generator;
 pub(crate) mod batch_requester;

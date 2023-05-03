@@ -115,13 +115,13 @@ const accountNFTs = await provider.getAccountNFTs("0x123");
 
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) class exposes the methods for retrieving the account resources, transactions, modules and events.
 
-In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](../../guides/sign-a-transaction.md) for instructions.
+In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library and Transaction Builder for constructing the transaction payloads. See the guide [Creating a Signed Transaction](../../integration/sign-a-transaction.md) for instructions.
 
 You can use the `AptosClient` class directly or the `Provider` class.
 
 ### IndexerClient class
 
-The `IndexerClient` class exposes functions to query the [Aptos Indexer](../../guides/indexing.md). The Aptos Indexer fulfills this need, allowing the data shaping critical to real-time app use.
+The `IndexerClient` class exposes functions to query the [Aptos Indexer](../../integration/indexing.md). The Aptos Indexer fulfills this need, allowing the data shaping critical to real-time app use.
 
 You can use the `IndexerClient` class directly or the `Provider` class.
 
@@ -162,7 +162,7 @@ The Aptos SDK validates the Transaction Builder and BCS in two ways:
 
 :::tip
 
-An example of unit tests for the BCS serializer can be found in [`serializer.test.ts`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/bcs/serializer.test.ts).
+An example of unit tests for the BCS serializer can be found in [`serializer.test.ts`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/tests/unit/serializer.test.ts).
 
 An example of an e2e test for submitting a BCS transaction can be found in [`aptos_client.test.ts`](https://github.com/aptos-labs/aptos-core/blob/f4a7820a61f22ed8306219621402d96f70379d20/ecosystem/typescript/sdk/src/tests/e2e/aptos_client.test.ts#L78).
 
@@ -184,5 +184,5 @@ Vector items are self-explanatory. However, a special serialization method is us
 - `code` in Script and ModuleBundle are hex-coded.
 
 :::tip
-See the [`transaction_vector.test.ts`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/transaction_builder/transaction_vector.test.ts) code example for how the TypeScript SDK does vector validation.
+See the [`transaction_vector.test.ts`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/tests/unit/transaction_vector.test.ts) code example for how the TypeScript SDK does vector validation.
 :::

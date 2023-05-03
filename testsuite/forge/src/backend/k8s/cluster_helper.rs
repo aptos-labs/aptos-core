@@ -17,13 +17,13 @@ use aptos_logger::{info, warn};
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
-    batch::{v1::Job, v1beta1::CronJob},
+    batch::v1::Job,
     core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod, Secret},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
-    Config, Error as KubeError,
+    Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
 use serde::de::DeserializeOwned;
@@ -31,7 +31,9 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
-    env, fs,
+    env,
+    fmt::Debug,
+    fs,
     fs::File,
     io::Write,
     net::TcpListener,
@@ -159,11 +161,15 @@ async fn wait_nodes_stateful_set(
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
-async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
+async fn delete_k8s_collection<T: kube::Resource>(
     api: Api<T>,
     name: &'static str,
     label_selector: &str,
-) -> Result<()> {
+) -> Result<()>
+where
+    T: Clone + DeserializeOwned + Debug,
+    <T as kube::Resource>::DynamicType: Default,
+{
     match api
         .delete_collection(
             &DeleteParams::default(),
@@ -172,7 +178,7 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
         .await?
     {
         either::Left(list) => {
-            let names: Vec<_> = list.iter().map(Meta::name).collect();
+            let names: Vec<_> = list.iter().map(ResourceExt::name).collect();
             info!("Deleting collection of {}: {:?}", name, names);
         },
         either::Right(status) => {
@@ -196,7 +202,6 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
     let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), kube_namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), kube_namespace);
     let jobs: Api<Job> = Api::namespaced(client.clone(), kube_namespace);
-    let cronjobs: Api<CronJob> = Api::namespaced(client.clone(), kube_namespace);
     // service deletion by label selector is not supported in this version of k8s api
     // let services: Api<Service> = Api::namespaced(client.clone(), kube_namespace);
 
@@ -210,7 +215,9 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
         delete_k8s_collection(stateful_sets.clone(), "StatefulSets", selector).await?;
         delete_k8s_collection(pvcs.clone(), "PersistentVolumeClaims", selector).await?;
         delete_k8s_collection(jobs.clone(), "Jobs", selector).await?;
-        delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
+        // This is causing problem on gcp forge for some reason?!
+        // HACK remove to unblock
+        // delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
         // delete_k8s_collection(services.clone(), "Services", selector).await?;
     }
 
@@ -706,7 +713,8 @@ pub async fn collect_running_nodes(
 
 pub async fn create_k8s_client() -> K8sClient {
     // get the client from the local kube context
-    let config_infer = Config::infer().await.unwrap();
+    let mut config_infer = Config::infer().await.unwrap();
+    config_infer.accept_invalid_certs = true;
     K8sClient::try_from(config_infer).unwrap()
 }
 
@@ -829,6 +837,7 @@ pub async fn create_pyroscope_secret(kube_namespace: String) -> Result<()> {
             data: pyroscope_secret_data,
             string_data: None,
             type_: None,
+            immutable: None,
         };
         if let Err(KubeError::Api(api_err)) = namespace_secrets_api
             .create(&PostParams::default(), &namespaced_pyroscope_secret)
@@ -897,6 +906,7 @@ pub async fn create_management_configmap(
             name: Some(management_configmap_name.clone()),
             ..ObjectMeta::default()
         },
+        immutable: None,
     };
     if let Err(KubeError::Api(api_err)) =
         configmap_api.create(&PostParams::default(), &config).await

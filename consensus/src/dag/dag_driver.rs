@@ -146,7 +146,6 @@ impl DagDriver {
         let payload = self
             .payload_client
             .pull_payload_for_dag(
-                self.round,
                 self.config.max_node_txns,
                 self.config.max_node_bytes,
                 payload_filter,

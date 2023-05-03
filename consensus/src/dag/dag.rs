@@ -5,7 +5,7 @@ use crate::{
     dag::{anchor_election::AnchorElection, bullshark::Bullshark},
     payload_manager::PayloadManager,
 };
-use aptos_consensus_types::node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData};
+use aptos_consensus_types::{node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData}, block::Block};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
@@ -460,10 +460,11 @@ impl Dag {
         // TODO persist!
 
         self.payload_manager
-            .prefetch_payload_data(
+            .prefetch_payload_data_inner(
                 self.epoch,
                 self.current_round,
-                certified_node.node().maybe_payload(),
+                certified_node.node().timestamp(),
+                certified_node.node().maybe_payload().unwrap(),
             )
             .await;
 

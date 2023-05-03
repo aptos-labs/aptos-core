@@ -10,7 +10,7 @@ use crate::{
             pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, GasParameters,
             COMPRESSED_POINT_NUM_BYTES,
         },
-        helpers::{SafeNativeContext, SafeNativeResult},
+        helpers::{log2_floor, SafeNativeContext, SafeNativeResult},
     },
     safely_assert_eq, safely_pop_arg, safely_pop_type_arg,
 };
@@ -592,54 +592,6 @@ pub(crate) fn native_multi_scalar_mul(
     let result_handle = point_data_mut.add_point(result);
 
     Ok(smallvec![Value::u64(result_handle)])
-}
-
-/// For all $n > 0$, returns $\floor{\log_2{n}}$, contained within a `Some`.
-/// For $n = 0$, returns `None`.
-#[allow(non_snake_case)]
-fn log2_floor(n: usize) -> Option<usize> {
-    if n == 0 {
-        return None;
-    }
-
-    // NOTE: n > 0, so n.leading_zeros() cannot equal usize::BITS. Therefore, we will never cast -1 to a usize.
-    Some(((usize::BITS - n.leading_zeros()) - 1) as usize)
-}
-
-#[cfg(test)]
-mod test {
-    use crate::natives::cryptography::ristretto255_point::log2_floor;
-
-    #[test]
-    fn test_log2_floor() {
-        assert_eq!(log2_floor(usize::MIN), None);
-        assert_eq!(log2_floor(0), None);
-        assert_eq!(log2_floor(1), Some(0));
-
-        assert_eq!(log2_floor(2), Some(1));
-        assert_eq!(log2_floor(3), Some(1));
-
-        assert_eq!(log2_floor(4), Some(2));
-        assert_eq!(log2_floor(5), Some(2));
-        assert_eq!(log2_floor(6), Some(2));
-        assert_eq!(log2_floor(7), Some(2));
-
-        assert_eq!(log2_floor(8), Some(3));
-        assert_eq!(log2_floor(9), Some(3));
-        assert_eq!(log2_floor(10), Some(3));
-        assert_eq!(log2_floor(11), Some(3));
-        assert_eq!(log2_floor(12), Some(3));
-        assert_eq!(log2_floor(13), Some(3));
-        assert_eq!(log2_floor(14), Some(3));
-        assert_eq!(log2_floor(15), Some(3));
-
-        assert_eq!(log2_floor(16), Some(4));
-
-        // usize::MAX = 2^{usize::BITS} - 1, so the floor will be usize::BITS - 1
-        assert_eq!(log2_floor(usize::MAX), Some((usize::BITS - 1) as usize));
-
-        println!("All good.");
-    }
 }
 
 /// This upgrades 'native_multi_scalar_mul' in two ways:

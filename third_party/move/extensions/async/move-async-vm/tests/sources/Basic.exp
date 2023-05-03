@@ -1,0 +1,32 @@
+publishing Runtime
+publishing bcs
+publishing Basic
+actor 0x4 created from 0x3::Basic
+  SUCCESS
+  commit 0x3::Basic::Basic[0x4] := New("[00, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::start (hash=0xD4CC9A1B01199BB9)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+  commit 0x3::Basic::Basic[0x4] := Modify("[01, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+  commit 0x3::Basic::Basic[0x4] := Modify("[02, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+  commit 0x3::Basic::Basic[0x4] := Modify("[03, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+  commit 0x3::Basic::Basic[0x4] := Modify("[04, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  sent 0x4 <- 0xEBAC30B69450533F argc=1
+  commit 0x3::Basic::Basic[0x4] := Modify("[05, 00, 00, 00, 00, 00, 00, 00]")
+actor 0x4 handling 0x3::Basic::count_down (hash=0xEBAC30B69450533F)
+  SUCCESS
+  commit 0x3::Basic::Basic[0x4] := Modify("[05, 00, 00, 00, 00, 00, 00, 00]")

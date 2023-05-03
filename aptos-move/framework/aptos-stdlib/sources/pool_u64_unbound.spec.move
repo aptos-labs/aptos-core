@@ -6,6 +6,11 @@ spec aptos_std::pool_u64_unbound {
     // Function specifications
     // -----------------------
 
+    spec Pool {
+        invariant forall addr: address:
+            table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
+    }
+
     spec fun spec_contains(pool: Pool, shareholder: address): bool {
         table::spec_contains(pool.shares, shareholder)
     }
@@ -136,10 +141,21 @@ spec aptos_std::pool_u64_unbound {
     shareholder_2: address,
     shares_to_transfer: u128
     ) {
-        pragma aborts_if_is_partial;
+        aborts_if (shareholder_1 != shareholder_2) && shares_to_transfer > 0 && spec_contains(pool, shareholder_2) &&
+            (spec_shares(pool, shareholder_2) + shares_to_transfer > MAX_U128);
         aborts_if !spec_contains(pool, shareholder_1);
         aborts_if spec_shares(pool, shareholder_1) < shares_to_transfer;
-        // TODO: difficult to specify due to the intermediate state problem.
+        ensures shareholder_1 == shareholder_2 ==> spec_shares(old(pool), shareholder_1) == spec_shares(pool, shareholder_1);
+        ensures ((shareholder_1 != shareholder_2) && (spec_shares(old(pool), shareholder_1) == shares_to_transfer)) ==>
+            !spec_contains(pool, shareholder_1);
+        ensures (shareholder_1 != shareholder_2 && shares_to_transfer > 0) ==>
+            (spec_contains(pool, shareholder_2));
+        ensures (shareholder_1 != shareholder_2 && shares_to_transfer > 0 && !spec_contains(old(pool), shareholder_2)) ==>
+            (spec_contains(pool, shareholder_2) && spec_shares(pool, shareholder_2) == shares_to_transfer);
+        ensures (shareholder_1 != shareholder_2 && shares_to_transfer > 0 && spec_contains(old(pool), shareholder_2)) ==>
+            (spec_contains(pool, shareholder_2) && spec_shares(pool, shareholder_2) == spec_shares(old(pool), shareholder_2) + shares_to_transfer);
+        ensures ((shareholder_1 != shareholder_2) && (spec_shares(old(pool), shareholder_1) > shares_to_transfer)) ==>
+            (spec_contains(pool, shareholder_1) && (spec_shares(pool, shareholder_1) == spec_shares(old(pool), shareholder_1) - shares_to_transfer));
     }
 
     spec deduct_shares(pool: &mut Pool, shareholder: address, num_shares: u128): u128 {

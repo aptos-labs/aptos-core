@@ -34,7 +34,7 @@ use aptos_genesis::{
 use aptos_logger::info;
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
-    on_chain_config::OnChainConsensusConfig,
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
 };
 use aptos_vm_genesis::{default_gas_schedule, AccountBalance, EmployeePool};
 use async_trait::async_trait;
@@ -55,25 +55,25 @@ const GENESIS_FILE: &str = "genesis.blob";
 /// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
+    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     GenerateGenesis(GenerateGenesis),
+    GetPoolAddresses(tools::PoolAddresses),
     GenerateKeys(keys::GenerateKeys),
     GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
-    GenerateAdminWriteSet(keys::GenerateAdminWriteSet),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
-    GetPoolAddresses(tools::PoolAddresses),
 }
 
 impl GenesisTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
+            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GenerateAdminWriteSet(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
-            GenesisTool::GetPoolAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -255,6 +255,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
             gas_schedule: default_gas_schedule(),
         },
     )?)
@@ -294,6 +295,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
             consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default(),
             gas_schedule: default_gas_schedule(),
         },
     )?)

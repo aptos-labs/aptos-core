@@ -12,6 +12,7 @@
 
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(clippy::too_many_arguments)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -97,25 +98,25 @@ pub enum EntryFunctionCall {
     /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
     /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
     /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-    /// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
+    /// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
     /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
     /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
     /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
     /// `originating address` refers to an account's original/first address.
     ///
     /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
-    /// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
-    /// OriginatingAddress[new_addr_a] -> addr_a
+    /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
+    /// `OriginatingAddress[new_addr_a]` -> `addr_a`
     /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
-    /// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+    /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
     ///
     /// But Bob likes to mess with Alice.
-    /// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+    /// Bob creates an account `addr_b` and maliciously rotates it to Alice's new address `new_addr_a`. Since we are no longer checking a PoK,
     /// Bob can easily do this.
     ///
-    /// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
-    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
-    /// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+    /// Now, the table will be updated to make Alice's new address point to Bob's address: `OriginatingAddress[new_addr_a]` -> `addr_b`.
+    /// When Alice recovers her account, her wallet will display the attacker's address (Bob's) `addr_b` as her address.
+    /// Now Alice will give `addr_b` to everyone to pay her, but the money will go to Bob.
     ///
     /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
     /// to rotate his address to Alice's address in the first place.
@@ -473,7 +474,7 @@ pub enum EntryFunctionCall {
     /// account, and rotates the authentication key to either the optional auth key if it is
     /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
     /// this function adds additional resource ownership to the resource account and should only be
-    /// used for resource accounts that need access to Coin<AptosCoin>.
+    /// used for resource accounts that need access to `Coin<AptosCoin>`.
     ResourceAccountCreateResourceAccountAndFund {
         seed: Vec<u8>,
         optional_auth_key: Vec<u8>,
@@ -629,7 +630,8 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    /// Convenience function to allow a staker to update the commision percentage paid to the operator.
+    /// Convenience function to allow a staker to update the commission percentage paid to the operator.
+    /// TODO: fix the typo in function name. commision -> commission
     StakingContractUpdateCommision {
         operator: AccountAddress,
         new_commission_percentage: u64,
@@ -1375,25 +1377,25 @@ pub fn account_revoke_signer_capability(
 /// demonstrating that the user intends to and has the capability to rotate the authentication key of this account;
 /// - the second signature `cap_update_table` refers to the signature by the new key (that the account owner wants to rotate to) on a
 /// valid `RotationProofChallenge`, demonstrating that the user owns the new private key, and has the authority to update the
-/// `OriginatingAddress` map with the new address mapping <new_address, originating_address>.
+/// `OriginatingAddress` map with the new address mapping `<new_address, originating_address>`.
 /// To verify these two signatures, we need their corresponding public key and public key scheme: we use `from_scheme` and `from_public_key_bytes`
 /// to verify `cap_rotate_key`, and `to_scheme` and `to_public_key_bytes` to verify `cap_update_table`.
 /// A scheme of 0 refers to an Ed25519 key and a scheme of 1 refers to Multi-Ed25519 keys.
 /// `originating address` refers to an account's original/first address.
 ///
 /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
-/// Alice has rotated her account addr_a to new_addr_a. As a result, the following entry is created, to help Alice when recovering her wallet:
-/// OriginatingAddress[new_addr_a] -> addr_a
+/// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
+/// `OriginatingAddress[new_addr_a]` -> `addr_a`
 /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
-/// (Fortunately, she still has her secret key new_sk_a associated with her new address new_addr_a, so she can do this.)
+/// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
 ///
 /// But Bob likes to mess with Alice.
-/// Bob creates an account addr_b and maliciously rotates it to Alice's new address new_addr_a. Since we are no longer checking a PoK,
+/// Bob creates an account `addr_b` and maliciously rotates it to Alice's new address `new_addr_a`. Since we are no longer checking a PoK,
 /// Bob can easily do this.
 ///
-/// Now, the table will be updated to make Alice's new address point to Bob's address: OriginatingAddress[new_addr_a] -> addr_b.
-/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) addr_b as her address.
-/// Now Alice will give addr_b to everyone to pay her, but the money will go to Bob.
+/// Now, the table will be updated to make Alice's new address point to Bob's address: `OriginatingAddress[new_addr_a]` -> `addr_b`.
+/// When Alice recovers her account, her wallet will display the attacker's address (Bob's) `addr_b` as her address.
+/// Now Alice will give `addr_b` to everyone to pay her, but the money will go to Bob.
 ///
 /// Because we ask for a valid `cap_update_table`, this kind of attack is not possible. Bob would not have the secret key of Alice's address
 /// to rotate his address to Alice's address in the first place.
@@ -2415,7 +2417,7 @@ pub fn resource_account_create_resource_account(
 /// account, and rotates the authentication key to either the optional auth key if it is
 /// non-empty (though auth keys are 32-bytes) or the source accounts current auth key. Note,
 /// this function adds additional resource ownership to the resource account and should only be
-/// used for resource accounts that need access to Coin<AptosCoin>.
+/// used for resource accounts that need access to `Coin<AptosCoin>`.
 pub fn resource_account_create_resource_account_and_fund(
     seed: Vec<u8>,
     optional_auth_key: Vec<u8>,
@@ -2907,7 +2909,8 @@ pub fn staking_contract_unlock_stake(operator: AccountAddress, amount: u64) -> T
     ))
 }
 
-/// Convenience function to allow a staker to update the commision percentage paid to the operator.
+/// Convenience function to allow a staker to update the commission percentage paid to the operator.
+/// TODO: fix the typo in function name. commision -> commission
 pub fn staking_contract_update_commision(
     operator: AccountAddress,
     new_commission_percentage: u64,

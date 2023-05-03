@@ -10,23 +10,25 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::Block,
-    common::{Payload, PayloadFilter, Round},
+    common::{Payload, PayloadFilter},
     executed_block::ExecutedBlock,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{Error as ExecutionError, StateComputeResult};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use futures::future::BoxFuture;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub type StateComputerCommitCallBackType =
     Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
+/// Clients can pull information about transactions from the mempool and return
+/// the retrieved information as a `Payload`.
 #[async_trait::async_trait]
 pub trait PayloadClient: Send + Sync {
     async fn pull_payload(
         &self,
-        round: Round,
+        max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,
@@ -38,7 +40,6 @@ pub trait PayloadClient: Send + Sync {
 
     async fn pull_payload_for_dag(
         &self,
-        round: Round,
         max_items: u64,
         max_bytes: u64,
         exclude: PayloadFilter,

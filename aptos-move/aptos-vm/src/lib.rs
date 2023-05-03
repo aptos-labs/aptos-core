@@ -103,7 +103,7 @@
 
 mod access_path_cache;
 #[macro_use]
-mod counters;
+pub mod counters;
 pub mod data_cache;
 
 #[cfg(feature = "mirai-contracts")]
@@ -129,6 +129,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use std::marker::Sync;
+pub use verifier::view_function::determine_is_view;
 
 /// This trait describes the VM's validation interfaces.
 pub trait VMValidator {

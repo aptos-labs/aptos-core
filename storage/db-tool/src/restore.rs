@@ -13,8 +13,6 @@ use aptos_backup_cli::{
     utils::GlobalRestoreOpt,
 };
 use aptos_executor_types::VerifyExecutionMode;
-use aptos_logger::{Level, Logger};
-use aptos_push_metrics::MetricsPusher;
 use clap::{Parser, Subcommand};
 
 /// Restore the database using either a one-time or continuous backup.
@@ -66,9 +64,6 @@ pub enum Oneoff {
 
 impl Command {
     pub async fn run(self) -> Result<()> {
-        Logger::new().level(Level::Info).init();
-        let _mp = MetricsPusher::start(vec![]);
-
         match self {
             Command::Oneoff(oneoff) => {
                 match oneoff {

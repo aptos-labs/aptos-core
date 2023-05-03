@@ -3,25 +3,32 @@
 
 use crate::{
     quorum_store::{
-        batch_requester::BatchRequester, batch_store::BatchStore, quorum_store_db::QuorumStoreDB,
-        types::PersistedValue,
+        batch_requester::BatchRequester,
+        batch_store::{BatchStore, QuotaManager},
+        quorum_store_db::QuorumStoreDB,
+        types::{PersistedValue, StorageMode},
     },
     test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
 };
-use aptos_consensus_types::proof_of_store::LogicalTime;
+use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
-use aptos_types::{account_address::AccountAddress, validator_verifier::random_validator_verifier};
+use aptos_types::{
+    account_address::AccountAddress, transaction::SignedTransaction,
+    validator_verifier::random_validator_verifier,
+};
+use claims::{assert_err, assert_ok, assert_ok_eq};
 use futures::executor::block_on;
+use once_cell::sync::Lazy;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
 use tokio::{sync::mpsc::channel, task::spawn_blocking};
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_extend_expiration_vs_save() {
-    let num_experiments = 2000;
+static TEST_REQUEST_ACCOUNT: Lazy<AccountAddress> = Lazy::new(AccountAddress::random);
+
+fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore<MockQuorumStoreSender>> {
     let tmp_dir = TempPath::new();
     let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
     let (tx, _rx) = channel(10);
@@ -30,55 +37,88 @@ async fn test_extend_expiration_vs_save() {
         AccountAddress::random(),
         1,
         1,
+        1,
+        1,
         MockQuorumStoreSender::new(tx),
     );
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
 
-    let batch_store = Arc::new(BatchStore::new(
+    Arc::new(BatchStore::new(
         10, // epoch
         10, // last committed round
         db,
-        0,
-        0,
-        2100,
-        0,    // grace period rounds
-        0,    // memory_quota
-        1000, // db quota
+        memory_quota, // memory_quota
+        2001,         // db quota
+        2001,         // batch quota
         requester,
         signers[0].clone(),
         validator_verifier,
-    ));
+    ))
+}
+
+fn request_for_test(
+    digest: &HashValue,
+    round: u64,
+    num_bytes: u64,
+    maybe_payload: Option<Vec<SignedTransaction>>,
+) -> PersistedValue {
+    PersistedValue::new(
+        BatchInfo::new(
+            *TEST_REQUEST_ACCOUNT, // make sure all request come from the same account
+            BatchId::new_for_test(1),
+            10,
+            round,
+            *digest,
+            10,
+            num_bytes,
+            0,
+        ),
+        maybe_payload,
+    )
+}
+
+#[test]
+fn test_insert_expire() {
+    let batch_store = batch_store_for_test(30);
+
+    let digest = HashValue::random();
+
+    assert_ok_eq!(
+        batch_store.insert_to_cache(request_for_test(&digest, 15, 10, None)),
+        true
+    );
+    assert_ok_eq!(
+        batch_store.insert_to_cache(request_for_test(&digest, 30, 10, None)),
+        true
+    );
+    assert_ok_eq!(
+        batch_store.insert_to_cache(request_for_test(&digest, 25, 10, None)),
+        false
+    );
+    let expired = batch_store.clear_expired_payload(27);
+    assert!(expired.is_empty());
+    let expired = batch_store.clear_expired_payload(29);
+    assert!(expired.is_empty());
+    assert_eq!(batch_store.clear_expired_payload(30), vec![digest]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_extend_expiration_vs_save() {
+    let num_experiments = 2000;
+    let batch_store = batch_store_for_test(2001);
 
     let batch_store_clone1 = batch_store.clone();
     let batch_store_clone2 = batch_store.clone();
 
     let digests: Vec<HashValue> = (0..num_experiments).map(|_| HashValue::random()).collect();
-    let later_exp_values: Vec<(HashValue, PersistedValue)> = (0..num_experiments)
+    let later_exp_values: Vec<PersistedValue> = (0..num_experiments)
         .map(|i| {
             // Pre-insert some of them.
             if i % 2 == 0 {
-                batch_store
-                    .save(
-                        digests[i],
-                        PersistedValue::new(
-                            Some(Vec::new()),
-                            LogicalTime::new(10, i as u64 + 30),
-                            AccountAddress::random(),
-                            10,
-                        ),
-                    )
-                    .unwrap();
+                assert_ok!(batch_store.save(request_for_test(&digests[i], i as u64 + 30, 1, None)));
             }
 
-            (
-                digests[i],
-                PersistedValue::new(
-                    Some(Vec::new()),
-                    LogicalTime::new(10, i as u64 + 40),
-                    AccountAddress::random(),
-                    10,
-                ),
-            )
+            request_for_test(&digests[i], i as u64 + 40, 1, None)
         })
         .collect();
 
@@ -87,9 +127,13 @@ async fn test_extend_expiration_vs_save() {
     let start_clone1 = start_flag.clone();
     let start_clone2 = start_flag.clone();
 
+    let save_error = Arc::new(AtomicBool::new(false));
+    let save_error_clone1 = save_error.clone();
+    let save_error_clone2 = save_error.clone();
+
     // Thread that extends expiration by saving.
     spawn_blocking(move || {
-        for (i, (digest, later_exp_value)) in later_exp_values.into_iter().enumerate() {
+        for (i, later_exp_value) in later_exp_values.into_iter().enumerate() {
             // Wait until both threads are ready for next experiment.
             loop {
                 let flag_val = start_clone1.load(Ordering::Acquire);
@@ -98,7 +142,11 @@ async fn test_extend_expiration_vs_save() {
                 }
             }
 
-            batch_store_clone1.save(digest, later_exp_value).unwrap();
+            if batch_store_clone1.save(later_exp_value).is_err() {
+                // Save in a separate flag and break so test doesn't hang.
+                save_error_clone1.store(true, Ordering::Release);
+                break;
+            }
             start_clone1.fetch_add(1, Ordering::Relaxed);
         }
     });
@@ -109,34 +157,27 @@ async fn test_extend_expiration_vs_save() {
             // Wait until both threads are ready for next experiment.
             loop {
                 let flag_val = start_clone2.load(Ordering::Acquire);
-                if flag_val == 3 * i + 1 || flag_val == 3 * i + 2 {
+                if flag_val == 3 * i + 1
+                    || flag_val == 3 * i + 2
+                    || save_error_clone2.load(Ordering::Acquire)
+                {
                     break;
                 }
             }
 
-            block_on(
-                batch_store_clone2.update_certified_round(LogicalTime::new(10, i as u64 + 30)),
-            );
+            block_on(batch_store_clone2.update_certified_timestamp(i as u64 + 30));
             start_clone2.fetch_add(1, Ordering::Relaxed);
         }
     });
 
     for (i, &digest) in digests.iter().enumerate().take(num_experiments) {
         // Set the conditions for experiment (both threads waiting).
-        while start_flag.load(Ordering::Acquire) % 3 != 0 {}
+        while start_flag.load(Ordering::Acquire) % 3 != 0 {
+            assert!(!save_error.load(Ordering::Acquire));
+        }
 
         if i % 2 == 1 {
-            batch_store
-                .save(
-                    digest,
-                    PersistedValue::new(
-                        Some(Vec::new()),
-                        LogicalTime::new(10, i as u64 + 30),
-                        AccountAddress::random(),
-                        10,
-                    ),
-                )
-                .unwrap();
+            assert_ok!(batch_store.save(request_for_test(&digest, i as u64 + 30, 1, None)));
         }
 
         // Unleash the threads.
@@ -148,13 +189,109 @@ async fn test_extend_expiration_vs_save() {
     // Expire everything, call for higher times as well.
     for i in 35..50 {
         batch_store
-            .update_certified_round(LogicalTime::new(10, (i + num_experiments) as u64))
+            .update_certified_timestamp((i + num_experiments) as u64)
             .await;
     }
 }
 
-// TODO: last certified round.
-// TODO: check correct digests are returned.
-// TODO: check grace period.
-// TODO: check quota.
-// TODO: check the channels.
+#[test]
+fn test_quota_manager() {
+    let mut qm = QuotaManager::new(20, 10, 7);
+    assert_ok_eq!(qm.update_quota(5), StorageMode::MemoryAndPersisted);
+    assert_ok_eq!(qm.update_quota(3), StorageMode::MemoryAndPersisted);
+    assert_ok_eq!(qm.update_quota(2), StorageMode::MemoryAndPersisted);
+    assert_ok_eq!(qm.update_quota(1), StorageMode::PersistedOnly);
+    assert_ok_eq!(qm.update_quota(2), StorageMode::PersistedOnly);
+    assert_ok_eq!(qm.update_quota(7), StorageMode::PersistedOnly);
+    // 6 batches, fully used quotas
+
+    // exceed storage quota.
+    assert_err!(qm.update_quota(2));
+
+    qm.free_quota(5, StorageMode::MemoryAndPersisted);
+    // 5 batches, available memory and db quota: 5
+
+    // exceed storage quota
+    assert_err!(qm.update_quota(6));
+    assert_ok_eq!(qm.update_quota(3), StorageMode::MemoryAndPersisted);
+
+    // exceed storage quota
+    assert_err!(qm.update_quota(3));
+    assert_ok_eq!(qm.update_quota(1), StorageMode::MemoryAndPersisted);
+    // 7 batches, available memory and DB quota: 1
+
+    // Exceed batch quota
+    assert_err!(qm.update_quota(1));
+
+    qm.free_quota(1, StorageMode::PersistedOnly);
+    // 6 batches, available memory quota: 1, available DB quota: 2
+
+    // exceed storage quota
+    assert_err!(qm.update_quota(3));
+    assert_ok_eq!(qm.update_quota(2), StorageMode::PersistedOnly);
+    // 7 batches, available memory quota: 1, available DB quota: 0
+
+    qm.free_quota(2, StorageMode::MemoryAndPersisted);
+    // 6 batches, available memory quota: 3, available DB quota: 2
+
+    // while there is available memory quota, DB quota isn't enough.
+    assert_err!(qm.update_quota(3));
+    assert_ok_eq!(qm.update_quota(2), StorageMode::MemoryAndPersisted);
+}
+
+#[test]
+fn test_get_local_batch() {
+    let store = batch_store_for_test(30);
+
+    let digest_1 = HashValue::random();
+    let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
+    // Should be stored in memory and DB.
+    assert!(!store.persist(vec![request_1]).is_empty());
+
+    block_on(store.update_certified_timestamp(40));
+
+    let digest_2 = HashValue::random();
+    assert!(digest_2 != digest_1);
+    // Expiration is before 40.
+    let request_2_expired = request_for_test(&digest_2, 30, 20, Some(vec![]));
+    assert!(store.persist(vec![request_2_expired]).is_empty());
+    // Proper (in the future) expiration.
+    let request_2 = request_for_test(&digest_2, 55, 20, Some(vec![]));
+    // Should be stored in DB only
+    assert!(!store.persist(vec![request_2]).is_empty());
+
+    let digest_3 = HashValue::random();
+    assert!(digest_3 != digest_1);
+    assert!(digest_3 != digest_2);
+    let request_3 = request_for_test(&digest_3, 56, 1970, Some(vec![]));
+    // Out of quota - should not be stored
+    assert!(store.persist(vec![request_3.clone()]).is_empty());
+
+    assert_ok!(store.get_batch_from_local(&digest_1));
+    assert_ok!(store.get_batch_from_local(&digest_2));
+    block_on(store.update_certified_timestamp(51));
+    // Expired value w. digest_1.
+    assert_err!(store.get_batch_from_local(&digest_1));
+    assert_ok!(store.get_batch_from_local(&digest_2));
+
+    // Value w. digest_3 was never persisted
+    assert_err!(store.get_batch_from_local(&digest_3));
+    // Since payload is cleared, we can now persist value w. digest_3
+    assert!(!store.persist(vec![request_3]).is_empty());
+    assert_ok!(store.get_batch_from_local(&digest_3));
+
+    block_on(store.update_certified_timestamp(52));
+    assert_ok!(store.get_batch_from_local(&digest_2));
+    assert_ok!(store.get_batch_from_local(&digest_3));
+
+    block_on(store.update_certified_timestamp(55));
+    // Expired value w. digest_2
+    assert_err!(store.get_batch_from_local(&digest_2));
+    assert_ok!(store.get_batch_from_local(&digest_3));
+
+    block_on(store.update_certified_timestamp(56));
+    // Expired value w. digest_3
+    assert_err!(store.get_batch_from_local(&digest_1));
+    assert_err!(store.get_batch_from_local(&digest_2));
+    assert_err!(store.get_batch_from_local(&digest_3));
+}
