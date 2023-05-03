@@ -142,10 +142,10 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.hash.keccak256.per_byte, { 1.. => "hash.keccak256.per_byte" }, 45 * MUL],
 
     // Bulletproofs gas parameters begin.
-    // Generated at time 1683145447.632959 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=17.31316.
-    [.bulletproofs.base, { 9.. => "bulletproofs.base" }, 3_626_131 * MUL],
-    [.bulletproofs.per_bit_rangeproof_verify, { 9.. => "bulletproofs.per_bit_rangeproof_verify" }, 294_923 * MUL],
-    [.bulletproofs.per_byte_rangeproof_deserialize, { 9.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 3 * MUL],
+    // Generated at time 1683148919.0628748 by `scripts/algebra-gas/update_bulletproofs_gas_params.py` with gas_per_ns=10.0.
+    [.bulletproofs.base, { 9.. => "bulletproofs.base" }, 3_208_556 * MUL],
+    [.bulletproofs.per_bit_rangeproof_verify, { 9.. => "bulletproofs.per_bit_rangeproof_verify" }, 273_192 * MUL],
+    [.bulletproofs.per_byte_rangeproof_deserialize, { 9.. => "bulletproofs.per_byte_rangeproof_deserialize" }, 33 * MUL],
     // Bulletproofs gas parameters end.
 
     [.type_info.type_of.base, "type_info.type_of.base", 300 * MUL],
