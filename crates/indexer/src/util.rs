@@ -147,6 +147,7 @@ pub fn convert_hex(val: String) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::token_models::v2_token_utils::V2TokenResource;
     use chrono::Datelike;
     use serde::Serialize;
 
@@ -229,6 +230,60 @@ mod tests {
         assert_eq!(d.default_properties["type"], "domain");
         assert_eq!(d.default_properties["creation_time_sec"], "1666125588");
         assert_eq!(d.default_properties["expiration_time_sec"], "1697661588");
+    }
+
+    #[test]
+    fn test_deserialize_bigdecimal() {
+        let test_fungible_asset_metadata = r#"
+        {
+            "decimals": 2,
+            "name": "test fungible asset name",
+            "supply": {
+            "vec": [
+                {
+                "current": {
+                    "aggregator": {
+                    "vec": []
+                    },
+                    "integer": {
+                    "vec": [
+                        {
+                        "limit": "340282366920938463463374607431768211455",
+                        "value": "1000"
+                        }
+                    ]
+                    }
+                },
+                "maximum": {
+                    "vec": ["10000"]
+                }
+                }
+            ]
+            },
+            "symbol": "TEST"
+          }"#;
+        let test_fungible_asset_metadata: serde_json::Value =
+            serde_json::from_str(test_fungible_asset_metadata).unwrap();
+        let fungible_asset = if let V2TokenResource::FungibleAssetMetadata(inner) =
+            V2TokenResource::from_resource(
+                "0x1::fungible_asset::Metadata",
+                &test_fungible_asset_metadata,
+                1,
+            )
+            .unwrap()
+        {
+            inner
+        } else {
+            panic!("should be fungible asset");
+        };
+        assert_eq!(
+            fungible_asset.supply.get_supply(),
+            Some(BigDecimal::from(1000))
+        );
+        assert_eq!(
+            fungible_asset.supply.get_maximum(),
+            Some(BigDecimal::from(10000))
+        );
     }
 
     #[test]

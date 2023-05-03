@@ -315,16 +315,23 @@ impl OptionalSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BigDecimalVectorWrapper {
+    pub vec: Vec<BigDecimalWrapper>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BigDecimalWrapper(#[serde(deserialize_with = "deserialize_from_string")] pub BigDecimal);
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Supply {
     current: OptionalAggregatorResource,
-    // #[serde(deserialize_with = "deserialize_from_string")]
-    // maximum: Vec<BigDecimal>,
+    maximum: BigDecimalVectorWrapper,
 }
 
 impl Supply {
     /// TODO: Extract maximum from Supply. Not sure how to do that right this moment
     pub fn get_maximum(&self) -> Option<BigDecimal> {
-        None
+        self.maximum.vec.get(0).map(|inner| inner.0.clone())
     }
 
     /// TODO: Not sure how to handle aggregator right now (tracked in a table?). Can only read from
