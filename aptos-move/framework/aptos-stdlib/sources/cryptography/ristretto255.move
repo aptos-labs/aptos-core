@@ -595,41 +595,51 @@ module aptos_std::ristretto255 {
 
     //
     // Testing constants
-    // TODO: Can we mark these with #[test_only], or is that a breaking change?
     //
 
     // The scalar 2
+    #[test_only]
     const TWO_SCALAR: vector<u8> = x"0200000000000000000000000000000000000000000000000000000000000000";
 
     // Non-canonical scalar: the order \ell of the group + 1
+    #[test_only]
     const L_PLUS_ONE: vector<u8> = x"eed3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     // Non-canonical scalar: the order \ell of the group + 2
+    #[test_only]
     const L_PLUS_TWO: vector<u8> = x"efd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010";
 
     // Some random scalar denoted by X
+    #[test_only]
     const X_SCALAR: vector<u8> = x"4e5ab4345d4708845913b4641bc27d5252a585101bcc4244d449f4a879d9f204";
 
     // X^{-1} = 1/X = 6859937278830797291664592131120606308688036382723378951768035303146619657244
     // 0x1CDC17FCE0E9A5BBD9247E56BB016347BBBA31EDD5A9BB96D50BCD7A3F962A0F
+    #[test_only]
     const X_INV_SCALAR: vector<u8> = x"1cdc17fce0e9a5bbd9247e56bb016347bbba31edd5a9bb96d50bcd7a3f962a0f";
 
     // Some random scalar Y = 2592331292931086675770238855846338635550719849568364935475441891787804997264
+    #[test_only]
     const Y_SCALAR: vector<u8> = x"907633fe1c4b66a4a28d2dd7678386c353d0de5455d4fc9de8ef7ac31f35bb05";
 
     // X * Y = 5690045403673944803228348699031245560686958845067437804563560795922180092780
+    #[test_only]
     const X_TIMES_Y_SCALAR: vector<u8> = x"6c3374a1894f62210aaa2fe186a6f92ce0aa75c2779581c295fc08179a73940c";
 
     // X + 2^256 * X \mod \ell
+    #[test_only]
     const REDUCED_X_PLUS_2_TO_256_TIMES_X_SCALAR: vector<u8> = x"d89ab38bd279024745639ed817ad3f64cc005b32db9939f91c521fc564a5c008";
 
     // sage: l = 2^252 + 27742317777372353535851937790883648493
     // sage: big = 2^256 - 1
     // sage: repr((big % l).digits(256))
+    #[test_only]
     const REDUCED_2_256_MINUS_1_SCALAR: vector<u8> = x"1c95988d7431ecd670cf7d73f45befc6feffffffffffffffffffffffffffff0f";
 
+    #[test_only]
     const NON_CANONICAL_ALL_ONES: vector<u8> = x"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
+    #[test_only]
     const A_SCALAR: vector<u8> = x"1a0e978a90f6622d3747023f8ad8264da758aa1b88e040d1589e7b7f2376ef09";
 
     // Generated in curve25519-dalek via:
@@ -639,12 +649,16 @@ module aptos_std::ristretto255 {
     //     let s = Scalar::from_hash(hasher);
     //     println!("scalar: {:x?}", s.to_bytes());
     // ```
+    #[test_only]
     const B_SCALAR: vector<u8> = x"dbfd97afd38a06f0138d0527efb28ead5b7109b486465913bf3aa472a8ed4e0d";
 
+    #[test_only]
     const A_TIMES_B_SCALAR: vector<u8> = x"2ab50e383d7c210f74d5387330735f18315112d10dfb98fcce1e2620c0c01402";
 
+    #[test_only]
     const A_PLUS_B_SCALAR: vector<u8> = x"083839dd491e57c5743710c39a91d6e502cab3cf0e279ae417d91ff2cb633e07";
 
+    #[test_only]
     /// A_SCALAR * BASE_POINT, computed by modifying a test in curve25519-dalek in src/edwards.rs to do:
     /// ```
     ///     let comp = RistrettoPoint(A_TIMES_BASEPOINT.decompress().unwrap()).compress();
@@ -652,8 +666,11 @@ module aptos_std::ristretto255 {
     /// ```
     const A_TIMES_BASE_POINT: vector<u8> = x"96d52d9262ee1e1aae79fbaee8c1d9068b0d01bf9a4579e618090c3d1088ae10";
 
+    #[test_only]
     const A_POINT: vector<u8> = x"e87feda199d72b83de4f5b2d45d34805c57019c6c59c42cb70ee3d19aa996f75";
+    #[test_only]
     const B_POINT: vector<u8> = x"fa0b3624b081c62f364d0b2839dcc76d7c3ab0e27e31beb2b9ed766575f28e76";
+    #[test_only]
     const A_PLUS_B_POINT: vector<u8> = x"70cf3753475b9ff33e2f84413ed6b5052073bccc0a0a81789d3e5675dc258056";
 
     //    const NON_CANONICAL_LARGEST_ED25519_S: vector<u8> = x"f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f";
