@@ -32,7 +32,6 @@ members = [
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
-    "aptos-utils",
     "config",
     "config/global-constants",
     "consensus",
@@ -359,7 +358,6 @@ aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
-aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
