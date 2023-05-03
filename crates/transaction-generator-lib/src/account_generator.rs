@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{create_account_transaction, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -40,21 +40,6 @@ impl AccountGenerator {
             max_working_set,
             creation_balance,
         }
-    }
-
-    fn gen_single_txn(
-        &self,
-        from: &mut LocalAccount,
-        to: AccountAddress,
-        txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
-        from.sign_with_transaction_builder(txn_factory.payload(
-            if self.creation_balance > 0 {
-                aptos_stdlib::aptos_account_transfer(to, self.creation_balance)
-            } else {
-                aptos_stdlib::aptos_account_create_account(to)
-            },
-        ))
     }
 }
 
@@ -98,7 +83,12 @@ impl TransactionGenerator for AccountGenerator {
         for _ in 0..num_to_create {
             let receiver = LocalAccount::generate(&mut self.rng);
             let receiver_address = receiver.address();
-            let request = self.gen_single_txn(account, receiver_address, &self.txn_factory);
+            let request = create_account_transaction(
+                account,
+                receiver_address,
+                &self.txn_factory,
+                self.creation_balance,
+            );
             requests.push(request);
             new_accounts.push(receiver);
             new_account_addresses.push(receiver_address);

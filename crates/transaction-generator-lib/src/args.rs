@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
     NoOp,
+    NoOp2Signers,
+    NoOp5Signers,
     CoinTransfer,
     CoinTransferWithInvalid,
     AccountGeneration,
@@ -80,6 +82,16 @@ impl TransactionTypeArg {
                 use_account_pool: false,
             },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Nop,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::NoOp2Signers => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Nop,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::NoOp5Signers => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::Nop,
                 num_modules: 1,
                 use_account_pool: false,
