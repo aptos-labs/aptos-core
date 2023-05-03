@@ -401,7 +401,7 @@ mod test {
 
     #[test]
     fn test_materialize_not_in_storage() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(300), 700);
         assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(700)));
@@ -409,7 +409,7 @@ mod test {
 
     #[test]
     fn test_materialize_known() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
@@ -420,7 +420,7 @@ mod test {
 
     #[test]
     fn test_materialize_overflow() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +0 to +400 satisfies <= 600 and is ok, but materialization fails
         // with 300 + 400 > 600!
@@ -431,7 +431,7 @@ mod test {
 
     #[test]
     fn test_materialize_underflow() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
@@ -441,7 +441,7 @@ mod test {
 
     #[test]
     fn test_materialize_non_monotonic_1() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
@@ -454,7 +454,7 @@ mod test {
 
     #[test]
     fn test_materialize_non_monotonic_2() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
@@ -467,7 +467,7 @@ mod test {
 
     #[test]
     fn test_add_overflow() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +0 to +800 > 600!
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
@@ -480,7 +480,7 @@ mod test {
 
     #[test]
     fn test_sub_underflow() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
 
         // +0 to -601 is impossible!
@@ -494,7 +494,7 @@ mod test {
 
     #[test]
     fn test_commutative() {
-        let mut aggregator_data = AggregatorData::default();
+        let mut aggregator_data = AggregatorData::new(true);
 
         // +200 -300 +50 +300 -25 +375 -600.
         let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
