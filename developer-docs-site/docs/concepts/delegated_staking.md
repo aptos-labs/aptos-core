@@ -18,7 +18,7 @@ Delegated staking is an extension of the staking protocol. A delegation pool abs
 
 For the full delegation pool smart contract, see [delegation_pool.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/delegation_pool.move) 
 
-Unlike a stake pool, a delegation pool can be initialized with zero stake. A resource account is created along with an empty stake pool it owns from that point on.This account will manage the stake of the underlying stake pool on behalf of the delegators by forwarding their stake-management operations to it (add, unlock, reactivate, withdraw) while the resource account cannot be directly accessed nor externally owned.
+Unlike a stake pool, a delegation pool can be initialized with zero stake. When initialized, the delegated stake pool is owned indirectly via a resource account.  This account will manage the stake of the underlying stake pool on behalf of the delegators by forwarding their stake-management operations to it (add, unlock, reactivate, withdraw) while the resource account cannot be directly accessed nor externally owned.
 
 See full list of [Delegation Pool Operations](../nodes/validator-node/operator/delegation-pool-operations.md)
 
