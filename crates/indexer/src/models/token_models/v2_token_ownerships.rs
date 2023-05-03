@@ -9,17 +9,14 @@ use super::{
     token_utils::TokenWriteSet,
     tokens::TableHandleToOwner,
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
+    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping},
 };
 use crate::{
-    models::move_resources::MoveResource,
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     util::{ensure_not_negative, standardize_address},
 };
 use anyhow::Context;
-use aptos_api_types::{
-    DeleteTableItem as APIDeleteTableItem, WriteResource, WriteTableItem as APIWriteTableItem,
-};
+use aptos_api_types::{DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem};
 use bigdecimal::{BigDecimal, One, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -117,77 +114,6 @@ impl TokenOwnershipV2 {
     // pub fn get_nft_v2_from_delete_resource(
     // ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
     // }
-
-    // Getting this from 0x1::fungible_asset::FungibleStore
-    pub fn get_ft_v2_from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-        write_set_change_index: i64,
-        txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
-    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-        let type_str = format!(
-            "{}::{}::{}",
-            write_resource.data.typ.address,
-            write_resource.data.typ.module,
-            write_resource.data.typ.name
-        );
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::FungibleAssetStore(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
-            if let Some(metadata) = token_v2_metadata.get(&resource.address) {
-                let object_core = metadata.object.clone();
-                let token_data_id = resource.address;
-                let storage_id = token_data_id.clone();
-                let is_soulbound = inner.frozen;
-                let amount = inner.balance;
-                let owner_address = object_core.owner;
-
-                return Ok(Some((
-                    Self {
-                        transaction_version: txn_version,
-                        write_set_change_index,
-                        token_data_id: token_data_id.clone(),
-                        property_version_v1: BigDecimal::zero(),
-                        owner_address: Some(owner_address.clone()),
-                        storage_id: storage_id.clone(),
-                        amount: amount.clone(),
-                        table_type_v1: None,
-                        token_properties_mutated_v1: None,
-                        is_soulbound_v2: Some(is_soulbound),
-                        token_standard: TokenStandard::V2.to_string(),
-                        is_fungible_v2: Some(true),
-                        transaction_timestamp: txn_timestamp,
-                    },
-                    CurrentTokenOwnershipV2 {
-                        token_data_id,
-                        property_version_v1: BigDecimal::zero(),
-                        owner_address,
-                        storage_id,
-                        amount,
-                        table_type_v1: None,
-                        token_properties_mutated_v1: None,
-                        is_soulbound_v2: Some(is_soulbound),
-                        token_standard: TokenStandard::V2.to_string(),
-                        is_fungible_v2: Some(true),
-                        last_transaction_version: txn_version,
-                        last_transaction_timestamp: txn_timestamp,
-                    },
-                )));
-            }
-        }
-        Ok(None)
-    }
 
     /// We want to track tokens in any offer/claims and tokenstore
     pub fn get_v1_from_write_table_item(

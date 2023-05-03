@@ -27,7 +27,7 @@ use crate::{
             CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, TokenOwnershipV2,
         },
         v2_token_utils::{
-            AptosCollection, FixedSupply, FungibleAssetMetadata, ObjectCore, TokenV2AggregatedData,
+            AptosCollection, FixedSupply, ObjectCore, TokenV2AggregatedData,
             TokenV2AggregatedDataMapping, UnlimitedSupply,
         },
     },
@@ -976,7 +976,6 @@ fn parse_v2_token(
                             TokenV2AggregatedData {
                                 aptos_collection: None,
                                 fixed_supply: None,
-                                fungible_asset_metadata: None,
                                 object: object_core,
                                 unlimited_supply: None,
                             },
@@ -1004,11 +1003,6 @@ fn parse_v2_token(
                             AptosCollection::from_write_resource(wr, txn_version).unwrap()
                         {
                             aggregated_data.aptos_collection = Some(aptos_collection);
-                        }
-                        if let Some(fungible_asset_metadata) =
-                            FungibleAssetMetadata::from_write_resource(wr, txn_version).unwrap()
-                        {
-                            aggregated_data.fungible_asset_metadata = Some(fungible_asset_metadata);
                         }
                     }
                 }
@@ -1122,7 +1116,6 @@ fn parse_v2_token(
                                 txn_version,
                                 wsc_index,
                                 txn_timestamp,
-                                &token_v2_metadata,
                             )
                             .unwrap()
                         {
@@ -1148,27 +1141,6 @@ fn parse_v2_token(
                                 ),
                                 current_nft_ownership,
                             );
-                            if let Some((ft_ownership, current_ft_ownership)) =
-                                TokenOwnershipV2::get_ft_v2_from_write_resource(
-                                    resource,
-                                    txn_version,
-                                    wsc_index,
-                                    txn_timestamp,
-                                    &token_v2_metadata,
-                                )
-                                .unwrap()
-                            {
-                                token_ownerships_v2.push(ft_ownership);
-                                current_token_ownerships_v2.insert(
-                                    (
-                                        current_ft_ownership.token_data_id.clone(),
-                                        current_ft_ownership.property_version_v1.clone(),
-                                        current_ft_ownership.owner_address.clone(),
-                                        current_ft_ownership.storage_id.clone(),
-                                    ),
-                                    current_ft_ownership,
-                                );
-                            }
                         }
                     },
                     _ => {},

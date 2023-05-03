@@ -6,10 +6,7 @@
 
 use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
-    models::{
-        coin_models::coin_utils::OptionalAggregatorResource, move_resources::MoveResource,
-        v2_objects::CurrentObjectPK,
-    },
+    models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
     util::truncate_str,
 };
 use anyhow::{Context, Result};
@@ -28,7 +25,6 @@ pub type TokenV2AggregatedDataMapping = HashMap<CurrentObjectPK, TokenV2Aggregat
 pub struct TokenV2AggregatedData {
     pub aptos_collection: Option<AptosCollection>,
     pub fixed_supply: Option<FixedSupply>,
-    pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub object: ObjectCore,
     pub unlimited_supply: Option<UnlimitedSupply>,
     // pub property_map: Option<PropertyMap>,
@@ -246,101 +242,10 @@ impl UnlimitedSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FungibleAssetMetadata {
-    pub supply: OptionalSupply,
-    pub decimals: i32,
-    pub symbol: String,
-}
-
-impl FungibleAssetMetadata {
-    pub fn from_write_resource(
-        write_resource: &WriteResource,
-        txn_version: i64,
-    ) -> anyhow::Result<Option<Self>> {
-        let type_str = format!(
-            "{}::{}::{}",
-            write_resource.data.typ.address,
-            write_resource.data.typ.module,
-            write_resource.data.typ.name
-        );
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::FungibleAssetMetadata(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
-            Ok(Some(inner))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FungibleAssetStore {
-    pub metadata: ResourceReference,
-    #[serde(deserialize_with = "deserialize_from_string")]
-    pub balance: BigDecimal,
-    pub frozen: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OptionalSupply {
-    vec: Vec<Supply>,
-}
-
-impl OptionalSupply {
-    pub fn get_supply(&self) -> Option<BigDecimal> {
-        if let Some(supply) = self.vec.first() {
-            supply.get_supply()
-        } else {
-            None
-        }
-    }
-
-    pub fn get_maximum(&self) -> Option<BigDecimal> {
-        if let Some(supply) = self.vec.first() {
-            supply.get_maximum()
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Supply {
-    current: OptionalAggregatorResource,
-    // #[serde(deserialize_with = "deserialize_from_string")]
-    // maximum: Vec<BigDecimal>,
-}
-
-impl Supply {
-    /// TODO: Extract maximum from Supply. Not sure how to do that right this moment
-    pub fn get_maximum(&self) -> Option<BigDecimal> {
-        None
-    }
-
-    /// TODO: Not sure how to handle aggregator right now (tracked in a table?). Can only read from
-    /// Integer portion of OptionalAggregator
-    pub fn get_supply(&self) -> Option<BigDecimal> {
-        self.current.integer.get_supply()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenResource {
     AptosCollection(AptosCollection),
     Collection(Collection),
     FixedSupply(FixedSupply),
-    FungibleAssetMetadata(FungibleAssetMetadata),
-    FungibleAssetStore(FungibleAssetStore),
     ObjectCore(ObjectCore),
     UnlimitedSupply(UnlimitedSupply),
     Token(Token),
@@ -356,8 +261,6 @@ impl V2TokenResource {
                 | "0x4::collection::UnlimitedSupply"
                 | "0x4::aptos_token::AptosCollection"
                 | "0x4::token::Token"
-                | "0x1::fungible_asset::Metadata"
-                | "0x1::fungible_asset::FungibleStore"
         )
     }
 
@@ -379,10 +282,6 @@ impl V2TokenResource {
                 .map(|inner| Some(V2TokenResource::AptosCollection(inner))),
             "0x4::token::Token" => serde_json::from_value(data.clone())
                 .map(|inner| Some(V2TokenResource::Token(inner))),
-            "0x1::fungible_asset::Metadata" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::FungibleAssetMetadata(inner))),
-            "0x1::fungible_asset::FungibleStore" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::FungibleAssetStore(inner))),
             _ => Ok(None),
         }
         .context(format!(

@@ -7,7 +7,7 @@
 
 use super::{
     token_utils::TokenWriteSet,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
+    v2_token_utils::{TokenStandard, V2TokenResource},
 };
 use crate::{
     models::move_resources::MoveResource,
@@ -66,7 +66,6 @@ impl TokenDataV2 {
         txn_version: i64,
         write_set_change_index: i64,
         txn_timestamp: chrono::NaiveDateTime,
-        token_v2_metadata: &TokenV2AggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
         let type_str = format!(
             "{}::{}::{}",
@@ -88,29 +87,12 @@ impl TokenDataV2 {
             V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
         {
             // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
-            let (mut maximum, mut supply, mut is_fungible_v2) =
-                (None, BigDecimal::zero(), Some(false));
+            let (maximum, supply, is_fungible_v2) = (None, BigDecimal::zero(), Some(false));
             // Get token properties from 0x4::property_map::PropertyMap
             let token_properties = serde_json::Value::Null;
-            if let Some(metadata) = token_v2_metadata.get(&resource.address) {
-                // Getting supply data (prefer fixed supply over unlimited supply although they should never appear at the same time anyway)
-                let fungible_asset_metadata = metadata.fungible_asset_metadata.as_ref();
-                if let Some(metadata) = fungible_asset_metadata {
-                    // TODO: Extract maximum from Supply. Not sure how to do that right this moment
-                    maximum = metadata.supply.get_maximum();
-                    // TODO: Not sure how to handle aggregator right now (tracked in a table?). Can only read from
-                    // Integer portion of OptionalAggregator
-                    supply = metadata.supply.get_supply().unwrap();
-                    is_fungible_v2 = Some(true);
-                }
-
-                // TODO: Get token properties from property map if available
-                // let property_map = metadata.property_map.as_ref();
-                // token_properties = blabla
-            } else {
-                // ObjectCore should not be missing, returning from entire function early
-                return Ok(None);
-            }
+            // TODO: Get token properties from property map if available
+            // let property_map = metadata.property_map.as_ref();
+            // token_properties = blabla
 
             let collection_id = inner.collection.inner.clone();
             let token_data_id = resource.address;
