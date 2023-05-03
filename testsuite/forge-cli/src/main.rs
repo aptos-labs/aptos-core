@@ -402,7 +402,8 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        // Three region as land_blocking
+        "land_blocking" => Ok(land_blocking_three_region_test_suite(duration)),
         "land_blocking_three_region" => Ok(land_blocking_three_region_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
@@ -1274,11 +1275,14 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
 fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_fullnode_count(20)
         .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["fullnode"]["config"]["mempool"]["default_failovers"] = 19.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(3500)
