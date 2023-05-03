@@ -77,7 +77,7 @@ impl MoveVmExt {
         &self,
         remote: &'r S,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_> {
+    ) -> SessionExt<'r, '_, S> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
@@ -109,6 +109,7 @@ impl MoveVmExt {
 
         SessionExt::new(
             self.inner.new_session_with_extensions(remote, extensions),
+            self,
             remote,
         )
     }

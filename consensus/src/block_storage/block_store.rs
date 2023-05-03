@@ -74,8 +74,10 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
             let commit_status = match status {
                 TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS_LABEL,
                 TransactionStatus::Discard(reason) => {
-                    if reason == &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
                         counters::TXN_COMMIT_RETRY_LABEL
+                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                        counters::TXN_COMMIT_FAILED_DUPLICATE_LABEL
                     } else {
                         counters::TXN_COMMIT_FAILED_LABEL
                     }

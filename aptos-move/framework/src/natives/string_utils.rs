@@ -289,6 +289,30 @@ fn native_format_impl(
     Ok(())
 }
 
+/// For old debug implementation
+/// TODO: remove when old framework is completely removed
+pub(crate) fn native_format_debug(
+    context: &mut SafeNativeContext,
+    ty: &Type,
+    v: Value,
+) -> SafeNativeResult<String> {
+    let layout = context.deref().type_to_fully_annotated_layout(ty)?.unwrap();
+    let mut format_context = FormatContext {
+        context,
+        base_gas: 0.into(),
+        per_byte_gas: 0.into(),
+        max_depth: usize::MAX,
+        max_len: usize::MAX,
+        type_tag: true,
+        canonicalize: false,
+        single_line: false,
+        include_int_type: false,
+    };
+    let mut out = String::new();
+    native_format_impl(&mut format_context, &layout, v, 0, &mut out)?;
+    Ok(out)
+}
+
 fn native_format(
     gas_params: &GasParameters,
     context: &mut SafeNativeContext,

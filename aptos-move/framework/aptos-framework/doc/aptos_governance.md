@@ -4,18 +4,16 @@
 # Module `0x1::aptos_governance`
 
 
-* AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
-* current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
-* the stake pool's lockup needs to be at least as long as the proposal's duration.
-*
-* It provides the following flow:
-* 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
-* needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
-* track proposal creation and proposal ids.
-* 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
-* only be used to vote on each proposal exactly once.
-*
+AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
+current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
+the stake pool's lockup needs to be at least as long as the proposal's duration.
 
+It provides the following flow:
+1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
+needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
+track proposal creation and proposal ids.
+2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
+only be used to vote on each proposal exactly once.
 
 
 -  [Resource `GovernanceResponsbility`](#0x1_aptos_governance_GovernanceResponsbility)
@@ -1473,17 +1471,6 @@ Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
 <pre><code><b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a>;
-</code></pre>
-
-
-
-
-<a name="0x1_aptos_governance_AbortsIfNotGovernanceConfig"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a> {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
-}
 </code></pre>
 
 

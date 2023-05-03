@@ -362,7 +362,7 @@ fn inject_runtime_metadata(
                             let serialized_metadata = bcs::to_bytes(&module_metadata)
                                 .expect("BCS for RuntimeModuleMetadata");
                             named_module.module.metadata.push(Metadata {
-                                key: APTOS_METADATA_KEY_V1.to_vec(),
+                                key: APTOS_METADATA_KEY_V1.clone(),
                                 value: serialized_metadata,
                             });
                         } else {
@@ -370,7 +370,7 @@ fn inject_runtime_metadata(
                                 bcs::to_bytes(&module_metadata.clone().downgrade())
                                     .expect("BCS for RuntimeModuleMetadata");
                             named_module.module.metadata.push(Metadata {
-                                key: APTOS_METADATA_KEY.to_vec(),
+                                key: APTOS_METADATA_KEY.clone(),
                                 value: serialized_metadata,
                             });
                         }
