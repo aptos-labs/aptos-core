@@ -81,7 +81,7 @@ A delegator is anyone who has stake in the delegation pool. Delegators earn rewa
 See [Delegation pool operations](../nodes/validator-node/operator/delegation-pool-operations.md) for the correct sequence of commands to run for the below flow.
 :::
 
-1. [Operator deploys validator node](../nodes/validator-node/operator/running-validator-node/running-validator-node.md)
+1. [Operator deploys validator node](../nodes/validator-node/operator/running-validator-node/index.md)
 2. [Run command to get delegation pool address](../nodes/validator-node/operator/delegation-pool-operations.md#connect-to-aptos-network)
 3. [Operator connects to the network using pool address derived in step 2](../nodes/validator-node/operator/connect-to-aptos-network.md)
 4. [Owner initializes the delegation pool and sets operator](../nodes/validator-node/operator/delegation-pool-operations.md#initialize-a-delegation-pool)
