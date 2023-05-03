@@ -27,7 +27,7 @@ use crate::{
             CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, TokenOwnershipV2,
         },
         v2_token_utils::{
-            AptosCollection, FixedSupply, ObjectCore, TokenV2AggregatedData,
+            AptosCollection, FixedSupply, ObjectCore, PropertyMap, TokenV2AggregatedData,
             TokenV2AggregatedDataMapping, UnlimitedSupply,
         },
     },
@@ -607,7 +607,13 @@ fn insert_token_datas_v2(
             diesel::insert_into(schema::token_datas_v2::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    maximum.eq(excluded(maximum)),
+                    supply.eq(excluded(supply)),
+                    token_properties.eq(excluded(token_properties)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
             None,
         )?;
     }
@@ -978,6 +984,7 @@ fn parse_v2_token(
                                 fixed_supply: None,
                                 object: object_core,
                                 unlimited_supply: None,
+                                property_map: None,
                             },
                         );
                     }
@@ -1003,6 +1010,11 @@ fn parse_v2_token(
                             AptosCollection::from_write_resource(wr, txn_version).unwrap()
                         {
                             aggregated_data.aptos_collection = Some(aptos_collection);
+                        }
+                        if let Some(property_map) =
+                            PropertyMap::from_write_resource(wr, txn_version).unwrap()
+                        {
+                            aggregated_data.property_map = Some(property_map);
                         }
                     }
                 }
@@ -1116,6 +1128,7 @@ fn parse_v2_token(
                                 txn_version,
                                 wsc_index,
                                 txn_timestamp,
+                                &token_v2_metadata,
                             )
                             .unwrap()
                         {

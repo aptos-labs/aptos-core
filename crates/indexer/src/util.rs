@@ -110,8 +110,6 @@ where
 {
     let s = serde_json::Value::deserialize(deserializer)?;
     // iterate the json string to convert key-value pair
-    // assume the format of {“map”: {“data”: [{“key”: “Yuri”, “value”: {“type”: “String”, “value”: “0x42656e”}}, {“key”: “Tarded”, “value”: {“type”: “String”, “value”: “0x446f766572"}}]}}
-    // if successfully parsing we return the decoded property_map string otherwise return the original string
     Ok(convert_bcs_token_object_propertymap(s.clone()).unwrap_or(s))
 }
 
@@ -131,11 +129,11 @@ pub fn convert_bcs_hex(typ: String, value: String) -> Option<String> {
 
     match typ.as_str() {
         "0x1::string::String" => bcs::from_bytes::<String>(decoded.as_slice()),
-        "u8" => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| format!("{}", e)),
-        "u64" => bcs::from_bytes::<u64>(decoded.as_slice()).map(|e| format!("{}", e)),
-        "u128" => bcs::from_bytes::<u128>(decoded.as_slice()).map(|e| format!("{}", e)),
-        "bool" => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| format!("{}", e)),
-        "address" => bcs::from_bytes::<Address>(decoded.as_slice()).map(|e| format!("{}", e)),
+        "u8" => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| e.to_string()),
+        "u64" => bcs::from_bytes::<u64>(decoded.as_slice()).map(|e| e.to_string()),
+        "u128" => bcs::from_bytes::<u128>(decoded.as_slice()).map(|e| e.to_string()),
+        "bool" => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| e.to_string()),
+        "address" => bcs::from_bytes::<Address>(decoded.as_slice()).map(|e| e.to_string()),
         _ => Ok(value),
     }
     .ok()
@@ -146,16 +144,16 @@ pub fn convert_bcs_hex_new(typ: u8, value: String) -> Option<String> {
     let decoded = hex::decode(value.strip_prefix("0x").unwrap_or(&*value)).ok()?;
 
     match typ {
-        0 /* bool */ => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| format!("{}", e)),
-        1 /* u8 */ => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| format!("{}", e)),
-        2 /* u16 */ => bcs::from_bytes::<u16>(decoded.as_slice()).map(|e| format!("{}", e)),
-        3 /* u32 */ => bcs::from_bytes::<u32>(decoded.as_slice()).map(|e| format!("{}", e)),
-        4 /* u64 */ => bcs::from_bytes::<u64>(decoded.as_slice()).map(|e| format!("{}", e)),
-        5 /* u128 */ => bcs::from_bytes::<u128>(decoded.as_slice()).map(|e| format!("{}", e)),
-        6 /* u256 */ => bcs::from_bytes::<BigDecimal>(decoded.as_slice()).map(|e| format!("{}", e)),
-        7 /* address */ => bcs::from_bytes::<Address>(decoded.as_slice()).map(|e| format!("{}", e)),
+        0 /* bool */ => bcs::from_bytes::<bool>(decoded.as_slice()).map(|e| e.to_string()),
+        1 /* u8 */ => bcs::from_bytes::<u8>(decoded.as_slice()).map(|e| e.to_string()),
+        2 /* u16 */ => bcs::from_bytes::<u16>(decoded.as_slice()).map(|e| e.to_string()),
+        3 /* u32 */ => bcs::from_bytes::<u32>(decoded.as_slice()).map(|e| e.to_string()),
+        4 /* u64 */ => bcs::from_bytes::<u64>(decoded.as_slice()).map(|e| e.to_string()),
+        5 /* u128 */ => bcs::from_bytes::<u128>(decoded.as_slice()).map(|e| e.to_string()),
+        6 /* u256 */ => bcs::from_bytes::<BigDecimal>(decoded.as_slice()).map(|e| e.to_string()),
+        7 /* address */ => bcs::from_bytes::<Address>(decoded.as_slice()).map(|e| e.to_string()),
         8 /* byte_vector */ => bcs::from_bytes::<Vec<u8>>(decoded.as_slice()).map(|e| format!("0x{}", hex::encode(e))),
-        9 /* string */ => bcs::from_bytes::<String>(decoded.as_slice()).map(|e| format!("{}", e)),
+        9 /* string */ => bcs::from_bytes::<String>(decoded.as_slice()),
         _ => Ok(value),
     }
         .ok()
@@ -298,38 +296,36 @@ mod tests {
     fn test_deserialize_token_object_property_map() {
         let test_property_json = r#"
         {
-	"inner": {
-		"data": [{
-				"key": "Rank",
-				"value": {
-					"type": 9,
-					"value": "0x0642726f6e7a65"
-				}
-			},
-			{
-				"key": "address_property",
-				"value": {
-					"type": 7,
-					"value": "0x2b4d540735a4e128fda896f988415910a45cab41c9ddd802b32dd16e8f9ca3cd"
-				}
-			},
-			{
-				"key": "bytes_property",
-				"value": {
-					"type": 8,
-					"value": "0x0401020304"
-				}
-			},
-			{
-				"key": "u64_property",
-				"value": {
-					"type": 4,
-					"value": "0x0000000000000001"
-				}
-			}
-		]
-	}
-}
+            "data": [{
+                    "key": "Rank",
+                    "value": {
+                        "type": 9,
+                        "value": "0x0642726f6e7a65"
+                    }
+                },
+                {
+                    "key": "address_property",
+                    "value": {
+                        "type": 7,
+                        "value": "0x2b4d540735a4e128fda896f988415910a45cab41c9ddd802b32dd16e8f9ca3cd"
+                    }
+                },
+                {
+                    "key": "bytes_property",
+                    "value": {
+                        "type": 8,
+                        "value": "0x0401020304"
+                    }
+                },
+                {
+                    "key": "u64_property",
+                    "value": {
+                        "type": 4,
+                        "value": "0x0000000000000001"
+                    }
+                }
+            ]
+        }
         "#;
         let test_property_json: serde_json::Value =
             serde_json::from_str(test_property_json).unwrap();
@@ -349,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_empty_token_object_property_map() {
-        let test_property_json = r#"{"inner": {"data": []}}"#;
+        let test_property_json = r#"{"data": []}"#;
         let test_property_json: serde_json::Value =
             serde_json::from_str(test_property_json).unwrap();
         let test_struct = TokenObjectDataMock {

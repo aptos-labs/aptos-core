@@ -7,7 +7,7 @@
 use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
     models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
-    util::truncate_str,
+    util::{deserialize_token_object_property_map_from_bcs_hexstring, truncate_str},
 };
 use anyhow::{Context, Result};
 use aptos_api_types::{deserialize_from_string, WriteResource};
@@ -27,7 +27,7 @@ pub struct TokenV2AggregatedData {
     pub fixed_supply: Option<FixedSupply>,
     pub object: ObjectCore,
     pub unlimited_supply: Option<UnlimitedSupply>,
-    // pub property_map: Option<PropertyMap>,
+    pub property_map: Option<PropertyMap>,
 }
 
 /// Tracks which token standard a token / collection is built upon
@@ -242,6 +242,43 @@ impl UnlimitedSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PropertyMap {
+    #[serde(deserialize_with = "deserialize_token_object_property_map_from_bcs_hexstring")]
+    pub inner: serde_json::Value,
+}
+
+impl PropertyMap {
+    pub fn from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+    ) -> anyhow::Result<Option<Self>> {
+        let type_str = format!(
+            "{}::{}::{}",
+            write_resource.data.typ.address,
+            write_resource.data.typ.module,
+            write_resource.data.typ.name
+        );
+        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
+            return Ok(None);
+        }
+        let resource = MoveResource::from_write_resource(
+            write_resource,
+            0, // Placeholder, this isn't used anyway
+            txn_version,
+            0, // Placeholder, this isn't used anyway
+        );
+
+        if let V2TokenResource::PropertyMap(inner) =
+            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenResource {
     AptosCollection(AptosCollection),
     Collection(Collection),
@@ -249,6 +286,7 @@ pub enum V2TokenResource {
     ObjectCore(ObjectCore),
     UnlimitedSupply(UnlimitedSupply),
     Token(Token),
+    PropertyMap(PropertyMap),
 }
 
 impl V2TokenResource {
@@ -261,6 +299,7 @@ impl V2TokenResource {
                 | "0x4::collection::UnlimitedSupply"
                 | "0x4::aptos_token::AptosCollection"
                 | "0x4::token::Token"
+                | "0x4::property_map::PropertyMap"
         )
     }
 
@@ -282,6 +321,8 @@ impl V2TokenResource {
                 .map(|inner| Some(V2TokenResource::AptosCollection(inner))),
             "0x4::token::Token" => serde_json::from_value(data.clone())
                 .map(|inner| Some(V2TokenResource::Token(inner))),
+            "0x4::property_map::PropertyMap" => serde_json::from_value(data.clone())
+                .map(|inner| Some(V2TokenResource::PropertyMap(inner))),
             _ => Ok(None),
         }
         .context(format!(

@@ -80,7 +80,7 @@ impl TokenObjectPropertyMap {
         let mut pm = TokenObjectPropertyMap {
             data: HashMap::new(),
         };
-        let records: &Vec<Value> = val.get("inner")?.get("data")?.as_array()?;
+        let records: &Vec<Value> = val.get("data")?.as_array()?;
         for entry in records {
             let key = entry.get("key")?.as_str()?;
             let val = entry.get("value")?.get("value")?.as_str()?;
