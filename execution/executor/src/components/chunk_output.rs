@@ -195,7 +195,7 @@ pub fn update_counters_for_processed_chunk(
                 );
                 (
                     // Specialize duplicate txns for alerts
-                    if discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
+                    if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
                         "discard_sequence_number_too_old"
                     } else {
                         "discard"
