@@ -309,24 +309,26 @@ impl AggregatorData {
         resolver: &dyn TableResolver,
         is_aggregator_enabled: bool,
     ) -> &mut Aggregator {
-        let (state, value) = if is_aggregator_enabled {
-            (AggregatorState::PositiveDelta, 0)
-        } else {
-            //If aggregator mode is disabled, then read the aggregator value from the table and initialize with it.
-            let key_bytes = id.key.0.to_vec();
-            resolver
-                .resolve_table_entry(&id.handle, &key_bytes)
-                .map_err(|_| (AggregatorState::PositiveDelta, 0))
-                .unwrap()
-                .map_or((AggregatorState::Data, 0), |bytes| {
-                    (AggregatorState::Data, deserialize(&bytes))
-                })
-        };
-        self.aggregators.entry(id).or_insert_with(|| Aggregator {
-            value,
-            state,
-            limit,
-            history: Some(History::new()),
+        self.aggregators.entry(id).or_insert_with(|| {
+            let (state, value) = if is_aggregator_enabled {
+                (AggregatorState::PositiveDelta, 0)
+            } else {
+                //If aggregator mode is disabled, then read the aggregator value from the table and initialize with it.
+                let key_bytes = id.key.0.to_vec();
+                resolver
+                    .resolve_table_entry(&id.handle, &key_bytes)
+                    .map_err(|_| (AggregatorState::PositiveDelta, 0))
+                    .unwrap()
+                    .map_or((AggregatorState::Data, 0), |bytes| {
+                        (AggregatorState::Data, deserialize(&bytes))
+                    })
+            };
+            Aggregator {
+                value,
+                state,
+                limit,
+                history: Some(History::new()),
+            }
         });
         self.aggregators.get_mut(&id).unwrap()
     }
