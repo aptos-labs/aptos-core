@@ -250,19 +250,19 @@ impl RestoreRunMode {
         }
     }
 
-    pub fn get_state_leaf_count(&self, version: Version) -> usize {
+    pub fn get_state_snapshot_before(&self, version: Version) -> Option<(Version, HashValue)> {
         match self {
-            RestoreRunMode::Restore { restore_handler } => {
-                restore_handler.get_state_leaf_count(version)
-            },
-            RestoreRunMode::Verify => 0,
+            RestoreRunMode::Restore { restore_handler } => restore_handler
+                .get_state_snapshot_before(version)
+                .unwrap_or(None),
+            RestoreRunMode::Verify => None,
         }
     }
 
-    pub fn get_in_progress_state_snapshot(&self) -> Result<Option<Version>> {
+    pub fn get_in_progress_state_kv_snapshot(&self) -> Result<Option<Version>> {
         match self {
             RestoreRunMode::Restore { restore_handler } => {
-                restore_handler.get_in_progress_state_snapshot_version()
+                restore_handler.get_in_progress_state_kv_snapshot_version()
             },
             RestoreRunMode::Verify => Ok(None),
         }

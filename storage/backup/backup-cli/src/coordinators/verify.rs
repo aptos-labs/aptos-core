@@ -147,11 +147,11 @@ impl VerifyCoordinator {
             global_opt,
             self.storage,
             txn_manifests,
+            None,
             None, /* replay_from_version */
             epoch_history,
             VerifyExecutionMode::NoVerify,
             self.output_transaction_analysis,
-            None,
         )
         .run()
         .await?;
