@@ -17,7 +17,11 @@ The current required minimum for staking is 1 million APT.
 
 ## Initializing the stake pool
 
-Make sure that this step is performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
+Make sure that this step is performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section. 
+
+To get the stake pool address before initializing the stake pool, run this command:
+
+```aptos account derive-resource-account-address --address <owner-address>  --seed ""```
 
 ## Joining validator set
 
