@@ -18,15 +18,15 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
-pub(crate) trait VMAdapter {
+pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
-    fn new_session<'r>(
+    fn new_session<'r, R: MoveResolverExt>(
         &self,
-        remote: &'r impl MoveResolverExt,
+        remote: &'r R,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_>;
+    ) -> SessionExt<'r, '_, R>;
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
@@ -36,10 +36,10 @@ pub(crate) trait VMAdapter {
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
 
     /// Runs the prologue for the given transaction.
-    fn run_prologue(
+    fn run_prologue<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
-        session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        session: &mut SessionExt<SS>,
+        storage: &S,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -48,17 +48,17 @@ pub(crate) trait VMAdapter {
     fn should_restart_execution(output: &TransactionOutput) -> bool;
 
     /// Execute a single transaction.
-    fn execute_single_transaction(
+    fn execute_single_transaction<S: MoveResolverExt>(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &impl MoveResolverExt,
+        data_cache: &S,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 
-    fn validate_signature_checked_transaction(
+    fn validate_signature_checked_transaction<S: MoveResolverExt, SS: MoveResolverExt>(
         &self,
-        session: &mut SessionExt,
-        storage: &impl MoveResolverExt,
+        session: &mut SessionExt<SS>,
+        storage: &S,
         transaction: &SignatureCheckedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,

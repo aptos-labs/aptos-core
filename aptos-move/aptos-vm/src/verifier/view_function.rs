@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::SessionExt,
+    move_vm_ext::{MoveResolverExt, SessionExt},
     verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
 };
 use aptos_framework::RuntimeModuleMetadataV1;
@@ -29,8 +29,8 @@ pub fn determine_is_view(
 
 /// Validate view function call. This checks whether the function is marked as a view
 /// function, and validates the arguments.
-pub(crate) fn validate_view_function(
-    session: &mut SessionExt,
+pub(crate) fn validate_view_function<S: MoveResolverExt>(
+    session: &mut SessionExt<S>,
     mut args: Vec<Vec<u8>>,
     fun_name: &IdentStr,
     fun_inst: &LoadedFunctionInstantiation,
