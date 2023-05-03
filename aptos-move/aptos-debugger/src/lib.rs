@@ -220,7 +220,7 @@ impl AptosDebugger {
 
     pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<ChangeSet>
     where
-        F: FnOnce(&mut SessionExt) -> VMResult<()>,
+        F: FnOnce(&mut SessionExt<StorageAdapter<DebuggerStateView>>) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let state_view_storage = StorageAdapter::new(&state_view);
