@@ -75,7 +75,6 @@ A delegator is anyone who has stake in the delegation pool. Delegators earn rewa
 3. Reactivate stake
 4. Withdraw stake
 
-
 ## Validator flow
 
 :::tip Delegation pool operations
