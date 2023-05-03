@@ -9,7 +9,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## Delegated Staking on the Aptos Blockchain
 
-:::tip Consensus We strongly recommend that you read about [Staking](../concepts/staking.md) on the Aptos Blockchain first. :::
+:::tip We strongly recommend that you read about [Staking](../concepts/staking.md) first. :::
 
 Delegated staking is an extension of the staking protocol on Aptos. A delegation pool abstracts the stake owner to an entity capable of collecting stake from delegators and adding it on their behalf to the native stake pool attached to the validator. This means that multiple entities can stake to a stake pool to reach the minimum requirement for the validator to join the validator set. Delegators can add stake to an inactive pool, but the delegation pool will not earn rewards until it is active. 
 
