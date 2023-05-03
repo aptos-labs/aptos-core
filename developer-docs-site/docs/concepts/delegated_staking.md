@@ -59,7 +59,6 @@ A node operator is assigned by the pool owner to run the validator node. The ope
 
 The operator receives commission that is distributed automatically at the end of each epoch as rewards. 
 
-
 ### Voter
 
 An owner can designate a voter. This enables the voter to participate in governance. The voter  will use the voter key to sign the governance votes in the transactions.
