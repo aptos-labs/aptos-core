@@ -45,11 +45,15 @@ pub struct NativeAggregatorContext<'a> {
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(
+        txn_hash: [u8; 32],
+        resolver: &'a dyn TableResolver,
+        is_aggregator_enabled: bool,
+    ) -> Self {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: Default::default(),
+            aggregator_data: RefCell::new(AggregatorData::new(is_aggregator_enabled)),
         }
     }
 
@@ -64,7 +68,8 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators, is_aggregator_enabled) =
+            aggregator_data.into_inner().into();
 
         let mut changes = BTreeMap::new();
 
@@ -75,6 +80,7 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
+                    assert!(is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -82,6 +88,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
+                    assert!(is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -198,7 +205,7 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage);
+        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, true);
         use AggregatorChange::*;
 
         test_set_up(&context);

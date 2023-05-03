@@ -293,9 +293,21 @@ pub struct AggregatorData {
     destroyed_aggregators: BTreeSet<AggregatorID>,
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorID, Aggregator>,
+    // If aggregators are not enabled, then all aggregators will directly store the Data instead of deltas.
+    is_aggregator_enabled: bool,
 }
 
 impl AggregatorData {
+    /// Initializes AggregatorData with default values
+    pub fn new(is_aggregator_enabled: bool) -> Self {
+        Self {
+            new_aggregators: Default::default(),
+            destroyed_aggregators: Default::default(),
+            aggregators: Default::default(),
+            is_aggregator_enabled,
+        }
+    }
+
     /// Returns a mutable reference to an aggregator with `id` and a `limit`.
     /// If transaction that is currently executing did not initilize it), a new
     /// aggregator instance is created, with a zero-initialized value and in a
@@ -303,9 +315,14 @@ impl AggregatorData {
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(&mut self, id: AggregatorID, limit: u128) -> &mut Aggregator {
+        let state = if self.is_aggregator_enabled {
+            AggregatorState::PositiveDelta
+        } else {
+            AggregatorState::Data
+        };
         self.aggregators.entry(id).or_insert_with(|| Aggregator {
             value: 0,
-            state: AggregatorState::PositiveDelta,
+            state,
             limit,
             history: Some(History::new()),
         });
@@ -354,11 +371,13 @@ impl AggregatorData {
         BTreeSet<AggregatorID>,
         BTreeSet<AggregatorID>,
         BTreeMap<AggregatorID, Aggregator>,
+        bool,
     ) {
         (
             self.new_aggregators,
             self.destroyed_aggregators,
             self.aggregators,
+            self.is_aggregator_enabled,
         )
     }
 }

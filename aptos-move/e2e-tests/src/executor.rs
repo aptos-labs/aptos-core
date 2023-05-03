@@ -593,7 +593,7 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(&remote_view, SessionId::void(), true);
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -642,7 +642,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let mut session = vm.new_session(&remote_view, SessionId::void(), true);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
