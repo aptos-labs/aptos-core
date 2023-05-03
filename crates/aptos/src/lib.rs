@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![deny(unsafe_code)]
+
 pub mod account;
 pub mod common;
 pub mod config;

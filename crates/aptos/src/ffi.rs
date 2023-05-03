@@ -1,3 +1,5 @@
+#![allow(unsafe_code)]
+
 use crate::Tool;
 use clap::Parser;
 use std::{
