@@ -26,7 +26,7 @@ fn bench_group(c: &mut Criterion) {
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
 
-    group.sample_size(100);
+    group.sample_size(1000);
     group.plot_config(plot_config);
 
     let mut sizes = vec![0, 1];
@@ -37,40 +37,27 @@ fn bench_group(c: &mut Criterion) {
         sizes.push(size);
     }
 
-    // for n in sizes {
-    //     sha2_256(&mut group, n);
-    //     sha2_512(&mut group, n);
-    //     sha3_256(&mut group, n);
-    //     hash_to_g1(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
-    //     hash_to_g2(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
-    //     keccak256(&mut group, n);
-    //     blake2_blake2b_256(&mut group, n);
-    //     blake2_rfc_blake2b_256(&mut group, n);
-    // }
-
-    for n in [65536] {
-        let mut rng = thread_rng();
-        group.bench_function(BenchmarkId::new("sha2_0_9_3", n), move |b| {
-            b.iter_with_setup(
-            || random_bytes(&mut rng, n),
-                |bytes| {
-                    let mut hasher = sha2::Sha256::new();
-                    hasher.update(bytes);
-                    let output = hasher.finalize();
-                },
-            )
-        });
+    for n in sizes {
+        sha2_256(&mut group, n);
+        sha2_512(&mut group, n);
+        sha3_256(&mut group, n);
+        hash_to_g1(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
+        hash_to_g2(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
+        keccak256(&mut group, n);
+        blake2_blake2b_256(&mut group, n);
+        blake2_rfc_blake2b_256(&mut group, n);
     }
+
     group.finish();
 }
 
 /// Benchmarks the time to hash an arbitrary message of size n bytes using SHA2-256
-fn sha2_256<M: Measurement>(group: &mut BenchmarkGroup<M>, n: usize) {
+fn sha2_256<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
     let mut rng = thread_rng();
 
-    group.throughput(Throughput::Bytes(n as u64));
+    g.throughput(Throughput::Bytes(n as u64));
 
-    group.bench_function(BenchmarkId::new("SHA2-256", n), move |b| {
+    g.bench_function(BenchmarkId::new("SHA2-256", n), move |b| {
         b.iter_with_setup(
             || random_bytes(&mut rng, n),
             |bytes| {
