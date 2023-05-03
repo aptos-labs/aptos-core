@@ -572,8 +572,22 @@ module aptos_std::ristretto255 {
 
     native fun scalar_neg_internal(a_bytes: vector<u8>): vector<u8>;
 
+    #[test_only]
+    native fun random_scalar_internal(): vector<u8>;
+
     //
-    // Testing
+    // Test-only functions
+    //
+    #[test_only]
+    public fun random_scalar(): Scalar {
+        Scalar {
+            data: random_scalar_internal()
+        }
+    }
+
+    //
+    // Testing constants
+    // TODO: Can we mark these with #[test_only], or is that a breaking change?
     //
 
     // The scalar 2
@@ -637,6 +651,10 @@ module aptos_std::ristretto255 {
     //    const NON_CANONICAL_LARGEST_ED25519_S: vector<u8> = x"f8ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f";
     //    const CANONICAL_LARGEST_ED25519_S_PLUS_ONE: vector<u8> = x"7e344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
     //    const CANONICAL_LARGEST_ED25519_S_MINUS_ONE: vector<u8> = x"7c344775474a7f9723b63a8be92ae76dffffffffffffffffffffffffffffff0f";
+
+    //
+    // Tests
+    //
 
     #[test]
     fun test_point_decompression() {

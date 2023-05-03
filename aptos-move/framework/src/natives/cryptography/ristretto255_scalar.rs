@@ -21,6 +21,33 @@ use std::{
     convert::TryFrom,
     ops::{Add, Mul, Neg, Sub},
 };
+#[cfg(feature = "testing")]
+use rand::thread_rng;
+#[cfg(feature = "testing")]
+use rand_core::RngCore;
+
+
+#[cfg(feature = "testing")]
+/// This is a test-only native that charges zero gas. It is only exported in testing mode.
+pub(crate) fn native_scalar_random(
+    _context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(_ty_args.is_empty());
+    debug_assert!(args.len() == 0);
+
+    let mut rng = thread_rng();
+
+    // We do this manually due to curve25519-dalek-ng's `Scalar::random` being incompatible with our
+    // `rand-0.7.3` dependency
+    let mut scalar_bytes = [0u8; 64];
+    rng.fill_bytes(&mut scalar_bytes);
+
+    let scalar = Scalar::from_bytes_mod_order_wide(&scalar_bytes);
+
+    Ok(smallvec![Value::vector_u8(scalar.to_bytes())])
+}
 
 pub(crate) fn native_scalar_is_canonical(
     gas_params: &GasParameters,
