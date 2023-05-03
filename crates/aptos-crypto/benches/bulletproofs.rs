@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
+use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput, BenchmarkId};
 use rand::{thread_rng, Rng};
 
 use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
@@ -18,7 +18,13 @@ fn bench_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulletproofs");
 
     range_prove(&mut group);
-    range_proof_verify(&mut group);
+    for n in [8, 16, 32, 64] {
+        range_proof_deserialize(&mut group, n);
+    }
+
+    for n in [8, 16, 32, 64] {
+        range_proof_verify(&mut group, n);
+    }
 
     group.finish();
 }
@@ -54,16 +60,15 @@ fn range_prove<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     });
 }
 
-fn range_proof_verify<M: Measurement>(g: &mut BenchmarkGroup<M>) {
+fn range_proof_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
     let mut rng = thread_rng();
 
-    let n = 64;
     let bp_gens = BulletproofGens::new(n, 1);
     let pc_gens = PedersenGens::default();
     let mut i: u64 = 1;
 
     g.throughput(Throughput::Elements(1));
-    g.bench_function("range_proof_verify", move |b| {
+    g.bench_function(BenchmarkId::new("range_proof_deserialize", n), move |b| {
         b.iter_with_setup(
             || {
                 let v = rng.gen_range(0, u64::MAX);
@@ -75,7 +80,45 @@ fn range_proof_verify<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
                 let mut t = merlin::Transcript::new(b"AptosBenchmark");
 
-                RangeProof::prove_single(&bp_gens, &pc_gens, &mut t, v, &v_blinding, n).unwrap()
+                let proof = RangeProof::prove_single(&bp_gens, &pc_gens, &mut t, v, &v_blinding, n).unwrap();
+                proof.0.to_bytes()
+            },
+            |proof_bytes| {
+                assert!(RangeProof::from_bytes(&proof_bytes[..]).is_ok());
+            },
+        )
+    });
+}
+
+
+fn range_proof_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
+    let mut rng = thread_rng();
+
+    let bp_gens = BulletproofGens::new(n, 1);
+    let pc_gens = PedersenGens::default();
+    let mut i: u64 = 1;
+    let max: u64 = match n {
+        8 => u8::MAX as u64,
+        16 => u16::MAX as u64,
+        32 => u32::MAX as u64,
+        64 => u64::MAX,
+        _ => panic!(),
+    };
+
+    g.throughput(Throughput::Elements(1));
+    g.bench_function(BenchmarkId::new("range_proof_verify", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let v = rng.gen_range(0, max);
+
+                // Sigh, some RngCore incompatibilites I don't want to deal with right now.
+                let v_blinding =
+                    Scalar::hash_from_bytes::<sha3::Sha3_512>(i.to_le_bytes().to_vec().as_slice());
+                i += 1;
+
+                let mut t = merlin::Transcript::new(b"AptosBenchmark");
+
+                RangeProof::prove_single(&bp_gens, &pc_gens, &mut t, v as u64, &v_blinding, n).unwrap()
             },
             |(proof, comm)| {
                 let mut t = merlin::Transcript::new(b"AptosBenchmark");

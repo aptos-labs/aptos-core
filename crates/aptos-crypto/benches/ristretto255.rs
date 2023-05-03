@@ -20,7 +20,7 @@ fn benchmark_groups(c: &mut Criterion) {
 
     group.sample_size(1000);
 
-    point_mul(&mut group);
+    /*point_mul(&mut group);
     basepoint_mul(&mut group);
     basepoint_double_mul(&mut group);
     point_add(&mut group);
@@ -41,11 +41,12 @@ fn benchmark_groups(c: &mut Criterion) {
     scalar_is_canonical(&mut group);
     scalar_mul(&mut group);
     scalar_neg(&mut group);
-    scalar_sub(&mut group);
+    scalar_sub(&mut group);*/
+    point_mul(&mut group);
 
     //for n in 1..=128 {
     //for n in [256, 512, 1024, 2048, 4096] {
-    for n in [8192, 16384, 32768] {
+    for n in [2, 8192, 16384, 32768] {
         multi_scalar_mul(&mut group, n);
     }
 
