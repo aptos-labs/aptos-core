@@ -1,16 +1,19 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import asyncio
-import sys
+import logging
 import time
-import typing
 from multiprocessing import Pipe, Process
 from multiprocessing.connection import Connection
+from typing import Any, List
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.account_sequence_number import AccountSequenceNumber
+from aptos_sdk.aptos_token_client import AptosTokenClient, Property, PropertyMap
 from aptos_sdk.async_client import ClientConfig, FaucetClient, RestClient
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.transaction_worker import TransactionWorker
@@ -91,13 +94,13 @@ class WorkerContainer:
             target=Worker.run, args=(conn, node_url, account, recipient)
         )
 
-    def get(self) -> typing.Any:
+    def get(self) -> Any:
         self._conn.recv()
 
     def join(self):
         self._process.join()
 
-    def put(self, value: typing.Any):
+    def put(self, value: Any):
         self._conn.send(value)
 
     def start(self):
@@ -130,10 +133,10 @@ class Worker:
 
     def run(queue: Pipe, node_url: str, account: Account, recipient: AccountAddress):
         worker = Worker(queue, node_url, account, recipient)
-        asyncio.run(worker.arun())
+        asyncio.run(worker.async_run())
 
-    async def arun(self):
-        print(f"hello from {self._account.address()}", flush=True)
+    async def async_run(self):
+        print(f"hello from {self._account.address()}")
         try:
             self._txn_worker.start()
 
@@ -142,7 +145,7 @@ class Worker:
 
             await self._txn_generator.increase_transaction_count(num_txns)
 
-            print(f"Increase txns from {self._account.address()}", flush=True)
+            print(f"Increase txns from {self._account.address()}")
             self._conn.send(True)
             self._conn.recv()
 
@@ -155,13 +158,14 @@ class Worker:
                     exception,
                 ) = await self._txn_worker.next_processed_transaction()
                 if exception:
-                    print(
-                        f"Account {self._txn_worker.account()}, transaction {sequence_number} submission failed: {exception}"
+                    logging.error(
+                        f"Account {self._txn_worker.address()}, transaction {sequence_number} submission failed.",
+                        exc_info=exception,
                     )
                 else:
                     txn_hashes.append(txn_hash)
 
-            print(f"Submit txns from {self._account.address()}", flush=True)
+            print(f"Submitted txns from {self._account.address()}", flush=True)
             self._conn.send(True)
             self._conn.recv()
 
@@ -172,10 +176,13 @@ class Worker:
             print(f"Verified txns from {self._account.address()}", flush=True)
             self._conn.send(True)
         except Exception as e:
-            print(e)
-            sys.stdout.flush()
+            logging.error(
+                "Failed during run.",
+                exc_info=e,
+            )
 
 
+# This performs a simple p2p transaction
 async def transfer_transaction(
     client: RestClient,
     sender: Account,
@@ -199,42 +206,109 @@ async def transfer_transaction(
     )
 
 
-async def main():
-    client_config = ClientConfig()
-    # Toggle to benchmark
-    client_config.http2 = False
-    client_config.http2 = True
-    rest_client = RestClient(NODE_URL, client_config)
+# This will create a collection in the first transaction and then create NFTs thereafter.
+# Note: Please adjust the sequence number and the name of the collection if run on the same set of
+# accounts, otherwise you may end up not creating a collection and failing all transactions.
+async def token_transaction(
+    client: RestClient,
+    sender: Account,
+    sequence_number: int,
+    recipient: AccountAddress,
+    amount: int,
+) -> str:
+    collection_name = "Funky Alice's"
+    if sequence_number == 8351:
+        payload = AptosTokenClient.create_collection_payload(
+            "Alice's simple collection",
+            20000000000,
+            collection_name,
+            "https://aptos.dev",
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            True,
+            0,
+            1,
+        )
+    else:
+        payload = AptosTokenClient.mint_token_payload(
+            collection_name,
+            "Alice's simple token",
+            f"token {sequence_number}",
+            "https://aptos.dev/img/nyan.jpeg",
+            PropertyMap([Property.string("string", "string value")]),
+        )
+    return await client.create_bcs_signed_transaction(sender, payload, sequence_number)
+
+
+class Accounts:
+    source: Account
+    senders: List[Account]
+    receivers: List[Account]
+
+    def __init__(self, source, senders, receivers):
+        self.source = source
+        self.senders = senders
+        self.receivers = receivers
+
+    def generate(path: str, num_accounts: int) -> Accounts:
+        source = Account.generate()
+        source.store(f"{path}/source.txt")
+        senders = []
+        receivers = []
+        for idx in range(num_accounts):
+            senders.append(Account.generate())
+            receivers.append(Account.generate())
+            senders[-1].store(f"{path}/sender_{idx}.txt")
+            receivers[-1].store(f"{path}/receiver_{idx}.txt")
+        return Accounts(source, senders, receivers)
+
+    def load(path: str, num_accounts: int) -> Accounts:
+        source = Account.load(f"{path}/source.txt")
+        senders = []
+        receivers = []
+        for idx in range(num_accounts):
+            senders.append(Account.load(f"{path}/sender_{idx}.txt"))
+            receivers.append(Account.load(f"{path}/receiver_{idx}.txt"))
+        return Accounts(source, senders, receivers)
+
+
+async def fund_from_faucet(rest_client: RestClient, source: Account):
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
-    num_accounts = 8
-    transactions = 1000
-    start = time.time()
+    fund_txns = []
+    for _ in range(40):
+        fund_txns.append(faucet_client.fund_account(source.address(), 100_000_000_000))
+    await asyncio.gather(*fund_txns)
 
-    print("Starting...")
 
-    accounts = []
-    recipients = []
-
-    for account in range(num_accounts):
-        recipients.append(Account.generate())
-        accounts.append(Account.generate())
-
-    last = time.time()
-    print(f"Accounts generated at {last - start}")
-
-    source = Account.generate()
-    await faucet_client.fund_account(source.address(), 100_000_000 * num_accounts)
+async def distribute_portionally(
+    rest_client: RestClient,
+    source: Account,
+    senders: List[Account],
+    receivers: List[Account],
+):
     balance = int(await rest_client.account_balance(source.address()))
+    per_node_balance = balance // (len(senders) + 1)
+    await distribute(rest_client, source, senders, receivers, per_node_balance)
 
-    per_node_balance = balance // (num_accounts + 1)
+
+async def distribute(
+    rest_client: RestClient,
+    source: Account,
+    senders: List[Account],
+    receivers: List[Account],
+    per_node_amount: int,
+):
+    all_accounts = list(map(lambda account: (account.address(), True), senders))
+    all_accounts.extend(map(lambda account: (account.address(), False), receivers))
+
     account_sequence_number = AccountSequenceNumber(rest_client, source.address())
-
-    print(f"Initial account funded at {time.time() - start} {time.time() - last}")
-    last = time.time()
-
-    all_accounts = list(map(lambda account: (account.address(), True), accounts))
-    all_accounts.extend(map(lambda account: (account.address(), False), recipients))
 
     txns = []
     txn_hashes = []
@@ -247,7 +321,7 @@ async def main():
             txn_hashes.extend(await asyncio.gather(*txns))
             txns = []
             sequence_number = await account_sequence_number.next_sequence_number()
-        amount = per_node_balance if fund else 0
+        amount = per_node_amount if fund else 0
         txn = await transfer_transaction(
             rest_client, source, sequence_number, account, amount
         )
@@ -257,6 +331,39 @@ async def main():
     for txn_hash in txn_hashes:
         await rest_client.wait_for_transaction(txn_hash)
     await account_sequence_number.synchronize()
+
+
+async def main():
+    client_config = ClientConfig()
+    client_config.http2 = True
+    rest_client = RestClient(NODE_URL, client_config)
+
+    num_accounts = 16
+    transactions = 10000
+    start = time.time()
+
+    print("Starting...")
+
+    # Generate will create new accounts, load will load existing accounts
+    all_accounts = Accounts.generate("nodes", num_accounts)
+    # all_accounts = Accounts.load("nodes", num_accounts)
+    accounts = all_accounts.senders
+    receivers = all_accounts.receivers
+    source = all_accounts.source
+
+    print(f"source: {source.address()}")
+
+    last = time.time()
+    print(f"Accounts generated / loaded at {last - start}")
+
+    await fund_from_faucet(rest_client, source)
+
+    print(f"Initial account funded at {time.time() - start} {time.time() - last}")
+    last = time.time()
+
+    balance = await rest_client.account_balance(source.address())
+    amount = int(balance * 0.9 / num_accounts)
+    await distribute(rest_client, source, accounts, receivers, amount)
 
     print(f"Funded all accounts at {time.time() - start} {time.time() - last}")
     last = time.time()
@@ -270,7 +377,7 @@ async def main():
     last = time.time()
 
     workers = []
-    for (account, recipient) in zip(accounts, recipients):
+    for (account, recipient) in zip(accounts, receivers):
         workers.append(WorkerContainer(NODE_URL, account, recipient.address()))
         workers[-1].start()
 

@@ -57,7 +57,7 @@ class TransactionWorker:
         self._outstanding_transactions = asyncio.Queue()
         self._processed_transactions = asyncio.Queue()
 
-    def account(self) -> AccountAddress:
+    def address(self) -> AccountAddress:
         return self._account.address()
 
     async def _submit_transactions_task(self):
@@ -84,22 +84,23 @@ class TransactionWorker:
     async def _process_transactions_task(self):
         try:
             while True:
-                # Always start waiting for one
+                # Always start waiting for one, that way we can acquire a batch in the loop below.
                 (
-                    txn_awaitable,
+                    txn_hash_awaitable,
                     sequence_number,
                 ) = await self._outstanding_transactions.get()
-                awaitables = [txn_awaitable]
+                awaitables = [txn_hash_awaitable]
                 sequence_numbers = [sequence_number]
 
-                # Only acquire if there are more
+                # Now acquire our batch.
                 while not self._outstanding_transactions.empty():
                     (
-                        txn_awaitable,
+                        txn_hash_awaitable,
                         sequence_number,
                     ) = await self._outstanding_transactions.get()
-                    awaitables.append(txn_awaitable)
+                    awaitables.append(txn_hash_awaitable)
                     sequence_numbers.append(sequence_number)
+
                 outputs = await asyncio.gather(*awaitables, return_exceptions=True)
 
                 for (output, sequence_number) in zip(outputs, sequence_numbers):
