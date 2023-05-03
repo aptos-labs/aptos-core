@@ -111,12 +111,14 @@ impl ProofWithData {
     }
 
     pub fn extend(&mut self, other: ProofWithData) {
+        let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
-        self.status
-            .lock()
-            .as_mut()
-            .unwrap()
-            .extend(other.status.lock().as_mut().unwrap().take());
+        let mut status = self.status.lock();
+        if status.is_none() {
+            *status = Some(other_data_status);
+        } else {
+            status.as_mut().unwrap().extend(other_data_status);
+        }
     }
 }
 
