@@ -12,11 +12,11 @@ use crate::{
     common::{
         init::{InitTool, Network},
         types::{
-            account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
-            MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs,
-            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, TransactionOptions, TransactionSummary,
+            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec, CliError,
+            CliTypedResult, EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions,
+            KeyType, MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
+            PoolAddressArgs, PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions,
+            RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
         },
         utils::write_to_file,
     },
@@ -318,10 +318,12 @@ impl CliTestFramework {
                     ),
                     member_id: Identifier::from_str("transfer").unwrap(),
                 },
-                args: vec![
-                    ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
-                    ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
-                ],
+                arg_vec: ArgWithTypeVec {
+                    args: vec![
+                        ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
+                        ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
+                    ],
+                },
                 type_args: vec![MoveType::Struct(MoveStructTag::new(
                     AccountAddress::ONE.into(),
                     IdentifierWrapper::from_str("aptos_coin").unwrap(),
@@ -591,13 +593,15 @@ impl CliTestFramework {
             entry_function_args: EntryFunctionArguments {
                 function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
                     .unwrap(),
-                args: vec![
-                    ArgWithType::address(self.account_id(operator_index)),
-                    ArgWithType::address(self.account_id(voter_index)),
-                    ArgWithType::u64(amount),
-                    ArgWithType::u64(commission_percentage),
-                    ArgWithType::bytes(vec![]),
-                ],
+                arg_vec: ArgWithTypeVec {
+                    args: vec![
+                        ArgWithType::address(self.account_id(operator_index)),
+                        ArgWithType::address(self.account_id(voter_index)),
+                        ArgWithType::u64(amount),
+                        ArgWithType::u64(commission_percentage),
+                        ArgWithType::bytes(vec![]),
+                    ],
+                },
                 type_args: vec![],
             },
             txn_options: self.transaction_options(owner_index, None),
@@ -912,7 +916,7 @@ impl CliTestFramework {
             txn_options: self.transaction_options(index, gas_options),
             entry_function_args: EntryFunctionArguments {
                 function_id,
-                args: parsed_args,
+                arg_vec: ArgWithTypeVec { args: parsed_args },
                 type_args: parsed_type_args,
             },
         }
@@ -976,7 +980,7 @@ impl CliTestFramework {
                 framework_package_args,
                 bytecode_version: None,
             },
-            args: Vec::new(),
+            arg_vec: ArgWithTypeVec { args: Vec::new() },
             type_args: Vec::new(),
         }
         .execute()
@@ -1002,7 +1006,7 @@ impl CliTestFramework {
                 },
                 bytecode_version: None,
             },
-            args,
+            arg_vec: ArgWithTypeVec { args },
             type_args,
         }
         .execute()
