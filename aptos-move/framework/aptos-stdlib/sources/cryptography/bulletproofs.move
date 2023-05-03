@@ -54,7 +54,8 @@ module aptos_std::bulletproofs {
         MAX_RANGE_BITS
     }
 
-    /// Deserializes a range proof from a sequence of bytes.
+    /// Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in
+    /// the zkcrypto's `bulletproofs` library (https://crates.io/crates/bulletproofs).
     public fun range_proof_from_bytes(bytes: vector<u8>): RangeProof {
         RangeProof {
             bytes
