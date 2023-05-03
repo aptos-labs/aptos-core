@@ -60,7 +60,7 @@ The operator receives commission that is distributed automatically at the end of
 
 ### Voter
 
-An owner can designate a voter. This enables the voter to participate in governance. The voter  will use the voter key to sign the governance votes in the transactions.
+An owner can designate a voter. This enables the voter to participate in governance. The voter will use the voter key to sign the governance votes in the transactions.
 
 :::tip Governance
 This document describes staking. See [Governance](./governance.md) for how to participate in the Aptos on-chain governance using the owner-voter model.
