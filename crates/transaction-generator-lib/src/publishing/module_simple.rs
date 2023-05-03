@@ -100,6 +100,12 @@ pub fn scramble(module: &mut CompiledModule, fn_count: usize, rng: &mut StdRng) 
     }
 }
 
+pub enum MultiSigConfig {
+    None,
+    Random(usize),
+    Publisher,
+}
+
 //
 // List of entry points to expose
 //
@@ -163,6 +169,9 @@ pub enum EntryPoints {
     TokenV1MintAndTransferNFTSequential,
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
+
+    TokenV2AmbassadorInitCollection,
+    TokenV2AmbassadorMint,
 }
 
 impl EntryPoints {
@@ -192,6 +201,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "simple",
+            EntryPoints::TokenV2AmbassadorInitCollection | EntryPoints::TokenV2AmbassadorMint => {
+                "simple"
+            },
         }
     }
 
@@ -221,6 +233,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+            EntryPoints::TokenV2AmbassadorInitCollection | EntryPoints::TokenV2AmbassadorMint => {
+                "ambassador"
+            },
         }
     }
 
@@ -317,6 +332,32 @@ impl EntryPoints {
                 ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
+
+            EntryPoints::TokenV2AmbassadorInitCollection => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("create_ambassador_collection").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&"unique ambasador collection").unwrap(), // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorMint => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_ambassador_token").to_owned(),
+                    vec![
+                        bcs::to_bytes(&"unique ambasador collection").unwrap(), // collection_name
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(),         // description
+                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),          // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),          // uri
+                    ],
+                )
+            },
         }
     }
 
@@ -330,15 +371,19 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
+            EntryPoints::TokenV2AmbassadorMint => {
+                Some(EntryPoints::TokenV2AmbassadorInitCollection)
+            },
             _ => None,
         }
     }
 
-    pub fn multi_sig_additional_num(&self) -> Option<usize> {
+    pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
-            EntryPoints::Nop2Signers => Some(1),
-            EntryPoints::Nop5Signers => Some(4),
-            _ => None,
+            EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
+            EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
+            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            _ => MultiSigConfig::None,
         }
     }
 }
@@ -434,11 +479,7 @@ fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
 
 fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let len = rng.gen_range(0usize, 1000usize);
-    let name: String = rng
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect();
+    let name: String = rand_string(rng, len);
     get_payload(module_id, ident_str!("set_name").to_owned(), vec![
         bcs::to_bytes(&name).unwrap(),
     ])
@@ -468,6 +509,13 @@ fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayl
     ])
 }
 
+fn rand_string(rng: &mut StdRng, len: usize) -> String {
+    rng.sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect()
+}
+
 fn make_or_change(
     rng: &mut StdRng,
     module_id: ModuleId,
@@ -475,11 +523,7 @@ fn make_or_change(
     data_len: usize,
 ) -> TransactionPayload {
     let id: u64 = rng.gen();
-    let name: String = rng
-        .sample_iter(&Alphanumeric)
-        .take(str_len)
-        .map(char::from)
-        .collect();
+    let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
     get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![
