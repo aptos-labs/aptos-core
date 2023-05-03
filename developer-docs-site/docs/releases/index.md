@@ -19,21 +19,27 @@ Hot fixes are exceptions that may occur in mainnet to address urgent issues in p
 
 If you are a node operator, [update your nodes with the new release](../nodes/full-node/update-fullnode-with-new-releases.md).
 
-## Subscribe to releases
+## Subscribe to Release Announcements
 
-To get notification of new Aptos releases, create a GitHub account if you don't have one and:
+**Subscribe via GitHub**
+1. Go to the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repository.
+2. Go to the *Watch* menu at the top and select **Custom**.
+3. In the *Custom* menu, select *Releases* and click **Apply**.
 
-1. Go to the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repository in a web browser.
-1. Go to the *Watch* menu at the top and select **Custom**.
-1. In the *Custom* menu, select *Releases* and click **Apply**.
+**Subscribe via [Aptos Discord](https://discord.gg/aptoslabs)**
 
-To know when the latest release lands, we also suggest you join the [Aptos Discord](https://discord.gg/aptoslabs) instance and monitor these channels:
+Here you'll be able to interact with us and our community. We also post upcoming releases in these channels.
 
-* [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349)
-* [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545)
-* [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904)
+  * [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349)
+  * [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545)
+  * [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904)
 
+**Subscribe via [AptosRelease Twitter](https://twitter.com/AptosRelease)**
+
+
+Here you'll get the latest updates about our upcoming mainnet releases and be notified when it's time to update your node.
+Every couple of days, AptosRelease will tweet a countdown to remind you to update to the latest version. *Note: We do not post about hotfixes here!*
 
 ## Aptos process and all releases
 
-Find information on [all Aptos releases](https://github.com/aptos-labs/aptos-core/releases) in GitHub. To understand how we conduct releases, review the [Aptos Release Process](https://github.com/aptos-labs/aptos-core/blob/main/RELEASE.md).
+ To understand how we conduct releases, review the [Aptos Release Process](https://github.com/aptos-labs/aptos-core/blob/main/RELEASE.md).
