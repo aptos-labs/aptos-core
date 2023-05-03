@@ -40,6 +40,7 @@ pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
+    pub(crate) is_aggregator_enabled: bool,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -53,7 +54,8 @@ impl<'a> NativeAggregatorContext<'a> {
         Self {
             txn_hash,
             resolver,
-            aggregator_data: RefCell::new(AggregatorData::new(is_aggregator_enabled)),
+            aggregator_data: Default::default(),
+            is_aggregator_enabled,
         }
     }
 
@@ -68,8 +70,7 @@ impl<'a> NativeAggregatorContext<'a> {
         let NativeAggregatorContext {
             aggregator_data, ..
         } = self;
-        let (_, destroyed_aggregators, aggregators, is_aggregator_enabled) =
-            aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
 
         let mut changes = BTreeMap::new();
 
@@ -80,7 +81,7 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    assert!(is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -88,7 +89,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    assert!(is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -191,11 +192,11 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100);
-        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200);
-        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500);
-        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600);
-        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700);
+        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, true);
+        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, true);
+        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, true);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, true);
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, true);
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
         aggregator_data.remove_aggregator(aggregator_id_for_test(300));
