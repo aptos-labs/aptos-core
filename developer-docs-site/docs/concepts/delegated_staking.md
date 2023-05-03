@@ -48,7 +48,6 @@ The delegation pool owner has the following capabilities:
 3. Sets operator commission percentage for the delegation pool
 4. Assigns voter for the delegation pool
 
-
 ### Operator
 
 A node operator is assigned by the pool owner to run the validator node. The operator has the following capabilities:
