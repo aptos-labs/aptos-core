@@ -793,23 +793,27 @@ module veiled_coin::veiled_coin {
     // Test-only functions
     //
 
-    // TODO: add test-only random_scalar in ristretto255
     #[test_only]
-    const SOME_RANDOMNESS_1: vector<u8> = x"a7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
+    /// Returns a random ElGamal keypair
+    fun generate_elgamal_keypair(): (Scalar, elgamal::CompressedPubkey) {
+        let sk = ristretto255::random_scalar();
+        let pk = elgamal::pubkey_from_secret_key(&sk);
+        (sk, pk)
+    }
+
     #[test_only]
-    const SOME_RANDOMNESS_2: vector<u8> = x"b7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_3: vector<u8> = x"c7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_4: vector<u8> = x"d7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_5: vector<u8> = x"a2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_6: vector<u8> = x"b2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_7: vector<u8> = x"c2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
-    #[test_only]
-    const SOME_RANDOMNESS_8: vector<u8> = x"d2c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
+    /// Returns true if the balance at address `owner` equals `value`.
+    /// Requires the ElGamal encryption randomness `r` and public key `pk` as auxiliary inputs.
+    public fun verify_opened_balance<CoinType>(owner: address, value: u64, r: &Scalar, pk: &elgamal::CompressedPubkey): bool acquires VeiledCoinStore {
+        // compute the expected encrypted balance
+        let value = ristretto255::new_scalar_from_u64(value);
+        let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, r, pk);
+
+        // get the actual encrypted balance
+        let actual_ct = elgamal::decompress_ciphertext(&veiled_balance<CoinType>(owner));
+
+        elgamal::ciphertext_equals(&actual_ct, &expected_ct)
+    }
 
     #[test_only]
     /// Proves the Sigma protocol used for veiled coin transfers.
@@ -917,28 +921,6 @@ module veiled_coin::veiled_coin {
         bytes
     }
 
-    #[test_only]
-    fun generate_elgamal_keypair(): (Scalar, elgamal::CompressedPubkey) {
-        // Hash the ristretto255 basepoint to get an arbitrary scalar for testing
-        let sk = ristretto255::random_scalar();
-        let pk = elgamal::pubkey_from_secret_key(&sk);
-        (sk, pk)
-    }
-
-    #[test_only]
-    /// Returns true if the balance at address `owner` equals `value`.
-    /// Requires the ElGamal encryption randomness `r` and public key `pk` as auxiliary inputs.
-    public fun verify_opened_balance<CoinType>(owner: address, value: u64, r: &Scalar, pk: &elgamal::CompressedPubkey): bool acquires VeiledCoinStore {
-        // compute the expected encrypted balance
-        let value = ristretto255::new_scalar_from_u64(value);
-        let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, r, pk);
-
-        // get the actual encrypted balance
-        let actual_ct = elgamal::decompress_ciphertext(&veiled_balance<CoinType>(owner));
-
-        elgamal::ciphertext_equals(&actual_ct, &expected_ct)
-    }
-
     //
     // Tests
     //
@@ -947,12 +929,12 @@ module veiled_coin::veiled_coin {
     fun sigma_proof_verify_test()
     {
        let (source_priv_key, source_pk) = generate_elgamal_keypair();
-       let balance_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+       let balance_rand = ristretto255::random_scalar();
        let balance_val = ristretto255::new_scalar_from_u64(150);
        let transfer_val = ristretto255::new_scalar_from_u64(50);
        let (_, dest_pk) = generate_elgamal_keypair();
        let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance_val, &balance_rand, &source_pk);
-       let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_4);
+       let transfer_rand = ristretto255::random_scalar();
        let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
        let new_balance_val = ristretto255::new_scalar_from_u64(100);
        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
@@ -967,19 +949,19 @@ module veiled_coin::veiled_coin {
     fun sigma_proof_verify_fails_test()
     {
        let (source_priv_key, source_pk) = generate_elgamal_keypair();
-       let balance_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+       let balance_rand = ristretto255::random_scalar();
        let balance_val = ristretto255::new_scalar_from_u64(150);
        let transfer_val = ristretto255::new_scalar_from_u64(50);
        let (_, dest_pk) = generate_elgamal_keypair();
        let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance_val, &balance_rand, &source_pk);
-       let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_4);
+       let transfer_rand = ristretto255::random_scalar();
        let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
        let new_balance_val = ristretto255::new_scalar_from_u64(100);
        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
        let sigma_proof = sigma_protocol_prove<coin::FakeMoney>(&source_pk, &dest_pk, &balance_ct, &withdraw_ct, &deposit_ct, &transfer_rand, &source_priv_key, &transfer_val, &new_balance_val);
 
-       let random_point = ristretto255::new_point_from_sha2_512(SOME_RANDOMNESS_3);
+       let random_point = ristretto255::random_point();
        sigma_proof.x1 = random_point;
 
        sigma_protocol_verify(&source_pk, &dest_pk, &balance_ct, &withdraw_ct, &deposit_ct, &sigma_proof);
@@ -989,7 +971,7 @@ module veiled_coin::veiled_coin {
     fun sigma_proof_serialize_test()
     {
        let (source_priv_key, source_pk) = generate_elgamal_keypair();
-       let rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+       let rand = ristretto255::random_scalar();
        let val = ristretto255::new_scalar_from_u64(50);
        let (_, dest_pk) = generate_elgamal_keypair();
        let balance_ct = elgamal::new_ciphertext_with_basepoint(&val, &rand, &source_pk);
@@ -1138,7 +1120,7 @@ module veiled_coin::veiled_coin {
         let source_original_balance = elgamal::decompress_ciphertext(&source_original_balance);
         // Transfer 50 of these veiled coins to destination
         let transfer_val = ristretto255::new_scalar_from_u64(50);
-        let transfer_rand = ristretto255::new_scalar_from_sha2_512(SOME_RANDOMNESS_2);
+        let transfer_rand = ristretto255::random_scalar();
 
         // This will be the balance left at the source, that we need to do a range proof for
         let new_balance_rand_source = ristretto255::scalar_neg(&transfer_rand);

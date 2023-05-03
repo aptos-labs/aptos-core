@@ -578,11 +578,19 @@ module aptos_std::ristretto255 {
     //
     // Test-only functions
     //
+
     #[test_only]
     public fun random_scalar(): Scalar {
         Scalar {
             data: random_scalar_internal()
         }
+    }
+
+    #[test_only]
+    public fun random_point(): RistrettoPoint {
+        let s = random_scalar();
+
+        basepoint_mul(&s)
     }
 
     //
