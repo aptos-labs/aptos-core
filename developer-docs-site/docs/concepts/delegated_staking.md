@@ -132,7 +132,4 @@ Rewards for delegated staking are calculated by using:
 2. Delegator stake
 3. [Validator rewards performance](../concepts/staking.md#rewards-formula)
 
-
 See [Computing delegation pool rewards](../nodes/validator-node/operator/delegation-pool-operations.md#compute-delegation-pool-rewards-earned)
-
-
