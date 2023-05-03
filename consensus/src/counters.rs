@@ -15,6 +15,8 @@ use once_cell::sync::Lazy;
 pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 /// Transaction commit failed (will not be retried)
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
+/// Transaction commit failed (will not be retried) because of a duplicate
+pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
