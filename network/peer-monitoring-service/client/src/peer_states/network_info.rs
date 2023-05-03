@@ -18,7 +18,11 @@ use aptos_peer_monitoring_service_types::{
     MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::TimeService;
-use std::sync::Arc;
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 /// A simple container that holds a single peer's network info
 #[derive(Clone, Debug)]
@@ -158,7 +162,7 @@ impl StateValueInterface for NetworkInfoState {
     }
 
     fn handle_monitoring_service_response_error(
-        &self,
+        &mut self,
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
@@ -171,6 +175,16 @@ impl StateValueInterface for NetworkInfoState {
             .message("Error encountered when requesting network information from the peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+}
+
+impl Display for NetworkInfoState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NetworkInfoState {{ recorded_network_info_response: {:?} }}",
+            self.recorded_network_info_response
+        )
     }
 }
 
