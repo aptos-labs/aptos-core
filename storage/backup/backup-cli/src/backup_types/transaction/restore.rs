@@ -191,10 +191,10 @@ impl TransactionRestoreController {
             global_opt,
             storage,
             vec![opt.manifest_handle],
+            None,
             opt.replay_from_version,
             epoch_history,
             verify_execution_mode,
-            None,
             None,
         );
 
@@ -225,11 +225,11 @@ impl TransactionRestoreBatchController {
         global_opt: GlobalRestoreOptions,
         storage: Arc<dyn BackupStorage>,
         manifest_handles: Vec<FileHandle>,
+        first_version: Option<Version>,
         replay_from_version: Option<Version>,
         epoch_history: Option<Arc<EpochHistory>>,
         verify_execution_mode: VerifyExecutionMode,
         output_transaction_analysis: Option<PathBuf>,
-        first_version: Option<Version>,
     ) -> Self {
         Self {
             global_opt,
@@ -263,7 +263,9 @@ impl TransactionRestoreBatchController {
         }
 
         let mut loaded_chunk_stream = self.loaded_chunk_stream();
-        // first_version determines the start version for saving txns
+        // If first_version is None, we confirm and save frozen substrees to create a baseline
+        // When first version is not None, it only happens when we already finish first phase of db restore and
+        // we don't need to confirm and save frozen subtrees again.
         let first_version = self.first_version.unwrap_or(
             self.confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
                 .await?,
@@ -492,7 +494,6 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
-        // Use stream to update the kv and SMT buffered state separately with a long buffer.
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()

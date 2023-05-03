@@ -19,10 +19,7 @@ use aptos_db::AptosDB;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    state_store::{state_key::StateKeyTag, state_key_prefix::StateKeyPrefix},
-    transaction::Version,
-};
+use aptos_types::transaction::Version;
 use itertools::zip_eq;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
 use tokio::time::Duration;
@@ -111,8 +108,8 @@ fn end_to_end() {
             backup_handles,
             None,
             None,
-            VerifyExecutionMode::verify_all(),
             None,
+            VerifyExecutionMode::verify_all(),
             None,
         )
         .run(),
@@ -139,28 +136,6 @@ fn end_to_end() {
             .map(|txn_to_commit| txn_to_commit.write_set().clone()),
     ) {
         assert_eq!(restore_ws, org_ws);
-    }
-
-    // Get all the key value pairs and compare if they are the same
-    let state_key_value_pairs_old = src_db
-        .get_prefixed_state_value_iterator(
-            &StateKeyPrefix::new(StateKeyTag::AccessPath, vec![]),
-            Option::None,
-            target_version,
-        )
-        .unwrap();
-    let state_key_value_pairs = tgt_db
-        .get_prefixed_state_value_iterator(
-            &StateKeyPrefix::new(StateKeyTag::AccessPath, vec![]),
-            Option::None,
-            target_version,
-        )
-        .unwrap();
-    for (old, new) in zip_eq(state_key_value_pairs_old, state_key_value_pairs) {
-        let (old_key, old_value) = old.unwrap();
-        let (new_key, new_value) = new.unwrap();
-        assert_eq!(old_key, new_key);
-        assert_eq!(old_value, new_value);
     }
 
     assert_eq!(

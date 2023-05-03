@@ -93,7 +93,7 @@ pub fn confirm_or_save_frozen_subtrees(
 /// Saves the given transactions to the db. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
 pub(crate) fn save_transactions(
-    db: Arc<DB>,
+    ledger_db: Arc<DB>,
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
@@ -106,6 +106,8 @@ pub(crate) fn save_transactions(
     existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
 ) -> Result<()> {
     if let Some(existing_batch) = existing_batch {
+        let batch = existing_batch.0;
+        let state_kv_batches = existing_batch.1;
         save_transactions_impl(
             ledger_store,
             transaction_store,
@@ -116,8 +118,8 @@ pub(crate) fn save_transactions(
             txn_infos,
             events,
             write_sets.as_ref(),
-            existing_batch.0,
-            existing_batch.1,
+            batch,
+            state_kv_batches,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
@@ -143,7 +145,7 @@ pub(crate) fn save_transactions(
             .state_kv_db
             .commit(last_version, sharded_kv_schema_batch)?;
 
-        db.write_schemas(batch)?;
+        ledger_db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -216,8 +218,16 @@ pub(crate) fn save_transactions_impl(
     for (idx, ws) in write_sets.iter().enumerate() {
         transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
     }
-    // only write kv and not update the state tree
-    state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
+    // only write kv and not update the state tree from version that state hasn't been committed
+    // in case we want to restore transactions separately from state
+    if state_store.get_usage(Some(first_version)).is_ok() {
+        state_store.put_write_sets(
+            write_sets[1..].to_vec(),
+            first_version + 1,
+            batch,
+            state_kv_batches,
+        )?;
+    }
 
     Ok(())
 }

@@ -128,14 +128,14 @@ impl RestoreHandler {
             .map_or(0, |(ver, _txn_info)| ver + 1))
     }
 
-    /// Returns the number of state leaves in the state merkel tree or 0 if no tree restored .
-    pub fn get_state_leaf_count(&self, version: Version) -> usize {
-        self.aptosdb
-            .get_state_leaf_count(version)
-            .unwrap_or(0_usize)
+    pub fn get_state_snapshot_before(
+        &self,
+        version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.aptosdb.get_state_snapshot_before(version)
     }
 
-    pub fn get_in_progress_state_snapshot_version(&self) -> Result<Option<Version>> {
+    pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
         let mut iter = self
             .aptosdb
             .ledger_db

@@ -597,7 +597,7 @@ impl StateStore {
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["update_with_writesets"])
+            .with_label_values(&["put_writesets"])
             .start_timer();
 
         // convert value state sets to hash map reference
@@ -625,7 +625,7 @@ impl StateStore {
             sharded_state_kv_batches,
         )?;
 
-        self.put_state_value(value_state_sets, first_version, sharded_state_kv_batches)?;
+        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)?;
 
         Ok(())
     }
@@ -657,10 +657,10 @@ impl StateStore {
             .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
-        self.put_state_value(value_state_sets, first_version, sharded_state_kv_batches)
+        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)
     }
 
-    pub fn put_state_value(
+    pub fn put_state_values(
         &self,
         value_state_sets: Vec<&ShardedStateUpdates>,
         first_version: Version,
