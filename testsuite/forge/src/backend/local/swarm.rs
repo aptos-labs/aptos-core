@@ -219,14 +219,14 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
 
         // We print out the root key to make it easy for users to deploy a local faucet
-        let encoded_root_key = hex::encode_upper(root_key.to_bytes());
+        let encoded_root_key = EncodingType::Hex.encode_key("root_key", &root_key)?;
         info!(
             "The root (or mint) key for the swarm is: 0x{}",
-            &encoded_root_key
+            String::from_utf8_lossy(encoded_root_key.as_slice())
         );
         let root_key_path = dir_actual.as_ref().join("root_key");
         if let Ok(mut out) = File::create(root_key_path.clone()) {
-            out.write_all(encoded_root_key.as_bytes())?;
+            out.write_all(encoded_root_key.as_slice())?;
             info!("Wrote root (or mint) key to: {}", root_key_path.display());
         }
         let root_key_path = dir_actual.as_ref().join("root_key.bin");
