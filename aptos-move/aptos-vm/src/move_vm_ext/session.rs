@@ -17,6 +17,7 @@ use aptos_framework::natives::{
     code::{NativeCodeContext, PublishRequest},
 };
 use aptos_gas::ChangeSetConfigs;
+use aptos_logger::error;
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -174,7 +175,7 @@ where
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
-        for (addr, account_changeset) in change_set.into_inner() {
+        for (addr, account_changeset) in change_set.clone().into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
@@ -201,7 +202,7 @@ where
                     .map_err(|_| common_error())?;
             }
 
-            for (resource_tag, resources) in resource_groups {
+            for (resource_tag, resources) in resource_groups.clone() {
                 let source_data = remote
                     .get_resource_group_data(&addr, &resource_tag)
                     .map_err(|_| common_error())?;
@@ -213,7 +214,7 @@ where
                 };
 
                 for (struct_tag, current_op) in resources.into_resources() {
-                    match current_op {
+                    match current_op.clone() {
                         MoveStorageOp::Delete => {
                             source_data.remove(&struct_tag).ok_or_else(common_error)?;
                         },
@@ -222,8 +223,12 @@ where
                             *data = new_data;
                         },
                         MoveStorageOp::New(data) => {
-                            let data = source_data.insert(struct_tag, data);
+                            let data = source_data.insert(struct_tag.clone(), data);
                             if data.is_some() {
+                                error!(
+                                    "Unexpected insertion: change_set: {:?}\naddr: {:?}\nsource_data: {:?}\nstruct_tag: {:?}\ncurrent_op: {:?}\nresource_groups: {:?}",
+                                    change_set, addr, source_data, struct_tag, current_op, resource_groups
+                                );
                                 return Err(common_error());
                             }
                         },
