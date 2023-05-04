@@ -1,0 +1,13 @@
+[package]
+name = "Examples"
+version = "0.0.0"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
+
+[addresses]
+aptos_framework = "0x1"
+# replace the admin_addr with the actual admin address we created using CLI
+admin_addr = "0xcafe"
+aptos_token_objects = "0x4"
