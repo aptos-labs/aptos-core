@@ -534,7 +534,7 @@ impl AptosVM {
             // transaction.
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Multisig payload bytes return error")
+                    .with_message("Multisig payload bytes return error".to_string())
                     .finish(Location::Undefined)
             })?;
         // We have to deserialize twice as the first time returns the actual return type of the
