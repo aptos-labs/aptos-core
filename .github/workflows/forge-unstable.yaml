@@ -96,6 +96,8 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       COMMENT_HEADER: forge-continuous
       # This test suite is configured using the forge.py config test command
       FORGE_TEST_SUITE: continuous
@@ -131,6 +133,8 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-state-sync-slow-processing-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_slow_processing_catching_up
@@ -144,6 +148,8 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-twin-validator-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: twin_validator_test
@@ -156,6 +162,8 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-three-region-with-different-node-speed-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 3600
       FORGE_TEST_SUITE: three_region_simulation_with_different_node_speed
@@ -170,6 +178,8 @@ jobs:
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_NAMESPACE: forge-state-sync-failures-catching-up-test-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_RUNNER_DURATION_SECS: 900
       FORGE_TEST_SUITE: state_sync_failures_catching_up
       FORGE_ENABLE_FAILPOINTS: true
@@ -182,6 +192,8 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # GCP cluster
+      FORGE_CLUSTER_NAME: aptos-forge-1
       FORGE_NAMESPACE: forge-validator-reboot-stress-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       # Run for 40 minutes
       FORGE_RUNNER_DURATION_SECS: 2400

@@ -145,7 +145,7 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster("tomato", "kubeconf"),
+        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf"),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
@@ -452,6 +452,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(
             get_dashboard_link(
                 "forge-pr-2983",
+                # Chain names don't use the "aptos-" prefix.
                 "forge-big-1",
                 True,
             ),
@@ -462,6 +463,7 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(
             get_dashboard_link(
                 "forge-pr-2983",
+                # Chain names don't use the "aptos-" prefix.
                 "forge-big-1",
                 (
                     datetime.fromtimestamp(100000, timezone.utc),
@@ -533,9 +535,13 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     RunResult(0, b'{"Account": "123456789012"}'),
                 ),
                 FakeCommand(
+                    "aws eks list-clusters",
+                    RunResult(0, b'{ "clusters": [ "aptos-forge-big-1" ] }'),
+                ),
+                FakeCommand(
                     # NOTE: with multi-cloud support, we set the kubeconfig to ensure auth before continuing
                     # See changes in: https://github.com/aptos-labs/aptos-core/pull/6166
-                    "aws eks update-kubeconfig --name forge-big-1 --kubeconfig temp1",
+                    "aws eks update-kubeconfig --name aptos-forge-big-1 --kubeconfig temp1",
                     RunResult(0, b""),
                 ),
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"banana")),
@@ -624,8 +630,8 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "S3ForgeConfigBackend",
                     lambda *_: FakeConfigBackend(
                         {
-                            "enabled_clusters": ["forge-big-1"],
-                            "all_clusters": ["forge-big-1", "banana"],
+                            "enabled_clusters": ["aptos-forge-big-1"],
+                            "all_clusters": ["aptos-forge-big-1", "banana"],
                             "test_suites": {},
                         }
                     ),
@@ -644,7 +650,7 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     "--no-log-metadata",
                     "test",
                     "--forge-cluster-name",
-                    "forge-big-1",
+                    "aptos-forge-big-1",
                     "--forge-report",
                     "temp-report",
                     "--forge-pre-comment",
@@ -699,7 +705,7 @@ class TestListClusters(unittest.TestCase):
                 ),
             ]
         )
-        clusters = list_eks_clusters(shell)
+        clusters = list(list_eks_clusters(shell).keys())
         self.assertEqual(clusters, ["aptos-forge-banana-1", "aptos-forge-potato-2"])
         shell.assert_commands(self)
 

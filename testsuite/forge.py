@@ -37,7 +37,7 @@ from test_framework.process import Processes, SystemProcesses
 
 from test_framework.shell import LocalShell, Shell
 from test_framework.time import SystemTime, Time
-from test_framework.cluster import Cloud, ForgeCluster, ForgeJob
+from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
 
 # map of build variant (e.g. cargo profile and feature flags)
 BUILD_VARIANT_TAG_PREFIX_MAP = {
@@ -1311,9 +1311,11 @@ def test(
     else:
         cloud_enum = Cloud.GCP
 
-    log.info(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
-    temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
+    log.info(f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}")
+    forge_cluster = find_forge_cluster(
+        context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
+    )
+    log.info(f"Found cluster: {forge_cluster}")
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
