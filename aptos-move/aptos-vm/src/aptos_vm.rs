@@ -505,6 +505,7 @@ impl AptosVM {
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error =
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("MultiSig transaction error".to_string())
                 .finish(Location::Undefined);
         let provided_payload = if let Some(payload) = &txn_payload.transaction_payload {
             bcs::to_bytes(&payload).map_err(|_| invariant_violation_error.clone())?
@@ -534,6 +535,7 @@ impl AptosVM {
             // transaction.
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Multisig payload bytes return error")
                     .finish(Location::Undefined)
             })?;
         // We have to deserialize twice as the first time returns the actual return type of the
@@ -702,6 +704,7 @@ impl AptosVM {
         // Serialization is not expected to fail so we're using invariant_violation error here.
         cleanup_args.push(bcs::to_bytes(&execution_error).map_err(|_| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("MultiSig payload cleanup error.".to_string())
                 .finish(Location::Undefined)
         })?);
         cleanup_session.execute_function_bypass_visibility(

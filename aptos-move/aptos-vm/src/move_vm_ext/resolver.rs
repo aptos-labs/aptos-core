@@ -56,6 +56,7 @@ pub trait MoveResolverExt:
             let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
                 .map_err(|_| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Resource Group data deser error")
                         .finish(Location::Undefined)
                 })?;
             Ok(group_data.remove(struct_tag))
