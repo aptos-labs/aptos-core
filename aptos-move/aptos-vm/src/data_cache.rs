@@ -66,9 +66,7 @@ impl<'a, 'm, S: MoveResolverExt> MoveResolverWithVMMetadata<'a, 'm, S> {
 
 impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<'a, 'm, S> {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        aptos_framework::get_vm_metadata(self.move_vm, module_id.clone()).or_else(|| {
-            self.move_resolver.get_module_metadata(module_id)
-        })
+        aptos_framework::get_vm_metadata(self.move_vm, module_id)
     }
 
     fn get_resource_group_data(

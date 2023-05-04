@@ -22,8 +22,8 @@ use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     on_chain_config::{
-        ApprovedExecutionHashes, ConfigurationResource, Features, GasSchedule, GasScheduleV2,
-        OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
+        ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
+        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -599,7 +599,11 @@ impl AptosVMImpl {
         &self,
         module: &ModuleId,
     ) -> Option<RuntimeModuleMetadataV1> {
-        aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
+        if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+            aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
+        } else {
+            aptos_framework::get_vm_metadata_v0(&self.move_vm, module.clone())
+        }
     }
 
     pub fn new_move_resolver<'r, R: MoveResolverExt>(
