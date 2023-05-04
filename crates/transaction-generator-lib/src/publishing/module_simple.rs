@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-use crate::publishing::raw_module_data;
 use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
@@ -27,18 +26,6 @@ use std::collections::HashMap;
 //
 // Functions to load and update the original package
 //
-
-pub fn load_package() -> (HashMap<String, CompiledModule>, PackageMetadata) {
-    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA)
-        .expect("PackageMetadata for GenericModule must deserialize");
-    let mut modules = HashMap::new();
-    for module_content in &*raw_module_data::MODULES {
-        let module =
-            CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
-        modules.insert(module.self_id().name().to_string(), module);
-    }
-    (modules, metadata)
-}
 
 pub fn version(module: &mut CompiledModule, rng: &mut StdRng) {
     // change `const COUNTER_STEP` in Simple.move
@@ -200,9 +187,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTParallel
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
-            | EntryPoints::TokenV1MintAndTransferFT => "simple",
+            | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
             EntryPoints::TokenV2AmbassadorInitCollection | EntryPoints::TokenV2AmbassadorMint => {
-                "simple"
+                "framework_usecases"
             },
         }
     }
