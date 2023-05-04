@@ -1726,6 +1726,27 @@ impl InternalOperation {
                                 ));
                             }
                         },
+                        Ok(OperationType::WithdrawUndelegated) => {
+                            if let (
+                                Some(OperationMetadata {
+                                    operator: Some(operator),
+                                    amount,
+                                    ..
+                                }),
+                                Some(account),
+                            ) = (&operation.metadata, &operation.account)
+                            {
+                                return Ok(Self::WithdrawUndelegated(
+                                    WithdrawUndelegated { 
+                                        owner: account.account_address()?,
+                                        operator: operator.account_address()?,
+                                        amount_withdrawn: amount.map(u64::from).unwrap_or_default(),
+                                        // TODO: WE DON'T NEED!
+                                        pool_address: operator.account_address()?,
+                                    },
+                                ));
+                            }
+                        },
                         _ => {},
                     }
                 }

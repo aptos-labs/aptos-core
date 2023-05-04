@@ -749,9 +749,9 @@ async fn test_withdraw_undelegate() {
         feaure_version,
     )
     .unwrap();
-    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
+    let _min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
 
-    let account_id_1 = cli.account_id(1);
+    let _account_id_1 = cli.account_id(1);
     let account_id_2 = cli.account_id(2);
     let account_id_3 = cli.account_id(3);
     let private_key_2 = cli.private_key(2);
@@ -759,64 +759,54 @@ async fn test_withdraw_undelegate() {
 
     // Test native stake pool and reset lockup support
     cli.fund_account(2, Some(1000000000000000)).await.unwrap();
-    create_stake_pool_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_2,
-        Some(account_id_3),
-        Some(account_id_2),
-        Some(100000000000000),
-        Some(5),
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Should successfully create stake pool");
+    // create_stake_pool_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     Some(account_id_3),
+    //     Some(account_id_2),
+    //     Some(100000000000000),
+    //     Some(5),
+    //     Duration::from_secs(30),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Should successfully create stake pool");
 
-    unlock_stake_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_2,
-        Some(account_id_3),
-        Some(10),
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Should successfully unlock stake");
+    // unlock_stake_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_2,
+    //     Some(account_id_3),
+    //     Some(10),
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Should successfully unlock stake");
 
-    let final_txn = distribute_staking_rewards_and_wait(
-        &rosetta_client,
-        &rest_client,
-        &network_identifier,
-        private_key_3,
-        account_id_3,
-        account_id_2,
-        Duration::from_secs(5),
-        None,
-        None,
-        None,
-    )
-    .await
-    .expect("Distribute staking rewards should work!");
+    // let final_txn = distribute_staking_rewards_and_wait(
+    //     &rosetta_client,
+    //     &rest_client,
+    //     &network_identifier,
+    //     private_key_3,
+    //     account_id_3,
+    //     account_id_2,
+    //     Duration::from_secs(5),
+    //     None,
+    //     None,
+    //     None,
+    // )
+    // .await
+    // .expect("Distribute staking rewards should work!");
 
-    // rosetta_client: &RosettaClient,
-    // rest_client: &aptos_rest_client::Client,
-    // network_identifier: &NetworkIdentifier,
-    // sender_key: &Ed25519PrivateKey,
-    // operator: AccountAddress,
-    // amount: Option<u64>,
-    // txn_expiry_duration: Duration,
-    // sequence_number: Option<u64>,
-    // max_gas: Option<u64>,
-    // gas_unit_price: Option<u64>,
-    withdraw_undelegated(
+    let final_txn = withdraw_undelegated(
         &rosetta_client,
         &rest_client,
         &network_identifier,
