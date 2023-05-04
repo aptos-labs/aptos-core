@@ -632,44 +632,38 @@ module veiled_coin::veiled_coin {
     ///
     /// The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
     ///  - $v$, the amount being transferred
-    ///  - $sk$, the sender's SK
-    ///  - $b$, the sender's new balance (after withdrawing $v$)
     ///  - $r$, ElGamal encryption randomness
     ///
     /// (Note that the Sigma protocol's zero-knowledge property ensures the witness is not revealed.)
     ///
-    /// The public statement $w$ in this relation consists of:
+    /// The public statement $x$ in this relation consists of:
+    ///  - $G$, the basepoint of a given elliptic curve
     ///  - $Y$, the sender's PK
     ///  - $Y'$, the recipient's PK
-    ///  - $(B_L, B_R)$, the sender's encrypted balance (before withdrawing $v$)
     ///  - $(C, D)$, the ElGamal encryption of $v$ under the sender's PK
     ///  - $(C', D)$, the ElGamal encryption of $v$ under the recipient's PK
     ///
     ///
-    /// The relation, at a high level, ensures that the sender withdrew $v$ from their encrypted balance $(B_L, B_R)$
-    /// and created two ciphertexts $(C, D)$ and $(C', D)$ encrypting $v$ under the sender's PK and recipient's PK, respectively.:
+    /// The relation, at a high level, and created two ciphertexts $(C, D)$ and $(C', D)$ 
+    /// encrypting $v$ under the sender's PK and recipient's PK, respectively.:
     ///
     /// ```
     /// R(
-    ///     x = [ Y, Y', (B_L, B_R), (C, C', D), G]
-    ///     w = [ sk, v, b, r ]
+    ///     x = [ Y, Y', (C, C', D), G]
+    ///     w = [ v, r ]
     /// ) = {
     ///     C = v * G + r * Y
     ///     C' = v * G + r * Y'
     ///     D = r * G
-    ///     B_L - C = b * G + sk * (B_R - D)
-    ///     Y = sk * G
     /// }
     /// ```
     ///
-    /// A relation similar to this is also described on page 14 of the Zether paper [BAZB20] (just replace $(B_L, B_R)$
-    /// -> $(C_L, C_R)$, $G$ -> $g$, $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $b$ -> $b'$, replace $v$ -> $b^*$).
+    /// A relation similar to this is also described on page 14 of the Zether paper [BAZB20] (just replace  $G$ -> $g$, $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$).
+    /// Note the equations C_L - C = b * G + sk * (C_R - D) and Y = sk * G in the Zether paper are enforced programmatically by    
+    /// this smart contract and so are not needed in our sigma protocol. 
     ///
     /// Specifically, this protocol proves that `withdraw_ct` and `deposit_ct` encrypt the same
     /// amount $v$ using the same randomness $r$, with `sender_pk` and `recipient_pk` respectively.
-    ///
-    /// It additionally proves that `sender_pk` was generated with the sender's secret key $sk$, and that `balance`
-    /// equals the correct updated value $b$ once `withdraw_ct` has been subtracted from it.
     fun sigma_protocol_verify<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
@@ -711,7 +705,7 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
-    /// Computes the challenge value as `c = H(g, y, \bar{y}, C_L, C_R, C, D, \bar{C}, X_1, X_2, X_3, X_4, X_5)`
+    /// Computes the challenge value as `c = H(g, y, \bar{y}, C, D, \bar{C}, X_1, X_3, X_4)`
     /// for the Sigma protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
     /// used above is from the Zether [BAZB20] paper.
     fun sigma_protocol_fiat_shamir<CoinType>(
