@@ -501,10 +501,7 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::TokenV1NFTMintAndTransferSequential),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::NbcuV1Mint), true);
     }
 
     #[test]
