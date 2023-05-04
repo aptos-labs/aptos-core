@@ -22,11 +22,8 @@ use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
 };
-use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    resolver::ResourceResolver,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
+use move_core_types::language_storage::{ModuleId, StructTag};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -237,8 +234,7 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let resolver = state_view.as_move_resolver();
-        let bytes = resolver
-            .get_resource(&address.into(), &resource_type)
+        let bytes = Self::resource_or_resource_group(&resolver, &address, &resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, address
@@ -275,6 +271,19 @@ impl StateApi {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
             },
         }
+    }
+
+    fn resource_or_resource_group(
+        resolver: &impl MoveResolverExt,
+        address: &Address,
+        resource_type: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let bytes = if resolver.is_resource_group(resource_type) {
+            resolver.get_resource_group_data(&address.into(), resource_type)?
+        } else {
+            resolver.get_resource(&address.into(), resource_type)?
+        };
+        Ok(bytes)
     }
 
     /// Retrieve the module
