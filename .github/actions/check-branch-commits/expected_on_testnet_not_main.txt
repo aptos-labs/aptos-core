@@ -3,4 +3,5 @@
 # hash should be on a new line, with a comment explaining why it is
 # not on the main branch.
 
-c9a622ec93871baf3a0a07b077f3a370dbef852e # Temporary override to revert faucet changes
+bc7c5aff1bbbc019cda8d248d58a4792c6c9b7aa # Confirmed to be ignored by @zekun
+88bb502c81fbdbb194a64be1e62a10703d6bfa36 # Confirmed to be ignored by @runtian-zhou
