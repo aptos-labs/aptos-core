@@ -10,7 +10,7 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
-use std::fmt;
+use std::{backtrace, fmt};
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
@@ -309,10 +309,15 @@ impl PartialVMError {
     }
 
     pub fn new(major_status: StatusCode) -> Self {
+        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            Some(format!("Invariant violation: {:?}", backtrace::Backtrace::force_capture()))
+        } else {
+            None
+        };
         Self(Box::new(PartialVMError_ {
             major_status,
             sub_status: None,
-            message: None,
+            message,
             exec_state: None,
             indices: vec![],
             offsets: vec![],
