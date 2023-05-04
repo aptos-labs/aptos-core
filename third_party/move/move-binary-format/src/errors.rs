@@ -310,7 +310,10 @@ impl PartialVMError {
 
     pub fn new(major_status: StatusCode) -> Self {
         let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
-            Some(format!("Invariant violation: {:?}", backtrace::Backtrace::force_capture()))
+            Some(format!(
+                "Invariant violation: {:?}",
+                backtrace::Backtrace::force_capture()
+            ))
         } else {
             None
         };

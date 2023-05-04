@@ -324,7 +324,12 @@ impl AptosVM {
             .map_err(|e| e.into_vm_status())?;
         let change_set_ext = user_txn_change_set_ext
             .squash(epilogue_change_set_ext)
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))?;
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Failed to squash writeset in txn".to_string()),
+                )
+            })?;
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
         let (write_set, events) = change_set.into_inner();
@@ -505,6 +510,7 @@ impl AptosVM {
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error =
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("MultiSig transaction error".to_string())
                 .finish(Location::Undefined);
         let provided_payload = if let Some(payload) = &txn_payload.transaction_payload {
             bcs::to_bytes(&payload).map_err(|_| invariant_violation_error.clone())?
@@ -534,6 +540,7 @@ impl AptosVM {
             // transaction.
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Multisig payload bytes return error".to_string())
                     .finish(Location::Undefined)
             })?;
         // We have to deserialize twice as the first time returns the actual return type of the
@@ -683,7 +690,12 @@ impl AptosVM {
         // Merge the inner function writeset with cleanup writeset.
         inner_function_change_set_ext
             .squash(cleanup_change_set_ext)
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Failed to squash writeset".to_string()),
+                )
+            })
     }
 
     fn failure_multisig_payload_cleanup<S: MoveResolverExt + StateView>(
@@ -702,6 +714,7 @@ impl AptosVM {
         // Serialization is not expected to fail so we're using invariant_violation error here.
         cleanup_args.push(bcs::to_bytes(&execution_error).map_err(|_| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("MultiSig payload cleanup error.".to_string())
                 .finish(Location::Undefined)
         })?);
         cleanup_session.execute_function_bypass_visibility(

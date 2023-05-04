@@ -167,9 +167,10 @@ where
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error_0 = || PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .finish(Location::Undefined);
-        let common_error = |_| common_error_0();
+        let common_error = || {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .finish(Location::Undefined)
+        };
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
@@ -180,33 +181,32 @@ where
             for (struct_tag, blob_op) in resources {
                 let resource_group = remote
                     .get_resource_group(&struct_tag)
-                    .map_err(common_error)?;
+                    .map_err(|_| common_error())?;
                 if let Some(resource_group) = resource_group {
                     resource_groups
                         .entry(resource_group)
                         .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
-                        .map_err(common_error)?;
+                        .map_err(|_| common_error())?;
                 } else {
                     change_set_filtered
                         .add_resource_op(addr, struct_tag, blob_op)
-                        .map_err(common_error)?;
+                        .map_err(|_| common_error())?;
                 }
             }
 
             for (name, blob_op) in modules {
                 change_set_filtered
                     .add_module_op(ModuleId::new(addr, name), blob_op)
-                    .map_err(common_error)?;
+                    .map_err(|_| common_error())?;
             }
 
             for (resource_tag, resources) in resource_groups {
                 let source_data = remote
                     .get_resource_group_data(&addr, &resource_tag)
-                    .map_err(common_error)?;
+                    .map_err(|_| common_error())?;
                 let (mut source_data, create) = if let Some(source_data) = source_data {
-                    let source_data =
-                        bcs::from_bytes(&source_data).map_err(common_error)?;
+                    let source_data = bcs::from_bytes(&source_data).map_err(|_| common_error())?;
                     (source_data, false)
                 } else {
                     (BTreeMap::new(), true)
@@ -215,20 +215,16 @@ where
                 for (struct_tag, current_op) in resources.into_resources() {
                     match current_op {
                         MoveStorageOp::Delete => {
-                            source_data
-                                .remove(&struct_tag)
-                                .ok_or_else(common_error)?;
+                            source_data.remove(&struct_tag).ok_or_else(common_error)?;
                         },
                         MoveStorageOp::Modify(new_data) => {
-                            let data = source_data
-                                .get_mut(&struct_tag)
-                                .ok_or_else(common_error)?;
+                            let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                             *data = new_data;
                         },
                         MoveStorageOp::New(data) => {
                             let data = source_data.insert(struct_tag, data);
                             if data.is_some() {
-                                return Err(common_error_0());
+                                return Err(common_error());
                             }
                         },
                     }
@@ -237,17 +233,13 @@ where
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(
-                        bcs::to_bytes(&source_data).map_err(common_error)?,
-                    )
+                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 } else {
-                    MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data).map_err(common_error)?,
-                    )
+                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
                 resource_group_change_set
                     .add_resource_op(addr, resource_tag, op)
-                    .map_err(common_error)?;
+                    .map_err(|_| common_error())?;
             }
         }
 
