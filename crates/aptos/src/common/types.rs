@@ -1672,6 +1672,23 @@ pub struct RotationProofChallenge {
     pub new_public_key: Vec<u8>,
 }
 
+#[derive(Debug, Parser)]
+/// This is used for both entry functions and scripts.
+pub struct ArgWithTypeVec {
+    /// Arguments combined with their type separated by spaces.
+    ///
+    /// Supported types [address, bool, hex, string, u8, u16, u32, u64, u128, u256, raw]
+    ///
+    /// Vectors may be specified using JSON array literal syntax (you may need to escape this with
+    /// quotes based on your shell interpreter)
+    ///
+    /// Example: `address:0x1 bool:true u8:0 u256:1234 "bool:[true, false]" 'address:[["0xace", "0xbee"], []]'`
+    ///
+    /// Vector is wrapped in a reusable struct for uniform CLI documentation.
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+}
+
 /// Common options for constructing an entry function transaction payload.
 #[derive(Debug, Parser)]
 pub struct EntryFunctionArguments {
@@ -1681,13 +1698,8 @@ pub struct EntryFunctionArguments {
     #[clap(long)]
     pub function_id: MemberId,
 
-    /// Arguments combined with their type separated by spaces.
-    ///
-    /// Supported types [u8, u16, u32, u64, u128, u256, bool, hex, string, address, raw, vector<inner_type>]
-    ///
-    /// Example: `address:0x1 bool:true u8:0 u256:1234 'vector<u32>:a,b,c,d'`
-    #[clap(long, multiple_values = true)]
-    pub args: Vec<ArgWithType>,
+    #[clap(flatten)]
+    pub(crate) arg_vec: ArgWithTypeVec,
 
     /// TypeTag arguments separated by spaces.
     ///
@@ -1700,6 +1712,7 @@ impl EntryFunctionArguments {
     /// Construct and return an entry function payload from function_id, args, and type_args.
     pub fn create_entry_function_payload(self) -> CliTypedResult<EntryFunction> {
         let args: Vec<Vec<u8>> = self
+            .arg_vec
             .args
             .into_iter()
             .map(|arg_with_type| arg_with_type.arg)
