@@ -27,6 +27,7 @@ mod accounts_pool_wrapper;
 pub mod args;
 mod batch_transfer;
 mod call_custom_modules;
+mod ecosystem_mints;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
@@ -42,7 +43,7 @@ use self::{
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     batch_transfer::BatchTransferTransactionGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator,
+    ecosystem_mints::NbcuV1MintTransactionGenerator, entry_points::EntryPointTransactionGenerator,
 };
 pub use publishing::module_simple::EntryPoints;
 
@@ -69,6 +70,9 @@ pub enum TransactionType {
     },
     BatchTransfer {
         batch_size: usize,
+    },
+    NbcuMint {
+        num_modules: usize,
     },
 }
 
@@ -271,6 +275,20 @@ pub async fn create_txn_generator_creator(
                         *batch_size,
                     ))
                 },
+                TransactionType::NbcuMint { num_modules } => Box::new(
+                    CustomModulesDelegationGeneratorCreator::new(
+                        txn_factory.clone(),
+                        init_txn_factory.clone(),
+                        source_accounts,
+                        txn_executor,
+                        *num_modules,
+                        "nbcu_v1",
+                        &mut NbcuV1MintTransactionGenerator {
+                            accounts_pool: accounts_pool.clone(),
+                        },
+                    )
+                    .await,
+                ),
             };
             txn_generator_creator_mix.push((txn_generator_creator, *weight));
         }

@@ -41,6 +41,9 @@ EXPECTED_TPS = {
     ("no-op5-signers", False, 1): (18600.0, True),
     ("token-v2-ambassador-mint", False, 1): (1750.0, True),
     ("token-v2-ambassador-mint", False, 20): (5380.0, True),
+
+    ("nbcu-v1-mint", False, 1): (1100.0, False),
+    ("nbcu-v1-mint", False, 20): (5000.0, False),
 }
 
 NOISE_LOWER_LIMIT = 0.8
