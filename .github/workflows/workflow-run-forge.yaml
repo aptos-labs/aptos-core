@@ -142,9 +142,7 @@ jobs:
 
       - name: "Setup GCloud project"
         shell: bash
-        run: |
-          gcloud container clusters get-credentials aptos-forge-0 --zone us-central1-c --project aptos-forge-gcp-0
-          gcloud config set project aptos-forge-gcp-0
+        run: gcloud config set project aptos-forge-gcp-0
 
       - name: Run pre-Forge checks
         shell: bash
