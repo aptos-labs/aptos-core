@@ -713,6 +713,179 @@ async fn test_transfer() {
     */
 }
 
+#[tokio::test]
+async fn test_withdraw_undelegate() {
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
+    let chain_id = swarm.chain_id();
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let network_identifier = chain_id.into();
+    // Mapping of account to block and balance mappings
+    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, i128>>::new();
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
+            break;
+        }
+    }
+
+    // Get minimum gas price
+    let gas_schedule: GasScheduleV2 = rest_client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::gas_schedule::GasScheduleV2")
+        .await
+        .unwrap()
+        .into_inner();
+    let feaure_version = gas_schedule.feature_version;
+    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
+        &gas_schedule.to_btree_map(),
+        feaure_version,
+    )
+    .unwrap();
+    let min_gas_price = u64::from(gas_params.txn.min_price_per_gas_unit);
+
+    let account_id_1 = cli.account_id(1);
+    let account_id_2 = cli.account_id(2);
+    let account_id_3 = cli.account_id(3);
+    let private_key_2 = cli.private_key(2);
+    let private_key_3 = cli.private_key(3);
+
+    // Test native stake pool and reset lockup support
+    cli.fund_account(2, Some(1000000000000000)).await.unwrap();
+    create_stake_pool_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Some(account_id_2),
+        Some(100000000000000),
+        Some(5),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully create stake pool");
+
+    unlock_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        Some(account_id_3),
+        Some(10),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully unlock stake");
+
+    let final_txn = distribute_staking_rewards_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        account_id_2,
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Distribute staking rewards should work!");
+
+    // rosetta_client: &RosettaClient,
+    // rest_client: &aptos_rest_client::Client,
+    // network_identifier: &NetworkIdentifier,
+    // sender_key: &Ed25519PrivateKey,
+    // operator: AccountAddress,
+    // amount: Option<u64>,
+    // txn_expiry_duration: Duration,
+    // sequence_number: Option<u64>,
+    // max_gas: Option<u64>,
+    // gas_unit_price: Option<u64>,
+    withdraw_undelegated(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_3,
+        Some(1337),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully withdraw undelegated");
+
+    let final_block_to_check = rest_client
+        .get_block_by_version(final_txn.info.version.0, false)
+        .await
+        .expect("Should be able to get block info for completed txns");
+
+    // Check a couple blocks past the final transaction to check more txns
+    let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
+
+    // TODO: Track total supply?
+    // TODO: Check account balance block hashes?
+    // TODO: Handle multiple coin types
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= final_block_height {
+            break;
+        }
+    }
+
+    // Now we have to watch all the changes
+    let mut current_version = 0;
+    let mut previous_block_index = 0;
+    for block_height in 0..final_block_height {
+        let request = BlockRequest::by_index(chain_id, block_height);
+        let response: BlockResponse = rosetta_client
+            .block(&request)
+            .await
+            .expect("Should be able to get blocks that are already known");
+        let block = response.block;
+
+        let actual_block = rest_client
+            .get_block_by_height_bcs(block_height, true)
+            .await
+            .expect("Should be able to get block for a known block")
+            .into_inner();
+
+
+        let actual_txns = actual_block
+            .transactions
+            .as_ref()
+            .expect("Every actual block should have transactions");
+        parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
+
+        // Keep track of the previous
+        previous_block_index = block_height;
+    }
+
+}
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since
 /// it's block based and it needs time to run, we do all the checks in a single test.
 #[tokio::test]
@@ -2374,6 +2547,38 @@ async fn unlock_stake_and_wait(
     let expiry_time = expiry_time(txn_expiry_duration);
     let txn_hash = rosetta_client
         .unlock_stake(
+            network_identifier,
+            sender_key,
+            operator,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn withdraw_undelegated(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    operator: AccountAddress,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .withdraw_undelegated(
             network_identifier,
             sender_key,
             operator,

@@ -387,7 +387,7 @@ impl RosettaClient {
         .await
     }
 
-    pub async fn withdraw_delegate(
+    pub async fn withdraw_undelegated(
         &self,
         network_identifier: &NetworkIdentifier,
         private_key: &Ed25519PrivateKey,
@@ -409,11 +409,11 @@ impl RosettaClient {
         // owner: AccountAddress,
         // operator: Option<AccountIdentifier>,
         // amount: Option<u64>,
-        let operations = vec![Operation::withdraw_delegate(
+        let operations = vec![Operation::withdraw_undelegated(
             0,
             None,
             sender,
-            AccountIdentifier::base_account(operator),
+            Some(AccountIdentifier::base_account(operator)),
             amount,
         )];
 
