@@ -136,7 +136,8 @@ module aptos_std::bulletproofs {
 
     #[test_only]
     /// Computes a range proof for the ElGamal encryption of `val` with randomness `r`, under the default Ristretto255
-    /// basepoint and provided ElGamal public key `pubkey`. Returns both the range proof and the encryption.
+    /// basepoint and provided ElGamal public key `pubkey` as if calling `elgamal::new_ciphertext_with_basepoint`.
+    /// Returns both the range proof and the encryption.
     /// Only works for `num_bits` \in {8, 16, 32, 64}.
     public fun prove_range_elgamal(val: &Scalar, r: &Scalar, pubkey: &elgamal::CompressedPubkey, num_bits: u64, dst: vector<u8>): (RangeProof, elgamal::Ciphertext) {
         let compressed_pubkey_point = elgamal::pubkey_to_compressed_point(pubkey);
