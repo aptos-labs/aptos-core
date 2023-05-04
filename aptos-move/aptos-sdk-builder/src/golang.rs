@@ -468,35 +468,73 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
         for (index, arg) in abi.args().iter().enumerate() {
             let decoding = match Self::bcs_primitive_type_name(arg.type_tag()) {
                 None => {
-                    let quoted_type = Self::quote_type(arg.type_tag());
-                    let splits: Vec<_> = quoted_type.rsplitn(2, '.').collect();
-                    let (left, right) = if splits.len() == 2 {
-                        (splits[1], splits[0])
+                    let type_tag_str = format!("{}", (arg.type_tag()));
+                    if "vector<0x1::string::String>".eq(&type_tag_str) {
+                        format!(
+                            "bcs.NewDeserializer(script.Value.Args[{}]).DeserializeVecBytes()",
+                            index,
+                        )
                     } else {
-                        (splits[0], "")
-                    };
-                    format!(
-                        "{}.BcsDeserialize{}(script.Value.Args[{}])",
-                        left, right, index
-                    )
+                        let quoted_type = Self::quote_type(arg.type_tag());
+                        let splits: Vec<_> = quoted_type.rsplitn(2, '.').collect();
+                        let (left, right) = if splits.len() == 2 {
+                            (splits[1], splits[0])
+                        } else {
+                            (splits[0], "")
+                        };
+                        format!(
+                            "{}.BcsDeserialize{}(script.Value.Args[{}])",
+                            left, right, index,
+                        )
+                    }
                 },
-                Some(type_name) => format!(
-                    "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
-                    index, type_name
-                ),
+                Some(type_name) => match type_name {
+                    "VecAddress" => format!(
+                        r#"
+var val {0}
+if err := deserializer.IncreaseContainerDepth(); err != nil {{
+    return ({0})(val), err
+}}
+length, err := deserializer.DeserializeI8()
+if err != nil {{
+    return nil, err
+}}
+var tmp {0}
+for i := 0; i < int(length); i++ {{
+    if obj, err := deserialize_array32_u8_array(deserializer); err == nil {{
+        tmp = obj
+    }} else {{
+        return (({0})(val)), err
+    }}
+    val = append(val, tmp)
+}}
+
+deserializer.DecreaseContainerDepth()
+call.{1} = val
+"#,
+                        Self::quote_type(arg.type_tag()),
+                        arg.name().to_camel_case()
+                    ),
+                    _ => format!(
+                        "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
+                        index, type_name
+                    ),
+                },
             };
-            writeln!(
-                self.out,
-                r#"
+            if Self::bcs_primitive_type_name(arg.type_tag()) != Some("VecAddress") {
+                writeln!(
+                    self.out,
+                    r#"
 if val, err := {}; err == nil {{
 	call.{} = val
 }} else {{
 	return nil, err
 }}
 "#,
-                decoding,
-                arg.name().to_camel_case(),
-            )?;
+                    decoding,
+                    arg.name().to_camel_case(),
+                )?;
+            }
         }
         writeln!(self.out, "return &call, nil")?;
         self.out.unindent();
@@ -559,22 +597,42 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
 
     fn output_encoding_helper(&mut self, type_tag: &TypeTag) -> Result<()> {
         let encoding = match Self::bcs_primitive_type_name(type_tag) {
-            None => r#"
+            None => {
+                if "vecstring".eq(&common::mangle_type(type_tag)) {
+                    "return encode_vecbytes_argument(arg)".to_string()
+                } else {
+                    format!(
+                        r#"
     if val, err := arg.BcsSerialize(); err == nil {{
         return val;
     }}
-    "#
-            .into(),
-            Some(type_name) => {
-                format!(
+    panic("Unable to serialize argument of type {}");
+    "#,
+                        common::mangle_type(type_tag)
+                    )
+                }
+            },
+            Some(type_name) => match type_name {
+                "VecAddress" => r#"
+    obj := []byte{ }
+	obj = append(obj, byte(len(arg)))
+	for _, val := range arg {{
+		valBytes := encode_address_argument(val)
+		obj = append(obj, valBytes...)
+	}}
+	return obj"#
+                    .into(),
+                _ => format!(
                     r#"
     s := bcs.NewSerializer();
     if err := s.Serialize{}(arg); err == nil {{
         return s.GetBytes();
     }}
+    panic("Unable to serialize argument of type {}");
     "#,
-                    type_name
-                )
+                    type_name,
+                    common::mangle_type(type_tag)
+                ),
             },
         };
         writeln!(
@@ -582,13 +640,11 @@ var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) 
             r#"
 func encode_{}_argument(arg {}) []byte {{
     {}
-    panic("Unable to serialize argument of type {}");
 }}
 "#,
             common::mangle_type(type_tag),
             Self::quote_type(type_tag),
-            encoding,
-            common::mangle_type(type_tag)
+            encoding
         )
     }
 
@@ -791,6 +847,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                     U8 => Some("VecBytes"),
                     type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
                 },
+                Address => Some("VecAddress"),
                 type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
             },
             Struct(struct_tag) => match struct_tag {

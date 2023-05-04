@@ -1,25 +1,24 @@
-/**
- * This is the general Voting module that can be used as part of a DAO Governance. Voting is designed to be used by
- * standalone governance modules, who has full control over the voting flow and is responsible for voting power
- * calculation and including proper capabilities when creating the proposal so resolution can go through.
- * On-chain governance of the Aptos network also uses Voting.
- *
- * The voting flow:
- * 1. The Voting module can be deployed at a known address (e.g. 0x1 for Aptos on-chain governance)
- * 2. The governance module, e.g. AptosGovernance, can be deployed later and define a GovernanceProposal resource type
- * that can also contain other information such as Capability resource for authorization.
- * 3. The governance module's owner can then register the ProposalType with Voting. This also hosts the proposal list
- * (forum) on the calling account.
- * 4. A proposer, through the governance module, can call Voting::create_proposal to create a proposal. create_proposal
- * cannot be called directly not through the governance module. A script hash of the resolution script that can later
- * be called to execute the proposal is required.
- * 5. A voter, through the governance module, can call Voting::vote on a proposal. vote requires passing a &ProposalType
- * and thus only the governance module that registers ProposalType can call vote.
- * 6. Once the proposal's expiration time has passed and more than the defined threshold has voted yes on the proposal,
- * anyone can call resolve which returns the content of the proposal (of type ProposalType) that can be used to execute.
- * 7. Only the resolution script with the same script hash specified in the proposal can call Voting::resolve as part of
- * the resolution process.
- */
+///
+/// This is the general Voting module that can be used as part of a DAO Governance. Voting is designed to be used by
+/// standalone governance modules, who has full control over the voting flow and is responsible for voting power
+/// calculation and including proper capabilities when creating the proposal so resolution can go through.
+/// On-chain governance of the Aptos network also uses Voting.
+///
+/// The voting flow:
+/// 1. The Voting module can be deployed at a known address (e.g. 0x1 for Aptos on-chain governance)
+/// 2. The governance module, e.g. AptosGovernance, can be deployed later and define a GovernanceProposal resource type
+/// that can also contain other information such as Capability resource for authorization.
+/// 3. The governance module's owner can then register the ProposalType with Voting. This also hosts the proposal list
+/// (forum) on the calling account.
+/// 4. A proposer, through the governance module, can call Voting::create_proposal to create a proposal. create_proposal
+/// cannot be called directly not through the governance module. A script hash of the resolution script that can later
+/// be called to execute the proposal is required.
+/// 5. A voter, through the governance module, can call Voting::vote on a proposal. vote requires passing a &ProposalType
+/// and thus only the governance module that registers ProposalType can call vote.
+/// 6. Once the proposal's expiration time has passed and more than the defined threshold has voted yes on the proposal,
+/// anyone can call resolve which returns the content of the proposal (of type ProposalType) that can be used to execute.
+/// 7. Only the resolution script with the same script hash specified in the proposal can call Voting::resolve as part of
+/// the resolution process.
 module aptos_framework::voting {
     use std::bcs::to_bytes;
     use std::error;
@@ -488,6 +487,13 @@ module aptos_framework::voting {
     }
 
     #[view]
+    /// Return the next unassigned proposal id
+    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address,): u64 acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        voting_forum.next_proposal_id
+    }
+
+    #[view]
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow(&voting_forum.proposals, proposal_id);
@@ -532,13 +538,24 @@ module aptos_framework::voting {
     }
 
     #[view]
+    /// Return the proposal's creation time.
+    public fun get_proposal_creation_secs<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64 acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.creation_time_secs
+    }
+
+    #[view]
     /// Return the proposal's expiration time.
     public fun get_proposal_expiration_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.expiration_secs
     }
 
@@ -548,9 +565,42 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): vector<u8> acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.execution_hash
+    }
+
+    #[view]
+    /// Return the proposal's minimum vote threshold
+    public fun get_min_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u128 acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.min_vote_threshold
+    }
+
+    #[view]
+    /// Return the proposal's early resolution minimum vote threshold (optionally set)
+    public fun get_early_resolution_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): Option<u128> acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.early_resolution_vote_threshold
+    }
+
+    #[view]
+    /// Return the proposal's current vote count (yes_votes, no_votes)
+    public fun get_votes<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): (u128, u128) acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        (proposal.yes_votes, proposal.no_votes)
     }
 
     #[view]
@@ -559,8 +609,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.is_resolved
     }
 
@@ -570,8 +620,8 @@ module aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): bool acquires VotingForum {
-        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
-        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         let is_multi_step_in_execution_key = utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         assert!(simple_map::contains_key(&proposal.metadata, &is_multi_step_in_execution_key), error::invalid_argument(EPROPOSAL_IS_SINGLE_STEP));
         from_bcs::to_bool(*simple_map::borrow(&proposal.metadata, &is_multi_step_in_execution_key))

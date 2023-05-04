@@ -9,8 +9,9 @@ use aptos_retrier::ExponentWithLimitDelay;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 use kube::{
-    api::{Api, Meta, Patch, PatchParams},
+    api::{Api, Patch, PatchParams},
     client::Client as K8sClient,
+    ResourceExt,
 };
 use serde_json::{json, Value};
 use std::{process::Command, sync::Arc, time::Duration};

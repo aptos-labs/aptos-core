@@ -663,7 +663,9 @@ $ aptos key generate --key-type ed25519 --output-file output.key
 }
 ```
 
-If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address.
+### Generating a vanity prefix key
+
+If you are generating an `ed25519` key, you can optionally supply a vanity prefix for the corresponding account address:
 
 ```bash
 $ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
@@ -676,8 +678,37 @@ $ aptos key generate --output-file starts_with_ace.key --vanity-prefix 0xace
 }
 ```
 
+This works for multisig accounts too:
+
+```bash
+% aptos key generate --output-file starts_with_bee.key --vanity-prefix 0xbee --vanity-multisig
+{
+  "Result": {
+    "PrivateKey Path": "starts_with_bee.key",
+    "PublicKey Path": "starts_with_bee.key.pub",
+    "Account Address:": "0x384cf987aab625f9727684d4dda8de668abedc18aa8dceabd7651a1cfb69196f",
+    "Multisig Account Address:": "0xbee0797c577428249125f6ed7f4a2a5939ddc34389294bd9f5d1627508832f56"
+  }
+}
+```
+
+Note the vanity flag documentation from the `aptos key generate` help:
+
+```
+--vanity-multisig
+    Use this flag when vanity prefix is for a multisig account. This mines a private key for
+    a single signer account that can, as its first transaction, create a multisig account
+    with the given vanity prefix
+
+--vanity-prefix <VANITY_PREFIX>
+    Vanity prefix that resultant account address should start with, e.g. 0xaceface or d00d.
+    Each additional character multiplies by a factor of 16 the computational difficulty
+    associated with generating an address, so try out shorter prefixes first and be prepared
+    to wait for longer ones
+```
+
 :::tip
-The more characters you specify, the longer it will take to generate a vanity account.
+If you want even faster vanity address generation for long prefixes, try out the parallelism-optimized [`optivanity`](https://github.com/econia-labs/optivanity) tool from [Econia Labs](https://www.econialabs.com/)
 :::
 
 ### Generating a peer config
@@ -718,6 +749,54 @@ The `peer_config.yaml` file will be created in your current working directory, w
 ## Move Examples
 
 Move examples can be found in the [Move section](../../move/move-on-aptos/cli).
+
+You can also pass multi-nested vector arguments, like in the `cli_args` example from [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples):
+
+:::tip
+To pass vectors (including nested vectors) as arguments, use JSON syntax escaped with quotes!
+:::
+
+```zsh
+aptos move run \
+    --function-id <deployer_address>::cli_args::set_vals \
+    --private-key-file <your-key-file> \
+    --args \
+        u8:123 \
+        "bool:[false, true, false, false]" \
+        'address:[["0xace", "0xbee"], ["0xcad"], ["0xdee"], []]'
+```
+
+Then you can call the view function to see your arguments persisted on-chain!
+
+```zsh
+aptos move view \
+    --function-id <deployer_address>::cli_args::reveal \
+    --args address:<deployer_address>
+{
+  "Result": [
+    123,
+    [
+      false,
+      true,
+      false,
+      false
+    ],
+    [
+      [
+        "0xace",
+        "0xbee"
+      ],
+      [
+        "0xcad"
+      ],
+      [
+        "0xdee"
+      ],
+      []
+    ]
+  ]
+}
+```
 
 ## Node command examples
 

@@ -25,6 +25,7 @@ pub enum FeatureFlag {
     STRUCT_CONSTRUCTORS = 15,
     PERIODICAL_REWARD_RATE_DECREASE = 16,
     PARTIAL_GOVERNANCE_VOTING = 17,
+    SIGNATURE_CHECKER_V2 = 18,
 }
 
 /// Representation of features on chain as a bitset.
@@ -37,7 +38,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000, 0b00100000],
+            features: vec![0b00100000, 0b00100000, 0b00000100],
         }
     }
 }

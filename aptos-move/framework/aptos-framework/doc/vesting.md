@@ -4,6 +4,41 @@
 # Module `0x1::vesting`
 
 
+Simple vesting contract that allows specifying how much APT coins should be vesting in each fixed-size period. The
+vesting contract also comes with staking and allows shareholders to withdraw rewards anytime.
+
+Vesting schedule is represented as a vector of distributions. For example, a vesting schedule of
+[3/48, 3/48, 1/48] means that after the vesting starts:
+1. The first and second periods will vest 3/48 of the total original grant.
+2. The third period will vest 1/48.
+3. All subsequent periods will also vest 1/48 (last distribution in the schedule) until the original grant runs out.
+
+Shareholder flow:
+1. Admin calls create_vesting_contract with a schedule of [3/48, 3/48, 1/48] with a vesting cliff of 1 year and
+vesting period of 1 month.
+2. After a month, a shareholder calls unlock_rewards to request rewards. They can also call vest() which would also
+unlocks rewards but since the 1 year cliff has not passed (vesting has not started), vest() would not release any of
+the original grant.
+3. After the unlocked rewards become fully withdrawable (as it's subject to staking lockup), shareholders can call
+distribute() to send all withdrawable funds to all shareholders based on the original grant's shares structure.
+4. After 1 year and 1 month, the vesting schedule now starts. Shareholders call vest() to unlock vested coins. vest()
+checks the schedule and unlocks 3/48 of the original grant in addition to any accumulated rewards since last
+unlock_rewards(). Once the unlocked coins become withdrawable, shareholders can call distribute().
+5. Assuming the shareholders forgot to call vest() for 2 months, when they call vest() again, they will unlock vested
+tokens for the next period since last vest. This would be for the first month they missed. They can call vest() a
+second time to unlock for the second month they missed.
+
+Admin flow:
+1. After creating the vesting contract, admin cannot change the vesting schedule.
+2. Admin can call update_voter, update_operator, or reset_lockup at any time to update the underlying staking
+contract.
+3. Admin can also call update_beneficiary for any shareholder. This would send all distributions (rewards, vested
+coins) of that shareholder to the beneficiary account. By defalt, if a beneficiary is not set, the distributions are
+send directly to the shareholder account.
+4. Admin can call terminate_vesting_contract to terminate the vesting. This would first finish any distribution but
+will prevent any further rewards or vesting distributions from being created. Once the locked up stake becomes
+withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting contract's withdrawal address.
+
 
 -  [Struct `VestingSchedule`](#0x1_vesting_VestingSchedule)
 -  [Struct `StakingInfo`](#0x1_vesting_StakingInfo)
@@ -2475,6 +2510,8 @@ staking_contract and stake modules.
 
 ## Function `create_vesting_contract_account`
 
+Create a salt for generating the resource accounts that will be holding the VestingContract.
+This address should be deterministic for the same admin and vesting contract creation nonce.
 
 
 <pre><code><b>fun</b> <a href="vesting.md#0x1_vesting_create_vesting_contract_account">create_vesting_contract_account</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): (<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="account.md#0x1_account_SignerCapability">account::SignerCapability</a>)

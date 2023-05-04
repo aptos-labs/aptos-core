@@ -61,59 +61,63 @@ pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger sp
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
-    // Maximum backoff delay for connecting outbound to peers
+    /// Maximum backoff delay for connecting outbound to peers
     pub max_connection_delay_ms: u64,
-    // Base for outbound connection backoff
+    /// Base for outbound connection backoff
     pub connection_backoff_base: u64,
-    // Rate to check connectivity to connected peers
+    /// Rate to check connectivity to connected peers
     pub connectivity_check_interval_ms: u64,
-    // Size of all network channels
+    /// Size of all network channels
     pub network_channel_size: usize,
-    // Maximum number of concurrent network requests
+    /// Maximum number of concurrent network requests
     pub max_concurrent_network_reqs: usize,
-    // Choose a protocol to discover and dial out to other peers on this network.
-    // `DiscoveryMethod::None` disables discovery and dialing out (unless you have
-    // seed peers configured).
+    /// Choose a protocol to discover and dial out to other peers on this network.
+    /// `DiscoveryMethod::None` disables discovery and dialing out (unless you have
+    /// seed peers configured).
     pub discovery_method: DiscoveryMethod,
+    /// Same as `discovery_method` but allows for multiple
     pub discovery_methods: Vec<DiscoveryMethod>,
+    /// Identity of this network
     pub identity: Identity,
     // TODO: Add support for multiple listen/advertised addresses in config.
-    // The address that this node is listening on for new connections.
+    /// The address that this node is listening on for new connections.
     pub listen_address: NetworkAddress,
-    // Select this to enforce that both peers should authenticate each other, otherwise
-    // authentication only occurs for outgoing connections.
+    /// Select this to enforce that both peers should authenticate each other, otherwise
+    /// authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
+    /// ID of the network to differentiate between networks
     pub network_id: NetworkId,
+    /// Number of threads to run for networking
     pub runtime_threads: Option<usize>,
     pub inbound_rx_buffer_size_bytes: Option<u32>,
     pub inbound_tx_buffer_size_bytes: Option<u32>,
     pub outbound_rx_buffer_size_bytes: Option<u32>,
     pub outbound_tx_buffer_size_bytes: Option<u32>,
-    // Addresses of initial peers to connect to. In a mutual_authentication network,
-    // we will extract the public keys from these addresses to set our initial
-    // trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
+    /// Addresses of initial peers to connect to. In a mutual_authentication network,
+    /// we will extract the public keys from these addresses to set our initial
+    /// trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
     pub seed_addrs: HashMap<PeerId, Vec<NetworkAddress>>,
-    // The initial peers to connect to prior to onchain discovery
+    /// The initial peers to connect to prior to onchain discovery
     pub seeds: PeerSet,
-    // The maximum size of an inbound or outbound request frame
+    /// The maximum size of an inbound or outbound request frame
     pub max_frame_size: usize,
-    // Enables proxy protocol on incoming connections to get original source addresses
+    /// Enables proxy protocol on incoming connections to get original source addresses
     pub enable_proxy_protocol: bool,
-    // Interval to send healthcheck pings to peers
+    /// Interval to send healthcheck pings to peers
     pub ping_interval_ms: u64,
-    // Timeout until a healthcheck ping is rejected
+    /// Timeout until a healthcheck ping is rejected
     pub ping_timeout_ms: u64,
-    // Number of failed healthcheck pings until a peer is marked unhealthy
+    /// Number of failed healthcheck pings until a peer is marked unhealthy
     pub ping_failures_tolerated: u64,
-    // Maximum number of outbound connections, limited by ConnectivityManager
+    /// Maximum number of outbound connections, limited by ConnectivityManager
     pub max_outbound_connections: usize,
-    // Maximum number of outbound connections, limited by PeerManager
+    /// Maximum number of outbound connections, limited by PeerManager
     pub max_inbound_connections: usize,
-    // Inbound rate limiting configuration, if not specified, no rate limiting
+    /// Inbound rate limiting configuration, if not specified, no rate limiting
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
-    // Outbound rate limiting configuration, if not specified, no rate limiting
+    /// Outbound rate limiting configuration, if not specified, no rate limiting
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
-    // The maximum size of an inbound or outbound message (it may be divided into multiple frame)
+    /// The maximum size of an inbound or outbound message (it may be divided into multiple frame)
     pub max_message_size: usize,
 }
 

@@ -55,12 +55,12 @@ const RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS: u64 = 1000;
 // the server will not fetch more data from the cache and file store until the channel is not full.
 const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
 
-pub struct RawDataServer {
+pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub server_config: IndexerGrpcConfig,
 }
 
-impl RawDataServer {
+impl RawDataServerWrapper {
     pub fn new(config: IndexerGrpcConfig) -> Self {
         Self {
             redis_client: Arc::new(
@@ -82,9 +82,9 @@ enum TransactionsDataStatus {
     DataGap,
 }
 
-/// RawDataServer handles the get transactions requests from cache and file store.
+/// RawDataServerWrapper handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
-impl RawData for RawDataServer {
+impl RawData for RawDataServerWrapper {
     type GetTransactionsStream = ResponseStream;
 
     /// GetTransactionsStream is a streaming GRPC endpoint:
@@ -333,7 +333,11 @@ fn get_transactions_response_builder(
         chain_id: Some(chain_id as u64),
         transactions: data
             .into_iter()
-            .map(|(encoded, _)| Transaction::decode(encoded.as_bytes()).unwrap())
+            .map(|(encoded, _)| {
+                let decoded_transaction = base64::decode(encoded).unwrap();
+                let transaction = Transaction::decode(&*decoded_transaction);
+                transaction.unwrap()
+            })
             .collect(),
     }
 }

@@ -129,10 +129,10 @@ const Content = ({ branch, page }: ContentProps) => {
       const response = await fetch(page_path);
       const raw_content = await response.text();
 
-      const regex_major = /href="(.*(\/.*\/doc\/))?(.*\.md.*)"/g;
-      const regex_local = /href="([a-zA-Z_-]+\.md)/g;
-      const regex_minor = /page=([a-zA-Z_-]+\.md)/g;
-      const regex_markdown = /\(([a-zA-Z_-]+\.md.*)\)/g;
+      const regex_major = /href="([\w\-\/]*(\/[\w\-]+\/doc\/))?([\w\-]+.md.*)"/g;
+      const regex_local = /href="([\w\-]+\.md)/g;
+      const regex_minor = /page=([\w\-]+\.md)/g;
+      const regex_markdown = /\(([\w\-]+\.md.*)\)/g;
       let redirected = raw_content.replaceAll(regex_major, `href="${url_root}?branch=${branch}&page=$2$3"`);
       redirected = redirected.replaceAll(regex_local, `href="/reference/move?branch=${branch}&page=$1`);
       redirected = redirected.replaceAll(regex_minor, `branch=${branch}&page=${page_root}/$1`);
