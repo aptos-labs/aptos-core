@@ -3145,6 +3145,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
  "lru 0.7.8",
  "move-binary-format",
