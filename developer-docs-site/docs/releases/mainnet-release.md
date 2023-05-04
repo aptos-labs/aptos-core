@@ -15,13 +15,13 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos SDK
 
-Aptos SDK Release v1.7.2
+Aptos SDK Release v1.8.5
 
 ## Aptos CLI
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.12](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.12)| `aptos-cli-v1.0.12` | `36c557a2258d67f46f5c8d8500a07956f9e62ccc` |
+|[Aptos CLI Release v1.0.13](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.13)| `aptos-cli-v1.0.13` | `7f864d4af722bf538f1a904e321130a261e92b3a` |
 
 ## Aptos Node
 

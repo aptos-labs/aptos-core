@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType},
+    config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
 use aptos_types::chain_id::ChainId;
@@ -286,10 +286,9 @@ impl StorageConfig {
 }
 
 impl ConfigSanitizer for StorageConfig {
-    /// Validate and process the storage config according to the given node role and chain ID
     fn sanitize(
         _node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         Ok(()) // TODO: add validation of higher-level properties once we have variable configs

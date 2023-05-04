@@ -45,7 +45,7 @@ impl NamedChain {
         match chain_id {
             1 => Ok(NamedChain::MAINNET),
             2 => Ok(NamedChain::TESTNET),
-            3 => Ok(NamedChain::DEVNET),
+            3 => Ok(NamedChain::DEVNET), // TODO: this is not correct and should removed. The devnet chain ID changes.
             4 => Ok(NamedChain::TESTING),
             5 => Ok(NamedChain::PREMAINNET),
             _ => Err(format!("Not a named chain. Given ID: {:?}", chain_id)),
@@ -77,11 +77,6 @@ impl FromStr for NamedChain {
 pub struct ChainId(u8);
 
 impl ChainId {
-    /// Returns true iff the chain ID matches devnet
-    pub fn is_devnet(&self) -> bool {
-        self.matches_named_chain(NamedChain::DEVNET)
-    }
-
     /// Returns true iff the chain ID matches testnet
     pub fn is_testnet(&self) -> bool {
         self.matches_named_chain(NamedChain::TESTNET)
