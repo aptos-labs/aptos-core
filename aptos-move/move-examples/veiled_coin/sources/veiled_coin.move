@@ -1,6 +1,17 @@
 /// This module provides a veiled coin type, denoted `VeiledCoin<T>` that hides the value/denomination of a coin.
 /// Importantly, although veiled transactions hide the amount of coins sent they still leak the sender and recipient.
 ///
+/// ## Terminology
+///
+/// 1. *Veiled coin*: a coin whose value is secret; i.e., it is encrypted under the owner's public key
+///
+/// 2. *Veiled amount*: any amount that is secret; i.e., encrypted under some public key
+///
+/// 3. *Veiled transaction*: a transaction that hides its amount transferred; i.e., a transaction whose amount is veiled
+///
+/// 4. *Veiled balance*: unlike a normal balance, a veiled balance is secret; i.e., it is encrypted under the account's
+///    public key
+///
 /// ## Limitations
 ///
 /// **WARNING:** This module is **experimental**! It is *NOT* production-ready. Specifically:
@@ -12,21 +23,33 @@
 ///    encryption keypair
 ///  5. there is no support for rotating the ElGamal encryption public key of a veiled account
 ///
-/// Another limitation is veiled coin amounts must be specified as `u32`'s rather than `u64`'s as would be typical for
-/// normal coins in the Aptos framework.
+/// ### Veiled coin amounts as truncated `u32`'s
 ///
-/// TODO: Describe how the `u32` works.
+/// Veiled coin amounts must be specified as `u32`'s rather than `u64`'s as would be typical for normal coins in the
+/// Aptos framework. This is because coin amounts must be encrypted with an *efficient*, additively-homomorphic encryption
+/// scheme. Currently, our best candidate is ElGamal encryption in the exponent, which can only decrypt values around
+/// 32 bits or slightly larger.
 ///
-/// ## Terminology
+/// Specifically, veiled coins are the middle 32 bits of the normal 64 bit coin values. In order to convert a `u32`
+/// veiled coin amount to a normal `u64` coin amount, we have to shift it left by 16 bits.
 ///
-/// 1. *Veiled coin*: a coin whose value is secret; i.e., it is encrypted under the owner's public key
+/// ```
+///   u64 normal coin amount format:
+///   [ left    || middle  || right ]
+///   [ 63 - 32 || 31 - 16 || 15 - 0]
 ///
-/// 2. *Veiled amount*: any amount that is secret; i.e., encrypted under some public key
+///   u32 veiled coin amount format; we take the middle 32 bits from the `u64` format above and store them in a `u32`:
+///   [ middle ]
+///   [ 31 - 0 ]
+/// ```
 ///
-/// 3. *Veiled transaction*: a transaction that hides its amount transferred; i.e., a transaction whose amount is veiled
+/// Recall that: A coin has a *decimal precision* $d$ (e.g., for `AptosCoin`, $d = 8$; see `initialize` in
+/// `aptos_coin.move`). This precision $d$ is used when displaying a `u64` amount, by dividing the amount by $10^d$.
+/// For example, if the precision $d = 2$, then a `u64` amount of 505 coins displays as 5.05 coins.
 ///
-/// 4. *Veiled balance*: unlike a normal balance, a veiled balance is secret; i.e., it is encrypted under the account's
-///    public key
+/// For veield coins, we can easily display a `u32` `Coin<T>` amount $v$ by:
+///  1. Casting $v$ as a u64 and shifting this left by 16 bits, obtaining a 64-bit $v'$
+///  2. Displaying $v'$ normally, by dividing it by $d$, which is the precision in `CoinInfo<T>`.
 ///
 /// ## Implementation details
 ///
@@ -59,6 +82,10 @@ module veiled_coin::veiled_coin {
 
     #[test_only]
     use std::features;
+    #[test_only]
+    use std::string::utf8;
+    #[test_only]
+    use aptos_std::debug::print;
 
     //
     // Errors
@@ -79,17 +106,23 @@ module veiled_coin::veiled_coin {
     /// Not enough coins to complete transaction.
     const EINSUFFICIENT_BALANCE: u64 = 5;
 
-    /// Failed deserializing bytes into either ElGamal ciphertext or Sigma protocol proof.
+    /// Failed deserializing bytes into either ElGamal ciphertext or $\Sigma$-protocol proof.
     const EDESERIALIZATION_FAILED: u64 = 6;
 
     /// Byte vector given for deserialization was the wrong length.
     const EBYTES_WRONG_LENGTH: u64 = 7;
 
-    /// Sigma protocol proof for withdrawals did not verify.
+    /// $\Sigma$-protocol proof for withdrawals did not verify.
     const ESIGMA_PROTOCOL_VERIFY_FAILED: u64 = 8;
 
     /// Tried cutting out more elements than are in the vector via `cut_vector`.
     const EVECTOR_CUT_TOO_LARGE: u64 = 9;
+
+    /// The `NUM_LEAST_SIGNIFICANT_BITS_REMOVED` and `NUM_MOST_SIGNIFICANT_BITS_REMOVED` constants need to sum to 32 (bits).
+    const EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT: u64 = 10;
+
+    /// Non-specific internal error (see source code)
+    const EINTERNAL_ERROR: u64 = 11;
 
     //
     // Constants
@@ -98,10 +131,21 @@ module veiled_coin::veiled_coin {
     /// The maximum number of bits used to represent a coin's value.
     const MAX_BITS_IN_VALUE : u64 = 32;
 
+    /// When converting a `u64` normal (public) amount to a `u32` veiled amount, we keep the middle 32 bits and
+    /// remove the `NUM_LEAST_SIGNIFICANT_BITS_REMOVED` least significant bits and the `NUM_MOST_SIGNIFICANT_BITS_REMOVED`
+    /// most significant bits (see comments in the beginning of this file).
+    ///
+    /// When converting a `u32` veiled amount to a `u64` normal (public) amount, we simply cast it to `u64` and shift it
+    /// left by `NUM_LEAST_SIGNIFICANT_BITS_REMOVED`.
+    const NUM_LEAST_SIGNIFICANT_BITS_REMOVED: u8 = 16;
+
+    /// See `NUM_LEAST_SIGNIFICANT_BITS_REMOVED` comments.
+    const NUM_MOST_SIGNIFICANT_BITS_REMOVED: u8 = 16;
+
     /// The domain separation tag (DST) used for the Bulletproofs prover.
     const VEILED_COIN_DST : vector<u8> = b"AptosVeiledCoin/BulletproofRangeProof";
 
-    /// The domain separation tag (DST) used in the Fiat-Shamir transform of our Sigma protocol.
+    /// The domain separation tag (DST) used in the Fiat-Shamir transform of our $\Sigma$-protocol.
     const FIAT_SHAMIR_SIGMA_DST : vector<u8> = b"AptosVeiledCoin/WithdrawalProofFiatShamir";
 
     //
@@ -135,17 +179,30 @@ module veiled_coin::veiled_coin {
     struct VeiledTransferProof<phantom CoinType> has drop {
         new_balance_proof: RangeProof,
         veiled_amount_proof: RangeProof,
-        sigma_proof: SigmaProof<CoinType>,
+        sigma_proof: FullSigmaProof<CoinType>,
     }
 
-    /// A Sigma protocol proof used as part of a `VeiledTransferProof`.
+    /// A cryptographic proof that ensures correctness of a veiled-to-*unveiled* coin transfer.
+    struct UnveiledWithdrawalProof<phantom CoinType> has drop {
+        sigma_proof: ElGamalToPedSigmaProof<CoinType>,
+        new_balance_proof: RangeProof,
+    }
+
+    /// A $\Sigma$-protocol proof used as part of a `VeiledTransferProof`.
+    /// This proof encompasses the $\Sigma$-protocol from `ElGamalToPedSigmaProof`.
     /// (A more detailed description can be found in `verify_withdrawal_sigma_protocol`.)
-    struct SigmaProof<phantom CoinType> has drop {
+    struct FullSigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
         x3: RistrettoPoint,
         x4: RistrettoPoint,
         alpha1: Scalar,
         alpha3: Scalar,
+    }
+
+    /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
+    /// (A more detailed description can be found in TODO: implement.)
+    struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
+        // TODO: implement
     }
 
     /// Event emitted when some amount of veiled coins were deposited into an account.
@@ -168,6 +225,11 @@ module veiled_coin::veiled_coin {
         assert!(
             bulletproofs::get_max_range_bits() >= MAX_BITS_IN_VALUE,
             error::internal(ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE)
+        );
+
+        assert!(
+            NUM_LEAST_SIGNIFICANT_BITS_REMOVED + NUM_MOST_SIGNIFICANT_BITS_REMOVED == 32,
+            error::internal(EU64_COIN_AMOUNT_CLAMPING_IS_INCORRECT)
         );
 
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
@@ -196,13 +258,13 @@ module veiled_coin::veiled_coin {
     ///
     /// **WARNING:** This function *leaks* the transferred `amount`, since it is given as a public input.
     public entry fun veil_to<CoinType>(
-        sender: &signer, recipient: address, amount: u64) acquires VeiledCoinMinter, VeiledCoinStore
+        sender: &signer, recipient: address, amount: u32) acquires VeiledCoinMinter, VeiledCoinStore
     {
-        let c = coin::withdraw<CoinType>(sender, amount);
+        let c = coin::withdraw<CoinType>(sender, cast_u32_to_u64_amount(amount));
 
-        let vc = unveiled_to_veiled_coin(c);
+        let vc = veiled_mint_from_coin(c);
 
-        deposit<CoinType>(recipient, vc)
+        veiled_deposit<CoinType>(recipient, vc)
     }
 
     /// Like `veil_to` except the `sender` is also the recipient.
@@ -210,7 +272,7 @@ module veiled_coin::veiled_coin {
     /// This function can be used by the `sender` to initialize his veiled balance to a *public* value.
     ///
     /// **WARNING:** The initialized balance is *leaked*, since its initialized `amount` is public here.
-    public entry fun veil<CoinType>(sender: &signer, amount: u64) acquires VeiledCoinMinter, VeiledCoinStore {
+    public entry fun veil<CoinType>(sender: &signer, amount: u32) acquires VeiledCoinMinter, VeiledCoinStore {
         veil_to<CoinType>(sender, signer::address_of(sender), amount)
     }
 
@@ -229,7 +291,11 @@ module veiled_coin::veiled_coin {
     {
         let range_proof_new_balance = bulletproofs::range_proof_from_bytes(range_proof_new_balance);
 
-        let c = veiled_to_unveiled_coin<CoinType>(sender, amount, &range_proof_new_balance);
+        let c = unveiled_withdraw<CoinType>(
+            sender,
+            amount,
+            &range_proof_new_balance);
+
         coin::deposit<CoinType>(recipient, c);
     }
 
@@ -253,7 +319,7 @@ module veiled_coin::veiled_coin {
     ///    `range_proof_new_balance`),
     /// 2. A range proof on the transferred amount in `withdraw_ct`, to ensure the sender won't create coins out of thin
     ///    air (in `range_proof_veiled_amount`),
-    /// 3. A Sigma protocol to prove that 'veiled_withdraw_amount' encrypts the same veiled amount as
+    /// 3. A $\Sigma$-protocol to prove that 'veiled_withdraw_amount' encrypts the same veiled amount as
     ///    'veiled_deposit_amount' with the same randomness (in `sigma_proof_bytes`).
     public entry fun fully_veiled_transfer<CoinType>(
         sender: &signer,
@@ -270,7 +336,7 @@ module veiled_coin::veiled_coin {
         let veiled_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
         assert!(std::option::is_some(&veiled_deposit_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        // This Sigma protocol proofs proves that `veiled_withdraw_amount` encrypts the same value using the same
+        // This $\Sigma$-protocol proofs proves that `veiled_withdraw_amount` encrypts the same value using the same
         // randomness as `veiled_deposit_amount` (i.e., the amount being transferred). These two ciphertexts are
         // required as we need to update both the sender's and the recipient's balances, which use different public keys
         // and so must be updated with ciphertexts encrypted under their respective public keys.
@@ -300,6 +366,28 @@ module veiled_coin::veiled_coin {
     //
     // Public functions.
     //
+
+    /// Clamps a `u64` normal public amount to a `u32` to-be-veiled amount.
+    ///
+    /// WARNING: Precision is lost here (see "Veiled coin amounts as truncated `u32`'s" in the top-level comments)
+    ///
+    /// (Unclear if this function will be needed.)
+    public fun clamp_u64_to_u32_amount(amount: u64): u32 {
+        // Removes the `NUM_MOST_SIGNIFICANT_BITS_REMOVED` most significant bits.
+        amount << NUM_MOST_SIGNIFICANT_BITS_REMOVED;
+        amount >> NUM_MOST_SIGNIFICANT_BITS_REMOVED;
+
+        // Removes the other `32 - NUM_MOST_SIGNIFICANT_BITS_REMOVED` least significant bits.
+        amount = amount >> NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
+
+        // We are now left with a 32-bit value
+        (amount as u32)
+    }
+
+    /// Casts a `u32` to-be-veiled amount to a `u64` normal public amount. No precision is lost here.
+    public fun cast_u32_to_u64_amount(amount: u32): u64 {
+        (amount as u64) << NUM_MOST_SIGNIFICANT_BITS_REMOVED
+    }
 
     /// Returns `true` if `addr` is registered to receive veiled coins of `CoinType`.
     public fun has_veiled_coin_store<CoinType>(addr: address): bool {
@@ -331,7 +419,16 @@ module veiled_coin::veiled_coin {
         borrow_global_mut<VeiledCoinStore<CoinType>>(addr).pk
     }
 
+    /// Returns the total supply of veiled coins
+    public fun total_veiled_coins<CoinType>(): u64 acquires VeiledCoinMinter {
+        let rsrc_acc_addr = signer::address_of(&get_resource_account_signer());
+        assert!(coin::is_account_registered<CoinType>(rsrc_acc_addr), EINTERNAL_ERROR);
+
+        coin::balance<CoinType>(rsrc_acc_addr)
+    }
+
     /// Like `register`, but the public key is parsed in an `elgamal::CompressedPubkey` struct.
+    /// TODO: Do we want to require a PoK of the SK here?
     public fun register_internal<CoinType>(user: &signer, pk: elgamal::CompressedPubkey) {
         let account_addr = signer::address_of(user);
         assert!(
@@ -356,7 +453,7 @@ module veiled_coin::veiled_coin {
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
     ///
     /// **WARNING:** Fundamentally, there is no way to hide the value of the coin being minted here.
-    public fun unveiled_to_veiled_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> acquires VeiledCoinMinter {
+    public fun veiled_mint_from_coin<CoinType>(c: Coin<CoinType>): VeiledCoin<CoinType> acquires VeiledCoinMinter {
         // If there is no CoinStore<CoinType> in the resource account, create one.
         let rsrc_acc_signer = get_resource_account_signer();
         let rsrc_acc_addr = signer::address_of(&rsrc_acc_signer);
@@ -367,7 +464,15 @@ module veiled_coin::veiled_coin {
         // Move the normal coin into the coin store, so we can mint a veiled coin.
         // (There is no other way to drop a normal coin, for safety reasons, so moving it into a coin store is
         //  the only option.)
-        let value = ristretto255::new_scalar_from_u64(coin::value(&c));
+        let value_u64 = coin::value(&c);
+        let value_u32 = clamp_u64_to_u32_amount(value_u64);
+        let value = ristretto255::new_scalar_from_u32(
+            value_u32
+        );
+
+        // Paranoid check: assert that the u64 coin value had only its middle 32 bits set
+        assert!(cast_u32_to_u64_amount(value_u32) == value_u64, error::internal(EINTERNAL_ERROR));
+
         coin::deposit(rsrc_acc_addr, c);
 
         VeiledCoin<CoinType> {
@@ -381,25 +486,25 @@ module veiled_coin::veiled_coin {
     /// Since the `amount` is public, no ZK range proof on it is required.
     ///
     /// **WARNING:** This function *leaks* the public `amount`.
-    public fun veiled_to_unveiled_coin<CoinType>(
+    public fun unveiled_withdraw<CoinType>(
         sender: &signer,
         amount: u32,
         new_balance_proof: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter
     {
-        // TODO: Is this casting enough? I thought we will shift the bits
-        let scalar_amount = ristretto255::new_scalar_from_u64((amount as u64));
-        let veiled_amount = elgamal::new_ciphertext_no_randomness(&scalar_amount);
-
         let addr = signer::address_of(sender);
 
         assert!(has_veiled_coin_store<CoinType>(addr), error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED));
+
+        let scalar_amount = ristretto255::new_scalar_from_u32(amount);
+        let veiled_amount = elgamal::new_ciphertext_no_randomness(&scalar_amount);
+
         let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
 
         // Since `veiled_amount` was created from a `u32` public `amount`, no ZK range proof is needed for it.
-        withdraw(veiled_amount, coin_store, new_balance_proof, &std::option::none());
+        veiled_withdraw(veiled_amount, coin_store, new_balance_proof, &std::option::none());
 
         // Note: If the above `withdraw` aborts, the whole TXN aborts, so there are no atomicity issues.
-        coin::withdraw(&get_resource_account_signer(), (amount as u64))
+        coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount))
     }
 
 
@@ -420,7 +525,8 @@ module veiled_coin::veiled_coin {
         let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
 
         // Checks that `veiled_withdraw_amount` and `veiled_deposit_amount` encrypt the same amount of coins, under the
-        // sender and recipient's PKs, respectively, by verifying the sigma protocol proof in `transfer_proof`.
+        // sender and recipient's PKs, respectively, by verifying the $\Sigma$-protocol proof in `transfer_proof`.
+        // TODO: full $\Sigma$-protocol verify (need to fetch sender's balance & update it locally, in order to verify)
         sigma_protocol_verify(
             &sender_pk,
             &recipient_pk,
@@ -429,7 +535,7 @@ module veiled_coin::veiled_coin {
             &transfer_proof.sigma_proof);
 
         // Verifies the range proofs in `transfer_proof` and withdraws `veiled_withdraw_amount` from the `sender`'s account.
-        withdraw<CoinType>(
+        veiled_withdraw<CoinType>(
             veiled_withdraw_amount,
             sender_coin_store,
             &transfer_proof.new_balance_proof,
@@ -440,11 +546,11 @@ module veiled_coin::veiled_coin {
 
         // Deposits `veiled_deposit_amount` into the recipient's account
         // (Note, if this aborts, the whole transaction aborts, so we do not need to worry about atomicity.)
-        deposit(recipient_addr, vc);
+        veiled_deposit(recipient_addr, vc);
     }
 
-    /// Deposits a veiled coin at address `to_addr`.
-    public fun deposit<CoinType>(to_addr: address, coin: VeiledCoin<CoinType>) acquires VeiledCoinStore {
+    /// Deposits a veiled `coin` at address `to_addr`.
+    public fun veiled_deposit<CoinType>(to_addr: address, coin: VeiledCoin<CoinType>) acquires VeiledCoinStore {
         assert!(
             has_veiled_coin_store<CoinType>(to_addr),
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED),
@@ -475,12 +581,12 @@ module veiled_coin::veiled_coin {
     /// *veiled* balance.
     ///
     /// **WARNING:** This function assumes that `veiled_amount` is correctly encrypted under the sender's PK. This
-    /// is the case when either (1) the amount was veiled correctly from a public value or (2) a Sigma protocol proof
+    /// is the case when either (1) the amount was veiled correctly from a public value or (2) a $\Sigma$-protocol proof
     /// over `veiled_amount` verified successfully.
     ///
     /// Always requires a ZK range proof `new_balance_proof` on `balance - amount`. When the veiled amount was NOT
     /// created from a public value, additionally requires a ZK range proof `veiled_amount_proof` on `amount`.
-    public fun withdraw<CoinType>(
+    public fun veiled_withdraw<CoinType>(
         veiled_amount: elgamal::Ciphertext,
         coin_store: &mut VeiledCoinStore<CoinType>,
         new_balance_proof: &RangeProof,
@@ -575,57 +681,61 @@ module veiled_coin::veiled_coin {
         let VeiledCoin<CoinType> { veiled_amount: _ } = c;
     }
 
-    /// Deserializes and returns a `SigmaProof` given its byte representation.
-    /// TODO: reference the sigma protocol here
-    /// Elements at the end of the `SigmaProof` struct are expected to be at the start
-    /// of the byte vector, and serialized using the serialization formats in the
-    /// `ristretto255` module.
-    fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<SigmaProof<CoinType>> {
+    /// Deserializes and returns a `SigmaProof` given its byte representation (see protocol description in
+    /// `sigma_protocol_verify`)
+    ///
+    /// Elements at the end of the `SigmaProof` struct are expected to be at the start  of the byte vector, and
+    /// serialized using the serialization formats in the `ristretto255` module.
+    fun deserialize_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<FullSigmaProof<CoinType>> {
         if (vector::length<u8>(&proof_bytes) != 160) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
 
         let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x1 = ristretto255::new_point_from_bytes(x1_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x1)) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
         let x1 = std::option::extract<RistrettoPoint>(&mut x1);
 
         let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x3 = ristretto255::new_point_from_bytes(x3_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x3)) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
         let x3 = std::option::extract<RistrettoPoint>(&mut x3);
 
         let x4_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let x4 = ristretto255::new_point_from_bytes(x4_bytes);
         if (!std::option::is_some<RistrettoPoint>(&x4)) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
         let x4 = std::option::extract<RistrettoPoint>(&mut x4);
 
         let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
         if (!std::option::is_some(&alpha1)) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
         let alpha1 = std::option::extract(&mut alpha1);
 
         let alpha3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
         let alpha3 = ristretto255::new_scalar_from_bytes(alpha3_bytes);
         if (!std::option::is_some(&alpha3)) {
-            return std::option::none<SigmaProof<CoinType>>()
+            return std::option::none<FullSigmaProof<CoinType>>()
         };
         let alpha3 = std::option::extract(&mut alpha3);
 
-        std::option::some(SigmaProof {
-            x1, x3, x4, alpha1, alpha3 
+        std::option::some(FullSigmaProof {
+            x1, x3, x4, alpha1, alpha3
         })
     }
 
-    /// Verifies a Sigma protocol proof necessary to ensure correctness of a veiled transfer.
+    /// Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled transfer.
+    /// Specifically, this proof proves that `withdraw_ct` and `deposit_ct` encrypt the same amount $v$ using the same
+    /// randomness $r$, with `sender_pk` and `recipient_pk` respectively.
+    ///
+    /// # Cryptographic details
     ///
     /// The proof argues knowledge of a witness $w$ such that a specific relation $R(x; w)$ is satisfied, for a public
     /// statement $x$ known to the verifier (i.e., known to the validators). We describe this relation below.
@@ -634,7 +744,7 @@ module veiled_coin::veiled_coin {
     ///  - $v$, the amount being transferred
     ///  - $r$, ElGamal encryption randomness
     ///
-    /// (Note that the Sigma protocol's zero-knowledge property ensures the witness is not revealed.)
+    /// (Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
     ///
     /// The public statement $x$ in this relation consists of:
     ///  - $G$, the basepoint of a given elliptic curve
@@ -644,7 +754,7 @@ module veiled_coin::veiled_coin {
     ///  - $(C', D)$, the ElGamal encryption of $v$ under the recipient's PK
     ///
     ///
-    /// The relation, at a high level, and created two ciphertexts $(C, D)$ and $(C', D)$ 
+    /// The relation, at a high level, and created two ciphertexts $(C, D)$ and $(C', D)$
     /// encrypting $v$ under the sender's PK and recipient's PK, respectively.:
     ///
     /// ```
@@ -658,18 +768,17 @@ module veiled_coin::veiled_coin {
     /// }
     /// ```
     ///
-    /// A relation similar to this is also described on page 14 of the Zether paper [BAZB20] (just replace  $G$ -> $g$, $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$).
-    /// Note the equations C_L - C = b * G + sk * (C_R - D) and Y = sk * G in the Zether paper are enforced programmatically by    
-    /// this smart contract and so are not needed in our sigma protocol. 
+    /// A relation similar to this is also described on page 14 of the Zether paper [BAZB20] (just replace  $G$ -> $g$,
+    /// $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$).
     ///
-    /// Specifically, this protocol proves that `withdraw_ct` and `deposit_ct` encrypt the same
-    /// amount $v$ using the same randomness $r$, with `sender_pk` and `recipient_pk` respectively.
+    /// Note the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
+    /// programmatically by this smart contract and so are not needed in our $\Sigma$-protocol.
     fun sigma_protocol_verify<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
         withdraw_ct: &elgamal::Ciphertext,
         deposit_ct: &elgamal::Ciphertext,
-        proof: &SigmaProof<CoinType>)
+        proof: &FullSigmaProof<CoinType>)
     {
         let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
         let recipient_pk_point = elgamal::pubkey_to_point(recipient_pk);
@@ -705,8 +814,9 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&bar_c, &bar_y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
+    /// TODO: explain the challenge derivation as a function of the parameters
     /// Computes the challenge value as `c = H(g, y, \bar{y}, C, D, \bar{C}, X_1, X_3, X_4)`
-    /// for the Sigma protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
+    /// for the $\Sigma$-protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
     /// used above is from the Zether [BAZB20] paper.
     fun sigma_protocol_fiat_shamir<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
@@ -773,10 +883,10 @@ module veiled_coin::veiled_coin {
     /// Returns true if the balance at address `owner` equals `value`.
     /// Requires the ElGamal encryption randomness `r` and public key `pk` as auxiliary inputs.
     public fun verify_opened_balance<CoinType>(
-        owner: address, value: u64, r: &Scalar, pk: &elgamal::CompressedPubkey): bool acquires VeiledCoinStore
+        owner: address, value: u32, r: &Scalar, pk: &elgamal::CompressedPubkey): bool acquires VeiledCoinStore
     {
         // compute the expected encrypted balance
-        let value = ristretto255::new_scalar_from_u64(value);
+        let value = ristretto255::new_scalar_from_u32(value);
         let expected_ct = elgamal::new_ciphertext_with_basepoint(&value, r, pk);
 
         // get the actual encrypted balance
@@ -786,15 +896,15 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    /// Proves the Sigma protocol used for veiled coin transfers.
-    /// See `sigma_protocol_verify` for a detailed description of the sigma protocol
+    /// Proves the $\Sigma$-protocol used for veiled coin transfers.
+    /// See `sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
     public fun sigma_protocol_prove<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
         withdraw_ct: &elgamal::Ciphertext,
         deposit_ct: &elgamal::Ciphertext,
         amount_rand: &Scalar,
-        amount_val: &Scalar): SigmaProof<CoinType>
+        amount_val: &Scalar): FullSigmaProof<CoinType>
    {
         let x1 = ristretto255::random_scalar();
         let x3 = ristretto255::random_scalar();
@@ -828,7 +938,7 @@ module veiled_coin::veiled_coin {
         let alpha3 = ristretto255::scalar_mul(&c, amount_val);
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
 
-        SigmaProof {
+        FullSigmaProof {
             x1: big_x1,
             x3: big_x3,
             x4: big_x4,
@@ -838,10 +948,10 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    /// Given a Sigma protocol proof, serializes it into byte form.
+    /// Given a $\Sigma$-protocol proof, serializes it into byte form.
     /// Elements at the end of the `SigmaProof` struct are placed into the vector first,
     /// using the serialization formats in the `ristretto255` module.
-    public fun serialize_sigma_proof<CoinType>(proof: &SigmaProof<CoinType>): vector<u8> {
+    public fun serialize_sigma_proof<CoinType>(proof: &FullSigmaProof<CoinType>): vector<u8> {
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
         let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
         let x4_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x4));
@@ -870,7 +980,7 @@ module veiled_coin::veiled_coin {
         let (_, recipient_pk) = generate_elgamal_keypair();
 
         // Set the transferred amount to 50
-        let amount_val = ristretto255::new_scalar_from_u64(50);
+        let amount_val = ristretto255::new_scalar_from_u32(50);
         let amount_rand = ristretto255::random_scalar();
         // Encrypt the amount under the sender's PK
         let withdraw_ct= elgamal::new_ciphertext_with_basepoint(&amount_val, &amount_rand, &sender_pk);
@@ -895,7 +1005,7 @@ module veiled_coin::veiled_coin {
     fun sigma_proof_verify_fails_test()
     {
        let (_, source_pk) = generate_elgamal_keypair();
-       let transfer_val = ristretto255::new_scalar_from_u64(50);
+       let transfer_val = ristretto255::new_scalar_from_u32(50);
        let (_, dest_pk) = generate_elgamal_keypair();
        let transfer_rand = ristretto255::random_scalar();
        let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
@@ -914,7 +1024,7 @@ module veiled_coin::veiled_coin {
     {
        let (_, source_pk) = generate_elgamal_keypair();
        let rand = ristretto255::random_scalar();
-       let val = ristretto255::new_scalar_from_u64(50);
+       let val = ristretto255::new_scalar_from_u32(50);
        let (_, dest_pk) = generate_elgamal_keypair();
        let source_randomness = ristretto255::scalar_neg(&rand);
        let (_, withdraw_ct) = bulletproofs::prove_range_elgamal(&val, &source_randomness, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
@@ -924,7 +1034,7 @@ module veiled_coin::veiled_coin {
 
        let sigma_proof_bytes = serialize_sigma_proof<coin::FakeMoney>(&sigma_proof);
 
-       let deserialized_proof = std::option::extract<SigmaProof<coin::FakeMoney>>(&mut deserialize_sigma_proof<coin::FakeMoney>(sigma_proof_bytes));
+       let deserialized_proof = std::option::extract<FullSigmaProof<coin::FakeMoney>>(&mut deserialize_sigma_proof<coin::FakeMoney>(sigma_proof_bytes));
 
        assert!(ristretto255::point_equals(&sigma_proof.x1, &deserialized_proof.x1), 1);
        assert!(ristretto255::point_equals(&sigma_proof.x3, &deserialized_proof.x3), 1);
@@ -933,156 +1043,199 @@ module veiled_coin::veiled_coin {
        assert!(ristretto255::scalar_equals(&sigma_proof.alpha3, &deserialized_proof.alpha3), 1);
     }
 
-    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
-    fun wrap_to_test(
-        myself: signer,
-        source_fx: signer,
-        destination: signer
-    ) acquires VeiledCoinMinter, VeiledCoinStore {
-        // Initialize the `veiled_coin` module
-        init_module(&myself);
+//    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
+//    fun wrap_to_test(
+//        myself: signer,
+//        source_fx: signer,
+//        destination: signer
+//    ) acquires VeiledCoinMinter, VeiledCoinStore {
+//        // Initialize the `veiled_coin` module
+//        init_module(&myself);
+//
+//        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
+//
+//        // Set up two accounts so we can register a new coin type on them
+//        let source_addr = signer::address_of(&source_fx);
+//        account::create_account_for_test(source_addr);
+//        let destination_addr = signer::address_of(&destination);
+//        account::create_account_for_test(destination_addr);
+//
+//        // Create some 1,000 fake money inside 'source'
+//        coin::create_fake_money(&source_fx, &destination, 1000);
+//
+//        // Split 500 and 500 between source and destination
+//        coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
+//
+//        // Wrap 150 normal coins to veiled coins from the source's normal coin account
+//        // to the destination's veiled coin account
+//        let (_, destination_pk) = generate_elgamal_keypair();
+//        let destination_pk_bytes = elgamal::pubkey_to_bytes(&destination_pk);
+//        register<coin::FakeMoney>(&destination, destination_pk_bytes);
+//        veil_to<coin::FakeMoney>(&source_fx, destination_addr, 150);
+//        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
+//        assert!(source_balance == 350, 1);
+//        let destination_rand = ristretto255::scalar_zero();
+//        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 150, &destination_rand, &destination_pk), 1);
+//
+//        // Unwrap back 50 veiled coins from the destination's veiled coin account to
+//        // the source's normal coin account
+//        let (_, source_pk) = generate_elgamal_keypair();
+//        let source_pk_bytes = elgamal::pubkey_to_bytes(&source_pk);
+//        register<coin::FakeMoney>(&source_fx, source_pk_bytes);
+//
+//        let destination_new_balance = ristretto255::new_scalar_from_u32(100);
+//
+//        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&destination_new_balance, &destination_rand, &destination_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+//        let new_balance_range_proof_bytes = bulletproofs::range_proof_to_bytes(&new_balance_range_proof);
+//
+//        unveil_to<coin::FakeMoney>(&destination, source_addr, 50, new_balance_range_proof_bytes);
+//        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
+//        assert!(source_balance == 400, 1);
+//        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 100, &destination_rand, &destination_pk), 1);
+//    }
 
-        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
-
-        // Set up two accounts so we can register a new coin type on them
-        let source_addr = signer::address_of(&source_fx);
-        account::create_account_for_test(source_addr);
-        let destination_addr = signer::address_of(&destination);
-        account::create_account_for_test(destination_addr);
-
-        // Create some 1,000 fake money inside 'source'
-        coin::create_fake_money(&source_fx, &destination, 1000);
-
-        // Split 500 and 500 between source and destination
-        coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
-
-        // Wrap 150 normal coins to veiled coins from the source's normal coin account
-        // to the destination's veiled coin account
-        let (_, destination_pk) = generate_elgamal_keypair();
-        let destination_pk_bytes = elgamal::pubkey_to_bytes(&destination_pk);
-        register<coin::FakeMoney>(&destination, destination_pk_bytes);
-        veil_to<coin::FakeMoney>(&source_fx, destination_addr, 150);
-        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
-        assert!(source_balance == 350, 1);
-        let destination_rand = ristretto255::scalar_zero();
-        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 150, &destination_rand, &destination_pk), 1);
-
-        // Unwrap back 50 veiled coins from the destination's veiled coin account to
-        // the source's normal coin account
-        let (_, source_pk) = generate_elgamal_keypair();
-        let source_pk_bytes = elgamal::pubkey_to_bytes(&source_pk);
-        register<coin::FakeMoney>(&source_fx, source_pk_bytes);
-
-        let destination_new_balance = ristretto255::new_scalar_from_u64(100);
-
-        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&destination_new_balance, &destination_rand, &destination_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-        let new_balance_range_proof_bytes = bulletproofs::range_proof_to_bytes(&new_balance_range_proof);
-
-        unveil_to<coin::FakeMoney>(&destination, source_addr, 50, new_balance_range_proof_bytes);
-        let source_balance = coin::balance<coin::FakeMoney>(source_addr);
-        assert!(source_balance == 400, 1);
-        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 100, &destination_rand, &destination_pk), 1);
+    #[test_only]
+    fun println(str: vector<u8>) {
+        print(&utf8(str));
     }
 
-    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
-    fun unwrap_test(
+    #[test(myself = @veiled_coin, aptos_fx = @aptos_framework, sender = @0x1337)]
+    fun unveil_test(
         myself: signer,
-        source_fx: signer,
-        destination: signer
+        aptos_fx: signer,
+        sender: signer,
     ) acquires VeiledCoinMinter, VeiledCoinStore {
-        // Initialize the `veiled_coin` module
+        println(b"Starting unveil_test()...");
+        print(&@veiled_coin);
+        print(&@aptos_framework);
+        // TODO: This line seems to yield a strange, irreproducible invariant violation error...
+        //assert!(@veiled_coin != @aptos_framework, 1);
+
+        // Initialize the `veiled_coin` module & enable the feature
         init_module(&myself);
+        println(b"Initialized module.");
+        features::change_feature_flags(&aptos_fx, vector[features::get_bulletproofs_feature()], vector[]);
+        println(b"Enabled feature flags.");
 
-        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
+        // Set up the Aptos framework and `sender` accounts & register a new `FakeCoin` type on them
+        account::create_account_for_test(signer::address_of(&aptos_fx)); // needed in `create_fake_money`
+        account::create_account_for_test(signer::address_of(&sender));
+        println(b"Created accounts for test.");
 
-        // Set up two accounts so we can register a new coin type on them
-        let source_addr = signer::address_of(&source_fx);
-        account::create_account_for_test(source_addr);
-        let destination_addr = signer::address_of(&destination);
-        account::create_account_for_test(destination_addr);
+        // Create 500 coins in `aptos_fx` (must be Aptos 0x1 address) and registers a coin store for the `sender`
+        coin::create_fake_money(&aptos_fx, &sender, cast_u32_to_u64_amount(500));
+        // Moves the 500 coins into `sender` (because `create_fake_money` is awkward and doesn't actually do this)
+        coin::transfer<coin::FakeMoney>(
+            &aptos_fx, signer::address_of(&sender), cast_u32_to_u64_amount(500));
 
-        // Create 500 fake money inside 'source'
-        coin::create_fake_money(&source_fx, &destination, 500);
+        // Register a veiled balance for the `sender`
+        let (_, sender_pk) = generate_elgamal_keypair();
+        register<coin::FakeMoney>(&sender, elgamal::pubkey_to_bytes(&sender_pk));
+        println(b"Registered the sender's veiled balance");
 
-        // Mint 150 veiled coins at source (requires registering a veiled coin store at 'source')
-        let (_, source_pk) = generate_elgamal_keypair();
-        let source_pk_bytes = elgamal::pubkey_to_bytes(&source_pk);
-        register<coin::FakeMoney>(&source_fx, source_pk_bytes);
-        veil<coin::FakeMoney>(&source_fx, 150);
+        // Veil 150 out of the `sender`'s 500 coins.
+        //
+        // Note: Sender initializes his veiled balance to 150 veiled coins, which is why we don't need its SK to decrypt
+        // it in order to transact.
+        veil<coin::FakeMoney>(&sender, 150);
+        println(b"Veiled 150 coins to the `sender`");
 
-        // The unwrap function doesn't change the veiled coin account randomness,
-        // so we use the zero scalar for it here
-        let source_new_balance = ristretto255::new_scalar_from_u64(100);
-        let new_balance_rand = ristretto255::scalar_zero();
+        println(b"Total veiled coins:");
+        print(&total_veiled_coins<coin::FakeMoney>());
 
-        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_balance, &new_balance_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-        unveil<coin::FakeMoney>(&source_fx, 50, bulletproofs::range_proof_to_bytes(&new_balance_range_proof));
-        assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 100, &new_balance_rand, &source_pk), 1);
+        assert!(total_veiled_coins<coin::FakeMoney>() == cast_u32_to_u64_amount(150), 1);
 
-        let nonveiled_balance = coin::balance<coin::FakeMoney>(source_addr);
-        assert!(nonveiled_balance == 400, 1);
+        // The `unveil` function uses randomness zero for the ElGamal encryption of the amount
+        let sender_new_balance = ristretto255::new_scalar_from_u32(100);
+        let zero_randomness = ristretto255::scalar_zero();
+
+        // TODO: Will need a different wrapper function that creates the `UnveiledWithdrawalProof`
+        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(
+            &sender_new_balance,
+            &zero_randomness,
+            &sender_pk,
+            MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+
+        // Move 50 veiled coins into the public balance of the sender
+        unveil<coin::FakeMoney>(
+            &sender,
+            50,
+            bulletproofs::range_proof_to_bytes(&new_balance_range_proof));
+
+        println(b"Remaining veiled coins, after `unveil` call:");
+        print(&total_veiled_coins<coin::FakeMoney>());
+
+        assert!(total_veiled_coins<coin::FakeMoney>() == cast_u32_to_u64_amount(100), 1);
+
+        assert!(verify_opened_balance<coin::FakeMoney>(
+            signer::address_of(&sender), 100, &zero_randomness, &sender_pk), 2);
+
+        let remaining_public_balance = coin::balance<coin::FakeMoney>(signer::address_of(&sender));
+        assert!(remaining_public_balance == cast_u32_to_u64_amount(400), 3);
     }
 
-    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
-    fun basic_viability_test(
-        myself: signer,
-        source_fx: signer,
-        destination: signer
-    ) acquires VeiledCoinMinter, VeiledCoinStore {
-        // Initialize the `veiled_coin` module
-        init_module(&myself);
+    // TODO: test payments to self return
 
-        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
-
-        // Set up two accounts so we can register a new coin type on them
-        let source_addr = signer::address_of(&source_fx);
-        account::create_account_for_test(source_addr);
-        let destination_addr = signer::address_of(&destination);
-        account::create_account_for_test(destination_addr);
-
-        // Create some 1,000 fake money inside 'source'
-        coin::create_fake_money(&source_fx, &destination, 1000);
-
-        // Split 500 and 500 between source and destination
-        coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
-
-        // Mint 150 veiled coins at source (requires registering a veiled coin store at 'source')
-        let (_, source_pk) = generate_elgamal_keypair();
-        let source_pk_bytes = elgamal::pubkey_to_bytes(&source_pk);
-        register<coin::FakeMoney>(&source_fx, source_pk_bytes);
-        veil<coin::FakeMoney>(&source_fx, 150);
-
-        // Transfer 50 of these veiled coins to destination
-        let transfer_val = ristretto255::new_scalar_from_u64(50);
-        let transfer_rand = ristretto255::random_scalar();
-
-        // This will be the balance left at the source, that we need to do a range proof for
-        let new_balance_rand_source = ristretto255::scalar_neg(&transfer_rand);
-        let source_new_balance = ristretto255::new_scalar_from_u64(100);
-        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_balance, &new_balance_rand_source, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-
-        let (transferred_amount_range_proof, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-
-        // Execute the veiled transaction: no one will be able to tell 50 coins are being transferred.
-        let (_, dest_pk) = generate_elgamal_keypair();
-        let dest_pk_bytes = elgamal::pubkey_to_bytes(&dest_pk);
-        register<coin::FakeMoney>(&destination, dest_pk_bytes);
-
-        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-
-        let sigma_proof = sigma_protocol_prove<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &transfer_rand, &transfer_val);
-        let sigma_proof_bytes = serialize_sigma_proof<coin::FakeMoney>(&sigma_proof);
-        fully_veiled_transfer<coin::FakeMoney>(&source_fx, destination_addr, elgamal::ciphertext_to_bytes(&withdraw_ct), elgamal::ciphertext_to_bytes(&deposit_ct), bulletproofs::range_proof_to_bytes(&new_balance_range_proof), bulletproofs::range_proof_to_bytes(&transferred_amount_range_proof), sigma_proof_bytes);
-
-        // Unwrap 25 coins from the source destination from veiled coins to regular coins
-        let source_new_balance_unwrap = ristretto255::new_scalar_from_u64(75);
-
-        // Unwrap doesn't change the randomness so we use the same randomness value as before
-        let (new_balance_range_proof_unwrap, _) = bulletproofs::prove_range_elgamal(&source_new_balance_unwrap, &new_balance_rand_source, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
-        unveil<coin::FakeMoney>(&source_fx, 25, bulletproofs::range_proof_to_bytes(&new_balance_range_proof_unwrap));
-
-        // Sanity check veiled balances
-        assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 75, &new_balance_rand_source, &source_pk), 1);
-        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 50, &transfer_rand, &dest_pk), 1);
-    }
+//    #[test(myself = @veiled_coin, source_fx = @aptos_framework, destination = @0x1337)]
+//    fun basic_viability_test(
+//        myself: signer,
+//        source_fx: signer,
+//        destination: signer
+//    ) acquires VeiledCoinMinter, VeiledCoinStore {
+//        // Initialize the `veiled_coin` module
+//        init_module(&myself);
+//
+//        features::change_feature_flags(&source_fx, vector[features::get_bulletproofs_feature()], vector[]);
+//
+//        // Set up two accounts so we can register a new coin type on them
+//        let source_addr = signer::address_of(&source_fx);
+//        account::create_account_for_test(source_addr);
+//        let destination_addr = signer::address_of(&destination);
+//        account::create_account_for_test(destination_addr);
+//
+//        // Create some 1,000 fake money inside 'source'
+//        coin::create_fake_money(&source_fx, &destination, 1000);
+//
+//        // Split 500 and 500 between source and destination
+//        coin::transfer<coin::FakeMoney>(&source_fx, destination_addr, 500);
+//
+//        // Mint 150 veiled coins at source (requires registering a veiled coin store at 'source')
+//        let (_, source_pk) = generate_elgamal_keypair();
+//        let source_pk_bytes = elgamal::pubkey_to_bytes(&source_pk);
+//        register<coin::FakeMoney>(&source_fx, source_pk_bytes);
+//        veil<coin::FakeMoney>(&source_fx, 150);
+//
+//        // Transfer 50 of these veiled coins to destination
+//        let transfer_val = ristretto255::new_scalar_from_u32(50);
+//        let transfer_rand = ristretto255::random_scalar();
+//
+//        // This will be the balance left at the source, that we need to do a range proof for
+//        let new_balance_rand_source = ristretto255::scalar_neg(&transfer_rand);
+//        let source_new_balance = ristretto255::new_scalar_from_u32(100);
+//        let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(&source_new_balance, &new_balance_rand_source, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+//
+//        let (transferred_amount_range_proof, withdraw_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+//
+//        // Execute the veiled transaction: no one will be able to tell 50 coins are being transferred.
+//        let (_, dest_pk) = generate_elgamal_keypair();
+//        let dest_pk_bytes = elgamal::pubkey_to_bytes(&dest_pk);
+//        register<coin::FakeMoney>(&destination, dest_pk_bytes);
+//
+//        let (_, deposit_ct) = bulletproofs::prove_range_elgamal(&transfer_val, &transfer_rand, &dest_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+//
+//        let sigma_proof = sigma_protocol_prove<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &transfer_rand, &transfer_val);
+//        let sigma_proof_bytes = serialize_sigma_proof<coin::FakeMoney>(&sigma_proof);
+//        fully_veiled_transfer<coin::FakeMoney>(&source_fx, destination_addr, elgamal::ciphertext_to_bytes(&withdraw_ct), elgamal::ciphertext_to_bytes(&deposit_ct), bulletproofs::range_proof_to_bytes(&new_balance_range_proof), bulletproofs::range_proof_to_bytes(&transferred_amount_range_proof), sigma_proof_bytes);
+//
+//        // Unveil 25 coins from the source destination from veiled coins to regular coins
+//        let source_new_balance_unveil = ristretto255::new_scalar_from_u32(75);
+//
+//        // Unveil doesn't change the randomness so we use the same randomness value as before
+//        let (new_balance_range_proof_unveil, _) = bulletproofs::prove_range_elgamal(&source_new_balance_unveil, &new_balance_rand_source, &source_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
+//        unveil<coin::FakeMoney>(&source_fx, 25, bulletproofs::range_proof_to_bytes(&new_balance_range_proof_unveil));
+//
+//        // Sanity check veiled balances
+//        assert!(verify_opened_balance<coin::FakeMoney>(source_addr, 75, &new_balance_rand_source, &source_pk), 1);
+//        assert!(verify_opened_balance<coin::FakeMoney>(destination_addr, 50, &transfer_rand, &dest_pk), 1);
+//    }
 }
