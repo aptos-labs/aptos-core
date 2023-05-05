@@ -2,15 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::{SystemTime, UNIX_EPOCH};
-use aptos_language_e2e_tests::account_universe::P2PTransferGen;
-use aptos_transaction_benchmarks::transactions::TransactionBencher;
-use proptest::prelude::*;
-use clap::{Parser, Subcommand};
 use aptos_crypto::_once_cell::sync::Lazy;
+use aptos_language_e2e_tests::account_universe::P2PTransferGen;
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
-
+use aptos_transaction_benchmarks::transactions::TransactionBencher;
+use clap::{Parser, Subcommand};
+use proptest::prelude::*;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
@@ -26,7 +25,7 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum BenchmarkCommand {
     CompareParallelAndSeq(ParallelAndSeqOpt),
-    ParallelExecution(ParallelExecutionOpt)
+    ParallelExecution(ParallelExecutionOpt),
 }
 
 #[derive(Debug, Parser)]
@@ -62,18 +61,20 @@ struct ParallelExecutionOpt {
     pub num_blocks: usize,
 
     #[clap(long, default_value = "8")]
-    pub concurrency_level: usize,
+    pub concurrency_level_per_shard: usize,
+
+    #[clap(long, default_value = "1")]
+    pub num_executor_shards: usize,
 }
 
 fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
-    let num_txns = opt.num_txns.unwrap_or(vec![1000, 10000, 50000]);
+    let num_txns = opt.num_txns.unwrap_or_else(|| vec![1000, 10000, 50000]);
+    let concurrency_level = num_cpus::get();
 
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
     let mut par_measurements: Vec<Vec<usize>> = Vec::new();
     let mut seq_measurements: Vec<Vec<usize>> = Vec::new();
-
-    let concurrency_level = num_cpus::get();
 
     for block_size in &num_txns {
         for num_accounts in &opt.num_accounts {
@@ -84,6 +85,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
                 opt.run_sequential,
                 opt.num_warmups,
                 opt.num_runs,
+                1,
                 concurrency_level,
             );
             par_tps.sort();
@@ -130,7 +132,6 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
         }
         println!();
     }
-
 }
 
 fn parallel_execution(opt: ParallelExecutionOpt) {
@@ -152,12 +153,12 @@ fn parallel_execution(opt: ParallelExecutionOpt) {
         false,
         0,
         opt.num_blocks,
-        opt.concurrency_level,
+        opt.num_executor_shards,
+        opt.concurrency_level_per_shard,
     );
 
     let sum: usize = par_tps.iter().sum();
-    println!("Avg Parallel TPS = {:?}",  sum / par_tps.len())
-
+    println!("Avg Parallel TPS = {:?}", sum / par_tps.len())
 }
 
 fn main() {
@@ -165,11 +166,7 @@ fn main() {
 
     // TODO: Check if I need DisplayChain here in the error case.
     match args.command {
-        BenchmarkCommand::CompareParallelAndSeq(opt) => {
-            compare_parallel_and_seq(opt)
-        }
-        BenchmarkCommand::ParallelExecution(opt) => {
-            parallel_execution(opt)
-        }
+        BenchmarkCommand::CompareParallelAndSeq(opt) => compare_parallel_and_seq(opt),
+        BenchmarkCommand::ParallelExecution(opt) => parallel_execution(opt),
     }
 }

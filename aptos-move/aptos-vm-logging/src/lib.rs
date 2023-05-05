@@ -72,12 +72,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
                 alert!("{:?}", e);
             };
         },
-        None => {
-            alert!(
-                "Speculative state not initialized to log message = {}",
-                message
-            );
-        },
+        None => {},
     };
 }
 
