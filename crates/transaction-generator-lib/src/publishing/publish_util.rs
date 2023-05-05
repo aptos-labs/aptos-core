@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::module_simple::EntryPoints;
-use crate::publishing::module_simple;
+use crate::{publishing::module_simple, EntryPoints};
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
@@ -12,6 +11,7 @@ use aptos_sdk::{
 };
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use rand::{rngs::StdRng, Rng};
+use std::collections::HashMap;
 
 // Information used to track a publisher and what allows to identify and
 // version the package published.
@@ -48,16 +48,16 @@ pub struct PackageHandler {
 
 impl Default for PackageHandler {
     fn default() -> Self {
-        Self::new()
+        Self::new("simple")
     }
 }
 
 impl PackageHandler {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         let packages = vec![PackageTracker {
             publishers: vec![],
             suffix: 0,
-            package: Package::simple(),
+            package: Package::by_name(name),
         }];
         PackageHandler { packages }
     }
@@ -101,12 +101,15 @@ impl PackageHandler {
 // Enum to define all packages known to the publisher code.
 #[derive(Clone, Debug)]
 pub enum Package {
-    Simple(Vec<CompiledModule>, PackageMetadata),
+    Simple(HashMap<String, CompiledModule>, PackageMetadata),
 }
 
 impl Package {
-    pub fn simple() -> Self {
-        let (modules, metadata) = module_simple::load_package();
+    pub fn by_name(name: &str) -> Self {
+        let (modules, metadata) = match name {
+            "simple" => module_simple::load_package(),
+            _ => unreachable!(),
+        };
         Self::Simple(modules, metadata)
     }
 
@@ -124,7 +127,7 @@ impl Package {
     pub fn version(&mut self, rng: &mut StdRng) {
         match self {
             Self::Simple(modules, _) => {
-                module_simple::version(&mut modules[0], rng);
+                module_simple::version(modules.get_mut("simple").unwrap(), rng);
             },
         }
     }
@@ -134,7 +137,7 @@ impl Package {
     pub fn scramble(&mut self, fn_count: usize, rng: &mut StdRng) {
         match self {
             Self::Simple(modules, _) => {
-                module_simple::scramble(&mut modules[0], fn_count, rng);
+                module_simple::scramble(modules.get_mut("simple").unwrap(), fn_count, rng);
             },
         }
     }
@@ -161,7 +164,7 @@ impl Package {
     ) -> SignedTransaction {
         match self {
             Self::Simple(modules, _) => {
-                let module_id = modules[0].self_id();
+                let module_id = modules.get("simple").unwrap().self_id();
                 // let payload = module_simple::rand_gen_function(rng, module_id);
                 let payload = module_simple::rand_simple_function(rng, module_id);
                 account.sign_with_transaction_builder(txn_factory.payload(payload))
@@ -179,7 +182,7 @@ impl Package {
     ) -> SignedTransaction {
         match self {
             Self::Simple(modules, _) => {
-                let module_id = modules[0].self_id();
+                let module_id = modules.get(fun.module_name()).unwrap().self_id();
                 let payload = fun.create_payload(module_id, rng, other);
                 account.sign_with_transaction_builder(txn_factory.payload(payload))
             },
@@ -188,13 +191,13 @@ impl Package {
 }
 
 fn update(
-    modules: &[CompiledModule],
+    modules: &HashMap<String, CompiledModule>,
     metadata: &PackageMetadata,
     publisher: AccountAddress,
     suffix: u64,
-) -> (Vec<CompiledModule>, PackageMetadata) {
-    let mut new_modules = vec![];
-    for module in modules {
+) -> (HashMap<String, CompiledModule>, PackageMetadata) {
+    let mut new_modules = HashMap::new();
+    for (original_name, module) in modules {
         let mut new_module = module.clone();
         let module_handle = new_module
             .module_handles
@@ -210,7 +213,7 @@ fn update(
             &mut new_module.identifiers[module_handle.name.0 as usize],
             Identifier::new(new_name).expect("Identifier must be legal"),
         );
-        new_modules.push(new_module);
+        new_modules.insert(original_name.clone(), new_module);
     }
     let mut metadata = metadata.clone();
     for module in &mut metadata.modules {
@@ -224,12 +227,12 @@ fn update(
 fn publish_transaction(
     txn_factory: &TransactionFactory,
     publisher: &mut LocalAccount,
-    modules: &[CompiledModule],
+    modules: &HashMap<String, CompiledModule>,
     metadata: &PackageMetadata,
 ) -> SignedTransaction {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
     let mut code: Vec<Vec<u8>> = vec![];
-    for module in modules {
+    for module in modules.values() {
         let mut module_code: Vec<u8> = vec![];
         module
             .serialize(&mut module_code)

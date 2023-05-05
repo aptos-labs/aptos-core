@@ -31,13 +31,19 @@ EXPECTED_TPS = {
     ("token-v1nft-mint-and-transfer-sequential", False): (1100.0, True),
     ("token-v1ft-mint-and-transfer20-collections", False): (6000.0, False),
     ("token-v1nft-mint-and-transfer-sequential20-collections", False): (4000.0, False),
-    # ("token-v1nft-mint-and-transfer-parallel", False): 1000.0,
+    ("token-v1nft-mint-and-transfer-parallel", False): (1000.0, False),
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
 }
 
 NOISE_LOWER_LIMIT = 0.8
-NOISE_UPPER_LIMIT = 1.1
+# temporarily increasing upper threshold for perf improvements in #8002,
+# TODO will reduce back after calibration
+NOISE_UPPER_LIMIT = 1.3
+
+# bump after a perf improvement, so you can easily distinguish runs
+# that are on top of this commit
+CODE_PERF_VERSION = "v2"
 
 # use production concurrency level for assertions
 CONCURRENCY_LEVEL = 8
@@ -54,7 +60,7 @@ else:
     EXECUTION_ONLY_CONCURRENCY_LEVELS = []
 
 if os.environ.get("DEFAULT_BUILD"):
-    BUILD_FLAG = ""  #  "--release"
+    BUILD_FLAG = ""  # "--release"
 else:
     BUILD_FLAG = "--profile performance"
 
@@ -137,8 +143,6 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         achieved_gps[transaction_type][0] = gps
 
         # line to be able to aggreate and visualize in Humio
-        # remove one of the options (json/csv) based on what turns
-        # out to be easier to use in Humio
         print(
             json.dumps(
                 {
@@ -149,11 +153,9 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "expected_tps": expected_tps,
                     "tps": tps,
                     "gps": gps,
+                    "code_perf_version": CODE_PERF_VERSION,
                 }
             )
-        )
-        print(
-            f"grep_single_node_perf,{transaction_type},{use_native_executor_row_str},{cur_block_size},{expected_tps},{tps},{gps}"
         )
 
         row.append(int(round(tps)))
@@ -212,11 +214,3 @@ if errors:
     exit(1)
 
 exit(0)
-
-# # Check if any threshold is not met
-# if tps_1k < THRESHOLD_1k or tps_10k < THRESHOLD_10k or tps_50k < THRESHOLD_50k:
-#     print("Sequential TPS below the threshold")
-#     exit(1)
-# else:
-#     print("Sequential TPS above the threshold")
-#     exit(0)
