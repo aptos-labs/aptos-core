@@ -70,7 +70,16 @@ def update() -> int:
 
     return update_exists
 
+def write_github_output(key, value) -> None:
+    print(f"GITHUB_OUTPUT: {key}={value}")
+    try:
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write(f"{key}={value}\n")
+    except KeyError:
+        print("GITHUB_OUTPUT environment variable not set")
+        exit()
+
 
 if __name__ == "__main__":
-    print("NEEDS_UPDATE={}".format(update()))
+    write_github_output("NEED_UPDATE", update())
     exit()
