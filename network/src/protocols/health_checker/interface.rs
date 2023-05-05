@@ -18,6 +18,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use crate::protocols::network::NetworkEvents2;
 
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct HealthCheckData {
@@ -35,13 +36,13 @@ impl HealthCheckData {
 pub struct HealthCheckNetworkInterface<NetworkClient> {
     health_check_data: RwLock<HashMap<PeerId, HealthCheckData>>,
     network_client: NetworkClient,
-    receiver: HealthCheckerNetworkEvents,
+    receiver: NetworkEvents2,
 }
 
-impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
+impl<NetworkClient: NetworkClientInterface>
     HealthCheckNetworkInterface<NetworkClient>
 {
-    pub fn new(network_client: NetworkClient, receiver: HealthCheckerNetworkEvents) -> Self {
+    pub fn new(network_client: NetworkClient, receiver: NetworkEvents2) -> Self {
         Self {
             health_check_data: RwLock::new(HashMap::new()),
             network_client,
@@ -144,12 +145,14 @@ impl<NetworkClient: Unpin> Stream for HealthCheckNetworkInterface<NetworkClient>
     type Item = Event<HealthCheckerMsg>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.get_mut().receiver).poll_next(cx)
+        //Pin::new(&mut self.get_mut().receiver).poll_next(cx) // TODO: reimplement
+        Poll::Pending
     }
 }
 
 impl<NetworkClient: Unpin> FusedStream for HealthCheckNetworkInterface<NetworkClient> {
     fn is_terminated(&self) -> bool {
-        self.receiver.is_terminated()
+        //self.receiver.is_terminated() // TODO: reimplement
+        true
     }
 }

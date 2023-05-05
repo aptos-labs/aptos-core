@@ -53,7 +53,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
 }
 
 impl<
-        NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+        NetworkClient: NetworkClientInterface,
         TransactionValidator: TransactionValidation + 'static,
     > SharedMempool<NetworkClient, TransactionValidator>
 {

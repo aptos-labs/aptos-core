@@ -32,8 +32,8 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     executor: &Handle,
     config: &NodeConfig,
     mempool: Arc<Mutex<CoreMempool>>,
-    network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_client: NetworkClient,
+    network_service_events: NetworkServiceEvents,
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
@@ -44,7 +44,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
 ) where
     TransactionValidator: TransactionValidation + 'static,
 {
-    let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, TransactionValidator> =
+    let smp: SharedMempool<NetworkClient, TransactionValidator> =
         SharedMempool::new(
             mempool.clone(),
             config.mempool.clone(),
@@ -81,8 +81,8 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
 pub fn bootstrap(
     config: &NodeConfig,
     db: Arc<dyn DbReader>,
-    network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_client: NetworkClient,
+    network_service_events: NetworkServiceEvents,
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,

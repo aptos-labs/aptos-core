@@ -28,6 +28,7 @@ use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tokio::runtime::Runtime;
+use aptos_network::protocols::network::NetworkEvents2;
 
 const TEST_RPC_PROTOCOL: ProtocolId = ProtocolId::ConsensusRpcBcs;
 const TEST_DIRECT_SEND_PROTOCOL: ProtocolId = ProtocolId::ConsensusDirectSendBcs;
@@ -56,11 +57,11 @@ pub type DummyNetworkEvents = NetworkEvents<DummyMsg>;
 pub struct DummyNetwork {
     pub runtime: Runtime,
     pub dialer_peer: PeerNetworkId,
-    pub dialer_events: DummyNetworkEvents,
-    pub dialer_network_client: NetworkClient<DummyMsg>,
+    pub dialer_events: NetworkEvents2,
+    pub dialer_network_client: NetworkClient,
     pub listener_peer: PeerNetworkId,
-    pub listener_events: DummyNetworkEvents,
-    pub listener_network_client: NetworkClient<DummyMsg>,
+    pub listener_events: NetworkEvents2,
+    pub listener_network_client: NetworkClient,
 }
 
 /// The following sets up a 2 peer network and verifies connectivity.
@@ -107,7 +108,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (listener_sender, mut listener_events) =
-        network_builder.add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config());
+        network_builder.add_client_and_service::<_>(&dummy_network_config());
     network_builder.build(runtime.handle().clone()).start();
     let listener_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
@@ -140,7 +141,7 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (dialer_sender, mut dialer_events) =
-        network_builder.add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config());
+        network_builder.add_client_and_service::<_>(&dummy_network_config());
     network_builder.build(runtime.handle().clone()).start();
     let dialer_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
@@ -150,29 +151,30 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     // Wait for establishing connection
-    let first_dialer_event = block_on(dialer_events.next()).unwrap();
-    if let Event::NewPeer(metadata) = first_dialer_event {
-        assert_eq!(metadata.remote_peer_id, listener_peer.peer_id());
-        assert_eq!(metadata.origin, ConnectionOrigin::Outbound);
-        assert_eq!(metadata.role, PeerRole::Validator);
-    } else {
-        panic!(
-            "No NewPeer event on dialer received instead: {:?}",
-            first_dialer_event
-        );
-    }
+    // let first_dialer_event = block_on(dialer_events.next()).unwrap();
+    panic!("TODO: reimplement dummy net");
+    // if let Event::NewPeer(metadata) = first_dialer_event {
+    //     assert_eq!(metadata.remote_peer_id, listener_peer.peer_id());
+    //     assert_eq!(metadata.origin, ConnectionOrigin::Outbound);
+    //     assert_eq!(metadata.role, PeerRole::Validator);
+    // } else {
+    //     panic!(
+    //         "No NewPeer event on dialer received instead: {:?}",
+    //         first_dialer_event
+    //     );
+    // }
 
-    let first_listener_event = block_on(listener_events.next()).unwrap();
-    if let Event::NewPeer(metadata) = first_listener_event {
-        assert_eq!(metadata.remote_peer_id, dialer_peer.peer_id());
-        assert_eq!(metadata.origin, ConnectionOrigin::Inbound);
-        assert_eq!(metadata.role, PeerRole::Validator);
-    } else {
-        panic!(
-            "No NewPeer event on listener received instead: {:?}",
-            first_listener_event
-        );
-    }
+    // let first_listener_event = block_on(listener_events.next()).unwrap();
+    // if let Event::NewPeer(metadata) = first_listener_event {
+    //     assert_eq!(metadata.remote_peer_id, dialer_peer.peer_id());
+    //     assert_eq!(metadata.origin, ConnectionOrigin::Inbound);
+    //     assert_eq!(metadata.role, PeerRole::Validator);
+    // } else {
+    //     panic!(
+    //         "No NewPeer event on listener received instead: {:?}",
+    //         first_listener_event
+    //     );
+    // }
 
     DummyNetwork {
         runtime,

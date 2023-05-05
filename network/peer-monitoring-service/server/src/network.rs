@@ -33,28 +33,29 @@ pub struct NetworkRequest {
 /// A stream of requests from the network. Each request also comes with a
 /// callback to send the response.
 pub struct PeerMonitoringServiceNetworkEvents {
-    network_request_stream: BoxStream<'static, NetworkRequest>,
+    //etwork_request_stream: BoxStream<'static, NetworkRequest>,
 }
 
 impl PeerMonitoringServiceNetworkEvents {
-    pub fn new(network_service_events: NetworkServiceEvents<PeerMonitoringServiceMessage>) -> Self {
+    pub fn new(network_service_events: NetworkServiceEvents) -> Self {
+        // TODO: reimplement
         // Transform the event streams to also include the network ID
-        let network_events: Vec<_> = network_service_events
-            .into_network_and_events()
-            .into_iter()
-            .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-            .collect();
-        let network_events = select_all(network_events).fuse();
-
-        // Transform each event to a network request
-        let network_request_stream = network_events
-            .filter_map(|(network_id, event)| {
-                future::ready(Self::event_to_request(network_id, event))
-            })
-            .boxed();
+        // let network_events: Vec<_> = network_service_events
+        //     .into_network_and_events()
+        //     .into_iter()
+        //     .map(|(network_id, events)| events.map(move |event| (network_id, event)))
+        //     .collect();
+        // let network_events = select_all(network_events).fuse();
+        //
+        // // Transform each event to a network request
+        // let network_request_stream = network_events
+        //     .filter_map(|(network_id, event)| {
+        //         future::ready(Self::event_to_request(network_id, event))
+        //     })
+        //     .boxed();
 
         Self {
-            network_request_stream,
+            //network_request_stream,
         }
     }
 
@@ -88,7 +89,8 @@ impl Stream for PeerMonitoringServiceNetworkEvents {
     type Item = NetworkRequest;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Pin::new(&mut self.network_request_stream).poll_next(cx)
+        //Pin::new(&mut self.network_request_stream).poll_next(cx)
+        Poll::Pending // TODO: reimplement
     }
 }
 

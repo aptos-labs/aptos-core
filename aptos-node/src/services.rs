@@ -80,7 +80,7 @@ pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener>,
-    consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
+    consensus_network_interfaces: ApplicationNetworkInterfaces,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
 ) -> Runtime {
@@ -104,7 +104,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     node_config: &mut NodeConfig,
     db_rw: &DbReaderWriter,
     mempool_reconfig_subscription: ReconfigNotificationListener,
-    network_interfaces: ApplicationNetworkInterfaces<MempoolSyncMsg>,
+    network_interfaces: ApplicationNetworkInterfaces,
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
@@ -140,7 +140,7 @@ pub fn start_node_inspection_service(node_config: &NodeConfig) {
 /// Starts the peer monitoring service and returns the runtime
 pub fn start_peer_monitoring_service(
     node_config: &NodeConfig,
-    network_interfaces: ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
+    network_interfaces: ApplicationNetworkInterfaces,
     db_reader: Arc<dyn DbReader>,
 ) -> Runtime {
     // Get the network client and events

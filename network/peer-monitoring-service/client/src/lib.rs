@@ -58,7 +58,7 @@ impl PeerMonitorState {
 /// the state of the peers.
 pub async fn start_peer_monitor(
     node_config: NodeConfig,
-    network_client: NetworkClient<PeerMonitoringServiceMessage>,
+    network_client: NetworkClient,
     runtime: Option<Handle>,
 ) {
     // Create a new monitoring client and peer monitor state
@@ -90,9 +90,7 @@ pub async fn start_peer_monitor(
 /// monitoring client with the given state.
 async fn start_peer_monitor_with_state(
     node_config: NodeConfig,
-    peer_monitoring_client: PeerMonitoringServiceClient<
-        NetworkClient<PeerMonitoringServiceMessage>,
-    >,
+    peer_monitoring_client: PeerMonitoringServiceClient<NetworkClient>,
     peer_monitor_state: PeerMonitorState,
     time_service: TimeService,
     runtime: Option<Handle>,

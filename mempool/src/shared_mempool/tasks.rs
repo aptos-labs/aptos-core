@@ -52,7 +52,7 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
     executor: Handle,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     let network_interface = &smp.network_interface.clone();
@@ -105,7 +105,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     callback: oneshot::Sender<Result<SubmissionStatus>>,
     timer: HistogramTimer,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation + 'static,
 {
     timer.stop_and_record();
@@ -138,7 +138,7 @@ pub(crate) async fn process_client_get_transaction<NetworkClient, TransactionVal
     callback: oneshot::Sender<Option<SignedTransaction>>,
     timer: HistogramTimer,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
@@ -163,7 +163,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
     peer: PeerNetworkId,
     timer: HistogramTimer,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     timer.stop_and_record();
@@ -248,7 +248,7 @@ pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>
     timeline_state: TimelineState,
 ) -> Vec<SubmissionStatusBundle>
 where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     let mut statuses = vec![];
@@ -322,7 +322,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     // Track latency: VM validation
@@ -438,7 +438,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     req: QuorumStoreRequest,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     // Start latency timer

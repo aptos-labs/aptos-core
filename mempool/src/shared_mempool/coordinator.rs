@@ -45,13 +45,13 @@ use tokio_stream::wrappers::IntervalStream;
 pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
     mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_service_events: NetworkServiceEvents,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mut mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    NetworkClient: NetworkClientInterface + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     info!(LogSchema::event_log(
@@ -60,12 +60,13 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
     ));
 
     // Transform events to also include the network id
-    let network_events: Vec<_> = network_service_events
-        .into_network_and_events()
-        .into_iter()
-        .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-        .collect();
-    let mut events = select_all(network_events).fuse();
+    // TODO: reimplement
+    // let network_events: Vec<_> = network_service_events
+    //     .into_network_and_events()
+    //     .into_iter()
+    //     .map(|(network_id, events)| events.map(move |event| (network_id, event)))
+    //     .collect();
+    // let mut events = select_all(network_events).fuse();
     let mut scheduled_broadcasts = FuturesUnordered::new();
 
     // Use a BoundedExecutor to restrict only `workers_available` concurrent
@@ -102,9 +103,9 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
             (peer, backoff) = scheduled_broadcasts.select_next_some() => {
                 tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
-            (network_id, event) = events.select_next_some() => {
-                handle_network_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
-            },
+            // (network_id, event) = events.select_next_some() => { // TODO: reimplement
+            //     handle_network_event(&executor, &bounded_executor, &mut scheduled_broadcasts, &mut smp, network_id, event).await;
+            // },
             complete => break,
         }
     }
@@ -120,7 +121,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,
     request: MempoolClientRequest,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    NetworkClient: NetworkClientInterface + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     match request {
@@ -176,7 +177,7 @@ fn handle_commit_notification<NetworkClient, TransactionValidator>(
     msg: MempoolCommitNotification,
     mempool_listener: &mut MempoolNotificationListener,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    NetworkClient: NetworkClientInterface,
     TransactionValidator: TransactionValidation,
 {
     debug!(
@@ -222,7 +223,7 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,
     config_update: OnChainConfigPayload,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    NetworkClient: NetworkClientInterface + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     info!(LogSchema::event_log(
@@ -254,7 +255,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
     network_id: NetworkId,
     event: Event<MempoolSyncMsg>,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    NetworkClient: NetworkClientInterface + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     match event {

@@ -47,6 +47,7 @@ use futures::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use aptos_types::network_address::Protocol;
 
 pub mod builder;
 mod interface;
@@ -111,7 +112,7 @@ pub struct HealthChecker<NetworkClient> {
     round: u64,
 }
 
-impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
+impl<NetworkClient: NetworkClientInterface + Unpin> HealthChecker<NetworkClient> {
     /// Create new instance of the [`HealthChecker`] actor.
     pub fn new(
         network_context: NetworkContext,
@@ -377,18 +378,27 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             nonce
         );
         let peer_network_id = PeerNetworkId::new(network_context.network_id(), peer_id);
+        let msg = HealthCheckerMsg::Ping(Ping(nonce));
+        let data = match ProtocolId::HealthCheckerRpc.to_bytes(&msg) {
+            Err(e) => return (peer_id, round, nonce, Err(RpcError::Error(e))),
+            Ok(d) => d,
+        };
         let res_pong_msg = network_client
             .send_to_peer_rpc(
-                HealthCheckerMsg::Ping(Ping(nonce)),
+                data.into(),
                 ping_timeout,
                 peer_network_id,
             )
             .await
             .map_err(|error| RpcError::Error(error.into()))
-            .and_then(|msg| match msg {
-                HealthCheckerMsg::Pong(res) => Ok(res),
-                _ => Err(RpcError::InvalidRpcResponse),
-            });
+            .and_then(|reply_bytes| {
+                match ProtocolId::HealthCheckerRpc.from_bytes(reply_bytes.as_ref()) {
+                    Ok(msg) => match msg {
+                    HealthCheckerMsg::Pong(res) => Ok(res),
+                    _ => Err(RpcError::InvalidRpcResponse),
+                },
+                    Err(e) => Err(RpcError::Error(e)),
+            }});
         (peer_id, round, nonce, res_pong_msg)
     }
 }

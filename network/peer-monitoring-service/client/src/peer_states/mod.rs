@@ -21,9 +21,7 @@ mod request_tracker;
 pub fn refresh_peer_states(
     monitoring_service_config: &PeerMonitoringServiceConfig,
     peer_monitor_state: PeerMonitorState,
-    peer_monitoring_client: PeerMonitoringServiceClient<
-        NetworkClient<PeerMonitoringServiceMessage>,
-    >,
+    peer_monitoring_client: PeerMonitoringServiceClient<NetworkClient>,
     connected_peers_and_metadata: HashMap<PeerNetworkId, PeerMetadata>,
     time_service: TimeService,
     runtime: Option<Handle>,

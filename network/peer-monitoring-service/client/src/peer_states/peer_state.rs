@@ -61,9 +61,7 @@ impl PeerState {
         &self,
         monitoring_service_config: &PeerMonitoringServiceConfig,
         peer_state_key: &PeerStateKey,
-        peer_monitoring_client: PeerMonitoringServiceClient<
-            NetworkClient<PeerMonitoringServiceMessage>,
-        >,
+        peer_monitoring_client: PeerMonitoringServiceClient<NetworkClient>,
         peer_network_id: PeerNetworkId,
         peer_metadata: PeerMetadata,
         request_id_generator: Arc<U64IdGenerator>,

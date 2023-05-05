@@ -15,11 +15,13 @@ use aptos_types::network_address::NetworkAddress;
 use async_trait::async_trait;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use bytes::Bytes;
+use crate::protocols::network::NetworkEvents2;
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
-pub trait NetworkMessageTrait: Clone + Message + Send + Sync + 'static {}
-impl<T: Clone + Message + Send + Sync + 'static> NetworkMessageTrait for T {}
+//pub trait NetworkMessageTrait: Clone + Message + Send + Sync + 'static {}
+//impl<T: Clone + Message + Send + Sync + 'static> NetworkMessageTrait for T {}
 
 /// A simple interface offered by the networking stack to each client application (e.g., consensus,
 /// state sync, mempool, etc.). This interface provides basic support for sending messages,
@@ -27,7 +29,7 @@ impl<T: Clone + Message + Send + Sync + 'static> NetworkMessageTrait for T {}
 /// specific metadata for each peer (e.g., peer scores and liveness).
 // TODO: Add API calls for managing metadata, updating state, etc.
 #[async_trait]
-pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + Sync {
+pub trait NetworkClientInterface: Clone + Send + Sync {
     /// Adds the given peer list to the set of discovered peers
     /// that can potentially be dialed for future connections.
     async fn add_peers_to_discovery(
@@ -50,38 +52,38 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
 
     /// Sends the given message to the specified peer. Note: this
     /// method does not guarantee message delivery or handle responses.
-    fn send_to_peer(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error>;
+    fn send_to_peer(&self, _message: Bytes, _peer: PeerNetworkId) -> Result<(), Error>;
 
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
-    fn send_to_peers(&self, _message: Message, _peers: &[PeerNetworkId]) -> Result<(), Error>;
+    fn send_to_peers(&self, _message: Bytes, _peers: &[PeerNetworkId]) -> Result<(), Error>;
 
     /// Sends the given message to the specified peer with the corresponding
     /// timeout. Awaits a response from the peer, or hits the timeout
     /// (whichever occurs first).
     async fn send_to_peer_rpc(
         &self,
-        _message: Message,
+        _message: Bytes,
         _rpc_timeout: Duration,
         _peer: PeerNetworkId,
-    ) -> Result<Message, Error>;
+    ) -> Result<Bytes, Error>;
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
 /// state sync and mempool, etc.) to interact with the network and other peers.
 #[derive(Clone, Debug)]
-pub struct NetworkClient<Message> {
+pub struct NetworkClient {
     direct_send_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
-    network_senders: HashMap<NetworkId, NetworkSender<Message>>,
+    network_senders: HashMap<NetworkId, NetworkSender>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
-impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
+impl NetworkClient {
     pub fn new(
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
-        network_senders: HashMap<NetworkId, NetworkSender<Message>>,
+        network_senders: HashMap<NetworkId, NetworkSender>,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
@@ -96,7 +98,7 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
     fn get_sender_for_network_id(
         &self,
         network_id: &NetworkId,
-    ) -> Result<&NetworkSender<Message>, Error> {
+    ) -> Result<&NetworkSender, Error> {
         self.network_senders.get(network_id).ok_or_else(|| {
             Error::UnexpectedError(format!(
                 "Unknown network ID specified for sender: {:?}",
@@ -135,7 +137,7 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
 }
 
 #[async_trait]
-impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkClient<Message> {
+impl NetworkClientInterface for NetworkClient {
     async fn add_peers_to_discovery(
         &self,
         _peers: &[(PeerNetworkId, NetworkAddress)],
@@ -163,14 +165,14 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         self.peers_and_metadata.clone()
     }
 
-    fn send_to_peer(&self, message: Message, peer: PeerNetworkId) -> Result<(), Error> {
+    fn send_to_peer(&self, message: Bytes, peer: PeerNetworkId) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         let direct_send_protocol_id = self
             .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
-    fn send_to_peers(&self, message: Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
+    fn send_to_peers(&self, message: Bytes, peers: &[PeerNetworkId]) -> Result<(), Error> {
         // Sort peers by protocol
         let mut peers_per_protocol = HashMap::new();
         let mut peers_without_a_protocol = vec![];
@@ -213,10 +215,10 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
 
     async fn send_to_peer_rpc(
         &self,
-        message: Message,
+        message: Bytes,
         rpc_timeout: Duration,
         peer: PeerNetworkId,
-    ) -> Result<Message, Error> {
+    ) -> Result<Bytes, Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         let rpc_protocol_id =
             self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
@@ -228,17 +230,17 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
 
 /// A network component that can be used by server applications (e.g., consensus,
 /// state sync and mempool, etc.) to respond to network events and network clients.
-pub struct NetworkServiceEvents<Message> {
-    network_and_events: HashMap<NetworkId, NetworkEvents<Message>>,
+pub struct NetworkServiceEvents {
+    network_and_events: HashMap<NetworkId, NetworkEvents2>,
 }
 
-impl<Message> NetworkServiceEvents<Message> {
-    pub fn new(network_and_events: HashMap<NetworkId, NetworkEvents<Message>>) -> Self {
+impl NetworkServiceEvents {
+    pub fn new(network_and_events: HashMap<NetworkId, NetworkEvents2>) -> Self {
         Self { network_and_events }
     }
-
-    /// Consumes and returns the network and events map
-    pub fn into_network_and_events(self) -> HashMap<NetworkId, NetworkEvents<Message>> {
-        self.network_and_events
-    }
+    //
+    // /// Consumes and returns the network and events map
+    // pub fn into_network_and_events(self) -> HashMap<NetworkId, NetworkEvents<_>> {
+    //     self.network_and_events
+    // }
 }

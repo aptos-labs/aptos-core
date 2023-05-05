@@ -19,9 +19,10 @@ use aptos_time_service::TimeService;
 use maplit::hashmap;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
+use crate::protocols::network::NetworkEvents2;
 
 pub struct HealthCheckerBuilder {
-    service: Option<HealthChecker<NetworkClient<HealthCheckerMsg>>>,
+    service: Option<HealthChecker<NetworkClient>>,
 }
 
 impl HealthCheckerBuilder {
@@ -31,8 +32,8 @@ impl HealthCheckerBuilder {
         ping_interval_ms: u64,
         ping_timeout_ms: u64,
         ping_failures_tolerated: u64,
-        network_sender: NetworkSender<HealthCheckerMsg>,
-        network_rx: HealthCheckerNetworkEvents,
+        network_sender: NetworkSender,
+        network_rx: NetworkEvents2,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         let network_senders = hashmap! {network_context.network_id() => network_sender};

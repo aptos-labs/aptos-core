@@ -16,6 +16,7 @@ use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceMessage,
 };
 use std::{sync::Arc, time::Duration};
+use aptos_network::ProtocolId;
 
 /// The interface for sending peer monitoring service requests
 /// and querying peer information.
@@ -24,7 +25,7 @@ pub struct PeerMonitoringServiceClient<NetworkClient> {
     network_client: NetworkClient,
 }
 
-impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
+impl<NetworkClient: NetworkClientInterface>
     PeerMonitoringServiceClient<NetworkClient>
 {
     pub fn new(network_client: NetworkClient) -> Self {
@@ -38,15 +39,18 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
         request: PeerMonitoringServiceRequest,
         timeout: Duration,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
+        let request = PeerMonitoringServiceMessage::Request(request);
+        let request_bytes = ProtocolId::PeerMonitoringServiceRpc.to_bytes(&request).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
         let response = self
             .network_client
             .send_to_peer_rpc(
-                PeerMonitoringServiceMessage::Request(request),
+                request_bytes.into(),
                 timeout,
                 recipient,
             )
             .await
             .map_err(|error| Error::NetworkError(error.to_string()))?;
+        let response = ProtocolId::PeerMonitoringServiceRpc.from_bytes(response.as_ref()).map_err(|e| Error::UnexpectedError(format!("decode err: {}", e)))?;
         match response {
             PeerMonitoringServiceMessage::Response(Ok(response)) => Ok(response),
             PeerMonitoringServiceMessage::Response(Err(err)) => {
@@ -67,9 +71,7 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
 
 /// Sends a request to a specific peer
 pub async fn send_request_to_peer(
-    peer_monitoring_client: PeerMonitoringServiceClient<
-        NetworkClient<PeerMonitoringServiceMessage>,
-    >,
+    peer_monitoring_client: PeerMonitoringServiceClient<NetworkClient>,
     peer_network_id: &PeerNetworkId,
     request_id: u64,
     request: PeerMonitoringServiceRequest,

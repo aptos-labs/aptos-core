@@ -29,20 +29,21 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_network::protocols::network::NetworkEvents2;
 
 /// A simple struct that holds both the network client
 /// and receiving interfaces for an application.
-pub struct ApplicationNetworkInterfaces<T> {
-    pub network_client: NetworkClient<T>,
-    pub network_service_events: NetworkServiceEvents<T>,
+pub struct ApplicationNetworkInterfaces {
+    pub network_client: NetworkClient,
+    pub network_service_events: NetworkServiceEvents, // TODO deprecated
 }
 
 /// A simple struct that holds an individual application
 /// network handle (i.e., network id, sender and receiver).
-struct ApplicationNetworkHandle<T> {
+struct ApplicationNetworkHandle {
     pub network_id: NetworkId,
-    pub network_sender: NetworkSender<T>,
-    pub network_events: NetworkEvents<T>,
+    pub network_sender: NetworkSender,
+    pub network_events: NetworkEvents2, // TODO deprecated
 }
 
 /// TODO: make this configurable (e.g., for compression)
@@ -163,10 +164,10 @@ pub fn setup_networks_and_get_interfaces(
     event_subscription_service: &mut EventSubscriptionService,
 ) -> (
     Vec<Runtime>,
-    Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    ApplicationNetworkInterfaces<MempoolSyncMsg>,
-    ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
-    ApplicationNetworkInterfaces<StorageServiceMessage>,
+    Option<ApplicationNetworkInterfaces>,
+    ApplicationNetworkInterfaces,
+    ApplicationNetworkInterfaces,
+    ApplicationNetworkInterfaces,
 ) {
     // Gather all network configs and network ids
     let (network_configs, network_ids) = extract_network_configs_and_ids(node_config);
@@ -284,11 +285,11 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
 }
 
 /// Registers a new application client and service with the network
-fn register_client_and_service_with_network<T: Serialize + for<'de> Deserialize<'de>>(
+fn register_client_and_service_with_network(
     network_builder: &mut NetworkBuilder,
     network_id: NetworkId,
     application_config: NetworkApplicationConfig,
-) -> ApplicationNetworkHandle<T> {
+) -> ApplicationNetworkHandle {
     let (network_sender, network_events) =
         network_builder.add_client_and_service(&application_config);
     ApplicationNetworkHandle {
@@ -302,18 +303,18 @@ fn register_client_and_service_with_network<T: Serialize + for<'de> Deserialize<
 /// be used by the applications themselves.
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
-    consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
-    mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
+    consensus_network_handle: Option<ApplicationNetworkHandle>,
+    mempool_network_handles: Vec<ApplicationNetworkHandle>,
     peer_monitoring_service_network_handles: Vec<
-        ApplicationNetworkHandle<PeerMonitoringServiceMessage>,
+        ApplicationNetworkHandle,
     >,
-    storage_service_network_handles: Vec<ApplicationNetworkHandle<StorageServiceMessage>>,
+    storage_service_network_handles: Vec<ApplicationNetworkHandle>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
-    Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    ApplicationNetworkInterfaces<MempoolSyncMsg>,
-    ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
-    ApplicationNetworkInterfaces<StorageServiceMessage>,
+    Option<ApplicationNetworkInterfaces>,
+    ApplicationNetworkInterfaces,
+    ApplicationNetworkInterfaces,
+    ApplicationNetworkInterfaces,
 ) {
     let consensus_interfaces = consensus_network_handle.map(|consensus_network_handle| {
         create_network_interfaces(
@@ -348,13 +349,11 @@ fn transform_network_handles_into_interfaces(
 
 /// Creates an application network inteface using the given
 /// handles and config.
-fn create_network_interfaces<
-    T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + 'static,
->(
-    network_handles: Vec<ApplicationNetworkHandle<T>>,
+fn create_network_interfaces(
+    network_handles: Vec<ApplicationNetworkHandle>,
     network_application_config: NetworkApplicationConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
-) -> ApplicationNetworkInterfaces<T> {
+) -> ApplicationNetworkInterfaces {
     // Gather the network senders and events
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();

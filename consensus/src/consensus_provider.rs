@@ -31,8 +31,8 @@ use tokio::runtime::Runtime;
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
     node_config: &NodeConfig,
-    network_client: NetworkClient<ConsensusMsg>,
-    network_service_events: NetworkServiceEvents<ConsensusMsg>,
+    network_client: NetworkClient,
+    network_service_events: NetworkServiceEvents,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,

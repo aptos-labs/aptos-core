@@ -5,10 +5,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::network_id::PeerNetworkId;
-use aptos_network::{
-    application::{interface::NetworkClientInterface, storage::PeersAndMetadata},
-    protocols::network::RpcError,
-};
+use aptos_network::{application::{interface::NetworkClientInterface, storage::PeersAndMetadata}, ProtocolId, protocols::network::RpcError};
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
     StorageServiceMessage,
@@ -35,7 +32,7 @@ pub struct StorageServiceClient<NetworkClient> {
     network_client: NetworkClient,
 }
 
-impl<NetworkClient: NetworkClientInterface<StorageServiceMessage>>
+impl<NetworkClient: NetworkClientInterface>
     StorageServiceClient<NetworkClient>
 {
     pub fn new(network_client: NetworkClient) -> Self {
@@ -48,11 +45,14 @@ impl<NetworkClient: NetworkClientInterface<StorageServiceMessage>>
         timeout: Duration,
         request: StorageServiceRequest,
     ) -> Result<StorageServiceResponse, Error> {
+        let request = StorageServiceMessage::Request(request);
+        let request_bytes = ProtocolId::StorageServiceRpc.to_bytes(&request).map_err(|e| Error::NetworkError(format!("encode err: {}", e)))?;
         let response = self
             .network_client
-            .send_to_peer_rpc(StorageServiceMessage::Request(request), timeout, recipient)
+            .send_to_peer_rpc(request_bytes.into(), timeout, recipient)
             .await
             .map_err(|error| Error::NetworkError(error.to_string()))?;
+        let response = ProtocolId::StorageServiceRpc.from_bytes(response.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))?;
         match response {
             StorageServiceMessage::Response(Ok(response)) => Ok(response),
             StorageServiceMessage::Response(Err(err)) => Err(Error::StorageServiceError(err)),

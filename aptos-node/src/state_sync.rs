@@ -72,7 +72,7 @@ pub fn create_event_subscription_service(
 /// Sets up all state sync runtimes and return the notification endpoints
 pub fn start_state_sync_and_get_notification_handles(
     node_config: &NodeConfig,
-    storage_network_interfaces: ApplicationNetworkInterfaces<StorageServiceMessage>,
+    storage_network_interfaces: ApplicationNetworkInterfaces,
     waypoint: Waypoint,
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,
@@ -167,7 +167,7 @@ fn setup_data_streaming_service(
 /// Sets up the aptos data client runtime
 fn setup_aptos_data_client(
     node_config: &NodeConfig,
-    network_client: NetworkClient<StorageServiceMessage>,
+    network_client: NetworkClient,
 ) -> anyhow::Result<(AptosNetDataClient, Runtime)> {
     // Create the storage service client
     let storage_service_client = StorageServiceClient::new(network_client);
@@ -191,7 +191,7 @@ fn setup_aptos_data_client(
 /// Sets up the state sync storage service runtime
 fn setup_state_sync_storage_service(
     config: StorageServiceConfig,
-    network_service_events: NetworkServiceEvents<StorageServiceMessage>,
+    network_service_events: NetworkServiceEvents,
     db_rw: &DbReaderWriter,
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime

@@ -114,7 +114,7 @@ pub const DIRECT_SEND: &[ProtocolId] = &[
     ProtocolId::ConsensusDirectSendJson,
 ];
 
-impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient<NetworkClient> {
+impl<NetworkClient: NetworkClientInterface> ConsensusNetworkClient<NetworkClient> {
     /// Returns a new consensus network client
     pub fn new(network_client: NetworkClient) -> Self {
         Self { network_client }
@@ -123,7 +123,8 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
     /// Send a single message to the destination peer
     pub fn send_to(&self, peer: PeerId, message: ConsensusMsg) -> Result<(), Error> {
         let peer_network_id = self.get_peer_network_id_for_peer(peer);
-        self.network_client.send_to_peer(message, peer_network_id)
+        let message_bytes = ProtocolId::ConsensusDirectSendCompressed.to_bytes(&message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        self.network_client.send_to_peer(message_bytes.into(), peer_network_id)
     }
 
     /// Send a single message to the destination peers
@@ -135,8 +136,9 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
         let peer_network_ids: Vec<PeerNetworkId> = peers
             .map(|peer| self.get_peer_network_id_for_peer(peer))
             .collect();
+        let message_bytes = ProtocolId::ConsensusDirectSendCompressed.to_bytes(&message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
         self.network_client
-            .send_to_peers(message, &peer_network_ids)
+            .send_to_peers(message_bytes.into(), &peer_network_ids)
     }
 
     /// Send a RPC to the destination peer
@@ -147,9 +149,12 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
         rpc_timeout: Duration,
     ) -> Result<ConsensusMsg, Error> {
         let peer_network_id = self.get_peer_network_id_for_peer(peer);
-        self.network_client
-            .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
-            .await
+        let protocol_id = ProtocolId::ConsensusDirectSendCompressed;
+        let message_bytes = protocol_id.to_bytes(&message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        let reply = self.network_client
+            .send_to_peer_rpc(message_bytes.into(), rpc_timeout, peer_network_id)
+            .await?;
+        protocol_id.from_bytes(reply.as_ref()).map_err(|e| Error::UnexpectedError(format!("decode err: {}", e)))
     }
 
     // TODO: we shouldn't need to expose this. Migrate the code to handle

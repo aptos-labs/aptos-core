@@ -42,7 +42,7 @@ impl<T: DeserializeOwned + Serialize> Message for T {}
 ///
 /// [`PeerNotification`]: crate::peer::PeerNotification
 #[derive(Debug)]
-pub enum Event<TMessage> {
+pub enum Event<TMessage> { // TODO: deprecated, to be replaced by direct handlers for direct-message or rpc-request and a different peer-info API
     /// New inbound direct-send message from peer.
     Message(PeerId, TMessage),
     /// New inbound rpc request. The request is fulfilled by sending the
@@ -143,6 +143,10 @@ impl NetworkApplicationConfig {
     }
 }
 
+pub struct NetworkEvents2 { // TODO: implement
+}
+
+
 /// A `Stream` of `Event<TMessage>` from the lower network layer to an upper
 /// network application that deserializes inbound network direct-send and rpc
 /// messages into `TMessage`. Inbound messages that fail to deserialize are logged
@@ -151,7 +155,7 @@ impl NetworkApplicationConfig {
 /// `NetworkEvents` is really just a thin wrapper around a
 /// `channel::Receiver<PeerNotification>` that deserializes inbound messages.
 #[pin_project]
-pub struct NetworkEvents<TMessage> {
+pub struct NetworkEvents<TMessage> { // TODO: deprecated, replace with distinct channels per ProtocolId
     #[pin]
     event_stream: Select<
         FilterMap<
@@ -270,10 +274,10 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 ///
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
 #[derive(Clone, Debug)]
-pub struct NetworkSender<TMessage> {
+pub struct NetworkSender {
     peer_mgr_reqs_tx: PeerManagerRequestSender,
     connection_reqs_tx: ConnectionRequestSender,
-    _marker: PhantomData<TMessage>,
+//    _marker: PhantomData<TMessage>,
 }
 
 /// Trait specifying the signature for `new()` `NetworkSender`s
@@ -284,7 +288,7 @@ pub trait NewNetworkSender {
     ) -> Self;
 }
 
-impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
+impl NewNetworkSender for NetworkSender {
     fn new(
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
@@ -292,12 +296,12 @@ impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
         Self {
             peer_mgr_reqs_tx,
             connection_reqs_tx,
-            _marker: PhantomData,
+            //_marker: PhantomData,
         }
     }
 }
 
-impl<TMessage> NetworkSender<TMessage> {
+impl NetworkSender {
     /// Request that a given Peer be dialed at the provided `NetworkAddress` and
     /// synchronously wait for the request to be performed.
     pub async fn dial_peer(&self, peer: PeerId, addr: NetworkAddress) -> Result<(), NetworkError> {
@@ -313,17 +317,16 @@ impl<TMessage> NetworkSender<TMessage> {
     }
 }
 
-impl<TMessage: Message> NetworkSender<TMessage> {
+impl NetworkSender {
     /// Send a protobuf message to a single recipient. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
         &self,
         recipient: PeerId,
         protocol: ProtocolId,
-        message: TMessage,
+        message: Bytes,
     ) -> Result<(), NetworkError> {
-        let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx.send_to(recipient, protocol, mdata)?;
+        self.peer_mgr_reqs_tx.send_to(recipient, protocol, message)?;
         Ok(())
     }
 
@@ -333,12 +336,11 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         &self,
         recipients: impl Iterator<Item = PeerId>,
         protocol: ProtocolId,
-        message: TMessage,
+        message: Bytes,
     ) -> Result<(), NetworkError> {
         // Serialize message.
-        let mdata = protocol.to_bytes(&message)?.into();
         self.peer_mgr_reqs_tx
-            .send_to_many(recipients, protocol, mdata)?;
+            .send_to_many(recipients, protocol, message)?;
         Ok(())
     }
 
@@ -349,17 +351,15 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         &self,
         recipient: PeerId,
         protocol: ProtocolId,
-        req_msg: TMessage,
+        req_msg: Bytes,
         timeout: Duration,
-    ) -> Result<TMessage, RpcError> {
+    ) -> Result<Bytes, RpcError> {
         // serialize request
-        let req_data = protocol.to_bytes(&req_msg)?.into();
         let res_data = self
             .peer_mgr_reqs_tx
-            .send_rpc(recipient, protocol, req_data, timeout)
+            .send_rpc(recipient, protocol, req_msg, timeout)
             .await?;
-        let res_msg: TMessage = protocol.from_bytes(&res_data)?;
-        Ok(res_msg)
+        Ok(res_data)
     }
 }
 

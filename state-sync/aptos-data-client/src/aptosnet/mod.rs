@@ -82,7 +82,7 @@ pub struct AptosNetDataClient {
     /// Config for AptosNet data client.
     data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
-    storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
+    storage_service_client: StorageServiceClient<NetworkClient>,
     /// All of the data-client specific data we have on each network peer.
     peer_states: Arc<RwLock<PeerStates>>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
@@ -96,7 +96,7 @@ impl AptosNetDataClient {
         data_client_config: AptosDataClientConfig,
         base_config: BaseConfig,
         time_service: TimeService,
-        storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
+        storage_service_client: StorageServiceClient<NetworkClient>,
         runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
         let client = Self {

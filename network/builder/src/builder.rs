@@ -45,6 +45,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
 use std::{clone::Clone, collections::HashSet, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
+use aptos_network::protocols::network::NetworkEvents2;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 enum State {
@@ -439,10 +440,10 @@ impl NetworkBuilder {
     /// Register a new client and service application with the network. Return
     /// the client interface for sending messages and the service interface
     /// for handling network requests.
-    pub fn add_client_and_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
+    pub fn add_client_and_service<SenderT: NewNetworkSender>(
         &mut self,
         config: &NetworkApplicationConfig,
-    ) -> (SenderT, EventsT) {
+    ) -> (SenderT, NetworkEvents2) {
         (
             self.add_client(&config.network_client_config),
             self.add_service(&config.network_service_config),
@@ -459,10 +460,11 @@ impl NetworkBuilder {
     /// Register a new service application with the network. Return the service
     /// interface for handling network requests.
     // TODO(philiphayes): return new NetworkService (name TBD) interface?
-    fn add_service<EventsT: NewNetworkEvents>(&mut self, config: &NetworkServiceConfig) -> EventsT {
-        let (peer_mgr_reqs_rx, connection_notifs_rx) =
-            self.peer_manager_builder.add_service(config);
-        EventsT::new(peer_mgr_reqs_rx, connection_notifs_rx)
+    fn add_service(&mut self, config: &NetworkServiceConfig) -> NetworkEvents2 { // TODO: reimplement
+        NetworkEvents2{} // TODO
+        // let (peer_mgr_reqs_rx, connection_notifs_rx) =
+        //     self.peer_manager_builder.add_service(config);
+        // EventsT::new(peer_mgr_reqs_rx, connection_notifs_rx)
     }
 }
 
