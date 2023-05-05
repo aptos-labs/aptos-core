@@ -167,8 +167,10 @@ where
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error = || PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .finish(Location::Undefined);
+        let common_error = || {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .finish(Location::Undefined)
+        };
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
@@ -204,8 +206,7 @@ where
                     .get_resource_group_data(&addr, &resource_tag)
                     .map_err(|_| common_error())?;
                 let (mut source_data, create) = if let Some(source_data) = source_data {
-                    let source_data =
-                        bcs::from_bytes(&source_data).map_err(|_| common_error())?;
+                    let source_data = bcs::from_bytes(&source_data).map_err(|_| common_error())?;
                     (source_data, false)
                 } else {
                     (BTreeMap::new(), true)
@@ -214,14 +215,10 @@ where
                 for (struct_tag, current_op) in resources.into_resources() {
                     match current_op {
                         MoveStorageOp::Delete => {
-                            source_data
-                                .remove(&struct_tag)
-                                .ok_or_else(common_error)?;
+                            source_data.remove(&struct_tag).ok_or_else(common_error)?;
                         },
                         MoveStorageOp::Modify(new_data) => {
-                            let data = source_data
-                                .get_mut(&struct_tag)
-                                .ok_or_else(common_error)?;
+                            let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                             *data = new_data;
                         },
                         MoveStorageOp::New(data) => {
@@ -236,13 +233,9 @@ where
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error())?,
-                    )
+                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 } else {
-                    MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error())?,
-                    )
+                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
                 resource_group_change_set
                     .add_resource_op(addr, resource_tag, op)
