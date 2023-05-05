@@ -201,17 +201,13 @@ impl BlockAptosVM {
             concurrency_level,
             executor_thread_pool,
         );
-        let result = executor
+        executor
             .execute_block(state_view, signature_verified_block, state_view)
             .map(|outputs| {
                 outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect()
-            });
-
-        //flush_speculative_logs();
-
-        result
+            })
     }
 }

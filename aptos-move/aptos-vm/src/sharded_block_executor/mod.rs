@@ -7,6 +7,7 @@ use crate::sharded_block_executor::{
     executor_shard::ExecutorShard,
 };
 use aptos_block_executor::errors::Error;
+use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use move_core_types::vm_status::VMStatus;
@@ -15,7 +16,7 @@ use std::{
     marker::PhantomData,
     sync::{
         mpsc::{Receiver, Sender},
-        Arc, Mutex,
+        Arc,
     },
     thread,
 };
@@ -27,11 +28,15 @@ mod executor_shard;
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
     num_executor_shards: usize,
     partitioner: Arc<dyn BlockPartitioner>,
-    transactions_txs: Vec<Sender<Vec<Transaction>>>,
+    command_txs: Vec<Sender<ExecutorShardCommand>>,
     shard_threads: Vec<thread::JoinHandle<()>>,
-    quit_signals: Vec<Arc<Mutex<bool>>>,
     result_rx: Receiver<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
     phantom: PhantomData<S>,
+}
+
+pub enum ExecutorShardCommand {
+    ExecuteBlock(Vec<Transaction>),
+    Stop,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
@@ -45,17 +50,14 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             (num_cpus::get() as f64 / num_executor_shards as f64).ceil() as usize
         });
         let (result_tx, result_rx) = std::sync::mpsc::channel();
-        let mut transactions_txs = vec![];
+        let mut command_txs = vec![];
         let mut shard_join_handles = vec![];
-        let mut quit_signals = vec![];
         for i in 0..num_executor_shards {
             let (transactions_tx, transactions_rx) = std::sync::mpsc::channel();
-            let quit_signal = Arc::new(Mutex::new(false));
-            transactions_txs.push(transactions_tx);
+            command_txs.push(transactions_tx);
             shard_join_handles.push(spawn_executor_shard(
                 i,
                 num_threads_per_executor,
-                quit_signal.clone(),
                 state_view.clone(),
                 transactions_rx,
                 result_tx.clone(),
@@ -64,9 +66,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         Self {
             num_executor_shards,
             partitioner: Arc::new(UniformPartitioner {}),
-            transactions_txs,
+            command_txs,
             shard_threads: shard_join_handles,
-            quit_signals,
             result_rx,
             phantom: PhantomData,
         }
@@ -80,16 +81,17 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     ) -> Result<Vec<TransactionOutput>, Error<VMStatus>> {
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
         for (i, transactions) in block_partitions.into_iter().enumerate() {
-            self.transactions_txs[i].send(transactions).unwrap();
+            self.command_txs[i]
+                .send(ExecutorShardCommand::ExecuteBlock(transactions))
+                .unwrap();
         }
-
         // wait for all remote executors to send the result back and append them in order by shard id
         // maintain a map of shard id to results and aggregate them later
         let mut results = HashMap::new();
-        println!("Waiting for results");
+        trace!("ShardedBlockExecutor Waiting for results");
         for _ in 0..self.num_executor_shards {
             let (shard_id, result) = self.result_rx.recv().unwrap();
-            println!("Got result from shard {}", shard_id);
+            trace!("Got result from shard {}", shard_id);
             if results.insert(shard_id, result?).is_some() {
                 panic!("Duplicate shard id {} in results", shard_id)
             }
@@ -103,12 +105,25 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     }
 }
 
+impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
+    fn drop(&mut self) {
+        // send stop command to all executor shards
+        for command_tx in self.command_txs.iter() {
+            command_tx.send(ExecutorShardCommand::Stop).unwrap();
+        }
+
+        // wait for all executor shards to stop
+        for shard_thread in self.shard_threads.drain(..) {
+            shard_thread.join().unwrap();
+        }
+    }
+}
+
 fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     shard_id: usize,
     concurrency_level: usize,
-    quit_signal: Arc<Mutex<bool>>,
     state_view: Arc<S>,
-    transaction_rx: Receiver<Vec<Transaction>>,
+    command_rx: Receiver<ExecutorShardCommand>,
     result_tx: Sender<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
 ) -> thread::JoinHandle<()> {
     // create and start a new executor shard in a separate thread
@@ -118,9 +133,8 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
             let executor_shard = ExecutorShard::new(
                 shard_id,
                 concurrency_level,
-                quit_signal,
                 state_view.clone(),
-                transaction_rx,
+                command_rx,
                 result_tx,
             );
             executor_shard.start();

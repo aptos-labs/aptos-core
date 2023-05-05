@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::block_executor::BlockAptosVM;
+use crate::{block_executor::BlockAptosVM, sharded_block_executor::ExecutorShardCommand};
 use aptos_block_executor::errors::Error;
+use aptos_logger::trace;
 use aptos_state_view::StateView;
-use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_types::transaction::TransactionOutput;
 use move_core_types::vm_status::VMStatus;
 use std::sync::{
     mpsc::{Receiver, Sender},
-    Arc, Mutex,
+    Arc,
 };
 
 /// A remote block executor that receives transactions from a channel and executes them in parallel.
@@ -16,9 +17,8 @@ use std::sync::{
 pub struct ExecutorShard<S: StateView + Sync> {
     shard_id: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    quit_signal: Arc<Mutex<bool>>,
     num_executor_threads: usize,
-    transactions_rx: Receiver<Vec<Transaction>>,
+    command_rx: Receiver<ExecutorShardCommand>,
     result_tx: Sender<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
     state_view: Arc<S>,
 }
@@ -27,9 +27,8 @@ impl<S: StateView + Sync> ExecutorShard<S> {
     pub fn new(
         shard_id: usize,
         concurrency_level: usize,
-        quit_signal: Arc<Mutex<bool>>,
         state_view: Arc<S>,
-        transactions_rx: Receiver<Vec<Transaction>>,
+        command_rx: Receiver<ExecutorShardCommand>,
         result_tx: Sender<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
@@ -41,24 +40,36 @@ impl<S: StateView + Sync> ExecutorShard<S> {
         Self {
             shard_id,
             executor_thread_pool,
-            quit_signal,
             num_executor_threads: concurrency_level,
-            transactions_rx,
+            command_rx,
             result_tx,
             state_view,
         }
     }
 
     pub fn start(&self) {
-        while !*self.quit_signal.lock().unwrap() {
-            let transactions = self.transactions_rx.recv().unwrap();
-            let ret = BlockAptosVM::execute_block_benchmark(
-                self.executor_thread_pool.clone(),
-                transactions.clone(),
-                self.state_view.as_ref(),
-                self.num_executor_threads,
-            );
-            self.result_tx.send((self.shard_id, ret)).unwrap();
+        loop {
+            let command = self.command_rx.recv().unwrap();
+            match command {
+                ExecutorShardCommand::ExecuteBlock(transactions) => {
+                    trace!(
+                        "Shard {} received ExecuteBlock command of block size {} ",
+                        self.shard_id,
+                        transactions.len()
+                    );
+                    let ret = BlockAptosVM::execute_block_benchmark(
+                        self.executor_thread_pool.clone(),
+                        transactions.clone(),
+                        self.state_view.as_ref(),
+                        self.num_executor_threads,
+                    );
+                    self.result_tx.send((self.shard_id, ret)).unwrap();
+                },
+                ExecutorShardCommand::Stop => {
+                    break;
+                },
+            }
         }
+        trace!("Shard {} is shutting down", self.shard_id);
     }
 }

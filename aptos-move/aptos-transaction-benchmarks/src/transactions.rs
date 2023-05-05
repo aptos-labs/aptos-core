@@ -5,7 +5,7 @@
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
-    account_universe::{AUTransactionGen, AccountUniverseGen},
+    account_universe::{AUTransactionGen, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
     executor::FakeExecutor,
     gas_costs::TXN_RESERVED,
@@ -125,25 +125,24 @@ where
         let mut seq_tps = Vec::new();
 
         let total_runs = num_warmups + num_runs;
+        let mut state = TransactionBenchState::with_size(
+            &self.strategy,
+            num_accounts,
+            num_txn,
+            num_executor_shards,
+            concurrency_level_per_shard,
+        );
+        println!(
+            "RUN benchmark for: num_shards {},  concurrency_level_per_shard = {}, \
+                        num_account = {}, \
+                        block_size = {}",
+            num_executor_shards, concurrency_level_per_shard, num_accounts, num_txn,
+        );
         for i in 0..total_runs {
-            let state = TransactionBenchState::with_size(
-                &self.strategy,
-                num_accounts,
-                num_txn,
-                num_executor_shards,
-                concurrency_level_per_shard,
-            );
-
             if i < num_warmups {
                 println!("WARMUP - ignore results");
                 state.execute_blockstm_benchmark(run_par, run_seq);
             } else {
-                println!(
-                    "RUN benchmark for: num_shards {},  concurrency_level_per_shard = {}, \
-                        num_account = {}, \
-                        block_size = {}",
-                    num_executor_shards, concurrency_level_per_shard, num_accounts, num_txn,
-                );
                 let tps = state.execute_blockstm_benchmark(run_par, run_seq);
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);
@@ -154,32 +153,90 @@ where
     }
 }
 
-struct TransactionBenchState {
-    transactions: Vec<Transaction>,
+struct TransactionBenchState<S>
+where
+    S: Strategy,
+    S::Value: AUTransactionGen,
+{
+    num_transactions: usize,
+    strategy: S,
+    account_universe: AccountUniverse,
     parallel_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     sequential_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
 }
 
-impl TransactionBenchState {
+impl<S> TransactionBenchState<S>
+where
+    S: Strategy,
+    S::Value: AUTransactionGen,
+{
     /// Creates a new benchmark state with the given number of accounts and transactions.
-    fn with_size<S>(
+    fn with_size(
         strategy: S,
         num_accounts: usize,
         num_transactions: usize,
         num_executor_shards: usize,
         concurrency_level_per_shard: usize,
-    ) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
-        let mut state = Self::with_universe(
+    ) -> Self {
+        Self::with_universe(
             strategy,
             universe_strategy(num_accounts, num_transactions),
             num_transactions,
             num_executor_shards,
             concurrency_level_per_shard,
-        );
+        )
+    }
+
+    /// Creates a new benchmark state with the given account universe strategy and number of
+    /// transactions.
+    fn with_universe(
+        strategy: S,
+        universe_strategy: impl Strategy<Value = AccountUniverseGen>,
+        num_transactions: usize,
+        num_executor_shards: usize,
+        concurrency_level_per_shard: usize,
+    ) -> Self {
+        let mut runner = TestRunner::default();
+        let universe = universe_strategy
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
+
+        let mut executor = FakeExecutor::from_head_genesis();
+        // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
+        // XXX We may want to include new accounts in case they have interesting performance
+        // characteristics.
+        let universe = universe.setup_gas_cost_stability(&mut executor);
+
+        let state_view = Arc::new(executor.get_state_view().clone());
+        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
+            num_executor_shards,
+            Some(concurrency_level_per_shard),
+            state_view.clone(),
+        ));
+        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1), state_view));
+
+        Self {
+            num_transactions,
+            strategy,
+            account_universe: universe,
+            parallel_block_executor,
+            sequential_block_executor,
+        }
+    }
+
+    pub fn gen_transaction(&mut self) -> Vec<Transaction> {
+        let mut runner = TestRunner::default();
+        let transaction_gens = vec(&self.strategy, self.num_transactions)
+            .new_tree(&mut runner)
+            .expect("creating a new value should succeed")
+            .current();
+        let mut transactions: Vec<Transaction> = transaction_gens
+            .into_iter()
+            .map(|txn_gen| {
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+            })
+            .collect();
 
         // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
         let validator_set = ValidatorSet::fetch_config(
@@ -199,78 +256,27 @@ impl TransactionBenchState {
             1,
         );
 
-        state
-            .transactions
-            .insert(0, Transaction::BlockMetadata(new_block));
-
-        state
-    }
-
-    /// Creates a new benchmark state with the given account universe strategy and number of
-    /// transactions.
-    fn with_universe<S>(
-        strategy: S,
-        universe_strategy: impl Strategy<Value = AccountUniverseGen>,
-        num_transactions: usize,
-        num_executor_shards: usize,
-        concurrency_level_per_shard: usize,
-    ) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
-        let mut runner = TestRunner::default();
-        let universe = universe_strategy
-            .new_tree(&mut runner)
-            .expect("creating a new value should succeed")
-            .current();
-
-        let mut executor = FakeExecutor::from_head_genesis();
-        // Run in gas-cost-stability mode for now -- this ensures that new accounts are ignored.
-        // XXX We may want to include new accounts in case they have interesting performance
-        // characteristics.
-        let mut universe = universe.setup_gas_cost_stability(&mut executor);
-
-        let transaction_gens = vec(strategy, num_transactions)
-            .new_tree(&mut runner)
-            .expect("creating a new value should succeed")
-            .current();
-        let transactions = transaction_gens
-            .into_iter()
-            .map(|txn_gen| Transaction::UserTransaction(txn_gen.apply(&mut universe).0))
-            .collect();
-
-        let state_view = Arc::new(executor.get_state_view().clone());
-        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
-            num_executor_shards,
-            Some(concurrency_level_per_shard),
-            state_view.clone(),
-        ));
-        let sequential_block_executor =
-            Arc::new(ShardedBlockExecutor::new(1, Some(1), state_view.clone()));
-
-        Self {
-            transactions,
-            parallel_block_executor,
-            sequential_block_executor,
-        }
+        transactions.insert(0, Transaction::BlockMetadata(new_block));
+        transactions
     }
 
     /// Executes this state in a single block.
-    fn execute_sequential(self) {
+    fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        self.sequential_block_executor
-            .execute_block(self.transactions)
+        let executor = self.sequential_block_executor.clone();
+        executor
+            .execute_block(self.gen_transaction())
             .expect("VM should not fail to start");
     }
 
     /// Executes this state in a single block.
-    fn execute_parallel(self) {
+    fn execute_parallel(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        self.parallel_block_executor
-            .execute_block(self.transactions)
+        let executor = self.parallel_block_executor.clone();
+        executor
+            .execute_block(self.gen_transaction())
             .expect("VM should not fail to start");
     }
 
@@ -289,13 +295,12 @@ impl TransactionBenchState {
         block_size * 1000 / exec_time as usize
     }
 
-    fn execute_blockstm_benchmark(self, run_par: bool, run_seq: bool) -> (usize, usize) {
+    fn execute_blockstm_benchmark(&mut self, run_par: bool, run_seq: bool) -> (usize, usize) {
+        let transactions = self.gen_transaction();
         let par_tps = if run_par {
             println!("Parallel execution starts...");
-            let tps = self.execute_benchmark(
-                self.transactions.clone(),
-                self.parallel_block_executor.clone(),
-            );
+            let tps =
+                self.execute_benchmark(transactions.clone(), self.parallel_block_executor.clone());
             println!("Parallel execution finishes, TPS = {}", tps);
             tps
         } else {
@@ -303,10 +308,7 @@ impl TransactionBenchState {
         };
         let seq_tps = if run_seq {
             println!("Sequential execution starts...");
-            let tps = self.execute_benchmark(
-                self.transactions.clone(),
-                self.sequential_block_executor.clone(),
-            );
+            let tps = self.execute_benchmark(transactions, self.sequential_block_executor.clone());
             println!("Sequential execution finishes, TPS = {}", tps);
             tps
         } else {
