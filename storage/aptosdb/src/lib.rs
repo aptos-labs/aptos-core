@@ -118,6 +118,7 @@ use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
@@ -807,7 +808,7 @@ impl AptosDB {
 
     fn save_transactions_impl(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
     ) -> Result<(SchemaBatch, ShardedStateKvSchemaBatch, HashValue)> {
@@ -829,7 +830,7 @@ impl AptosDB {
 
                 let state_updates_vec = txns_to_commit
                     .iter()
-                    .map(|txn_to_commit| txn_to_commit.state_updates())
+                    .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
                     .collect::<Vec<_>>();
 
                 self.state_store.put_value_sets(
@@ -848,8 +849,11 @@ impl AptosDB {
                     .start_timer();
                 zip_eq(first_version..=last_version, txns_to_commit)
                     .map(|(ver, txn_to_commit)| {
-                        self.event_store
-                            .put_events(ver, txn_to_commit.events(), &ledger_batch)
+                        self.event_store.put_events(
+                            ver,
+                            txn_to_commit.borrow().events(),
+                            &ledger_batch,
+                        )
                     })
                     .collect::<Result<Vec<_>>>()
             });
@@ -863,12 +867,12 @@ impl AptosDB {
                         // Transaction updates. Gather transaction hashes.
                         self.transaction_store.put_transaction(
                             ver,
-                            txn_to_commit.transaction(),
+                            txn_to_commit.borrow().transaction(),
                             &ledger_batch,
                         )?;
                         self.transaction_store.put_write_set(
                             ver,
-                            txn_to_commit.write_set(),
+                            txn_to_commit.borrow().write_set(),
                             &ledger_batch,
                         )
                     },
@@ -876,7 +880,7 @@ impl AptosDB {
                 // Transaction accumulator updates. Get result root hash.
                 let txn_infos: Vec<_> = txns_to_commit
                     .iter()
-                    .map(|t| t.transaction_info())
+                    .map(|t| t.borrow().transaction_info())
                     .cloned()
                     .collect();
                 self.ledger_store
@@ -900,7 +904,7 @@ impl AptosDB {
 
     fn save_transactions_validation(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -1060,7 +1064,7 @@ impl AptosDB {
 
     fn post_commit(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -1087,7 +1091,10 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["indexer_index"])
                 .start_timer();
-            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
+            let write_sets: Vec<_> = txns_to_commit
+                .iter()
+                .map(|txn| txn.borrow().write_set())
+                .collect();
             indexer.index(self.state_store.clone(), first_version, &write_sets)?;
         }
 
@@ -1925,7 +1932,7 @@ impl DbWriter for AptosDB {
     /// Same as save_transactions, but only for a whole block.
     fn save_transaction_block(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[Arc<TransactionToCommit>],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
