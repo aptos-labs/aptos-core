@@ -7,19 +7,23 @@
 use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
     models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
-    util::{deserialize_token_object_property_map_from_bcs_hexstring, truncate_str},
+    util::{
+        deserialize_token_object_property_map_from_bcs_hexstring, standardize_address, truncate_str,
+    },
 };
 use anyhow::{Context, Result};
-use aptos_api_types::{deserialize_from_string, WriteResource};
+use aptos_api_types::{deserialize_from_string, Event, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{self, Formatter},
 };
 
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 pub type TokenV2AggregatedDataMapping = HashMap<CurrentObjectPK, TokenV2AggregatedData>;
+/// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
+pub type TokenV2Burned = HashSet<CurrentObjectPK>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenV2AggregatedData {
@@ -242,6 +246,30 @@ impl UnlimitedSupply {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BurnEvent {
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub index: BigDecimal,
+    token: String,
+}
+
+impl BurnEvent {
+    pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+        let event_type = event.typ.to_string();
+        if let Some(V2TokenEvent::BurnEvent(inner)) =
+            V2TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_token_address(&self) -> String {
+        standardize_address(&self.token)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyMap {
     #[serde(deserialize_with = "deserialize_token_object_property_map_from_bcs_hexstring")]
     pub inner: serde_json::Value,
@@ -307,22 +335,29 @@ impl V2TokenResource {
         data_type: &str,
         data: &serde_json::Value,
         txn_version: i64,
-    ) -> Result<V2TokenResource> {
+    ) -> Result<Self> {
         match data_type {
-            "0x1::object::ObjectCore" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::ObjectCore(inner))),
-            "0x4::collection::Collection" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::Collection(inner))),
-            "0x4::collection::FixedSupply" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::FixedSupply(inner))),
-            "0x4::collection::UnlimitedSupply" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::UnlimitedSupply(inner))),
-            "0x4::aptos_token::AptosCollection" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::AptosCollection(inner))),
-            "0x4::token::Token" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::Token(inner))),
-            "0x4::property_map::PropertyMap" => serde_json::from_value(data.clone())
-                .map(|inner| Some(V2TokenResource::PropertyMap(inner))),
+            "0x1::object::ObjectCore" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::ObjectCore(inner)))
+            },
+            "0x4::collection::Collection" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Collection(inner)))
+            },
+            "0x4::collection::FixedSupply" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::FixedSupply(inner)))
+            },
+            "0x4::collection::UnlimitedSupply" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::UnlimitedSupply(inner)))
+            },
+            "0x4::aptos_token::AptosCollection" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::AptosCollection(inner)))
+            },
+            "0x4::token::Token" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::Token(inner)))
+            },
+            "0x4::property_map::PropertyMap" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::PropertyMap(inner)))
+            },
             _ => Ok(None),
         }
         .context(format!(
@@ -332,6 +367,30 @@ impl V2TokenResource {
         .context(format!(
             "Resource unsupported! Call is_resource_supported first. version {} type {}",
             txn_version, data_type
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum V2TokenEvent {
+    BurnEvent(BurnEvent),
+}
+
+impl V2TokenEvent {
+    pub fn from_event(
+        data_type: &str,
+        data: &serde_json::Value,
+        txn_version: i64,
+    ) -> Result<Option<V2TokenEvent>> {
+        match data_type {
+            "0x4::collection::BurnEvent" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::BurnEvent(inner)))
+            },
+            _ => Ok(None),
+        }
+        .context(format!(
+            "version {} failed! failed to parse type {}, data {:?}",
+            txn_version, data_type, data
         ))
     }
 }

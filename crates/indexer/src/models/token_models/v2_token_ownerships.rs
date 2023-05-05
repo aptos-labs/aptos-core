@@ -6,20 +6,27 @@
 #![allow(clippy::unused_unit)]
 
 use super::{
+    collection_datas::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS},
     token_utils::TokenWriteSet,
     tokens::TableHandleToOwner,
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping},
+    v2_token_utils::{ObjectCore, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned},
 };
 use crate::{
+    database::PgPoolConnection,
     schema::{current_token_ownerships_v2, token_ownerships_v2},
     util::{ensure_not_negative, standardize_address},
 };
 use anyhow::Context;
-use aptos_api_types::{DeleteTableItem as APIDeleteTableItem, WriteTableItem as APIWriteTableItem};
+use aptos_api_types::{
+    DeleteResource, DeleteTableItem as APIDeleteTableItem, WriteResource,
+    WriteTableItem as APIWriteTableItem,
+};
 use bigdecimal::{BigDecimal, One, Zero};
+use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // PK of current_token_ownerships_v2, i.e. token_data_id, property_version_v1, owner_address, storage_id
 pub type CurrentTokenOwnershipV2PK = (String, BigDecimal, String, String);
@@ -61,9 +68,37 @@ pub struct CurrentTokenOwnershipV2 {
     pub last_transaction_timestamp: chrono::NaiveDateTime,
 }
 
+// Facilitate tracking when a token is burned
+#[derive(Clone, Debug)]
+pub struct NFTOwnershipV2 {
+    pub token_data_id: String,
+    pub owner_address: String,
+    pub is_soulbound: Option<bool>,
+}
+
+/// Need a separate struct for queryable because we don't want to define the inserted_at column (letting DB fill)
+#[derive(Debug, Identifiable, Queryable)]
+#[diesel(primary_key(token_data_id, property_version_v1, owner_address, storage_id))]
+#[diesel(table_name = current_token_ownerships_v2)]
+pub struct CurrentTokenOwnershipV2Query {
+    pub token_data_id: String,
+    pub property_version_v1: BigDecimal,
+    pub owner_address: String,
+    pub storage_id: String,
+    pub amount: BigDecimal,
+    pub table_type_v1: Option<String>,
+    pub token_properties_mutated_v1: Option<serde_json::Value>,
+    pub is_soulbound_v2: Option<bool>,
+    pub token_standard: String,
+    pub is_fungible_v2: Option<bool>,
+    pub last_transaction_version: i64,
+    pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub inserted_at: chrono::NaiveDateTime,
+}
+
 impl TokenOwnershipV2 {
     /// For nfts it's the same resources that we parse tokendatas from so we leverage the work done in there to get ownership data
-    pub fn get_nft_v2_from_write_resource(
+    pub fn get_nft_v2_from_token_data(
         token_data: &TokenDataV2,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
     ) -> anyhow::Result<(Self, CurrentTokenOwnershipV2)> {
@@ -109,11 +144,120 @@ impl TokenOwnershipV2 {
         ))
     }
 
-    /// If an NFT is deleted, the resource will be deleted and we will see a burn event.
-    /// It'll be better to track all the tokens but for now using events is easier
-    // pub fn get_nft_v2_from_delete_resource(
-    // ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
-    // }
+    /// This handles the case where token is burned but objectCore is still there
+    pub fn get_burned_nft_v2_from_write_resource(
+        write_resource: &WriteResource,
+        txn_version: i64,
+        write_set_change_index: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        tokens_burned: &TokenV2Burned,
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
+        if let Some(token_address) =
+            tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
+        {
+            if let Some(object_core) = ObjectCore::from_write_resource(write_resource, txn_version)?
+            {
+                let token_data_id = token_address.clone();
+                let owner_address = object_core.owner.clone();
+                let storage_id = token_data_id.clone();
+                let is_soulbound = !object_core.allow_ungated_transfer;
+
+                return Ok(Some((
+                    Self {
+                        transaction_version: txn_version,
+                        write_set_change_index,
+                        token_data_id: token_data_id.clone(),
+                        property_version_v1: BigDecimal::zero(),
+                        owner_address: Some(owner_address.clone()),
+                        storage_id: storage_id.clone(),
+                        amount: BigDecimal::zero(),
+                        table_type_v1: None,
+                        token_properties_mutated_v1: None,
+                        is_soulbound_v2: Some(is_soulbound),
+                        token_standard: TokenStandard::V2.to_string(),
+                        is_fungible_v2: Some(false),
+                        transaction_timestamp: txn_timestamp,
+                    },
+                    CurrentTokenOwnershipV2 {
+                        token_data_id,
+                        property_version_v1: BigDecimal::zero(),
+                        owner_address,
+                        storage_id,
+                        amount: BigDecimal::zero(),
+                        table_type_v1: None,
+                        token_properties_mutated_v1: None,
+                        is_soulbound_v2: Some(is_soulbound),
+                        token_standard: TokenStandard::V2.to_string(),
+                        is_fungible_v2: Some(false),
+                        last_transaction_version: txn_version,
+                        last_transaction_timestamp: txn_timestamp,
+                    },
+                )));
+            }
+        }
+        Ok(None)
+    }
+
+    /// This handles the case where token is burned and objectCore is deleted
+    pub fn get_burned_nft_v2_from_delete_resource(
+        write_resource: &DeleteResource,
+        txn_version: i64,
+        write_set_change_index: i64,
+        txn_timestamp: chrono::NaiveDateTime,
+        prior_nft_ownership: &HashMap<String, NFTOwnershipV2>,
+        tokens_burned: &TokenV2Burned,
+        conn: &mut PgPoolConnection,
+    ) -> anyhow::Result<Option<(Self, CurrentTokenOwnershipV2)>> {
+        if let Some(token_address) =
+            tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
+        {
+            let latest_nft_ownership: NFTOwnershipV2 = match prior_nft_ownership.get(token_address)
+            {
+                Some(inner) => inner.clone(),
+                None => {
+                    CurrentTokenOwnershipV2Query::get_nft_by_token_data_id(conn, token_address)?
+                },
+            };
+
+            let token_data_id = token_address.clone();
+            let owner_address = latest_nft_ownership.owner_address.clone();
+            let storage_id = token_data_id.clone();
+            let is_soulbound = latest_nft_ownership.is_soulbound;
+
+            return Ok(Some((
+                Self {
+                    transaction_version: txn_version,
+                    write_set_change_index,
+                    token_data_id: token_data_id.clone(),
+                    property_version_v1: BigDecimal::zero(),
+                    owner_address: Some(owner_address.clone()),
+                    storage_id: storage_id.clone(),
+                    amount: BigDecimal::zero(),
+                    table_type_v1: None,
+                    token_properties_mutated_v1: None,
+                    is_soulbound_v2: is_soulbound,
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: Some(false),
+                    transaction_timestamp: txn_timestamp,
+                },
+                CurrentTokenOwnershipV2 {
+                    token_data_id,
+                    property_version_v1: BigDecimal::zero(),
+                    owner_address,
+                    storage_id,
+                    amount: BigDecimal::zero(),
+                    table_type_v1: None,
+                    token_properties_mutated_v1: None,
+                    is_soulbound_v2: is_soulbound,
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: Some(false),
+                    last_transaction_version: txn_version,
+                    last_transaction_timestamp: txn_timestamp,
+                },
+            )));
+        }
+        Ok(None)
+    }
 
     /// We want to track tokens in any offer/claims and tokenstore
     pub fn get_v1_from_write_table_item(
@@ -277,5 +421,42 @@ impl TokenOwnershipV2 {
         } else {
             Ok(None)
         }
+    }
+}
+
+impl CurrentTokenOwnershipV2Query {
+    pub fn get_nft_by_token_data_id(
+        conn: &mut PgPoolConnection,
+        token_data_id: &str,
+    ) -> anyhow::Result<NFTOwnershipV2> {
+        let mut retried = 0;
+        while retried < QUERY_RETRIES {
+            retried += 1;
+            match Self::get_nft_by_token_data_id_impl(conn, token_data_id) {
+                Ok(inner) => {
+                    return Ok(NFTOwnershipV2 {
+                        token_data_id: inner.token_data_id.clone(),
+                        owner_address: inner.owner_address.clone(),
+                        is_soulbound: inner.is_soulbound_v2,
+                    })
+                },
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+                },
+            }
+        }
+        Err(anyhow::anyhow!(
+            "Failed to get nft by token data id: {}",
+            token_data_id
+        ))
+    }
+
+    fn get_nft_by_token_data_id_impl(
+        conn: &mut PgPoolConnection,
+        token_data_id: &str,
+    ) -> diesel::QueryResult<Self> {
+        current_token_ownerships_v2::table
+            .filter(current_token_ownerships_v2::token_data_id.eq(token_data_id))
+            .first::<Self>(conn)
     }
 }

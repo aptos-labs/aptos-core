@@ -24,11 +24,11 @@ use crate::{
         v2_collections::{CollectionV2, CurrentCollectionV2, CurrentCollectionV2PK},
         v2_token_datas::{CurrentTokenDataV2, CurrentTokenDataV2PK, TokenDataV2},
         v2_token_ownerships::{
-            CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, TokenOwnershipV2,
+            CurrentTokenOwnershipV2, CurrentTokenOwnershipV2PK, NFTOwnershipV2, TokenOwnershipV2,
         },
         v2_token_utils::{
-            AptosCollection, FixedSupply, ObjectCore, PropertyMap, TokenV2AggregatedData,
-            TokenV2AggregatedDataMapping, UnlimitedSupply,
+            AptosCollection, BurnEvent, FixedSupply, ObjectCore, PropertyMap,
+            TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned, UnlimitedSupply,
         },
     },
     schema,
@@ -38,7 +38,10 @@ use aptos_api_types::{Transaction, WriteSetChange};
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
 pub const NAME: &str = "token_processor";
 pub struct TokenTransactionProcessor {
@@ -962,7 +965,11 @@ fn parse_v2_token(
         CurrentTokenOwnershipV2PK,
         CurrentTokenOwnershipV2,
     > = HashMap::new();
-    // Metadata for token v2
+    // Tracks prior ownership in case a token gets burned
+    let mut prior_nft_ownership: HashMap<String, NFTOwnershipV2> = HashMap::new();
+    // Get Metadata for token v2 by object
+    // We want to persist this through the entire batch so that even if a token is burned,
+    // we can still get the object core metadata for it
     let mut token_v2_metadata: TokenV2AggregatedDataMapping = HashMap::new();
 
     // Code above is inefficient (multiple passthroughs) so I'm approaching TokenV2 with a cleaner code structure
@@ -970,6 +977,15 @@ fn parse_v2_token(
         if let Transaction::UserTransaction(user_txn) = txn {
             let txn_version = user_txn.info.version.0 as i64;
             let txn_timestamp = parse_timestamp(user_txn.timestamp.0, txn_version);
+            // Get burn events for token v2 by object
+            let mut tokens_burned: TokenV2Burned = HashSet::new();
+
+            // Pass through events to get the burn events and token activities v2
+            for (_, event) in user_txn.events.iter().enumerate() {
+                if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                    tokens_burned.insert(burn_event.get_token_address());
+                }
+            }
 
             // Need to do a first pass to get all the objects
             for (_, wsc) in user_txn.info.changes.iter().enumerate() {
@@ -1068,6 +1084,14 @@ fn parse_v2_token(
                         {
                             token_ownerships_v2.push(token_ownership);
                             if let Some(cto) = current_token_ownership {
+                                prior_nft_ownership.insert(
+                                    cto.token_data_id.clone(),
+                                    NFTOwnershipV2 {
+                                        token_data_id: cto.token_data_id.clone(),
+                                        owner_address: cto.owner_address.clone(),
+                                        is_soulbound: cto.is_soulbound_v2,
+                                    },
+                                );
                                 current_token_ownerships_v2.insert(
                                     (
                                         cto.token_data_id.clone(),
@@ -1093,6 +1117,14 @@ fn parse_v2_token(
                         {
                             token_ownerships_v2.push(token_ownership);
                             if let Some(cto) = current_token_ownership {
+                                prior_nft_ownership.insert(
+                                    cto.token_data_id.clone(),
+                                    NFTOwnershipV2 {
+                                        token_data_id: cto.token_data_id.clone(),
+                                        owner_address: cto.owner_address.clone(),
+                                        is_soulbound: cto.is_soulbound_v2,
+                                    },
+                                );
                                 current_token_ownerships_v2.insert(
                                     (
                                         cto.token_data_id.clone(),
@@ -1134,7 +1166,7 @@ fn parse_v2_token(
                         {
                             // Add NFT ownership
                             let (nft_ownership, current_nft_ownership) =
-                                TokenOwnershipV2::get_nft_v2_from_write_resource(
+                                TokenOwnershipV2::get_nft_v2_from_token_data(
                                     &token_data,
                                     &token_v2_metadata,
                                 )
@@ -1145,6 +1177,79 @@ fn parse_v2_token(
                                 current_token_data,
                             );
                             token_ownerships_v2.push(nft_ownership);
+                            prior_nft_ownership.insert(
+                                current_nft_ownership.token_data_id.clone(),
+                                NFTOwnershipV2 {
+                                    token_data_id: current_nft_ownership.token_data_id.clone(),
+                                    owner_address: current_nft_ownership.owner_address.clone(),
+                                    is_soulbound: current_nft_ownership.is_soulbound_v2,
+                                },
+                            );
+                            current_token_ownerships_v2.insert(
+                                (
+                                    current_nft_ownership.token_data_id.clone(),
+                                    current_nft_ownership.property_version_v1.clone(),
+                                    current_nft_ownership.owner_address.clone(),
+                                    current_nft_ownership.storage_id.clone(),
+                                ),
+                                current_nft_ownership,
+                            );
+
+                            // Add burned NFT handling
+                            if let Some((nft_ownership, current_nft_ownership)) =
+                                TokenOwnershipV2::get_burned_nft_v2_from_write_resource(
+                                    resource,
+                                    txn_version,
+                                    wsc_index,
+                                    txn_timestamp,
+                                    &tokens_burned,
+                                )
+                                .unwrap()
+                            {
+                                token_ownerships_v2.push(nft_ownership);
+                                prior_nft_ownership.insert(
+                                    current_nft_ownership.token_data_id.clone(),
+                                    NFTOwnershipV2 {
+                                        token_data_id: current_nft_ownership.token_data_id.clone(),
+                                        owner_address: current_nft_ownership.owner_address.clone(),
+                                        is_soulbound: current_nft_ownership.is_soulbound_v2,
+                                    },
+                                );
+                                current_token_ownerships_v2.insert(
+                                    (
+                                        current_nft_ownership.token_data_id.clone(),
+                                        current_nft_ownership.property_version_v1.clone(),
+                                        current_nft_ownership.owner_address.clone(),
+                                        current_nft_ownership.storage_id.clone(),
+                                    ),
+                                    current_nft_ownership,
+                                );
+                            }
+                        }
+                    },
+                    WriteSetChange::DeleteResource(resource) => {
+                        // Add burned NFT handling
+                        if let Some((nft_ownership, current_nft_ownership)) =
+                            TokenOwnershipV2::get_burned_nft_v2_from_delete_resource(
+                                resource,
+                                txn_version,
+                                wsc_index,
+                                txn_timestamp,
+                                &prior_nft_ownership,
+                                &tokens_burned,
+                                conn,
+                            )
+                            .unwrap()
+                        {
+                            token_ownerships_v2.push(nft_ownership);
+                            prior_nft_ownership.insert(
+                                current_nft_ownership.token_data_id.clone(),
+                                NFTOwnershipV2 {
+                                    token_data_id: current_nft_ownership.token_data_id.clone(),
+                                    owner_address: current_nft_ownership.owner_address.clone(),
+                                    is_soulbound: current_nft_ownership.is_soulbound_v2,
+                                },
+                            );
                             current_token_ownerships_v2.insert(
                                 (
                                     current_nft_ownership.token_data_id.clone(),
