@@ -29,7 +29,7 @@ jobs:
         run: python3 scripts/update_docker_images.py
 
       - name: Create Pull Request
-        if: ${{ steps.check_update.outputs.NEEDS_UPDATE == 'True' }}
+        if: ${{ steps.check_update.outputs.NEED_UPDATE == 'True' }}
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.REPO_TOKEN }}
