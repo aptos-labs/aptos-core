@@ -137,13 +137,15 @@ impl StateMerkleDb {
         cp_root_path: impl AsRef<Path>,
         sharding: bool,
     ) -> Result<()> {
-        let state_merkle_db = Self::open(
+        let rocksdb_configs = RocksdbConfigs {
+            use_sharded_state_merkle_db: sharding,
+            ..Default::default()
+        };
+        let state_merkle_db = Self::new(
             db_root_path,
-            RocksdbConfig::default(),
-            false,
-            /*enable_cache=*/ false,
-            VersionedNodeCache::new(),
-            LruNodeCache::new(0),
+            rocksdb_configs,
+            /*readonly=*/ false,
+            /*max_nodes_per_lru_cache_shard=*/ 0,
         )?;
         let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);
 
