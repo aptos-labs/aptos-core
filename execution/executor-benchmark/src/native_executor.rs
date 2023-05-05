@@ -22,13 +22,13 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::{
-    identifier::Identifier,
+    ident_str,
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
 };
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 struct IncrementalOutput {
     write_set: Vec<(StateKey, WriteOp)>,
@@ -160,7 +160,7 @@ impl NativeExecutor {
                 return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         AccountAddress::ONE,
-                        Identifier::from_str("account").unwrap(),
+                        ident_str!("account").into(),
                     )),
                     code: 7,
                     info: None,
@@ -187,7 +187,7 @@ impl NativeExecutor {
                 return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         AccountAddress::ONE,
-                        Identifier::from_str("account").unwrap(),
+                        ident_str!("account").into(),
                     )),
                     code: 8,
                     info: None,
