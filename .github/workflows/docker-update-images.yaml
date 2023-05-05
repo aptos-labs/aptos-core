@@ -26,7 +26,7 @@ jobs:
 
       - name: Check and pin updates (if any)
         id: check_update
-        run: python3 scripts/update_docker_images.py >> $GITHUB_OUTPUT
+        run: python3 scripts/update_docker_images.py >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
         if: ${{ steps.check_update.outputs.NEEDS_UPDATE == 'True' }}
