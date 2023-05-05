@@ -6,7 +6,7 @@ use crate::{
     endpoints::{AptosTapError, AptosTapErrorCode},
     middleware::NUM_OUTSTANDING_TRANSACTIONS,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_logger::{
     error, info,
@@ -94,28 +94,28 @@ impl ApiConnectionConfig {
 
     pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
         if let Some(ref key) = self.key {
-            Ok(key.private_key())
-        } else {
-            let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
+            return Ok(key.private_key());
+        }
+        let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
+            format!(
+                "Failed to read key file: {}",
+                self.key_file_path.to_string_lossy()
+            )
+        })?;
+        // decode as bcs first, fall back to a file of hex
+        let result = aptos_sdk::bcs::from_bytes(&key_bytes); //.with_context(|| "bad bcs");
+        if let Ok(x) = result {
+            return Ok(x);
+        }
+        let keystr = String::from_utf8(key_bytes).map_err(|e| anyhow!(e))?;
+        Ok(ConfigKey::from_encoded_string(keystr.as_str())
+            .with_context(|| {
                 format!(
-                    "Failed to read key file: {}",
+                    "{}: key file failed as both bcs and hex",
                     self.key_file_path.to_string_lossy()
                 )
-            })?;
-            // decode as bcs first, fall back to a file of hex
-            let result: Result<Ed25519PrivateKey> =
-                aptos_sdk::bcs::from_bytes(&key_bytes).with_context(|| "bad bcs");
-            match result {
-                Err(_) => {
-                    let keystr = String::from_utf8(key_bytes)
-                        .with_context(|| "key file not bcs and is bad utf8")?;
-                    Ok(ConfigKey::from_encoded_string(keystr.as_str())
-                        .with_context(|| "key file failed as both bcs and hex")?
-                        .private_key())
-                },
-                Ok(x) => Ok(x),
-            }
-        }
+            })?
+            .private_key())
     }
 }
 

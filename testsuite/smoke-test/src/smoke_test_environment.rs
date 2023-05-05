@@ -85,7 +85,7 @@ impl SwarmBuilder {
         // Add support for forge
         assert!(self.local);
         static FACTORY: Lazy<LocalFactory> =
-            Lazy::new(|| LocalFactory::from_workspace(String::from("")).unwrap());
+            Lazy::new(|| LocalFactory::from_workspace(None).unwrap());
         let version = FACTORY.versions().max().unwrap();
         info!("Node finished compiling");
 

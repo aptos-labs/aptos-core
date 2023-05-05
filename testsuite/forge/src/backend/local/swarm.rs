@@ -229,9 +229,9 @@ impl LocalSwarm {
             out.write_all(encoded_root_key.as_slice())?;
             info!("Wrote root (or mint) key to: {}", root_key_path.display());
         }
+        let encoded_root_key = EncodingType::BCS.encode_key("root_key", &root_key)?;
         let root_key_path = dir_actual.as_ref().join("root_key.bin");
         if let Ok(mut out) = File::create(root_key_path.clone()) {
-            let encoded_root_key = EncodingType::BCS.encode_key("root_key", &root_key)?;
             out.write_all(encoded_root_key.as_slice())?;
             info!("Wrote root (or mint) key to: {}", root_key_path.display());
         }

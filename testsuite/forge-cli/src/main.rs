@@ -249,7 +249,7 @@ fn main() -> Result<()> {
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
                             mempool_backlog: 5000,
                         }));
-                    let swarm_dir = local_cfg.swarmdir.clone().unwrap_or_default();
+                    let swarm_dir = local_cfg.swarmdir.clone();
                     run_forge(
                         duration,
                         test_suite,

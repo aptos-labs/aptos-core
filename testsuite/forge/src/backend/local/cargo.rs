@@ -20,12 +20,19 @@ pub struct Metadata {
     pub workspace_root: PathBuf,
 }
 
+/// at _forge_ compile time, decide what kind of build we will use for `aptos-node`
 pub fn use_release() -> bool {
     option_env!("LOCAL_SWARM_NODE_RELEASE").is_some()
 }
 
+/// at _forge_ compile time, decide to build `aptos-node` only for consensus perf tests
 pub fn build_consensus_only_node() -> bool {
     option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
+}
+
+/// at forge _run_ time, compile `aptos-node` without indexer
+pub fn build_aptos_node_without_indexer() -> bool {
+    std::env::var("FORGE_BUILD_WITHOUT_INDEXER").is_ok()
 }
 
 pub fn metadata() -> Result<Metadata> {
@@ -158,18 +165,15 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 }
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
-    let use_release = use_release();
-    let consensus_only = build_consensus_only_node();
-    let without_indexer = std::env::var("FORGE_BUILD_WITHOUT_INDEXER").is_ok();
-    let mut args = if without_indexer {
+    let mut args = if build_aptos_node_without_indexer() {
         vec!["build", "--features=failpoints"]
     } else {
         vec!["build", "--features=failpoints,indexer"]
     };
-    if consensus_only {
+    if build_consensus_only_node() {
         args.push("--features=consensus-only-perf-test");
     }
-    if use_release {
+    if use_release() {
         args.push("--release");
     };
     args

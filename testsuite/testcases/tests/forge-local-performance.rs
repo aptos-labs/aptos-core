@@ -30,9 +30,5 @@ fn main() -> Result<()> {
         ));
 
     let options = Options::from_args();
-    forge_main(
-        tests,
-        LocalFactory::from_workspace(String::from(""))?,
-        &options,
-    )
+    forge_main(tests, LocalFactory::from_workspace(None)?, &options)
 }
