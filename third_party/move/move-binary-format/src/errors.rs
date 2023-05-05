@@ -309,10 +309,17 @@ impl PartialVMError {
     }
 
     pub fn new(major_status: StatusCode) -> Self {
+        debug_assert!(major_status!= StatusCode::EXECUTED);
+        let message =
+            if cfg!(debug_assertions) && major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+                Some(format!("UNKNOWN_INVARIANT_VIOLATION_ERROR at {:?}", std::backtrace::Backtrace::force_capture()))
+            } else {
+                None
+            };
         Self(Box::new(PartialVMError_ {
             major_status,
             sub_status: None,
-            message: None,
+            message,
             exec_state: None,
             indices: vec![],
             offsets: vec![],
@@ -329,7 +336,12 @@ impl PartialVMError {
         self
     }
 
-    pub fn with_message(mut self, message: String) -> Self {
+    pub fn with_message(mut self, mut message: String) -> Self {
+        if cfg!(debug_assertions) && self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            if let Some(stacktrace) = self.0.message.take() {
+                message = format!("{} @{}", message, stacktrace);
+            }
+        }
         debug_assert!(self.0.message.is_none());
         self.0.message = Some(message);
         self
