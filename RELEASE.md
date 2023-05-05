@@ -34,11 +34,11 @@ The aptos node release tags are created for validator/fullnode deployment of the
 The aptos framework release tags are created to facilitate the on-chain framework upgrade of the given release branch. The minor number *Z* will increment when a new hot-fix release or a new  framework update is required on this release branch.
 
 ### aptos-cli-v*X.Y.Z* release tag
-The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the latest CLI version [here]https://aptos.dev/tools/install-cli/install-from-brew/#upgrading-the-cli).
+The aptos cli release tags are created to track the CLI versions for community to use when developing on the Aptos network. It's always recommended to upgrade your CLI when a new version is released, for the best user experience. Learn how to update to the [latest CLI version](https://aptos.dev/tools/install-cli/install-from-brew/#upgrading-the-cli).
 
 ## How we test each release at Aptos
 ### Blockchain
-* We write and maintain high quality unit tests to verify code behavior and according to the specifications. Check out our Codecov [here](https://app.codecov.io/gh/aptos-labs/aptos-core)!
+* We write and maintain high quality unit tests to verify code behavior and according to the specifications. Check out our [Codecov](https://app.codecov.io/gh/aptos-labs/aptos-core)!
 * Integration tests run on each PR verifying each component’s correctness.
 * For large-scale and chaos testing, we use a custom test harness called Forge. Forge orchestrates a cluster of nodes based on the recommended production configuration to simulate different deployment scenarios, and can then submit a variety of different client traffic patterns. It can also inject chaos such as latency, bandwidth, network partitions, and simulate real-world scenarios. It runs on every PR and continuously on main and release branches.
 * Performance tests run sequential and parallel execution benchmarks on an isolated machine. We verify the TPS (transactions per second) is within the target threshold range and watch for performance regressions.
