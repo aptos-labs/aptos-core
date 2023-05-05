@@ -61,7 +61,7 @@ module "validator" {
 
   # addons
   enable_monitoring      = var.enable_monitoring
-  enable_node_exporter   = var.enable_node_exporter
+  enable_node_exporter   = var.enable_prometheus_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
 }
 

@@ -585,7 +585,7 @@ module aptos_framework::fungible_asset {
     public fun init_test_metadata(constructor_ref: &ConstructorRef): (MintRef, TransferRef, BurnRef) {
         add_fungibility(
             constructor_ref,
-            option::some(option::some(100)) /* max supply */,
+            option::some(option::some(100)), // max supply
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0

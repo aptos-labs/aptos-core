@@ -5,9 +5,10 @@ use crate::constants::BLOB_STORAGE_SIZE;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
-// The cache size is estimated to be 10M transactions.
-// For 10M transactions, the cache size is about 40GB.
-const CACHE_SIZE_ESTIMATION: u64 = 10_000_000_u64;
+// The cache size is estimated to be 3M transactions.
+// For 3M transactions, the cache size is about 25GB.
+// At TPS 20k, it takes about 2.5 minutes to fill up the cache.
+const CACHE_SIZE_ESTIMATION: u64 = 3_000_000_u64;
 
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is

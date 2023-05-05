@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -90,10 +92,9 @@ impl Default for NodeMonitoringConfig {
 }
 
 impl ConfigSanitizer for PeerMonitoringServiceConfig {
-    /// Validate and process the peer monitoring config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -129,7 +130,7 @@ mod tests {
         // Verify the config passes sanitization for testnet
         PeerMonitoringServiceConfig::sanitize(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::testnet(),
         )
         .unwrap();
@@ -137,7 +138,7 @@ mod tests {
         // Verify the config fails sanitization for mainnet
         let error = PeerMonitoringServiceConfig::sanitize(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::mainnet(),
         )
         .unwrap_err();

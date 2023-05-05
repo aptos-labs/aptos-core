@@ -1,0 +1,13 @@
+//# publish
+module 0x1.m {
+    struct Foo<T> { x: T }
+
+    f(s: &signer) {
+    label b0:
+        // Foo<bool> is valid for `pack` but not `move_to`, due to its lack of the key ability
+        // We perform caching to avoid checking the same struct inst within the same context, but
+        // need to make sure these two cases are handled separately
+        move_to<Foo<bool>>(move(s), Foo<bool> { x: true });
+        return;
+    }
+}

@@ -57,6 +57,16 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         counters::LAST_COMMITTED_ROUND.set(block.round() as i64);
         counters::LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
 
+        let failed_rounds = block
+            .block()
+            .block_data()
+            .failed_authors()
+            .map(|v| v.len())
+            .unwrap_or(0);
+        if failed_rounds > 0 {
+            counters::COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
+        }
+
         // Quorum store metrics
         quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
 
@@ -64,8 +74,10 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
             let commit_status = match status {
                 TransactionStatus::Keep(_) => counters::TXN_COMMIT_SUCCESS_LABEL,
                 TransactionStatus::Discard(reason) => {
-                    if reason == &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
                         counters::TXN_COMMIT_RETRY_LABEL
+                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                        counters::TXN_COMMIT_FAILED_DUPLICATE_LABEL
                     } else {
                         counters::TXN_COMMIT_FAILED_LABEL
                     }

@@ -1,9 +1,11 @@
 [package]
-name = "TokenObjects"
+name = "FungibleToken"
 version = "0.0.0"
 
 [addresses]
-token_objects = "_"
+aptos_framework = "0x1"
+aptos_token_objects = "0x4"
+fungible_token = "_"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }

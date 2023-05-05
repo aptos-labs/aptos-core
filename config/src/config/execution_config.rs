@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, utils::RootPath, Error, NodeConfig, RoleType,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, utils::RootPath, Error,
+    NodeConfig,
 };
 use aptos_types::{chain_id::ChainId, transaction::Transaction};
 use serde::{Deserialize, Serialize};
@@ -19,12 +20,19 @@ const GENESIS_DEFAULT: &str = "genesis.blob";
 #[serde(default, deny_unknown_fields)]
 pub struct ExecutionConfig {
     #[serde(skip)]
+    /// For testing purposes, the ability to add a genesis transaction directly
     pub genesis: Option<Transaction>,
+    /// Location of the genesis file
     pub genesis_file_location: PathBuf,
+    /// Number of threads to run execution
     pub concurrency_level: u16,
+    /// Number of threads to read proofs
     pub num_proof_reading_threads: u16,
+    /// Enables paranoid mode for types, which adds extra runtime VM checks
     pub paranoid_type_verification: bool,
+    /// Enables paranoid mode for hot potatoes, which adds extra runtime VM checks
     pub paranoid_hot_potato_verification: bool,
+    /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
 }
 
@@ -118,10 +126,9 @@ impl ExecutionConfig {
 }
 
 impl ConfigSanitizer for ExecutionConfig {
-    /// Validate and process the execution config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -169,7 +176,7 @@ mod test {
         };
 
         // Sanitize the config and verify that it succeeds
-        ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+        ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
             .unwrap();
     }
 
@@ -187,7 +194,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -206,7 +213,7 @@ mod test {
 
         // Sanitize the config and verify that it fails
         let error =
-            ExecutionConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            ExecutionConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

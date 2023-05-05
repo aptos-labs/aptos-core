@@ -98,11 +98,17 @@ impl Mempool {
         if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
             self.log_reject_transaction(sender, sequence_number, counters::COMMIT_IGNORED_LABEL);
             // Do not remove the transaction from mempool
-        } else {
-            self.log_reject_transaction(sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
-            self.transactions
-                .reject_transaction(sender, sequence_number, hash);
+            return;
         }
+
+        let label = if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+            counters::COMMIT_REJECTED_DUPLICATE_LABEL
+        } else {
+            counters::COMMIT_REJECTED_LABEL
+        };
+        self.log_reject_transaction(sender, sequence_number, label);
+        self.transactions
+            .reject_transaction(sender, sequence_number, hash);
     }
 
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
