@@ -40,17 +40,18 @@ impl<NetworkClient: NetworkClientInterface>
         timeout: Duration,
     ) -> Result<PeerMonitoringServiceResponse, Error> {
         let request = PeerMonitoringServiceMessage::Request(request);
-        let request_bytes = ProtocolId::PeerMonitoringServiceRpc.to_bytes(&request).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        // let request_bytes = ProtocolId::PeerMonitoringServiceRpc.to_bytes(&request).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
         let response = self
             .network_client
             .send_to_peer_rpc(
-                request_bytes.into(),
+                ProtocolId::PeerMonitoringServiceRpc,
+                &request,
                 timeout,
                 recipient,
             )
             .await
             .map_err(|error| Error::NetworkError(error.to_string()))?;
-        let response = ProtocolId::PeerMonitoringServiceRpc.from_bytes(response.as_ref()).map_err(|e| Error::UnexpectedError(format!("decode err: {}", e)))?;
+        //let response = ProtocolId::PeerMonitoringServiceRpc.from_bytes(response.as_ref()).map_err(|e| Error::UnexpectedError(format!("decode err: {}", e)))?;
         match response {
             PeerMonitoringServiceMessage::Response(Ok(response)) => Ok(response),
             PeerMonitoringServiceMessage::Response(Err(err)) => {

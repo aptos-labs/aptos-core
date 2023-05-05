@@ -387,8 +387,8 @@ impl<NetworkClient: NetworkClientInterface> MempoolNetworkInterface<NetworkClien
             request_id: batch_id,
             transactions,
         };
-        let request_bytes = ProtocolId::MempoolDirectSend.to_bytes(&request).map_err(|e| BroadcastError::NetworkError(peer, e.into()))?;
-        if let Err(e) = self.network_client.send_to_peer(request_bytes.into(), peer) {
+        //let request_bytes = ProtocolId::MempoolDirectSend.to_bytes(&request).map_err(|e| BroadcastError::NetworkError(peer, e.into()))?;
+        if let Err(e) = self.network_client.send_to_peer(ProtocolId::MempoolDirectSend, &request, peer) {
             counters::network_send_fail_inc(counters::BROADCAST_TXNS);
             return Err(BroadcastError::NetworkError(peer, e.into()));
         }
@@ -404,8 +404,8 @@ impl<NetworkClient: NetworkClientInterface> MempoolNetworkInterface<NetworkClien
         fail_point!("mempool::send_to", |_| {
             Err(anyhow::anyhow!("Injected error in mempool::send_to").into())
         });
-        let message_bytes = ProtocolId::MempoolDirectSend.to_bytes(&message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
-        self.network_client.send_to_peer(message_bytes.into(), peer)
+        // let message_bytes = ProtocolId::MempoolDirectSend.to_bytes(&message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        self.network_client.send_to_peer(ProtocolId::MempoolDirectSend, &message, peer)
     }
 
     /// Updates the local tracker for a broadcast.  This is used to handle `DirectSend` tracking of

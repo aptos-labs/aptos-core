@@ -46,13 +46,12 @@ impl<NetworkClient: NetworkClientInterface>
         request: StorageServiceRequest,
     ) -> Result<StorageServiceResponse, Error> {
         let request = StorageServiceMessage::Request(request);
-        let request_bytes = ProtocolId::StorageServiceRpc.to_bytes(&request).map_err(|e| Error::NetworkError(format!("encode err: {}", e)))?;
+        //let request_bytes = ProtocolId::StorageServiceRpc.to_bytes(&request).map_err(|e| Error::NetworkError(format!("encode err: {}", e)))?;
         let response = self
             .network_client
-            .send_to_peer_rpc(request_bytes.into(), timeout, recipient)
+            .send_to_peer_rpc(ProtocolId::StorageServiceRpc, &request, timeout, recipient)
             .await
             .map_err(|error| Error::NetworkError(error.to_string()))?;
-        let response = ProtocolId::StorageServiceRpc.from_bytes(response.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))?;
         match response {
             StorageServiceMessage::Response(Ok(response)) => Ok(response),
             StorageServiceMessage::Response(Err(err)) => Err(Error::StorageServiceError(err)),

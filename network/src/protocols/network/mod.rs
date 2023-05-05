@@ -146,6 +146,12 @@ impl NetworkApplicationConfig {
 pub struct NetworkEvents2 { // TODO: implement
 }
 
+impl NetworkEvents2 {
+    pub fn new() -> Self {
+        Self{}
+    }
+}
+
 
 /// A `Stream` of `Event<TMessage>` from the lower network layer to an upper
 /// network application that deserializes inbound network direct-send and rpc

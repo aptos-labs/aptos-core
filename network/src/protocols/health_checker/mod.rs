@@ -48,6 +48,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use aptos_types::network_address::Protocol;
+use crate::protocols::network::NetworkEvents2;
 
 pub mod builder;
 mod interface;
@@ -60,7 +61,7 @@ mod test;
 /// raw `Bytes` rpc messages are deserialized into
 /// `HealthCheckerMsg` types. `HealthCheckerNetworkEvents` is a thin wrapper
 /// around an `channel::Receiver<PeerManagerNotification>`.
-pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
+pub type HealthCheckerNetworkEvents = NetworkEvents2;
 
 /// Returns a network application config for the health check client and service
 pub fn health_checker_network_config() -> NetworkApplicationConfig {
@@ -379,26 +380,23 @@ impl<NetworkClient: NetworkClientInterface + Unpin> HealthChecker<NetworkClient>
         );
         let peer_network_id = PeerNetworkId::new(network_context.network_id(), peer_id);
         let msg = HealthCheckerMsg::Ping(Ping(nonce));
-        let data = match ProtocolId::HealthCheckerRpc.to_bytes(&msg) {
-            Err(e) => return (peer_id, round, nonce, Err(RpcError::Error(e))),
-            Ok(d) => d,
-        };
+        // let data = match ProtocolId::HealthCheckerRpc.to_bytes(&msg) {
+        //     Err(e) => return (peer_id, round, nonce, Err(RpcError::Error(e))),
+        //     Ok(d) => d,
+        // };
         let res_pong_msg = network_client
             .send_to_peer_rpc(
-                data.into(),
+                ProtocolId::HealthCheckerRpc,
+                &msg,
                 ping_timeout,
                 peer_network_id,
             )
             .await
             .map_err(|error| RpcError::Error(error.into()))
-            .and_then(|reply_bytes| {
-                match ProtocolId::HealthCheckerRpc.from_bytes(reply_bytes.as_ref()) {
-                    Ok(msg) => match msg {
+            .and_then(|msg| match msg {
                     HealthCheckerMsg::Pong(res) => Ok(res),
                     _ => Err(RpcError::InvalidRpcResponse),
-                },
-                    Err(e) => Err(RpcError::Error(e)),
-            }});
+                });
         (peer_id, round, nonce, res_pong_msg)
     }
 }

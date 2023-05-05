@@ -38,7 +38,7 @@ struct TestHarness {
 impl TestHarness {
     fn new_permissive(
         ping_failures_tolerated: u64,
-    ) -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
+    ) -> (Self, HealthChecker<NetworkClient>) {
         ::aptos_logger::Logger::init_for_testing();
         let mock_time = TimeService::mock();
 
@@ -87,7 +87,7 @@ impl TestHarness {
         )
     }
 
-    fn new_strict() -> (Self, HealthChecker<NetworkClient<HealthCheckerMsg>>) {
+    fn new_strict() -> (Self, HealthChecker<NetworkClient>) {
         Self::new_permissive(0 /* ping_failures_tolerated */)
     }
 

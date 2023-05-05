@@ -16,6 +16,8 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 use bytes::Bytes;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use crate::protocols::network::NetworkEvents2;
 
 /// A simple definition to handle all the trait bounds for messages.
@@ -52,21 +54,22 @@ pub trait NetworkClientInterface: Clone + Send + Sync {
 
     /// Sends the given message to the specified peer. Note: this
     /// method does not guarantee message delivery or handle responses.
-    fn send_to_peer(&self, _message: Bytes, _peer: PeerNetworkId) -> Result<(), Error>;
+    fn send_to_peer<T: Serialize + Sync>(&self, protocol_id: ProtocolId, _message: &T, _peer: PeerNetworkId) -> Result<(), Error>;
 
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
-    fn send_to_peers(&self, _message: Bytes, _peers: &[PeerNetworkId]) -> Result<(), Error>;
+    fn send_to_peers<T: Serialize + Sync>(&self, protocol_id: ProtocolId, _message: &T, _peers: &[PeerNetworkId]) -> Result<(), Error>;
 
     /// Sends the given message to the specified peer with the corresponding
     /// timeout. Awaits a response from the peer, or hits the timeout
     /// (whichever occurs first).
-    async fn send_to_peer_rpc(
+    async fn send_to_peer_rpc<T: Serialize + Sync, O: DeserializeOwned>(
         &self,
-        _message: Bytes,
+        protocol_id: ProtocolId,
+        _message: &T,
         _rpc_timeout: Duration,
         _peer: PeerNetworkId,
-    ) -> Result<Bytes, Error>;
+    ) -> Result<O, Error>;
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
@@ -165,66 +168,84 @@ impl NetworkClientInterface for NetworkClient {
         self.peers_and_metadata.clone()
     }
 
-    fn send_to_peer(&self, message: Bytes, peer: PeerNetworkId) -> Result<(), Error> {
+    fn send_to_peer<T: Serialize + Sync>(&self, protocol_id: ProtocolId, message: &T, peer: PeerNetworkId) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        let direct_send_protocol_id = self
-            .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
-        Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
+        // let direct_send_protocol_id = self
+        //     .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
+        let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        Ok(network_sender.send_to(peer.peer_id(), protocol_id, blob.into())?)
     }
 
-    fn send_to_peers(&self, message: Bytes, peers: &[PeerNetworkId]) -> Result<(), Error> {
+    fn send_to_peers<T: Serialize + Sync>(&self, protocol_id: ProtocolId, message: &T, peers: &[PeerNetworkId]) -> Result<(), Error> {
         // Sort peers by protocol
-        let mut peers_per_protocol = HashMap::new();
-        let mut peers_without_a_protocol = vec![];
+        let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        //let mut peers_per_protocol = HashMap::new();
+        //let mut peers_without_a_protocol = vec![];
+        //let mut errors = vec![];
         for peer in peers {
-            match self
-                .get_preferred_protocol_for_peer(peer, &self.direct_send_protocols_and_preferences)
-            {
-                Ok(protocol) => peers_per_protocol
-                    .entry(protocol)
-                    .or_insert_with(Vec::new)
-                    .push(peer),
-                Err(_) => peers_without_a_protocol.push(peer),
-            }
+            let network_id = peer.network_id();
+            if let Ok(prots) = self.get_supported_protocols(peer) {
+                if prots.contains(protocol_id) {
+                    if let Ok(network_sender) = self.get_sender_for_network_id(&network_id) {
+                        if let Err(err) = network_sender.send_to(peer.peer_id(), protocol_id, blob.clone().into()) {
+                            // TODO: count send errors for metrics?
+                            // TODO: log errors?
+                            //errors.push(err);
+                        }
+                    } // TODO: wat? how could this happen?
+                } // TODO: count unsendable messages?
+            } // TODO: wat? peer disconnected while we weren't looking?
+            // match self
+            //     .get_preferred_protocol_for_peer(peer, &self.direct_send_protocols_and_preferences)
+            // {
+            //     Ok(protocol) => peers_per_protocol
+            //         .entry(protocol)
+            //         .or_insert_with(Vec::new)
+            //         .push(peer),
+            //     Err(_) => peers_without_a_protocol.push(peer),
+            // }
         }
-
-        // We only periodically log any unavailable peers (to prevent log spamming)
-        if !peers_without_a_protocol.is_empty() {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(10)),
-                warn!(
-                    "Unavailable peers (without a common network protocol): {:?}",
-                    peers_without_a_protocol
-                )
-            );
-        }
-
-        // Send to all peers in each protocol group and network
-        for (protocol_id, peers) in peers_per_protocol {
-            for (network_id, peers) in &peers
-                .iter()
-                .group_by(|peer_network_id| peer_network_id.network_id())
-            {
-                let network_sender = self.get_sender_for_network_id(&network_id)?;
-                let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
-                network_sender.send_to_many(peer_ids, protocol_id, message.clone())?;
-            }
-        }
+        //
+        // // We only periodically log any unavailable peers (to prevent log spamming)
+        // if !peers_without_a_protocol.is_empty() {
+        //     sample!(
+        //         SampleRate::Duration(Duration::from_secs(10)),
+        //         warn!(
+        //             "Unavailable peers (without a common network protocol): {:?}",
+        //             peers_without_a_protocol
+        //         )
+        //     );
+        // }
+        //
+        // // Send to all peers in each protocol group and network
+        // for (protocol_id, peers) in peers_per_protocol {
+        //     for (network_id, peers) in &peers
+        //         .iter()
+        //         .group_by(|peer_network_id| peer_network_id.network_id())
+        //     {
+        //         let network_sender = self.get_sender_for_network_id(&network_id)?;
+        //         let peer_ids = peers.map(|peer_network_id| peer_network_id.peer_id());
+        //         network_sender.send_to_many(peer_ids, protocol_id, message.clone())?;
+        //     }
+        // }
         Ok(())
     }
 
-    async fn send_to_peer_rpc(
+    async fn send_to_peer_rpc<T: Serialize + Sync, O: DeserializeOwned>(
         &self,
-        message: Bytes,
+        protocol_id: ProtocolId,
+        message: &T,
         rpc_timeout: Duration,
         peer: PeerNetworkId,
-    ) -> Result<Bytes, Error> {
+    ) -> Result<O, Error> {
+        let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        let rpc_protocol_id =
-            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
-        Ok(network_sender
-            .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
-            .await?)
+        // let rpc_protocol_id =
+        //     self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
+        let result = network_sender
+            .send_rpc(peer.peer_id(), protocol_id, blob.into(), rpc_timeout)
+            .await?;
+        protocol_id.from_bytes(result.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))
     }
 }
 
