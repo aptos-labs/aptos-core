@@ -10,16 +10,20 @@
     "simple_nft": "ts-node simple_nft.ts",
     "transfer_coin": "ts-node transfer_coin.ts",
     "test": "run-s bcs_transaction multisig_transaction simple_nft transfer_coin",
-    "your_coin": "ts-node your_coin.ts"
+    "your_coin": "ts-node your_coin.ts",
+    "call_aptos_cli": "ts-node call_aptos_cli.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "aptos": "latest",
-    "dotenv": "16.0.1"
+    "dotenv": "16.0.1",
+    "ffi-napi": "^4.0.3",
+    "ref-array-di": "^1.2.2"
   },
   "devDependencies": {
+    "@types/ffi-napi": "^4.0.7",
     "@types/node": "18.6.2",
     "npm-run-all": "4.1.5",
     "ts-node": "10.9.1",

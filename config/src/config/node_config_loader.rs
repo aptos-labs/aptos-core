@@ -3,7 +3,8 @@
 
 use crate::{
     config::{
-        config_sanitizer::ConfigSanitizer, utils::RootPath, Error, NodeConfig, PersistableConfig,
+        config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer, utils::RootPath,
+        Error, NodeConfig, PersistableConfig,
     },
     utils::get_genesis_txn,
 };
@@ -14,7 +15,47 @@ use aptos_types::{
     transaction::{Transaction, WriteSetPayload},
     write_set::WriteOp,
 };
+use serde_yaml::Value;
 use std::path::Path;
+
+/// A simple enum to represent the type of a node
+/// as determined from the config file.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NodeType {
+    Validator,
+    ValidatorFullnode,
+    PublicFullnode,
+}
+
+impl NodeType {
+    pub fn is_validator(self) -> bool {
+        self == NodeType::Validator
+    }
+
+    pub fn is_validator_fullnode(self) -> bool {
+        self == NodeType::ValidatorFullnode
+    }
+
+    /// Returns the type of the node as determined by the node config
+    pub fn extract_from_config(node_config: &NodeConfig) -> Self {
+        // Validator nodes are trivial to detect
+        if node_config.base.role.is_validator() {
+            return NodeType::Validator;
+        }
+
+        // Otherwise, we must decipher between VFNs and PFNs
+        // based on the presence of a VFN network.
+        let vfn_network_found = node_config
+            .full_node_networks
+            .iter()
+            .any(|network| network.network_id.is_vfn_network());
+        if vfn_network_found {
+            NodeType::ValidatorFullnode
+        } else {
+            NodeType::PublicFullnode
+        }
+    }
+}
 
 /// A simple node config loader that performs basic config
 /// sanitization and post-processing.
@@ -37,10 +78,9 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
         let input_dir = RootPath::new(&self.node_config_path);
         node_config.execution.load_from_path(&input_dir)?;
 
-        // Sanitize the node config
-        sanitize_node_config(&mut node_config)?;
-
-        // TODO: post-process the config for the current environment
+        // Optimize and sanitize the node config
+        let local_config_yaml = get_local_config_yaml(&self.node_config_path)?;
+        optimize_and_sanitize_node_config(&mut node_config, local_config_yaml)?;
 
         // Update the data directory
         node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
@@ -48,10 +88,29 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
     }
 }
 
-/// Sanitize the node config for the current environment
-fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
+/// Return the node config file contents as a string
+fn get_local_config_yaml<P: AsRef<Path>>(node_config_path: P) -> Result<Value, Error> {
+    // Read the file contents into a string
+    let local_config_yaml = NodeConfig::read_config_file(&node_config_path)?;
+
+    // Parse the file contents as a yaml value
+    let local_config_yaml = serde_yaml::from_str(&local_config_yaml).map_err(|error| {
+        Error::Yaml(
+            "Failed to parse the node config file into a YAML value".into(),
+            error,
+        )
+    })?;
+
+    Ok(local_config_yaml)
+}
+
+/// Optimize and sanitize the node config for the current environment
+fn optimize_and_sanitize_node_config(
+    node_config: &mut NodeConfig,
+    local_config_yaml: Value,
+) -> Result<(), Error> {
     // Get the role and chain_id for the node
-    let node_role = node_config.base.role;
+    let node_type = NodeType::extract_from_config(node_config);
     let chain_id = match get_chain_id(node_config) {
         Ok(chain_id) => chain_id,
         Err(error) => {
@@ -60,8 +119,11 @@ fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
         },
     };
 
+    // Optimize the node config
+    NodeConfig::optimize(node_config, &local_config_yaml, node_type, chain_id)?;
+
     // Sanitize the node config
-    NodeConfig::sanitize(node_config, node_role, chain_id)
+    NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
 /// Get the chain ID for the node
@@ -120,5 +182,69 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
             "The genesis transaction has the incorrect type: {:?}!",
             genesis_txn
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        config::{node_config_loader::NodeType, BaseConfig, NetworkConfig, NodeConfig, RoleType},
+        network_id::NetworkId,
+    };
+
+    #[test]
+    fn test_node_type_from_validator_config() {
+        // Create a validator node config
+        let node_config = NodeConfig {
+            base: BaseConfig {
+                role: RoleType::Validator,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify the node type is correct
+        assert_eq!(
+            NodeType::extract_from_config(&node_config),
+            NodeType::Validator
+        );
+    }
+
+    #[test]
+    fn test_node_type_from_vfn_config() {
+        // Create a VFN node config
+        let node_config = NodeConfig {
+            base: BaseConfig {
+                role: RoleType::FullNode,
+                ..Default::default()
+            },
+            full_node_networks: vec![NetworkConfig::network_with_id(NetworkId::Vfn)],
+            ..Default::default()
+        };
+
+        // Verify the node type is correct
+        assert_eq!(
+            NodeType::extract_from_config(&node_config),
+            NodeType::ValidatorFullnode
+        );
+    }
+
+    #[test]
+    fn test_node_type_from_pfn_config() {
+        // Create a PFN node config
+        let node_config = NodeConfig {
+            base: BaseConfig {
+                role: RoleType::FullNode,
+                ..Default::default()
+            },
+            full_node_networks: vec![NetworkConfig::network_with_id(NetworkId::Public)],
+            ..Default::default()
+        };
+
+        // Verify the node type is correct
+        assert_eq!(
+            NodeType::extract_from_config(&node_config),
+            NodeType::PublicFullnode
+        );
     }
 }

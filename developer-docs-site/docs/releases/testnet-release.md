@@ -11,20 +11,20 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos Framework
 
-[Aptos Framework Release v1.3.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.3.0)
+[Aptos Framework Release v1.4.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.4.0)
 
 ## Aptos SDK
 
-Aptos SDK Release v1.7.2
+Aptos SDK Release v1.8.5
 
 ## Aptos CLI
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.12](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.12)| `aptos-cli-v1.0.12` | `36c557a2258d67f46f5c8d8500a07956f9e62ccc` |
+|[Aptos CLI Release v1.0.13](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.13)| `aptos-cli-v1.0.13` | `7f864d4af722bf538f1a904e321130a261e92b3a` |
 
 ## Aptos Node
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node Release v1.3.5](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.3.5)| [`aptos-node-v1.3.5`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.3.5/images/sha256-2c575d25db0ef1003d313cddc0d15b213bc694c490b5911f35b72c7a135692d5?context=explore) | `sha256:2c575d25db0ef1003d313cddc0d15b213bc694c490b5911f35b72c7a135692d5` | [aptos-node-v1.3.5](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.3.5)| `e80219926372ccd1c69654d7b6bb4ba21a0c9862` |
+|[Aptos Node Release v1.4.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.4.0)| [`aptos-node-v1.4.0`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.4.0/images/sha256-a354732dd4b90bf1776a0b55a8109940124bbc183740aea79b35dd1a164561ff?context=explore) | `sha256:a354732dd4b90bf1776a0b55a8109940124bbc183740aea79b35dd1a164561ff` | [aptos-node-v1.4.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.4.0)| `57f8b499aead5adf38276acb585cd2c0de398568` |

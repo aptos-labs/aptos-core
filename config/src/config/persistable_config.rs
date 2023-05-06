@@ -4,31 +4,16 @@
 use crate::config::{Error, NodeConfig, SafetyRulesConfig};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    fs::File,
-    io::{Read, Write},
+    fs::{read_to_string, File},
+    io::Write,
     path::Path,
 };
 
 pub trait PersistableConfig: Serialize + DeserializeOwned {
     /// Load the config from disk at the given path
     fn load_config<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        // Open the config file
-        let config_path_string = path.as_ref().to_str().unwrap().to_string();
-        let mut file = File::open(&path).map_err(|error| {
-            Error::Unexpected(format!(
-                "Failed to open config file: {:?}. Error: {:?}",
-                config_path_string, error
-            ))
-        })?;
-
         // Read the file into a string
-        let mut file_contents = String::new();
-        file.read_to_string(&mut file_contents).map_err(|error| {
-            Error::Unexpected(format!(
-                "Failed to read the config file into a string: {:?}. Error: {:?}",
-                config_path_string, error
-            ))
-        })?;
+        let file_contents = Self::read_config_file(&path)?;
 
         // Parse the file string
         Self::parse_serialized_config(&file_contents)
@@ -47,6 +32,17 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
             .map_err(|e| Error::IO(output_file.as_ref().to_str().unwrap().to_string(), e))?;
 
         Ok(())
+    }
+
+    /// Read the config at the given path and return the contents as a string
+    fn read_config_file<P: AsRef<Path>>(path: P) -> Result<String, Error> {
+        let config_path_string = path.as_ref().to_str().unwrap().to_string();
+        read_to_string(config_path_string.clone()).map_err(|error| {
+            Error::Unexpected(format!(
+                "Failed to read the config file into a string: {:?}. Error: {:?}",
+                config_path_string, error
+            ))
+        })
     }
 
     /// Parse the config from the serialized string

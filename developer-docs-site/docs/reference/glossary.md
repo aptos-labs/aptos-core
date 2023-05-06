@@ -41,7 +41,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### AptosBFT
 
 - **AptosBFT** is the Aptos protocol's BFT consensus algorithm.
-- AptosBFT is based on HotStuff.
+- AptosBFT is based on Jolteon.
 
 ### Aptos Blockchain
 
@@ -102,7 +102,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 ### Byzantine Fault Tolerance (BFT)
 
 - **Byzantine Fault Tolerance** (BFT) is the ability of a distributed system to provide safety and liveness guarantees in the presence of faulty, or “[Byzantine](#byzantine-validator),” validators below a certain threshold.
-- The Aptos blockchain uses AptosBFT, a consensus protocol based on [HotStuff](#hotstuff).
+- The Aptos blockchain uses AptosBFT, a consensus protocol based on [Jolteon](#Jolteon).
 - BFT algorithms typically operate with a number of entities, collectively holding N votes (which are called “validators” in the Aptos network’s application of the system).
 - N is chosen to withstand some number of validators holding f votes, which might be malicious.
 - In this configuration, N is typically set to 3f+1. Validators holding up to f votes will be allowed to be faulty &mdash; offline, malicious, slow, etc. As long as 2f+1 votes are held by [honest](#honest-validator) validators, they will be able to reach consensus on consistent decisions.
@@ -207,11 +207,11 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Honesty** means a validator that faithfully executes the consensus protocol and is not Byzantine.
 
-### HotStuff
+### Jolteon
 
-- **HotStuff** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
-- AptosBFT, the Aptos network's consensus algorithm, is based on HotStuff.
-- It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols.
+- **Jolteon** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
+- AptosBFT, the Aptos network's consensus algorithm, is based on Jolteon.
+- It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols. In particular, it reduces latency by 33% compared to HotStuff.
 
 ## I
 

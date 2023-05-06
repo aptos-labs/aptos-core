@@ -120,6 +120,7 @@ pub fn run_benchmark<V>(
             db.clone(),
             &source_dir,
             // Initialization pipeline is temporary, so needs to be fully committed.
+            // No discards/aborts allowed during initialization, even if they are allowed later.
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
@@ -434,7 +435,10 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::CreateNewAccountResource), true);
+        test_generic_benchmark::<AptosVM>(
+            Some(TransactionTypeArg::TokenV1NFTMintAndTransferSequential),
+            true,
+        );
     }
 
     #[test]

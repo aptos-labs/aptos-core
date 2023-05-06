@@ -236,6 +236,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "tools/install-cli/automated-install",
             "tools/install-cli/download-cli-binaries",
             "tools/install-cli/install-from-brew",
             "tools/install-cli/build-from-source",

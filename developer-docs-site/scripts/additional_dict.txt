@@ -24,6 +24,7 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosRelease
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -134,6 +135,7 @@ Integrators
 JPG
 JSON
 Jetbrains
+Jolteon
 Kubernetes
 LLVM
 Labs's
@@ -351,6 +353,7 @@ haproxy
 hardcoded
 hippospace
 hotfix
+hotfixes
 hotstuff
 href
 http

@@ -5,6 +5,7 @@
 // All modules should be declared below
 mod api_config;
 mod base_config;
+mod config_optimizer;
 mod config_sanitizer;
 mod consensus_config;
 mod error;

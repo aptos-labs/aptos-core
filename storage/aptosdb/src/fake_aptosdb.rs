@@ -49,7 +49,7 @@ use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
-use std::{collections::HashMap, mem::swap, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, mem::swap, sync::Arc};
 
 /// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
 /// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
@@ -171,12 +171,12 @@ impl FakeAptosDB {
 
     fn save_and_compute_root_hash(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
     ) -> Result<HashValue> {
         let txn_infos: Vec<_> = txns_to_commit
             .iter()
-            .map(|t| t.transaction_info())
+            .map(|t| t.borrow().transaction_info())
             .cloned()
             .collect();
 
@@ -200,31 +200,10 @@ impl FakeAptosDB {
             num_transactions,
         )
     }
-}
 
-impl DbWriter for FakeAptosDB {
-    fn get_state_snapshot_receiver(
+    fn save_transactions_impl(
         &self,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
-        self.inner
-            .get_state_snapshot_receiver(version, expected_root_hash)
-    }
-
-    fn finalize_state_snapshot(
-        &self,
-        version: Version,
-        output_with_proof: TransactionOutputListWithProof,
-        ledger_infos: &[LedgerInfoWithSignatures],
-    ) -> Result<()> {
-        self.inner
-            .finalize_state_snapshot(version, output_with_proof, ledger_infos)
-    }
-
-    fn save_transactions(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -245,7 +224,10 @@ impl DbWriter for FakeAptosDB {
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
                 self.inner.save_transactions(
-                    txns_to_commit,
+                    &txns_to_commit
+                        .iter()
+                        .map(|txn| txn.borrow().clone())
+                        .collect::<Vec<_>>(),
                     first_version,
                     base_state_version,
                     ledger_info_with_sigs,
@@ -320,7 +302,7 @@ impl DbWriter for FakeAptosDB {
                     if latest_checkpoint_version >= first_version {
                         let idx = (latest_checkpoint_version - first_version) as usize;
                         ensure!(
-                            txns_to_commit[idx].is_state_checkpoint(),
+                            txns_to_commit[idx].borrow().is_state_checkpoint(),
                             "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
                             latest_checkpoint_version,
                             first_version + idx as u64
@@ -328,7 +310,9 @@ impl DbWriter for FakeAptosDB {
                         Some(
                             txns_to_commit[..=idx]
                                 .iter()
-                                .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                                .flat_map(|txn_to_commit| {
+                                    txn_to_commit.borrow().state_updates().clone()
+                                })
                                 .collect(),
                         )
                     } else {
@@ -349,6 +333,7 @@ impl DbWriter for FakeAptosDB {
             // Iterate through the transactions and update the in-memory maps
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
                 |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
+                    let txn_to_commit = txn_to_commit.borrow();
                     self.txn_by_version
                         .insert(ver, txn_to_commit.transaction().clone());
                     self.txn_info_by_version
@@ -382,6 +367,66 @@ impl DbWriter for FakeAptosDB {
             }
             Ok(())
         })
+    }
+}
+
+impl DbWriter for FakeAptosDB {
+    fn get_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn aptos_storage_interface::StateSnapshotReceiver<StateKey, StateValue>>> {
+        self.inner
+            .get_state_snapshot_receiver(version, expected_root_hash)
+    }
+
+    fn finalize_state_snapshot(
+        &self,
+        version: Version,
+        output_with_proof: TransactionOutputListWithProof,
+        ledger_infos: &[LedgerInfoWithSignatures],
+    ) -> Result<()> {
+        self.inner
+            .finalize_state_snapshot(version, output_with_proof, ledger_infos)
+    }
+
+    fn save_transactions(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+    ) -> Result<()> {
+        self.save_transactions_impl(
+            txns_to_commit,
+            first_version,
+            base_state_version,
+            ledger_info_with_sigs,
+            sync_commit,
+            latest_in_memory_state,
+        )
+    }
+
+    fn save_transaction_block(
+        &self,
+        txns_to_commit: &[Arc<TransactionToCommit>],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+        _block_state_updates: HashMap<StateKey, Option<StateValue>>,
+    ) -> Result<()> {
+        self.save_transactions_impl(
+            txns_to_commit,
+            first_version,
+            base_state_version,
+            ledger_info_with_sigs,
+            sync_commit,
+            latest_in_memory_state,
+        )
     }
 }
 
