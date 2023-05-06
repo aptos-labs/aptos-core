@@ -162,6 +162,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .with_message("split_and_merge_resource_groups error".to_string())
             .finish(Location::Undefined);
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
