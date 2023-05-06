@@ -36,7 +36,6 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
   }}
 /> --->
 
-
 The Aptos staking module defines a capability that represents ownership. 
 
 :::tip Ownership
@@ -47,7 +46,6 @@ The `OwnerCapability` resource can be used to control the stake pool. Three pers
 - Owner
 - Operator
 - Voter
-
 
 Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as it separates the account that is control of the funds from the other accounts (operator, voter), hence allows secure delegations of responsibilities. 
 
@@ -271,7 +269,6 @@ Note that rewards are given only to the **leader-validators**, i.e., validators 
 :::tip Rewards are subject to lockup period
 All the validator rewards are also subject to lockup period as they are added to the original staked amount. 
 :::
-
 
 ## Leaving the validator set
 
