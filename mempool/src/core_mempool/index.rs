@@ -247,12 +247,14 @@ impl TimelineIndex {
                 txn.sequence_info.transaction_sequence_number,
             ),
         );
-        txn.timeline_state = TimelineState::Ready(self.timeline_id);
+        if let TimelineState::NotReady(validator_only) = txn.timeline_state {
+            txn.timeline_state = TimelineState::Ready(self.timeline_id, validator_only);
+        }
         self.timeline_id += 1;
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
-        if let TimelineState::Ready(timeline_id) = txn.timeline_state {
+        if let TimelineState::Ready(timeline_id, _) = txn.timeline_state {
             self.timeline.remove(&timeline_id);
         }
     }

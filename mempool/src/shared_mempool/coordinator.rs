@@ -301,7 +301,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     let timeline_state = if ineligible_for_broadcast {
                         TimelineState::NonQualified
                     } else {
-                        TimelineState::NotReady
+                        TimelineState::NotReady(true)
                     };
                     // This timer measures how long it took for the bounded executor to
                     // *schedule* the task.
