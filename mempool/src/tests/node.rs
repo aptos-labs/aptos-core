@@ -374,7 +374,7 @@ impl Node {
                 transaction.clone(),
                 transaction.gas_unit_price(),
                 0,
-                TimelineState::NotReady,
+                TimelineState::NotReady(false),
             );
         }
     }
