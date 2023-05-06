@@ -289,6 +289,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
 
         // If the peer isn't prioritized, lets not broadcast
         self.check_peer_prioritized(peer)?;
+        let for_validator = peer.network_id().is_vfn_network();
 
         // If backoff mode is on for this peer, only execute broadcasts that were scheduled as a backoff broadcast.
         // This is to ensure the backoff mode is actually honored (there is a chance a broadcast was scheduled
@@ -306,14 +307,14 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             .sent_batches
             .clone()
             .into_iter()
-            .filter(|(id, _batch)| !mempool.timeline_range(&id.0).is_empty())
+            .filter(|(id, _batch)| !mempool.timeline_range(&id.0, for_validator).is_empty())
             .collect::<BTreeMap<MultiBatchId, SystemTime>>();
         state.broadcast_info.retry_batches = state
             .broadcast_info
             .retry_batches
             .clone()
             .into_iter()
-            .filter(|id| !mempool.timeline_range(&id.0).is_empty())
+            .filter(|id| !mempool.timeline_range(&id.0, for_validator).is_empty())
             .collect::<BTreeSet<MultiBatchId>>();
 
         // Check for batch to rebroadcast:
@@ -354,7 +355,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         Some(counters::RETRY_BROADCAST_LABEL)
                     };
 
-                    let txns = mempool.timeline_range(&id.0);
+                    let txns = mempool.timeline_range(&id.0, for_validator);
                     (id.clone(), txns, metric_label)
                 },
                 None => {
@@ -362,6 +363,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     let (txns, new_timeline_id) = mempool.read_timeline(
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
+                        for_validator,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),

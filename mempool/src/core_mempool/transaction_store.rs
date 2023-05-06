@@ -371,7 +371,7 @@ impl TransactionStore {
         // check previous txn in sequence is ready
         if let Some(account_txns) = self.transactions.get(&txn.get_sender()) {
             if let Some(prev_txn) = account_txns.get(&(tx_sequence_number - 1)) {
-                if let TimelineState::Ready(_) = prev_txn.timeline_state {
+                if let TimelineState::Ready(_, _) = prev_txn.timeline_state {
                     return true;
                 }
             }
@@ -433,10 +433,13 @@ impl TransactionStore {
                 let process_ready = !self.priority_index.contains(txn);
                 self.priority_index.insert(txn);
 
-                let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
-                if process_broadcast_ready {
+                let process_broadcast_ready = if let TimelineState::NotReady(_) = txn.timeline_state
+                {
                     self.timeline_index.insert(txn);
-                }
+                    true
+                } else {
+                    false
+                };
 
                 if process_ready {
                     if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time) {
@@ -458,7 +461,7 @@ impl TransactionStore {
             let mut parking_lot_txns = 0;
             for (_, txn) in txns.range_mut((Bound::Excluded(min_seq), Bound::Unbounded)) {
                 match txn.timeline_state {
-                    TimelineState::Ready(_) => {},
+                    TimelineState::Ready(_, _) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
                         txn.was_parked = true;
@@ -579,7 +582,7 @@ impl TransactionStore {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-    ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
+    ) -> (Vec<&MempoolTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
         let mut last_timeline_id = timeline_id.id_per_bucket.clone();
@@ -598,9 +601,9 @@ impl TransactionStore {
                     if batch_total_bytes.saturating_add(transaction_bytes) > self.max_batch_bytes {
                         break; // The batch is full
                     } else {
-                        batch.push(txn.txn.clone());
+                        batch.push(txn);
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
-                        if let TimelineState::Ready(timeline_id) = txn.timeline_state {
+                        if let TimelineState::Ready(timeline_id, _) = txn.timeline_state {
                             last_timeline_id[i] = timeline_id;
                         }
                         if let Ok(time_delta) = SystemTime::now().duration_since(txn.insertion_time)
@@ -630,7 +633,7 @@ impl TransactionStore {
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
-    ) -> Vec<SignedTransaction> {
+    ) -> Vec<&MempoolTransaction> {
         self.timeline_index
             .timeline_range(start_end_pairs)
             .iter()
@@ -638,7 +641,6 @@ impl TransactionStore {
                 self.transactions
                     .get(account)
                     .and_then(|txns| txns.get(sequence_number))
-                    .map(|txn| txn.txn.clone())
             })
             .collect()
     }
@@ -726,8 +728,8 @@ impl TransactionStore {
                     t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
-                    if let TimelineState::Ready(_) = t.timeline_state {
-                        t.timeline_state = TimelineState::NotReady;
+                    if let TimelineState::Ready(_, validator_only) = t.timeline_state {
+                        t.timeline_state = TimelineState::NotReady(validator_only);
                     }
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
