@@ -28,7 +28,7 @@ pub fn mempool_incoming_transactions_strategy(
     (
         proptest::collection::vec(any::<SignedTransaction>(), 0..100),
         prop_oneof![
-            Just(TimelineState::NotReady),
+            Just(TimelineState::NotReady(false)),
             Just(TimelineState::NonQualified)
         ],
     )
