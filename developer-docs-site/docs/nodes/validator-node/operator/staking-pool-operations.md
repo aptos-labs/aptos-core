@@ -11,7 +11,9 @@ This document describes how to perform [staking](../../../concepts/staking.md) p
 The current required minimum for staking is 1 million APT.
 :::
 
-:::danger Important There is no upgrade mechanism for the staking contract from staking pool to delegation pool. A new delegation pool would have to be created. :::
+:::danger
+Important There is no upgrade mechanism for the staking contract from staking pool to delegation pool. A new delegation pool would have to be created.
+:::
 
 ## Connect to Aptos network
 
@@ -19,7 +21,7 @@ The current required minimum for staking is 1 million APT.
 
 ## Initializing the stake pool
 
-Make sure that this step is performed by the owner. See [Initialize staking pool](../../staking-pool-operations.md#initialize-staking-pool) section.
+Make sure that this step is performed by the owner. See [Initialize staking pool](#initialize-staking-pool) section.
 
 ## Joining validator set
 
