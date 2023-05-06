@@ -311,7 +311,7 @@ where
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["get_txns_to_commit"])
                     .start_timer();
-                block.output.transactions_to_commit()?
+                block.output.transactions_to_commit()
             };
 
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
@@ -330,7 +330,7 @@ where
                 sync_commit,
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
-                block.output.block_state_updates.clone().unwrap(),
+                block.output.block_state_updates.clone(),
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

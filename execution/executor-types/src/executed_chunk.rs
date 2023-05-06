@@ -4,19 +4,16 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{StateComputeResult, TransactionData};
+use crate::TransactionData;
 use anyhow::{bail, ensure, Result};
-use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
+use aptos_crypto::hash::CryptoHash;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    proof::accumulator::InMemoryAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
-use std::{collections::HashMap, sync::Arc};
 
 #[derive(Default)]
 pub struct ExecutedChunk {
@@ -26,8 +23,6 @@ pub struct ExecutedChunk {
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
     pub ledger_info: Option<LedgerInfoWithSignatures>,
-    // Only used when it is a block.
-    pub block_state_updates: Option<HashMap<StateKey, Option<StateValue>>>,
 }
 
 impl ExecutedChunk {
@@ -43,7 +38,6 @@ impl ExecutedChunk {
         Self {
             result_view: self.result_view.clone(),
             next_epoch_state: self.next_epoch_state.clone(),
-            block_state_updates: self.block_state_updates.clone(),
             ..Default::default()
         }
     }
@@ -120,24 +114,6 @@ impl ExecutedChunk {
         }
     }
 
-    /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
-    /// one of the two cases: 1. a reconfiguration (txns in the proposed block after the txn caused
-    /// the reconfiguration will be retried) 2. a Transaction::StateCheckpoint at the end of the
-    /// block.
-    ///
-    /// Called from `BlockExecutor`
-    pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
-        ensure!(
-            self.next_epoch_state.is_some()
-                || self
-                    .to_commit
-                    .last()
-                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint(_))),
-            "Chunk not ending with a state checkpoint.",
-        );
-        Ok(())
-    }
-
     pub fn maybe_select_chunk_ending_ledger_info(
         &self,
         verified_target_li: &LedgerInfoWithSignatures,
@@ -192,32 +168,5 @@ impl ExecutedChunk {
         self.result_view = rhs.result_view;
         self.next_epoch_state = rhs.next_epoch_state;
         self.ledger_info = rhs.ledger_info;
-    }
-
-    pub fn as_state_compute_result(
-        &self,
-        parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> StateComputeResult {
-        let txn_accu = self.result_view.txn_accumulator();
-
-        let mut transaction_info_hashes = Vec::new();
-        let mut reconfig_events = Vec::new();
-
-        for (_, txn_data) in &self.to_commit {
-            transaction_info_hashes.push(txn_data.txn_info_hash());
-            reconfig_events.extend(txn_data.reconfig_events.iter().cloned())
-        }
-
-        StateComputeResult::new(
-            txn_accu.root_hash(),
-            txn_accu.frozen_subtree_roots().clone(),
-            txn_accu.num_leaves(),
-            parent_accumulator.frozen_subtree_roots().clone(),
-            parent_accumulator.num_leaves(),
-            self.next_epoch_state.clone(),
-            self.status.clone(),
-            transaction_info_hashes,
-            reconfig_events,
-        )
     }
 }

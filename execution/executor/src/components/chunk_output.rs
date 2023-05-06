@@ -6,7 +6,7 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
-use aptos_executor_types::ExecutedChunk;
+use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -89,7 +89,7 @@ impl ChunkOutput {
     pub fn apply_to_ledger_for_block(
         self,
         base_view: &ExecutedTrees,
-    ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
+    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger_for_block", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in apply_to_ledger_for_block."
