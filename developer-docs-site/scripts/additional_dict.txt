@@ -12,6 +12,7 @@ APIs
 APT
 APT's
 APTs
+APY
 AUTH
 AWS
 Ait
@@ -55,6 +56,8 @@ DECL
 DM
 DNS
 Dapps
+Delegator
+Delegators
 Deref
 Deref
 Destructuring
@@ -63,6 +66,8 @@ DevEx
 Devnet
 DoS
 DocGen
+delegator
+delegators
 dropdown
 EACCOUNT
 EALREADY
