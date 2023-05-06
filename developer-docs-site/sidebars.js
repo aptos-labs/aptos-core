@@ -51,7 +51,16 @@ const sidebars = {
         "concepts/gas-txn-fee",
         "concepts/base-gas",
         "concepts/blocks",
-        "concepts/staking",
+        {
+          type: "category",
+          label: "Staking",
+          link: { type: "doc", id: "concepts/staking" },
+          collapsible: true,
+          collapsed: true,
+          items: [
+            "concepts/delegated-staking",
+          ],
+        },
         "concepts/governance",
       ],
     },
