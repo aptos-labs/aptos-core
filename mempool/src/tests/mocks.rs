@@ -165,7 +165,7 @@ impl MockSharedMempool {
                         txn.clone(),
                         txn.gas_unit_price(),
                         0,
-                        TimelineState::NotReady,
+                        TimelineState::NotReady(false),
                     )
                     .code
                     != MempoolStatusCode::Accepted
