@@ -27,8 +27,7 @@ These are release branches based on Aptos release planning timeline. They are cr
 the `main` branch every 1-2 months.
 
 ### aptos-node-v*X.Y.Z* release tag
-The aptos node release tags are created for validator/fullnode deployment of the given release branch. The minor number *Z* will increment when a new hot-fix release is required on the release branch. Aptos team will publish the matching tag docker images on 
-[Aptos Docker Hub](https://hub.docker.com/r/aptoslabs/validator/tags) when it's available.
+The aptos node release tags are created for validator/fullnode deployment of the given release branch. The minor number *Z* will increment when a new hot-fix release is required on the release branch. Aptos team will publish the matching tag docker images on [Aptos Docker Hub](https://hub.docker.com/r/aptoslabs/validator/tags) when it's available.
 
 ### aptos-framework-v*X.Y.Z* release tag
 The aptos framework release tags are created to facilitate the on-chain framework upgrade of the given release branch. The minor number *Z* will increment when a new hot-fix release or a new  framework update is required on this release branch.
