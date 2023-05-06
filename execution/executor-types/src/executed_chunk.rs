@@ -13,9 +13,10 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     proof::accumulator::InMemoryAccumulator,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Default)]
 pub struct ExecutedChunk {
@@ -25,6 +26,8 @@ pub struct ExecutedChunk {
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
     pub ledger_info: Option<LedgerInfoWithSignatures>,
+    // Only used when it is a block.
+    pub block_state_updates: Option<HashMap<StateKey, Option<StateValue>>>,
 }
 
 impl ExecutedChunk {
@@ -40,6 +43,7 @@ impl ExecutedChunk {
         Self {
             result_view: self.result_view.clone(),
             next_epoch_state: self.next_epoch_state.clone(),
+            block_state_updates: self.block_state_updates.clone(),
             ..Default::default()
         }
     }
