@@ -115,7 +115,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     let timeline_state = if ineligible_for_broadcast {
         TimelineState::NonQualified
     } else {
-        TimelineState::NotReady
+        TimelineState::NotReady(false)
     };
     let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state);
     log_txn_process_results(&statuses, None);
