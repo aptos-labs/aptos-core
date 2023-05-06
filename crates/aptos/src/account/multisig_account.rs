@@ -116,9 +116,8 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload = MultisigTransactionPayload::EntryFunction(
-            self.entry_function_args.create_entry_function_payload()?,
-        );
+        let payload =
+            MultisigTransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
         self.txn_options
             .submit_transaction(aptos_stdlib::multisig_account_create_transaction(
                 self.multisig_account.multisig_address,

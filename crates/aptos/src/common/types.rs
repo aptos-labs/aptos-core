@@ -6,14 +6,15 @@ use crate::{
         init::Network,
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
-            get_account_with_state, get_auth_key, get_sequence_number, prompt_yes_with_override,
-            read_from_file, start_logger, to_common_result, to_common_success_result,
-            write_to_file, write_to_file_with_opts, write_to_user_only_file,
+            get_account_with_state, get_auth_key, get_sequence_number, parse_json_file,
+            prompt_yes_with_override, read_from_file, start_logger, to_common_result,
+            to_common_success_result, write_to_file, write_to_file_with_opts,
+            write_to_user_only_file,
         },
     },
     config::GlobalConfig,
     genesis::git::from_yaml,
-    move_tool::{ArgWithType, MemberId},
+    move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
@@ -24,7 +25,7 @@ use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_rest_client::{
-    aptos_api_types::{HashValue, MoveType, ViewRequest},
+    aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
     Client, Transaction,
 };
@@ -32,8 +33,8 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, SignedTransaction, TransactionPayload,
-        TransactionStatus,
+        authenticator::AuthenticationKey, EntryFunction, Script, SignedTransaction,
+        TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
 use async_trait::async_trait;
@@ -1672,8 +1673,54 @@ pub struct RotationProofChallenge {
     pub new_public_key: Vec<u8>,
 }
 
+/// Common options for interactions with a multisig account.
+#[derive(Clone, Debug, Parser, Serialize)]
+pub struct MultisigAccount {
+    /// The address of the multisig account to interact with.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) multisig_address: AccountAddress,
+}
+
 #[derive(Debug, Parser)]
-/// This is used for both entry functions and scripts.
+pub struct TypeArgVec {
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
+}
+
+impl TryFrom<&Vec<String>> for TypeArgVec {
+    type Error = CliError;
+
+    fn try_from(value: &Vec<String>) -> Result<Self, Self::Error> {
+        let mut type_args = vec![];
+        for string_ref in value {
+            type_args.push(
+                MoveType::from_str(string_ref)
+                    .map_err(|err| CliError::UnableToParse("type argument", err.to_string()))?,
+            );
+        }
+        Ok(TypeArgVec { type_args })
+    }
+}
+
+impl TryInto<Vec<TypeTag>> for TypeArgVec {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<Vec<TypeTag>, Self::Error> {
+        let mut type_tags: Vec<TypeTag> = vec![];
+        for type_arg in self.type_args {
+            type_tags.push(
+                TypeTag::try_from(type_arg)
+                    .map_err(|err| CliError::UnableToParse("type argument", err.to_string()))?,
+            );
+        }
+        Ok(type_tags)
+    }
+}
+
+#[derive(Debug, Parser)]
 pub struct ArgWithTypeVec {
     /// Arguments combined with their type separated by spaces.
     ///
@@ -1683,10 +1730,57 @@ pub struct ArgWithTypeVec {
     /// quotes based on your shell interpreter)
     ///
     /// Example: `address:0x1 bool:true u8:0 u256:1234 "bool:[true, false]" 'address:[["0xace", "0xbee"], []]'`
-    ///
-    /// Vector is wrapped in a reusable struct for uniform CLI documentation.
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
+}
+
+impl TryFrom<&Vec<ArgWithTypeJSON>> for ArgWithTypeVec {
+    type Error = CliError;
+
+    fn try_from(value: &Vec<ArgWithTypeJSON>) -> Result<Self, Self::Error> {
+        let mut args = vec![];
+        for arg_json_ref in value {
+            let function_arg_type = FunctionArgType::from_str(&arg_json_ref.arg_type)?;
+            args.push(function_arg_type.parse_arg_json(&arg_json_ref.arg_value)?);
+        }
+        Ok(ArgWithTypeVec { args })
+    }
+}
+
+impl TryInto<Vec<TransactionArgument>> for ArgWithTypeVec {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<Vec<TransactionArgument>, Self::Error> {
+        let mut args = vec![];
+        for arg in self.args {
+            args.push(arg.try_into()?);
+        }
+        Ok(args)
+    }
+}
+
+impl TryInto<Vec<Vec<u8>>> for ArgWithTypeVec {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<Vec<Vec<u8>>, Self::Error> {
+        Ok(self
+            .args
+            .into_iter()
+            .map(|arg_with_type| arg_with_type.arg)
+            .collect())
+    }
+}
+
+impl TryInto<Vec<serde_json::Value>> for ArgWithTypeVec {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<Vec<serde_json::Value>, Self::Error> {
+        let mut args = vec![];
+        for arg in self.args {
+            args.push(arg.to_json()?);
+        }
+        Ok(args)
+    }
 }
 
 /// Common options for constructing an entry function transaction payload.
@@ -1695,50 +1789,126 @@ pub struct EntryFunctionArguments {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
-    pub function_id: MemberId,
+    #[clap(long, required_unless_present = "json-file")]
+    pub function_id: Option<MemberId>,
 
+    #[clap(flatten)]
+    pub(crate) type_arg_vec: TypeArgVec,
     #[clap(flatten)]
     pub(crate) arg_vec: ArgWithTypeVec,
 
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub type_args: Vec<MoveType>,
+    /// JSON file specifying public entry function ID, type arguments, and arguments.
+    #[clap(long, parse(from_os_str), conflicts_with_all = &["function-id", "args", "type-args"])]
+    pub(crate) json_file: Option<PathBuf>,
 }
 
 impl EntryFunctionArguments {
-    /// Construct and return an entry function payload from function_id, args, and type_args.
-    pub fn create_entry_function_payload(self) -> CliTypedResult<EntryFunction> {
-        let args: Vec<Vec<u8>> = self
-            .arg_vec
-            .args
-            .into_iter()
-            .map(|arg_with_type| arg_with_type.arg)
-            .collect();
-
-        let mut parsed_type_args: Vec<TypeTag> = Vec::new();
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg.clone())
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            parsed_type_args.push(type_tag)
+    /// Get instance as if all fields passed from command line, parsing JSON input file if needed.
+    fn check_json_file(self) -> CliTypedResult<EntryFunctionArguments> {
+        if self.json_file.is_none() {
+            Ok(self)
+        } else {
+            let json =
+                parse_json_file::<EntryFunctionArgumentsJSON>(self.json_file.as_ref().unwrap())?;
+            Ok(EntryFunctionArguments {
+                function_id: Some(MemberId::from_str(&json.function_id)?),
+                type_arg_vec: TypeArgVec::try_from(&json.type_args)?,
+                arg_vec: ArgWithTypeVec::try_from(&json.args)?,
+                json_file: None,
+            })
         }
+    }
+}
 
+impl TryInto<EntryFunction> for EntryFunctionArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<EntryFunction, Self::Error> {
+        let entry_function_args = self.check_json_file()?;
+        let function_id = entry_function_args.function_id.unwrap();
         Ok(EntryFunction::new(
-            self.function_id.module_id,
-            self.function_id.member_id,
-            parsed_type_args,
-            args,
+            function_id.module_id,
+            function_id.member_id,
+            entry_function_args.type_arg_vec.try_into()?,
+            entry_function_args.arg_vec.try_into()?,
         ))
     }
 }
 
-/// Common options for interactions with a multisig account.
-#[derive(Clone, Debug, Parser, Serialize)]
-pub struct MultisigAccount {
-    /// The address of the multisig account to interact with.
-    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    pub(crate) multisig_address: AccountAddress,
+impl TryInto<ViewRequest> for EntryFunctionArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<ViewRequest, Self::Error> {
+        let entry_function_args = self.check_json_file()?;
+        let function_id = entry_function_args.function_id.unwrap();
+        Ok(ViewRequest {
+            function: EntryFunctionId {
+                module: function_id.module_id.into(),
+                name: function_id.member_id.into(),
+            },
+            type_arguments: entry_function_args.type_arg_vec.type_args,
+            arguments: entry_function_args.arg_vec.try_into()?,
+        })
+    }
+}
+
+/// Common options for constructing a script payload
+#[derive(Debug, Parser)]
+pub struct ScriptFunctionArguments {
+    #[clap(flatten)]
+    pub(crate) type_arg_vec: TypeArgVec,
+    #[clap(flatten)]
+    pub(crate) arg_vec: ArgWithTypeVec,
+
+    /// JSON file specifying type arguments and arguments.
+    #[clap(long, parse(from_os_str), conflicts_with_all = &["args", "type-args"])]
+    pub(crate) json_file: Option<PathBuf>,
+}
+
+impl ScriptFunctionArguments {
+    /// Get instance as if all fields passed from command line, parsing JSON input file if needed.
+    fn check_json_file(self) -> CliTypedResult<ScriptFunctionArguments> {
+        if self.json_file.is_none() {
+            Ok(self)
+        } else {
+            let json =
+                parse_json_file::<ScriptFunctionArgumentsJSON>(self.json_file.as_ref().unwrap())?;
+            Ok(ScriptFunctionArguments {
+                type_arg_vec: TypeArgVec::try_from(&json.type_args)?,
+                arg_vec: ArgWithTypeVec::try_from(&json.args)?,
+                json_file: None,
+            })
+        }
+    }
+
+    pub fn create_script_payload(self, bytecode: Vec<u8>) -> CliTypedResult<TransactionPayload> {
+        let script_function_args = self.check_json_file()?;
+        Ok(TransactionPayload::Script(Script::new(
+            bytecode,
+            script_function_args.type_arg_vec.try_into()?,
+            script_function_args.arg_vec.try_into()?,
+        )))
+    }
+}
+
+#[derive(Deserialize)]
+/// JSON file format for function arguments.
+pub struct ArgWithTypeJSON {
+    arg_type: String,
+    arg_value: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+/// JSON file format for entry function arguments.
+struct EntryFunctionArgumentsJSON {
+    function_id: String,
+    type_args: Vec<String>,
+    args: Vec<ArgWithTypeJSON>,
+}
+
+#[derive(Deserialize)]
+/// JSON file format for script function arguments.
+struct ScriptFunctionArgumentsJSON {
+    type_args: Vec<String>,
+    args: Vec<ArgWithTypeJSON>,
 }

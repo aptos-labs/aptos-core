@@ -14,9 +14,10 @@ use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
-            load_account_arg, ArgWithTypeVec, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir,
-            ProfileOptions, PromptOptions, RestOptions, TransactionOptions, TransactionSummary,
+            load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
+            EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir, ProfileOptions,
+            PromptOptions, RestOptions, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -37,11 +38,10 @@ use aptos_framework::{
     prover::ProverOptions, BuildOptions, BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
-use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
-    transaction::{Script, TransactionArgument, TransactionPayload},
+    transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
@@ -52,18 +52,13 @@ use codespan_reporting::{
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
-    u256::U256,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
-    convert::TryFrom,
     fmt::{Display, Formatter},
     path::{Path, PathBuf},
     str::FromStr,
@@ -1102,10 +1097,11 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload = TransactionPayload::EntryFunction(
-            self.entry_function_args.create_entry_function_payload()?,
-        );
-        profile_or_submit(payload, &self.txn_options).await
+        profile_or_submit(
+            TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            &self.txn_options,
+        )
+        .await
     }
 }
 
@@ -1125,21 +1121,9 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
-        let mut args: Vec<serde_json::Value> = vec![];
-        for arg in self.entry_function_args.arg_vec.args {
-            args.push(arg.to_json()?);
-        }
-
-        let view_request = ViewRequest {
-            function: EntryFunctionId {
-                module: self.entry_function_args.function_id.module_id.into(),
-                name: self.entry_function_args.function_id.member_id.into(),
-            },
-            type_arguments: self.entry_function_args.type_args,
-            arguments: args,
-        };
-
-        self.txn_options.view(view_request).await
+        self.txn_options
+            .view(self.entry_function_args.try_into()?)
+            .await
     }
 }
 
@@ -1151,12 +1135,7 @@ pub struct RunScript {
     #[clap(flatten)]
     pub(crate) compile_proposal_args: CompileScriptFunction,
     #[clap(flatten)]
-    pub(crate) arg_vec: ArgWithTypeVec,
-    /// TypeTag arguments separated by spaces.
-    ///
-    /// Example: `u8 u16 u32 u64 u128 u256 bool address vector signer`
-    #[clap(long, multiple_values = true)]
-    pub(crate) type_args: Vec<MoveType>,
+    pub(crate) script_function_args: ScriptFunctionArguments,
 }
 
 #[async_trait]
@@ -1170,23 +1149,11 @@ impl CliCommand<TransactionSummary> for RunScript {
             .compile_proposal_args
             .compile("RunScript", self.txn_options.prompt_options)?;
 
-        let mut args: Vec<TransactionArgument> = vec![];
-        for arg in self.arg_vec.args {
-            args.push(arg.try_into()?);
-        }
-
-        let mut type_args: Vec<TypeTag> = Vec::new();
-
-        // These TypeArgs are used for generics
-        for type_arg in self.type_args.into_iter() {
-            let type_tag = TypeTag::try_from(type_arg)
-                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
-            type_args.push(type_tag)
-        }
-
-        let payload = TransactionPayload::Script(Script::new(bytecode, type_args, args));
-
-        profile_or_submit(payload, &self.txn_options).await
+        profile_or_submit(
+            self.script_function_args.create_script_payload(bytecode)?,
+            &self.txn_options,
+        )
+        .await
     }
 }
 

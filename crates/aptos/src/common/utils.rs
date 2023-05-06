@@ -23,7 +23,7 @@ use aptos_types::{
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -472,4 +472,11 @@ pub async fn profile_or_submit(
             .await
             .map(TransactionSummary::from)
     }
+}
+
+/// Try parsing JSON in file at path into a specified type.
+pub fn parse_json_file<T: for<'a> Deserialize<'a>>(path_ref: &Path) -> CliTypedResult<T> {
+    serde_json::from_slice::<T>(&read_from_file(path_ref)?).map_err(|err| {
+        CliError::UnableToReadFile(format!("{}", path_ref.display()), err.to_string())
+    })
 }

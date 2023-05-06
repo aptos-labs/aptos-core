@@ -434,3 +434,254 @@ $ aptos move run --function-id default::message::set_message --args string:hello
   }
 }
 ```
+
+## Arguments in JSON
+
+### Background
+
+This section references the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args), which contains the following manifest:
+
+
+```toml title="Move.toml"
+:!: static/move-examples/cli_args/Move.toml manifest
+```
+
+Here, the package is deployed under the named address `test_account`.
+
+### Entry functions
+
+The only module in the package, `cli_args.move`, defines a simple `Holder` resource with fields of various data types:
+
+```rust title="Holder in cli_args.move"
+:!: static/move-examples/cli_args/sources/cli_args.move resource
+```
+
+A public entry function with multi-nested vectors can be used to set the fields:
+
+```rust title="Setter function in cli_args.move"
+:!: static/move-examples/cli_args/sources/cli_args.move setter
+```
+
+After the package has been published, `aptos move run` can be used to call `set_vals()`:
+
+```zsh title="Running function with nested vector arguments from CLI"
+aptos move run \
+    --function-id <test_account>::cli_args::set_vals \
+    --private-key-file <test_account.key> \
+    --type-args \
+        0x1::account::Account \
+        0x1::chain_id::ChainId \
+    --args \
+        u8:123 \
+        "bool:[false, true, false, false]" \
+        'address:[["0xace", "0xbee"], ["0xcad"], []]'
+```
+
+:::tip
+To pass vectors (including nested vectors) as arguments from the command line, use JSON syntax escaped with quotes!
+:::
+
+The function ID, type arguments, and arguments can alternatively be specified in a JSON file:
+
+```json title="entry_function_arguments.json"
+{
+    "function_id": "<test_account>::cli_args::set_vals",
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::chain_id::ChainId"
+    ],
+    "args": [
+        {
+            "arg_type": "u8",
+            "arg_value": 123
+        },
+        {
+            "arg_type": "bool",
+            "arg_value": [false, true, false, false]
+        },
+        {
+            "arg_type": "address",
+            "arg_value": [
+                [
+                    "0xace",
+                    "0xbee"
+                ],
+                [
+                    "0xcad"
+                ],
+                []
+            ]
+        }
+    ]
+}
+```
+
+Here, the call to `aptos move run` looks like:
+
+```zsh
+aptos move run \
+    --private-key-file <test_account.key> \
+    --json-file entry_function_arguments.json
+```
+
+### View functions
+
+Once the values in a `Holder` have been set, the `reveal()` view function can be used to check the first three fields, and to compare type arguments against the last two fields:
+
+```rust title="View function"
+:!: static/move-examples/cli_args/sources/cli_args.move view
+```
+
+This view function can be called with arguments specified either from the CLI or from a JSON file:
+
+```zsh title="Arguments via CLI"
+aptos move view \
+    --function-id <test_account>::cli_args::reveal \
+    --type-args \
+        0x1::account::Account \
+        0x1::account::Account \
+    --args address:<test_account>
+```
+
+```zsh title="Arguments via JSON file"
+aptos move view --json-file view_function_arguments.json
+```
+
+```json title="view_function_arguments.json"
+{
+    "function_id": "<test_account>::cli_args::reveal",
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::account::Account"
+    ],
+    "args": [
+        {
+            "arg_type": "address",
+            "arg_value": "<test_account>"
+        }
+    ]
+}
+```
+
+```zsh title="Output"
+{
+  "Result": [
+    123,
+    [
+      false,
+      true,
+      false,
+      false
+    ],
+    [
+      [
+        "0xace",
+        "0xbee"
+      ],
+      [
+        "0xcad"
+      ],
+      []
+    ],
+    true,
+    false
+  ]
+}
+```
+
+### Script functions
+
+The package also contains a script, `set_vals.move`, which is a wrapper for the setter function:
+
+```rust title="script"
+:!: static/move-examples/cli_args/scripts/set_vals.move script
+```
+
+Here, `aptos move run-script` is run from inside the [`cli_args` package directory](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args):
+
+:::tip
+Before trying out the below examples, compile the package with the correct named address via:
+
+```zsh
+aptos move compile --named-addresses test_account=<test_account>
+```
+:::
+
+```zsh title="Arguments via CLI"
+aptos move run-script \
+    --compiled-script-path build/CliArgs/bytecode_scripts/set_vals.mv \
+    --private-key-file <test_account.key> \
+    --type-args \
+        0x1::account::Account \
+        0x1::chain_id::ChainId \
+    --args \
+        u8:123 \
+        "u8:[122, 123, 124, 125]" \
+        address:"0xace"
+```
+
+```zsh title="Arguments via JSON file"
+aptos move run-script \
+    --compiled-script-path build/CliArgs/bytecode_scripts/set_vals.mv \
+    --private-key-file <test_account.key> \
+    --json-file script_function_arguments.json
+```
+
+```json title="script_function_arguments.json"
+{
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::chain_id::ChainId"
+    ],
+    "args": [
+        {
+            "arg_type": "u8",
+            "arg_value": 123
+        },
+        {
+            "arg_type": "u8",
+            "arg_value": [122, 123, 124, 125]
+        },
+        {
+            "arg_type": "address",
+            "arg_value": "0xace"
+        }
+    ]
+}
+```
+
+Both such script function invocations result in the following `reveal()` view function output:
+
+```zsh title="View function call"
+aptos move view \
+    --function-id <test_account>::cli_args::reveal \
+    --type-args \
+        0x1::account::Account \
+        0x1::chain_id::ChainId \
+    --args address:<test_account>
+```
+
+```json title="View function output"
+{
+  "Result": [
+    123,
+    [
+      false,
+      false,
+      true,
+      true
+    ],
+    [
+      [
+        "0xace"
+      ]
+    ],
+    true,
+    true
+  ]
+}
+```
+
+:::note
+As of the time of this writing, the `aptos` CLI only supports script function arguments for vectors of type `u8`, and only up to a vector depth of 1. Hence `vector<address>` and `vector<vector<u8>>` are invalid script function argument types.
+:::

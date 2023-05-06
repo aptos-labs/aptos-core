@@ -16,7 +16,8 @@ use crate::{
             CliTypedResult, EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions,
             KeyType, MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
             PoolAddressArgs, PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions,
-            RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+            RestOptions, RngArgs, SaveFile, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -310,22 +311,25 @@ impl CliTestFramework {
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
-                function_id: MemberId {
+                function_id: Some(MemberId {
                     module_id: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
                     member_id: ident_str!("transfer").into(),
-                },
+                }),
                 arg_vec: ArgWithTypeVec {
                     args: vec![
                         ArgWithType::from_str("address:0xdeadbeefcafebabe").unwrap(),
                         ArgWithType::from_str(&format!("u64:{}", amount)).unwrap(),
                     ],
                 },
-                type_args: vec![MoveType::Struct(MoveStructTag::new(
-                    AccountAddress::ONE.into(),
-                    ident_str!("aptos_coin").into(),
-                    ident_str!("AptosCoin").into(),
-                    vec![],
-                ))],
+                type_arg_vec: TypeArgVec {
+                    type_args: vec![MoveType::Struct(MoveStructTag::new(
+                        AccountAddress::ONE.into(),
+                        ident_str!("aptos_coin").into(),
+                        ident_str!("AptosCoin").into(),
+                        vec![],
+                    ))],
+                },
+                json_file: None,
             },
             txn_options: self.transaction_options(sender_index, gas_options),
         }
@@ -587,8 +591,9 @@ impl CliTestFramework {
     ) -> CliTypedResult<TransactionSummary> {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
-                function_id: MemberId::from_str("0x1::staking_contract::create_staking_contract")
-                    .unwrap(),
+                function_id: Some(
+                    MemberId::from_str("0x1::staking_contract::create_staking_contract").unwrap(),
+                ),
                 arg_vec: ArgWithTypeVec {
                     args: vec![
                         ArgWithType::address(self.account_id(operator_index)),
@@ -598,7 +603,8 @@ impl CliTestFramework {
                         ArgWithType::bytes(vec![]),
                     ],
                 },
-                type_args: vec![],
+                type_arg_vec: TypeArgVec { type_args: vec![] },
+                json_file: None,
             },
             txn_options: self.transaction_options(owner_index, None),
         }
@@ -909,12 +915,15 @@ impl CliTestFramework {
         }
 
         RunFunction {
-            txn_options: self.transaction_options(index, gas_options),
             entry_function_args: EntryFunctionArguments {
-                function_id,
+                function_id: Some(function_id),
                 arg_vec: ArgWithTypeVec { args: parsed_args },
-                type_args: parsed_type_args,
+                type_arg_vec: TypeArgVec {
+                    type_args: parsed_type_args,
+                },
+                json_file: None,
             },
+            txn_options: self.transaction_options(index, gas_options),
         }
         .execute()
         .await
@@ -976,8 +985,11 @@ impl CliTestFramework {
                 framework_package_args,
                 bytecode_version: None,
             },
-            arg_vec: ArgWithTypeVec { args: Vec::new() },
-            type_args: Vec::new(),
+            script_function_args: ScriptFunctionArguments {
+                type_arg_vec: TypeArgVec { type_args: vec![] },
+                arg_vec: ArgWithTypeVec { args: vec![] },
+                json_file: None,
+            },
         }
         .execute()
         .await
@@ -1002,8 +1014,11 @@ impl CliTestFramework {
                 },
                 bytecode_version: None,
             },
-            arg_vec: ArgWithTypeVec { args },
-            type_args,
+            script_function_args: ScriptFunctionArguments {
+                type_arg_vec: TypeArgVec { type_args },
+                arg_vec: ArgWithTypeVec { args },
+                json_file: None,
+            },
         }
         .execute()
         .await
