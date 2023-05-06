@@ -349,16 +349,29 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        for_validator: bool,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
-        self.transactions.read_timeline(timeline_id, count)
+        let (txns, ids) = self.transactions.read_timeline(timeline_id, count);
+        (
+            txns.iter()
+                .filter(|txn| for_validator || !txn.timeline_state.ready_validator_only())
+                .map(|txn| txn.txn.clone())
+                .collect(),
+            ids,
+        )
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
+        for_validator: bool,
     ) -> Vec<SignedTransaction> {
-        self.transactions.timeline_range(start_end_pairs)
+        let txns = self.transactions.timeline_range(start_end_pairs);
+        txns.iter()
+            .filter(|txn| for_validator || !txn.timeline_state.ready_validator_only())
+            .map(|txn| txn.txn.clone())
+            .collect()
     }
 
     pub fn gen_snapshot(&self) -> TxnsLog {

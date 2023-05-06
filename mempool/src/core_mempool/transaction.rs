@@ -70,12 +70,21 @@ impl MempoolTransaction {
 pub enum TimelineState {
     // The transaction is ready for broadcast.
     // Associated integer represents it's position in the log of such transactions.
-    Ready(u64),
+    Ready(u64, bool),
     // Transaction is not yet ready for broadcast, but it might change in a future.
-    NotReady,
+    NotReady(bool),
     // Transaction will never be qualified for broadcasting.
     // Currently we don't broadcast transactions originated on other peers.
     NonQualified,
+}
+
+impl TimelineState {
+    pub fn ready_validator_only(&self) -> bool {
+        match self {
+            TimelineState::Ready(_, validator_only) => *validator_only,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -110,7 +119,7 @@ mod test {
             signed_txn,
             Duration::from_secs(1),
             1,
-            TimelineState::NotReady,
+            TimelineState::NotReady(false),
             0,
             SystemTime::now(),
         )
