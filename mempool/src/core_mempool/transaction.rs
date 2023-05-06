@@ -119,7 +119,7 @@ mod test {
             signed_txn,
             Duration::from_secs(1),
             1,
-            TimelineState::NotReady,
+            TimelineState::NotReady(false),
             0,
             SystemTime::now(),
         )

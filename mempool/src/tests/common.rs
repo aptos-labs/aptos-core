@@ -121,7 +121,7 @@ pub(crate) fn add_txns_to_mempool(
             txn.clone(),
             txn.gas_unit_price(),
             transaction.account_seqno,
-            TimelineState::NotReady,
+            TimelineState::NotReady(false),
         );
         transactions.push(txn);
     }
@@ -138,7 +138,7 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
             transaction.clone(),
             transaction.gas_unit_price(),
             0,
-            TimelineState::NotReady,
+            TimelineState::NotReady(false),
         )
         .code
     {
