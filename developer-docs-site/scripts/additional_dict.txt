@@ -24,6 +24,7 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosRelease
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -351,6 +352,7 @@ haproxy
 hardcoded
 hippospace
 hotfix
+hotfixes
 hotstuff
 href
 http
