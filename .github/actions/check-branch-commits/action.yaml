@@ -1,11 +1,18 @@
 name: "Check Branch Commits"
 description: |
-  Runs the branch commit checker on aptos-core, assuming it is already checked out in the current working directory.
-  The branch commit checker verifies the following:
-    - That all commits in devnet, testnet and mainnet, are in main.
-    - That all commits in testnet are in devnet.
-    - That all commits in mainnet are in testnet.
-  These rules will help to ensure we're rolling forward appropriately, i.e., main -> devnet -> testnet -> mainnet.
+  This action runs the branch commit checker, which helps to ensure that:
+    1. All release branches are rolling forward appropriately, i.e., main -> devnet -> testnet -> mainnet.
+    2. The public and private aptos-core repositories are in sync.
+
+  To ensure the properties above, the branch commit checker verifies that:
+    - In the public aptos-core repository:
+      1. All commits in the `devnet`, `testnet` and `mainnet` branches, are in the `main` branch.
+      2. All commits in the `testnet` branch are in `devnet` branch.
+      3. All commits in the `mainnet` branch are in `testnet` branch.
+    - Across the public and private aptos-core repositories:
+      1. All commits in the private `aptos-release.*` branches are in the public `aptos-release.*` branches (and vice versa).
+      2. All commits in the private `main` branch are in the public `main` branch (and vice versa).
+
 inputs:
   TIMEOUT_MINUTES:
     description: "The number of minutes to wait for branch commit checking to finish."
