@@ -222,6 +222,7 @@ SignedTransaction
 SignerCap
 Skylake
 Solana
+Staker
 StateCheckpointTransaction
 Subtyping
 TCP
