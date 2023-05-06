@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::StorageAdapter,
-    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
     identifier::Identifier,
@@ -28,9 +28,9 @@ use move_core_types::{
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 
-pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
+pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
 
-impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
+impl<'r, 'l> GenesisSession<'r, 'l> {
     pub fn exec_func(
         &mut self,
         module_name: &str,
@@ -109,7 +109,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
 
 pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: u8) -> ChangeSet
 where
-    F: FnOnce(&mut GenesisSession<StorageAdapter<S>>),
+    F: FnOnce(&mut GenesisSession),
 {
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
