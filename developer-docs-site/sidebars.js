@@ -57,9 +57,7 @@ const sidebars = {
           link: { type: "doc", id: "concepts/staking" },
           collapsible: true,
           collapsed: true,
-          items: [
-            "concepts/delegated-staking",
-          ],
+          items: ["concepts/delegated-staking"],
         },
         "concepts/governance",
       ],
