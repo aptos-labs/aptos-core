@@ -237,8 +237,9 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
         let resolver = state_view.as_move_resolver();
+        // TODO
         let bytes = resolver
-            .get_resource(&address.into(), &resource_type)
+            .get_resource(&address.into(), &resource_type, &[])
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, address

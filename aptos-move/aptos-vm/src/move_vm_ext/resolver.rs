@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
+use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::{aptos_try, return_on_failure};
@@ -9,14 +9,16 @@ use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::MoveResolver,
 };
 use move_table_extension::TableResolver;
 
-fn get_resource_group_from_metadata(
+pub fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
-    metadata: Option<aptos_framework::RuntimeModuleMetadataV1>,
+    metadata: &[Metadata],
 ) -> Option<StructTag> {
+    let metadata = aptos_framework::get_metadata(metadata);
     metadata?
         .struct_attributes
         .get(struct_tag.name.as_ident_str().as_str())?
@@ -27,7 +29,7 @@ fn get_resource_group_from_metadata(
 pub trait MoveResolverExt:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
+    fn get_module_metadata(&self, module_id: ModuleId) -> Vec<Metadata>;
 
     fn get_resource_group_data(
         &self,
@@ -43,14 +45,15 @@ pub trait MoveResolverExt:
 
     fn get_resource_group(&self, struct_tag: &StructTag) -> Option<StructTag> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
-        get_resource_group_from_metadata(struct_tag, metadata)
+        get_resource_group_from_metadata(struct_tag, &metadata)
     }
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {
         aptos_try!({
-            return_on_failure!(self
-                .get_module_metadata(struct_tag.module_id())?
+            let md =
+                aptos_framework::get_metadata(&self.get_module_metadata(struct_tag.module_id()))?;
+            return_on_failure!(md
                 .struct_attributes
                 .get(struct_tag.name.as_ident_str().as_str())?
                 .iter()

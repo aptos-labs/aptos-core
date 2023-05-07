@@ -22,6 +22,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
@@ -392,6 +393,7 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         &self,
         address: &AccountAddress,
         typ: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
         let res = self
             .harness

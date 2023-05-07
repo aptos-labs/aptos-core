@@ -90,8 +90,9 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
         }
     }
 
+    // TODO
     pub fn get_resource_bytes(&self, addr: &AccountAddress, tag: &StructTag) -> Option<Vec<u8>> {
-        self.cache.state.get_resource(addr, tag).ok()?
+        self.cache.state.get_resource(addr, tag, &[]).ok()?
     }
 
     pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {

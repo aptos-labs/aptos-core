@@ -26,7 +26,6 @@ use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    metadata::Metadata,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -574,19 +573,6 @@ impl Loader {
     /// Check whether this cache is invalidated.
     pub(crate) fn is_invalidated(&self) -> bool {
         *self.invalidated.read()
-    }
-
-    /// Copies metadata out of a modules bytecode if available.
-    pub(crate) fn get_metadata(&self, module: ModuleId, key: &[u8]) -> Option<Metadata> {
-        let cache = self.module_cache.read();
-        cache
-            .modules
-            .get(&module)?
-            .module
-            .metadata
-            .iter()
-            .find(|md| md.key == key)
-            .cloned()
     }
 
     //
@@ -1464,7 +1450,7 @@ impl Loader {
         self.module_cache.read().function_at(idx)
     }
 
-    fn get_module(&self, idx: &ModuleId) -> Arc<Module> {
+    pub(crate) fn get_module(&self, idx: &ModuleId) -> Arc<Module> {
         Arc::clone(
             self.module_cache
                 .read()

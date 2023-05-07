@@ -182,7 +182,12 @@ impl<'r> TransactionDataCache<'r> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_resource(&addr, &ty_tag) {
+            let module = &loader.get_module(&ty_tag.module_id());
+
+            let gv = match self
+                .remote
+                .get_resource(&addr, &ty_tag, &module.module().metadata)
+            {
                 Ok(Some(blob)) => {
                     load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {

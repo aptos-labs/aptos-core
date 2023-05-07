@@ -60,7 +60,8 @@ pub fn view_resource_in_move_storage(
         name: resource.to_owned(),
         type_params: type_args,
     };
-    match storage.get_resource(&address, &tag).unwrap() {
+    // TODO
+    match storage.get_resource(&address, &tag, &[]).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
         Some(data) => {
             let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;

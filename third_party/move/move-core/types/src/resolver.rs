@@ -5,6 +5,7 @@
 use crate::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
 };
 use anyhow::Error;
 
@@ -37,6 +38,7 @@ pub trait ResourceResolver {
         &self,
         address: &AccountAddress,
         typ: &StructTag,
+        metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error>;
 }
 
@@ -50,8 +52,9 @@ impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
-        (**self).get_resource(address, tag)
+        (**self).get_resource(address, tag, metadata)
     }
 }
 

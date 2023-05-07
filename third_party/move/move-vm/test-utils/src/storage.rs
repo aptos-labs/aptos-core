@@ -8,6 +8,7 @@ use move_core_types::{
     effects::{AccountChangeSet, ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, MoveResolver, ResourceResolver},
 };
 #[cfg(feature = "table-extension")]
@@ -34,7 +35,12 @@ impl ModuleResolver for BlankStorage {
 }
 
 impl ResourceResolver for BlankStorage {
-    fn get_resource(&self, _address: &AccountAddress, _tag: &StructTag) -> Result<Option<Vec<u8>>> {
+    fn get_resource(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+        _metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 }
@@ -75,6 +81,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
@@ -82,7 +89,8 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
             }
         }
 
-        self.base.get_resource(address, tag)
+        // TODO
+        self.base.get_resource(address, tag, &[])
     }
 }
 
@@ -282,6 +290,7 @@ impl ResourceResolver for InMemoryStorage {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage.resources.get(tag).cloned());

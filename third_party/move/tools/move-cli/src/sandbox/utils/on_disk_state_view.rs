@@ -15,6 +15,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
+    metadata::Metadata,
     parser,
     resolver::{ModuleResolver, ResourceResolver},
 };
@@ -408,10 +409,12 @@ impl ModuleResolver for OnDiskStateView {
 }
 
 impl ResourceResolver for OnDiskStateView {
+    // TODO
     fn get_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         self.get_resource_bytes(*address, struct_tag.clone())
     }

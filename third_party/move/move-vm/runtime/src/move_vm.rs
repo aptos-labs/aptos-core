@@ -12,7 +12,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    resolver::MoveResolver,
 };
 use std::{collections::BTreeSet, sync::Arc};
 
@@ -120,7 +120,16 @@ impl MoveVM {
     ///
     /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
     ///   call this directly via the loader instead of the VM.
-    pub fn get_module_metadata(&self, module: ModuleId, key: &[u8]) -> Option<Metadata> {
-        self.runtime.loader().get_metadata(module, key)
+    pub fn get_module_metadata(&self, module: ModuleId, key: &[u8]) -> Option<Vec<u8>> {
+        let module = self.runtime.loader().get_module(&module);
+        Some(
+            module
+                .module()
+                .metadata
+                .iter()
+                .find(|md| md.key == key)?
+                .value
+                .clone(),
+        )
     }
 }

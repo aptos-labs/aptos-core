@@ -18,6 +18,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
     value::{serialize_values, MoveValue},
@@ -259,6 +260,7 @@ impl ResourceResolver for RemoteStore {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(None)
     }

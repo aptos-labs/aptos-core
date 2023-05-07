@@ -215,8 +215,9 @@ impl ConcretizedFormals {
                 .ok_or_else(|| {
                     anyhow!("Unbound type variable found: {:?}", access_path.root.type_)
                 })?;
+            // TODO fix metadata
             if let Some(resource_bytes) = blockchain_view
-                .get_resource(g, &tag)
+                .get_resource(g, &tag, &[])
                 .map_err(|_| anyhow!("Failed to get resource for {:?}::{:?}", g, tag))?
             {
                 let layout =
