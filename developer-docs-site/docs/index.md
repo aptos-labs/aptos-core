@@ -126,8 +126,6 @@ Aptos offers the ability to run a local testnet, as well as provides a shared de
 
 :::tip Aptos Devnet Resets
 The Aptos devnet is reset every Thursday. See the latest updates in the [Aptos Discord](https://discord.gg/aptoslabs).
-:::info
-
 :::
 
 ## Find the ecosystem
