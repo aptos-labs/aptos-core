@@ -304,6 +304,21 @@ module aptos_framework::aptos_governance {
         metadata_hash: vector<u8>,
         is_multi_step_proposal: bool,
     ) acquires GovernanceConfig, GovernanceEvents {
+        create_proposal_v2_impl(proposer, stake_pool, execution_hash, metadata_location, metadata_hash, is_multi_step_proposal);
+    }
+
+    /// Create a single-step or multi-step proposal with the backing `stake_pool`.
+    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
+    /// only the exact script with matching hash can be successfully executed.
+    /// Return proposal_id when a proposal is sucessfully created.
+    public fun create_proposal_v2_impl(
+        proposer: &signer,
+        stake_pool: address,
+        execution_hash: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
+        is_multi_step_proposal: bool,
+    ): u64 acquires GovernanceConfig, GovernanceEvents {
         let proposer_address = signer::address_of(proposer);
         assert!(stake::get_delegated_voter(stake_pool) == proposer_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
@@ -361,6 +376,7 @@ module aptos_framework::aptos_governance {
                 proposal_metadata,
             },
         );
+        proposal_id
     }
 
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
@@ -1122,6 +1138,16 @@ module aptos_framework::aptos_governance {
 
         let approved_hashes = borrow_global<ApprovedExecutionHashes>(@aptos_framework).hashes;
         assert!(*simple_map::borrow(&approved_hashes, &0) == vector[10u8,], 1);
+    }
+
+    #[test_only]
+    public fun initialize_for_test(
+        aptos_framework: &signer,
+        min_voting_threshold: u128,
+        required_proposer_stake: u64,
+        voting_duration_secs: u64,
+    ) {
+        initialize(aptos_framework, min_voting_threshold, required_proposer_stake, voting_duration_secs);
     }
 
     #[verify_only]

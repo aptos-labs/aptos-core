@@ -152,6 +152,24 @@ spec aptos_framework::aptos_governance {
         include CreateProposalAbortsIf;
     }
 
+    spec create_proposal_v2_impl (
+        proposer: &signer,
+        stake_pool: address,
+        execution_hash: vector<u8>,
+        metadata_location: vector<u8>,
+        metadata_hash: vector<u8>,
+        is_multi_step_proposal: bool,
+    ): u64 {
+        use aptos_framework::chain_status;
+        // TODO: The variable `stake_balance` is the return value of the function `get_voting_power`.
+        // `get_voting_power` has already stated that it cannot be fully verified,
+        // so the value of `stake_balance` cannot be obtained in the spec,
+        // and the `aborts_if` of `stake_balancede` cannot be written.
+        pragma aborts_if_is_partial;
+        requires chain_status::is_operating();
+        include CreateProposalAbortsIf;
+    }
+
     /// `stake_pool` must exist StakePool.
     /// The delegated voter under the resource StakePool of the stake_pool must be the proposer address.
     /// Address @aptos_framework must exist GovernanceEvents.
