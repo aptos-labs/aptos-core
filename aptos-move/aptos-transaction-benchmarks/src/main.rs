@@ -54,6 +54,9 @@ struct ParallelExecutionOpt {
     #[clap(long, default_value = "10000")]
     pub num_accounts: usize,
 
+    #[clap(long, default_value = "2")]
+    pub num_warmups: usize,
+
     #[clap(long, default_value = "50000")]
     pub block_size: usize,
 
@@ -155,7 +158,7 @@ fn parallel_execution(opt: ParallelExecutionOpt) {
         opt.block_size,
         true,
         false,
-        0,
+        opt.num_warmups,
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
