@@ -11,13 +11,13 @@ use aptos_sdk::{
 };
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use rand::{rngs::StdRng, Rng};
-use std::collections::HashMap;
 
 // Information used to track a publisher and what allows to identify and
 // version the package published.
 #[derive(Clone, Debug)]
 struct PublisherInfo {
     publisher: AccountAddress,
+    #[allow(dead_code)]
     suffix: u64,
     fn_count: usize,
     // TODO: do we need upgrade number? it seems to be assigned by the system
@@ -91,7 +91,10 @@ impl PackageHandler {
         };
         let mut package = tracker.package.update(
             tracker.publishers[idx].publisher,
-            tracker.publishers[idx].suffix,
+            0,
+            // TODO cleanup.
+            // unnecessary to have indices for module published under different accout,
+            // they can all be named the same
         );
         if self.is_simple {
             if version {
@@ -107,7 +110,7 @@ impl PackageHandler {
 // Enum to define all packages known to the publisher code.
 #[derive(Clone, Debug)]
 pub enum Package {
-    Simple(HashMap<String, CompiledModule>, PackageMetadata),
+    Simple(Vec<(String, CompiledModule)>, PackageMetadata),
 }
 
 impl Package {
@@ -122,14 +125,14 @@ impl Package {
     fn load_package(
         package_bytes: &[u8],
         modules_bytes: &[Vec<u8>],
-    ) -> (HashMap<String, CompiledModule>, PackageMetadata) {
+    ) -> (Vec<(String, CompiledModule)>, PackageMetadata) {
         let metadata = bcs::from_bytes::<PackageMetadata>(package_bytes)
             .expect("PackageMetadata for GenericModule must deserialize");
-        let mut modules = HashMap::new();
+        let mut modules = Vec::new();
         for module_content in modules_bytes {
             let module =
                 CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
-            modules.insert(module.self_id().name().to_string(), module);
+            modules.push((module.self_id().name().to_string(), module));
         }
         (modules, metadata)
     }
@@ -146,21 +149,13 @@ impl Package {
 
     // Change package "version"
     pub fn version(&mut self, rng: &mut StdRng) {
-        match self {
-            Self::Simple(modules, _) => {
-                module_simple::version(modules.get_mut("simple").unwrap(), rng);
-            },
-        }
+        module_simple::version(self.get_mut_module("simple"), rng)
     }
 
     // Scrambles the package, passing a function count for the functions that can
     // be duplicated and a `StdRng` to generate random values
     pub fn scramble(&mut self, fn_count: usize, rng: &mut StdRng) {
-        match self {
-            Self::Simple(modules, _) => {
-                module_simple::scramble(modules.get_mut("simple").unwrap(), fn_count, rng);
-            },
-        }
+        module_simple::scramble(self.get_mut_module("simple"), fn_count, rng)
     }
 
     // Return a transaction to publish the current package
@@ -190,21 +185,38 @@ impl Package {
 
     pub fn get_module_id(&self, module_name: &str) -> ModuleId {
         match self {
-            Self::Simple(modules, _) => modules
-                .get(module_name)
-                .expect("Wanted module doesn't exist")
-                .self_id(),
+            Self::Simple(modules, _) => {
+                for (name, module) in modules {
+                    if name == module_name {
+                        return module.self_id();
+                    }
+                }
+                panic!("Module for {} not found", module_name);
+            },
+        }
+    }
+
+    pub fn get_mut_module(&mut self, module_name: &str) -> &mut CompiledModule {
+        match self {
+            Self::Simple(modules, _) => {
+                for (name, module) in modules {
+                    if name == module_name {
+                        return module;
+                    }
+                }
+                panic!("Module for {} not found", module_name);
+            },
         }
     }
 }
 
 fn update(
-    modules: &HashMap<String, CompiledModule>,
+    modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
     publisher: AccountAddress,
     suffix: u64,
-) -> (HashMap<String, CompiledModule>, PackageMetadata) {
-    let mut new_modules = HashMap::new();
+) -> (Vec<(String, CompiledModule)>, PackageMetadata) {
+    let mut new_modules = Vec::new();
     for (original_name, module) in modules {
         let mut new_module = module.clone();
         let module_handle = new_module
@@ -218,19 +230,26 @@ fn update(
         );
 
         if suffix > 0 {
-            let mut new_name = new_module.identifiers[module_handle.name.0 as usize].to_string();
-            new_name.push_str(suffix.to_string().as_str());
-            let _ = std::mem::replace(
-                &mut new_module.identifiers[module_handle.name.0 as usize],
-                Identifier::new(new_name).expect("Identifier must be legal"),
-            );
+            for module_handle in &new_module.module_handles {
+                if module_handle.address.0 == original_address_idx {
+                    let mut new_name =
+                        new_module.identifiers[module_handle.name.0 as usize].to_string();
+                    new_name.push('_');
+                    new_name.push_str(suffix.to_string().as_str());
+                    let _ = std::mem::replace(
+                        &mut new_module.identifiers[module_handle.name.0 as usize],
+                        Identifier::new(new_name).expect("Identifier must be legal"),
+                    );
+                }
+            }
         }
-        new_modules.insert(original_name.clone(), new_module);
+        new_modules.push((original_name.clone(), new_module));
     }
     let mut metadata = metadata.clone();
     if suffix > 0 {
         for module in &mut metadata.modules {
             let mut new_name = module.name.clone();
+            new_name.push('_');
             new_name.push_str(suffix.to_string().as_str());
             module.name = new_name;
         }
@@ -241,12 +260,12 @@ fn update(
 fn publish_transaction(
     txn_factory: &TransactionFactory,
     publisher: &mut LocalAccount,
-    modules: &HashMap<String, CompiledModule>,
+    modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
 ) -> SignedTransaction {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
     let mut code: Vec<Vec<u8>> = vec![];
-    for module in modules.values() {
+    for (_, module) in modules {
         let mut module_code: Vec<u8> = vec![];
         module
             .serialize(&mut module_code)
