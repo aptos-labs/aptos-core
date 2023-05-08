@@ -43,7 +43,8 @@ use self::{
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     batch_transfer::BatchTransferTransactionGeneratorCreator,
-    ecosystem_mints::NbcuV1MintTransactionGenerator, entry_points::EntryPointTransactionGenerator,
+    ecosystem_mints::{NbcuPremintMintTransactionGenerator, NbcuV1MintTransactionGenerator},
+    entry_points::EntryPointTransactionGenerator,
 };
 pub use publishing::module_simple::EntryPoints;
 
@@ -71,7 +72,10 @@ pub enum TransactionType {
     BatchTransfer {
         batch_size: usize,
     },
-    NbcuMint {
+    NbcuV1Mint {
+        num_modules: usize,
+    },
+    NbcuPremintMint {
         num_modules: usize,
     },
 }
@@ -275,7 +279,7 @@ pub async fn create_txn_generator_creator(
                         *batch_size,
                     ))
                 },
-                TransactionType::NbcuMint { num_modules } => Box::new(
+                TransactionType::NbcuV1Mint { num_modules } => Box::new(
                     CustomModulesDelegationGeneratorCreator::new(
                         txn_factory.clone(),
                         init_txn_factory.clone(),
@@ -284,6 +288,20 @@ pub async fn create_txn_generator_creator(
                         *num_modules,
                         "nbcu_v1",
                         &mut NbcuV1MintTransactionGenerator {
+                            accounts_pool: accounts_pool.clone(),
+                        },
+                    )
+                    .await,
+                ),
+                TransactionType::NbcuPremintMint { num_modules } => Box::new(
+                    CustomModulesDelegationGeneratorCreator::new(
+                        txn_factory.clone(),
+                        init_txn_factory.clone(),
+                        source_accounts,
+                        txn_executor,
+                        *num_modules,
+                        "nbcu_premint",
+                        &mut NbcuPremintMintTransactionGenerator {
                             accounts_pool: accounts_pool.clone(),
                         },
                     )
