@@ -12,7 +12,7 @@ hippospace.
 
 The [Object model](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/object.move) allows Move to represent a complex type as a set of resources stored within a single address and offers a rich capability model that allows for fine-grained resource control and ownership management.
 
-See [Object >](./object.md)
+See [Object >](./aptos-object.md)
 
 ## Digital Asset Standards
 ### [Aptos Coin](./aptos-coin.md)

@@ -27,8 +27,6 @@ Object is a core primitive in Aptos Move and created via the object module at 0x
 ## Structure
 An object is stored in the ObjectGroup resource group, which enables other resources within the object to be co-located for data locality and data cost savings. It's important to note that not all resources within an object need to be co-located within the ObjectGroup, and it's up to the developer of an object to determine their data layout.
 
-[object.png](../../static/img/docs/object.png)
-
 ### Object resource group
 
 Object is a container for resources that are stored within a single address. These resources usually represent related data often accessed together and should be stored within a single address for data locality and cost savings.
@@ -70,6 +68,9 @@ LiquidityPool resource is part of the ObjectGroup resource group. This means tha
 
 LiquidityPool resource can be added during construction of the object:
 ```rust
+use aptos_framework::object::Object;
+use aptos_framework::fungible_asset::FungibleAsset;
+
 pub fun create_liquidity_pool(
     token_a: Object<FungibleAsset>,
     token_b: Object<FungibleAsset>,
@@ -87,8 +88,6 @@ pub fun create_liquidity_pool(
     });
 }
 ```
-
-[liquidity_pool.png](../../static/img/docs/liquidity_pool.png)
 
 More resources can also be added post-creation if the exchange module stores the ExtendRef. This is covered in more detail in the Capabilities section.
 
@@ -135,6 +134,8 @@ These refs can be stored and used to manage the object.
 
 DeleteRef can be used to delete the object:
 ```rust
+use aptos_framework::object::{Object, DeleteRef};
+
 struct DeleteRefStore has key {
     delete_ref: DeleteRef,
 }
@@ -157,6 +158,8 @@ public fun delete_liquidity_pool(liquidity_pool: Object<LiquidityPool>) {
 ExtendRef can be used to add resources to the object like the LiquidityPool resource in the previous section:
 TransferRef can be used to disable owner-transfer when `ungated_transfer_allowed = true` or to forcefully transfer the object without the owner being involved:
 ```rust
+use aptos_framework::object::{Object, TransferRef};
+
 struct TransferRefStore has key {
     transfer_ref: TransferRef,
 }
@@ -189,7 +192,7 @@ A reference to the object can be generated any time and stored in a resource as 
 public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T>;
 ```
 `Object<T>` is a reference around the object address with the guarantee that `T` exists when the reference is created. For example, we can create an `Object<LiquidityPool>` for a liquidity pool object.
-Creating an object reference with a non-existent T will fail at runtime.
+Creating an object reference with a non-existent `T` will fail at runtime.
 Note that after references are created and stored, they do not guarantee that the resource `T` or the entire object itself has not been deleted.
 
 ### Events
@@ -207,7 +210,7 @@ public fun new_event_handle<T: drop + store>(object: &signer): event::EventHandl
 These event handles can be stored in the custom resources added to the object. Example:
 ```rust
 struct LiquidityPoolEventStore has key {
-    create_events: event::EventHandle<LiquidityPoolEvent>,
+    create_events: event::EventHandle<CreateLiquidtyPoolEvent>,
 }
 
 struct CreateLiquidtyPoolEvent {
@@ -221,8 +224,8 @@ public entry fun create_liquidity_pool_with_events() {
     let exchange_signer = &get_exchange_signer();
     let liquidity_pool_constructor_ref = &object::create_object_from_account(exchange_signer);
     let liquidity_pool_signer = &object::generate_signer(liquidity_pool_constructor_ref);
-    let event_handle = object::new_event_handle<LiquidityPoolEvent>(liquidity_pool_signer);
-    event::emit<LiquidityPoolEvent>(event_handle, CreateLiquidtyPoolEvent {
+    let event_handle = object::new_event_handle<CreateLiquidtyPoolEvent>(liquidity_pool_signer);
+    event::emit<CreateLiquidtyPoolEvent>(event_handle, CreateLiquidtyPoolEvent {
         token_a: token_a,
         token_b: token_b,
         reserves_a: reserves_a,
