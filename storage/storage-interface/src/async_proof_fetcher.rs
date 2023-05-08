@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, DbReader};
+use crate::{metrics::TIMER, DbReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate};
@@ -52,6 +52,29 @@ impl AsyncProofFetcher {
             data_receiver,
             num_proofs_to_read: AtomicUsize::new(0),
         }
+    }
+
+    pub fn fetch_state_value_and_proof(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+        root_hash: Option<HashValue>,
+    ) -> Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
+        let _timer = TIMER
+            .with_label_values(&["async_proof_fetcher_fetch"])
+            .start_timer();
+        let value = self.reader.get_state_value_by_version(state_key, version)?;
+        self.schedule_proof_read(
+            state_key.clone(),
+            version,
+            root_hash,
+            value.as_ref().map(|v| v.hash()),
+        );
+        Ok((value, None))
+    }
+
+    pub fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
+        self.wait()
     }
 
     // Waits scheduled proof read to finish, and returns all read proofs.
@@ -121,31 +144,6 @@ impl AsyncProofFetcher {
                 }
             }
         });
-    }
-}
-
-impl ProofFetcher for AsyncProofFetcher {
-    fn fetch_state_value_and_proof(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-        root_hash: Option<HashValue>,
-    ) -> Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
-        let _timer = TIMER
-            .with_label_values(&["async_proof_fetcher_fetch"])
-            .start_timer();
-        let value = self.reader.get_state_value_by_version(state_key, version)?;
-        self.schedule_proof_read(
-            state_key.clone(),
-            version,
-            root_hash,
-            value.as_ref().map(|v| v.hash()),
-        );
-        Ok((value, None))
-    }
-
-    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
-        self.wait()
     }
 }
 
