@@ -190,7 +190,7 @@ public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T>;
 ```
 `Object<T>` is a reference around the object address with the guarantee that `T` exists when the reference is created. For example, we can create an `Object<LiquidityPool>` for a liquidity pool object.
 Creating an object reference with a non-existent T will fail at runtime.
-Note that after references are created and stored, they do not guarantee that the resource T or the entire object itself has not been deleted. 
+Note that after references are created and stored, they do not guarantee that the resource `T` or the entire object itself has not been deleted.
 
 ### Events
 Objects come with transfer_events by default, which are emitted when the object is transferred. Transfer events are stored in the ObjectCore resource.
