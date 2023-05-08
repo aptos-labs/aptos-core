@@ -12,12 +12,16 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    resolver::MoveResolver,
+    metadata::Metadata, resolver::MoveResolver,
 };
 use std::{collections::BTreeSet, sync::Arc};
 
 pub struct MoveVM {
     runtime: VMRuntime,
+}
+
+pub struct MoveVMRef<'a> {
+    runtime: &'a VMRuntime,
 }
 
 impl MoveVM {
@@ -107,6 +111,16 @@ impl MoveVM {
         self.runtime.loader().get_and_clear_module_cache_hits()
     }
 
+    pub fn get_ref(&self) -> MoveVMRef {
+        MoveVMRef::new(&self.runtime)
+    }
+}
+
+impl<'l> MoveVMRef<'l> {
+    pub(crate) fn new(runtime: &'l VMRuntime) -> Self {
+        Self { runtime }
+    }
+
     /// Attempts to discover metadata in a given module with given key. Availability
     /// of this data may depend on multiple aspects. In general, no hard assumptions of
     /// availability should be made, but typically, one can expect that
@@ -120,16 +134,10 @@ impl MoveVM {
     ///
     /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
     ///   call this directly via the loader instead of the VM.
-    pub fn get_module_metadata(&self, module: ModuleId, key: &[u8]) -> Option<Vec<u8>> {
-        let module = self.runtime.loader().get_module(&module);
-        Some(
-            module
-                .module()
-                .metadata
-                .iter()
-                .find(|md| md.key == key)?
-                .value
-                .clone(),
-        )
+    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, find: F) -> Option<T>
+    where
+        F: FnOnce(&[Metadata]) -> Option<T>,
+    {
+        find(&self.runtime.loader().get_module(module).module().metadata)
     }
 }

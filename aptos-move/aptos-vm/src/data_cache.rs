@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::move_vm_ext::{get_resource_group_from_metadata, MoveResolverExt};
+use crate::move_vm_ext::MoveResolverExt;
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
@@ -23,6 +23,18 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use std::{collections::BTreeMap, ops::Deref};
+
+pub(crate) fn get_resource_group_from_metadata(
+    struct_tag: &StructTag,
+    metadata: &[Metadata],
+) -> Option<StructTag> {
+    let metadata = aptos_framework::get_metadata(metadata);
+    metadata?
+        .struct_attributes
+        .get(struct_tag.name.as_ident_str().as_str())?
+        .iter()
+        .find_map(|attr| attr.get_resource_group_member())
+}
 
 fn get_any_resource(
     move_resolver: &impl MoveResolverExt,

@@ -14,18 +14,6 @@ use move_core_types::{
 };
 use move_table_extension::TableResolver;
 
-pub fn get_resource_group_from_metadata(
-    struct_tag: &StructTag,
-    metadata: &[Metadata],
-) -> Option<StructTag> {
-    let metadata = aptos_framework::get_metadata(metadata);
-    metadata?
-        .struct_attributes
-        .get(struct_tag.name.as_ident_str().as_str())?
-        .iter()
-        .find_map(|attr| attr.get_resource_group_member())
-}
-
 pub trait MoveResolverExt:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
@@ -42,11 +30,6 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError>;
-
-    fn get_resource_group(&self, struct_tag: &StructTag) -> Option<StructTag> {
-        let metadata = self.get_module_metadata(struct_tag.module_id());
-        get_resource_group_from_metadata(struct_tag, &metadata)
-    }
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {

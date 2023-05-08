@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, loader::LoadedFunction,
+    data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVMRef,
     native_extensions::NativeContextExtensions, runtime::VMRuntime,
 };
 use move_binary_format::{
@@ -386,6 +386,10 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Gets the underlying native extensions.
     pub fn get_native_extensions(&mut self) -> &mut NativeContextExtensions<'r> {
         &mut self.native_extensions
+    }
+
+    pub fn get_movevm(&self) -> MoveVMRef<'l> {
+        MoveVMRef::new(self.runtime)
     }
 }
 

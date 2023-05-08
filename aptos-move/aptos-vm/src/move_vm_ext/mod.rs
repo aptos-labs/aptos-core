@@ -8,7 +8,7 @@ mod session;
 mod vm;
 
 pub use crate::move_vm_ext::{
-    resolver::{get_resource_group_from_metadata, MoveResolverExt},
+    resolver::MoveResolverExt,
     session::{SessionExt, SessionId},
     vm::{verifier_config, MoveVmExt},
 };
