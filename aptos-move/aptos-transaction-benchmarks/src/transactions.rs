@@ -141,15 +141,17 @@ where
             AccountPickStyle::Unlimited
         };
 
+        let mut state = TransactionBenchState::with_size(
+            &self.strategy,
+            num_accounts,
+            num_txn,
+            num_executor_shards,
+            concurrency_level_per_shard,
+            account_pick_style.clone(),
+        );
+
         for i in 0..total_runs {
-            let mut state = TransactionBenchState::with_size(
-                &self.strategy,
-                num_accounts,
-                num_txn,
-                num_executor_shards,
-                concurrency_level_per_shard,
-                account_pick_style.clone(),
-            );
+
             if i < num_warmups {
                 println!("WARMUP - ignore results");
                 state.execute_blockstm_benchmark(run_par, run_seq, no_conflict_txn);
