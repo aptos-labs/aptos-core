@@ -150,7 +150,7 @@ impl Object {
                     allow_ungated_transfer: None,
                     last_guid_creation_num: None,
                     last_transaction_version: txn_version,
-                    is_deleted: false,
+                    is_deleted: true,
                 },
             )))
         } else {
