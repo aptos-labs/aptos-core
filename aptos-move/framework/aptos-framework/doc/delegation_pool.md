@@ -2577,6 +2577,8 @@ this change won't take effects until the next lockup period.
 
     <b>let</b> active_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, delegator_address);
 
+    // &lt;active shares&gt; of &lt;pending voter of shareholder&gt; -= &lt;active_shares&gt;
+    // &lt;active shares&gt; of &lt;new voter of shareholder&gt; += &lt;active_shares&gt;
     <b>let</b> pending_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(
         <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
         governance_records,
@@ -3017,6 +3019,9 @@ deposited <code>coins_amount</code>. This function doesn't make any coin transfe
 
     // Always <b>update</b> governance records before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> change <b>to</b> the shares pool.
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
+    // &lt;active shares&gt; of &lt;shareholder&gt; += &lt;new_shares&gt; ----&gt;
+    // &lt;active shares&gt; of &lt;current voter of shareholder&gt; += &lt;new_shares&gt;
+    // &lt;active shares&gt; of &lt;next voter of shareholder&gt; += &lt;new_shares&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(pool, governance_records, shareholder);
@@ -3075,6 +3080,9 @@ to ensure there is always only one withdrawal request.
 
     // Always <b>update</b> governance records before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> change <b>to</b> the shares pool.
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
+    // &lt;pending inactive shares&gt; of &lt;shareholder&gt; += &lt;new_shares&gt;   ----&gt;
+    // &lt;pending inactive shares&gt; of &lt;current voter of shareholder&gt; += &lt;new_shares&gt;
+    // no impact on &lt;pending inactive shares&gt; of &lt;next voter of shareholder&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
@@ -3172,6 +3180,9 @@ be available for withdrawal when current OLC ends.
 
     // Always <b>update</b> governance records before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> change <b>to</b> the shares pool.
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
+    // &lt;active shares&gt; of &lt;shareholder&gt; -= &lt;shares_to_redeem&gt; ----&gt;
+    // &lt;active shares&gt; of &lt;current voter of shareholder&gt; -= &lt;shares_to_redeem&gt;
+    // &lt;active shares&gt; of &lt;next voter of shareholder&gt; -= &lt;shares_to_redeem&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(
@@ -3238,6 +3249,9 @@ escape inactivation when current lockup ends.
 
     // Always <b>update</b> governance records before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> change <b>to</b> the shares pool.
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
+    // &lt;pending inactive shares&gt; of &lt;shareholder&gt; -= &lt;shares_to_redeem&gt;  ----&gt;
+    // &lt;pending inactive shares&gt; of &lt;current voter of shareholder&gt; -= &lt;shares_to_redeem&gt;
+    // no impact on &lt;pending inactive shares&gt; of &lt;next voter of shareholder&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
