@@ -1001,6 +1001,8 @@ module aptos_framework::delegation_pool {
 
         let active_shares = get_delegator_active_shares(delegation_pool, delegator_address);
 
+        // <active shares> of <pending voter of shareholder> -= <active_shares>
+        // <active shares> of <new voter of shareholder> += <active_shares>
         let pending_voter_voting_power = update_and_borrow_mut_voter_voting_power(
             delegation_pool,
             governance_records,
@@ -1241,6 +1243,9 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
+        // <active shares> of <shareholder> += <new_shares> ---->
+        // <active shares> of <current voter of shareholder> += <new_shares>
+        // <active shares> of <next voter of shareholder> += <new_shares>
         if (partial_governance_voting_enabled(pool_address)) {
             let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
             let voting_power_delegation = update_and_borrow_mut_delegator_voting_power_delegation(pool, governance_records, shareholder);
@@ -1279,6 +1284,9 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
+        // <pending inactive shares> of <shareholder> += <new_shares>   ---->
+        // <pending inactive shares> of <current voter of shareholder> += <new_shares>
+        // no impact on <pending inactive shares> of <next voter of shareholder>
         if (partial_governance_voting_enabled(pool_address)) {
             let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
             let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
@@ -1336,6 +1344,9 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
+        // <active shares> of <shareholder> -= <shares_to_redeem> ---->
+        // <active shares> of <current voter of shareholder> -= <shares_to_redeem>
+        // <active shares> of <next voter of shareholder> -= <shares_to_redeem>
         if (partial_governance_voting_enabled(pool_address)) {
             let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
             let voting_power_delegation = update_and_borrow_mut_delegator_voting_power_delegation(
@@ -1382,6 +1393,9 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
+        // <pending inactive shares> of <shareholder> -= <shares_to_redeem>  ---->
+        // <pending inactive shares> of <current voter of shareholder> -= <shares_to_redeem>
+        // no impact on <pending inactive shares> of <next voter of shareholder>
         if (partial_governance_voting_enabled(pool_address)) {
             let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
             let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
