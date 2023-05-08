@@ -23,7 +23,7 @@ use crate::{
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
     OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{ensure, format_err, Context, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -35,8 +35,10 @@ use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
-    state_delta::StateDelta, DbReader, StateSnapshotReceiver,
+    async_proof_fetcher::AsyncProofFetcher,
+    cached_state_view::{CachedStateView, ShardedStateCache},
+    state_delta::StateDelta,
+    DbReader, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -48,6 +50,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use arr_macro::arr;
 use claims::{assert_ge, assert_le};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -137,6 +140,27 @@ impl DbReader for StateDb {
             .map(|(_, value)| value))
     }
 
+    /// Gets the latest state value and its corresponding version when it's of the given key up
+    /// to the given version.
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let mut read_opts = ReadOptions::default();
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .state_kv_db
+            .db_shard(state_key.get_shard_id())
+            .iter::<StateValueSchema>(read_opts)?;
+        iter.seek(&(state_key.clone(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -179,27 +203,6 @@ impl DbReader for StateDb {
 }
 
 impl StateDb {
-    /// Get the latest state value and the its corresponding version when its of the given key up
-    /// to the given version.
-    pub fn get_state_value_with_version_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self
-            .state_kv_db
-            .db_shard(state_key.get_shard_id())
-            .iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
-    }
-
     /// Get the latest ended epoch strictly before required version, i.e. if the passed in version
     /// ends an epoch, return one epoch early than that.
     pub fn get_previous_epoch_ending(&self, version: Version) -> Result<Option<(u64, Version)>> {
@@ -235,6 +238,17 @@ impl DbReader for StateStore {
         version: Version,
     ) -> Result<Option<StateValue>> {
         self.deref().get_state_value_by_version(state_key, version)
+    }
+
+    /// Gets the latest state value and the its corresponding version when its of the given key up
+    /// to the given version.
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.deref()
+            .get_state_value_with_version_by_version(state_key, version)
     }
 
     /// Returns the proof of the given state key and version.
@@ -576,6 +590,7 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         expected_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
         ledger_batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
@@ -587,6 +602,7 @@ impl StateStore {
             &value_state_sets,
             first_version,
             expected_usage,
+            sharded_state_cache,
             ledger_batch,
             sharded_state_kv_batches,
         )?;
@@ -629,6 +645,9 @@ impl StateStore {
         value_state_sets: &[&HashMap<StateKey, Option<StateValue>>],
         first_version: Version,
         expected_usage: StateStorageUsage,
+        // If not None, it must contains all keys in the value_state_sets.
+        // TODO(grao): Restructure this function.
+        sharded_state_cache: Option<&ShardedStateCache>,
         batch: &SchemaBatch,
         sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
     ) -> Result<()> {
@@ -639,36 +658,43 @@ impl StateStore {
         let base_version = first_version.checked_sub(1);
         let mut usage = self.get_usage(base_version)?;
         let base_version_usage = usage;
-        let cache = Arc::new(DashMap::<StateKey, (Version, Option<StateValue>)>::new());
 
+        let mut state_cache_with_version = &arr![DashMap::new(); 16];
         if let Some(base_version) = base_version {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["put_stats_and_indices__total_get"])
                 .start_timer();
-            let key_set = value_state_sets
-                .iter()
-                .flat_map(|value_state_set| value_state_set.iter())
-                .map(|(key, _)| key)
-                .collect::<HashSet<_>>();
-            IO_POOL.scope(|s| {
-                for key in key_set {
-                    let cache = cache.clone();
-                    s.spawn(move |_| {
-                        let _timer = OTHER_TIMERS_SECONDS
-                            .with_label_values(&["put_stats_and_indices__get_state_value"])
-                            .start_timer();
-                        let version_and_value = self
-                            .state_db
-                            .get_state_value_with_version_by_version(key, base_version)
-                            .expect("Must succeed.");
-                        if let Some((version, value)) = version_and_value {
-                            cache.insert(key.clone(), (version, Some(value)));
-                        } else {
-                            cache.insert(key.clone(), (base_version, None));
-                        }
-                    });
-                }
-            });
+            if let Some(sharded_state_cache) = sharded_state_cache {
+                // For some entries the base value version is None, here is to fiil those in.
+                // See `ShardedStateCache`.
+                self.prepare_version_in_cache(base_version, sharded_state_cache)?;
+                state_cache_with_version = sharded_state_cache;
+            } else {
+                let key_set = value_state_sets
+                    .iter()
+                    .flat_map(|value_state_set| value_state_set.iter())
+                    .map(|(key, _)| key)
+                    .collect::<HashSet<_>>();
+                IO_POOL.scope(|s| {
+                    for key in key_set {
+                        let cache = &state_cache_with_version[key.get_shard_id() as usize];
+                        s.spawn(move |_| {
+                            let _timer = OTHER_TIMERS_SECONDS
+                                .with_label_values(&["put_stats_and_indices__get_state_value"])
+                                .start_timer();
+                            let version_and_value = self
+                                .state_db
+                                .get_state_value_with_version_by_version(key, base_version)
+                                .expect("Must succeed.");
+                            if let Some((version, value)) = version_and_value {
+                                cache.insert(key.clone(), (Some(version), Some(value)));
+                            } else {
+                                cache.insert(key.clone(), (Some(base_version), None));
+                            }
+                        });
+                    }
+                });
+            }
         }
 
         let _timer = OTHER_TIMERS_SECONDS
@@ -694,8 +720,9 @@ impl StateStore {
                     )?;
                 }
 
+                let cache = &state_cache_with_version[key.get_shard_id() as usize];
                 let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
-                    cache.insert(key.clone(), (version, value.clone()))
+                    cache.insert(key.clone(), (Some(version), value.clone()))
                 {
                     old_value_opt.map(|value| (old_version, value))
                 } else {
@@ -703,6 +730,7 @@ impl StateStore {
                 };
 
                 if let Some((old_version, old_value)) = old_version_and_value_opt {
+                    let old_version = old_version.context("Must have old version in cache.")?;
                     usage.remove_item(key.size() + old_value.size());
                     // stale index of the old value at its version.
                     sharded_state_kv_batches[key.get_shard_id() as usize]
@@ -865,6 +893,43 @@ impl StateStore {
         iter.seek_to_first();
         let all_rows = iter.collect::<Result<Vec<_>>>()?;
         Ok(all_rows.into_iter().map(|(k, _v)| k).collect())
+    }
+
+    fn prepare_version_in_cache(
+        &self,
+        base_version: Version,
+        sharded_state_cache: &ShardedStateCache,
+    ) -> Result<()> {
+        IO_POOL.scope(|s| {
+            sharded_state_cache.par_iter().for_each(|shard| {
+                shard.iter_mut().for_each(|mut entry| {
+                    match entry.value() {
+                        (None, Some(_)) => s.spawn(move |_| {
+                            let _timer = OTHER_TIMERS_SECONDS
+                                .with_label_values(&["put_stats_and_indices__get_state_value"])
+                                .start_timer();
+                            let version_and_value = self
+                                .state_db
+                                .get_state_value_with_version_by_version(entry.key(), base_version)
+                                .expect("Must succeed.");
+                            if let Some((version, _)) = version_and_value {
+                                entry.0 = Some(version);
+                            } else {
+                                unreachable!();
+                            }
+                        }),
+                        _ => {
+                            // I just want a counter.
+                            let _timer = OTHER_TIMERS_SECONDS
+                                .with_label_values(&["put_stats_and_indices__skip"])
+                                .start_timer();
+                        },
+                    };
+                })
+            });
+        });
+
+        Ok(())
     }
 }
 
