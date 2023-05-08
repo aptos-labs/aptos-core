@@ -55,7 +55,7 @@ struct ParallelExecutionOpt {
     pub num_accounts: usize,
 
     #[clap(long, default_value = "50000")]
-    pub txns_per_block: usize,
+    pub block_size: usize,
 
     #[clap(long, default_value = "10")]
     pub num_blocks: usize,
@@ -65,6 +65,9 @@ struct ParallelExecutionOpt {
 
     #[clap(long, default_value = "1")]
     pub num_executor_shards: usize,
+
+    #[clap(long, default_value = "true")]
+    pub no_conflict_txns: bool,
 }
 
 fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
@@ -87,6 +90,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
                 opt.num_runs,
                 1,
                 concurrency_level,
+                false,
             );
             par_tps.sort();
             seq_tps.sort();
@@ -148,13 +152,14 @@ fn parallel_execution(opt: ParallelExecutionOpt) {
 
     let (par_tps, _) = bencher.blockstm_benchmark(
         opt.num_accounts,
-        opt.txns_per_block,
+        opt.block_size,
         true,
         false,
         0,
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
+        opt.no_conflict_txns,
     );
 
     let sum: usize = par_tps.iter().sum();

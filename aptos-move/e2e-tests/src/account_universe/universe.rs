@@ -31,6 +31,7 @@ pub struct AccountUniverseGen {
 #[derive(Clone, Debug)]
 pub struct AccountUniverse {
     accounts: Vec<AccountCurrent>,
+    pick_style: AccountPickStyle,
     picker: AccountPicker,
     /// Whether to ignore any new accounts that transactions add to the universe.
     ignore_new_accounts: bool,
@@ -61,14 +62,15 @@ impl AccountUniverseGen {
     pub fn strategy(
         num_accounts: impl Into<SizeRange>,
         balance_strategy: impl Strategy<Value = u64>,
+        pick_style: AccountPickStyle,
     ) -> impl Strategy<Value = Self> {
         // Pick a sequence number in a smaller range so that valid transactions can be generated.
         // XXX should we also test edge cases around large sequence numbers?
         // Note that using a function as a strategy directly means that shrinking will not occur,
         // but that should be fine because there's nothing to really shrink within accounts anyway.
-        vec(AccountData::strategy(balance_strategy), num_accounts).prop_map(|accounts| Self {
+        vec(AccountData::strategy(balance_strategy), num_accounts).prop_map(move |accounts| Self {
             accounts,
-            pick_style: AccountPickStyle::Unlimited,
+            pick_style: pick_style.clone(),
         })
     }
 
@@ -82,6 +84,7 @@ impl AccountUniverseGen {
         Self::strategy(
             min_accounts..default_num_accounts(),
             min_balance..max_balance,
+            AccountPickStyle::Unlimited,
         )
     }
 
@@ -126,10 +129,11 @@ impl AccountUniverse {
         ignore_new_accounts: bool,
     ) -> Self {
         let accounts: Vec<_> = accounts.into_iter().map(AccountCurrent::new).collect();
-        let picker = AccountPicker::new(pick_style, accounts.len());
+        let picker = AccountPicker::new(pick_style.clone(), accounts.len());
 
         Self {
             accounts,
+            pick_style,
             picker,
             ignore_new_accounts,
         }
@@ -158,6 +162,10 @@ impl AccountUniverse {
         if !self.ignore_new_accounts {
             self.accounts.push(AccountCurrent::new(account_data));
         }
+    }
+
+    pub fn reset_picker(&mut self) {
+        self.picker = AccountPicker::new(self.pick_style.clone(), self.accounts.len());
     }
 
     /// Picks an account using the provided `Index` as a source of randomness.
