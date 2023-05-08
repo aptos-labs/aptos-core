@@ -14,7 +14,7 @@ The existing Aptos data model emphasizes the use of the store ability within Mov
 
 1. Data is not be guaranteed to be accessible, for example, it can be placed within a user-defined resource that may violate expectations for that data, e.g., a creator attempting to burn an NFT put into a user-defined store. This can be confusing to both the users and creators of this data.
 2. Data of differing types can be stored to a single data structure (e.g., map, vector) via any, but for complex data types any incurs additional costs within Move as each access requires deserialization. It also can lead to confusion if API developers expect that a specific any field changes the type it represents.
-3. While resource accounts allow for greater autonomy of data, they do so inefficiently for objects and does not take advantage of resource groups.
+3. While resource accounts allow for greater autonomy of data, they do so inefficiently for objects and do not take advantage of resource groups.
 4. Data cannot be recursively composable, because Move currently prohibits recursive data structures. Furthermore, experience suggests that true recursive data structures can lead to security vulnerabilities.
 5. Existing data cannot be easily referenced from entry functions, for example, supporting string validation requires many lines of code. Each key within a table can be very unique and specializing to support within entry functions becomes complex.
 6. Events cannot be emitted from data but from an account that may not be associated with the data.
