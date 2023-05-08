@@ -6,7 +6,6 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
-use aptos_config::config::StateSyncDriverConfig;
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
     ConsensusSyncNotification,
@@ -391,17 +390,14 @@ impl FusedStream for ErrorNotificationListener {
 #[derive(Clone)]
 pub struct MempoolNotificationHandler<M> {
     mempool_notification_sender: M,
-    state_sync_driver_config: StateSyncDriverConfig,
+    mempool_commit_ack_timeout_ms: u64,
 }
 
 impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
-    pub fn new(
-        mempool_notification_sender: M,
-        state_sync_driver_config: StateSyncDriverConfig,
-    ) -> Self {
+    pub fn new(mempool_notification_sender: M, mempool_commit_ack_timeout_ms: u64) -> Self {
         Self {
             mempool_notification_sender,
-            state_sync_driver_config,
+            mempool_commit_ack_timeout_ms,
         }
     }
 
@@ -416,7 +412,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             .notify_new_commit(
                 committed_transactions,
                 block_timestamp_usecs,
-                self.state_sync_driver_config.mempool_commit_ack_timeout_ms,
+                self.mempool_commit_ack_timeout_ms,
             )
             .await;
 

@@ -79,7 +79,10 @@ impl DriverFactory {
             ErrorNotificationListener::new();
         let mempool_notification_handler = MempoolNotificationHandler::new(
             mempool_notification_sender,
-            node_config.state_sync.state_sync_driver,
+            node_config
+                .state_sync
+                .state_sync_driver
+                .mempool_commit_ack_timeout_ms,
         );
 
         // Create a new runtime (if required)

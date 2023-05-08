@@ -512,7 +512,7 @@ fn create_storage_synchronizer(
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
     let mempool_notification_handler = MempoolNotificationHandler::new(
         mempool_notification_sender,
-        StateSyncDriverConfig::default(),
+        StateSyncDriverConfig::default().mempool_commit_ack_timeout_ms,
     );
 
     // Create the metadata storage
