@@ -88,7 +88,7 @@ function applyMixin(targetClass: any, baseClass: any, baseClassProp: string) {
     propertyDescriptor.value = function (...args: any) {
       return (this as any)[baseClassProp][propertyName](...args);
     };
-    if (targetClass.hasOwnProperty(propertyName)) {
+    if (targetClass.hasOwnProperty.call(targetClass, propertyName)) {
       // The mixin has already been applied, so skip applying it again
       return;
     }
