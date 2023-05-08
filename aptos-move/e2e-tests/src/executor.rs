@@ -325,7 +325,7 @@ impl FakeExecutor {
                 Some(aggregator) => {
                     let state_key = aggregator.state_key();
                     let value_bytes = self
-                        .read_state_value(&state_key)
+                        .read_state_value_bytes(&state_key)
                         .expect("aggregator value must exist in data store");
                     bcs::from_bytes(&value_bytes).unwrap()
                 },
@@ -469,8 +469,12 @@ impl FakeExecutor {
         seq
     }
 
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
+        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+    }
+
     /// Get the blob for the associated AccessPath
-    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
         TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
     }
 
