@@ -188,7 +188,7 @@ A reference to the object can be generated any time and stored in a resource as 
 /// Returns the address of within a ConstructorRef
 public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T>;
 ```
-Object\<T\> is a reference around the object address with the guarantee that T exists when the reference is created. For example, we can create an Object\<LiquidityPool\> for a liquidity pool object.
+`Object<T>` is a reference around the object address with the guarantee that `T` exists when the reference is created. For example, we can create an `Object<LiquidityPool>` for a liquidity pool object.
 Creating an object reference with a non-existent T will fail at runtime.
 Note that after references are created and stored, they do not guarantee that the resource T or the entire object itself has not been deleted. 
 
