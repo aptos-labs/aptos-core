@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 8d8247fbd6da3ebef1e20384b2f0c098c1a6f0edd28041ffdc99afc406654c67 # shrinks to (num_user_txns, reconfig_txn_index) = (10, 0)
+cc 06cc3868004fdece03d52e325e1086deaa8eed5686d2490640b52d6b42e8ece8 # shrinks to a_size = 0, b_size = 0, c_size = 0, amount = 1

@@ -88,10 +88,17 @@ spec aptos_framework::coin {
     }
 
     spec supply<CoinType>(): Option<u128> {
-        // TODO: The error target is in `optional_aggregator::read`,
-        // which cannot be verified because the calling level is too deep.
-        pragma aborts_if_is_partial;
-        include AbortsIfNotExistCoinInfo<CoinType>;
+        let coin_addr = type_info::type_of<CoinType>().account_address;
+        aborts_if !exists<CoinInfo<CoinType>>(coin_addr);
+        let maybe_supply = global<CoinInfo<CoinType>>(coin_addr).supply;
+        let supply = option::spec_borrow(maybe_supply);
+        let value = optional_aggregator::optional_aggregator_value(supply);
+
+        ensures if (option::spec_is_some(maybe_supply)) {
+            result == option::spec_some(value)
+        } else {
+            option::spec_is_none(result)
+        };
     }
 
     spec burn<CoinType>(
@@ -111,14 +118,33 @@ spec aptos_framework::coin {
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
     ) {
-        // TODO: The target of the error is `coin::burn`,
-        // and I added the verification of the resource `CoinInfo` and it was still wrong.
-        pragma aborts_if_is_partial;
-        let addr =  type_info::type_of<CoinType>().account_address;
+        let addr = type_info::type_of<CoinType>().account_address;
         let coin_store = global<CoinStore<CoinType>>(account_addr);
+        let post post_coin_store = global<CoinStore<CoinType>>(account_addr);
+
         modifies global<CoinInfo<CoinType>>(addr);
+        modifies global<CoinStore<CoinType>>(account_addr);
+
+        aborts_if amount != 0 && !exists<CoinInfo<CoinType>>(addr);
         aborts_if amount != 0 && !exists<CoinStore<CoinType>>(account_addr);
         aborts_if coin_store.coin.value < amount;
+
+        let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
+        let supply = option::spec_borrow(maybe_supply);
+        let value = optional_aggregator::optional_aggregator_value(supply);
+
+        let post post_maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
+        let post post_supply = option::spec_borrow(post_maybe_supply);
+        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
+
+        aborts_if option::spec_is_some(maybe_supply) && value < amount;
+
+        ensures post_coin_store.coin.value == coin_store.coin.value - amount;
+        ensures if (option::spec_is_some(maybe_supply)) {
+            post_value == value - amount
+        } else {
+            option::spec_is_none(post_maybe_supply)
+        };
     }
 
     /// `account_addr` is not frozen.
@@ -175,17 +201,30 @@ spec aptos_framework::coin {
     /// The creator of `CoinType` must be `@aptos_framework`.
     /// `SupplyConfig` allow upgrade.
     spec upgrade_supply<CoinType>(account: &signer) {
-        // TODO: The error target is in `optional_aggregator::read`,
-        // which cannot be verified because the calling level is too deep.
-        pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
         let coin_address = type_info::type_of<CoinType>().account_address;
         aborts_if coin_address != account_addr;
         aborts_if !exists<SupplyConfig>(@aptos_framework);
         aborts_if !exists<CoinInfo<CoinType>>(account_addr);
+
         let supply_config = global<SupplyConfig>(@aptos_framework);
         aborts_if !supply_config.allow_upgrades;
         modifies global<CoinInfo<CoinType>>(account_addr);
+
+        let maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
+        let supply = option::spec_borrow(maybe_supply);
+        let value = optional_aggregator::optional_aggregator_value(supply);
+
+        let post post_maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
+        let post post_supply = option::spec_borrow(post_maybe_supply);
+        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
+
+        let supply_no_parallel = option::spec_is_some(maybe_supply) &&
+            !optional_aggregator::is_parallelizable(supply);
+
+        aborts_if supply_no_parallel && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        ensures supply_no_parallel ==>
+            optional_aggregator::is_parallelizable(post_supply) && post_value == value;
     }
 
     spec initialize {
@@ -235,13 +274,31 @@ spec aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
-        // TODO: The error target is in `aggregator_factory::create_aggregator_internal`.
-        // I added the verification of the resource `AggregatorFactory` and still reported an error.
-        pragma aborts_if_is_partial;
         include InitializeInternalSchema<CoinType>{
             name: name.bytes,
             symbol: symbol.bytes
         };
+        let account_addr = signer::address_of(account);
+        let post coin_info = global<CoinInfo<CoinType>>(account_addr);
+        let post supply = option::spec_borrow(coin_info.supply);
+        let post value = optional_aggregator::optional_aggregator_value(supply);
+        let post limit = optional_aggregator::optional_aggregator_limit(supply);
+        modifies global<CoinInfo<CoinType>>(account_addr);
+        aborts_if monitor_supply && parallelizable
+            && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        ensures exists<CoinInfo<CoinType>>(account_addr)
+            && coin_info.name == name
+            && coin_info.symbol == symbol
+            && coin_info.decimals == decimals;
+        ensures if (monitor_supply) {
+            value == 0 && limit == MAX_U128
+                && (parallelizable == optional_aggregator::is_parallelizable(supply))
+        } else {
+            option::spec_is_none(coin_info.supply)
+        };
+        ensures result_1 == BurnCapability<CoinType> {};
+        ensures result_2 == FreezeCapability<CoinType> {};
+        ensures result_3 == MintCapability<CoinType> {};
     }
 
     spec merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
