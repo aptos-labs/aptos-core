@@ -1,0 +1,10 @@
+[package]
+name = 'bugs'
+version = '0.0.1'
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+AptosToken = { local = "../../../../../aptos-move/framework/aptos-token" }
+
+[addresses]
+self='0xABCD'

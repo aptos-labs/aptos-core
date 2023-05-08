@@ -29,6 +29,10 @@ pub type TransactionGeneratorWorker = dyn Fn(
 
 #[async_trait]
 pub trait UserModuleTransactionGenerator: Sync + Send {
+    fn publisher_funds(&self) -> u64 {
+        0
+    }
+
     /// Called for each instance of the module we publish,
     /// if any additional transactions are needed to setup the package.
     /// For example, if we need to create an NFT collection, or otherwise
@@ -132,7 +136,8 @@ impl CustomModulesDelegationGeneratorCreator {
                 account,
                 publisher_address,
                 &init_txn_factory,
-                2 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
+                1000 * init_txn_factory.get_gas_unit_price()
+                    * init_txn_factory.get_max_gas_amount(),
             ));
 
             let package = package_handler.pick_package(&mut rng, &mut publisher);

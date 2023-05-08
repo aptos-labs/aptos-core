@@ -514,7 +514,7 @@ impl TxnEmitter {
 
     pub async fn start_job(
         &mut self,
-        root_account: &mut LocalAccount,
+        source_account: &mut LocalAccount,
         req: EmitJobRequest,
         stats_tracking_phases: usize,
     ) -> Result<EmitJob> {
@@ -547,7 +547,7 @@ impl TxnEmitter {
             seed
         );
         let mut account_minter = AccountMinter::new(
-            root_account,
+            source_account,
             init_txn_factory.clone(),
             StdRng::from_seed(seed),
         );
