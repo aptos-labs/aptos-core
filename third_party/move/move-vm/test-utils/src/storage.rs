@@ -81,7 +81,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-        _metadata: &[Metadata],
+        metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
@@ -90,7 +90,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         }
 
         // TODO
-        self.base.get_resource(address, tag, &[])
+        self.base.get_resource(address, tag, metadata)
     }
 }
 
