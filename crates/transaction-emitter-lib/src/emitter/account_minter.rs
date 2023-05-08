@@ -72,7 +72,7 @@ impl<'t> AccountMinter<'t> {
             .checked_add(
                 req.max_gas_per_txn * req.gas_price
                 // for module publishing
-                + 2 * req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+                + 1000 * req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
             )
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();

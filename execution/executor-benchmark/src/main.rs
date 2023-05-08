@@ -168,7 +168,7 @@ enum Command {
         #[clap(long, default_value = "1000000")]
         num_accounts: usize,
 
-        #[clap(long, default_value = "10000000000")]
+        #[clap(long, default_value = "900000000000")]
         init_account_balance: u64,
     },
     RunExecutor {
@@ -206,7 +206,7 @@ enum Command {
         #[clap(long, default_value = "1000000")]
         num_new_accounts: usize,
 
-        #[clap(long, default_value = "1000000")]
+        #[clap(long, default_value = "900000000000")]
         init_account_balance: u64,
     },
 }

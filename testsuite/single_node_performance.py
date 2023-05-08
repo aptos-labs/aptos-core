@@ -44,6 +44,7 @@ EXPECTED_TPS = {
 
     ("nbcu-v1-mint", False, 1): (1100.0, False),
     ("nbcu-v1-mint", False, 20): (5000.0, False),
+    ("nbcu-premint-mint", False, 1): (3000.0, False),
 }
 
 NOISE_LOWER_LIMIT = 0.8

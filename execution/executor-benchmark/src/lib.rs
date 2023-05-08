@@ -459,8 +459,8 @@ mod tests {
         crate::db_generator::create_db_with_accounts::<E>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
-            100_000_000, /* init_account_balance */
-            5,           /* block_size */
+            100_000_000_000, /* init_account_balance */
+            5,               /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             verify_sequence_numbers,
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::NbcuV1Mint), true);
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::NbcuPremintMint), true);
     }
 
     #[test]
