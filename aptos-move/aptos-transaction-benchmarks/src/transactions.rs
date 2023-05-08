@@ -147,11 +147,10 @@ where
             num_txn,
             num_executor_shards,
             concurrency_level_per_shard,
-            account_pick_style.clone(),
+            account_pick_style,
         );
 
         for i in 0..total_runs {
-
             if i < num_warmups {
                 println!("WARMUP - ignore results");
                 state.execute_blockstm_benchmark(run_par, run_seq, no_conflict_txn);
