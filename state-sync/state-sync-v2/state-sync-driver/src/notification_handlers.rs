@@ -6,6 +6,7 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
 };
+use aptos_config::config::StateSyncDriverConfig;
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
     ConsensusSyncNotification,
@@ -27,9 +28,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-
-// TODO(joshlind): make these configurable!
-const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 
 /// A notification for new data that has been committed to storage
 #[derive(Clone, Debug)]
@@ -393,12 +391,17 @@ impl FusedStream for ErrorNotificationListener {
 #[derive(Clone)]
 pub struct MempoolNotificationHandler<M> {
     mempool_notification_sender: M,
+    state_sync_driver_config: StateSyncDriverConfig,
 }
 
 impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
-    pub fn new(mempool_notification_sender: M) -> Self {
+    pub fn new(
+        mempool_notification_sender: M,
+        state_sync_driver_config: StateSyncDriverConfig,
+    ) -> Self {
         Self {
             mempool_notification_sender,
+            state_sync_driver_config,
         }
     }
 
@@ -413,7 +416,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             .notify_new_commit(
                 committed_transactions,
                 block_timestamp_usecs,
-                MEMPOOL_COMMIT_ACK_TIMEOUT_MS,
+                self.state_sync_driver_config.mempool_commit_ack_timeout_ms,
             )
             .await;
 
