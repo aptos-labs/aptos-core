@@ -303,6 +303,7 @@ impl AptosDB {
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        empty_buffered_state_for_restore: bool,
     ) -> Self {
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
@@ -325,6 +326,7 @@ impl AptosDB {
             state_kv_pruner,
             buffered_state_target_items,
             hack_for_tests,
+            empty_buffered_state_for_restore,
         ));
 
         let ledger_pruner = LedgerPrunerManager::new(
@@ -351,7 +353,7 @@ impl AptosDB {
         }
     }
 
-    pub fn open<P: AsRef<Path> + Clone>(
+    fn open_internal<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
         pruner_config: PrunerConfig,
@@ -359,6 +361,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        empty_buffered_state_for_restore: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -379,6 +382,7 @@ impl AptosDB {
             pruner_config,
             buffered_state_target_items,
             readonly,
+            empty_buffered_state_for_restore,
         );
 
         if !readonly && enable_indexer {
@@ -386,6 +390,48 @@ impl AptosDB {
         }
 
         Ok(myself)
+    }
+
+    pub fn open<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            false,
+        )
+    }
+
+    pub fn open_kv_only<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            true,
+        )
     }
 
     pub fn open_dbs<P: AsRef<Path> + Clone>(
@@ -2103,6 +2149,7 @@ impl DbWriter for AptosDB {
                 &events,
                 wsets,
                 Option::Some((&mut batch, &mut sharded_kv_batch)),
+                false,
             )?;
 
             // Save the epoch ending ledger infos

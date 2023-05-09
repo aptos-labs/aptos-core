@@ -104,6 +104,7 @@ pub(crate) fn save_transactions(
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
     existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
+    kv_replay: bool,
 ) -> Result<()> {
     if let Some(existing_batch) = existing_batch {
         let batch = existing_batch.0;
@@ -120,6 +121,7 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             batch,
             state_kv_batches,
+            kv_replay,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
@@ -136,6 +138,7 @@ pub(crate) fn save_transactions(
             write_sets.as_ref(),
             &mut batch,
             &mut sharded_kv_schema_batch,
+            kv_replay,
         )?;
         // get the last version and commit to the state kv db
         // commit the state kv before ledger in case of failure happens
@@ -208,6 +211,7 @@ pub(crate) fn save_transactions_impl(
     write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    kv_replay: bool,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
         transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
@@ -218,15 +222,9 @@ pub(crate) fn save_transactions_impl(
     for (idx, ws) in write_sets.iter().enumerate() {
         transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
     }
-    // only write kv and not update the state tree from version that state hasn't been committed
-    // in case we want to restore transactions separately from state
-    if state_store.get_usage(Some(first_version)).is_ok() {
-        state_store.put_write_sets(
-            write_sets[1..].to_vec(),
-            first_version + 1,
-            batch,
-            state_kv_batches,
-        )?;
+
+    if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
+        state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
     }
 
     Ok(())

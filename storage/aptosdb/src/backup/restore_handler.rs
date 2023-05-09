@@ -118,6 +118,31 @@ impl RestoreHandler {
             events,
             write_sets,
             None,
+            false,
+        )
+    }
+
+    pub fn save_transactions_and_replay_kv(
+        &self,
+        first_version: Version,
+        txns: &[Transaction],
+        txn_infos: &[TransactionInfo],
+        events: &[Vec<ContractEvent>],
+        write_sets: Vec<WriteSet>,
+    ) -> Result<()> {
+        restore_utils::save_transactions(
+            self.ledger_db.clone(),
+            self.ledger_store.clone(),
+            self.transaction_store.clone(),
+            self.event_store.clone(),
+            self.state_store.clone(),
+            first_version,
+            txns,
+            txn_infos,
+            events,
+            write_sets,
+            None,
+            true,
         )
     }
 

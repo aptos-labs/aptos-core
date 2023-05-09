@@ -158,8 +158,8 @@ impl ReplayVerifyCoordinator {
             self.storage,
             txn_manifests,
             None,
-            Some(replay_transactions_from_version), /* replay_from_version */
-            None,                                   /* epoch_history */
+            Some((replay_transactions_from_version, false)), /* replay_from_version */
+            None,                                            /* epoch_history */
             self.verify_execution_mode.clone(),
             None,
         )

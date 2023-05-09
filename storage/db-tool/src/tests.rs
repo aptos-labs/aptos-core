@@ -465,9 +465,9 @@ mod compaction_tests {
                 assert_eq!(new_value, old_value);
             });
         }
-        // first snapshot tree recovered
+        // first snapshot tree not recovered
         assert!(
-            tree_db.get_root_hash(0).is_err(),
+            tree_db.get_root_hash(0).is_err() || tree_db.get_leaf_count(0).unwrap() == 0,
             "tree at version 0 should not be restored"
         );
         // second snapshot tree recovered

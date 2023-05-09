@@ -286,16 +286,18 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
-            let restore_handler = Arc::new(AptosDB::open(
+            // for restore, we can always start state store with empty buffered_state since we will restore
+            let restore_handler = Arc::new(AptosDB::open_kv_only(
                 db_dir,
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
-                opt.rocksdb_opt.into(),
+                opt.rocksdb_opt.clone().into(),
                 false,
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )?)
             .get_restore_handler();
+
             RestoreRunMode::Restore { restore_handler }
         } else {
             RestoreRunMode::Verify

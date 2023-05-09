@@ -151,6 +151,7 @@ fn test_end_to_end_impl(d: TestData) {
                 replay_from_version: Some(
                     d.state_snapshot_ver.unwrap_or(Version::max_value() - 1) + 1,
                 ),
+                kv_only_replay: Some(false),
             },
             global_restore_opt,
             store,
