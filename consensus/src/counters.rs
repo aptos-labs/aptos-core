@@ -20,6 +20,10 @@ pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
 /// Transaction commit was unsuccessful, but will be retried
 pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
 
+/// Dedup
+pub static DEDUP_COUNT: Lazy<IntCounter> =
+    Lazy::new(|| register_int_counter!("aptos_consensus_dedup_count", "Dedup").unwrap());
+
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////
