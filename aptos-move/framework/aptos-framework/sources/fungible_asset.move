@@ -160,9 +160,9 @@ module aptos_framework::fungible_asset {
                 maximum
             }
         });
-        assert!(string::length(&name) <= MAX_NAME_LENGTH, error::invalid_argument(ENAME_TOO_LONG));
-        assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::invalid_argument(ESYMBOL_TOO_LONG));
-        assert!(decimals <= MAX_DECIMALS, error::invalid_argument(EDECIMALS_TOO_LARGE));
+        assert!(string::length(&name) <= MAX_NAME_LENGTH, error::out_of_range(ENAME_TOO_LONG));
+        assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::out_of_range(ESYMBOL_TOO_LONG));
+        assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
         assert!(string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         move_to(metadata_object_signer,
             Metadata {
