@@ -134,10 +134,10 @@ impl<'l> MoveVMRef<'l> {
     ///
     /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
     ///   call this directly via the loader instead of the VM.
-    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, find: F) -> Option<T>
+    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        find(&self.runtime.loader().get_module(module)?.module().metadata)
+        f(&self.runtime.loader().get_module(module)?.module().metadata)
     }
 }
