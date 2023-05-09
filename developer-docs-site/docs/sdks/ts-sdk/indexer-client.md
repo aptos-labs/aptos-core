@@ -17,7 +17,7 @@ Before using the `IndexerClient` class, you will need to configure it with the n
 
 To initialize the `IndexerClient` class, you will need to pass in the necessary configuration parameters. Here is an example:
 
-```js
+```ts
 import { IndexerClient } from "aptos";
 
 const client = new IndexerClient("https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql");
@@ -27,7 +27,7 @@ const client = new IndexerClient("https://indexer-testnet.staging.gcp.aptosdev.c
 
 To make an API call, you will need to call the appropriate method on the `IndexerClient` object. The method name and parameters will depend on the specific API you are using. Here is an example:
 
-```js
+```ts
 const accountNFTs = await client.getAccountNFTs("0x123");
 ```
 

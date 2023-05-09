@@ -3,9 +3,6 @@ title: "API client Layer"
 slug: "typescript-sdk-client-layer"
 ---
 
-import ThemedImage from '@theme/ThemedImage';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-
 The API client layer in the SDK provides a robust and reliable communication channel between the client-side application and the blockchain server. It is a component of the SDK that enables developers to interact with the network through the use of application programming interfaces (APIs). The client layer is responsible for making API calls to the network, sending and receiving data to and from the network, and handling any errors or exceptions that may occur during the process.
 
 The client layer is used to communicate with the Aptos REST API the Aptos Indexer API and handling of errors and exceptions.
@@ -30,7 +27,7 @@ The `Provider` class accepts:
 
 To initialize the Provider class, you will need to pass in the necessary configuration parameters. Here is an example:
 
-```js
+```ts
 import { Provider, Network } from "aptos";
 
 const provider = new Provider(Network.TESTNET);
@@ -40,7 +37,7 @@ const provider = new Provider(Network.TESTNET);
 
 To make an API call, you will need to call the appropriate method on the Provider class. The method name and parameters will depend on the specific API you are using. Here is an example:
 
-```js
+```ts
 const account = await provider.getAccount("0x123");
 ```
 
@@ -62,7 +59,7 @@ The TypeScript SDK provides 2 efficient ways to `generate a raw transaction` tha
 
 The `generateTransaction()` method, accepts an `entry function payload` type and is available for entry funtion transaction submission. It uses the [TransactionBuilderRemoteABI](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderRemoteABI.html) to fetch the ABI from chain, serializes the payload arguments based on the entry function argument types and generates and return a raw transaction that can be signed and submitted to chain.
 
-```js
+```ts
 const alice = new AptosAccount();
 
 const payload = {
@@ -86,7 +83,7 @@ To submit an entry function payload, using the Transaction Builder would be simp
 
 The `generateRawTransaction()` method, accept `any transaction payload type (entry, script, multisig)` and exepcts for the arguments passed in to be serialized. It then generates and returns a raw transaction that can be signed and submitted to chain.
 
-```js
+```ts
 const alice = new AptosAccount();
 
 const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
@@ -98,7 +95,7 @@ const rawTxn = await provider.generateRawTransaction(alice.address(), entryFunct
 
 For simplicity, the TypeScript SDK provides a method that can submit a BCS transaction in a one call.
 
-```js
+```ts
 const rawTxn = await provider.generateSignSubmitTransaction(alice, entryFunctionPayload);
 ```
 
@@ -106,7 +103,7 @@ const rawTxn = await provider.generateSignSubmitTransaction(alice, entryFunction
 
 Once one has generated a raw transaction, they need to sign this transaction with their private key. The TypeScript SDK provides a method that accepts an `aptos account` and `a raw transaction` and signs it.
 
-```js
+```ts
 const signedTxn = AptosClient.generateBCSTransaction(alice, rawTxn);
 ```
 
@@ -114,7 +111,7 @@ const signedTxn = AptosClient.generateBCSTransaction(alice, rawTxn);
 
 Once a transaction has been signed, it is ready to be submited to chain. The TypeScript SDK provides a method that accepts the `signed transaction` and submits it to the Aptos network.
 
-```js
+```ts
 const transactionRes = await provider.submitSignedBCSTransaction(signedTxn);
 ```
 

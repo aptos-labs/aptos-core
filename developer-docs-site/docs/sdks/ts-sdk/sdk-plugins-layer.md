@@ -3,8 +3,7 @@ title: "Plugins Layer"
 slug: "typescript-sdk-plugins-layer"
 ---
 
-import ThemedImage from '@theme/ThemedImage';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+A plugin is a component that can be added to the TypeScript SDK to extend or enhance its functionality. Plugins are meant to be built to support popular applications on the Aptos network and can be used to add new features, ease the use of the application operations and to customize the user experience.
 
 ### Token Client
 
@@ -39,12 +38,13 @@ It covers (1) write methods that support creating a unique identity on the Aptos
 
 The main write methods supported by the SDK are:
 
-- mintAptosName
+- Mint an Aptos Name
+- Init Reverse Lookup Registry
 
 The main read methods are:
 
-- getAddressByName
-- getPrimaryNameByAddress
+- Get Address By Name
+- Get Primary Name By Address
 
 ### Faucet Client
 
@@ -52,12 +52,21 @@ The [FaucetClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/
 
 The main read methods are:
 
-- fundAccount
+- Fund Account
 
 ### Coin Client
 
 The [CoinClient](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/src/plugins/coin_client.ts) class provides method to intercat with the coin module to transfer coins between accounts and to check an account balance. By default it transfers `0x1::aptos_coin::AptosCoin`, but you can specify a different coin type with the `coinType` argument.
+
 The main read methods are:
 
-- transfer
-- checkBalance
+- Transfer
+- Check Balance
+
+## Build a Plugin
+
+Developers can also create plugins to extend the functionality of the SDK and to provide users with a better experience. To do that, simply follow these steps:
+
+1. Create a new `.ts` file under the `src/plugins/` folder and name it `<pluginName>.ts` (e.g `ans_client`)
+2. Create a class with the same `pluginName` (e.g `AnsClient`) and implement it.
+3. Export that file from the `src/plugins/index.ts` file. (e.g `export * from "./ans_client";`)

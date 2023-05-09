@@ -275,7 +275,7 @@ const sidebars = {
                 },
                 "sdks/ts-sdk/sdk-core-layer",
                 "sdks/ts-sdk/sdk-plugins-layer",
-                "sdks/ts-sdk/sdk-validation",
+                "sdks/ts-sdk/sdk-tests",
               ],
             },
             "sdks/python-sdk",

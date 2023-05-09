@@ -1,12 +1,14 @@
 ---
-title: "Validation"
-slug: "typescript-sdk-validation"
+title: "Tests and Validation"
+slug: "typescript-sdk-tests"
 ---
 
-import ThemedImage from '@theme/ThemedImage';
-import useBaseUrl from '@docusaurus/useBaseUrl';
+The TypeScript SDK uses two types of tests - `e2e` and `unit` tests and are located under the `src/tests/` folder.
 
-## Validation for the Transaction Builder and BCS
+- `e2e` tests - end to end tests are meant to test the end-to-end operations starting from the sdk methods to the interaction with the REST/Indexer API and a smart contract and up to the blockchain level. For example, to test a transaction has been submitted, we start with building the transation payload the sdk expects, post the submit request to the REST API and fetch the transaction data to make sure it has been fully submitted to the blockchain.
+- `unit` tests - the unit tests are meant to test the output of a function in the SDK with theprovided input. For example, we test wether an account address is valid.
+
+### Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 

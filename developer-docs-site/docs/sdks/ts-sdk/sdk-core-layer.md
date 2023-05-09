@@ -3,9 +3,6 @@ title: "Core Layer"
 slug: "typescript-sdk-core-layer"
 ---
 
-import ThemedImage from '@theme/ThemedImage';
-import useBaseUrl from '@docusaurus/useBaseUrl';
-
 The core SDK layer exposes the functionalities needed by most applications:
 
 - Key generation
@@ -15,7 +12,7 @@ The core SDK layer exposes the functionalities needed by most applications:
 
 ### Transaction Builder
 
-The Aptos TypeScript SDK exposes five transaction Builder classes:
+The Aptos TypeScript SDK exposes five transaction builder classes:
 
 - [TransactionBuilder](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilder.html) that takes in a Signing Message (serialized raw transaction) and returns a signature.
 - [TransactionBuilderEd25519](https://aptos-labs.github.io/ts-sdk-doc/classes/TransactionBuilderEd25519.html) extends the TransactionBuilder class and provides a signing method for raw transactions with a single public key.

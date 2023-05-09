@@ -5,14 +5,13 @@ slug: "typescript-sdk-aptos-client-class"
 
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) class is a component of the aptos SDK that enables developers to interact with the network through the use of REST APIs generated from an [OpenAPI](https://aptos-labs.github.io/ts-sdk-doc/) specification.
 
-The `AptosClient` is used to communicate with the Aptos REST API and handling of errors and exceptions.
 In addition, the `AptosClient` component supports submitting transactions in BCS format, which prepares and signs the raw transactions on the client-side. This method leverages the BCS Library or Transaction Builder for constructing the transaction payloads.
 
 ### OpenAPI
 
 The [AptosClient](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosClient.html) uses the [OpenAPI](https://aptos-labs.github.io/ts-sdk-doc/) specification to generate a set of classes that represent the various endpoints and operations of the Aptos REST API.
 
-`OpenAPI` is a specification for building and documenting RESTful APIs. It provides a standard format for describing the structure of an API, including the available endpoints, methods, input and output parameters. By using the `OpenAPI` specification, developers integrated with the aptos SDK can ensure that their APIs are consistent, well-documented, and easily integrated with other applications.
+`OpenAPI` is a specification for building and documenting RESTful APIs. It provides a standard format for describing the structure of an API, including the available endpoints, methods, input and output parameters.
 
 ### Usage
 
@@ -24,9 +23,9 @@ Before using the `AptosClient` class, you will need to configure it with the nec
 
 ### Initialization
 
-To initialize the `AptosClient` class, you will need to pass in the necessary configuration parameters. Here is an example:
+Here is an example of how to initialize an `AptosClient`:
 
-```js
+```ts
 import { AptosClient } from "aptos";
 
 const client = new AptosClient("https://fullnode.testnet.aptoslabs.com");
@@ -36,7 +35,7 @@ const client = new AptosClient("https://fullnode.testnet.aptoslabs.com");
 
 To make an API call, you will need to call the appropriate method on the `AptosClient` object. The method name and parameters will depend on the specific API you are using. Here is an example:
 
-```js
+```ts
 const accountResources = await client.getAccountResources("0x123");
 ```
 
@@ -44,12 +43,12 @@ In this example, we are using the `getAccountResources()` method to retrieve the
 
 ### Submit transaction to chain
 
-To submit a transaction to chain, you will need to build a transaction payload to be submitted to chain. Here is an example:
+To submit a transaction to the blockchain, you will need to build a transaction payload to be submitted. Here is an example:
 
-```js
+```ts
 const alice = new AptosAccount();
 
-const payload = {
+const payload: Types.EntryFunctionPayload = {
   function: "0x123::todolist::create_task",
   type_arguments: [],
   arguments: ["read aptos.dev"],
@@ -60,7 +59,7 @@ const bcsTxn = AptosClient.generateBCSTransaction(alice, rawTxn);
 const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
 ```
 
-`function` - is built from the module address, module name and the function name.
+`function` - `function` - must be a fully qualified function name and is composed of `module address`, `module name` and `function name` seperated by `::`.
 `type_arguments` - this is for the case a Move function expects a generic type argument.
 `arguments` - the arguments the function expects.
 
