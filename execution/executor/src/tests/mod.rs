@@ -529,6 +529,43 @@ fn test_deleted_key_from_state_store() {
     assert_eq!(state_value_from_db1, StateValue::from(dummy_value1));
 }
 
+#[test]
+fn test_reconfig_suffix_empty_blocks() {
+    let TestExecutor {
+        _path,
+        db: _,
+        executor,
+    } = TestExecutor::new();
+    let block_a = TestBlock::new(10000, 1, gen_block_id(1));
+    let mut block_b = TestBlock::new(10000, 1, gen_block_id(2));
+    let block_c = TestBlock::new(1, 1, gen_block_id(3));
+    let block_d = TestBlock::new(1, 1, gen_block_id(4));
+    let checkpoint_txn = block_b.txns.pop().unwrap();
+    block_b.txns.push(encode_reconfiguration_transaction());
+    block_b.txns.push(checkpoint_txn);
+    let parent_block_id = executor.committed_block_id();
+    executor
+        .execute_block((block_a.id, block_a.txns), parent_block_id)
+        .unwrap();
+    let output = executor
+        .execute_block((block_b.id, block_b.txns), block_a.id)
+        .unwrap();
+    executor
+        .execute_block((block_c.id, block_c.txns), block_b.id)
+        .unwrap();
+    executor
+        .execute_block((block_d.id, block_d.txns), block_c.id)
+        .unwrap();
+
+    let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
+    executor
+        .commit_blocks(
+            vec![block_a.id, block_b.id, block_c.id, block_d.id],
+            ledger_info,
+        )
+        .unwrap();
+}
+
 struct TestBlock {
     txns: Vec<Transaction>,
     id: HashValue,
