@@ -39,7 +39,7 @@ use aptos_types::{
     on_chain_config::GasScheduleV2, transaction::SignedTransaction,
 };
 use std::{
-    collections::{BTreeMap, HashSet, HashMap},
+    collections::{BTreeMap, HashSet},
     convert::TryFrom,
     future::Future,
     str::FromStr,
@@ -756,15 +756,14 @@ async fn test_transfer() {
 async fn test_delegation_pool_operations() {
     let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 3).await;
 
-    let account_1 = cli.account_id(0);
-    // let account_2 = cli.account_id(1);
+    let _account_1 = cli.account_id(0);
     cli.fund_account(0, Some(100000000)).await.unwrap();
     let private_key_0 = cli.private_key(0);
 
     let chain_id = swarm.chain_id();
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
-    let request = NetworkRequest {
+    let _request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
     let network_identifier = chain_id.into();
@@ -806,11 +805,18 @@ async fn test_delegation_pool_operations() {
 
     let (tx, _) = res.into_parts();
     let tx_serialized = json!(tx);
-    print!("Serialized output is {}", tx_serialized);
-    let pool_address_str = tx_serialized["changes"][5]["address"].clone();
-    print!("Pool address is {}", pool_address_str);
+    let mut pool_address_str = "";
+
+    if let Some(changes) = tx_serialized["changes"].as_array() {
+        for change in changes {
+            if change["data"]["type"] == "0x1::delegation_pool::DelegationPool" {
+                pool_address_str = change["address"].as_str().unwrap();
+                break;
+            }
+        }
+    }
     let pool_address = AccountAddress::from_hex_literal(
-        pool_address_str.as_str().unwrap(),
+        pool_address_str,
     ).unwrap();
 
     add_delegated_stake(
@@ -822,11 +828,12 @@ async fn test_delegation_pool_operations() {
     )
     .await;
 
+    // TODO: replace this with add_delegated_stake call through rosetta
     add_delegated_stake(
         &swarm.aptos_public_info(),
         &mut account_5,
         pool_address,
-        1500000000,
+        15000000000,
         2,
     )
     .await;
@@ -836,8 +843,8 @@ async fn test_delegation_pool_operations() {
         &rest_client,
         &network_identifier,
         private_key_0,
-        account_1,
-        Some(1500000000),
+        pool_address,
+        Some(10000000000),
         Duration::from_secs(5),
         None,
         None,
