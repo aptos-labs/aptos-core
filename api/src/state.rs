@@ -22,10 +22,10 @@ use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
 };
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
-    resolver::ResourceResolver,
+    resolver::MoveResolver,
 };
 use poem_openapi::{
     param::{Path, Query},
@@ -239,11 +239,7 @@ impl StateApi {
         let resolver = state_view.as_move_resolver();
         // TODO
         let bytes = resolver
-            .get_resource(
-                &address.into(),
-                &resource_type,
-                &resolver.get_module_metadata(resource_type.module_id()),
-            )
+            .get_resource(&address.into(), &resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, address

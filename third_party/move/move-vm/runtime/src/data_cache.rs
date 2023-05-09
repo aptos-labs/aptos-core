@@ -189,7 +189,10 @@ impl<'r> TransactionDataCache<'r> {
                 None => &[],
             };
 
-            let gv = match self.remote.get_resource(&addr, &ty_tag, metadata) {
+            let gv = match self
+                .remote
+                .get_resource_with_metadata(&addr, &ty_tag, metadata)
+            {
                 Ok(Some(blob)) => {
                     load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {

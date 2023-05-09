@@ -76,18 +76,6 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Vec<Metadata> {
-        let module_bytes = match self.get_module(&module_id) {
-            Ok(Some(bytes)) => bytes,
-            _ => return vec![],
-        };
-        let module = match CompiledModule::deserialize(&module_bytes) {
-            Ok(module) => module,
-            _ => return vec![],
-        };
-        module.metadata
-    }
-
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
@@ -110,7 +98,7 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    fn get_resource(
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -121,6 +109,18 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
+    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
+        let module_bytes = match self.get_module(module_id) {
+            Ok(Some(bytes)) => bytes,
+            _ => return vec![],
+        };
+        let module = match CompiledModule::deserialize(&module_bytes) {
+            Ok(module) => module,
+            _ => return vec![],
+        };
+        module.metadata
+    }
+
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
