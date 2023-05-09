@@ -138,7 +138,11 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
+        let before = txns.len();
         let txns = Self::dedup(txns);
+        if txns.len() < before {
+            counters::DEDUP_COUNT.inc_by((before - txns.len()) as u64);
+        }
 
         let shuffled_txns = txn_shuffler.shuffle(txns);
 
