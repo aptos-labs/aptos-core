@@ -197,9 +197,9 @@ impl AptosVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        state: &impl MoveResolverExt,
+        resolver: &impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.0.load_module(module_id, state)
+        self.0.load_module(module_id, resolver)
     }
 
     /// Generates a transaction output for a transaction that encountered errors during the
@@ -1524,10 +1524,10 @@ impl VMValidator for AptosVM {
 impl VMAdapter for AptosVM {
     fn new_session<'r>(
         &self,
-        remote: &'r impl MoveResolverExt,
+        resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.0.new_session(remote, session_id)
+        self.0.new_session(resolver, session_id)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -1574,19 +1574,19 @@ impl VMAdapter for AptosVM {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &impl MoveResolverExt,
+        resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =
-                    self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
+                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
-                    data_cache,
+                    resolver,
                     write_set_payload.clone(),
                     log_context,
                 )?;
@@ -1596,8 +1596,7 @@ impl VMAdapter for AptosVM {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_string();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) =
-                    self.execute_user_transaction(data_cache, txn, log_context);
+                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
                 if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
                     vm_status.clone().keep_or_discard()

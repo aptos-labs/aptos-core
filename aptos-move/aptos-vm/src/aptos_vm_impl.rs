@@ -55,7 +55,7 @@ pub struct AptosVMImpl {
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new(state: &impl StateView) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
@@ -179,10 +179,10 @@ impl AptosVMImpl {
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework
-    fn get_transaction_validation<S: MoveResolverExt>(
-        remote_cache: &S,
+    fn get_transaction_validation(
+        resolver: &impl MoveResolverExt,
     ) -> Option<TransactionValidation> {
-        match remote_cache
+        match resolver
             .get_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
@@ -232,9 +232,9 @@ impl AptosVMImpl {
         &self.features
     }
 
-    pub fn check_gas<S: MoveResolverExt>(
+    pub fn check_gas(
         &self,
-        storage: &S,
+        resolver: &impl MoveResolverExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -243,7 +243,7 @@ impl AptosVMImpl {
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
             let data =
-                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+                resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
@@ -605,20 +605,20 @@ impl AptosVMImpl {
         }
     }
 
-    pub fn new_session<'r, R: MoveResolverExt>(
+    pub fn new_session<'r>(
         &self,
-        r: &'r R,
+        resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.move_vm.new_session(r, session_id)
+        self.move_vm.new_session(resolver, session_id)
     }
 
-    pub fn load_module<'r, R: MoveResolverExt>(
+    pub fn load_module<'r>(
         &self,
         module_id: &ModuleId,
-        remote: &'r R,
+        resolver: &'r impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.move_vm.load_module(module_id, remote)
+        self.move_vm.load_module(module_id, resolver)
     }
 }
 
