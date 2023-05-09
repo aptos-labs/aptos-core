@@ -153,6 +153,7 @@ fn test_token_objects() {
         AccountAddress::from_hex_literal("0xcafe").unwrap(),
     )]);
     run_tests_for_pkg("token_objects/hero", named_address.clone());
+    run_tests_for_pkg("token_objects/marketplace", named_address.clone());
     run_tests_for_pkg("token_objects/ambassador/move", named_address);
 }
 
