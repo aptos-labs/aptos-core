@@ -45,13 +45,6 @@ export type GetAccountTransactionsDataQueryVariables = Types.Exact<{
 
 export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', move_resources: Array<{ __typename?: 'move_resources', transaction_version: any }> };
 
-export type GetCurrentDelegatorBalancesCountQueryVariables = Types.Exact<{
-  poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
-}>;
-
-
-export type GetCurrentDelegatorBalancesCountQuery = { __typename?: 'query_root', current_delegator_balances_aggregate: { __typename?: 'current_delegator_balances_aggregate', aggregate?: { __typename?: 'current_delegator_balances_aggregate_fields', count: number } | null } };
-
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
   poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
@@ -64,6 +57,13 @@ export type GetIndexerLedgerInfoQueryVariables = Types.Exact<{ [key: string]: ne
 
 
 export type GetIndexerLedgerInfoQuery = { __typename?: 'query_root', ledger_infos: Array<{ __typename?: 'ledger_infos', chain_id: any }> };
+
+export type GetNumberOfDelegatorsQueryVariables = Types.Exact<{
+  poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
+}>;
+
+
+export type GetNumberOfDelegatorsQuery = { __typename?: 'query_root', num_active_delegator_per_pool: Array<{ __typename?: 'num_active_delegator_per_pool', num_active_delegator?: any | null }> };
 
 export type GetTokenActivitiesQueryVariables = Types.Exact<{
   idHash: Types.Scalars['String'];
