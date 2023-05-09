@@ -69,6 +69,8 @@ pub struct TransactionRestoreOpt {
         recovering a state snapshot, or previous transaction replay."
     )]
     pub replay_from_version: Option<Version>,
+    #[clap(long)]
+    pub kv_only_replay: Option<bool>,
 }
 
 impl TransactionRestoreOpt {
@@ -187,12 +189,23 @@ impl TransactionRestoreController {
         epoch_history: Option<Arc<EpochHistory>>,
         verify_execution_mode: VerifyExecutionMode,
     ) -> Self {
+        let replay_from_version: Option<(Version, bool)> =
+            if let Some(version) = opt.replay_from_version {
+                Some((
+                    version,
+                    opt.kv_only_replay.expect(
+                        "KV only replay must be specified if replay from version is specified.",
+                    ),
+                ))
+            } else {
+                None
+            };
         let inner = TransactionRestoreBatchController::new(
             global_opt,
             storage,
             vec![opt.manifest_handle],
             None,
-            opt.replay_from_version,
+            replay_from_version,
             epoch_history,
             verify_execution_mode,
             None,
@@ -213,7 +226,7 @@ pub struct TransactionRestoreBatchController {
     global_opt: GlobalRestoreOptions,
     storage: Arc<dyn BackupStorage>,
     manifest_handles: Vec<FileHandle>,
-    replay_from_version: Option<Version>,
+    replay_from_version: Option<(Version, bool)>,
     epoch_history: Option<Arc<EpochHistory>>,
     verify_execution_mode: VerifyExecutionMode,
     output_transaction_analysis: Option<PathBuf>,
@@ -226,7 +239,7 @@ impl TransactionRestoreBatchController {
         storage: Arc<dyn BackupStorage>,
         manifest_handles: Vec<FileHandle>,
         first_version: Option<Version>,
-        replay_from_version: Option<Version>,
+        replay_from_version: Option<(Version, bool)>, // bool indicates if this is a KV only replay
         epoch_history: Option<Arc<EpochHistory>>,
         verify_execution_mode: VerifyExecutionMode,
         output_transaction_analysis: Option<PathBuf>,
@@ -270,20 +283,26 @@ impl TransactionRestoreBatchController {
             self.confirm_or_save_frozen_subtrees(&mut loaded_chunk_stream)
                 .await?,
         );
-
         if let RestoreRunMode::Restore { restore_handler } = self.global_opt.run_mode.as_ref() {
             ensure!(
                 self.output_transaction_analysis.is_none(),
                 "Bug: requested to output transaction output sizing info in restore mode.",
             );
             AptosVM::set_concurrency_level_once(self.global_opt.replay_concurrency_level);
+
+            let kv_only = self.replay_from_version.map_or(false, |(_, k)| k);
             let txns_to_execute_stream = self
                 .save_before_replay_version(first_version, loaded_chunk_stream, restore_handler)
                 .await?;
 
             if let Some(txns_to_execute_stream) = txns_to_execute_stream {
-                self.replay_transactions(restore_handler, txns_to_execute_stream)
-                    .await?;
+                if kv_only {
+                    self.replay_kv(restore_handler, txns_to_execute_stream)
+                        .await?;
+                } else {
+                    self.replay_transactions(restore_handler, txns_to_execute_stream)
+                        .await?;
+                }
             }
         } else {
             self.go_through_verified_chunks(loaded_chunk_stream, first_version)
@@ -307,10 +326,13 @@ impl TransactionRestoreBatchController {
             .and_then(|m: TransactionBackup| future::ready(m.verify().map(|_| m)));
 
         let target_version = self.global_opt.target_version;
+        let first_version = self.first_version.unwrap_or(0);
         let chunk_manifest_stream = manifest_stream
             .map_ok(|m| stream::iter(m.chunks.into_iter().map(Result::<_>::Ok)))
             .try_flatten()
-            .try_take_while(move |c| future::ready(Ok(c.first_version <= target_version)))
+            .try_filter(move |c| {
+                future::ready(c.first_version <= target_version && c.last_version >= first_version)
+            })
             .scan(0, |last_chunk_last_version, chunk_res| {
                 let res = match &chunk_res {
                     Ok(chunk) => {
@@ -394,7 +416,8 @@ impl TransactionRestoreBatchController {
         // self.replay_from_version is from cli argument. However, in fact, we either not replay or replay
         // after current DB's version.
         let first_to_replay = max(
-            self.replay_from_version.unwrap_or(Version::MAX),
+            self.replay_from_version
+                .map_or(Version::MAX, |(version, _)| version),
             next_expected_version,
         );
         let target_version = self.global_opt.target_version;
@@ -420,6 +443,7 @@ impl TransactionRestoreBatchController {
                     // remove the txns that are before the global_first_version
                     if global_first_version > first_version {
                         let num_to_remove = (global_first_version - first_version) as usize;
+
                         txns.drain(..num_to_remove);
                         txn_infos.drain(..num_to_remove);
                         event_vecs.drain(..num_to_remove);
@@ -435,7 +459,6 @@ impl TransactionRestoreBatchController {
                         let txn_infos_to_save: Vec<_> = txn_infos.drain(..num_to_save).collect();
                         let event_vecs_to_save: Vec<_> = event_vecs.drain(..num_to_save).collect();
                         let write_sets_to_save = write_sets.drain(..num_to_save).collect();
-
                         tokio::task::spawn_blocking(move || {
                             restore_handler.save_transactions(
                                 first_version,
@@ -482,6 +505,83 @@ impl TransactionRestoreBatchController {
         Ok(first_txn_to_replay.map(|_| txns_to_execute_stream))
     }
 
+    // only apply KV to the DB
+    async fn replay_kv(
+        &self,
+        restore_handler: &RestoreHandler,
+        txns_to_execute_stream: impl Stream<
+            Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>,
+        >,
+    ) -> Result<()> {
+        let (first_version, _) = self.replay_from_version.unwrap();
+        let mut base_version = first_version;
+        let mut offset = 0u64;
+        let replay_start = Instant::now();
+        let arc_restore_handler = Arc::new(restore_handler.clone());
+
+        let db_commit_stream = txns_to_execute_stream
+            .try_chunks(BATCH_SIZE)
+            .err_into::<anyhow::Error>()
+            .map_ok(|chunk| {
+                let (txns, txn_infos, write_sets, events): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
+                    chunk.into_iter().multiunzip();
+                let handler = arc_restore_handler.clone();
+                base_version += offset;
+                offset = txns.len() as u64;
+                async move {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["replay_txn_chunk_kv_only"])
+                        .start_timer();
+                    tokio::task::spawn_blocking(move || {
+                        // we directly save transaction and kvs to DB without involving chunk executor
+                        handler.save_transactions_and_replay_kv(
+                            base_version,
+                            &txns,
+                            &txn_infos,
+                            &events,
+                            write_sets,
+                        )?;
+                        // return the last version after the replaying
+                        Ok(base_version + offset - 1)
+                    })
+                    .err_into::<anyhow::Error>()
+                    .await
+                }
+            })
+            .try_buffered_x(self.global_opt.concurrent_downloads, 1)
+            .and_then(future::ready);
+
+        let total_replayed = db_commit_stream
+            .and_then(|version| async move {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["commit_txn_chunk_kv_only"])
+                    .start_timer();
+                tokio::task::spawn_blocking(move || {
+                    // version is the latest version finishing the KV replaying
+                    let total_replayed = version - first_version;
+                    TRANSACTION_REPLAY_VERSION.set(version as i64);
+                    info!(
+                        version = version,
+                        accumulative_tps =
+                            (total_replayed as f64 / replay_start.elapsed().as_secs_f64()) as u64,
+                        "KV replayed."
+                    );
+                    Ok(version)
+                })
+                .await?
+            })
+            .try_fold(0, |_total, total| future::ok(total))
+            .await?;
+        info!(
+            total_replayed = total_replayed,
+            accumulative_tps =
+                (total_replayed as f64 / replay_start.elapsed().as_secs_f64()) as u64,
+            "KV Replay finished."
+        );
+        Ok(())
+    }
+
+    // replay the txn to the DB
     async fn replay_transactions(
         &self,
         restore_handler: &RestoreHandler,
@@ -489,7 +589,7 @@ impl TransactionRestoreBatchController {
             Item = Result<(Transaction, TransactionInfo, WriteSet, Vec<ContractEvent>)>,
         >,
     ) -> Result<()> {
-        let first_version = self.replay_from_version.unwrap();
+        let (first_version, _) = self.replay_from_version.unwrap();
         restore_handler.reset_state_store();
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));

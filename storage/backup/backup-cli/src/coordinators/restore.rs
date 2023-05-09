@@ -90,10 +90,20 @@ impl RestoreCoordinator {
     }
 
     /// Support two modes
-    /// 1. restore to target version
-    /// 2. restore a DB with all data ranging from start_version to target_version
-    /// We basically introduce a ledger history start version (lhs), a replay start version (rs) and target version
-    /// We directly store the write set and key values between (lhs, rs) and replay txn from (rs, target]
+    /// 1. restore to target version when do_phase_1 is false. We restore a closest snapshot and replay txns till the target version
+    /// 2. restore a DB with all data ranging from start_version to target_version with all KV restored between ledger_history_start_version and target_version along with the latest tree at target version.
+
+    /// The overall flow is as follows:
+    /// The first phase is restore till the tree snapshot before the target version. It includes the following work
+    /// a. restore the KV snapshot before ledger history start version, which also restore StateStorageUsage at the version
+    /// b. start from the first transaction of loaded chunk, save the txn accumualator, and apply transactions till the KV snapshot. We don't restore state KVs here since we can't calculate StateStorageUsage before the KV snapshot.
+    /// we start save transaction and restore KV after kv_snapshot version till the tree_snapshot before target version
+    ///
+    /// The second phase is restore the tree snapshot and replay txns till the target version
+    /// a. restore the tree snapshot
+    /// b. replay the txn till the target version
+    ///
+    /// we are support the resume from any point when the restore is interrupted.
     async fn run_impl(self) -> Result<()> {
         if self.replay_all {
             bail!("--replay--all not supported in this version.");
@@ -138,9 +148,12 @@ impl RestoreCoordinator {
             .run_mode
             .get_next_expected_transaction_version()?;
 
-        let kv_snapshot = if db_next_version == 0 {
-            match self.global_opt.run_mode.get_in_progress_state_kv_snapshot() {
-                Ok(Some(ver)) => {
+        let kv_snapshot = match self.global_opt.run_mode.get_in_progress_state_kv_snapshot() {
+            Ok(Some(ver)) => {
+                if db_next_version >= ver {
+                    // already restored the kv snapshot, no need to restore again
+                    None
+                } else {
                     let snapshot = metadata_view.select_state_snapshot(ver)?;
                     ensure!(
                         snapshot.is_some() && snapshot.as_ref().unwrap().version == ver,
@@ -148,67 +161,79 @@ impl RestoreCoordinator {
                         ver
                     );
                     snapshot
-                },
-                Ok(None) | Err(_) => {
-                    metadata_view.select_state_snapshot(std::cmp::min(lhs, max_txn_ver))?
-                },
-            }
-        } else {
-            None
+                }
+            },
+            Ok(None) | Err(_) => {
+                assert_eq!(
+                    db_next_version, 0,
+                    "DB should be empty if no in-progress state snapshot found"
+                );
+                metadata_view
+                    .select_state_snapshot(std::cmp::min(lhs, max_txn_ver))
+                    .expect("Cannot find any snapshot before ledger history start version")
+            },
         };
 
-        let tree_snapshot = metadata_view
-            .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
-            .expect("Cannot find tree snapshot before target version");
+        let tree_snapshot = if let Some((latest_tree_version, _)) = latest_tree_version {
+            let snapshot = metadata_view.select_state_snapshot(latest_tree_version)?;
 
-        let two_phase_restore = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
+            ensure!(
+                snapshot.is_some() && snapshot.as_ref().unwrap().version == latest_tree_version,
+                "cannot find tree snapshot {}",
+                latest_tree_version
+            );
+            snapshot.unwrap()
+        } else {
+            metadata_view
+                .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
+                .expect("Cannot find tree snapshot before target version")
+        };
+
+        let do_phase_1 = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
             // if we have a kv snapshot, we need to restore the state between lhs and rs
+            // if the version are equal, we don't need to restore phase 1. we can directly restore a snapshot with both tree and KV, and then replay txn till the target_version
             kv_snapshot.version < tree_snapshot.version
         } else {
             // if we don't have a kv snapshot, we need to restore the state between db_next_version and rs
-            db_next_version < tree_snapshot.version && db_next_version > 0
+            db_next_version < tree_snapshot.version
         };
-        let txn_start_version = if kv_snapshot.is_some() {
-            kv_snapshot.as_ref().unwrap().version
+        let txn_start_version = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
+            kv_snapshot.version
         } else {
             db_next_version
         };
         let transaction_backups =
             metadata_view.select_transaction_backups(txn_start_version, target_version)?;
         let epoch_ending_backups = metadata_view.select_epoch_ending_backups(target_version)?;
+        let epoch_handles = epoch_ending_backups
+            .iter()
+            .filter(|e| e.first_version <= target_version)
+            .map(|backup| backup.manifest.clone())
+            .collect();
+        let epoch_history = if !self.skip_epoch_endings {
+            Some(Arc::new(
+                EpochHistoryRestoreController::new(
+                    epoch_handles,
+                    self.global_opt.clone(),
+                    self.storage.clone(),
+                )
+                .run()
+                .await?,
+            ))
+        } else {
+            None
+        };
 
         // Restore the the state kv between lhs and rs
-        if two_phase_restore {
-            let start_version = if let Some(ref kv_snapshot) = kv_snapshot {
-                kv_snapshot.version
-            } else {
-                db_next_version
-            };
+        if do_phase_1 {
             info!(
                 "Start restoring DB from version {} to tree snapshot version {}",
-                start_version, tree_snapshot.version,
+                txn_start_version, tree_snapshot.version,
             );
-            let epoch_handles = epoch_ending_backups
-                .iter()
-                .filter(|e| e.first_version <= tree_snapshot.version)
-                .map(|backup| backup.manifest.clone())
-                .collect();
-            let epoch_history = if !self.skip_epoch_endings {
-                Some(Arc::new(
-                    EpochHistoryRestoreController::new(
-                        epoch_handles,
-                        self.global_opt.clone(),
-                        self.storage.clone(),
-                    )
-                    .run()
-                    .await?,
-                ))
-            } else {
-                None
-            };
 
+            // phase 1.a: restore the kv snapshot
             if kv_snapshot.is_some() {
-                let kv_snapshot = kv_snapshot.unwrap();
+                let kv_snapshot = kv_snapshot.clone().unwrap();
                 info!("Start restoring KV snapshot at {}", kv_snapshot.version);
 
                 StateSnapshotRestoreController::new(
@@ -225,20 +250,40 @@ impl RestoreCoordinator {
                 .run()
                 .await?;
             }
+
+            // phase 1.b: save the txn between the first txn of the first chunk and the tree snapshot
             let txn_manifests = transaction_backups
                 .iter()
-                .filter(|e| e.first_version < tree_snapshot.version)
+                .filter(|e| {
+                    e.first_version <= tree_snapshot.version && e.last_version >= db_next_version
+                })
                 .map(|e| e.manifest.clone())
                 .collect();
+            assert!(
+                db_next_version == 0
+                    || transaction_backups.first().map_or(0, |t| t.first_version)
+                        <= db_next_version,
+                "Inconsistent state: first txn version {} is larger than db_next_version {}",
+                transaction_backups.first().map_or(0, |t| t.first_version),
+                db_next_version
+            );
             // update the kv to the kv db
+            // reset the global
             let mut transaction_restore_opt = self.global_opt.clone();
-            transaction_restore_opt.target_version = tree_snapshot.version - 1;
+            // We should replay kv to include the version of tree snapshot so that we can get correct storage usage at that version
+            // while restore tree only snapshots
+            let kv_replay_version = if let Some(kv_snapshot) = kv_snapshot.as_ref() {
+                kv_snapshot.version + 1
+            } else {
+                db_next_version
+            };
+            transaction_restore_opt.target_version = tree_snapshot.version;
             TransactionRestoreBatchController::new(
                 transaction_restore_opt,
                 Arc::clone(&self.storage),
                 txn_manifests,
-                None,
-                None,
+                Some(db_next_version),
+                Some((kv_replay_version, true /* only replay KV */)),
                 epoch_history.clone(),
                 VerifyExecutionMode::NoVerify,
                 None,
@@ -249,40 +294,17 @@ impl RestoreCoordinator {
             db_next_version = tree_snapshot.version;
         }
 
-        // Restore the full tree snapshot and replay till the target version
+        // Phase 2: restore the full tree snapshot and replay till the target version
         {
-            let epoch_handles = epoch_ending_backups
-                .iter()
-                .filter(|e| e.first_version <= target_version)
-                .map(|backup| backup.manifest.clone())
-                .collect();
-
-            let epoch_history = if !self.skip_epoch_endings {
-                Some(Arc::new(
-                    EpochHistoryRestoreController::new(
-                        epoch_handles,
-                        self.global_opt.clone(),
-                        self.storage.clone(),
-                    )
-                    .run()
-                    .await?,
-                ))
-            } else {
-                None
-            };
-
-            let first_version = if db_next_version == 0 {
-                None
-            } else {
-                Some(db_next_version)
-            };
-            let mut replay_version = first_version;
+            let first_version = (db_next_version > 0).then_some(db_next_version);
+            // we don't want to replay txn at exact tree snapshot version since the kv is restored either in phase 1 OR by snapshot restore in default mode
+            let mut replay_version = first_version.map(|v| (v, false));
 
             info!(
                 "Starting restore DB from version {} to target version {}",
                 db_next_version, target_version,
             );
-            // If the tree is not completed, we directly restore from the latest snapshot before target
+            // phase 2.a: if the tree is not completed, we directly restore from the latest snapshot before target
             if !tree_completed {
                 // For boostrap DB to latest version, we want to use default mode
                 let restore_mode = if db_next_version > 0 {
@@ -308,11 +330,13 @@ impl RestoreCoordinator {
                 )
                 .run()
                 .await?;
-                if restore_mode == StateSnapshotRestoreMode::Default {
-                    replay_version = Some(tree_snapshot.version + 1);
-                }
+                replay_version = Some((
+                    tree_snapshot.version + 1,
+                    false, /*replay entire txn including update tree and KV*/
+                ));
             }
 
+            // phase 2.b: restore the txn between the tree snapshot and the target version
             let txn_manifests = transaction_backups
                 .iter()
                 .filter(|e| e.last_version >= db_next_version)
