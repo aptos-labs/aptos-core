@@ -28,6 +28,8 @@ pub struct CurrentTokenPendingClaim {
     pub table_handle: String,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub token_data_id: String,
+    pub collection_id: String,
 }
 
 impl CurrentTokenPendingClaim {
@@ -65,11 +67,15 @@ impl CurrentTokenPendingClaim {
 
                 if let Some(table_metadata) = maybe_table_metadata {
                     let token_id = offer.token_id;
-                    let token_data_id = token_id.token_data_id;
-                    let collection_data_id_hash = token_data_id.get_collection_data_id_hash();
-                    let token_data_id_hash = token_data_id.to_hash();
-                    let collection_name = token_data_id.get_collection_trunc();
-                    let name = token_data_id.get_name_trunc();
+                    let token_data_id_struct = token_id.token_data_id;
+                    let collection_data_id_hash =
+                        token_data_id_struct.get_collection_data_id_hash();
+                    let token_data_id_hash = token_data_id_struct.to_hash();
+                    // Basically adding 0x prefix to the previous 2 lines. This is to be consistent with Token V2
+                    let collection_id = token_data_id_struct.get_collection_id();
+                    let token_data_id = token_data_id_struct.to_id();
+                    let collection_name = token_data_id_struct.get_collection_trunc();
+                    let name = token_data_id_struct.get_name_trunc();
 
                     return Ok(Some(Self {
                         token_data_id_hash,
@@ -77,13 +83,15 @@ impl CurrentTokenPendingClaim {
                         from_address: standardize_address(&table_metadata.owner_address),
                         to_address: standardize_address(&offer.to_addr),
                         collection_data_id_hash,
-                        creator_address: standardize_address(&token_data_id.creator),
+                        creator_address: standardize_address(&token_data_id_struct.creator),
                         collection_name,
                         name,
                         amount: token.amount,
                         table_handle,
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
+                        token_data_id,
+                        collection_id,
                     }));
                 } else {
                     aptos_logger::warn!(
@@ -133,11 +141,14 @@ impl CurrentTokenPendingClaim {
             });
 
             let token_id = offer.token_id;
-            let token_data_id = token_id.token_data_id;
-            let collection_data_id_hash = token_data_id.get_collection_data_id_hash();
-            let token_data_id_hash = token_data_id.to_hash();
-            let collection_name = token_data_id.get_collection_trunc();
-            let name = token_data_id.get_name_trunc();
+            let token_data_id_struct = token_id.token_data_id;
+            let collection_data_id_hash = token_data_id_struct.get_collection_data_id_hash();
+            let token_data_id_hash = token_data_id_struct.to_hash();
+            // Basically adding 0x prefix to the previous 2 lines. This is to be consistent with Token V2
+            let collection_id = token_data_id_struct.get_collection_id();
+            let token_data_id = token_data_id_struct.to_id();
+            let collection_name = token_data_id_struct.get_collection_trunc();
+            let name = token_data_id_struct.get_name_trunc();
 
             return Ok(Some(Self {
                 token_data_id_hash,
@@ -145,13 +156,15 @@ impl CurrentTokenPendingClaim {
                 from_address: standardize_address(&table_metadata.owner_address),
                 to_address: standardize_address(&offer.to_addr),
                 collection_data_id_hash,
-                creator_address: standardize_address(&token_data_id.creator),
+                creator_address: standardize_address(&token_data_id_struct.creator),
                 collection_name,
                 name,
                 amount: BigDecimal::zero(),
                 table_handle,
                 last_transaction_version: txn_version,
                 last_transaction_timestamp: txn_timestamp,
+                token_data_id,
+                collection_id,
             }));
         }
         Ok(None)

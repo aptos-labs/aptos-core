@@ -18,6 +18,7 @@ use move_binary_format::{
 };
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
+use std::collections::HashMap;
 
 //
 // Contains all the code to work on the Simple package
@@ -27,13 +28,15 @@ use rand_core::RngCore;
 // Functions to load and update the original package
 //
 
-pub fn load_package() -> (Vec<CompiledModule>, PackageMetadata) {
-    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA_SIMPLE)
+pub fn load_package() -> (HashMap<String, CompiledModule>, PackageMetadata) {
+    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA)
         .expect("PackageMetadata for GenericModule must deserialize");
-    let mut modules = vec![];
-    let module = CompiledModule::deserialize(&raw_module_data::MODULE_SIMPLE)
-        .expect("Simple.move must deserialize");
-    modules.push(module);
+    let mut modules = HashMap::new();
+    for module_content in &*raw_module_data::MODULES {
+        let module =
+            CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
+        modules.insert(module.self_id().name().to_string(), module);
+    }
     (modules, metadata)
 }
 
@@ -146,6 +149,7 @@ pub enum EntryPoints {
     },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
+
     /// Initialize Token V1 NFT collection
     TokenV1InitializeCollection,
     /// Mint an NFT token. Should be called only after InitializeCollection is called
@@ -158,6 +162,60 @@ pub enum EntryPoints {
 }
 
 impl EntryPoints {
+    pub fn package_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "simple",
+        }
+    }
+
+    pub fn module_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+        }
+    }
+
     pub fn create_payload(
         &self,
         module_id: ModuleId,

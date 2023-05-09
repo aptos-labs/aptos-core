@@ -226,6 +226,7 @@ macro_rules! abort_unless_feature_flag_enabled {
 
 fn abort_invariant_violated() -> PartialVMError {
     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        .with_message("aptos_std::crypto_algebra native abort".to_string())
 }
 
 static BLS12381_GT_GENERATOR: Lazy<ark_bls12_381::Fq12> = Lazy::new(|| {

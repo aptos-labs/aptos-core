@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_state_view::CachedStateView, proof_fetcher::ProofFetcher, state_delta::StateDelta,
-    DbReader,
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
+    state_delta::StateDelta, DbReader,
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
@@ -96,7 +96,7 @@ impl ExecutedTrees {
         &self,
         id: StateViewId,
         reader: Arc<dyn DbReader>,
-        proof_fetcher: Arc<dyn ProofFetcher>,
+        proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Result<CachedStateView> {
         CachedStateView::new(
             id,
