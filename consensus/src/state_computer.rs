@@ -20,12 +20,15 @@ use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateCom
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{boxed::Box, collections::HashSet, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
 type NotificationType = (
@@ -92,6 +95,22 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
         }
     }
+
+    fn dedup(txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
+        // TODO: will we have to filter with hash? Probably not required, this is deterministic.
+        let mut seen_txns = HashSet::new();
+        txns.into_iter()
+            .filter(|txn| {
+                let txn_summary = (txn.sender(), txn.sequence_number());
+                if seen_txns.contains(&txn_summary) {
+                    false
+                } else {
+                    seen_txns.insert(txn_summary);
+                    true
+                }
+            })
+            .collect()
+    }
 }
 
 // TODO: filter duplicated transaction before executing
@@ -119,6 +138,7 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
+        let txns = Self::dedup(txns);
 
         let shuffled_txns = txn_shuffler.shuffle(txns);
 
@@ -189,6 +209,7 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
+            let signed_txns = Self::dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(signed_txns);
 
             txns.extend(block.transactions_to_commit(
