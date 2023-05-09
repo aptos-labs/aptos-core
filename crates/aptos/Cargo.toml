@@ -97,6 +97,3 @@ cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = { workspace = true }
-
-[lib]
-crate-type = ["rlib", "dylib"]

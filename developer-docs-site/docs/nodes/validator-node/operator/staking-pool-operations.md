@@ -5,10 +5,14 @@ slug: "staking-pool-operations"
 
 # Staking Pool Operations
 
-This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that you can stake only when you meet the minimal staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions.
+This document describes how to perform [staking](../../../concepts/staking.md) pool operations. Note that a staking pool can only accept stake from the stake pool owner. You can stake only when you meet the minimum staking requirement. See also the related [Delegation Pool Operations](./delegation-pool-operations.md) instructions to accept stake from multiple delegators in order to reach the minimum. 
 
 :::tip Minimum staking requirement
 The current required minimum for staking is 1 million APT.
+:::
+
+:::danger
+Important There is no upgrade mechanism for the staking contract from staking pool to delegation pool. A new delegation pool would have to be created.
 :::
 
 ## Connect to Aptos network
@@ -17,7 +21,7 @@ The current required minimum for staking is 1 million APT.
 
 ## Initializing the stake pool
 
-Make sure that this step is performed by the owner. See [Initialize staking pool](../../validator-node/owner/index.md#initialize-staking-pool) in the owner documentation section.
+Make sure that this step is performed by the owner. See [Initialize staking pool](#initialize-staking-pool) section.
 
 ## Joining validator set
 
@@ -26,6 +30,94 @@ Follow the below steps to set up the validator node using the operator account a
 :::tip Mainnet vs Testnet
 The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
+
+## Perform pool owner operations
+
+This document describes how to [use the Aptos CLI](../../../tools/aptos-cli-tool/use-aptos-cli.md) to perform owner operations during validation.
+
+### Owner operations with CLI
+
+:::tip Testnet vs Mainnet
+The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
+:::
+
+### Initialize CLI
+
+Initialize CLI with a private key from an existing account, such as a wallet, or create a new account.
+
+```bash
+aptos init --profile mainnet-owner \
+  --network mainnet
+```
+
+You can either enter the private key from an existing wallet, or create new wallet address.
+
+### Initialize staking pool
+
+```bash
+aptos stake initialize-stake-owner \
+  --initial-stake-amount 100000000000000 \
+  --operator-address <operator-address> \
+  --voter-address <voter-address> \
+  --profile mainnet-owner
+```
+
+### Transfer coin between accounts
+
+```bash
+aptos account transfer \
+  --account <operator-address> \
+  --amount <amount> \
+  --profile mainnet-owner
+```
+
+### Switch operator
+
+```bash
+aptos stake set-operator \
+  --operator-address <new-operator-address> \ 
+  --profile mainnet-owner
+```
+
+### Switch voter
+
+```bash
+aptos stake set-delegated-voter \
+  --voter-address <new-voter-address> \ 
+  --profile mainnet-owner
+```
+
+### Add stake
+
+```bash
+aptos stake add-stake \
+  --amount <amount> \
+  --profile mainnet-owner
+```
+
+### Increase stake lockup
+
+```bash
+aptos stake increase-lockup --profile mainnet-owner
+```
+
+### Unlock stake
+
+```bash
+aptos stake unlock-stake \
+  --amount <amount> \
+  --profile mainnet-owner
+```
+
+### Withdraw stake
+
+```bash
+aptos stake withdraw-stake \
+  --amount <amount> \
+  --profile mainnet-owner
+```
+
+## Perform operator operations
 
 ### 1. Initialize Aptos CLI
 
@@ -221,9 +313,11 @@ Month 3, Day 29, if you call the commission again, 30 days of commission would b
 
 You can call the command multiple times, and the amount you receive depends on the day when you requested commission unlock previously.
 
-## Frequently used staking operations commands
 
-### Checking your validator performance
+Commission is unlocked when `request-commission` is called, the staker unlocks stake, or the staker switches operator. The commission will not be withdrawable until the end of the lockup period. Unlocked commission will continue to earn rewards until the lockup period expires.
+
+
+## Checking your validator performance
 
 To see your validator performance in the current and past epochs and the rewards earned, run the below command. The output will show the validator's performance in block proposals, and in governance voting and governance proposals. Default values are used in the below command. Type `aptos node get-performance --help` to see default values used.
 
@@ -290,3 +384,7 @@ aptos node analyze-validator-performance \
   --profile mainnet-operator \
   --start-epoch 0 | grep <pool address>
 ```
+
+## Tracking rewards
+
+`DistributeEvent` is emitted when there is a transfer from staking_contract to the operator or staker (owner). Rewards can be tracked either by listening to `DistributeEvent` or by using the [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function) to call `staking_contract_amounts`. This will return `accumulated_rewards` and `commission_amount`.

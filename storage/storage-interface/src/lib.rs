@@ -43,10 +43,8 @@ mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
-pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;
-pub mod sync_proof_fetcher;
 
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
