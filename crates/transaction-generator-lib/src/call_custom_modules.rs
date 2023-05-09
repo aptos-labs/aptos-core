@@ -43,24 +43,21 @@ impl CallCustomModulesGenerator {
 impl TransactionGenerator for CallCustomModulesGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let needed = accounts.len() * transactions_per_account;
-        let mut requests = Vec::with_capacity(needed);
+        let mut requests = Vec::with_capacity(num_to_create);
 
-        for account in accounts {
-            for _ in 0..transactions_per_account {
-                let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
-                let request = package.use_specific_transaction(
-                    self.entry_point,
-                    account,
-                    &self.txn_factory,
-                    Some(&mut self.rng),
-                    Some(publisher),
-                );
-                requests.push(request);
-            }
+        for _ in 0..num_to_create {
+            let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+            let request = package.use_specific_transaction(
+                self.entry_point,
+                account,
+                &self.txn_factory,
+                Some(&mut self.rng),
+                Some(publisher),
+            );
+            requests.push(request);
         }
         requests
     }

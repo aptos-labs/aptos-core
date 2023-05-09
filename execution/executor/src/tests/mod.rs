@@ -20,7 +20,7 @@ use aptos_executor_types::{
 };
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -425,7 +425,7 @@ fn apply_transaction_by_writeset(
         .verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
         )
         .unwrap();
 
@@ -563,7 +563,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 .verified_state_view(
                     StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
-                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                    Arc::new(AsyncProofFetcher::new(db.reader.clone())),
                 )
                 .unwrap(),
         )

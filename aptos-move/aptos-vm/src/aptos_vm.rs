@@ -1612,8 +1612,9 @@ impl VMAdapter for AptosVM {
                 {
                     error!(
                         *log_context,
-                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}",
+                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
                         bcs::to_bytes::<SignedTransaction>(&**txn),
+                        vm_status,
                     );
                     TRANSACTIONS_INVARIANT_VIOLATION.inc();
                 }

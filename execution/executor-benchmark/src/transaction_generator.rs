@@ -288,7 +288,7 @@ impl TransactionGenerator {
                 .flat_map(|_| {
                     let sender = self.main_signer_accounts.as_mut().unwrap().get_random();
                     transaction_generator
-                        .generate_transactions(vec![sender], transactions_per_sender)
+                        .generate_transactions(sender, transactions_per_sender)
                         .into_iter()
                         .map(|t| BenchmarkTransaction {
                             transaction: Transaction::UserTransaction(t),
