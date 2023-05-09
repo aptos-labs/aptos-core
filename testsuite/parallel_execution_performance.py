@@ -5,6 +5,7 @@
 
 import subprocess
 import re
+import platform
 
 # Set the tps and speedup ratio threshold for block size 1k, 10k and 50k
 THRESHOLDS = {
@@ -44,7 +45,11 @@ speedups_set = {}
 
 fail = False
 for threads in THREADS:
-    command = f"taskset -c 0-{threads-1} cargo run --profile performance compare-parallel-and-seq  --run-parallel"
+    operating_system = platform.system()
+    if operating_system == "Linux":
+        command = f"taskset -c 0-{threads-1} cargo run --profile performance compare-parallel-and-seq --run-sequential --run-parallel"
+    else:
+        command = f"cargo run --profile performance compare-parallel-and-seq --run-sequential --run-parallel"
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )
