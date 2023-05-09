@@ -4,7 +4,7 @@
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
-use aptos_utils::{aptos_try, return_on_failure};
+use aptos_utils::aptos_try;
 use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
@@ -31,11 +31,10 @@ pub trait MoveResolverExt:
         aptos_try!({
             let md =
                 aptos_framework::get_metadata(&self.get_module_metadata(&struct_tag.module_id()))?;
-            return_on_failure!(md
-                .struct_attributes
+            md.struct_attributes
                 .get(struct_tag.name.as_ident_str().as_str())?
                 .iter()
-                .find(|attr| attr.is_resource_group()));
+                .find(|attr| attr.is_resource_group())?;
             Some(())
         })
         .is_some()

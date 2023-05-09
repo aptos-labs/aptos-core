@@ -516,9 +516,8 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-
         let resolver = state_view.as_move_resolver();
-        // TODO
+
         let bytes = resolver
             .get_resource(&self.address.into(), resource_type)
             .context(format!(

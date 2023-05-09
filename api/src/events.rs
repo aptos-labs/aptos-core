@@ -172,8 +172,9 @@ impl EventsApi {
 
         match accept_type {
             AcceptType::Json => {
-                let state_view = self.context.latest_state_view_poem(&latest_ledger_info)?;
-                let events = state_view
+                let events = self
+                    .context
+                    .latest_state_view_poem(&latest_ledger_info)?
                     .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)

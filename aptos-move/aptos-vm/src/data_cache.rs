@@ -28,8 +28,8 @@ pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
     metadata: &[Metadata],
 ) -> Option<StructTag> {
-    let metadata = aptos_framework::get_metadata(metadata);
-    metadata?
+    let metadata = aptos_framework::get_metadata(metadata)?;
+    metadata
         .struct_attributes
         .get(struct_tag.name.as_ident_str().as_str())?
         .iter()

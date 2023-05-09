@@ -328,13 +328,12 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
-        let resolver = state_view.as_move_resolver();
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                if resolver.is_resource_group(&key) {
+                if state_view.as_move_resolver().is_resource_group(&key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
