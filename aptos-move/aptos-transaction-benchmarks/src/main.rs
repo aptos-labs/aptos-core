@@ -30,7 +30,7 @@ enum BenchmarkCommand {
 
 #[derive(Debug, Parser)]
 struct ParallelAndSeqOpt {
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value = "200000")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
