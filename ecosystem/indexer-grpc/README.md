@@ -1,6 +1,6 @@
 # Indexer GRPC
 
-Indexer GRPC is an infrastructure for efficiently indexing on-chain data with low-latency.
+Indexer GRPC is an infrastructure for efficiently serving on-chain data for indexing with low-latency.
 
 
 ## Setup 
