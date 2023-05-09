@@ -36,10 +36,10 @@ struct ParallelAndSeqOpt {
     #[clap(long)]
     pub num_txns: Option<Vec<usize>>,
 
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     pub run_parallel: bool,
 
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     pub run_sequential: bool,
 
     #[clap(long, default_value = "2")]

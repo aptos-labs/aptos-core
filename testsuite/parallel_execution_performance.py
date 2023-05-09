@@ -44,7 +44,7 @@ speedups_set = {}
 
 fail = False
 for threads in THREADS:
-    command = f"taskset -c 0-{threads-1} cargo run --profile performance main true true"
+    command = f"taskset -c 0-{threads-1} cargo run --profile performance compare-parallel-and-seq  --run-parallel"
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )
