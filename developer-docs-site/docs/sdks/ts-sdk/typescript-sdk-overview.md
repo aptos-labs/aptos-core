@@ -31,4 +31,4 @@ sources={{
 - [API client Layer](./sdk-client-layer.md)
 - [Core Layer](./sdk-core-layer.md)
 - [Plugins Layer](./sdk-plugins-layer.md)
-- [Tests](./sdk-tests.md)
+- [Tests and Validation](./sdk-tests.md)
