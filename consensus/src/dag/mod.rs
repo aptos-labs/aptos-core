@@ -5,7 +5,9 @@ mod anchor_election;
 mod bullshark;
 mod dag;
 pub(crate) mod dag_driver;
-mod reliable_broadcast;
+pub(crate) mod reliable_broadcast;
+pub(crate) mod state_machine;
+mod timer;
 mod types;
 
 #[cfg(test)]

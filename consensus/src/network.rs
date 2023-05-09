@@ -44,6 +44,7 @@ use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
 };
+use crate::dag::state_machine::OutgoingMessage;
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
@@ -130,6 +131,8 @@ pub(crate) trait DagSender {
     async fn send_certified_node_ack(&self, ack: CertifiedNodeAck, recipients: Vec<Author>);
 
     async fn send_certified_node_request(&self, req: CertifiedNodeRequest, recipients: Vec<Author>);
+
+    async fn send_consensus_msg(&mut self, msg: OutgoingMessage);
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -454,6 +457,14 @@ impl DagSender for NetworkSender {
         fail_point!("consensus::send::certified_node_request_msg", |_| ());
         let msg = ConsensusMsg::CertifiedNodeRequestMsg(Box::new(req));
         self.send(msg, recipients).await
+    }
+
+    async fn send_consensus_msg(&mut self, msg: OutgoingMessage) {
+        fail_point!("consensus::send::consensus_msg", |_| ());
+        match msg.maybe_recipients {
+            None => self.broadcast(msg.message).await,
+            Some(recipients) => self.send(msg.message, recipients).await,
+        }
     }
 }
 

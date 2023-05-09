@@ -8,7 +8,10 @@ use crate::{
         BlockStore,
     },
     counters,
-    dag::dag_driver::DagDriver,
+    dag::{
+        dag_driver::DagDriver, reliable_broadcast::ReliableBroadcast,
+        state_machine::StateMachineLoop,
+    },
     error::{error_kind, DbError},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
@@ -756,24 +759,39 @@ impl EpochManager {
         let genesis_block_id = epoch_genesis_block_id(&ledger_info);
 
         //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
+        let signer = Arc::new(signer);
         let dag_driver = DagDriver::new(
             self.epoch(),
             self.author,
             self.config.dag_config.clone(),
-            payload_client,
-            network_sender,
+            // payload_client,
+            // network_sender,
             epoch_state.verifier.clone(),
-            Arc::new(signer),
-            rb_msg_rx,
-            dag_driver_msg_rx,
+            signer.clone(),
+            // rb_msg_rx,
+            // dag_driver_msg_rx,
             payload_manager,
             state_computer,
             self.time_service.clone(),
             genesis_block_id,
         );
+        let rb = ReliableBroadcast::new(self.author, epoch, epoch_state.verifier.clone(), signer);
+
         let (close_tx, close_rx) = oneshot::channel();
         self.dag_driver_close_tx = Some(close_tx);
-        tokio::spawn(dag_driver.start(close_rx));
+
+        let state_machine = StateMachineLoop::new(
+            dag_driver,
+            rb,
+            dag_driver_msg_rx,
+            rb_msg_rx,
+            self.config.dag_config.clone(),
+            payload_client,
+            network_sender,
+        );
+
+        // tokio::spawn(dag_driver.run(close_rx));
+        tokio::spawn(state_machine.run(close_rx));
     }
 
     async fn start_round_manager(

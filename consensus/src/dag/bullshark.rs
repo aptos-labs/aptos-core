@@ -213,7 +213,7 @@ impl Bullshark {
     }
 
     async fn push_to_execution(&mut self, ordered_history: Vec<Node>) {
-        let mut payload = Payload::empty(true);
+        let mut payload = Payload::empty(false);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
         let round = ordered_history[0].round();
         let timestamp = ordered_history[0].timestamp();

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{Payload, Round};
+use crate::common::{Payload, Round, Author};
 use anyhow::Context;
 use aptos_crypto::{bls12381, hash::DefaultHasher, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};

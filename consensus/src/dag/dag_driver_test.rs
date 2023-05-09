@@ -2,6 +2,7 @@
 
 use super::dag_driver::DagDriver;
 use crate::{
+    dag::{reliable_broadcast::ReliableBroadcast, state_machine::StateMachineLoop},
     experimental::buffer_manager::OrderedBlocks,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
@@ -47,7 +48,7 @@ use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
-    dag_driver: Option<DagDriver>,
+    state_machine: Option<StateMachineLoop>,
     signer: ValidatorSigner,
     pending_network_events: Vec<Event<ConsensusMsg>>,
     all_network_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
@@ -156,22 +157,34 @@ impl NodeSetup {
 
         let dag_driver = DagDriver::new(
             epoch_state.epoch,
-            author,
+            author.clone(),
             DagConfig::default(),
-            payload_client,
-            network,
-            epoch_state.verifier,
+            epoch_state.verifier.clone(),
             Arc::new(signer.clone()),
-            rb_network_msg_rx,
-            network_msg_rx,
             Arc::from(PayloadManager::DirectMempool),
             mock_state_computer.clone(),
             time_service,
             HashValue::zero(),
         );
+        let rb = ReliableBroadcast::new(
+            author,
+            epoch_state.epoch,
+            epoch_state.verifier.clone(),
+            Arc::new(signer.clone()),
+        );
+
+        let state_machine = StateMachineLoop::new(
+            dag_driver,
+            rb,
+            network_msg_rx,
+            rb_network_msg_rx,
+            DagConfig::default(),
+            payload_client,
+            network,
+        );
 
         Self {
-            dag_driver: Some(dag_driver),
+            state_machine: Some(state_machine),
             signer,
             pending_network_events: Vec::new(),
             all_network_events,
@@ -192,7 +205,7 @@ impl NodeSetup {
         let (_close_tx, close_rx) = oneshot::channel();
         spawn_named!(
             "dag-driver",
-            self.dag_driver.take().unwrap().start(close_rx)
+            self.state_machine.take().unwrap().run(close_rx)
         );
         loop {
             match self.next_network_message().await {

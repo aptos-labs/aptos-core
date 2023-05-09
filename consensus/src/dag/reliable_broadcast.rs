@@ -1,25 +1,29 @@
-// Copyright © Aptos Foundation
-
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::types::{AckSet, IncrementalNodeCertificateState},
-    network::{DagSender, NetworkSender},
+    dag::{
+        state_machine::{Actions, Command, OutgoingMessage, StateMachine, StateMachineEvent},
+        timer::TickingTimer,
+        types::{AckSet, IncrementalNodeCertificateState},
+    },
+    network::NetworkSender,
+    network_interface::ConsensusMsg,
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    common::Round,
+    common::{Author, Round},
     node::{CertifiedNode, CertifiedNodeAck, Node, SignedNodeDigest},
 };
 use aptos_logger::info;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
+use async_trait::async_trait;
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, mem, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Receiver, time};
 
 #[allow(dead_code)]
@@ -42,16 +46,18 @@ pub struct ReliableBroadcast {
     status: Status,
     peer_round_signatures: BTreeMap<(Round, PeerId), SignedNodeDigest>,
     // vs BTreeMap<Round, BTreeMap<PeerId, ConsensusMsg>> vs Hashset?
-    network_sender: NetworkSender,
+    // network_sender: NetworkSender,
     validator_verifier: ValidatorVerifier,
     validator_signer: Arc<ValidatorSigner>,
+
+    messages: Vec<OutgoingMessage>,
+    broadcast_timer: TickingTimer,
 }
 
 impl ReliableBroadcast {
     pub fn new(
         my_id: PeerId,
         epoch: u64,
-        network_sender: NetworkSender,
         validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
@@ -62,9 +68,12 @@ impl ReliableBroadcast {
             // TODO: we need to persist the map and rebuild after crash
             // TODO: Do we need to clean memory inside an epoc? We need to DB between epochs.
             peer_round_signatures: BTreeMap::new(),
-            network_sender,
+            // network_sender,
             validator_verifier,
             validator_signer,
+
+            messages: Vec::new(),
+            broadcast_timer: TickingTimer::new(100),
         }
     }
 
@@ -74,7 +83,7 @@ impl ReliableBroadcast {
             node.clone(),
             IncrementalNodeCertificateState::new(node.digest()),
         ); // TODO: should we persist?
-        self.network_sender.send_node(node, None).await
+        self.send_node(node, None)
     }
 
     // TODO: verify earlier that digest matches the node and epoch is right.
@@ -85,9 +94,7 @@ impl ReliableBroadcast {
             .get(&(node.round(), node.source()))
         {
             Some(signed_node_digest) => {
-                self.network_sender
-                    .send_signed_node_digest(signed_node_digest.clone(), vec![node.source()])
-                    .await
+                self.send_signed_node_digest(signed_node_digest.clone(), vec![node.source()])
             },
             None => {
                 let signed_node_digest =
@@ -96,9 +103,7 @@ impl ReliableBroadcast {
                 self.peer_round_signatures
                     .insert((node.round(), node.source()), signed_node_digest.clone());
                 // TODO: persist
-                self.network_sender
-                    .send_signed_node_digest(signed_node_digest, vec![node.source()])
-                    .await;
+                self.send_signed_node_digest(signed_node_digest, vec![node.source()]);
             },
         }
     }
@@ -141,24 +146,20 @@ impl ReliableBroadcast {
             // Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick peer_id {},", self.my_id),
             Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick"),
             Status::SendingNode(node, incremental_node_certificate_state) => {
-                self.network_sender
-                    .send_node(
-                        node.clone(),
-                        Some(
-                            incremental_node_certificate_state
-                                .missing_peers_signatures(&self.validator_verifier),
-                        ),
-                    )
-                    .await;
+                self.send_node(
+                    node.clone(),
+                    Some(
+                        incremental_node_certificate_state
+                            .missing_peers_signatures(&self.validator_verifier),
+                    ),
+                );
             },
             Status::SendingCertificate(certified_node, ack_set) => {
-                self.network_sender
-                    .send_certified_node(
-                        certified_node.clone(),
-                        Some(ack_set.missing_peers(&self.validator_verifier)),
-                        true,
-                    )
-                    .await;
+                self.send_certified_node(
+                    certified_node.clone(),
+                    Some(ack_set.missing_peers(&self.validator_verifier)),
+                    true,
+                );
             },
         };
     }
@@ -197,36 +198,11 @@ impl ReliableBroadcast {
                 },
 
                 Some(command) = command_rx.recv() => {
-                    match command {
-                        ReliableBroadcastCommand::BroadcastRequest(node) => {
-                            self.handle_broadcast_request(node).await;
-                            interval.reset();
-                        }
-                    }
+                    self.process_command(command).await;
                 },
 
                 Some(msg) = network_msg_rx.next() => {
-                    match msg {
-                        VerifiedEvent::NodeMsg(node) => {
-                            self.handle_node_message(*node).await
-                        },
-
-                        VerifiedEvent::SignedNodeDigestMsg(signed_node_digest) => {
-                            if let Some(certified_node) = self.handle_signed_digest(*signed_node_digest) {
-                                self.network_sender.send_certified_node(certified_node, None, true).await;
-                                interval.reset();
-                            }
-
-                        },
-
-
-                        VerifiedEvent::CertifiedNodeAckMsg(ack) => {
-                            self.handle_certified_node_ack_msg(*ack);
-                        },
-
-                        _ => unreachable!("reliable broadcast got wrong messsgae"),
-                    }
-
+                    self.process_message(msg).await;
                 },
 
                 close_req = close_rx.select_next_some() => {
@@ -238,5 +214,105 @@ impl ReliableBroadcast {
 
             }
         }
+    }
+
+    async fn process_message(&mut self, msg: VerifiedEvent) {
+        match msg {
+            VerifiedEvent::NodeMsg(node) => self.handle_node_message(*node).await,
+
+            VerifiedEvent::SignedNodeDigestMsg(signed_node_digest) => {
+                if let Some(certified_node) = self.handle_signed_digest(*signed_node_digest) {
+                    self.send_certified_node(certified_node, None, true);
+                    self.broadcast_timer.reset();
+                }
+            },
+
+            VerifiedEvent::CertifiedNodeAckMsg(ack) => {
+                self.handle_certified_node_ack_msg(*ack);
+            },
+
+            _ => unreachable!("reliable broadcast got wrong messsgae"),
+        }
+    }
+
+    async fn process_command(&mut self, command: ReliableBroadcastCommand) {
+        match command {
+            ReliableBroadcastCommand::BroadcastRequest(node) => {
+                self.handle_broadcast_request(node).await;
+                self.broadcast_timer.reset();
+            },
+        }
+    }
+
+    fn send_node(&mut self, node: Node, maybe_recipients: Option<Vec<Author>>) {
+        self.messages.push(OutgoingMessage {
+            message: ConsensusMsg::NodeMsg(Box::new(node)),
+            maybe_recipients,
+        });
+    }
+
+    fn send_signed_node_digest(
+        &mut self,
+        signed_node_digest: SignedNodeDigest,
+        recipients: Vec<Author>,
+    ) {
+        self.messages.push(OutgoingMessage {
+            message: ConsensusMsg::SignedNodeDigestMsg(Box::new(signed_node_digest)),
+            maybe_recipients: Some(recipients),
+        });
+    }
+
+    fn send_certified_node(
+        &mut self,
+        node: CertifiedNode,
+        maybe_recipients: Option<Vec<Author>>,
+        expects_ack: bool,
+    ) {
+        self.messages.push(OutgoingMessage {
+            message: ConsensusMsg::CertifiedNodeMsg(Box::new(node), expects_ack),
+            maybe_recipients,
+        });
+    }
+}
+
+#[async_trait]
+impl StateMachine for ReliableBroadcast {
+    async fn tick(&mut self) {
+        if self.broadcast_timer.tick() {
+            self.handle_tick().await;
+            self.broadcast_timer.reset();
+        }
+    }
+
+    async fn step(&mut self, input: StateMachineEvent) -> anyhow::Result<()> {
+        match input {
+            StateMachineEvent::VerifiedEvent(event) => {
+                self.process_message(event).await;
+            },
+            StateMachineEvent::Command(command) => {
+                if let Command::ReliableBroadcastCommand(command) = command {
+                    self.process_command(command).await;
+                } else {
+                    unreachable!("reliable broadcast got wrong command");
+                }
+            },
+        }
+        Ok(())
+    }
+
+    fn has_ready(&self) -> bool {
+        !self.messages.is_empty()
+    }
+
+    async fn ready(&mut self) -> Option<Actions> {
+        if !self.has_ready() {
+            return None;
+        }
+
+        Some(Actions {
+            messages: mem::take(&mut self.messages),
+            command: None,
+            generate_proposal: None,
+        })
     }
 }
