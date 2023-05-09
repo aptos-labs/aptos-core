@@ -138,6 +138,6 @@ impl<'l> MoveVMRef<'l> {
     where
         F: FnOnce(&[Metadata]) -> Option<T>,
     {
-        find(&self.runtime.loader().get_module(module).module().metadata)
+        find(&self.runtime.loader().get_module(module)?.module().metadata)
     }
 }

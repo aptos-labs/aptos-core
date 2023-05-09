@@ -1450,14 +1450,8 @@ impl Loader {
         self.module_cache.read().function_at(idx)
     }
 
-    pub(crate) fn get_module(&self, idx: &ModuleId) -> Arc<Module> {
-        Arc::clone(
-            self.module_cache
-                .read()
-                .modules
-                .get(idx)
-                .expect("ModuleId on Function must exist"),
-        )
+    pub(crate) fn get_module(&self, idx: &ModuleId) -> Option<Arc<Module>> {
+        self.module_cache.read().modules.get(idx).cloned()
     }
 
     fn get_script(&self, hash: &ScriptHash) -> Arc<Script> {
@@ -2458,7 +2452,9 @@ impl Function {
     pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {
-                let module = loader.get_module(module_id);
+                let module = loader
+                    .get_module(module_id)
+                    .expect("ModuleId on Function must exist");
                 Resolver::for_module(loader, module)
             },
             Scope::Script(script_hash) => {
