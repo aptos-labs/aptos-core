@@ -8,7 +8,6 @@ use aptos::{
     common::types::GasOptions,
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
-use serde_json::json;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
@@ -38,6 +37,7 @@ use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
     on_chain_config::GasScheduleV2, transaction::SignedTransaction,
 };
+use serde_json::json;
 use std::{
     collections::{BTreeMap, HashSet},
     convert::TryFrom,
@@ -518,7 +518,6 @@ async fn create_staking_contract(
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
-
 async fn create_delegation_pool(
     info: &AptosPublicInfo<'_>,
     account: &mut LocalAccount,
@@ -795,13 +794,7 @@ async fn test_delegation_pool_operations() {
         .await
         .unwrap();
 
-    let res = create_delegation_pool(
-        &swarm.aptos_public_info(),
-        &mut account_4,
-        10,
-        1,
-    )
-    .await;
+    let res = create_delegation_pool(&swarm.aptos_public_info(), &mut account_4, 10, 1).await;
 
     let (tx, _) = res.into_parts();
     let tx_serialized = json!(tx);
@@ -815,9 +808,7 @@ async fn test_delegation_pool_operations() {
             }
         }
     }
-    let pool_address = AccountAddress::from_hex_literal(
-        pool_address_str,
-    ).unwrap();
+    let pool_address = AccountAddress::from_hex_literal(pool_address_str).unwrap();
 
     add_delegated_stake(
         &swarm.aptos_public_info(),
@@ -944,7 +935,6 @@ async fn test_delegation_pool_operations() {
         // Keep track of the previous
         previous_block_index = block_height;
     }
-
 }
 
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since

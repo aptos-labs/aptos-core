@@ -10,7 +10,7 @@ use crate::{
     construction::{
         parse_create_stake_pool_operation, parse_distribute_staking_rewards_operation,
         parse_reset_lockup_operation, parse_set_operator_operation, parse_set_voter_operation,
-        parse_unlock_stake_operation, parse_unlock_delegated_stake_operation,
+        parse_unlock_delegated_stake_operation, parse_unlock_stake_operation,
     },
     error::ApiResult,
     types::{
@@ -421,7 +421,10 @@ impl Operation {
             status,
             AccountIdentifier::base_account(delegator),
             None,
-            Some(OperationMetadata::unlock_delegated_stake(pool_address, amount)),
+            Some(OperationMetadata::unlock_delegated_stake(
+                pool_address,
+                amount,
+            )),
         )
     }
 }
@@ -881,11 +884,9 @@ fn parse_failed_operations_from_txn_payload(
                 }
             },
             (AccountAddress::ONE, DELEGATION_POOL_MODULE, UNLOCK_DELEGATED_STAKE_FUNCTION) => {
-                if let Ok(mut ops) = parse_unlock_delegated_stake_operation(
-                    sender,
-                    inner.ty_args(),
-                    inner.args(),
-                ) {
+                if let Ok(mut ops) =
+                    parse_unlock_delegated_stake_operation(sender,inner.ty_args(), inner.args())
+                {
                     if let Some(operation) = ops.get_mut(0) {
                         operation.status = Some(OperationStatusType::Failure.to_string());
                     }

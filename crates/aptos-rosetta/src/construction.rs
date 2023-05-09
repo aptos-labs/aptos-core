@@ -561,11 +561,9 @@ async fn construction_parse(
                     STAKING_CONTRACT_MODULE,
                     DISTRIBUTE_STAKING_REWARDS_FUNCTION,
                 ) => parse_distribute_staking_rewards_operation(sender, &type_args, &args)?,
-                (
-                    AccountAddress::ONE,
-                    DELEGATION_POOL_MODULE,
-                    UNLOCK_DELEGATED_STAKE_FUNCTION,
-                ) => parse_unlock_delegated_stake_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, DELEGATION_POOL_MODULE, UNLOCK_DELEGATED_STAKE_FUNCTION) => {
+                    parse_unlock_delegated_stake_operation(sender, &type_args, &args)?
+                },
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -1048,8 +1046,12 @@ async fn construction_payloads(
             }
         },
         InternalOperation::UnlockDelegatedStake(inner) => {
-            if let InternalOperation::UnlockDelegatedStake(ref metadata_op) = metadata.internal_operation {
-                if inner.delegator != metadata_op.delegator || inner.pool_address != metadata_op.pool_address {
+            if let InternalOperation::UnlockDelegatedStake(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.delegator != metadata_op.delegator
+                    || inner.pool_address != metadata_op.pool_address
+                {
                     return Err(ApiError::InvalidInput(Some(format!(
                         "Unlock delegated stake operation doesn't match metadata {:?} vs {:?}",
                         inner, metadata.internal_operation

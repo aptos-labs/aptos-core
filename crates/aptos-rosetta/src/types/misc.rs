@@ -118,9 +118,9 @@ impl OperationType {
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
     const STAKING_REWARD: &'static str = "staking_reward";
+    const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
     const WITHDRAW: &'static str = "withdraw";
-    const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
