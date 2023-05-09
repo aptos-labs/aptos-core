@@ -5,6 +5,7 @@ use crate::{
     clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
+    downtime_metrics_cache::DowntimeMetricsCache
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
@@ -165,6 +166,7 @@ pub struct Context {
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+    downtime_metrics_cache: Arc<RwLock<DowntimeMetricsCache>>
 }
 
 impl Context {
@@ -175,6 +177,7 @@ impl Context {
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+        downtime_metrics_cache: Arc<RwLock<DowntimeMetricsCache>>
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -183,6 +186,7 @@ impl Context {
             jwt_service,
             log_env_map,
             peer_identities,
+            downtime_metrics_cache
         }
     }
 
@@ -200,6 +204,10 @@ impl Context {
 
     pub fn jwt_service(&self) -> &JsonWebTokenService {
         &self.jwt_service
+    }
+
+    pub fn downtime_metrics_cache(&self) -> Arc<RwLock<DowntimeMetricsCache>> {
+        self.downtime_metrics_cache.clone()
     }
 
     pub fn metrics_client(&self) -> &GroupedMetricsClients {

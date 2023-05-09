@@ -7,6 +7,7 @@ use crate::{
     index::routes,
     metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
+    downtime_metrics_cache::DowntimeMetricsCache
 };
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
@@ -41,6 +42,7 @@ mod jwt_auth;
 mod log_ingest;
 mod metrics;
 mod prometheus_push_metrics;
+mod downtime_metrics_cache;
 mod remote_config;
 #[cfg(any(test))]
 pub(crate) mod tests;
@@ -107,6 +109,8 @@ impl AptosTelemetryServiceArgs {
         let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
 
+        let downtime_metrics_cache = Arc::new(aptos_infallible::RwLock::new(DowntimeMetricsCache::new(Duration::from_secs(60000))));
+
         let context = Context::new(
             server_private_key,
             PeerStoreTuple::new(
@@ -122,6 +126,7 @@ impl AptosTelemetryServiceArgs {
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
+            downtime_metrics_cache.clone()
         );
 
         PeerSetCacheUpdater::new(
@@ -131,6 +136,8 @@ impl AptosTelemetryServiceArgs {
             Duration::from_secs(config.update_interval),
         )
         .run();
+
+        downtime_metrics_cache.write().run();
 
         PrometheusExporter::new(telemetry_metrics_client).run();
 

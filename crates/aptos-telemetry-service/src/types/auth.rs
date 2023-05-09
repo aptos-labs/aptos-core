@@ -25,7 +25,7 @@ pub struct AuthResponse {
     pub handshake_msg: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Claims {
     pub chain_id: ChainId,
     pub peer_id: PeerId,

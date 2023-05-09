@@ -10,6 +10,7 @@ use crate::{
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
+use chrono::Utc;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
@@ -39,6 +40,16 @@ pub async fn handle_metrics_ingest(
     metrics_body: Bytes,
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
+    let timestamp = Utc::now().timestamp() as usize;
+    push_metrics_to_clients(context, claims, encoding, metrics_body, timestamp).await
+}
+
+pub async fn push_metrics_to_clients(context: Context,
+    claims: Claims,
+    encoding: Option<String>,
+    metrics_body: Bytes,
+    timestamp: usize
+) -> anyhow::Result<impl Reply, Rejection> {
 
     let extra_labels = claims_to_extra_labels(
         &claims,
@@ -54,6 +65,7 @@ pub async fn handle_metrics_ingest(
         },
         _ => &context.metrics_client().ingest_metrics_client,
     };
+
 
     let start_timer = Instant::now();
 
@@ -86,6 +98,8 @@ pub async fn handle_metrics_ingest(
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
                     .with_label_values(&[name, "Unknown"])
                     .observe(start_timer.elapsed().as_secs_f64());
+                let downtime_metrics_cache = context.downtime_metrics_cache();
+                downtime_metrics_cache.write().add_metrics_to_cache(context.clone(), claims.clone(), encoding.clone(), metrics_body.clone(), timestamp);
                 error!(
                     "error sending remote write request for client {}: {}",
                     name.clone(),
