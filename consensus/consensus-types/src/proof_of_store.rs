@@ -20,12 +20,12 @@ use std::{
 #[derive(
     Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, CryptoHasher, BCSCryptoHash,
 )]
-pub struct BatchId {
-    pub id: u64,
+pub struct BatchId { //16
+    pub id: u64, // 8
     /// A number that is stored in the DB and updated only if the value does not exist in
     /// the DB: (a) at the start of an epoch, or (b) the DB was wiped. When the nonce is updated,
     /// id starts again at 0. Using the current system time allows the nonce to be ordering.
-    pub nonce: u64,
+    pub nonce: u64, // 8
 }
 
 impl BatchId {
@@ -67,15 +67,15 @@ impl Display for BatchId {
 #[derive(
     Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
-pub struct BatchInfo {
-    author: PeerId,
-    batch_id: BatchId,
-    epoch: u64,
-    expiration: u64,
-    digest: HashValue,
-    num_txns: u64,
-    num_bytes: u64,
-    gas_bucket_start: u64,
+pub struct BatchInfo { //120
+    author: PeerId, // 32
+    batch_id: BatchId, //16
+    epoch: u64,//8
+    expiration: u64,//8
+    digest: HashValue,//32
+    num_txns: u64,//8
+    num_bytes: u64,//8
+    gas_bucket_start: u64,//8
 }
 
 impl BatchInfo {
@@ -288,9 +288,9 @@ impl ProofOfStoreMsg {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct ProofOfStore {
-    info: BatchInfo,
-    multi_signature: AggregateSignature,
+pub struct ProofOfStore { //232
+    info: BatchInfo, //120
+    multi_signature: AggregateSignature, //112
 }
 
 impl ProofOfStore {

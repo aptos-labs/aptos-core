@@ -36,11 +36,11 @@ impl SignedNodeDigestInfo {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct SignedNodeDigest {
-    epoch: u64,
-    signed_node_digest_info: SignedNodeDigestInfo,
-    peer_id: PeerId,
-    signature: bls12381::Signature,
+pub struct SignedNodeDigest {//168
+    epoch: u64,//8
+    signed_node_digest_info: SignedNodeDigestInfo,//32
+    peer_id: PeerId,//32
+    signature: bls12381::Signature,//96
 }
 
 impl SignedNodeDigest {
@@ -86,9 +86,9 @@ impl SignedNodeDigest {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
-pub struct NodeCertificate {
-    signed_node_digest_info: SignedNodeDigestInfo,
-    multi_signature: AggregateSignature,
+pub struct NodeCertificate { //144
+    signed_node_digest_info: SignedNodeDigestInfo, //32
+    multi_signature: AggregateSignature, //112
 }
 
 impl NodeCertificate {
@@ -114,7 +114,7 @@ impl NodeCertificate {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
-pub struct NodeMetaData {
+pub struct NodeMetaData { // 88
     epoch: u64,
     round: u64,
     source: PeerId,
@@ -193,10 +193,10 @@ fn compute_node_digest(
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct Node {
-    metadata: NodeMetaData,
-    consensus_payload: Payload,
-    parents: HashSet<NodeMetaData>,
+pub struct Node { //22488
+    metadata: NodeMetaData, // 88
+    consensus_payload: Payload, // 16240
+    parents: HashSet<NodeMetaData>, // 88*70
 }
 
 impl Node {
@@ -315,9 +315,9 @@ impl Node {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct CertifiedNode {
-    header: Node,
-    certificate: NodeCertificate,
+pub struct CertifiedNode { //22632
+    header: Node, //22488
+    certificate: NodeCertificate, //144
 }
 
 impl CertifiedNode {

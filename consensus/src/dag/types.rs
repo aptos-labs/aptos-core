@@ -19,9 +19,9 @@ use serde::{Serialize, Deserialize};
 
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct IncrementalNodeCertificateState {
-    signed_node_digest_info: SignedNodeDigestInfo,
-    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
+pub struct IncrementalNodeCertificateState { // 12832
+    signed_node_digest_info: SignedNodeDigestInfo, //32
+    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>, //size: (32+96) * 100 = 12800
 }
 
 #[allow(dead_code)]
@@ -84,9 +84,9 @@ impl IncrementalNodeCertificateState {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
-pub struct AckSet {
-    digest: HashValue,
-    set: HashSet<PeerId>,
+pub struct AckSet {//2272
+    digest: HashValue,//32
+    set: HashSet<PeerId>,//32*70=2240
 }
 
 impl AckSet {

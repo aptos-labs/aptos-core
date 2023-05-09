@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use aptos_logger::info;
-use aptos_schemadb::{DB, define_schema, Options};
+use aptos_schemadb::{DB, define_schema, Options, ReadOptions};
 use aptos_schemadb::schema::{KeyCodec, ValueCodec};
 use aptos_types::PeerId;
 use crate::dag::reliable_broadcast::ReliableBroadcastInMem;
@@ -90,6 +90,9 @@ impl ReliableBroadcastStorage for NaiveReliableBroadcastDB {
         info!("NaiveReliableBroadcastDB::save_all(my_id={my_id}, epoch={epoch},in_mem=...)");
         let key = NaiveKey{ id: my_id, epoch };
         self.db.put::<ReliableBroadcastStateSchema>(&key, in_mem).expect(format!("Failed in saving ReliableBroadcast state for id {my_id}, epoch {epoch} into NaiveReliableBroadcastDB.").as_str());
+        let x = ReadOptions::default();
+        ReadOptions::
+        self.db.iter()
     }
 }
 

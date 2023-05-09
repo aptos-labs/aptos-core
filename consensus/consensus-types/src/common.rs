@@ -88,8 +88,8 @@ impl Default for DataStatus {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ProofWithData {
-    pub proofs: Vec<ProofOfStore>,
+pub struct ProofWithData { //16240
+    pub proofs: Vec<ProofOfStore>, //232 * 70
     #[serde(skip)]
     pub status: Arc<Mutex<Option<DataStatus>>>,
 }
@@ -124,9 +124,9 @@ impl ProofWithData {
 
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub enum Payload {
+pub enum Payload { // 16240
     DirectMempool(Vec<SignedTransaction>),
-    InQuorumStore(ProofWithData),
+    InQuorumStore(ProofWithData), //16240
 }
 
 impl Payload {

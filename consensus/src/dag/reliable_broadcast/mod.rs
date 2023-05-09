@@ -34,19 +34,19 @@ pub(crate) enum ReliableBroadcastCommand {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-enum Status {
+enum Status { //60204
     NothingToSend,
-    SendingNode(Node, IncrementalNodeCertificateState),
-    SendingCertificate(CertifiedNode, AckSet),
+    SendingNode(Node, IncrementalNodeCertificateState),//22488 + 12832 = 35320
+    SendingCertificate(CertifiedNode, AckSet),//22632 + 2272 = 24904
 }
 
 /// The in-mem copy of a ReliableBroadcast state.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct ReliableBroadcastInMem {
-    my_id: PeerId,
-    epoch: u64,
-    status: Status,
-    peer_round_signatures: BTreeMap<(Round, PeerId), SignedNodeDigest>,
+pub struct ReliableBroadcastInMem { //82500
+    my_id: PeerId,//32
+    epoch: u64, //8
+    status: Status, //60204
+    peer_round_signatures: BTreeMap<(Round, PeerId), SignedNodeDigest>,//(8+32+168)*107=22256
     // vs BTreeMap<Round, BTreeMap<PeerId, ConsensusMsg>> vs Hashset?
 }
 
@@ -73,14 +73,12 @@ impl ReliableBroadcast {
         let in_mem = if let Some(in_mem) = storage.load_all(my_id, epoch) {
             in_mem
         } else {
-            let in_mem = ReliableBroadcastInMem {
+            ReliableBroadcastInMem {
                 my_id,
                 epoch,
                 status: Status::NothingToSend,
                 peer_round_signatures: BTreeMap::new(),
-            };
-            storage.save_all(my_id, epoch, &in_mem);
-            in_mem
+            }
         };
         Self {
             in_mem,
