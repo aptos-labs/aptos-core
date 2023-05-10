@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVMRef,
+    data_cache::TransactionDataCache, loader::LoadedFunction,
     native_extensions::NativeContextExtensions, runtime::VMRuntime,
 };
 use move_binary_format::{
@@ -17,6 +17,7 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     value::MoveTypeLayout,
 };
 use move_vm_types::{
@@ -388,8 +389,15 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self.native_extensions
     }
 
-    pub fn get_movevm(&self) -> MoveVMRef<'l> {
-        MoveVMRef::new(self.runtime)
+    pub fn get_module_metadata<'a, F, R>(&'a self, module_id: &ModuleId, f: F) -> R
+    where
+        F: FnOnce(Option<&[Metadata]>) -> R,
+    {
+        if let Some(m) = self.runtime.loader().get_module(module_id) {
+            f(Some(m.module().metadata.as_slice()))
+        } else {
+            f(None)
+        }
     }
 }
 

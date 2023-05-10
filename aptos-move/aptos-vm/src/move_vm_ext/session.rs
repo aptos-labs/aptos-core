@@ -34,7 +34,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
-use move_vm_runtime::{move_vm::MoveVMRef, session::Session};
+use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -94,13 +94,22 @@ impl SessionId {
 }
 
 pub struct SessionExt<'r, 'l> {
+    move_vm: &'l MoveVM,
     inner: Session<'r, 'l>,
     remote: &'r dyn MoveResolverExt,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
-    pub fn new(inner: Session<'r, 'l>, remote: &'r dyn MoveResolverExt) -> Self {
-        Self { inner, remote }
+    pub fn new(
+        move_vm: &'l MoveVM,
+        inner: Session<'r, 'l>,
+        remote: &'r dyn MoveResolverExt,
+    ) -> Self {
+        Self {
+            move_vm,
+            inner,
+            remote,
+        }
     }
 
     pub fn finish<C: AccessPathCache>(
@@ -108,10 +117,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> VMResult<ChangeSetExt> {
-        let move_vm = self.inner.get_movevm();
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
+            Self::split_and_merge_resource_groups(self.move_vm, self.remote, change_set)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -157,7 +165,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If elements remain, Modify
     ///   * Otherwise delete
     fn split_and_merge_resource_groups(
-        runtime: MoveVMRef,
+        move_vm: &MoveVM,
         remote: &dyn MoveResolverExt,
         change_set: MoveChangeSet,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
@@ -174,8 +182,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group = runtime.with_module_metadata(&struct_tag.module_id(), |md| {
-                    get_resource_group_from_metadata(&struct_tag, md)
+                let resource_group = move_vm.get_module_metadata(&struct_tag.module_id(), |md| {
+                    get_resource_group_from_metadata(&struct_tag, md?)
                 });
 
                 if let Some(resource_group) = resource_group {
@@ -188,6 +196,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     change_set_filtered
                         .add_resource_op(addr, struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
+                    git
                 }
             }
 

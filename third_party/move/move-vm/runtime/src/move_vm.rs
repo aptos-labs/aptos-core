@@ -20,10 +20,6 @@ pub struct MoveVM {
     runtime: VMRuntime,
 }
 
-pub struct MoveVMRef<'a> {
-    runtime: &'a VMRuntime,
-}
-
 impl MoveVM {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
@@ -111,33 +107,14 @@ impl MoveVM {
         self.runtime.loader().get_and_clear_module_cache_hits()
     }
 
-    pub fn get_ref(&self) -> MoveVMRef {
-        MoveVMRef::new(&self.runtime)
-    }
-}
-
-impl<'l> MoveVMRef<'l> {
-    pub(crate) fn new(runtime: &'l VMRuntime) -> Self {
-        Self { runtime }
-    }
-
-    /// Attempts to discover metadata in a given module with given key. Availability
-    /// of this data may depend on multiple aspects. In general, no hard assumptions of
-    /// availability should be made, but typically, one can expect that
-    /// the modules which have been involved in the execution of the last session are available.
-    ///
-    /// This is called by an adapter to extract, for example, debug information out of
-    /// the metadata section of the code for post mortem analysis. Notice that because
-    /// of ownership of the underlying binary representation of modules hidden behind an rwlock,
-    /// this actually has to hand back a copy of the associated metadata, so metadata should
-    /// be organized keeping this in mind.
-    ///
-    /// TODO: in the new loader architecture, as the loader is visible to the adapter, one would
-    ///   call this directly via the loader instead of the VM.
-    pub fn with_module_metadata<T, F>(&self, module: &ModuleId, f: F) -> Option<T>
+    pub fn get_module_metadata<F, R>(&self, module_id: &ModuleId, f: F) -> R
     where
-        F: FnOnce(&[Metadata]) -> Option<T>,
+        F: FnOnce(Option<&[Metadata]>) -> R,
     {
-        f(&self.runtime.loader().get_module(module)?.module().metadata)
+        if let Some(m) = self.runtime.loader().get_module(module_id) {
+            f(Some(m.module().metadata.as_slice()))
+        } else {
+            f(None)
+        }
     }
 }

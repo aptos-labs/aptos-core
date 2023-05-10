@@ -108,6 +108,7 @@ impl MoveVmExt {
         self.inner.flush_loader_cache_if_invalidated();
 
         SessionExt::new(
+            self,
             self.inner.new_session_with_extensions(remote, extensions),
             remote,
         )
