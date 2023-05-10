@@ -307,10 +307,10 @@ impl AggregatorData {
         id: AggregatorID,
         limit: u128,
         resolver: &dyn TableResolver,
-        is_aggregator_enabled: bool,
+        aggregator_enabled: bool,
     ) -> &mut Aggregator {
         self.aggregators.entry(id).or_insert_with(|| {
-            let (state, value) = if is_aggregator_enabled {
+            let (state, value) = if aggregator_enabled {
                 (AggregatorState::PositiveDelta, 0)
             } else {
                 //If aggregator mode is disabled, then read the aggregator value from the table and initialize with it.

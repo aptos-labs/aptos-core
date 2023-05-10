@@ -40,7 +40,7 @@ pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn TableResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
-    pub(crate) is_aggregator_enabled: bool,
+    pub(crate) aggregator_enabled: bool,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -49,13 +49,13 @@ impl<'a> NativeAggregatorContext<'a> {
     pub fn new(
         txn_hash: [u8; 32],
         resolver: &'a dyn TableResolver,
-        is_aggregator_enabled: bool,
+        aggregator_enabled: bool,
     ) -> Self {
         Self {
             txn_hash,
             resolver,
             aggregator_data: Default::default(),
-            is_aggregator_enabled,
+            aggregator_enabled,
         }
     }
 
@@ -81,7 +81,7 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    assert!(self.is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -89,7 +89,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    assert!(self.is_aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
