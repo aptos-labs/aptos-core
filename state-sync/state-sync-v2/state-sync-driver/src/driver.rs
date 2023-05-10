@@ -24,7 +24,7 @@ use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
-use aptos_data_client::AptosDataClientInterface;
+use aptos_data_client::interface::AptosDataClientInterface;
 use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
 };

@@ -13,8 +13,10 @@ use crate::{
         state::{ErrorType, PeerStates},
     },
     global_summary::GlobalDataSummary,
-    AptosDataClientInterface, Error, Response, ResponseCallback, ResponseContext, ResponseError,
-    ResponseId,
+    interface::{
+        AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+    },
+    Error, ResponseId,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},

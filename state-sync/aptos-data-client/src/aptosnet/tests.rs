@@ -7,7 +7,8 @@ use crate::{
         poller::{poll_peer, DataSummaryPoller},
         state::calculate_optimal_chunk_sizes,
     },
-    AptosDataClientInterface, Error,
+    interface::AptosDataClientInterface,
+    Error,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
@@ -1105,10 +1106,9 @@ async fn bad_peer_is_eventually_banned_callback() {
         if !seen_data_unavailable_err {
             match result {
                 Ok(response) => {
-                    response
-                        .context
-                        .response_callback
-                        .notify_bad_response(crate::ResponseError::ProofVerificationError);
+                    response.context.response_callback.notify_bad_response(
+                        crate::interface::ResponseError::ProofVerificationError,
+                    );
                 },
                 Err(Error::DataIsUnavailable(_)) => {
                     seen_data_unavailable_err = true;
@@ -1426,7 +1426,7 @@ async fn bad_peer_is_eventually_added_back() {
             response
                 .context
                 .response_callback
-                .notify_bad_response(crate::ResponseError::ProofVerificationError);
+                .notify_bad_response(crate::interface::ResponseError::ProofVerificationError);
         }
     }
 

@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
-    AptosDataClientInterface,
+    interface::AptosDataClientInterface,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
