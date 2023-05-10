@@ -17,11 +17,7 @@ use move_core_types::{
 use std::{collections::BTreeSet, sync::Arc};
 
 pub struct MoveVM {
-    runtime: VMRuntime,
-}
-
-pub struct MoveVMRef<'a> {
-    runtime: &'a VMRuntime,
+    pub(crate) runtime: VMRuntime,
 }
 
 impl MoveVM {
@@ -56,16 +52,20 @@ impl MoveVM {
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
     pub fn new_session<'r>(&self, remote: &'r dyn MoveResolver) -> Session<'r, '_> {
-        self.runtime.new_session(remote)
+        self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
         remote: &'r dyn MoveResolver,
-        extensions: NativeContextExtensions<'r>,
+        native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
-        self.runtime.new_session_with_extensions(remote, extensions)
+        Session {
+            move_vm: self,
+            data_cache: TransactionDataCache::new(remote),
+            native_extensions,
+        }
     }
 
     /// Load a module into VM's code cache
@@ -109,16 +109,6 @@ impl MoveVM {
     /// TODO: new loader architecture
     pub fn get_and_clear_module_cache_hits(&self) -> BTreeSet<ModuleId> {
         self.runtime.loader().get_and_clear_module_cache_hits()
-    }
-
-    pub fn get_ref(&self) -> MoveVMRef {
-        MoveVMRef::new(&self.runtime)
-    }
-}
-
-impl<'l> MoveVMRef<'l> {
-    pub(crate) fn new(runtime: &'l VMRuntime) -> Self {
-        Self { runtime }
     }
 
     /// Attempts to discover metadata in a given module with given key. Availability

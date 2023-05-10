@@ -34,7 +34,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
-use move_vm_runtime::{move_vm::MoveVMRef, session::Session};
+use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -108,7 +108,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> VMResult<ChangeSetExt> {
-        let move_vm = self.inner.get_movevm();
+        let move_vm = self.inner.get_move_vm();
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
@@ -157,7 +157,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If elements remain, Modify
     ///   * Otherwise delete
     fn split_and_merge_resource_groups(
-        runtime: MoveVMRef,
+        runtime: &MoveVM,
         remote: &dyn MoveResolverExt,
         change_set: MoveChangeSet,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {

@@ -599,9 +599,9 @@ impl AptosVMImpl {
         module: &ModuleId,
     ) -> Option<RuntimeModuleMetadataV1> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(&self.move_vm.get_ref(), module)
+            aptos_framework::get_vm_metadata(&self.move_vm, module)
         } else {
-            aptos_framework::get_vm_metadata_v0(&self.move_vm.get_ref(), module)
+            aptos_framework::get_vm_metadata_v0(&self.move_vm, module)
         }
     }
 

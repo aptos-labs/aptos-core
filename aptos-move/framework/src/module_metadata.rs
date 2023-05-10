@@ -14,7 +14,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
-use move_vm_runtime::move_vm::MoveVMRef;
+use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -139,12 +139,12 @@ pub fn get_metadata_v0(md: &[Metadata]) -> Option<RuntimeModuleMetadataV1> {
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(vm: &MoveVMRef, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
     vm.with_module_metadata(module_id, get_metadata)
 }
 
 /// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(vm: &MoveVMRef, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
     vm.with_module_metadata(module_id, get_metadata_v0)
 }
 
