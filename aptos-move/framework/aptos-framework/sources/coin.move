@@ -242,6 +242,10 @@ module aptos_framework::coin {
     #[view]
     /// Returns `true` is account_addr has frozen the CoinStore
     public fun is_coin_store_frozen<CoinType>(account_addr: address): bool acquires CoinStore {
+        if(!is_account_registered<CoinType>(account_addr)) {
+          return false
+        };
+
         let coin_store = borrow_global<CoinStore<CoinType>>(account_addr);
         coin_store.frozen
     }
@@ -852,6 +856,9 @@ module aptos_framework::coin {
     #[test(account = @0x1)]
     public fun test_is_coin_store_frozen(account: signer) acquires CoinStore {
         let account_addr = signer::address_of(&account);
+        // An non registered account is has a frozen coin store
+        assert!(!is_coin_store_frozen<FakeMoney>(account_addr), 1);
+
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);
 
