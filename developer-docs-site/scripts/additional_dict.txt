@@ -12,6 +12,7 @@ APIs
 APT
 APT's
 APTs
+APY
 AUTH
 AWS
 Ait
@@ -24,6 +25,7 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosRelease
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -55,6 +57,8 @@ DECL
 DM
 DNS
 Dapps
+Delegator
+Delegators
 Deref
 Deref
 Destructuring
@@ -63,6 +67,8 @@ DevEx
 Devnet
 DoS
 DocGen
+delegator
+delegators
 dropdown
 EACCOUNT
 EALREADY
@@ -134,6 +140,7 @@ Integrators
 JPG
 JSON
 Jetbrains
+Jolteon
 Kubernetes
 LLVM
 Labs's
@@ -215,6 +222,7 @@ SignedTransaction
 SignerCap
 Skylake
 Solana
+Staker
 StateCheckpointTransaction
 Subtyping
 TCP
@@ -351,6 +359,7 @@ haproxy
 hardcoded
 hippospace
 hotfix
+hotfixes
 hotstuff
 href
 http

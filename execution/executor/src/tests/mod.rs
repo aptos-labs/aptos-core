@@ -20,7 +20,7 @@ use aptos_executor_types::{
 };
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -425,7 +425,7 @@ fn apply_transaction_by_writeset(
         .verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
         )
         .unwrap();
 
@@ -529,6 +529,43 @@ fn test_deleted_key_from_state_store() {
     assert_eq!(state_value_from_db1, StateValue::from(dummy_value1));
 }
 
+#[test]
+fn test_reconfig_suffix_empty_blocks() {
+    let TestExecutor {
+        _path,
+        db: _,
+        executor,
+    } = TestExecutor::new();
+    let block_a = TestBlock::new(10000, 1, gen_block_id(1));
+    let mut block_b = TestBlock::new(10000, 1, gen_block_id(2));
+    let block_c = TestBlock::new(1, 1, gen_block_id(3));
+    let block_d = TestBlock::new(1, 1, gen_block_id(4));
+    let checkpoint_txn = block_b.txns.pop().unwrap();
+    block_b.txns.push(encode_reconfiguration_transaction());
+    block_b.txns.push(checkpoint_txn);
+    let parent_block_id = executor.committed_block_id();
+    executor
+        .execute_block((block_a.id, block_a.txns), parent_block_id)
+        .unwrap();
+    let output = executor
+        .execute_block((block_b.id, block_b.txns), block_a.id)
+        .unwrap();
+    executor
+        .execute_block((block_c.id, block_c.txns), block_b.id)
+        .unwrap();
+    executor
+        .execute_block((block_d.id, block_d.txns), block_c.id)
+        .unwrap();
+
+    let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
+    executor
+        .commit_blocks(
+            vec![block_a.id, block_b.id, block_c.id, block_d.id],
+            ledger_info,
+        )
+        .unwrap();
+}
+
 struct TestBlock {
     txns: Vec<Transaction>,
     id: HashValue,
@@ -547,10 +584,6 @@ impl TestBlock {
         };
         TestBlock { txns, id }
     }
-
-    fn len(&self) -> u64 {
-        self.txns.len() as u64
-    }
 }
 
 // Executes a list of transactions by executing and immediately committing one at a time. Returns
@@ -567,7 +600,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 .verified_state_view(
                     StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
-                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                    Arc::new(AsyncProofFetcher::new(db.reader.clone())),
                 )
                 .unwrap(),
         )
@@ -590,58 +623,6 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
-
-    #[test]
-    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
-    fn test_executor_two_branches(
-        a_size in 0..30u64,
-        b_size in 0..30u64,
-        c_size in 0..30u64,
-        amount in any::<u32>(),
-    ) {
-        // Genesis -> A -> B
-        //            |
-        //            └--> C
-        let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
-        let block_b = TestBlock::new(b_size, amount, gen_block_id(2));
-        let block_c = TestBlock::new(c_size, amount, gen_block_id(3));
-        // Execute block A, B and C. Hold all results in memory.
-        let executor = TestExecutor::new();
-        let parent_block_id = executor.committed_block_id();
-
-        let output_a = executor.execute_block(
-            (block_a.id, block_a.txns.clone()), parent_block_id
-        ).unwrap();
-        let root_hash_a = output_a.root_hash();
-        prop_assert_eq!(output_a.version(), block_a.len());
-        let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_b.version(), block_a.len() + block_b.len());
-        let output_c = executor.execute_block((block_c.id, block_c.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_c.version(), block_a.len() + block_c.len());
-
-        let root_hash_b = output_b.root_hash();
-        let root_hash_c = output_c.root_hash();
-
-        // Execute block A and B. Execute and commit one transaction at a time.
-        let expected_root_hash_a = run_transactions_naive(block_a.txns.clone());
-        prop_assert_eq!(root_hash_a, expected_root_hash_a);
-
-        let expected_root_hash_b = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            txns.extend(block_b.txns.iter().cloned());
-            txns
-        });
-        prop_assert_eq!(root_hash_b, expected_root_hash_b);
-
-        let expected_root_hash_c = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            txns.extend(block_c.txns.iter().cloned());
-            txns
-        });
-        prop_assert_eq!(root_hash_c, expected_root_hash_c);
-    }
 
     #[test]
     #[cfg_attr(feature = "consensus-only-perf-test", ignore)]

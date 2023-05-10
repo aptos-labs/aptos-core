@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use crate::config::{
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -34,10 +36,9 @@ pub struct IndexerGrpcConfig {
 }
 
 impl ConfigSanitizer for IndexerGrpcConfig {
-    /// Validate and process the indexer grpc config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         let indexer_grpc_config = &mut node_config.indexer_grpc;

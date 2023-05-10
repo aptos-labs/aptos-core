@@ -35,8 +35,8 @@ use aptos_logger::info;
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    cached_state_view::CachedStateView, state_delta::StateDelta,
-    sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
+    state_delta::StateDelta, DbReader, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -489,7 +489,7 @@ impl StateStore {
                 state_db.clone(),
                 num_transactions,
                 buffered_state.current_state().current.clone(),
-                Arc::new(SyncProofFetcher::new(state_db.clone())),
+                Arc::new(AsyncProofFetcher::new(state_db.clone())),
             )?;
             let write_sets = TransactionStore::new(Arc::clone(&state_db.ledger_db))
                 .get_write_sets(snapshot_next_version, num_transactions)?;

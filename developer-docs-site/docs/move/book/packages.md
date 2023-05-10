@@ -335,11 +335,12 @@ version = "0.0.0"
 C = "0x3"
 ```
 
-Place the bytecode file and the corresponding `Move.toml` file in the same directory with the bytecode in a `build` subdirectory. For instance, the layout of the folder `B` (for the package `Bar`) and `C` (for the package `Foo`) would resemble:
+Place the bytecode file and the corresponding `Move.toml` file in the same directory with the bytecode in a `build` subdirectory. Note an empty `sources` directory is **required**. For instance, the layout of the folder `B` (for the package `Bar`) and `C` (for the package `Foo`) would resemble:
 
 ```rust
 ./B
 ├── Move.toml
+├── sources
 ├── build
  ├ Bar.mv
 ```

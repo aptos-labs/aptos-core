@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType};
+use crate::config::{
+    config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
+    node_config_loader::NodeType, utils::is_network_perf_test_enabled, Error, NodeConfig,
+};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -17,7 +21,8 @@ pub struct PeerMonitoringServiceConfig {
     pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
     pub network_monitoring: NetworkMonitoringConfig,
     pub node_monitoring: NodeMonitoringConfig,
-    pub peer_monitor_interval_ms: u64, // The interval (ms) between peer monitor executions
+    pub peer_monitor_interval_usec: u64, // The interval (usec) between peer monitor executions
+    pub performance_monitoring: PerformanceMonitoringConfig,
 }
 
 impl Default for PeerMonitoringServiceConfig {
@@ -29,10 +34,11 @@ impl Default for PeerMonitoringServiceConfig {
             max_network_channel_size: 1000,
             max_num_response_bytes: 100 * 1024, // 100 KB
             max_request_jitter_ms: 1000,        // Monitoring requests are very infrequent
-            metadata_update_interval_ms: 5000,
+            metadata_update_interval_ms: 5000,  // 5 seconds
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
-            peer_monitor_interval_ms: 1000,
+            peer_monitor_interval_usec: 1_000_000, // 1 second
+            performance_monitoring: PerformanceMonitoringConfig::default(),
         }
     }
 }
@@ -73,6 +79,36 @@ impl Default for NetworkMonitoringConfig {
     }
 }
 
+// TODO: add support for direct send test mode!
+
+// Note: to enable performance monitoring, the compilation feature "network-perf-test" is required.
+// Simply enabling the config values here will not enable performance monitoring.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PerformanceMonitoringConfig {
+    pub enable_direct_send_testing: bool, // Whether or not to enable direct send test mode
+    pub direct_send_data_size: u64,       // The amount of data to send in each request
+    pub direct_send_interval_usec: u64,   // The interval (microseconds) between requests
+    pub enable_rpc_testing: bool,         // Whether or not to enable RPC test mode
+    pub rpc_data_size: u64,               // The amount of data to send in each RPC request
+    pub rpc_interval_usec: u64,           // The interval (microseconds) between RPC requests
+    pub rpc_timeout_ms: u64,              // The timeout (ms) for each RPC request
+}
+
+impl Default for PerformanceMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            enable_direct_send_testing: false,    // Disabled by default
+            direct_send_data_size: 512 * 1024,    // 512 KB
+            direct_send_interval_usec: 2_000_000, // 2 seconds
+            enable_rpc_testing: false,            // Disabled by default
+            rpc_data_size: 512 * 1024,            // 512 KB
+            rpc_interval_usec: 2_000_000,         // 2 seconds
+            rpc_timeout_ms: 10_000,               // 10 seconds
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NodeMonitoringConfig {
@@ -90,10 +126,9 @@ impl Default for NodeMonitoringConfig {
 }
 
 impl ConfigSanitizer for PeerMonitoringServiceConfig {
-    /// Validate and process the peer monitoring config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
@@ -103,11 +138,130 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
         if chain_id.is_mainnet() && peer_monitoring_config.enable_peer_monitoring_client {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "The peer monitoring service is not enabled in mainnet!".to_string(),
+                "The peer monitoring service is not enabled in mainnet!".into(),
             ));
         };
 
+        // Sanitize the performance monitoring config
+        PerformanceMonitoringConfig::sanitize(node_config, node_type, chain_id)
+    }
+}
+
+impl ConfigSanitizer for PerformanceMonitoringConfig {
+    fn sanitize(
+        node_config: &mut NodeConfig,
+        _node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let performance_monitoring_config =
+            &node_config.peer_monitoring_service.performance_monitoring;
+
+        // Verify that performance monitoring is not enabled in mainnet
+        let enable_direct_send_testing = performance_monitoring_config.enable_direct_send_testing;
+        let enable_rpc_testing = performance_monitoring_config.enable_rpc_testing;
+        if chain_id.is_mainnet()
+            && (is_network_perf_test_enabled() || enable_direct_send_testing || enable_rpc_testing)
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Performance monitoring should not be enabled in mainnet!".into(),
+            ));
+        };
+
+        // Verify that at least one performance monitoring mode is enabled if the feature exists
+        if is_network_perf_test_enabled() && !enable_direct_send_testing && !enable_rpc_testing {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "At least one performance monitoring mode must be enabled!".into(),
+            ));
+        }
+
+        // Verify that the peer monitor loop interval is valid (with respect to the request intervals)
+        if is_network_perf_test_enabled() {
+            let peer_monitor_interval_usec = node_config
+                .peer_monitoring_service
+                .peer_monitor_interval_usec;
+            let direct_send_interval_usec = performance_monitoring_config.direct_send_interval_usec;
+            let rpc_interval_usec = performance_monitoring_config.rpc_interval_usec;
+
+            // Verify that the peer monitor loop interval is <= the direct send interval
+            if enable_direct_send_testing
+                && (peer_monitor_interval_usec > direct_send_interval_usec)
+            {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "The peer monitor loop interval must be <= the direct send interval!".into(),
+                ));
+            }
+
+            // Verify that the peer monitor loop interval is <= the RPC interval
+            if enable_rpc_testing && (peer_monitor_interval_usec > rpc_interval_usec) {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "The peer monitor loop interval must be <= the RPC interval!".into(),
+                ));
+            }
+        }
+
         Ok(())
+    }
+}
+
+impl ConfigOptimizer for PeerMonitoringServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<bool, Error> {
+        let peer_monitoring_config = &mut node_config.peer_monitoring_service;
+        let local_monitoring_config_yaml = &local_config_yaml["peer_monitoring_service"];
+
+        // Increase the max number of message bytes if the network-perf-test feature is enabled
+        let mut modified_config = false;
+        if local_monitoring_config_yaml["max_num_response_bytes"].is_null()
+            && is_network_perf_test_enabled()
+        {
+            peer_monitoring_config.max_num_response_bytes = 10 * 1024 * 1024; // 100 MB
+            modified_config = true;
+        }
+
+        // Optimize the performance monitoring config
+        modified_config = modified_config
+            || PerformanceMonitoringConfig::optimize(
+                node_config,
+                local_config_yaml,
+                node_type,
+                chain_id,
+            )?;
+
+        Ok(modified_config)
+    }
+}
+
+impl ConfigOptimizer for PerformanceMonitoringConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        _chain_id: ChainId,
+    ) -> Result<bool, Error> {
+        let performance_monitoring_config =
+            &mut node_config.peer_monitoring_service.performance_monitoring;
+        let local_performance_config_yaml =
+            &local_config_yaml["peer_monitoring_service"]["performance_monitoring"];
+
+        // Enable RPC testing if the network-perf-test feature is enabled
+        let mut modified_config = false;
+        if local_performance_config_yaml["enable_rpc_testing"].is_null()
+            && is_network_perf_test_enabled()
+        {
+            performance_monitoring_config.enable_rpc_testing = true;
+            modified_config = true;
+        }
+
+        Ok(modified_config)
     }
 }
 
@@ -129,7 +283,7 @@ mod tests {
         // Verify the config passes sanitization for testnet
         PeerMonitoringServiceConfig::sanitize(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::testnet(),
         )
         .unwrap();
@@ -137,7 +291,7 @@ mod tests {
         // Verify the config fails sanitization for mainnet
         let error = PeerMonitoringServiceConfig::sanitize(
             &mut node_config,
-            RoleType::FullNode,
+            NodeType::PublicFullnode,
             ChainId::mainnet(),
         )
         .unwrap_err();

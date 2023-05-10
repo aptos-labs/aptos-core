@@ -93,7 +93,7 @@ aptos init --profile $PROFILE --rest-url http://localhost:8080 --faucet-url http
 To fund accounts:
 
 ```bash
-aptos account fund --profile $PROFILE --account $PROFILE
+aptos account fund-with-faucet --profile $PROFILE --account $PROFILE
 ```
 
 To create resource accounts:

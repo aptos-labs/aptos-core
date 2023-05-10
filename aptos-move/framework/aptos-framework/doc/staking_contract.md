@@ -1690,6 +1690,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 ## Function `assert_staking_contract_exists`
 
+Assert that a staking_contract exists for the staker/operator pair.
 
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>)
@@ -1719,6 +1720,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 ## Function `add_distribution`
 
+Add a new distribution for <code>recipient</code> and <code>amount</code> to the staking contract's distributions list.
 
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_add_distribution">add_distribution</a>(operator: <b>address</b>, <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>: &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_StakingContract">staking_contract::StakingContract</a>, recipient: <b>address</b>, coins_amount: u64, add_distribution_events: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="staking_contract.md#0x1_staking_contract_AddDistributionEvent">staking_contract::AddDistributionEvent</a>&gt;)
@@ -1759,6 +1761,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 ## Function `get_staking_contract_amounts_internal`
 
+Calculate accumulated rewards and commissions since last update.
 
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_get_staking_contract_amounts_internal">get_staking_contract_amounts_internal</a>(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>: &<a href="staking_contract.md#0x1_staking_contract_StakingContract">staking_contract::StakingContract</a>): (u64, u64, u64)
@@ -1895,6 +1898,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
 
 ## Function `new_staking_contracts_holder`
 
+Create a new staking_contracts resource.
 
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_new_staking_contracts_holder">new_staking_contracts_holder</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>

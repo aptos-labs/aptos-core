@@ -131,7 +131,7 @@ module aptos_framework::primary_fungible_store {
     ): (MintRef, TransferRef, BurnRef) {
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(option::some(100)) /* max supply */,
+            option::some(option::some(100)), // max supply
             string::utf8(b"USDA"),
             string::utf8(b"$$$"),
             0

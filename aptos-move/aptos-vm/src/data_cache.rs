@@ -22,7 +22,33 @@ use move_core_types::{
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
+
+pub(crate) fn get_any_resource(
+    move_resolver: &impl MoveResolverExt,
+    address: &AccountAddress,
+    struct_tag: &StructTag,
+) -> Result<Option<Vec<u8>>, VMError> {
+    let resource_group = move_resolver.get_resource_group(struct_tag);
+    if let Some(resource_group) = resource_group {
+        let group_data = move_resolver.get_resource_group_data(address, &resource_group)?;
+        if let Some(group_data) = group_data {
+            let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
+                .map_err(|_| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .finish(Location::Undefined)
+                })?;
+            Ok(group_data.remove(struct_tag))
+        } else {
+            Ok(None)
+        }
+    } else {
+        move_resolver.get_standard_resource(address, struct_tag)
+    }
+}
 
 pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
     move_resolver: &'a S,
@@ -74,7 +100,7 @@ impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.get_any_resource(address, struct_tag)?)
+        Ok(get_any_resource(self, address, struct_tag)?)
     }
 }
 
@@ -167,7 +193,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.get_any_resource(address, struct_tag)?)
+        Ok(get_any_resource(self, address, struct_tag)?)
     }
 }
 

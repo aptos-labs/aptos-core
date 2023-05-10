@@ -6,6 +6,28 @@
 Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
 the Move stdlib, the Aptos stdlib, and the Aptos framework.
 
+============================================================================================
+Feature Flag Definitions
+
+Each feature flag should come with documentation which justifies the need of the flag.
+Introduction of a new feature flag requires approval of framework owners. Be frugal when
+introducing new feature flags, as too many can make it hard to understand the code.
+
+Each feature flag should come with a specification of a lifetime:
+
+- a *transient* feature flag is only needed until a related code rollout has happened. This
+is typically associated with the introduction of new native Move functions, and is only used
+from Move code. The owner of this feature is obliged to remove it once this can be done.
+
+- a *permanent* feature flag is required to stay around forever. Typically, those flags guard
+behavior in native code, and the behavior with or without the feature need to be preserved
+for playback.
+
+Note that removing a feature flag still requires the function which tests for the feature
+(like <code>code_dependency_check_enabled</code> below) to stay around for compatibility reasons, as it
+is a public function. However, once the feature flag is disabled, those functions can constantly
+return true.
+
 
 -  [Resource `Features`](#0x1_features_Features)
 -  [Constants](#@Constants_0)

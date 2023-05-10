@@ -35,7 +35,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -338,7 +337,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 }
 
 fn exec_function(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -367,7 +366,7 @@ fn exec_function(
 }
 
 fn initialize(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
@@ -437,7 +436,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
     ]
 }
 
-fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_features(session: &mut SessionExt) {
     let features: Vec<u64> = default_features()
         .into_iter()
         .map(|feature| feature as u64)
@@ -456,7 +455,7 @@ fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_aptos_coin(session: &mut SessionExt) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -466,7 +465,7 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
     );
 }
 
-fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
+fn set_genesis_end(session: &mut SessionExt) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -477,7 +476,7 @@ fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
 }
 
 fn initialize_core_resources_and_aptos_coin(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     core_resources_key: &Ed25519PublicKey,
 ) {
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
@@ -494,10 +493,7 @@ fn initialize_core_resources_and_aptos_coin(
 }
 
 /// Create and initialize Association and Core Code accounts.
-fn initialize_on_chain_governance(
-    session: &mut SessionExt<impl MoveResolver>,
-    genesis_config: &GenesisConfiguration,
-) {
+fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &GenesisConfiguration) {
     exec_function(
         session,
         GOVERNANCE_MODULE_NAME,
@@ -512,7 +508,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
+fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -526,7 +522,7 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 }
 
 fn create_employee_validators(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     employees: &[EmployeePool],
     genesis_config: &GenesisConfiguration,
 ) {
@@ -549,10 +545,7 @@ fn create_employee_validators(
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
-fn create_and_initialize_validators(
-    session: &mut SessionExt<impl MoveResolver>,
-    validators: &[Validator],
-) {
+fn create_and_initialize_validators(session: &mut SessionExt, validators: &[Validator]) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(validators_bytes);
@@ -566,7 +559,7 @@ fn create_and_initialize_validators(
 }
 
 fn create_and_initialize_validators_with_commission(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
@@ -584,7 +577,7 @@ fn create_and_initialize_validators_with_commission(
     );
 }
 
-fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
+fn allow_core_resources_to_set_version(session: &mut SessionExt) {
     exec_function(
         session,
         VERSION_MODULE_NAME,
@@ -595,14 +588,14 @@ fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolve
 }
 
 /// Publish the framework release bundle.
-fn publish_framework(session: &mut SessionExt<impl MoveResolver>, framework: &ReleaseBundle) {
+fn publish_framework(session: &mut SessionExt, framework: &ReleaseBundle) {
     for pack in &framework.packages {
         publish_package(session, pack)
     }
 }
 
 /// Publish the given package.
-fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePackage) {
+fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
     let modules = pack.sorted_code_and_modules();
     let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
@@ -630,7 +623,7 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
     exec_function(
         session,
         "block",

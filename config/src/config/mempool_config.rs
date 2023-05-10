@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType, MAX_APPLICATION_MESSAGE_SIZE,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+    MAX_APPLICATION_MESSAGE_SIZE,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_types::chain_id::ChainId;
@@ -67,7 +68,7 @@ impl Default for MempoolConfig {
             capacity: 2_000_000,
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
-            default_failovers: 3,
+            default_failovers: 1,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
@@ -78,10 +79,9 @@ impl Default for MempoolConfig {
 }
 
 impl ConfigSanitizer for MempoolConfig {
-    /// Validate and process the mempool config according to the given node role and chain ID
     fn sanitize(
         _node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         Ok(()) // TODO: add reasonable verifications
