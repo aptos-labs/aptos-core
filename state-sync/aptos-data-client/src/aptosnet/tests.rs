@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
-use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
+use super::{AptosDataClient, AptosNetDataClient, Error};
+use crate::aptosnet::{
+    poller::{poll_peer, DataSummaryPoller},
+    state::calculate_optimal_chunk_sizes,
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig, RoleType},
