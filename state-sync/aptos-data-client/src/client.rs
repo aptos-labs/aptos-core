@@ -13,8 +13,8 @@ use crate::{
     metrics::{
         increment_request_counter, set_gauge, start_request_timer, PRIORITIZED_PEER, REGULAR_PEER,
     },
+    peer_states::{ErrorType, PeerStates},
     poller::DataSummaryPoller,
-    state::{ErrorType, PeerStates},
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -72,11 +72,11 @@ const PEER_LOG_FREQ_SECS: u64 = 10;
 #[derive(Clone, Debug)]
 pub struct AptosDataClient {
     /// Config for AptosNet data client.
-    pub(crate) data_client_config: AptosDataClientConfig,
+    data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
     storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
     /// All of the data-client specific data we have on each network peer.
-    pub(crate) peer_states: Arc<RwLock<PeerStates>>,
+    peer_states: Arc<RwLock<PeerStates>>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
     global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
     /// Used for generating the next request/response id.
@@ -114,6 +114,11 @@ impl AptosDataClient {
     /// Returns true iff compression should be requested
     pub fn use_compression(&self) -> bool {
         self.data_client_config.use_compression
+    }
+
+    /// Returns the response timeout in milliseconds
+    pub fn get_response_timeout_ms(&self) -> u64 {
+        self.data_client_config.response_timeout_ms
     }
 
     /// Returns the max number of output reductions as defined by the config
@@ -491,6 +496,12 @@ impl AptosDataClient {
         let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
         self.send_request_and_decode(storage_request, request_timeout_ms)
             .await
+    }
+
+    /// Returns a copy of the peer states for testing
+    #[cfg(test)]
+    pub(crate) fn get_peer_states(&self) -> PeerStates {
+        self.peer_states.read().clone()
     }
 }
 

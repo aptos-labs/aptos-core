@@ -9,8 +9,8 @@ pub mod global_summary;
 pub mod interface;
 mod logging;
 mod metrics;
+mod peer_states;
 mod poller;
-mod state;
 
 #[cfg(test)]
 mod tests;

@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
 use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, Epoch};
 use aptos_types::{
