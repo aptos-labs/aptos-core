@@ -8,6 +8,7 @@ Standards define a common interoperable interface for all developers to build up
 hippospace.
 
 ## Object
+
 ### [Aptos Object](./aptos-object.md)
 
 The [Object model](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/object.move) allows Move to represent a complex type as a set of resources stored within a single address and offers a rich capability model that allows for fine-grained resource control and ownership management.
@@ -25,9 +26,17 @@ The [Coin module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/
 
 See [Aptos Coin >](./aptos-coin.md)
 
+### [Fungible Asset](./fungible-asset.md)
+
+The [Fungible Asset module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) is a new standard meant for simple, typesafe, and fungible assets based on object model intending to replace Aptos coin.
+Fungible asset standard offers more features and flexibilities to Aptos move developers on creating and managing fungible assets.
+
+See [Fungible Asset >](./fungible-asset.md)
+
 ### Aptos Token
 
 #### [Token V2](./aptos-token-v2.md)
+
 The new [Token v2 standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) allows:
 
 - Rich, flexible assets and collectibles.
@@ -37,19 +46,13 @@ The v2 standard is recommended for any new collections or protocols that want to
 See [Aptos Token v2 >](./aptos-token-v2.md)
 
 #### [Token V1](./aptos-token.md)
+
 The old existing [Token module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move), on the other hand:
 
 - Encapsulates rich, flexible assets and collectibles. These assets are discrete (non-decimal) and can be fungible, semi-fungible, or nonfungible.
 - The token standard is in its own `AptosToken` package at the Address `0x3` to allow for rapid iteration based on feedback from the community.
 
 See [Aptos Token >](./aptos-token.md)
-
-### [Fungible Asset](./fungible-asset.md)
-
-The [Fungible Asset module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) is a new standard meant for simple, typesafe, and fungible assets based on object model intending to replace Aptos coin.
-Fungible asset standard offers more features and flexibilities to Aptos move developers on creating and managing fungible assets.
-
-See [Fungible Asset >](./fungible-asset.md)
 
 ## Wallet standards
 

@@ -249,6 +249,7 @@ TokenData
 TokenStore
 TokenTransfers
 TokenV
+Tokenization
 TransactionBuilder
 TransactionBuilderABI
 TransactionFee
@@ -329,6 +330,7 @@ config
 configs
 const
 copyable
+cryptocurrency
 cryptographic
 cryptographically
 customizable
@@ -365,6 +367,7 @@ faq
 fetchList
 filesystem
 findable
+flexibilities
 fn
 fullnode
 fullnode's
@@ -385,6 +388,7 @@ href
 http
 ide
 ie
+illiquid
 img
 incrementing
 init
@@ -508,6 +512,7 @@ subcommands
 subdirectory
 subtype
 subtyping
+superset
 svg
 synchronizer
 terraform
@@ -516,6 +521,8 @@ th
 tl
 todo
 todolist
+tokenization
+tokenized
 toml
 toolchain
 topologies
