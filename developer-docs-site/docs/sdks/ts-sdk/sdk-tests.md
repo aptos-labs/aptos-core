@@ -3,12 +3,12 @@ title: "Tests and Validation"
 slug: "typescript-sdk-tests"
 ---
 
-The TypeScript SDK uses two types of tests - `e2e` and `unit` tests and are located under the `src/tests/` folder.
+The TypeScript SDK uses two types of tests, `e2e` and `unit` tests, located under the `src/tests/` folder:
 
-- `e2e` tests - end to end tests are meant to test the end-to-end operations starting from the sdk methods to the interaction with the REST/Indexer API and a smart contract and up to the blockchain level. For example, to test a transaction has been submitted, we start with building the transation payload the sdk expects, post the submit request to the REST API and fetch the transaction data to make sure it has been fully submitted to the blockchain.
-- `unit` tests - the unit tests are meant to test the output of a function in the SDK with theprovided input. For example, we test wether an account address is valid.
+- `e2e` tests – End-to-end tests are meant to test the end-to-end operations starting from the SDK methods to the interaction with the REST/Indexer API and a smart contract and up to the blockchain level. For example, to test if a transaction has been submitted, we start with building the transaction payload the SDK expects, post the submit request to the REST API, and fetch the transaction data to make sure it has been fully submitted to the blockchain.
+- `unit` tests – Unit tests are meant to test the output of a function in the SDK with the provided input. For example, we can test whether an account address is valid.
 
-### Validation for the Transaction Builder and BCS
+## Validation for the Transaction Builder and BCS
 
 The [BCS](https://docs.rs/bcs/latest/bcs/) is used to assemble and serialize the transaction payloads for signing and submission.
 
@@ -16,7 +16,7 @@ Given that different programming languages have different primitive type constra
 
 The Aptos SDK validates the Transaction Builder and BCS in two ways:
 
-1. First, with the unit tests and end-to-end (e2e) tests.
+1. The first level of validation is through unit tests and end-to-end (e2e) tests.
 
 :::tip
 

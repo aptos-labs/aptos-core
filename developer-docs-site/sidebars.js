@@ -267,7 +267,7 @@ const sidebars = {
                 "sdks/ts-sdk/typescript-sdk-overview",
                 {
                   type: "category",
-                  label: "API client layer",
+                  label: "API Client Layer",
                   link: { type: "doc", id: "sdks/ts-sdk/sdk-client-layer" },
                   collapsible: true,
                   collapsed: true,

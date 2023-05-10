@@ -12,9 +12,9 @@ The [Aptos TypeScript SDK](https://github.com/aptos-labs/aptos-core/tree/main/ec
 
 The Aptos TypeScript SDK has three logical layers:
 
-1. Client layer - Responsible on communication with the blockchain server.
-2. Core SDK layer - Exposes the functionalities needed by most applications.
-3. Plugins layer - Implementation of different use cases such as Token, NFT, ANS, etc
+1. Client layer – Responsible on communication with the blockchain server.
+2. Core layer – Exposes the functionalities needed by most applications.
+3. Plugins layer – Implementation of different use cases such as Token, NFT, ANS, etc.
 
 See below a high-level architecture diagram of the Aptos TypeScript SDK.
 
@@ -28,7 +28,7 @@ sources={{
 
 ## Components of the TypeScript SDK
 
-- [API client Layer](./sdk-client-layer.md)
+- [API Client Layer](./sdk-client-layer.md)
 - [Core Layer](./sdk-core-layer.md)
 - [Plugins Layer](./sdk-plugins-layer.md)
 - [Tests and Validation](./sdk-tests.md)

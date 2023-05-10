@@ -10,7 +10,7 @@ The core SDK layer exposes the functionalities needed by most applications:
 - Transaction status querying
 - Information retrieval techniques
 
-### Transaction Builder
+## Transaction Builder
 
 The Aptos TypeScript SDK exposes five transaction builder classes:
 
@@ -26,7 +26,7 @@ The Transaction Builder contains the TypeScript types for constructing the trans
 2. Script
 3. MultiSig Transaction
 
-#### Generate transaction
+### Generate transaction
 
 The TypeScript SDK provides 2 efficient ways to generate a raw transaction that can be signed and submitted to chain
 
@@ -35,7 +35,7 @@ The TypeScript SDK provides 2 efficient ways to generate a raw transaction that 
 
 In addition, The Aptos SDK supports transaction status queries (success, failure, pending), by transaction hash.
 
-### AptosAccount class
+## AptosAccount class
 
 The [AptosAccount](https://aptos-labs.github.io/ts-sdk-doc/classes/AptosAccount.html) class has a constructor that creates a new account instance or retrieves an existing account instance. Additionally, this class provides the methods for:
 
