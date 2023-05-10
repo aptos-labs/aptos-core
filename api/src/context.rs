@@ -802,21 +802,80 @@ impl Context {
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
-        let second_bucket = match self
+
+        // 1. Get the block metadata txns
+        let mut lookup_version = ledger_info.ledger_version.0;
+        let mut blocks = vec![];
+        // TODO: discard the first block, because it's an incomplete block?
+        for _i in 0..120 {
+            match self.db.get_block_info_by_version(lookup_version) {
+                Ok(block) => {
+                    lookup_version = block.0.saturating_sub(1);
+                    blocks.push(block);
+                    // TODO: -1, or just first?
+                },
+                Err(_) => {
+                    break;
+                },
+            }
+        }
+
+        // 2. Get gas prices per block
+        let mut min_inclusion_prices = vec![];
+        // TODO: make configurable, 250
+        let block_full_threshold = 250;
+        // TODO: if multiple calls to db is a perf issue, combine the calls and then split it up
+        for (first, last, _) in blocks {
+            let min_inclusion_price =
+                match self
+                    .db
+                    .get_gas_prices(first, last - first, ledger_info.ledger_version.0)
+                {
+                    Ok(prices) => {
+                        if prices.len() < block_full_threshold {
+                            min_gas_unit_price
+                        } else {
+                            prices.iter().min().unwrap() + 1
+                        }
+                    },
+                    Err(_) => min_gas_unit_price,
+                };
+            min_inclusion_prices.push(min_inclusion_price);
+        }
+
+        // 3. Get values
+        // (1) low
+        let low_price = *min_inclusion_prices.iter().min().unwrap();
+
+        // (2) market
+        let mut latest_prices: Vec<_> = min_inclusion_prices
+            .iter()
+            .rev()
+            .take(30)
+            .cloned()
+            .collect();
+        latest_prices.sort();
+        let market_price = latest_prices[latest_prices.len() / 2];
+
+        // (3) aggressive
+        min_inclusion_prices.sort();
+        let p90_price = min_inclusion_prices[min_inclusion_prices.len() * 9 / 10];
+        // round up to next bucket
+        let aggressive_price = match self
             .node_config
             .mempool
             .broadcast_buckets
             .iter()
-            .enumerate()
-            .nth(1)
+            .find(|bucket| **bucket >= p90_price)
         {
-            Some(bucket) => *bucket.1,
-            None => min_gas_unit_price,
+            None => p90_price,
+            Some(bucket) => *bucket,
         };
+
         Ok(GasEstimation {
-            deprioritized_gas_estimate: Some(min_gas_unit_price),
-            gas_estimate: min_gas_unit_price,
-            prioritized_gas_estimate: Some(second_bucket),
+            deprioritized_gas_estimate: Some(low_price),
+            gas_estimate: market_price,
+            prioritized_gas_estimate: Some(aggressive_price),
         })
     }
 
