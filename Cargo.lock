@@ -1788,6 +1788,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-ledger"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-log-derive"
 version = "0.1.0"
 dependencies = [
