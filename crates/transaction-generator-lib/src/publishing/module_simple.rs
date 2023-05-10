@@ -109,6 +109,10 @@ pub enum EntryPoints {
     // 0 args
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, signed by 2 accounts
+    Nop2Signers,
+    /// Empty (NoOp) function, signed by 5 accounts
+    Nop5Signers,
     /// Increment signer resource - COUNTER_STEP
     Step,
     /// Fetch signer resource - COUNTER_STEP
@@ -165,6 +169,8 @@ impl EntryPoints {
     pub fn package_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::Nop2Signers
+            | EntryPoints::Nop5Signers
             | EntryPoints::Step
             | EntryPoints::GetCounter
             | EntryPoints::ResetData
@@ -192,6 +198,8 @@ impl EntryPoints {
     pub fn module_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::Nop2Signers
+            | EntryPoints::Nop5Signers
             | EntryPoints::Step
             | EntryPoints::GetCounter
             | EntryPoints::ResetData
@@ -225,6 +233,12 @@ impl EntryPoints {
         match self {
             // 0 args
             EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Nop2Signers => {
+                get_payload_void(module_id, ident_str!("nop_2_signers").to_owned())
+            },
+            EntryPoints::Nop5Signers => {
+                get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
+            },
             EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
             EntryPoints::GetCounter => {
                 get_payload_void(module_id, ident_str!("get_counter").to_owned())
@@ -308,14 +322,22 @@ impl EntryPoints {
 
     pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
         match self {
-            EntryPoints::TokenV1MintAndStoreFT
-            | EntryPoints::TokenV1MintAndTransferFT
-            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
             | EntryPoints::TokenV1MintAndTransferNFTParallel
-            | EntryPoints::TokenV1MintAndTransferNFTSequential => {
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
+            _ => None,
+        }
+    }
+
+    pub fn multi_sig_additional_num(&self) -> Option<usize> {
+        match self {
+            EntryPoints::Nop2Signers => Some(1),
+            EntryPoints::Nop5Signers => Some(4),
             _ => None,
         }
     }

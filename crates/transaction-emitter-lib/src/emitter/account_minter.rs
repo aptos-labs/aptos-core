@@ -69,7 +69,11 @@ impl<'t> AccountMinter<'t> {
         let coins_per_account = (req.expected_max_txns / total_requested_accounts as u64)
             .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
             .unwrap()
-            .checked_add(req.max_gas_per_txn * req.gas_price)
+            .checked_add(
+                req.max_gas_per_txn * req.gas_price
+                // for module publishing
+                + 2 * req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+            )
             .unwrap(); // extra coins for secure to pay none zero gas price
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
