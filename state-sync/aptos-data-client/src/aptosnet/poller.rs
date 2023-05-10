@@ -3,10 +3,10 @@
 
 use crate::{
     aptosnet::{
+        client::AptosNetDataClient,
         logging::{LogEntry, LogEvent, LogSchema},
         metrics,
         metrics::{set_gauge, start_request_timer, DataType},
-        AptosNetDataClient,
     },
     AptosDataClient, Error, GlobalDataSummary, Response,
 };
