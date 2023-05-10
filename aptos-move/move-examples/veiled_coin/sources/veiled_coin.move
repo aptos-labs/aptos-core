@@ -1190,6 +1190,8 @@ module veiled_coin::veiled_coin {
         print(&@aptos_framework);
         // TODO: This line seems to yield a strange, irreproducible invariant violation error...
         //assert!(@veiled_coin != @aptos_framework, 1);
+        // This line does not
+        //assert!(signer::address_of(&veiled_coin) != signer::address_of(&aptos_fx), 1);
 
         // Create a `sender` account with 500 `FakeCoin`'s
         set_up_for_veiled_coin_test(
