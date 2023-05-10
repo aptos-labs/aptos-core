@@ -297,9 +297,12 @@ pub struct AggregatorData {
 
 impl AggregatorData {
     /// Returns a mutable reference to an aggregator with `id` and a `limit`.
-    /// If transaction that is currently executing did not initilize it), a new
-    /// aggregator instance is created, with a zero-initialized value and in a
-    /// delta state.
+    /// If transaction that is currently executing did not initilize it, a new aggregator instance is created.
+    /// The state of the new aggregator instance depends on the `aggregator_enabled` flag.
+    /// If the `aggregator_enabled` flag is true, the new aggregator instance
+    /// is initialized with zero and in a delta state.
+    /// If the `aggregator_enabled` flag is false, the new aggregator instance
+    /// is set initialized with its latest value and in a Data state.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(
