@@ -1668,6 +1668,7 @@ dependencies = [
  "aptos-inspection-service",
  "aptos-logger",
  "aptos-protos",
+ "async-trait",
  "backoff",
  "base64 0.13.0",
  "cloud-storage",
