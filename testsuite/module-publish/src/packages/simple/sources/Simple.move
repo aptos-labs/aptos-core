@@ -45,6 +45,12 @@ module 0xABCD::simple {
     public entry fun nop(_s: &signer) {
     }
 
+    public entry fun nop_2_signers(_s1: &signer, _s2: &signer) {
+    }
+
+    public entry fun nop_5_signers(_s1: &signer, _s2: &signer, _s3: &signer, _s4: &signer, _s5: &signer) {
+    }
+
     // Test simple CPU usage. Loop as defined by the input `count`.
     // Not a true test of CPU usage given the number of instructions
     // used, but a simple reference to computation with no data access.
