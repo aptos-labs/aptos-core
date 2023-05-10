@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::logging::{LogEntry, LogEvent, LogSchema},
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
     interface::ResponseError,
+    logging::{LogEntry, LogEvent, LogSchema},
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},

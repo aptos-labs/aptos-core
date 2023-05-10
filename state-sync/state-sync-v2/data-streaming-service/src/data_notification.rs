@@ -139,7 +139,7 @@ pub struct TransactionsOrOutputsWithProofRequest {
 /// network and will be available in `client_response` when received.
 pub struct PendingClientResponse {
     pub client_request: DataClientRequest,
-    pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::Error>>,
+    pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::error::Error>>,
 }
 
 impl Debug for PendingClientResponse {

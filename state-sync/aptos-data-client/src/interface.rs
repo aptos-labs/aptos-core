@@ -1,4 +1,4 @@
-use crate::{error, error::Error, global_summary::GlobalDataSummary, ResponseId};
+use crate::{error, error::Error, global_summary::GlobalDataSummary};
 use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -154,6 +154,9 @@ pub trait ResponseCallback: fmt::Debug + Send + Sync + 'static {
     // an error once. however, the current state-sync-v2 code makes this difficult...
     fn notify_bad_response(&self, error: ResponseError);
 }
+
+/// A unique identifier for each response
+pub type ResponseId = u64;
 
 #[derive(Debug)]
 pub struct ResponseContext {

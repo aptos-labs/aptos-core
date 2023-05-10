@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Error;
+use crate::error::Error;
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::Schema;
 use aptos_storage_service_types::requests::StorageServiceRequest;

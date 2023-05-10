@@ -141,9 +141,9 @@ impl MockAptosDataClient {
         thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
     }
 
-    fn emulate_subscription_expiration(&self) -> aptos_data_client::Error {
+    fn emulate_subscription_expiration(&self) -> aptos_data_client::error::Error {
         thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
-        aptos_data_client::Error::TimeoutWaitingForResponse("RPC timed out!".into())
+        aptos_data_client::error::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
 
     fn calculate_last_index(&self, start_index: u64, end_index: u64) -> u64 {
@@ -244,7 +244,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
-    ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -286,7 +286,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         start_epoch: Epoch,
         end_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::Error> {
+    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -322,7 +322,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         request_timeout_ms: u64,
     ) -> Result<
         Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
-        aptos_data_client::Error,
+        aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
             request_timeout_ms,
@@ -383,7 +383,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         request_timeout_ms: u64,
     ) -> Result<
         Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
-        aptos_data_client::Error,
+        aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
             request_timeout_ms,
@@ -495,7 +495,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<u64>, aptos_data_client::Error> {
+    ) -> Result<Response<u64>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -512,7 +512,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -539,7 +539,7 @@ impl AptosDataClientInterface for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
