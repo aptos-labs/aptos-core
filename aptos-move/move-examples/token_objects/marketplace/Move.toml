@@ -3,7 +3,7 @@ name = "TokenObjectsMarketplace"
 version = "0.0.0"
 
 [addresses]
-marketplace_owner = "_"
+marketplace_contract = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
