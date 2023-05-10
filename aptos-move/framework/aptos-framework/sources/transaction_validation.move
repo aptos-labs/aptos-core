@@ -158,7 +158,16 @@ module aptos_framework::transaction_validation {
         );
 
         let i = 0;
-        while (i < num_secondary_signers) {
+        while ({
+            spec {
+                invariant i <= num_secondary_signers;
+                invariant forall j in 0..i:
+                    account::exists_at(secondary_signer_addresses[j])
+                    && secondary_signer_public_key_hashes[j]
+                       == account::get_authentication_key(secondary_signer_addresses[j]);
+            };
+            (i < num_secondary_signers)
+        }) {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
             assert!(account::exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
 
