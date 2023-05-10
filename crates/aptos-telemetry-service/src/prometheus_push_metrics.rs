@@ -76,6 +76,7 @@ pub async fn push_metrics_to_clients(
                 metrics_body.clone(),
                 extra_labels.clone(),
                 encoding.clone().unwrap_or_default(),
+                timestamp
             )
             .await;
 
