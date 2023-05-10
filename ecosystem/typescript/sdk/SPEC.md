@@ -58,20 +58,20 @@ We do not use the fourth **`won't`** level in this specification.
   - [ ] **1.1.7** Vectors using uleb128.
   - [ ] **1.1.8** Addresses as a fixed 32 byte type.
   - [ ] **1.1.9** Generics.
+  - [ ] **1.1.10** bool.
+  - [ ] **1.1.11** Object<T> encodings as an address.
 - [ ] **1.2** The encoding & decoding details **should** be hidden from the end user and done by the SDK.
 
 ### 2. API servers
 
 - [ ] **2.1** The SDK **must** interact directly with the Aptos REST API.
-  - [ ] **2.1.1** The SDK **must** allow to pass `start` and `limit` parameters to REST API request.
-  - [ ] **2.1.2** The SDK **should** implement the OpenAPI spec https://fullnode.mainnet.aptoslabs.com/v1/spec#/.
+  - [ ] **2.1.1** The SDK **must** support pagination with optional `start` and `limit` parameters to the REST API request.
+  - [ ] **2.1.2** The SDK **should** implement a client that adheres to the OpenAPI spec https://fullnode.mainnet.aptoslabs.com/v1/spec#/.
 - [ ] **2.2** The SDK **should** interact directly with the Aptos Indexer API.
-  - [ ] **2.2.1** The SDK **must** allow to pass `offset` and `limit` parameters to Indexer API request.
+  - [ ] **2.2.1** The SDK **must** support pagination with optional `offset` and `limit` parameters to Indexer API request.
   - [ ] **2.2.2** The SDK **must** validate the account address when interacting with the Indexer API.
-    - [ ] **2.2.2.1** The SDK **must** validate an account address is a hex string format.
-    - [ ] **2.2.2.2** The SDK **must** validate an account address is 66 chars long.
-    - [ ] **2.2.2.3** The SDK **must** padding an account address with leading `0`.
-  - [ ] **2.2.3** The SDK **should** handle premade GraphQL queries https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql.
+    - [ ] **2.2.2.1** The SDK **must** validate an account address is a 64 character hex string with a leading `0x`.
+  - [ ] **2.2.3** The SDK **must** handle premade GraphQL queries https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql.
   - [ ] **2.2.3** The SDK **should** allow the user to pass in a custom GraphQL query.
 - [ ] **2.3** The SDK **should** support interactions with Aptos devnet, testnet and mainnet networks.
 - [ ] **2.4** The SDK **should** support interactions with a custom URL.
@@ -79,22 +79,32 @@ We do not use the fourth **`won't`** level in this specification.
 ### 3. Account Management
 
 - [ ] **3.1** The SDK **must** support account creation.
-- [ ] **3.2** The SDK **must** support account balance read.
+- [ ] **3.2** The SDK **must** support account APT coin balance read.
 - [ ] **3.3** The SDK **must** support key management for Ed25519 keys.
+  - [ ] **3.3.1** The SDK **must** support Key generation
+  - [ ] **3.3.2** The SDK **must** support Key loading from a file
+  - [ ] **3.3.3** The SDK **must** support Key loading from an input
+  - [ ] **3.3.4** The SDK **should** support Key rotation
+  - [ ] **3.3.5** The SDK **could** Key management via local storage
+  - [ ] **3.3.6** The SDK **could** Key management via hardware wallet (e.g. Ledger, Keystone, etc.)
 - [ ] **3.4** The SDK **must** support local single-threaded sequence number management.
-- [ ] **3.5** The SDK **should** provide multi-agent signer support.
-- [ ] **3.6** The SDK **should** provide multi-Ed25519 signer support.
-- [ ] **3.7** The SDK **should** provide mnemonic support.
-- [ ] **3.8** The SDK **should** provide multi-sig support.
-- [ ] **3.9** The SDK **should** provide resource account support.
+  - [ ] **3.4.1** The SDK **should** support multi-account sequence number management
+  - [ ] **3.4.2** The SDK **should** support single threaded sequence number high throughput smart queuing
+- [ ] **3.5** The SDK **must** provide multi-agent signer support.
+- [ ] **3.6** The SDK **should** support account any coin balance read.
+- [ ] **3.7** The SDK **should** provide multi-Ed25519 signer support.
+- [ ] **3.8** The SDK **should** provide mnemonic support.
+- [ ] **3.9** The SDK **should** provide onchain multi-sig support.
+- [ ] **3.10** The SDK **should** provide resource account support.
+- [ ] **3.10** The SDK **should** provide Object support for deriving known objects and object ownership.
 
 ### 4. Transaction
 
 - [ ] **4.1** The SDK **must** support entry function payload transaction submission.
 - [ ] **4.2** The SDK **must** support script payload transaction submission.
-- [ ] **4.3** The SDK **must** use the gas estimation API to determine the gas price when building transaction payloads.
-  - [ ] **4.3.1** The SDK **should** cache the response from the gas estimation API for a set period of time (e.g. 1 minute).
-- [ ] **4.4** The SDK **must** support simulation of transactions.
+- [ ] **4.3** The SDK **must** support simulation of transactions.
+- [ ] **4.4** The SDK **should** use the gas estimation API to determine the gas price when building transaction payloads.
+  - [ ] **4.4.1** The SDK **must** cache the response from the gas estimation API for a set period of time (e.g. 1 minute).
 
 ### 5. Coin Management
 
