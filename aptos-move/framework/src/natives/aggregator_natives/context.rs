@@ -81,7 +81,8 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    assert!(self.aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
@@ -89,7 +90,8 @@ impl<'a> NativeAggregatorContext<'a> {
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
-                    assert!(self.aggregator_enabled); // Aggregator state can be a delta only if aggregators are enabled.
+                    // Aggregator state can be a delta only if aggregators are enabled.
+                    assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
@@ -204,12 +206,50 @@ mod test {
         aggregator_data.remove_aggregator(aggregator_id_for_test(800));
     }
 
+    fn test_set_up_aggregator_disabled(context: &NativeAggregatorContext) {
+        let mut aggregator_data = context.aggregator_data.borrow_mut();
+
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
+        aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
+
+        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, false);
+        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, false);
+        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, false);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, false);
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, false);
+
+        aggregator_data.remove_aggregator(aggregator_id_for_test(100));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(300));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(500));
+        aggregator_data.remove_aggregator(aggregator_id_for_test(800));
+    }
+
     #[test]
     fn test_into_change_set() {
         let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, true);
         use AggregatorChange::*;
 
         test_set_up(&context);
+        let AggregatorChangeSet { changes } = context.into_change_set();
+
+        assert!(!changes.contains_key(&aggregator_id_for_test(100)));
+        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), Write(0));
+        assert!(!changes.contains_key(&aggregator_id_for_test(300)));
+        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
+        assert!(changes.contains_key(&aggregator_id_for_test(600)));
+        assert!(changes.contains_key(&aggregator_id_for_test(700)));
+        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
+    }
+
+    #[test]
+    fn test_into_change_set_aggregator_disabled() {
+        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, false);
+        use AggregatorChange::*;
+
+        test_set_up_aggregator_disabled(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));

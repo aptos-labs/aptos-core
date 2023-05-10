@@ -325,9 +325,9 @@ impl AggregatorData {
         if !aggregator_enabled {
             let result = aggregator.read_and_materialize(resolver, &id);
             if let Ok(value) = result {
-                aggregator.state = AggregatorState::Data;
                 aggregator.value = value;
             }
+            aggregator.state = AggregatorState::Data;
         }
         aggregator
     }
