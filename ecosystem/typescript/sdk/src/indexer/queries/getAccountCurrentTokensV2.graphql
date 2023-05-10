@@ -1,0 +1,26 @@
+query getAccountCurrentTokensV2($address: String!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(
+    where: { owner_address: { _eq: $address }, amount: { _gt: 0 } }
+    order_by: { last_transaction_version: desc }
+    offset: $offset
+    limit: $limit
+  ) {
+    amount
+    current_token_data {
+      ...TokenDataFieldsV2
+    }
+    last_transaction_version
+    property_version_v1
+    token_standard
+  }
+}
+
+fragment TokenDataFieldsV2 on current_token_datas_v2 {
+  token_uri
+  token_data_id
+  token_properties
+  token_name
+  current_collection {
+    collection_name
+  }
+}

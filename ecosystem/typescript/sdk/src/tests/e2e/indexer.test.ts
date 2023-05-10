@@ -200,5 +200,14 @@ describe("Indexer", () => {
       const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });
+
+    it.only("test", async () => {
+      const tokenOwnership = await indexerClient.getTokenOwnershipV2(
+        "0xe2134e886b6be06b6d1e0c6a944213497260a69a7ce2a7198880a04bd475ae0e",
+      );
+      expect(tokenOwnership.current_token_ownerships_v2).toHaveLength(8);
+      expect(tokenOwnership.current_token_ownerships_v2[0]).toHaveProperty("current_token_data");
+      expect(tokenOwnership.current_token_ownerships_v2[0].current_token_data?.token_name).toBe("Cat");
+    });
   });
 });

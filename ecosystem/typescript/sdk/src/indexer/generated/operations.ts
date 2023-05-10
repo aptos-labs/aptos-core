@@ -22,6 +22,17 @@ export type TokenDataFieldsFragment = { __typename?: 'current_token_datas', crea
 
 export type CollectionDataFieldsFragment = { __typename?: 'current_collection_datas', metadata_uri: string, supply: any, description: string, collection_name: string, collection_data_id_hash: string, table_handle: string, creator_address: string };
 
+export type GetAccountCurrentTokensV2QueryVariables = Types.Exact<{
+  address: Types.Scalars['String'];
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
+
+
+export type GetAccountCurrentTokensV2Query = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', amount: any, last_transaction_version: any, property_version_v1: any, token_standard: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_uri: string, token_data_id: string, token_properties: any, token_name: string, current_collection?: { __typename?: 'current_collections_v2', collection_name: string } | null } | null }> };
+
+export type TokenDataFieldsV2Fragment = { __typename?: 'current_token_datas_v2', token_uri: string, token_data_id: string, token_properties: any, token_name: string, current_collection?: { __typename?: 'current_collections_v2', collection_name: string } | null };
+
 export type GetAccountTokensCountQueryVariables = Types.Exact<{
   owner_address?: Types.InputMaybe<Types.Scalars['String']>;
 }>;

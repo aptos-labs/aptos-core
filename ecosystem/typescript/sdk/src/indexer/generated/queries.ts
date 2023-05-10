@@ -24,6 +24,17 @@ export const CollectionDataFieldsFragmentDoc = `
   creator_address
 }
     `;
+export const TokenDataFieldsV2FragmentDoc = `
+    fragment TokenDataFieldsV2 on current_token_datas_v2 {
+  token_uri
+  token_data_id
+  token_properties
+  token_name
+  current_collection {
+    collection_name
+  }
+}
+    `;
 export const GetAccountCoinsData = `
     query getAccountCoinsData($owner_address: String, $offset: Int, $limit: Int) {
   current_coin_balances(
@@ -62,6 +73,24 @@ export const GetAccountCurrentTokens = `
 }
     ${TokenDataFieldsFragmentDoc}
 ${CollectionDataFieldsFragmentDoc}`;
+export const GetAccountCurrentTokensV2 = `
+    query getAccountCurrentTokensV2($address: String!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(
+    where: {owner_address: {_eq: $address}, amount: {_gt: 0}}
+    order_by: {last_transaction_version: desc}
+    offset: $offset
+    limit: $limit
+  ) {
+    amount
+    current_token_data {
+      ...TokenDataFieldsV2
+    }
+    last_transaction_version
+    property_version_v1
+    token_standard
+  }
+}
+    ${TokenDataFieldsV2FragmentDoc}`;
 export const GetAccountTokensCount = `
     query getAccountTokensCount($owner_address: String) {
   current_token_ownerships_aggregate(
@@ -221,6 +250,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
+    },
+    getAccountCurrentTokensV2(variables: Types.GetAccountCurrentTokensV2QueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensV2Query> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensV2Query>(GetAccountCurrentTokensV2, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokensV2', 'query');
     },
     getAccountTokensCount(variables?: Types.GetAccountTokensCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTokensCountQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTokensCountQuery>(GetAccountTokensCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTokensCount', 'query');

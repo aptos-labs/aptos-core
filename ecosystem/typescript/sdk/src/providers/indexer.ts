@@ -17,6 +17,7 @@ import {
   GetTokenOwnersDataQuery,
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
+  GetAccountCurrentTokensV2Query,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -33,6 +34,7 @@ import {
   GetTokenOwnersData,
   GetTopUserTransactions,
   GetUserTransactions,
+  GetAccountCurrentTokensV2,
 } from "../indexer/generated/queries";
 
 /**
@@ -309,5 +311,25 @@ export class IndexerClient {
       variables: { poolAddress: address },
     };
     return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an Aptos account's token ownership
+   *
+   * @param ownerAddress Hex-encoded 32 byte Aptos account address
+   * @returns GetAccountCurrentTokensV2Query response type
+   */
+  async getTokenOwnershipV2(
+    ownerAddress: MaybeHexString,
+    options?: PaginationArgs,
+  ): Promise<GetAccountCurrentTokensV2Query> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+    const graphqlQuery = {
+      query: GetAccountCurrentTokensV2,
+      variables: { address, offset: options?.offset, limit: options?.limit },
+    };
+
+    return this.queryIndexer<GetAccountCurrentTokensV2Query>(graphqlQuery);
   }
 }
