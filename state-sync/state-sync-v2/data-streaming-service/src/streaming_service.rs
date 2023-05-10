@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
-use aptos_data_client::{AptosDataClient, GlobalDataSummary, OptimalChunkSizes};
+use aptos_data_client::{AptosDataClientInterface, GlobalDataSummary, OptimalChunkSizes};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use futures::StreamExt;
@@ -51,7 +51,7 @@ pub struct DataStreamingService<T> {
     notification_id_generator: Arc<U64IdGenerator>,
 }
 
-impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
+impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<T> {
     pub fn new(
         data_client_config: AptosDataClientConfig,
         streaming_service_config: DataStreamingServiceConfig,

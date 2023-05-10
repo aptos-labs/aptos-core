@@ -24,7 +24,7 @@ use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
-use aptos_data_client::AptosDataClient;
+use aptos_data_client::AptosDataClientInterface;
 use aptos_data_streaming_service::streaming_client::{
     DataStreamingClient, NotificationAndFeedback, NotificationFeedback,
 };
@@ -121,7 +121,7 @@ pub struct StateSyncDriver<
 }
 
 impl<
-        DataClient: AptosDataClient + Send + Clone + 'static,
+        DataClient: AptosDataClientInterface + Send + Clone + 'static,
         MempoolNotifier: MempoolNotificationSender,
         MetadataStorage: MetadataStorageInterface + Clone,
         StorageSyncer: StorageSynchronizerInterface + Clone,

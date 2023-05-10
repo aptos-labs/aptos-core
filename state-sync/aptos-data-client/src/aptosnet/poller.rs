@@ -8,7 +8,7 @@ use crate::{
         metrics,
         metrics::{set_gauge, start_request_timer, DataType},
     },
-    AptosDataClient, Error, GlobalDataSummary, Response,
+    AptosDataClientInterface, Error, GlobalDataSummary, Response,
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};

@@ -6,7 +6,7 @@ use crate::{data_notification::DataNotification, data_stream::DataStreamListener
 use aptos_config::config::AptosDataClientConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_data_client::{
-    AdvertisedData, AptosDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
+    AdvertisedData, AptosDataClientInterface, GlobalDataSummary, OptimalChunkSizes, Response,
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_infallible::Mutex;
@@ -198,7 +198,7 @@ impl MockAptosDataClient {
 }
 
 #[async_trait]
-impl AptosDataClient for MockAptosDataClient {
+impl AptosDataClientInterface for MockAptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {
