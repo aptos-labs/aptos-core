@@ -803,16 +803,19 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
 
+        // TODO: cache, the estimation and per-block for computing future estimations
         // 1. Get the block metadata txns
         let mut lookup_version = ledger_info.ledger_version.0;
         let mut blocks = vec![];
         // TODO: discard the first block, because it's an incomplete block?
         for _i in 0..120 {
             match self.db.get_block_info_by_version(lookup_version) {
-                Ok(block) => {
-                    lookup_version = block.0.saturating_sub(1);
-                    blocks.push(block);
-                    // TODO: -1, or just first?
+                Ok((first, last, _)) => {
+                    lookup_version = first.saturating_sub(1);
+                    blocks.push((first, last));
+                    if lookup_version == 0 {
+                        break;
+                    }
                 },
                 Err(_) => {
                     break;
@@ -823,9 +826,9 @@ impl Context {
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
         // TODO: make configurable, 250
-        let block_full_threshold = 250;
+        let block_full_threshold = 1;
         // TODO: if multiple calls to db is a perf issue, combine the calls and then split it up
-        for (first, last, _) in blocks {
+        for (first, last) in blocks {
             let min_inclusion_price =
                 match self
                     .db
@@ -845,15 +848,13 @@ impl Context {
 
         // 3. Get values
         // (1) low
-        let low_price = *min_inclusion_prices.iter().min().unwrap();
+        let low_price = match min_inclusion_prices.iter().take(10).min() {
+            Some(price) => *price,
+            None => min_gas_unit_price,
+        };
 
         // (2) market
-        let mut latest_prices: Vec<_> = min_inclusion_prices
-            .iter()
-            .rev()
-            .take(30)
-            .cloned()
-            .collect();
+        let mut latest_prices: Vec<_> = min_inclusion_prices.iter().take(30).cloned().collect();
         latest_prices.sort();
         let market_price = latest_prices[latest_prices.len() / 2];
 

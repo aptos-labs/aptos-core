@@ -1043,6 +1043,66 @@ async fn test_gas_estimation() {
     context.check_golden_output(resp);
 }
 
+// TODO: the min_gas returned is 0, how to make it something more reasonable like 100?
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_empty() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = context.get("/estimate_gas_price").await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_one_block() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let txn1 = ctx.mint_user_account(creator).await;
+    ctx.commit_block(&vec![txn1]).await;
+
+    let resp = context.get("/estimate_gas_price").await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_one_empty_block() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    ctx.commit_block(&vec![]).await;
+
+    let resp = context.get("/estimate_gas_price").await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_ten_blocks() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    for _i in 0..10 {
+        let txn1 = ctx.mint_user_account(creator).await;
+        ctx.commit_block(&vec![txn1]).await;
+    }
+
+    let resp = context.get("/estimate_gas_price").await;
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_ten_empty_blocks() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    for _i in 0..10 {
+        ctx.commit_block(&vec![]).await;
+    }
+
+    let resp = context.get("/estimate_gas_price").await;
+    context.check_golden_output(resp);
+}
+
 fn gen_string(len: u64) -> String {
     let mut rng = thread_rng();
     std::iter::repeat(())
