@@ -56,7 +56,7 @@ fn test_script(chain_id: ChainId, time: u64) {
 
     // run script before the stricter rules take effect
     executor.new_block_with_timestamp(time - 1);
-    executor.exec("reconfiguration", "reconfigure", vec![], vec![]);
+    executor.exec("reconfiguration", "reconfigure", vec![], vec![], true);
 
     let txn = sender
         .account()
@@ -78,7 +78,7 @@ fn test_script(chain_id: ChainId, time: u64) {
 
     // run script after the stricter rules take effect
     executor.new_block_with_timestamp(time);
-    executor.exec("reconfiguration", "reconfigure", vec![], vec![]);
+    executor.exec("reconfiguration", "reconfigure", vec![], vec![], true);
 
     let txn = sender
         .account()

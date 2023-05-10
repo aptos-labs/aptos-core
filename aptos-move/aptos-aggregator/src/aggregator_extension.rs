@@ -312,13 +312,11 @@ impl AggregatorData {
         resolver: &dyn TableResolver,
         aggregator_enabled: bool,
     ) -> &mut Aggregator {
-        self.aggregators.entry(id).or_insert_with(|| {
-            Aggregator {
-                value: 0,
-                state: AggregatorState::PositiveDelta,
-                limit,
-                history: Some(History::new()),
-            }
+        self.aggregators.entry(id).or_insert_with(|| Aggregator {
+            value: 0,
+            state: AggregatorState::PositiveDelta,
+            limit,
+            history: Some(History::new()),
         });
 
         let aggregator = self.aggregators.get_mut(&id).unwrap();
@@ -425,12 +423,17 @@ mod test {
     fn test_materialize_known_aggregator_disabled() {
         let mut aggregator_data = AggregatorData::default();
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
-        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, &*TEST_RESOLVER, true);
+        let aggregator =
+            aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, &*TEST_RESOLVER, true);
         assert_ok!(aggregator.add(100));
         assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
 
-        let aggregator =
-        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, &*TEST_RESOLVER, false);
+        let aggregator = aggregator_data.get_aggregator(
+            aggregator_id_for_test(200),
+            200,
+            &*TEST_RESOLVER,
+            false,
+        );
         assert_eq!(aggregator.state, AggregatorState::Data);
         assert_eq!(aggregator.value, 100);
         assert_ok!(aggregator.add(50));
@@ -454,11 +457,17 @@ mod test {
     fn test_materialize_overflow_aggregator_disabled() {
         let mut aggregator_data = AggregatorData::default();
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 600);
-        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, true);
+        let aggregator =
+            aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, true);
         assert_ok!(aggregator.add(300));
         assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
 
-        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, false);
+        let aggregator = aggregator_data.get_aggregator(
+            aggregator_id_for_test(200),
+            600,
+            &*TEST_RESOLVER,
+            false,
+        );
         println!("::{}", aggregator.value);
         assert_err!(aggregator.add(400));
     }
@@ -478,11 +487,17 @@ mod test {
     fn test_materialize_underflow_aggregator_disabled() {
         let mut aggregator_data = AggregatorData::default();
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 600);
-        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, true);
+        let aggregator =
+            aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, true);
         assert_ok!(aggregator.add(300));
         assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &aggregator_id_for_test(200)));
 
-        let aggregator = aggregator_data.get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, false);
+        let aggregator = aggregator_data.get_aggregator(
+            aggregator_id_for_test(200),
+            600,
+            &*TEST_RESOLVER,
+            false,
+        );
         println!("::{}", aggregator.value);
         assert_err!(aggregator.sub(400));
     }
