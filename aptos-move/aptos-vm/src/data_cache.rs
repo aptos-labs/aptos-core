@@ -3,14 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::move_vm_ext::MoveResolverExt;
+use crate::{
+    aptos_vm_impl::gas_config,
+    move_vm_ext::{get_max_binary_format_version, MoveResolverExt},
+};
 #[allow(unused_imports)]
 use anyhow::Error;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    on_chain_config::ConfigStorage,
+    on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
 };
 use move_binary_format::{errors::*, CompiledModule};
@@ -28,8 +31,8 @@ pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
     metadata: &[Metadata],
 ) -> Option<StructTag> {
-    let metadata = aptos_framework::get_metadata(metadata)?;
-    metadata
+    let metadata = aptos_framework::get_metadata(metadata);
+    metadata?
         .struct_attributes
         .get(struct_tag.name.as_ident_str().as_str())?
         .iter()
@@ -114,7 +117,14 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
             Ok(Some(bytes)) => bytes,
             _ => return vec![],
         };
-        let module = match CompiledModule::deserialize(&module_bytes) {
+        let (_, gas_feature_version) = gas_config(self);
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let max_binary_format_version =
+            get_max_binary_format_version(&features, gas_feature_version);
+        let module = match CompiledModule::deserialize_with_max_version(
+            &module_bytes,
+            max_binary_format_version,
+        ) {
             Ok(module) => module,
             _ => return vec![],
         };

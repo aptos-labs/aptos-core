@@ -27,6 +27,14 @@ pub struct MoveVmExt {
     chain_id: u8,
 }
 
+pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u64) -> u32 {
+    if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
+        6
+    } else {
+        5
+    }
+}
+
 impl MoveVmExt {
     pub fn new(
         native_gas_params: NativeGasParameters,
@@ -40,11 +48,7 @@ impl MoveVmExt {
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
         let max_binary_format_version =
-            if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
-                6
-            } else {
-                5
-            };
+            get_max_binary_format_version(&features, gas_feature_version);
 
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);

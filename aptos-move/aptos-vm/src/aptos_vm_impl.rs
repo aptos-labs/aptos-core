@@ -53,6 +53,26 @@ pub struct AptosVMImpl {
     features: Features,
 }
 
+pub fn gas_config(storage: &StorageAdapter<impl StateView>) -> (Option<AptosGasParameters>, u64) {
+    match GasScheduleV2::fetch_config(storage) {
+        Some(gas_schedule) => {
+            let feature_version = gas_schedule.feature_version;
+            let map = gas_schedule.to_btree_map();
+            (
+                AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
+                feature_version,
+            )
+        },
+        None => match GasSchedule::fetch_config(storage) {
+            Some(gas_schedule) => {
+                let map = gas_schedule.to_btree_map();
+                (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
+            },
+            None => (None, 0),
+        },
+    }
+}
+
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new(state: &impl StateView) -> Self {
@@ -60,23 +80,7 @@ impl AptosVMImpl {
 
         // Get the gas parameters
         let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
-            match GasScheduleV2::fetch_config(&storage) {
-                Some(gas_schedule) => {
-                    let feature_version = gas_schedule.feature_version;
-                    let map = gas_schedule.to_btree_map();
-                    (
-                        AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
-                        feature_version,
-                    )
-                },
-                None => match GasSchedule::fetch_config(&storage) {
-                    Some(gas_schedule) => {
-                        let map = gas_schedule.to_btree_map();
-                        (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
-                    },
-                    None => (None, 0),
-                },
-            };
+            gas_config(&storage);
 
         let storage_gas_schedule = match gas_feature_version {
             0 => None,
