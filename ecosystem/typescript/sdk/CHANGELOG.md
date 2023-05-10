@@ -6,6 +6,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Fix get number of delegators Indexer query
+
 ## 1.8.5 (2023-04-29)
 
 - Add local tests for `AnsClient`
