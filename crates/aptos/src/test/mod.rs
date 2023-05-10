@@ -53,14 +53,13 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
 use aptos_rest_client::{
-    aptos_api_types::{IdentifierWrapper, MoveStructTag, MoveType},
+    aptos_api_types::{MoveStructTag, MoveType},
     Transaction,
 };
-use aptos_sdk::move_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-};
+use aptos_sdk::move_types::{account_address::AccountAddress, language_storage::ModuleId};
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
+use move_core_types::ident_str;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -312,11 +311,8 @@ impl CliTestFramework {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
                 function_id: MemberId {
-                    module_id: ModuleId::new(
-                        AccountAddress::ONE,
-                        Identifier::from_str("coin").unwrap(),
-                    ),
-                    member_id: Identifier::from_str("transfer").unwrap(),
+                    module_id: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    member_id: ident_str!("transfer").into(),
                 },
                 arg_vec: ArgWithTypeVec {
                     args: vec![
@@ -326,8 +322,8 @@ impl CliTestFramework {
                 },
                 type_args: vec![MoveType::Struct(MoveStructTag::new(
                     AccountAddress::ONE.into(),
-                    IdentifierWrapper::from_str("aptos_coin").unwrap(),
-                    IdentifierWrapper::from_str("AptosCoin").unwrap(),
+                    ident_str!("aptos_coin").into(),
+                    ident_str!("AptosCoin").into(),
                     vec![],
                 ))],
             },

@@ -113,8 +113,8 @@ impl Default for TransactionType {
 pub trait TransactionGenerator: Sync + Send {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction>;
 }
 

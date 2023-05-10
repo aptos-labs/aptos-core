@@ -6,7 +6,7 @@ use crate::{
     benchmark_transaction::BenchmarkTransaction,
     db_access::{CoinStore, DbAccessUtil},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aptos_crypto::HashValue;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
@@ -46,11 +46,11 @@ impl GenInitTransactionExecutor for DbGenInitTransactionExecutor {
     async fn query_sequence_number(&self, address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
         let address_account_view = db_state_view.as_account_with_state_view(&address);
-        Ok(address_account_view
+        address_account_view
             .get_account_resource()
             .unwrap()
-            .unwrap()
-            .sequence_number())
+            .map(|account| account.sequence_number())
+            .context("account doesn't exist")
     }
 
     async fn execute_transactions_with_counter(
@@ -71,7 +71,9 @@ impl GenInitTransactionExecutor for DbGenInitTransactionExecutor {
         )?;
 
         for txn in txns {
-            while txn.sequence_number() > self.query_sequence_number(txn.sender()).await? {
+            // Pipeline commit makes sure all initialization transactions
+            // get committed succesfully on-chain
+            while txn.sequence_number() >= self.query_sequence_number(txn.sender()).await? {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         }

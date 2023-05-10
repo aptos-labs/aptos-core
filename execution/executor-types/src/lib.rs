@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 pub use error::Error;
+pub use executed_block::ExecutedBlock;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ use std::{
 };
 
 mod error;
+mod executed_block;
 mod executed_chunk;
 pub mod in_memory_state_calculator;
 mod parsed_transaction_output;

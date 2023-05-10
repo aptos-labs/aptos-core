@@ -98,18 +98,6 @@ export const GetAccountTransactionsData = `
   }
 }
     `;
-export const GetCurrentDelegatorBalancesCount = `
-    query getCurrentDelegatorBalancesCount($poolAddress: String) {
-  current_delegator_balances_aggregate(
-    where: {pool_type: {_eq: "active_shares"}, pool_address: {_eq: $poolAddress}, amount: {_gt: "0"}}
-    distinct_on: delegator_address
-  ) {
-    aggregate {
-      count
-    }
-  }
-}
-    `;
 export const GetDelegatedStakingActivities = `
     query getDelegatedStakingActivities($delegatorAddress: String, $poolAddress: String) {
   delegated_staking_activities(
@@ -128,6 +116,16 @@ export const GetIndexerLedgerInfo = `
     query getIndexerLedgerInfo {
   ledger_infos {
     chain_id
+  }
+}
+    `;
+export const GetNumberOfDelegators = `
+    query getNumberOfDelegators($poolAddress: String) {
+  num_active_delegator_per_pool(
+    where: {pool_address: {_eq: $poolAddress}, num_active_delegator: {_gt: "0"}}
+    distinct_on: pool_address
+  ) {
+    num_active_delegator
   }
 }
     `;
@@ -233,14 +231,14 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getAccountTransactionsData(variables?: Types.GetAccountTransactionsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTransactionsDataQuery>(GetAccountTransactionsData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTransactionsData', 'query');
     },
-    getCurrentDelegatorBalancesCount(variables?: Types.GetCurrentDelegatorBalancesCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCurrentDelegatorBalancesCountQuery> {
-      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCurrentDelegatorBalancesCountQuery>(GetCurrentDelegatorBalancesCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCurrentDelegatorBalancesCount', 'query');
-    },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');
     },
     getIndexerLedgerInfo(variables?: Types.GetIndexerLedgerInfoQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetIndexerLedgerInfoQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetIndexerLedgerInfoQuery>(GetIndexerLedgerInfo, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getIndexerLedgerInfo', 'query');
+    },
+    getNumberOfDelegators(variables?: Types.GetNumberOfDelegatorsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetNumberOfDelegatorsQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetNumberOfDelegatorsQuery>(GetNumberOfDelegators, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getNumberOfDelegators', 'query');
     },
     getTokenActivities(variables: Types.GetTokenActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivities', 'query');
