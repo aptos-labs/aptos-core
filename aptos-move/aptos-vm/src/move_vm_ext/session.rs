@@ -17,7 +17,6 @@ use aptos_framework::natives::{
     code::{NativeCodeContext, PublishRequest},
 };
 use aptos_gas::ChangeSetConfigs;
-use aptos_logger::error;
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -32,7 +31,7 @@ use move_core_types::{
     effects::{
         AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
     },
-    language_storage::{ModuleId, StructTag, CORE_CODE_ADDRESS},
+    language_storage::{ModuleId, StructTag},
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
@@ -131,9 +130,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ) -> VMResult<ChangeSetExt> {
         let move_vm = self.inner.get_move_vm();
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
-        let (change_set, resource_group_change_set, updated_timestamp) =
-            Self::process_resource_group_and_timestamp(move_vm, self.remote, change_set)?;
-        let current_time = Self::get_current_timestamp(updated_timestamp, self.remote);
+
+        let (change_set, resource_group_change_set) =
+            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
+        let current_time = CurrentTimeMicroseconds::fetch_config(self.remote);
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -166,8 +166,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ctx.requested_module_bundle.take()
     }
 
-    /// * Separate the resource groups from the non-resource groups and parse the latest timestamp
-    ///   if updated.
+    /// * Separate the resource groups from the non-resource.
     /// * non-resource groups are kept as is
     /// * resource groups are merged into the correct format as deltas to the source data
     ///   * Remove resource group data from the deltas
@@ -185,15 +184,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
-    fn process_resource_group_and_timestamp(
+    fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn MoveResolverExt,
         change_set: MoveChangeSet,
-    ) -> VMResult<(
-        MoveChangeSet,
-        MoveChangeSet,
-        Result<Option<CurrentTimeMicroseconds>, ()>,
-    )> {
+    ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -201,10 +196,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .finish(Location::Undefined);
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
-        // Assuming the timestamp has not been updated in this session by returning Ok(None), which
-        //   results in the call site to assume the timestamp to be the same as in the base state
-        //   view
-        let mut updated_timestamp: Result<Option<CurrentTimeMicroseconds>, ()> = Ok(None);
 
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
@@ -222,12 +213,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
                 } else {
-                    if addr == CORE_CODE_ADDRESS
-                        && CurrentTimeMicroseconds::struct_tag() == struct_tag
-                    {
-                        updated_timestamp = Self::parse_updated_timestamp(&blob_op)
-                    }
-
                     change_set_filtered
                         .add_resource_op(addr, struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
@@ -291,46 +276,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        Ok((
-            change_set_filtered,
-            resource_group_change_set,
-            updated_timestamp,
-        ))
-    }
-
-    // Seen the global timestamp resource being updated.
-    //   returns Ok(Some(timestamp)) if successfully parsed it
-    //   returns Err(()) if failed to parse or seeing a delete, which will result in the call site
-    //     assuming the timestamp to be None
-    fn parse_updated_timestamp(
-        op: &MoveStorageOp<Vec<u8>>,
-    ) -> Result<Option<CurrentTimeMicroseconds>, ()> {
-        match op {
-            MoveStorageOp::New(bytes) | MoveStorageOp::Modify(bytes) => {
-                match bcs::from_bytes(bytes) {
-                    Ok(current_time) => Ok(Some(current_time)),
-                    Err(err) => {
-                        error!("Failed to deserialize CurrentTimeMicroseconds. {}", err);
-                        Err(())
-                    },
-                }
-            },
-            MoveStorageOp::Delete => {
-                error!("CurrentTimeMicroseconds got deleted.");
-                Err(())
-            },
-        }
-    }
-
-    fn get_current_timestamp(
-        updated_timestamp: Result<Option<CurrentTimeMicroseconds>, ()>,
-        remote: &dyn MoveResolverExt,
-    ) -> Option<CurrentTimeMicroseconds> {
-        match updated_timestamp {
-            Ok(Some(timestamp)) => Some(timestamp),
-            Ok(None) => CurrentTimeMicroseconds::fetch_config(remote),
-            Err(()) => None,
-        }
+        Ok((change_set_filtered, resource_group_change_set))
     }
 
     pub fn convert_change_set<C: AccessPathCache>(
