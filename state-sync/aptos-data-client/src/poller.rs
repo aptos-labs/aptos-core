@@ -164,7 +164,7 @@ pub(crate) fn poll_peer(
         let data_request = DataRequest::GetStorageServerSummary;
         let storage_request =
             StorageServiceRequest::new(data_request, data_client.use_compression());
-        let request_timeout = data_client.data_client_config.response_timeout_ms;
+        let request_timeout = data_client.get_response_timeout_ms();
 
         // Start the peer polling timer
         let timer = start_request_timer(
