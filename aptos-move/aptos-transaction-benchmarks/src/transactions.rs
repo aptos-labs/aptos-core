@@ -22,7 +22,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 /// Benchmarking support for transactions.
 #[derive(Clone)]
@@ -30,16 +30,6 @@ pub struct TransactionBencher<S> {
     num_accounts: usize,
     num_transactions: usize,
     strategy: S,
-}
-
-impl<S> Debug for TransactionBencher<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "TransactionBencher: num_accounts {:?}, num_transactions {:?}",
-            self.num_accounts, self.num_transactions
-        )
-    }
 }
 
 impl<S> TransactionBencher<S>

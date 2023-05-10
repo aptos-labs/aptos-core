@@ -51,16 +51,16 @@ struct ParallelAndSeqOpt {
 
 #[derive(Debug, Parser)]
 struct ParallelExecutionOpt {
-    #[clap(long, default_value = "10000")]
+    #[clap(long, default_value = "200000")]
     pub num_accounts: usize,
 
-    #[clap(long, default_value = "2")]
+    #[clap(long, default_value = "5")]
     pub num_warmups: usize,
 
-    #[clap(long, default_value = "50000")]
+    #[clap(long, default_value = "100000")]
     pub block_size: usize,
 
-    #[clap(long, default_value = "10")]
+    #[clap(long, default_value = "15")]
     pub num_blocks: usize,
 
     #[clap(long, default_value = "8")]

@@ -193,8 +193,6 @@ impl BlockAptosVM {
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
-        // TODO (skedia) add speculative logs back - it currently doesn't support initializing twice
-        init_speculative_logs(signature_verified_block.len());
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(

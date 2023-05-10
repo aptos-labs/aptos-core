@@ -59,7 +59,7 @@ impl<S: StateView + Sync> ExecutorShard<S> {
                     );
                     let ret = BlockAptosVM::execute_block_benchmark(
                         self.executor_thread_pool.clone(),
-                        transactions.clone(),
+                        transactions,
                         self.state_view.as_ref(),
                         self.num_executor_threads,
                     );
