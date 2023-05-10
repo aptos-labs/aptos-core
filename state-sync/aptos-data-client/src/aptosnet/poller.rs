@@ -174,7 +174,7 @@ pub(crate) fn poll_peer(
         );
 
         // Fetch the storage summary for the peer and stop the timer
-        let result: crate::Result<StorageServerSummary> = data_client
+        let result: crate::error::Result<StorageServerSummary> = data_client
             .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
             .await
             .map(Response::into_payload);

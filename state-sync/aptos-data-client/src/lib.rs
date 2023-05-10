@@ -13,6 +13,7 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use async_trait::async_trait;
+use error::Error;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fmt::Display};
@@ -21,52 +22,7 @@ use thiserror::Error;
 pub type ResponseId = u64;
 
 pub mod aptosnet;
-
-pub type Result<T, E = Error> = ::std::result::Result<T, E>;
-
-// TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
-/// An error returned by the Aptos Data Client for failed API calls.
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
-pub enum Error {
-    #[error("The requested data is unavailable and cannot be found! Error: {0}")]
-    DataIsUnavailable(String),
-    #[error("The requested data is too large: {0}")]
-    DataIsTooLarge(String),
-    #[error("Invalid request: {0}")]
-    InvalidRequest(String),
-    #[error("Invalid response: {0}")]
-    InvalidResponse(String),
-    #[error("Timed out waiting for a response: {0}")]
-    TimeoutWaitingForResponse(String),
-    #[error("Unexpected error encountered: {0}")]
-    UnexpectedErrorEncountered(String),
-}
-
-impl Error {
-    /// Returns a summary label for the error
-    pub fn get_label(&self) -> &'static str {
-        match self {
-            Self::DataIsUnavailable(_) => "data_is_unavailable",
-            Self::DataIsTooLarge(_) => "data_is_too_large",
-            Self::InvalidRequest(_) => "invalid_request",
-            Self::InvalidResponse(_) => "invalid_response",
-            Self::TimeoutWaitingForResponse(_) => "timeout_waiting_for_response",
-            Self::UnexpectedErrorEncountered(_) => "unexpected_error_encountered",
-        }
-    }
-}
-
-impl From<aptos_storage_service_client::Error> for Error {
-    fn from(error: aptos_storage_service_client::Error) -> Self {
-        Self::UnexpectedErrorEncountered(error.to_string())
-    }
-}
-
-impl From<aptos_storage_service_types::responses::Error> for Error {
-    fn from(error: aptos_storage_service_types::responses::Error) -> Self {
-        Self::InvalidResponse(error.to_string())
-    }
-}
+mod error;
 
 /// The API offered by the Aptos Data Client.
 #[async_trait]
@@ -86,7 +42,7 @@ pub trait AptosDataClient {
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
+    ) -> error::Result<Response<Vec<LedgerInfoWithSignatures>>>;
 
     /// Fetches a new transaction output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -97,7 +53,7 @@ pub trait AptosDataClient {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -109,7 +65,7 @@ pub trait AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
 
     /// Fetches a new transaction or output list with proof. Versions start at
     /// `known_version + 1` and `known_epoch` (inclusive). The end version
@@ -121,14 +77,14 @@ pub trait AptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+    ) -> error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
 
     /// Fetches the number of states at the specified version.
     async fn get_number_of_states(
         &self,
         version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<u64>>;
+    ) -> error::Result<Response<u64>>;
 
     /// Fetches a single state value chunk with proof, containing the values
     /// from start to end index (inclusive) at the specified version. The proof
@@ -141,7 +97,7 @@ pub trait AptosDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
-    ) -> Result<Response<StateValueChunkWithProof>>;
+    ) -> error::Result<Response<StateValueChunkWithProof>>;
 
     /// Fetches a transaction output list with proof, with transaction
     /// outputs from start to end versions (inclusive). The proof is relative
@@ -154,7 +110,7 @@ pub trait AptosDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOutputListWithProof>>;
 
     /// Fetches a transaction list with proof, with transactions from
     /// start to end versions (inclusive). The proof is relative to the
@@ -169,7 +125,7 @@ pub trait AptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionListWithProof>>;
+    ) -> error::Result<Response<TransactionListWithProof>>;
 
     /// Fetches a transaction or output list with proof, with data from
     /// start to end versions (inclusive). The proof is relative to the
@@ -184,7 +140,7 @@ pub trait AptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOrOutputListWithProof>>;
+    ) -> error::Result<Response<TransactionOrOutputListWithProof>>;
 }
 
 /// A response error that users of the Aptos Data Client can use to notify
@@ -312,7 +268,7 @@ impl TryFrom<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)> for R
 
     fn try_from(
         inner: (TransactionOrOutputListWithProof, LedgerInfoWithSignatures),
-    ) -> Result<Self, Error> {
+    ) -> error::Result<Self, Error> {
         let ((transaction_list, output_list), ledger_info) = inner;
         if let Some(transaction_list) = transaction_list {
             Ok(Self::NewTransactionsWithProof((
@@ -353,7 +309,7 @@ impl From<TransactionListWithProof> for ResponsePayload {
 impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
     type Error = Error;
 
-    fn try_from(inner: TransactionOrOutputListWithProof) -> Result<Self, Error> {
+    fn try_from(inner: TransactionOrOutputListWithProof) -> error::Result<Self, Error> {
         let (transaction_list, output_list) = inner;
         if let Some(transaction_list) = transaction_list {
             Ok(Self::TransactionsWithProof(transaction_list))

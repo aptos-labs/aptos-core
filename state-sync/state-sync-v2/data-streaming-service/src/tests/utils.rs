@@ -442,7 +442,7 @@ impl AptosDataClient for MockAptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> aptos_data_client::Result<
+    ) -> aptos_data_client::error::Result<
         Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
         self.verify_request_timeout(
@@ -567,7 +567,7 @@ impl AptosDataClient for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> aptos_data_client::Result<Response<TransactionOrOutputListWithProof>> {
+    ) -> aptos_data_client::error::Result<Response<TransactionOrOutputListWithProof>> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,

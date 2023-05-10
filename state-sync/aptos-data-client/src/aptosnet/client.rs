@@ -131,7 +131,7 @@ impl AptosNetDataClient {
     }
 
     /// Recompute and update the global data summary cache
-    pub fn update_global_summary_cache(&self) -> crate::Result<(), Error> {
+    pub fn update_global_summary_cache(&self) -> crate::error::Result<(), Error> {
         // Before calculating the summary, we should garbage collect
         // the peer states (to handle disconnected peers).
         self.garbage_collect_peer_states()?;
@@ -144,7 +144,7 @@ impl AptosNetDataClient {
     }
 
     /// Garbage collects the peer states to remove data for disconnected peers
-    fn garbage_collect_peer_states(&self) -> crate::Result<(), Error> {
+    fn garbage_collect_peer_states(&self) -> crate::error::Result<(), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
@@ -161,7 +161,7 @@ impl AptosNetDataClient {
     pub(crate) fn choose_peer_for_request(
         &self,
         request: &StorageServiceRequest,
-    ) -> crate::Result<PeerNetworkId, Error> {
+    ) -> crate::error::Result<PeerNetworkId, Error> {
         // All requests should be sent to prioritized peers (if possible).
         // If none can handle the request, fall back to the regular peers.
         let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
@@ -197,7 +197,9 @@ impl AptosNetDataClient {
     }
 
     /// Fetches the next prioritized peer to poll
-    pub fn fetch_prioritized_peer_to_poll(&self) -> crate::Result<Option<PeerNetworkId>, Error> {
+    pub fn fetch_prioritized_peer_to_poll(
+        &self,
+    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
         let num_in_flight_polls = self.peer_states.read().num_in_flight_priority_polls();
         update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
@@ -213,7 +215,7 @@ impl AptosNetDataClient {
     }
 
     /// Fetches the next regular peer to poll
-    pub fn fetch_regular_peer_to_poll(&self) -> crate::Result<Option<PeerNetworkId>, Error> {
+    pub fn fetch_regular_peer_to_poll(&self) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
         let num_in_flight_polls = self.peer_states.read().num_in_flight_regular_polls();
         update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
@@ -232,7 +234,7 @@ impl AptosNetDataClient {
     fn select_peer_to_poll(
         &self,
         mut peers: Vec<PeerNetworkId>,
-    ) -> crate::Result<Option<PeerNetworkId>, Error> {
+    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Identify the peers who do not already have in-flight requests.
         peers.retain(|peer| !self.peer_states.read().existing_in_flight_request(peer));
 
@@ -254,7 +256,7 @@ impl AptosNetDataClient {
     }
 
     /// Returns all peers connected to us
-    fn get_all_connected_peers(&self) -> crate::Result<Vec<PeerNetworkId>, Error> {
+    fn get_all_connected_peers(&self) -> crate::error::Result<Vec<PeerNetworkId>, Error> {
         let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
             return Err(Error::DataIsUnavailable(
@@ -268,7 +270,7 @@ impl AptosNetDataClient {
     /// Returns all priority and regular peers
     pub(crate) fn get_priority_and_regular_peers(
         &self,
-    ) -> crate::Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
+    ) -> crate::error::Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
@@ -297,7 +299,7 @@ impl AptosNetDataClient {
         &self,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -322,7 +324,7 @@ impl AptosNetDataClient {
         peer: PeerNetworkId,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -365,7 +367,7 @@ impl AptosNetDataClient {
         peer: PeerNetworkId,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<StorageServiceResponse>, Error> {
+    ) -> crate::error::Result<Response<StorageServiceResponse>, Error> {
         let id = self.next_response_id();
         trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
@@ -480,7 +482,7 @@ impl AptosNetDataClient {
         &self,
         request_timeout_ms: u64,
         data_request: DataRequest,
-    ) -> crate::Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -502,7 +504,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<Vec<LedgerInfoWithSignatures>>> {
+    ) -> crate::error::Result<Response<Vec<LedgerInfoWithSignatures>>> {
         let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
             start_epoch,
             expected_end_epoch,
@@ -518,7 +520,8 @@ impl AptosDataClient for AptosNetDataClient {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
         let data_request =
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
@@ -534,7 +537,7 @@ impl AptosDataClient for AptosNetDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
         let data_request =
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version,
@@ -551,7 +554,8 @@ impl AptosDataClient for AptosNetDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
         let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
             NewTransactionsOrOutputsWithProofRequest {
                 known_version,
@@ -568,7 +572,7 @@ impl AptosDataClient for AptosNetDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<u64>> {
+    ) -> crate::error::Result<Response<u64>> {
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
@@ -580,7 +584,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<StateValueChunkWithProof>> {
+    ) -> crate::error::Result<Response<StateValueChunkWithProof>> {
         let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
             start_index,
@@ -596,7 +600,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<TransactionOutputListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionOutputListWithProof>> {
         let data_request =
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version,
@@ -614,7 +618,7 @@ impl AptosDataClient for AptosNetDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<TransactionListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionListWithProof>> {
         let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
             proof_version,
             start_version,
@@ -632,7 +636,7 @@ impl AptosDataClient for AptosNetDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> crate::Result<Response<TransactionOrOutputListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionOrOutputListWithProof>> {
         let data_request =
             DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                 proof_version,
