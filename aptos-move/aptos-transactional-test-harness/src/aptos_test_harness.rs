@@ -25,10 +25,7 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{
-    data_cache::{AsMoveResolver, IntoMoveResolver, StorageAdapterOwned},
-    AptosVM, VMExecutor,
-};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::StructOpt;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -74,7 +71,7 @@ use std::{
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: StorageAdapterOwned<FakeDataStore>,
+    storage: FakeDataStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
 }
@@ -400,8 +397,8 @@ impl<'a> AptosTestAdapter<'a> {
                 )
             })?;
 
-        let annotated =
-            MoveValueAnnotator::new(&self.storage).view_resource(&aptos_coin_tag, &balance_blob)?;
+        let annotated = MoveValueAnnotator::new(&self.storage.as_move_resolver())
+            .view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
         for (key, val) in annotated.value {
@@ -573,7 +570,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Genesis modules
-        let mut storage = FakeDataStore::new(HashMap::new()).into_move_resolver();
+        let mut storage = FakeDataStore::new(HashMap::new());
         storage.add_write_set(GENESIS_CHANGE_SET_HEAD.write_set());
 
         // Builtin private key mapping
@@ -863,7 +860,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
+        view_resource_in_move_storage(
+            &self.storage.as_move_resolver(),
+            address,
+            module,
+            resource,
+            type_args,
+        )
     }
 
     fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {

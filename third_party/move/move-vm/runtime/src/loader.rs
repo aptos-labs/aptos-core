@@ -26,7 +26,6 @@ use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    metadata::Metadata,
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -574,19 +573,6 @@ impl Loader {
     /// Check whether this cache is invalidated.
     pub(crate) fn is_invalidated(&self) -> bool {
         *self.invalidated.read()
-    }
-
-    /// Copies metadata out of a modules bytecode if available.
-    pub(crate) fn get_metadata(&self, module: ModuleId, key: &[u8]) -> Option<Metadata> {
-        let cache = self.module_cache.read();
-        cache
-            .modules
-            .get(&module)?
-            .module
-            .metadata
-            .iter()
-            .find(|md| md.key == key)
-            .cloned()
     }
 
     //
@@ -1464,14 +1450,8 @@ impl Loader {
         self.module_cache.read().function_at(idx)
     }
 
-    fn get_module(&self, idx: &ModuleId) -> Arc<Module> {
-        Arc::clone(
-            self.module_cache
-                .read()
-                .modules
-                .get(idx)
-                .expect("ModuleId on Function must exist"),
-        )
+    pub(crate) fn get_module(&self, idx: &ModuleId) -> Option<Arc<Module>> {
+        self.module_cache.read().modules.get(idx).cloned()
     }
 
     fn get_script(&self, hash: &ScriptHash) -> Arc<Script> {
@@ -2472,7 +2452,9 @@ impl Function {
     pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {
-                let module = loader.get_module(module_id);
+                let module = loader
+                    .get_module(module_id)
+                    .expect("ModuleId on Function must exist");
                 Resolver::for_module(loader, module)
             },
             Scope::Script(script_hash) => {
