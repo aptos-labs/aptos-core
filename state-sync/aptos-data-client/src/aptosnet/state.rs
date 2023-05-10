@@ -4,7 +4,7 @@
 use crate::{
     aptosnet::logging::{LogEntry, LogEvent, LogSchema},
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
-    ResponseError,
+    interface::ResponseError,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},

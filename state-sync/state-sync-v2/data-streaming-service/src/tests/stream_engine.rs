@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
-    ResponsePayload,
+    interface::ResponsePayload,
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_storage_service_types::responses::CompleteDataRange;

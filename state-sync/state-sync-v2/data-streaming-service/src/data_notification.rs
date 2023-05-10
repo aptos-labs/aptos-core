@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::streaming_client::Epoch;
-use aptos_data_client::{Response, ResponsePayload};
+use aptos_data_client::interface::{Response, ResponsePayload};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,

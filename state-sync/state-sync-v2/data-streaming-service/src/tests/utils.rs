@@ -7,7 +7,9 @@ use aptos_config::config::AptosDataClientConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
-    AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+    interface::{
+        AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+    },
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;
