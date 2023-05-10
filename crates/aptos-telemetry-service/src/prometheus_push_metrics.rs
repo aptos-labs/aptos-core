@@ -43,7 +43,15 @@ pub async fn handle_metrics_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
     let timestamp = Utc::now().timestamp() as usize;
-    push_metrics_to_clients(context, claims, encoding, metrics_body, timestamp).await
+    push_metrics_to_clients(
+        context,
+        claims,
+        encoding,
+        metrics_body,
+        timestamp,
+        Vec::new(),
+    )
+    .await
 }
 
 pub async fn push_metrics_to_clients(
@@ -52,6 +60,7 @@ pub async fn push_metrics_to_clients(
     encoding: Option<String>,
     metrics_body: Bytes,
     timestamp: usize,
+    ignore_clients: Vec<String>,
 ) -> anyhow::Result<impl Reply, Rejection> {
     let extra_labels = claims_to_extra_labels(
         &claims,
@@ -69,14 +78,20 @@ pub async fn push_metrics_to_clients(
     };
 
     let start_timer = Instant::now();
+    let successful_clients = aptos_infallible::RwLock::new(Vec::<String>::new());
 
     let post_futures = client.iter().map(|(name, client)| async {
+        // If the metrics were successfully pushed to a client before, then that client is included in `ignore_clients` vector
+        if ignore_clients.contains(name) {
+            successful_clients.write().push(name.clone());
+            return Ok(());
+        }
         let result = client
             .post_prometheus_metrics(
                 metrics_body.clone(),
                 extra_labels.clone(),
                 encoding.clone().unwrap_or_default(),
-                timestamp
+                timestamp,
             )
             .await;
 
@@ -87,6 +102,7 @@ pub async fn push_metrics_to_clients(
                     .observe(start_timer.elapsed().as_secs_f64());
                 if res.status().is_success() {
                     debug!("remote write to victoria metrics succeeded");
+                    successful_clients.write().push(name.clone());
                 } else {
                     error!(
                         "remote write failed to victoria_metrics for client {}: {}",
@@ -100,16 +116,6 @@ pub async fn push_metrics_to_clients(
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
                     .with_label_values(&[name, "Unknown"])
                     .observe(start_timer.elapsed().as_secs_f64());
-                context
-                    .downtime_metrics_cache()
-                    .write()
-                    .push_back(MetricsEntry {
-                        context: context.clone(),
-                        claims: claims.clone(),
-                        encoding: encoding.clone(),
-                        metrics_body: metrics_body.clone(),
-                        timestamp,
-                    });
                 error!(
                     "error sending remote write request for client {}: {}",
                     name.clone(),
@@ -120,6 +126,20 @@ pub async fn push_metrics_to_clients(
         }
         Ok(())
     });
+
+    if successful_clients.read().len() < client.len() {
+        context
+            .downtime_metrics_cache()
+            .write()
+            .push_back(MetricsEntry {
+                context: context.clone(),
+                claims: claims.clone(),
+                encoding: encoding.clone(),
+                metrics_body: metrics_body.clone(),
+                timestamp,
+                ignore_clients: successful_clients.read().clone(),
+            });
+    }
 
     #[allow(clippy::unnecessary_fold)]
     if futures::future::join_all(post_futures)

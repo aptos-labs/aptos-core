@@ -14,6 +14,7 @@ pub struct MetricsEntry {
     pub encoding: Option<String>,
     pub metrics_body: Bytes,
     pub timestamp: usize, // The timestamp at which the metrics was originally submitted to a client.
+    pub ignore_clients: Vec<String>, // Don't resubmit these metrics to these clients.
 }
 
 /// This struct caches the metrics when a client is down.
@@ -56,6 +57,7 @@ impl DowntimeMetricsCacheUpdater {
                     entry.encoding,
                     entry.metrics_body,
                     entry.timestamp,
+                    entry.ignore_clients,
                 )
                 .await;
             }

@@ -38,7 +38,7 @@ pub mod victoria_metrics_api {
             raw_metrics_body: Bytes,
             extra_labels: Vec<String>,
             encoding: String,
-            timestamp: usize
+            timestamp: usize,
         ) -> Result<reqwest::Response, anyhow::Error> {
             let labels: Vec<(String, String)> = extra_labels
                 .iter()
@@ -46,7 +46,10 @@ pub mod victoria_metrics_api {
                 .collect();
 
             self.inner
-                .post(format!("{}api/v1/import/prometheus?timestamp={}", self.base_url,timestamp))
+                .post(format!(
+                    "{}api/v1/import/prometheus?timestamp={}",
+                    self.base_url, timestamp
+                ))
                 .bearer_auth(self.auth_token.clone())
                 .header(CONTENT_ENCODING, encoding)
                 .query(&labels)
