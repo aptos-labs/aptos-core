@@ -5,7 +5,9 @@ use crate::{
     auth::with_auth,
     constants::MAX_CONTENT_LENGTH,
     context::Context,
-    debug, error,
+    debug,
+    downtime_metrics_cache::MetricsEntry,
+    error,
     errors::{MetricsIngestError, ServiceError},
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
@@ -44,13 +46,13 @@ pub async fn handle_metrics_ingest(
     push_metrics_to_clients(context, claims, encoding, metrics_body, timestamp).await
 }
 
-pub async fn push_metrics_to_clients(context: Context,
+pub async fn push_metrics_to_clients(
+    context: Context,
     claims: Claims,
     encoding: Option<String>,
     metrics_body: Bytes,
-    timestamp: usize
+    timestamp: usize,
 ) -> anyhow::Result<impl Reply, Rejection> {
-
     let extra_labels = claims_to_extra_labels(
         &claims,
         context
@@ -65,7 +67,6 @@ pub async fn push_metrics_to_clients(context: Context,
         },
         _ => &context.metrics_client().ingest_metrics_client,
     };
-
 
     let start_timer = Instant::now();
 
@@ -98,8 +99,16 @@ pub async fn push_metrics_to_clients(context: Context,
                 METRICS_INGEST_BACKEND_REQUEST_DURATION
                     .with_label_values(&[name, "Unknown"])
                     .observe(start_timer.elapsed().as_secs_f64());
-                let downtime_metrics_cache = context.downtime_metrics_cache();
-                downtime_metrics_cache.write().add_metrics_to_cache(context.clone(), claims.clone(), encoding.clone(), metrics_body.clone(), timestamp);
+                context
+                    .downtime_metrics_cache()
+                    .write()
+                    .push_back(MetricsEntry {
+                        context: context.clone(),
+                        claims: claims.clone(),
+                        encoding: encoding.clone(),
+                        metrics_body: metrics_body.clone(),
+                        timestamp,
+                    });
                 error!(
                     "error sending remote write request for client {}: {}",
                     name.clone(),

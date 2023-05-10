@@ -3,9 +3,9 @@
 
 use crate::{
     clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
+    downtime_metrics_cache::MetricsEntry,
     types::common::EpochedPeerStore,
     LogIngestConfig, MetricsEndpointsConfig,
-    downtime_metrics_cache::DowntimeMetricsCache
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
@@ -13,7 +13,7 @@ use aptos_types::{chain_id::ChainId, PeerId};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, TokenData, Validation};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     convert::Infallible,
     sync::Arc,
 };
@@ -166,7 +166,7 @@ pub struct Context {
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
-    downtime_metrics_cache: Arc<RwLock<DowntimeMetricsCache>>
+    downtime_metrics_cache: Arc<RwLock<VecDeque<MetricsEntry>>>,
 }
 
 impl Context {
@@ -177,7 +177,7 @@ impl Context {
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
-        downtime_metrics_cache: Arc<RwLock<DowntimeMetricsCache>>
+        downtime_metrics_cache: Arc<RwLock<VecDeque<MetricsEntry>>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -186,7 +186,7 @@ impl Context {
             jwt_service,
             log_env_map,
             peer_identities,
-            downtime_metrics_cache
+            downtime_metrics_cache,
         }
     }
 
@@ -206,7 +206,7 @@ impl Context {
         &self.jwt_service
     }
 
-    pub fn downtime_metrics_cache(&self) -> Arc<RwLock<DowntimeMetricsCache>> {
+    pub fn downtime_metrics_cache(&self) -> Arc<RwLock<VecDeque<MetricsEntry>>> {
         self.downtime_metrics_cache.clone()
     }
 

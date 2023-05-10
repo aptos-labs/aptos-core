@@ -3,6 +3,7 @@
 
 use crate::{
     context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
+    downtime_metrics_cache::MetricsEntry,
     index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::{x25519, Uniform};
@@ -10,7 +11,10 @@ use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 use warp::{
     http::{header::CONTENT_TYPE, Response},
     hyper::body::Bytes,
@@ -50,6 +54,9 @@ pub async fn new_test_context() -> TestContext {
             jwt_service,
             HashMap::new(),
             HashMap::new(),
+            Arc::new(aptos_infallible::RwLock::new(
+                VecDeque::<MetricsEntry>::new(),
+            )),
         ),
     )
 }
