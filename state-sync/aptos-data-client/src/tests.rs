@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    client::AptosNetDataClient,
+    client::AptosDataClient,
     error::Error,
     interface::AptosDataClientInterface,
     poller::{poll_peer, DataSummaryPoller},
@@ -89,7 +89,7 @@ impl MockNetwork {
         base_config: Option<BaseConfig>,
         data_client_config: Option<AptosDataClientConfig>,
         networks: Option<Vec<NetworkId>>,
-    ) -> (Self, MockTimeService, AptosNetDataClient, DataSummaryPoller) {
+    ) -> (Self, MockTimeService, AptosDataClient, DataSummaryPoller) {
         // Setup the request managers
         let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
         let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
@@ -119,7 +119,7 @@ impl MockNetwork {
         let mock_time = TimeService::mock();
         let base_config = base_config.unwrap_or_default();
         let data_client_config = data_client_config.unwrap_or_default();
-        let (client, poller) = AptosNetDataClient::new(
+        let (client, poller) = AptosDataClient::new(
             data_client_config,
             base_config,
             mock_time.clone(),
@@ -1510,7 +1510,7 @@ async fn optimal_chunk_size_calculations() {
 
 /// A helper method that fetches peers to poll depending on the peer priority
 fn fetch_peer_to_poll(
-    client: AptosNetDataClient,
+    client: AptosDataClient,
     is_priority_peer: bool,
 ) -> Result<Option<PeerNetworkId>, Error> {
     // Fetch the next peer to poll
@@ -1529,7 +1529,7 @@ fn fetch_peer_to_poll(
 }
 
 /// Fetches the number of in flight requests for peers depending on priority
-fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -> u64 {
+fn get_num_in_flight_polls(client: AptosDataClient, is_priority_peer: bool) -> u64 {
     if is_priority_peer {
         client.peer_states.read().num_in_flight_priority_polls()
     } else {
@@ -1541,7 +1541,7 @@ fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -
 /// and returns storage server summaries for each.
 async fn poll_peers(
     mock_network: &mut MockNetwork,
-    client: &AptosNetDataClient,
+    client: &AptosDataClient,
     all_peers: Vec<PeerNetworkId>,
 ) {
     for peer in all_peers {
@@ -1561,7 +1561,7 @@ async fn poll_peers(
 }
 
 /// Verifies the exclusive existence of peer states for all the specified peers
-fn verify_peer_states(client: &AptosNetDataClient, all_peers: Vec<PeerNetworkId>) {
+fn verify_peer_states(client: &AptosDataClient, all_peers: Vec<PeerNetworkId>) {
     let peer_to_states = client.peer_states.read().get_peer_to_states();
     for peer in &all_peers {
         assert!(peer_to_states.contains_key(peer));
