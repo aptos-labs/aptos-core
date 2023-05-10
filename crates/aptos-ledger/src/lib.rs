@@ -25,16 +25,9 @@ pub enum AptosLedgerError {
 /// Returns the current version of the Aptos app on Ledger
 pub fn get_app_version() -> Result<String, AptosLedgerError> {
     // open connection to ledger
-    // NOTE: ledger has to be unlocked
-    let hidapi = match HidApi::new() {
-        Ok(hidapi) => hidapi,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
-    };
-
-    // Open transport to the first device
-    let transport = match TransportNativeHID::new(&hidapi) {
+    let transport = match open_ledger_transport() {
         Ok(transport) => transport,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+        Err(err) => return Err(err),
     };
 
     match transport.exchange(&APDUCommand {
@@ -67,16 +60,9 @@ pub fn get_app_version() -> Result<String, AptosLedgerError> {
 /// Returns the official app name register in Ledger
 pub fn get_app_name() -> Result<String, AptosLedgerError> {
     // open connection to ledger
-    // NOTE: ledger has to be unlocked
-    let hidapi = match HidApi::new() {
-        Ok(hidapi) => hidapi,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
-    };
-
-    // Open transport to the first device
-    let transport = match TransportNativeHID::new(&hidapi) {
+    let transport = match open_ledger_transport() {
         Ok(transport) => transport,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+        Err(err) => return Err(err),
     };
 
     match transport.exchange(&APDUCommand {
@@ -112,16 +98,9 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
 /// * `display` - If true, the public key will be displayed on the Ledger device, and confirmation is needed
 pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
     // open connection to ledger
-    // NOTE: ledger has to be unlocked
-    let hidapi = match HidApi::new() {
-        Ok(hidapi) => hidapi,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
-    };
-
-    // Open transport to the first device
-    let transport = match TransportNativeHID::new(&hidapi) {
+    let transport = match open_ledger_transport() {
         Ok(transport) => transport,
-        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+        Err(err) => return Err(err),
     };
 
     // serialize the derivative path
@@ -190,4 +169,21 @@ fn serialize_bip32(path: &str) -> Vec<u8> {
     }
 
     serialized
+}
+
+fn open_ledger_transport() -> Result<TransportNativeHID, AptosLedgerError> {
+    // open connection to ledger
+    // NOTE: ledger has to be unlocked
+    let hidapi = match HidApi::new() {
+        Ok(hidapi) => hidapi,
+        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+    };
+
+    // Open transport to the first device
+    let transport = match TransportNativeHID::new(&hidapi) {
+        Ok(transport) => transport,
+        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+    };
+
+    Ok(transport)
 }
