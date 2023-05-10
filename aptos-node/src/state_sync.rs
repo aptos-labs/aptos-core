@@ -4,7 +4,7 @@
 use crate::network::ApplicationNetworkInterfaces;
 use aptos_config::config::{NodeConfig, StateSyncConfig, StorageServiceConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_client::aptosnet::client::AptosNetDataClient;
 use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,

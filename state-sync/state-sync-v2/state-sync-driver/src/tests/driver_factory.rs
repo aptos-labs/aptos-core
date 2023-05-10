@@ -10,7 +10,7 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_consensus_notifications::new_consensus_notifier_listener_pair;
-use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_client::aptosnet::client::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;

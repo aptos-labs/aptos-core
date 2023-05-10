@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_client::aptosnet::client::AptosNetDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::{
