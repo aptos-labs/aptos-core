@@ -89,22 +89,19 @@ fn add_to_sized_pool<T>(
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
-        let mut new_accounts = Vec::with_capacity(accounts.len() * transactions_per_account);
-        let mut new_account_addresses =
-            Vec::with_capacity(accounts.len() * transactions_per_account);
-        for account in accounts {
-            for _ in 0..transactions_per_account {
-                let receiver = LocalAccount::generate(&mut self.rng);
-                let receiver_address = receiver.address();
-                let request = self.gen_single_txn(account, receiver_address, &self.txn_factory);
-                requests.push(request);
-                new_accounts.push(receiver);
-                new_account_addresses.push(receiver_address);
-            }
+        let mut requests = Vec::with_capacity(num_to_create);
+        let mut new_accounts = Vec::with_capacity(num_to_create);
+        let mut new_account_addresses = Vec::with_capacity(num_to_create);
+        for _ in 0..num_to_create {
+            let receiver = LocalAccount::generate(&mut self.rng);
+            let receiver_address = receiver.address();
+            let request = self.gen_single_txn(account, receiver_address, &self.txn_factory);
+            requests.push(request);
+            new_accounts.push(receiver);
+            new_account_addresses.push(receiver_address);
         }
 
         if self.add_created_accounts_to_pool {

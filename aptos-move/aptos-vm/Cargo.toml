@@ -27,6 +27,7 @@ aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }

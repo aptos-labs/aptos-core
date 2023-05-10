@@ -34,6 +34,9 @@ pub enum Commands {
         endpoint: url::Url,
         #[clap(long)]
         framework_git_rev: Option<String>,
+        /// Set this value if you want to get the generated proposal at the same time.
+        #[clap(long)]
+        output_dir: Option<PathBuf>,
         #[clap(subcommand)]
         input_option: InputOptions,
         /// Mint to validator such that it has enough stake to allow fast voting resolution.
@@ -82,6 +85,7 @@ async fn main() -> Result<()> {
             endpoint,
             framework_git_rev,
             mint_to_validator,
+            output_dir,
         } => {
             let config =
                 aptos_release_builder::ReleaseConfig::load_config(release_config.as_path())?;
@@ -139,8 +143,12 @@ async fn main() -> Result<()> {
             network_config
                 .set_fast_resolve(FAST_RESOLUTION_TIME)
                 .await?;
-            aptos_release_builder::validate::validate_config(config, network_config.clone())
-                .await?;
+            aptos_release_builder::validate::validate_config_and_generate_release(
+                config,
+                network_config.clone(),
+                output_dir,
+            )
+            .await?;
             // Reset resolution time back to normal after resolution
             network_config
                 .set_fast_resolve(DEFAULT_RESOLUTION_TIME)

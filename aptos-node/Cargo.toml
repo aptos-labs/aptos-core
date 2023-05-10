@@ -82,4 +82,5 @@ consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-me
 default = []
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
+network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console"]
