@@ -114,7 +114,7 @@ impl AptosTelemetryServiceArgs {
         >::new()));
         let downtime_metrics_cache_updater = DowntimeMetricsCacheUpdater::new(
             downtime_metrics_cache.clone(),
-            Duration::from_secs(60000),
+            Duration::from_secs(60),
         );
 
         let context = Context::new(
