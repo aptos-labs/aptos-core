@@ -6,8 +6,8 @@ use crate::{data_notification::DataNotification, data_stream::DataStreamListener
 use aptos_config::config::AptosDataClientConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_data_client::{
-    AdvertisedData, AptosDataClientInterface, GlobalDataSummary, OptimalChunkSizes, Response,
-    ResponseCallback, ResponseContext, ResponseError,
+    global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
+    AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;

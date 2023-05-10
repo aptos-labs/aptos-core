@@ -23,7 +23,10 @@ use crate::{
         Epoch, GetAllEpochEndingLedgerInfosRequest, GetAllStatesRequest, StreamRequest,
     },
 };
-use aptos_data_client::{AdvertisedData, GlobalDataSummary, ResponsePayload};
+use aptos_data_client::{
+    global_summary::{AdvertisedData, GlobalDataSummary},
+    ResponsePayload,
+};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};

@@ -12,7 +12,10 @@ use crate::{
     },
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
-use aptos_data_client::{AptosDataClientInterface, GlobalDataSummary, OptimalChunkSizes};
+use aptos_data_client::{
+    global_summary::{GlobalDataSummary, OptimalChunkSizes},
+    AptosDataClientInterface,
+};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use futures::StreamExt;

@@ -12,8 +12,9 @@ use crate::{
         poller::DataSummaryPoller,
         state::{ErrorType, PeerStates},
     },
-    AptosDataClientInterface, Error, GlobalDataSummary, Response, ResponseCallback,
-    ResponseContext, ResponseError, ResponseId,
+    global_summary::GlobalDataSummary,
+    AptosDataClientInterface, Error, Response, ResponseCallback, ResponseContext, ResponseError,
+    ResponseId,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
