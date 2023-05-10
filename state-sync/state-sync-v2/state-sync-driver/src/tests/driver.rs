@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, RoleType, StateSyncDriverConfig};
 use aptos_consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use aptos_data_client::client::AptosNetDataClient;
+use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::{
@@ -301,7 +301,7 @@ async fn create_driver_for_tests(
         HashMap::new(),
         PeersAndMetadata::new(&[]),
     ));
-    let (aptos_data_client, _) = AptosNetDataClient::new(
+    let (aptos_data_client, _) = AptosDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         time_service.clone(),

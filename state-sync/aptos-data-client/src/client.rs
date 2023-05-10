@@ -54,7 +54,7 @@ const PEER_LOG_FREQ_SECS: u64 = 10;
 /// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
-/// The `AptosNetDataClient`:
+/// The `AptosDataClient`:
 ///
 /// 1. Sends requests to connected Aptos peers.
 /// 2. Does basic type conversions and error handling on the responses.
@@ -70,7 +70,7 @@ const PEER_LOG_FREQ_SECS: u64 = 10;
 /// The client is expected to be cloneable and usable from many concurrent tasks
 /// and/or threads.
 #[derive(Clone, Debug)]
-pub struct AptosNetDataClient {
+pub struct AptosDataClient {
     /// Config for AptosNet data client.
     pub(crate) data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
@@ -83,7 +83,7 @@ pub struct AptosNetDataClient {
     response_id_generator: Arc<U64IdGenerator>,
 }
 
-impl AptosNetDataClient {
+impl AptosDataClient {
     pub fn new(
         data_client_config: AptosDataClientConfig,
         base_config: BaseConfig,
@@ -495,7 +495,7 @@ impl AptosNetDataClient {
 }
 
 #[async_trait]
-impl AptosDataClientInterface for AptosNetDataClient {
+impl AptosDataClientInterface for AptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
     }
@@ -653,7 +653,7 @@ impl AptosDataClientInterface for AptosNetDataClient {
 
 /// The AptosNet-specific request context needed to update a peer's scoring.
 struct AptosNetResponseCallback {
-    data_client: AptosNetDataClient,
+    data_client: AptosDataClient,
     id: ResponseId,
     peer: PeerNetworkId,
     request: StorageServiceRequest,

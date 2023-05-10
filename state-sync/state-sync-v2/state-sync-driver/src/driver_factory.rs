@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationListener;
-use aptos_data_client::client::AptosNetDataClient;
+use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
 use aptos_executor_types::ChunkExecutorTrait;
@@ -49,7 +49,7 @@ impl DriverFactory {
         metadata_storage: MetadataStorage,
         consensus_listener: ConsensusNotificationListener,
         mut event_subscription_service: EventSubscriptionService,
-        aptos_data_client: AptosNetDataClient,
+        aptos_data_client: AptosDataClient,
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
     ) -> Self {

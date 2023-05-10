@@ -10,7 +10,7 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_consensus_notifications::new_consensus_notifier_listener_pair;
-use aptos_data_client::client::AptosNetDataClient;
+use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use aptos_db::AptosDB;
 use aptos_event_notifications::EventSubscriptionService;
@@ -72,7 +72,7 @@ fn test_new_initialized_configs() {
         HashMap::new(),
         PeersAndMetadata::new(&[]),
     ));
-    let (aptos_data_client, _) = AptosNetDataClient::new(
+    let (aptos_data_client, _) = AptosDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         TimeService::mock(),

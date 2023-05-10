@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    client::AptosNetDataClient,
+    client::AptosDataClient,
     error::Error,
     global_summary::GlobalDataSummary,
     interface::{AptosDataClientInterface, Response},
@@ -30,15 +30,15 @@ const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 /// A poller for storage summaries that is responsible for periodically refreshing
 /// the view of advertised data in the network.
 pub struct DataSummaryPoller {
-    data_client: AptosNetDataClient, // The data client through which to poll peers
-    poll_loop_interval: Duration,    // The interval between polling loop executions
-    runtime: Option<Handle>,         // An optional runtime on which to spawn the poller threads
-    time_service: TimeService,       // The service to monitor elapsed time
+    data_client: AptosDataClient, // The data client through which to poll peers
+    poll_loop_interval: Duration, // The interval between polling loop executions
+    runtime: Option<Handle>,      // An optional runtime on which to spawn the poller threads
+    time_service: TimeService,    // The service to monitor elapsed time
 }
 
 impl DataSummaryPoller {
     pub fn new(
-        data_client: AptosNetDataClient,
+        data_client: AptosDataClient,
         poll_loop_interval: Duration,
         runtime: Option<Handle>,
         time_service: TimeService,
@@ -150,7 +150,7 @@ fn log_poller_error(error: Error) {
 
 /// Spawns a dedicated poller for the given peer.
 pub(crate) fn poll_peer(
-    data_client: AptosNetDataClient,
+    data_client: AptosDataClient,
     peer: PeerNetworkId,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
