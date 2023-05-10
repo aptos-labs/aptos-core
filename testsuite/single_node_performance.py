@@ -3,12 +3,14 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
-import subprocess
 import re
 import os
 import tempfile
 import json
+from typing import Callable, Optional, Tuple, Mapping, Sequence
 from tabulate import tabulate
+from subprocess import Popen, PIPE, CalledProcessError
+from dataclasses import dataclass
 
 
 # numbers are based on the machine spec used by github action
@@ -66,8 +68,8 @@ if os.environ.get("DETAILED"):
 else:
     EXECUTION_ONLY_CONCURRENCY_LEVELS = []
 
-if os.environ.get("DEFAULT_BUILD"):
-    BUILD_FLAG = ""  # "--release"
+if os.environ.get("RELEASE_BUILD"):
+    BUILD_FLAG = "--release"
 else:
     BUILD_FLAG = "--profile performance"
 
@@ -76,16 +78,132 @@ target_directory = "execution/executor-benchmark/src"
 
 
 def execute_command(command):
-    try:
-        output = subprocess.check_output(
-            command, shell=True, text=True, cwd=target_directory
-        )
-    except subprocess.CalledProcessError as e:
-        print(e.output)
-        raise e
+    result = []
+    with Popen(
+        command,
+        shell=True,
+        text=True,
+        cwd=target_directory,
+        stdout=PIPE,
+        bufsize=1,
+        universal_newlines=True,
+    ) as p:
+        # stream to output while command is executing
+        for line in p.stdout:
+            print(line, end="")
+            result.append(line)
 
-    print(output)
-    return output
+    if p.returncode != 0:
+        raise CalledProcessError(p.returncode, p.args)
+
+    # return the full output in the end for postprocessing
+    return "\n".join(result)
+
+
+@dataclass
+class RunGroupKey:
+    transaction_type: str
+    module_working_set_size: int
+    executor_type: str
+
+
+@dataclass
+class RunResults:
+    tps: float
+    gps: float
+    fraction_in_execution: float
+    fraction_of_execution_in_vm: float
+    fraction_in_commit: float
+
+
+@dataclass
+class RunGroupInstance:
+    key: RunGroupKey
+    single_node_result: RunResults
+    concurrency_level_results: Mapping[int, RunResults]
+    block_size: int
+    expected_tps: float
+
+
+def extract_run_results(output: str, execution_only: bool) -> RunResults:
+    if execution_only:
+        tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
+        gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+    else:
+        tps = float(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)[0])
+        gps = float(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)[-1])
+
+    fraction_in_execution = float(
+        re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[-1]
+    )
+    fraction_of_execution_in_vm = float(
+        re.findall(r"Overall fraction of execution (\d+\.?\d*) in VM", output)[-1]
+    )
+    fraction_in_commit = float(
+        re.findall(r"Overall fraction of total: (\d+\.?\d*) in commit", output)[-1]
+    )
+
+    return RunResults(
+        tps, gps, fraction_in_execution, fraction_of_execution_in_vm, fraction_in_commit
+    )
+
+
+def print_table(
+    results: Sequence[RunGroupInstance],
+    by_levels: bool,
+    single_field: Optional[Tuple[str, Callable[[RunResults], any]]],
+    concurrency_levels=EXECUTION_ONLY_CONCURRENCY_LEVELS,
+):
+    headers = [
+        "transaction_type",
+        "module_working_set",
+        "executor",
+        "block_size",
+        "expected t/s",
+    ]
+    if by_levels:
+        headers.extend(
+            [
+                f"exe_only {concurrency_level}"
+                for concurrency_level in concurrency_levels
+            ]
+        )
+        assert single_field is not None
+
+    if single_field is not None:
+        field_name, _ = single_field
+        headers.append(field_name)
+    else:
+        headers.extend(["t/s", "exe/total", "vm/exe", "commit/total", "g/s"])
+
+    rows = []
+    for result in results:
+        row = [
+            result.key.transaction_type,
+            result.key.module_working_set_size,
+            result.key.executor_type,
+            result.block_size,
+            result.expected_tps,
+        ]
+        if by_levels:
+            _, field_getter = single_field
+            for concurrency_level in concurrency_levels:
+                row.append(
+                    field_getter(result.concurrency_level_results[concurrency_level])
+                )
+
+        if single_field is not None:
+            _, field_getter = single_field
+            row.append(field_getter(result.single_node_result))
+        else:
+            row.append(int(round(result.single_node_result.tps)))
+            row.append(round(result.single_node_result.fraction_in_execution, 3))
+            row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
+            row.append(round(result.single_node_result.fraction_in_commit, 3))
+            row.append(int(round(result.single_node_result.gps)))
+        rows.append(row)
+
+    print(tabulate(rows, headers=headers))
 
 
 errors = []
@@ -95,11 +213,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --use-state-kv-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
-    achieved_tps = {}
-    achieved_gps = {}
-
-    rows = []
-    gas_rows = []
+    results = []
 
     for (transaction_type, use_native_executor, module_working_set_size), (
         expected_tps,
@@ -108,48 +222,38 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         print(f"Testing {transaction_type}")
         cur_block_size = int(min([expected_tps, BLOCK_SIZE]))
 
-        achieved_tps[transaction_type] = {}
-        achieved_gps[transaction_type] = {}
-        use_native_executor_row_str = "native" if use_native_executor else "VM"
-        row = [
-            transaction_type,
-            module_working_set_size,
-            use_native_executor_row_str,
-            cur_block_size,
-            expected_tps,
-        ]
-        gas_row = [
-            transaction_type,
-            module_working_set_size,
-            use_native_executor_row_str,
-            cur_block_size,
-        ]
+        executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
         common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --use-state-kv-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+
+        concurrency_level_results = {}
+
         for concurrency_level in EXECUTION_ONLY_CONCURRENCY_LEVELS:
             test_db_command = f"cargo run {BUILD_FLAG} -- --concurrency-level {concurrency_level}  --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
 
-            tps = float(
-                re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1]
+            concurrency_level_results[concurrency_level] = extract_run_results(
+                output, execution_only=True
             )
-            gps = float(
-                re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1]
-            )
-
-            achieved_tps[transaction_type][concurrency_level] = tps
-            achieved_gps[transaction_type][concurrency_level] = gps
-            row.append(int(round(tps)))
-            gas_row.append(int(round(gps)))
 
         test_db_command = f"cargo run {BUILD_FLAG} -- --concurrency-level {CONCURRENCY_LEVEL} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
-        tps = float(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)[0])
-        gps = float(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)[-1])
-        achieved_tps[transaction_type][0] = tps
-        achieved_gps[transaction_type][0] = gps
+        current_run_key = RunGroupKey(
+            transaction_type, module_working_set_size, executor_type
+        )
+        single_node_result = extract_run_results(output, execution_only=False)
+
+        results.append(
+            RunGroupInstance(
+                key=current_run_key,
+                single_node_result=single_node_result,
+                concurrency_level_results=concurrency_level_results,
+                block_size=cur_block_size,
+                expected_tps=expected_tps,
+            )
+        )
 
         # line to be able to aggreate and visualize in Humio
         print(
@@ -158,69 +262,51 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "grep": "grep_json_single_node_perf",
                     "transaction_type": transaction_type,
                     "module_working_set_size": module_working_set_size,
-                    "executor_type": use_native_executor_row_str,
+                    "executor_type": executor_type,
                     "block_size": cur_block_size,
                     "expected_tps": expected_tps,
-                    "tps": tps,
-                    "gps": gps,
+                    "tps": single_node_result.tps,
+                    "gps": single_node_result.gps,
                     "code_perf_version": CODE_PERF_VERSION,
                 }
             )
         )
 
-        row.append(int(round(tps)))
-        gas_row.append(int(round(gps)))
-
-        rows.append(row)
-        gas_rows.append(gas_row)
-
-        print(
-            tabulate(
-                rows,
-                headers=[
-                    "transaction_type",
-                    "module_working_set",
-                    "executor",
-                    "block_size",
-                    "expected t/s",
-                ]
-                + [
-                    f"exe_only {concurrency_level}"
-                    for concurrency_level in EXECUTION_ONLY_CONCURRENCY_LEVELS
-                ]
-                + ["t/s"],
-            )
+        print_table(
+            results, by_levels=True, single_field=("t/s", lambda r: int(round(r.tps)))
         )
-
-        print(
-            tabulate(
-                gas_rows,
-                headers=["transaction_type", "executor", "block_size"]
-                + [
-                    f"exe_only {concurrency_level}"
-                    for concurrency_level in EXECUTION_ONLY_CONCURRENCY_LEVELS
-                ]
-                + ["g/s"],
-            )
+        print_table(
+            results, by_levels=True, single_field=("g/s", lambda r: int(round(r.gps)))
         )
+        print_table(
+            results,
+            by_levels=True,
+            single_field=("exe/total", lambda r: round(r.fraction_in_execution, 3)),
+        )
+        print_table(
+            results,
+            by_levels=True,
+            single_field=("vm/exe", lambda r: round(r.fraction_of_execution_in_vm, 3)),
+        )
+        print_table(results, by_levels=False, single_field=None)
 
-        if tps < expected_tps * NOISE_LOWER_LIMIT:
-            text = f"regression detected {tps} < {expected_tps * NOISE_LOWER_LIMIT} = {expected_tps} * {NOISE_LOWER_LIMIT}, {transaction_type} with {use_native_executor_row_str} executor didn't meet TPS requirements"
+        if single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT:
+            text = f"regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT} = {expected_tps} * {NOISE_LOWER_LIMIT}, {current_run_key} didn't meet TPS requirements"
             if check_active:
                 errors.append(text)
             else:
                 warnings.append(text)
-        elif tps < expected_tps * NOISE_LOWER_LIMIT_WARN:
-            text = f"potential (but within normal noise) regression detected {tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {transaction_type} with {use_native_executor_row_str} executor didn't meet TPS requirements"
+        elif single_node_result.tps < expected_tps * NOISE_LOWER_LIMIT_WARN:
+            text = f"potential (but within normal noise) regression detected {single_node_result.tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {current_run_key} didn't meet TPS requirements"
             warnings.append(text)
-        elif tps > expected_tps * NOISE_UPPER_LIMIT:
-            text = f"perf improvement detected {tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {transaction_type} with {use_native_executor_row_str} executor exceeded TPS requirements, increase TPS requirements to match new baseline"
+        elif single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT:
+            text = f"perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {current_run_key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             if check_active:
                 errors.append(text)
             else:
                 warnings.append(text)
-        elif tps > expected_tps * NOISE_UPPER_LIMIT_WARN:
-            text = f"potential (but within normal noise) perf improvement detected {tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {transaction_type} with {use_native_executor_row_str} executor exceeded TPS requirements, increase TPS requirements to match new baseline"
+        elif single_node_result.tps > expected_tps * NOISE_UPPER_LIMIT_WARN:
+            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {current_run_key} exceeded TPS requirements, increase TPS requirements to match new baseline"
             warnings.append(text)
 
 if warnings:
