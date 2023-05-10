@@ -12,8 +12,8 @@ use crate::{
         poller::DataSummaryPoller,
         state::{ErrorType, PeerStates},
     },
-    AptosDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
-    ResponseError, ResponseId,
+    AptosDataClientInterface, Error, GlobalDataSummary, Response, ResponseCallback,
+    ResponseContext, ResponseError, ResponseId,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -50,7 +50,7 @@ use tokio::runtime::Handle;
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
 
-/// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
+/// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
 /// The `AptosNetDataClient`:
@@ -494,7 +494,7 @@ impl AptosNetDataClient {
 }
 
 #[async_trait]
-impl AptosDataClient for AptosNetDataClient {
+impl AptosDataClientInterface for AptosNetDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
     }

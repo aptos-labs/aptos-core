@@ -7,7 +7,7 @@ use crate::{
         poller::{poll_peer, DataSummaryPoller},
         state::calculate_optimal_chunk_sizes,
     },
-    AptosDataClient, Error,
+    AptosDataClientInterface, Error,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
