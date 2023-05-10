@@ -17,7 +17,8 @@ provider "helm" {
 module "validator" {
   source = "../../aptos-node/gcp"
 
-  manage_via_tf = var.manage_via_tf
+  cluster_bootstrap = var.cluster_bootstrap
+  manage_via_tf     = var.manage_via_tf
 
   # Project config
   project = var.project
