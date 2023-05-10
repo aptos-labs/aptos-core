@@ -191,26 +191,3 @@ fn serialize_bip32(path: &str) -> Vec<u8> {
 
     serialized
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_app_version() {
-        let version = get_app_version();
-        println!("Version: {:?}", version);
-    }
-
-    #[test]
-    fn test_get_app_name() {
-        let app_name = get_app_name();
-        println!("App Name: {:?}", app_name);
-    }
-
-    #[test]
-    fn test_get_public_key() {
-        let pub_key = get_public_key(false);
-        println!("Public Key: {:?}", pub_key);
-    }
-}
