@@ -3,7 +3,8 @@
 
 use crate::{
     aptosnet::logging::{LogEntry, LogEvent, LogSchema},
-    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
+    global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
+    ResponseError,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},

@@ -20,8 +20,8 @@ use crate::{
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
-    AdvertisedData, AptosDataClientInterface, GlobalDataSummary, Response, ResponseContext,
-    ResponseError, ResponsePayload,
+    global_summary::{AdvertisedData, GlobalDataSummary},
+    AptosDataClientInterface, Response, ResponseContext, ResponseError, ResponsePayload,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;

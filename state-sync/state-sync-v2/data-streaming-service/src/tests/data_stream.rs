@@ -28,8 +28,8 @@ use crate::{
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
-    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, Response, ResponseContext,
-    ResponsePayload,
+    global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
+    Response, ResponseContext, ResponsePayload,
 };
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
