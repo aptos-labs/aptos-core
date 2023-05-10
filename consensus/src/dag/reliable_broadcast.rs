@@ -300,12 +300,12 @@ impl StateMachine for ReliableBroadcast {
         Ok(())
     }
 
-    fn has_ready(&self) -> bool {
+    async fn has_ready(&self) -> bool {
         !self.messages.is_empty()
     }
 
     async fn ready(&mut self) -> Option<Actions> {
-        if !self.has_ready() {
+        if !self.has_ready().await {
             return None;
         }
 
@@ -313,6 +313,7 @@ impl StateMachine for ReliableBroadcast {
             messages: mem::take(&mut self.messages),
             command: None,
             generate_proposal: None,
+            ordered_blocks: None,
         })
     }
 }

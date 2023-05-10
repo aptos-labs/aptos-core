@@ -343,6 +343,7 @@ pub(crate) struct Dag {
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
     // Arc to something that returns the anchors
     proposer_election: Arc<dyn AnchorElection>,
+    // FIXME(ibalajiarun): Remove this Arc Mutex
     bullshark: Arc<Mutex<Bullshark>>,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,

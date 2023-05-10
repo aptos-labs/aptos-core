@@ -8,6 +8,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    persistent_liveness_storage::RecoveryData,
     round_manager::VerifiedEvent,
     test_utils::{
         consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
@@ -37,8 +38,8 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{
-    epoch_state::EpochState, transaction::SignedTransaction, validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
 use futures_channel::oneshot;
@@ -86,7 +87,7 @@ impl NodeSetup {
                 .unwrap();
         }
         for (id, signer) in signers.iter().take(num_nodes).enumerate() {
-            let (_, storage) = MockStorage::start_for_testing((&validators).into());
+            let (recovery_data, storage) = MockStorage::start_for_testing((&validators).into());
 
             nodes.push(Self::new(
                 playground,
@@ -94,6 +95,7 @@ impl NodeSetup {
                 signer.to_owned(),
                 storage,
                 id,
+                recovery_data,
             ));
         }
 
@@ -106,6 +108,7 @@ impl NodeSetup {
         signer: ValidatorSigner,
         storage: Arc<MockStorage>,
         id: usize,
+        recovery_data: RecoveryData,
     ) -> Self {
         let epoch_state = EpochState {
             epoch: 1,
@@ -162,9 +165,10 @@ impl NodeSetup {
             epoch_state.verifier.clone(),
             Arc::new(signer.clone()),
             Arc::from(PayloadManager::DirectMempool),
-            mock_state_computer.clone(),
+            // mock_state_computer.clone(),
             time_service,
             HashValue::zero(),
+            recovery_data.take().0 .3.ledger_info().clone(),
         );
         let rb = ReliableBroadcast::new(
             author,
@@ -181,6 +185,7 @@ impl NodeSetup {
             DagConfig::default(),
             payload_client,
             network,
+            mock_state_computer.clone(),
         );
 
         Self {

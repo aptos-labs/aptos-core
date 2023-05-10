@@ -39,19 +39,22 @@ pub struct Bullshark {
     epoch: u64,
     prev_execution_block_id: HashValue,
     my_id: PeerId,
-    state_computer: Arc<dyn StateComputer>,
+    // state_computer: Arc<dyn StateComputer>,
     dag: Vec<HashMap<PeerId, Node>>,
     lowest_unordered_anchor_wave: u64,
     proposer_election: Arc<dyn AnchorElection>,
     verifier: ValidatorVerifier,
-    pending_payload: HashMap<HashValue, Payload>, // TODO: dont clone. Either deal with life time or use Arc<Payload> in Node and clone the Arc here.
+    // FIXME: dont clone. Either deal with life time or use Arc<Payload> in Node and clone the Arc here.
+    pending_payload: HashMap<HashValue, Payload>,
+
+    ordered_blocks: Vec<Arc<ExecutedBlock>>,
 }
 
 impl Bullshark {
     pub fn new(
         epoch: u64,
         my_id: PeerId,
-        state_computer: Arc<dyn StateComputer>,
+        // state_computer: Arc<dyn StateComputer>,
         proposer_election: Arc<dyn AnchorElection>,
         verifier: ValidatorVerifier,
         prev_execution_block_id: HashValue,
@@ -60,12 +63,14 @@ impl Bullshark {
             epoch,
             prev_execution_block_id,
             my_id,
-            state_computer,
+            // state_computer,
             dag: Vec::new(),
             lowest_unordered_anchor_wave: 0,
             proposer_election,
             verifier,
             pending_payload: HashMap::new(),
+
+            ordered_blocks: Vec::new(),
         }
     }
 
@@ -247,22 +252,9 @@ impl Bullshark {
         );
         let block_id = block.id();
         let block_info = block.block_info();
-        let mut blocks: Vec<Arc<ExecutedBlock>> = Vec::new();
-        blocks.push(Arc::new(block));
+        self.ordered_blocks.push(Arc::new(block));
 
         self.prev_execution_block_id = block_id;
-
-        self.state_computer
-            .commit(
-                &blocks,
-                LedgerInfoWithSignatures::new(
-                    LedgerInfo::new(block_info, HashValue::zero()),
-                    AggregateSignature::empty(),
-                ),
-                Box::new(|_, _| {}),
-            )
-            .await
-            .unwrap();
     }
 
     pub fn pending_payload(&self) -> PayloadFilter {
@@ -272,5 +264,13 @@ impl Bullshark {
             .map(|(_, payload)| payload)
             .collect();
         PayloadFilter::from(&excluded_payload)
+    }
+
+    pub fn ordered_blocks(&self) -> &[Arc<ExecutedBlock>] {
+        &self.ordered_blocks
+    }
+
+    pub fn take_ordered_blocks(&mut self) -> Vec<Arc<ExecutedBlock>> {
+        std::mem::take(&mut self.ordered_blocks)
     }
 }

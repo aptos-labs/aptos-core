@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{Payload, Round, Author};
+use crate::common::{Author, Payload, Round};
 use anyhow::Context;
 use aptos_crypto::{bls12381, hash::DefaultHasher, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::AggregateSignature, ledger_info::LedgerInfoWithSignatures,
+    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, sync::Arc};
@@ -197,6 +197,7 @@ pub struct Node {
     metadata: NodeMetaData,
     consensus_payload: Payload,
     parents: HashSet<NodeMetaData>,
+    highest_commit_info: LedgerInfoWithSignatures,
 }
 
 impl Node {
@@ -207,6 +208,7 @@ impl Node {
         payload: Payload,
         parents: HashSet<NodeMetaData>,
         timestamp: u64,
+        highest_commit_info: LedgerInfoWithSignatures,
     ) -> Self {
         let digest = compute_node_digest(epoch, round, source, timestamp, &payload, &parents);
         let metadata = NodeMetaData::new(epoch, round, source, digest, timestamp);
@@ -215,6 +217,7 @@ impl Node {
             metadata,
             consensus_payload: payload,
             parents,
+            highest_commit_info,
         }
     }
 
@@ -312,6 +315,10 @@ impl Node {
     pub fn timestamp(&self) -> u64 {
         self.metadata.timestamp
     }
+
+    pub fn highest_commit_info(&self) -> &LedgerInfoWithSignatures {
+        &self.highest_commit_info
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -374,6 +381,10 @@ impl CertifiedNode {
 
     pub fn metadata(&self) -> &NodeMetaData {
         self.header.metadata()
+    }
+
+    pub fn highest_commit_info(&self) -> &LedgerInfoWithSignatures {
+        self.header.highest_commit_info()
     }
 }
 

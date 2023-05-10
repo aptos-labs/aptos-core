@@ -27,7 +27,8 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::{error, spawn_named};
 use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+    ledger_info::LedgerInfoWithSignatures, validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorVerifier, PeerId,
 };
 use async_trait::async_trait;
 use claims::assert_some;
@@ -67,6 +68,10 @@ pub struct DagDriver {
 
     interval_timer: TickingTimer,
     remote_fetch_timer: TickingTimer,
+
+    highest_commit_info: LedgerInfoWithSignatures,
+
+    validator_verifier: ValidatorVerifier,
 }
 
 impl DagDriver {
@@ -79,15 +84,16 @@ impl DagDriver {
         verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
         payload_manager: Arc<PayloadManager>,
-        state_computer: Arc<dyn StateComputer>,
+        // state_computer: Arc<dyn StateComputer>,
         time_service: Arc<dyn TimeService>,
         genesis_block_id: HashValue,
+        root_commit_ledger_info: LedgerInfoWithSignatures,
     ) -> Self {
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
             epoch,
             author,
-            state_computer,
+            // state_computer,
             proposer_election.clone(),
             verifier.clone(),
             genesis_block_id,
@@ -132,6 +138,9 @@ impl DagDriver {
             interval_timer: TickingTimer::new(100),
             remote_fetch_timer: TickingTimer::new(50),
             rb_command: None,
+            highest_commit_info: root_commit_ledger_info,
+
+            validator_verifier: verifier,
         };
         dag_driver.init();
 
@@ -167,6 +176,7 @@ impl DagDriver {
             payload,
             parents,
             timestamp,
+            self.highest_commit_info.clone(),
         )
     }
 
@@ -182,7 +192,24 @@ impl DagDriver {
         }
     }
 
+    async fn process_highest_commit_ledger_info(&self, commit_info: &LedgerInfoWithSignatures) {
+        // FIXME(ibalajiarun) handle unwraps
+        // TODO(ibalajiarun) move signature verification to bounded_executor in EpochManager
+        commit_info
+            .verify_signatures(&self.validator_verifier)
+            .unwrap();
+
+        if commit_info.commit_info().round()
+            > self.highest_commit_info.commit_info().round() + self.config.state_sync_window
+        {
+            todo!()
+        }
+    }
+
     async fn handle_certified_node(&mut self, certified_node: CertifiedNode, ack_required: bool) {
+        self.process_highest_commit_ledger_info(certified_node.highest_commit_info())
+            .await;
+
         let digest = certified_node.digest();
         let source = certified_node.source();
         self.dag.try_add_node(certified_node).await;
@@ -215,7 +242,7 @@ impl DagDriver {
     }
 
     async fn advance_round(&mut self, payload: Payload) {
-        // TODO(ibalajiarun): Fix the unwrap
+        // FIXME(ibalajiarun): Fix the unwrap
         let parents = self.next_round_parents.take().unwrap();
         let node = self.create_node(parents, payload).await;
         self.rb_command = Some(ReliableBroadcastCommand::BroadcastRequest(node));
@@ -282,6 +309,10 @@ impl DagDriver {
             maybe_recipients: Some(recipients),
         });
     }
+
+    pub async fn notify_commit(&mut self, commit_info: LedgerInfoWithSignatures) {
+        self.highest_commit_info = commit_info;
+    }
 }
 
 #[async_trait]
@@ -303,12 +334,15 @@ impl StateMachine for DagDriver {
         Ok(())
     }
 
-    fn has_ready(&self) -> bool {
-        self.awaiting_proposal || !self.messages.is_empty() || self.rb_command.is_some()
+    async fn has_ready(&self) -> bool {
+        self.awaiting_proposal
+            || !self.messages.is_empty()
+            || self.rb_command.is_some()
+            || !self.bullshark.lock().await.ordered_blocks().is_empty()
     }
 
     async fn ready(&mut self) -> Option<Actions> {
-        if !self.has_ready() {
+        if !self.has_ready().await {
             return None;
         }
         let mut actions = Actions::default();
@@ -326,6 +360,10 @@ impl StateMachine for DagDriver {
                 .rb_command
                 .take()
                 .map(|cmd| Command::ReliableBroadcastCommand(cmd))
+        }
+
+        if !self.bullshark.lock().await.ordered_blocks().is_empty() {
+            actions.ordered_blocks = Some(self.bullshark.lock().await.take_ordered_blocks());
         }
 
         Some(actions)

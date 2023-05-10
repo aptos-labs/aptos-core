@@ -41,7 +41,9 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::QuorumStoreClient,
-    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    persistent_liveness_storage::{
+        LedgerRecoveryData, PersistentLivenessStorage, RecoveryData, RootInfo,
+    },
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -760,6 +762,8 @@ impl EpochManager {
 
         //TODO:  add ordering_state_computer (pass to bullshark) and payload manager (for pre-fetching).
         let signer = Arc::new(signer);
+        let (root, _, _, _) = recovery_data.take();
+
         let dag_driver = DagDriver::new(
             self.epoch(),
             self.author,
@@ -771,9 +775,10 @@ impl EpochManager {
             // rb_msg_rx,
             // dag_driver_msg_rx,
             payload_manager,
-            state_computer,
+            // state_computer,
             self.time_service.clone(),
             genesis_block_id,
+            root.3.ledger_info().clone(),
         );
         let rb = ReliableBroadcast::new(self.author, epoch, epoch_state.verifier.clone(), signer);
 
@@ -788,6 +793,7 @@ impl EpochManager {
             self.config.dag_config.clone(),
             payload_client,
             network_sender,
+            state_computer,
         );
 
         // tokio::spawn(dag_driver.run(close_rx));
@@ -1074,6 +1080,7 @@ impl EpochManager {
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let dag_driver_tx = self.dag_driver_tx.clone();
             let rb_tx = self.rb_tx.clone();
+            // TODO(ibalajiarun): check if this multi-threaded executor is okay in terms of Node reordering
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
