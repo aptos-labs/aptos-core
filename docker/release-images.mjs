@@ -51,6 +51,11 @@ const IMAGES_TO_RELEASE = {
       Features.Indexer,
     ],
   },
+  faucet: {
+    release: [
+      Features.Default,
+    ],
+  },
   forge: {
     release: [
       Features.Default,
