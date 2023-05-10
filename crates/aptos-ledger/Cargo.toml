@@ -13,5 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ledger-transport-hid = "0.10.0"
+hex = "0.4.3"
 ledger-apdu = "0.10.0"
+ledger-transport-hid = "0.10.0"
