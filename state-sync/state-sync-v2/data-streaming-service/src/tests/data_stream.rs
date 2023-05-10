@@ -198,7 +198,7 @@ async fn test_stream_data_error() {
     });
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
-        client_response: Some(Err(aptos_data_client::Error::DataIsUnavailable(
+        client_response: Some(Err(aptos_data_client::error::Error::DataIsUnavailable(
             "Missing data!".into(),
         ))),
     };
@@ -1171,9 +1171,9 @@ fn set_subscription_response_in_queue(
 fn set_timeout_response_in_queue(data_stream: &mut DataStream<MockAptosDataClient>, index: usize) {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = sent_requests.as_mut().unwrap().get_mut(index).unwrap();
-    let client_response = Some(Err(aptos_data_client::Error::TimeoutWaitingForResponse(
-        "Timed out!".into(),
-    )));
+    let client_response = Some(Err(
+        aptos_data_client::error::Error::TimeoutWaitingForResponse("Timed out!".into()),
+    ));
     pending_response.lock().client_response = client_response;
 }
 
@@ -1190,7 +1190,9 @@ async fn wait_for_data_client_to_respond(
         if let Some(client_response) = &pending_response.lock().client_response {
             if !matches!(
                 client_response,
-                Err(aptos_data_client::Error::TimeoutWaitingForResponse(_))
+                Err(aptos_data_client::error::Error::TimeoutWaitingForResponse(
+                    _
+                ))
             ) {
                 return;
             }

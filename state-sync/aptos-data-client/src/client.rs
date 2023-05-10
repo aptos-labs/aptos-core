@@ -2,21 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::{
-        logging::{LogEntry, LogEvent, LogSchema},
-        metrics,
-        metrics::{
-            increment_request_counter, set_gauge, start_request_timer, PRIORITIZED_PEER,
-            REGULAR_PEER,
-        },
-        poller::DataSummaryPoller,
-        state::{ErrorType, PeerStates},
-    },
+    error::Error,
     global_summary::GlobalDataSummary,
     interface::{
         AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+        ResponseId,
     },
-    Error, ResponseId,
+    logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
+    metrics::{
+        increment_request_counter, set_gauge, start_request_timer, PRIORITIZED_PEER, REGULAR_PEER,
+    },
+    poller::DataSummaryPoller,
+    state::{ErrorType, PeerStates},
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},

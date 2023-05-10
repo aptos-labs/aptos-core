@@ -3,7 +3,6 @@ use thiserror::Error;
 
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
-// TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
 /// An error returned by the Aptos Data Client for failed API calls.
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {

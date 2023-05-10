@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::{
-        client::AptosNetDataClient,
-        poller::{poll_peer, DataSummaryPoller},
-        state::calculate_optimal_chunk_sizes,
-    },
+    client::AptosNetDataClient,
+    error::Error,
     interface::AptosDataClientInterface,
-    Error,
+    poller::{poll_peer, DataSummaryPoller},
+    state::calculate_optimal_chunk_sizes,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{

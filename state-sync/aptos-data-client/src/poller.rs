@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::{
-        client::AptosNetDataClient,
-        logging::{LogEntry, LogEvent, LogSchema},
-        metrics,
-        metrics::{set_gauge, start_request_timer, DataType},
-    },
+    client::AptosNetDataClient,
+    error::Error,
     global_summary::GlobalDataSummary,
     interface::{AptosDataClientInterface, Response},
-    Error,
+    logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
+    metrics::{set_gauge, start_request_timer, DataType},
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
