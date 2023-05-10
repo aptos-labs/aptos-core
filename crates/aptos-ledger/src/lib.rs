@@ -4,6 +4,7 @@
 use ledger_apdu::APDUCommand;
 use ledger_transport_hid::hidapi::HidApi;
 use ledger_transport_hid::TransportNativeHID;
+use std::str;
 
 const LEDGER_VID: u16 = 0x2c97; // Ledger Vendor ID
 const CLA_APTOS: u8 = 0x5b; // Aptos CLA Instruction class
@@ -63,8 +64,47 @@ pub fn get_app_version() -> Result<String, AptosLedgerError> {
     };
 }
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+pub fn get_app_name() -> Result<String, AptosLedgerError> {
+    // open connection to ledger
+    // NOTE: ledger has to be unlocked
+    let hidapi = match HidApi::new() {
+        Ok(hidapi) => hidapi,
+        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+    };
+
+    // Open transport to the first device
+    let transport = match TransportNativeHID::new(&hidapi) {
+        Ok(transport) => transport,
+        Err(_err) => return Err(AptosLedgerError::DeviceNotFound),
+    };
+
+    match transport.exchange(&APDUCommand {
+        cla: CLA_APTOS,
+        ins: INS_GET_APP_NAME,
+        p1: 0, // Instruction parameter 1 (offset)
+        p2: 0,
+        data: vec![],
+    }) {
+        Ok(response) => {
+            // Ok means we successfully exchanged with the Ledger
+            // but doesn't mean our request succeeded
+            // we need to check it based on `response.retcode`
+            if response.retcode() == APDU_ANSWER_CODE {
+                let app_name = match str::from_utf8(response.data()) {
+                    Ok(v) => v,
+                    Err(e) => return Err(AptosLedgerError::UnexpectedError(e.to_string())),
+                };
+                return Ok(app_name.to_string());
+            } else {
+                let error_string = response
+                    .error_code()
+                    .map(|error_code| error_code.to_string())
+                    .unwrap_or_else(|retcode| format!("Error with retcode: {}", retcode));
+                return Err(AptosLedgerError::UnexpectedError(error_string));
+            }
+        },
+        Err(err) => return Err(AptosLedgerError::UnexpectedError(err.to_string())),
+    };
 }
 
 #[cfg(test)]
@@ -75,5 +115,11 @@ mod tests {
     fn test_get_app_version() {
         let version = get_app_version();
         println!("Version: {:?}", version);
+    }
+
+    #[test]
+    fn test_get_app_name() {
+        let app_name = get_app_name();
+        println!("Version: {:?}", app_name);
     }
 }
