@@ -53,7 +53,7 @@ pub struct AptosVMImpl {
     features: Features,
 }
 
-pub fn gas_config(storage: &StorageAdapter<impl StateView>) -> (Option<AptosGasParameters>, u64) {
+pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>, u64) {
     match GasScheduleV2::fetch_config(storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
