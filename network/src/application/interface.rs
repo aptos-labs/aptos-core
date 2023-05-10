@@ -15,7 +15,11 @@ use aptos_types::network_address::NetworkAddress;
 use async_trait::async_trait;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use bytes::Bytes;
+use futures_util::future::FusedFuture;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use crate::protocols::network::NetworkEvents2;
@@ -78,7 +82,7 @@ pub trait NetworkClientInterface: Clone + Send + Sync {
 pub struct NetworkClient {
     direct_send_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
-    network_senders: HashMap<NetworkId, NetworkSender>,
+    // network_senders: HashMap<NetworkId, NetworkSender>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -86,29 +90,29 @@ impl NetworkClient {
     pub fn new(
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
-        network_senders: HashMap<NetworkId, NetworkSender>,
+        // network_senders: HashMap<NetworkId, NetworkSender>,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             direct_send_protocols_and_preferences,
             rpc_protocols_and_preferences,
-            network_senders,
+            // network_senders,
             peers_and_metadata,
         }
     }
 
     /// Returns the network sender for the specified network ID
-    fn get_sender_for_network_id(
-        &self,
-        network_id: &NetworkId,
-    ) -> Result<&NetworkSender, Error> {
-        self.network_senders.get(network_id).ok_or_else(|| {
-            Error::UnexpectedError(format!(
-                "Unknown network ID specified for sender: {:?}",
-                network_id
-            ))
-        })
-    }
+    // fn get_sender_for_network_id(
+    //     &self,
+    //     network_id: &NetworkId,
+    // ) -> Result<&NetworkSender, Error> {
+    //     self.network_senders.get(network_id).ok_or_else(|| {
+    //         Error::UnexpectedError(format!(
+    //             "Unknown network ID specified for sender: {:?}",
+    //             network_id
+    //         ))
+    //     })
+    // }
 
     /// Identify the supported protocols from the specified peer's connection
     fn get_supported_protocols(&self, peer: &PeerNetworkId) -> Result<ProtocolIdSet, Error> {
@@ -137,6 +141,38 @@ impl NetworkClient {
             peer, protocols_supported_by_peer
         )))
     }
+
+    fn send_bytes_to_peer(&self, protocol_id: ProtocolId, message: Bytes, peer: &PeerNetworkId) -> Result<(), Error> {
+        // TODO: put on per-peer-per-network outbound queue for a per-peer send thread
+        // TODO: manage maximum number of pending messages and maximum total pending bytes on a peer outbound queue
+        // TODO? (optionally, for some queues) when the queue is full push a new message and drop the _oldest_ message. The old message may be obsolete already, only send the newest data.
+        Err(Error::UnexpectedError(format!("TODO: implement network client send_bytes_to_peer")))
+    }
+
+    fn send_rpc_to_peer(&self, protocol_id: ProtocolId, message: Bytes, rpc_timeout: Duration, peer: &PeerNetworkId) -> RpcResult {
+        // TODO: outbound RPC could get complicated. timeout could happen to something in the queue and not even sent yet.
+        // A timer task needs to keep a priority queue ordered by next timeout.
+        // Lookup by rpc_id and lookup by timeout both need to be cleared when either is invoked.
+        RpcResult{}
+    }
+}
+
+pub struct RpcResult {
+    // TODO: stuff?
+}
+
+impl Future for RpcResult {
+    type Output = Bytes;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Poll::Pending // TODO: implement RpcResult FusedFuture
+    }
+}
+
+impl FusedFuture for RpcResult {
+    fn is_terminated(&self) -> bool {
+        true // TODO: implement RpcResult FusedFuture
+    }
 }
 
 #[async_trait]
@@ -149,8 +185,10 @@ impl NetworkClientInterface for NetworkClient {
     }
 
     async fn disconnect_from_peer(&self, peer: PeerNetworkId) -> Result<(), Error> {
-        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        Ok(network_sender.disconnect_peer(peer.peer_id()).await?)
+        // TODO: fix, reimplement
+        // let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        // Ok(network_sender.disconnect_peer(peer.peer_id()).await?)
+        Err(Error::UnexpectedError(format!("TODO: reimplement network client disconnect_from_peer")))
     }
 
     fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
@@ -169,11 +207,8 @@ impl NetworkClientInterface for NetworkClient {
     }
 
     fn send_to_peer<T: Serialize + Sync>(&self, protocol_id: ProtocolId, message: &T, peer: PeerNetworkId) -> Result<(), Error> {
-        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        // let direct_send_protocol_id = self
-        //     .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
         let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
-        Ok(network_sender.send_to(peer.peer_id(), protocol_id, blob.into())?)
+        self.send_bytes_to_peer(protocol_id,blob.into(), &peer)
     }
 
     fn send_to_peers<T: Serialize + Sync>(&self, protocol_id: ProtocolId, message: &T, peers: &[PeerNetworkId]) -> Result<(), Error> {
@@ -186,13 +221,17 @@ impl NetworkClientInterface for NetworkClient {
             let network_id = peer.network_id();
             if let Ok(prots) = self.get_supported_protocols(peer) {
                 if prots.contains(protocol_id) {
-                    if let Ok(network_sender) = self.get_sender_for_network_id(&network_id) {
-                        if let Err(err) = network_sender.send_to(peer.peer_id(), protocol_id, blob.clone().into()) {
-                            // TODO: count send errors for metrics?
-                            // TODO: log errors?
-                            //errors.push(err);
-                        }
-                    } // TODO: wat? how could this happen?
+                    if let Err(err) = self.send_bytes_to_peer(protocol_id, blob.into(), peer) {
+                        // TODO: count send errors for metrics?
+                        // TODO: log errors?
+                    }
+                    // if let Ok(network_sender) = self.get_sender_for_network_id(&network_id) {
+                    //     if let Err(err) = network_sender.send_to(peer.peer_id(), protocol_id, blob.clone().into()) {
+                    //         // TODO: count send errors for metrics?
+                    //         // TODO: log errors?
+                    //         //errors.push(err);
+                    //     }
+                    // } // TODO: wat? how could this happen?
                 } // TODO: count unsendable messages?
             } // TODO: wat? peer disconnected while we weren't looking?
             // match self
@@ -239,12 +278,13 @@ impl NetworkClientInterface for NetworkClient {
         peer: PeerNetworkId,
     ) -> Result<O, Error> {
         let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
-        let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
+        //let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         // let rpc_protocol_id =
         //     self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
-        let result = network_sender
-            .send_rpc(peer.peer_id(), protocol_id, blob.into(), rpc_timeout)
-            .await?;
+        // let result = network_sender
+        //     .send_rpc(peer.peer_id(), protocol_id, blob.into(), rpc_timeout)
+        //     .await?;
+        let result = self.send_rpc_to_peer(protocol_id, blob.into(), rpc_timeout, &peer).await;
         protocol_id.from_bytes(result.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))
     }
 }

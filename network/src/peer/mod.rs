@@ -41,20 +41,19 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
-use futures::{
-    self,
-    channel::oneshot,
-    io::{AsyncRead, AsyncWrite},
-    stream::StreamExt,
-    SinkExt,
-};
-use futures_util::stream::select;
+use futures::{self, channel::oneshot, io::{AsyncRead, AsyncWrite}, stream::StreamExt, SinkExt, Stream};
+use futures_util::stream::{FusedStream, select};
 use serde::Serialize;
 use std::{fmt, panic, time::Duration};
+use std::pin::Pin;
+use std::sync::mpsc::{Receiver, sync_channel, SyncSender, TryRecvError};
+use std::task::{Context, Poll};
+use anyhow::anyhow;
+use tokio::io::WriteHalf;
+//use tokio::io::{AsyncWrite, WriteHalf};
 use tokio::runtime::Handle;
-use tokio_util::compat::{
-    FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
-};
+use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
+use crate::protocols::wire::messaging::v1::network_message_frame_codec;
 
 #[cfg(test)]
 mod test;
@@ -216,16 +215,20 @@ where
             MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
         let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
+        let (mut write_reqs_tx, mut write_reqs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(1024); // TODO: channel too deep?
+        let mut write_reqs_rx = OrderedCompoundStream::new(vec![&mut write_reqs_rx]);
+
         // Start writer "process" as a separate task. We receive two handles to
         // communicate with the task:
         //   1. `write_reqs_tx`: Queue of pending NetworkMessages to write.
         //   2. `close_tx`: Handle to close the task and underlying connection.
-        let (mut write_reqs_tx, writer_close_tx) = Self::start_writer_task(
+        let writer_close_tx = Self::start_writer_task(
             &self.executor,
             self.time_service.clone(),
             self.connection_metadata.clone(),
             self.network_context,
             writer,
+            &mut write_reqs_rx,
             self.max_frame_size,
             self.max_message_size,
         );
@@ -304,12 +307,11 @@ where
         connection_metadata: ConnectionMetadata,
         network_context: NetworkContext,
         mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
+        write_reqs_rx: &mut dyn FusedStream<Item=NetworkMessage>,
         max_frame_size: usize,
         max_message_size: usize,
-    ) -> (aptos_channels::Sender<NetworkMessage>, oneshot::Sender<()>) {
+        ) -> oneshot::Sender<()> {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        let (write_reqs_tx, mut write_reqs_rx): (aptos_channels::Sender<NetworkMessage>, _) =
-            aptos_channels::new(1024, &counters::PENDING_WIRE_MESSAGES);
         let (close_tx, mut close_rx) = oneshot::channel();
 
         let (mut msg_tx, msg_rx) = aptos_channels::new(1024, &counters::PENDING_MULTIPLEX_MESSAGE);
@@ -381,6 +383,8 @@ where
             loop {
                 futures::select! {
                     message = write_reqs_rx.select_next_some() => {
+                        // A large message becomes a series of chunks in the chunk channel backlog.
+                        // writer_task above pulls round robin from the large-message-chunk-stream and the small-message-stream.
                         // either channel full would block the other one
                         let result = if outbound_stream.should_stream(&message) {
                             outbound_stream.stream_message(message).await
@@ -404,7 +408,8 @@ where
         };
         executor.spawn(writer_task);
         executor.spawn(multiplex_task);
-        (write_reqs_tx, close_tx)
+        //(write_reqs_tx, close_tx)
+        close_tx
     }
 
     async fn handle_inbound_network_message(
@@ -466,7 +471,7 @@ where
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut tokio::sync::mpsc::Sender<NetworkMessage>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -488,7 +493,7 @@ where
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
 
-                    write_reqs_tx.send(message).await?;
+                    write_reqs_tx.send(message).await.map_err(|e| PeerManagerError::Error(anyhow!(e)))?;
                     return Err(err.into());
                 },
                 ReadError::IoError(_) => {
@@ -547,7 +552,7 @@ where
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_reqs_tx: &mut tokio::sync::mpsc::Sender<NetworkMessage>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
@@ -666,5 +671,82 @@ where
             self.network_context,
             remote_peer_id.short_str()
         );
+    }
+}
+
+struct OrderedCompoundStream<'a, T> {
+    //streams: Vec<&'a mut Receiver<T>>,
+    streams: Vec<&'a mut tokio::sync::mpsc::Receiver<T>>,
+    done: bool,
+}
+
+impl<'a, T> OrderedCompoundStream<'a, T> {
+    // pub fn new(streams: Vec<&'a mut Receiver<T>>) -> Self {
+    pub fn new(streams: Vec<&'a mut tokio::sync::mpsc::Receiver<T>>) -> Self {
+        Self{
+            streams,
+            done:false,
+        }
+    }
+}
+
+impl<'a, T> Stream for OrderedCompoundStream<'a, T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.done {
+            return Poll::Ready(None);
+        }
+        //loop {
+            let mut any = false;
+            for source in self.streams {
+                let res = source.poll_recv(cx);
+                match res {
+                    Poll::Ready(vo) => match vo {
+                        None => {}
+                        Some(v) => {
+                            any = true;
+                            return res;
+                        }
+                    }
+                    Poll::Pending => {
+                        any = true;
+                    }
+                }
+                // FusedStream
+                // if source.is_terminated() {continue;}
+                // any = true;
+                // let res= source.poll_next(cx);
+                // match res {
+                //     Poll::Ready(_) => return res,
+                //     Poll::Pending => continue,
+                // }
+                //
+                // std::sync::mpsc::Receiver
+                // let res = source.try_recv();
+                // match res {
+                //     Ok(v) => return Poll::Ready(v),
+                //     Err(e) => match e {
+                //         TryRecvError::Empty => {
+                //             any = true;
+                //         }
+                //         // TODO: mark skip? remove from vec?
+                //         TryRecvError::Disconnected => {}
+                //     }
+                // }
+            }
+            if !any {
+                self.done = true;
+                return Poll::Ready(None);
+            }
+            //cx.waker().wake_by_ref();
+            return Poll::Pending
+        //}
+    }
+}
+
+impl<'a, T> FusedStream for OrderedCompoundStream<'a, T> {
+    fn is_terminated(&self) -> bool {
+        self.done
     }
 }

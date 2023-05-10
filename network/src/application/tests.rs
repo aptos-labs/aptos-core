@@ -36,8 +36,9 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use std::sync::mpsc::SyncSender;
 use tokio::time::timeout;
-use crate::protocols::network::NetworkEvents2;
+use crate::protocols::network::{IncomingMessage, NetworkEvents2};
 
 // Useful test constants for timeouts
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -444,12 +445,12 @@ async fn test_network_client_senders_no_matching_protocols() {
     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
     // Create a network client with network senders
-    let (network_senders, _network_events, _outbound_request_receivers, _inbound_request_senders) =
-        create_network_sender_and_events(&network_ids);
+    // let (network_senders, _network_events, _outbound_request_receivers, _inbound_request_senders) =
+    //     create_network_sender_and_events(&network_ids);
     let network_client: NetworkClient = NetworkClient::new(
         vec![ProtocolId::ConsensusDirectSendBcs],
         vec![ProtocolId::StorageServiceRpc],
-        network_senders,
+        // network_senders,
         peers_and_metadata.clone(),
     );
 
@@ -753,13 +754,14 @@ fn create_aptos_channel<K: Eq + Hash + Clone, T>(
 /// Creates a set of network senders and events for the specified
 /// network IDs. Also returns the internal inbound and outbound
 /// channels for emulating network message sends across the wire.
+#[cfg(disabled)] // TODO: broken, replace?
 fn create_network_sender_and_events(
     network_ids: &[NetworkId],
 ) -> (
     HashMap<NetworkId, NetworkSender>,
     NetworkServiceEvents,
     HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
-    HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    HashMap<NetworkId, SyncSender<IncomingMessage>>,
 ) {
     let mut network_senders = HashMap::new();
     let mut network_and_events = HashMap::new();
@@ -768,7 +770,7 @@ fn create_network_sender_and_events(
 
     for network_id in network_ids {
         // Create the peer manager and connection channels
-        let (inbound_request_sender, inbound_request_receiver) = create_aptos_channel();
+        let (inbound_request_sender, inbound_request_receiver) = std::sync::mpsc::sync_channel::<IncomingMessage>(10);
         let (outbound_request_sender, outbound_request_receiver) = create_aptos_channel();
         let (connection_outbound_sender, _connection_outbound_receiver) = create_aptos_channel();
         //let (_connection_inbound_sender, connection_inbound_receiver) = create_aptos_channel();
@@ -778,8 +780,10 @@ fn create_network_sender_and_events(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
         );
-        let network_events =
-            NetworkEvents2::new();//(inbound_request_receiver, connection_inbound_receiver);
+        let network_events = NetworkEvents2{
+            direct_streams: vec![],
+            rpc_streams: vec![],
+        };//::new();//(inbound_request_receiver, connection_inbound_receiver);
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);

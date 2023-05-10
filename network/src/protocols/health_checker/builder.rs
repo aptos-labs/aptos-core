@@ -36,11 +36,11 @@ impl HealthCheckerBuilder {
         network_rx: NetworkEvents2,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
-        let network_senders = hashmap! {network_context.network_id() => network_sender};
+        //let network_senders = hashmap! {network_context.network_id() => network_sender};
         let network_client = NetworkClient::new(
             vec![],
             vec![HealthCheckerRpc],
-            network_senders,
+            //network_senders,
             peers_and_metadata,
         );
         let service = HealthChecker::new(

@@ -28,6 +28,9 @@ use futures::{
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::sync::mpsc::Receiver;
+use aptos_config::network_id::PeerNetworkId;
+use crate::protocols::wire::messaging::v1::{Priority, RequestId};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -143,13 +146,34 @@ impl NetworkApplicationConfig {
     }
 }
 
+pub struct IncomingMessage {
+    pub sender: PeerNetworkId,
+    pub protocol_id: ProtocolId,
+    pub priority: Priority,
+    pub message: Bytes,
+}
+
+impl IncomingMessage {
+    pub fn get_obj<T: DeserializeOwned>(&self) -> anyhow::Result<T> {
+        self.protocol_id.from_bytes(self.message.as_ref())
+    }
+}
+
+pub struct IncomingRpcRequest {
+    pub core: IncomingMessage,
+    pub request_id: RequestId, // rpc field
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
 pub struct NetworkEvents2 { // TODO: implement
+    pub direct_streams: Vec<(ProtocolId, Receiver<IncomingMessage>)>,
+    pub rpc_streams: Vec<(ProtocolId, Receiver<IncomingRpcRequest>)>,
 }
 
 impl NetworkEvents2 {
-    pub fn new() -> Self {
-        Self{}
-    }
+    // pub fn new() -> Self {
+    //     Self{}
+    // }
 }
 
 
@@ -281,16 +305,16 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
 #[derive(Clone, Debug)]
 pub struct NetworkSender {
-    peer_mgr_reqs_tx: PeerManagerRequestSender,
-    connection_reqs_tx: ConnectionRequestSender,
+    peer_mgr_reqs_tx: PeerManagerRequestSender, // TODO: replace
+    connection_reqs_tx: ConnectionRequestSender, // TODO: replace
 //    _marker: PhantomData<TMessage>,
 }
 
 /// Trait specifying the signature for `new()` `NetworkSender`s
 pub trait NewNetworkSender {
     fn new(
-        peer_mgr_reqs_tx: PeerManagerRequestSender,
-        connection_reqs_tx: ConnectionRequestSender,
+        peer_mgr_reqs_tx: PeerManagerRequestSender, // TODO: replace
+        connection_reqs_tx: ConnectionRequestSender, // TODO: replace
     ) -> Self;
 }
 
