@@ -112,7 +112,7 @@ impl AptosNetDataClient {
         };
         let poller = DataSummaryPoller::new(
             client.clone(),
-            Duration::from_millis(client.data_client_config.summary_poll_interval_ms),
+            Duration::from_millis(client.data_client_config.summary_poll_loop_interval_ms),
             runtime,
             time_service,
         );
@@ -686,7 +686,7 @@ impl fmt::Debug for AptosNetResponseCallback {
 /// the view of advertised data in the network.
 pub struct DataSummaryPoller {
     data_client: AptosNetDataClient, // The data client through which to poll peers
-    poll_interval: Duration,         // The interval between polling rounds
+    poll_loop_interval: Duration,    // The interval between polling loop executions
     runtime: Option<Handle>,         // An optional runtime on which to spawn the poller threads
     time_service: TimeService,       // The service to monitor elapsed time
 }
@@ -694,13 +694,13 @@ pub struct DataSummaryPoller {
 impl DataSummaryPoller {
     fn new(
         data_client: AptosNetDataClient,
-        poll_interval: Duration,
+        poll_loop_interval: Duration,
         runtime: Option<Handle>,
         time_service: TimeService,
     ) -> Self {
         Self {
             data_client,
-            poll_interval,
+            poll_loop_interval,
             runtime,
             time_service,
         }
@@ -712,12 +712,12 @@ impl DataSummaryPoller {
             (LogSchema::new(LogEntry::DataSummaryPoller)
                 .message("Starting the Aptos data poller!"))
         );
-        let ticker = self.time_service.interval(self.poll_interval);
-        futures::pin_mut!(ticker);
+        let poll_loop_ticker = self.time_service.interval(self.poll_loop_interval);
+        futures::pin_mut!(poll_loop_ticker);
 
         loop {
             // Wait for next round before polling
-            ticker.next().await;
+            poll_loop_ticker.next().await;
 
             // Update the global storage summary
             if let Err(error) = self.data_client.update_global_summary_cache() {

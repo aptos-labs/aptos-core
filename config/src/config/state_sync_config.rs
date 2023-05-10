@@ -244,8 +244,8 @@ pub struct AptosDataClientConfig {
     pub response_timeout_ms: u64,
     /// Timeout (in ms) when waiting for a subscription response
     pub subscription_timeout_ms: u64,
-    /// Interval (in ms) between data summary polls
-    pub summary_poll_interval_ms: u64,
+    /// Interval (in ms) between data summary poll loop executions
+    pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
     pub use_compression: bool,
 }
@@ -263,7 +263,7 @@ impl Default for AptosDataClientConfig {
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             response_timeout_ms: 10000,    // 10 seconds
             subscription_timeout_ms: 5000, // 5 seconds
-            summary_poll_interval_ms: 200,
+            summary_poll_loop_interval_ms: 200,
             use_compression: true,
         }
     }
