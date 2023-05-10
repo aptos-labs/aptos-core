@@ -630,6 +630,7 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        aggregator_enabled: bool,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
@@ -643,7 +644,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void(), true);
+        let mut session = vm.new_session(&remote_view, SessionId::void(), aggregator_enabled);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

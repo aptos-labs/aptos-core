@@ -21,6 +21,7 @@ fn test_timestamp_time_has_started() {
         "set_time_has_started",
         vec![],
         serialize_values(&vec![MoveValue::Signer(account_address)]),
+        true,
     );
     assert_eq!(output.unwrap_err().move_abort_code(), Some(327683));
 
@@ -64,6 +65,7 @@ fn test_block_double_init() {
             MoveValue::Signer(CORE_CODE_ADDRESS),
             MoveValue::U64(1),
         ]),
+        true,
     );
 
     assert_eq!(
