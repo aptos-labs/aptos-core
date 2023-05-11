@@ -31,7 +31,8 @@ const Features = {
   Default: "default",
   Indexer: "indexer",
 };
-const TESTING_IMAGES = ["validator-testing"];
+
+const IMAGES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
   validator: {
     performance: [
@@ -89,7 +90,7 @@ chdir(dirname(process.argv[1]) + "/.."); // change workdir to the root of the re
 execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
 await import("zx/globals");
 
-const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
+const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "GCP_DOCKER_ARTIFACT_REPO_US", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
 const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS"];
 
 const parsedArgs = {};
@@ -134,19 +135,19 @@ if (process.env.CI === "true") {
 
 const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
 const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
+const GCP_ARTIFACT_REPO_US = parsedArgs.GCP_DOCKER_ARTIFACT_REPO_US;
 const DOCKERHUB = "docker.io/aptoslabs";
-
-const TARGET_REGISTRIES = [
-  GCP_ARTIFACT_REPO,
-  DOCKERHUB,
-  AWS_ECR,
-];
 
 const INTERNAL_TARGET_REGISTRIES = [
   GCP_ARTIFACT_REPO,
+  GCP_ARTIFACT_REPO_US,
   AWS_ECR,
 ];
 
+const ALL_TARGET_REGISTRIES = [
+  ...INTERNAL_TARGET_REGISTRIES,
+  DOCKERHUB,
+];
 
 // default 10 seconds
 parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
@@ -157,7 +158,7 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
     const profilePrefix = profile === "release" ? "" : profile;
     for (const feature of features) {
       const featureSuffix = feature === Features.Default ? "" : feature;
-      const targetRegistries = TESTING_IMAGES.includes(image) ? INTERNAL_TARGET_REGISTRIES : TARGET_REGISTRIES;
+      const targetRegistries = IMAGES_TO_RELEASE_ONLY_INTERNAL.includes(image) ? INTERNAL_TARGET_REGISTRIES : ALL_TARGET_REGISTRIES;
 
       for (const targetRegistry of targetRegistries) {
         const imageSource = `${parsedArgs.GCP_DOCKER_ARTIFACT_REPO}/${image}:${joinTagSegments(
