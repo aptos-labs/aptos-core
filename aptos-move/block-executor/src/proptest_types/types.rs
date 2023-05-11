@@ -547,7 +547,6 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
         let mut result_vec = vec![];
         for (idx, txn) in txns.iter().enumerate() {
-            println!("txn {} gas limit {:?}", idx, maybe_gas_limit);
             let delta_writes_at_idx = resolved_deltas.as_ref().map(|delta_writes| {
                 delta_writes[idx]
                     .iter()

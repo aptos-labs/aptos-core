@@ -301,7 +301,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
         let lock = self.commit_locks[txn_idx as usize].lock();
-        println!("txn {} recorded {}", txn_idx, delta_writes.len());
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
