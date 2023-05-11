@@ -646,17 +646,15 @@ module aptos_framework::delegation_pool {
         // delegated_voter is managed by the stake pool itself.
         stake::set_delegated_voter(&stake_pool_signer, signer::address_of(&stake_pool_signer));
 
-        if (!exists<GovernanceRecords>(pool_address)) {
-            move_to(&stake_pool_signer, GovernanceRecords {
-                votes: smart_table::new(),
-                votes_per_proposal: smart_table::new(),
-                vote_delegation: smart_table::new(),
-                delegated_votes: smart_table::new(),
-                vote_events: account::new_event_handle<VoteEvent>(&stake_pool_signer),
-                create_proposal_events: account::new_event_handle<CreateProposalEvent>(&stake_pool_signer),
-                delegate_voting_power_events: account::new_event_handle<DelegateVotingPowerEvent>(&stake_pool_signer),
-            });
-        }
+        move_to(&stake_pool_signer, GovernanceRecords {
+            votes: smart_table::new(),
+            votes_per_proposal: smart_table::new(),
+            vote_delegation: smart_table::new(),
+            delegated_votes: smart_table::new(),
+            vote_events: account::new_event_handle<VoteEvent>(&stake_pool_signer),
+            create_proposal_events: account::new_event_handle<CreateProposalEvent>(&stake_pool_signer),
+            delegate_voting_power_events: account::new_event_handle<DelegateVotingPowerEvent>(&stake_pool_signer),
+        });
     }
 
     public entry fun vote(voter: &signer, pool_address: address, proposal_id: u64, voting_power: u64, should_pass: bool) acquires DelegationPool, GovernanceRecords {

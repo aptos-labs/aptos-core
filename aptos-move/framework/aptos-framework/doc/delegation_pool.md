@@ -1781,17 +1781,15 @@ THe existing voter will be replaced. The function is permissionless.
     // delegated_voter is managed by the <a href="stake.md#0x1_stake">stake</a> pool itself.
     <a href="stake.md#0x1_stake_set_delegated_voter">stake::set_delegated_voter</a>(&stake_pool_signer, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&stake_pool_signer));
 
-    <b>if</b> (!<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address)) {
-        <b>move_to</b>(&stake_pool_signer, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
-            votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
-            votes_per_proposal: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
-            vote_delegation: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
-            delegated_votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
-            vote_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a>&gt;(&stake_pool_signer),
-            create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a>&gt;(&stake_pool_signer),
-            delegate_voting_power_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a>&gt;(&stake_pool_signer),
-        });
-    }
+    <b>move_to</b>(&stake_pool_signer, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+        votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        votes_per_proposal: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        vote_delegation: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        delegated_votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        vote_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a>&gt;(&stake_pool_signer),
+        create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a>&gt;(&stake_pool_signer),
+        delegate_voting_power_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a>&gt;(&stake_pool_signer),
+    });
 }
 </code></pre>
 
