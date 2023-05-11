@@ -146,7 +146,7 @@ fn mint_nft_e2e() {
     // assert that the token id exists in the nft receiver's token store
     // read_state_value() will only be successful if the nft receiver's token store has this token id
     let state_key = &StateKey::table_item(token_store_table, bcs::to_bytes(&token_id).unwrap());
-    h.read_state_value(state_key).unwrap();
+    h.read_state_value_bytes(state_key).unwrap();
 }
 
 /// samples two signatures for unit tests in move-examples/

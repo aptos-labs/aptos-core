@@ -124,12 +124,8 @@ pub fn storage_service_network_configuration(node_config: &NodeConfig) -> Networ
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-/// Extracts all network configs and ids from the given node config.
-/// This method also does some basic verification of the network configs.
-fn extract_network_configs_and_ids(
-    node_config: &NodeConfig,
-) -> (Vec<NetworkConfig>, Vec<NetworkId>) {
-    // Extract all network configs
+/// Extracts all network configs from the given node config
+fn extract_network_configs(node_config: &NodeConfig) -> Vec<NetworkConfig> {
     let mut network_configs: Vec<NetworkConfig> = node_config.full_node_networks.to_vec();
     if let Some(network_config) = node_config.validator_network.as_ref() {
         // Ensure that mutual authentication is enabled by default!
@@ -138,28 +134,28 @@ fn extract_network_configs_and_ids(
         }
         network_configs.push(network_config.clone());
     }
+    network_configs
+}
 
-    // Extract all network IDs
-    let mut network_ids = vec![];
-    for network_config in &network_configs {
-        // Guarantee there is only one of this network
-        let network_id = network_config.network_id;
-        if network_ids.contains(&network_id) {
-            panic!(
-                "Duplicate NetworkId: '{}'. Can't start node with duplicate networks! Check the node config!",
-                network_id
-            );
-        }
-        network_ids.push(network_id);
-    }
+/// Extracts all network ids from the given node config
+fn extract_network_ids(node_config: &NodeConfig) -> Vec<NetworkId> {
+    extract_network_configs(node_config)
+        .into_iter()
+        .map(|network_config| network_config.network_id)
+        .collect()
+}
 
-    (network_configs, network_ids)
+/// Creates the global peers and metadata struct
+pub fn create_peers_and_metadata(node_config: &NodeConfig) -> Arc<PeersAndMetadata> {
+    let network_ids = extract_network_ids(node_config);
+    PeersAndMetadata::new(&network_ids)
 }
 
 /// Sets up all networks and returns the appropriate application network interfaces
 pub fn setup_networks_and_get_interfaces(
     node_config: &NodeConfig,
     chain_id: ChainId,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     event_subscription_service: &mut EventSubscriptionService,
 ) -> (
     Vec<Runtime>,
@@ -168,11 +164,8 @@ pub fn setup_networks_and_get_interfaces(
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
 ) {
-    // Gather all network configs and network ids
-    let (network_configs, network_ids) = extract_network_configs_and_ids(node_config);
-
-    // Create the global peers and metadata
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+    // Gather all network configs
+    let network_configs = extract_network_configs(node_config);
 
     // Create each network and register the application handles
     let mut network_runtimes = vec![];

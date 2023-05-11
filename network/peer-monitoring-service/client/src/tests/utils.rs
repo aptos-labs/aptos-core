@@ -10,7 +10,7 @@ use crate::{
 use aptos_config::{
     config::{
         LatencyMonitoringConfig, NetworkMonitoringConfig, NodeConfig, NodeMonitoringConfig,
-        PeerMonitoringServiceConfig, PeerRole,
+        PeerMonitoringServiceConfig, PeerRole, PerformanceMonitoringConfig,
     },
     network_id::{NetworkId, PeerNetworkId},
 };
@@ -50,6 +50,7 @@ pub fn config_with_latency_ping_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             network_monitoring: disabled_network_monitoring_config(),
             node_monitoring: disabled_node_monitoring_config(),
+            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -62,6 +63,7 @@ pub fn config_with_network_info_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             latency_monitoring: disabled_latency_monitoring_config(),
             node_monitoring: disabled_node_monitoring_config(),
+            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -74,6 +76,7 @@ pub fn config_with_node_info_requests() -> NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             latency_monitoring: disabled_latency_monitoring_config(),
             network_monitoring: disabled_network_monitoring_config(),
+            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -81,10 +84,11 @@ pub fn config_with_node_info_requests() -> NodeConfig {
 }
 
 /// Returns a config where node info requests don't refresh
-pub fn config_without_node_info_requests() -> NodeConfig {
+pub fn config_with_only_latency_and_network_requests() -> NodeConfig {
     NodeConfig {
         peer_monitoring_service: PeerMonitoringServiceConfig {
             node_monitoring: disabled_node_monitoring_config(),
+            performance_monitoring: disabled_performance_monitoring_config(),
             ..Default::default()
         },
         ..Default::default()
@@ -148,7 +152,7 @@ pub fn create_node_info_response(
 }
 
 /// Returns a latency monitoring config where latency requests are disabled
-fn disabled_latency_monitoring_config() -> LatencyMonitoringConfig {
+pub fn disabled_latency_monitoring_config() -> LatencyMonitoringConfig {
     LatencyMonitoringConfig {
         latency_ping_interval_ms: UNREALISTIC_INTERVAL_MS,
         ..Default::default()
@@ -156,7 +160,7 @@ fn disabled_latency_monitoring_config() -> LatencyMonitoringConfig {
 }
 
 /// Returns a network monitoring config where network infos are disabled
-fn disabled_network_monitoring_config() -> NetworkMonitoringConfig {
+pub fn disabled_network_monitoring_config() -> NetworkMonitoringConfig {
     NetworkMonitoringConfig {
         network_info_request_interval_ms: UNREALISTIC_INTERVAL_MS,
         ..Default::default()
@@ -164,9 +168,18 @@ fn disabled_network_monitoring_config() -> NetworkMonitoringConfig {
 }
 
 /// Returns a node monitoring config where node infos are disabled
-fn disabled_node_monitoring_config() -> NodeMonitoringConfig {
+pub fn disabled_node_monitoring_config() -> NodeMonitoringConfig {
     NodeMonitoringConfig {
         node_info_request_interval_ms: UNREALISTIC_INTERVAL_MS,
+        ..Default::default()
+    }
+}
+
+/// Returns a performance monitoring config where performance monitoring is disabled
+pub fn disabled_performance_monitoring_config() -> PerformanceMonitoringConfig {
+    PerformanceMonitoringConfig {
+        direct_send_interval_usec: UNREALISTIC_INTERVAL_MS * 1000,
+        rpc_interval_usec: UNREALISTIC_INTERVAL_MS * 1000,
         ..Default::default()
     }
 }
@@ -209,8 +222,9 @@ pub async fn elapse_node_info_update_interval(node_config: NodeConfig, mock_time
 /// Elapses enough time for the monitoring loop to execute
 pub async fn elapse_peer_monitor_interval(node_config: NodeConfig, mock_time: MockTimeService) {
     let peer_monitoring_config = node_config.peer_monitoring_service;
+    let peer_monitor_duration_ms = peer_monitoring_config.peer_monitor_interval_usec / 1000;
     mock_time
-        .advance_ms_async(peer_monitoring_config.peer_monitor_interval_ms + 1)
+        .advance_ms_async(peer_monitor_duration_ms + 1)
         .await;
 }
 
@@ -276,10 +290,11 @@ pub async fn initialize_and_verify_peer_states(
     elapse_peer_monitor_interval(node_config.clone(), mock_time.clone()).await;
 
     // Verify the initial client requests and send responses
+    let num_expected_requests = PeerStateKey::get_all_keys().len() as u64;
     verify_all_requests_and_respond(
         network_id,
         mock_monitoring_server,
-        3,
+        num_expected_requests,
         Some(network_info_response.clone()),
         Some(node_info_response.clone()),
     )
@@ -638,6 +653,14 @@ pub async fn verify_all_requests_and_respond(
                     PeerMonitoringServiceResponse::LatencyPing(LatencyPingResponse {
                         ping_counter: latency_ping.ping_counter,
                     })
+                },
+                #[cfg(feature = "network-perf-test")] // Disabled by default
+                PeerMonitoringServiceRequest::PerformanceMonitoringRequest(request) => {
+                    PeerMonitoringServiceResponse::PerformanceMonitoring(
+                        aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
+                            response_counter: request.request_counter,
+                        },
+                    )
                 },
                 request => panic!("Unexpected monitoring request received: {:?}", request),
             };

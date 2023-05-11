@@ -8,7 +8,7 @@ import {
   GetAccountCurrentTokensQuery,
   GetAccountTransactionsCountQuery,
   GetAccountTransactionsDataQuery,
-  GetCurrentDelegatorBalancesCountQuery,
+  GetNumberOfDelegatorsQuery,
   GetDelegatedStakingActivitiesQuery,
   GetIndexerLedgerInfoQuery,
   GetTokenActivitiesCountQuery,
@@ -24,7 +24,7 @@ import {
   GetAccountCurrentTokens,
   GetAccountTransactionsCount,
   GetAccountTransactionsData,
-  GetCurrentDelegatorBalancesCount,
+  GetNumberOfDelegators,
   GetDelegatedStakingActivities,
   GetIndexerLedgerInfo,
   GetTokenActivities,
@@ -297,15 +297,15 @@ export class IndexerClient {
   }
 
   /**
-   * Queries current delegator balances count
+   * Queries current number of delegators in a pool
    *
-   * @returns GetCurrentDelegatorBalancesCountQuery response type
+   * @returns GetNumberOfDelegatorsQuery response type
    */
-  async getCurrentDelegatorBalancesCount(poolAddress: MaybeHexString): Promise<GetCurrentDelegatorBalancesCountQuery> {
+  async getNumberOfDelegators(poolAddress: MaybeHexString): Promise<GetNumberOfDelegatorsQuery> {
     const address = HexString.ensure(poolAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
-      query: GetCurrentDelegatorBalancesCount,
+      query: GetNumberOfDelegators,
       variables: { poolAddress: address },
     };
     return this.queryIndexer(graphqlQuery);

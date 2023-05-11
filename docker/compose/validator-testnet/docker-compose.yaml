@@ -34,10 +34,7 @@ services:
       - type: volume
         source: aptos-shared
         target: /opt/aptos/var
-      - type: bind
-        source: ./validator_node_template.yaml
-        target: /opt/aptos/var/validator_node_template.yaml
-    command: ["/usr/local/bin/aptos-node", "--test", "--test-dir", "/opt/aptos/var/", "--config", "/opt/aptos/var/"]
+    command: ["/usr/local/bin/aptos-node", "--test", "--test-dir", "/opt/aptos/var/"]
     ports:
       - "8080:8080"
     expose:
@@ -62,13 +59,10 @@ services:
             sleep 1
           else
             sleep 1
-            /usr/local/bin/aptos-faucet-service \\
-              run-simple \\
-              --listen-address 0.0.0.0 \\
-              --listen-port 8000 \\
+            /usr/local/bin/aptos-faucet \\
               --chain-id TESTING \\
-              --key-file-path /opt/aptos/var/mint.key \\
-              --node-url http://172.16.1.10:8080
+              --mint-key-file-path /opt/aptos/var/mint.key \\
+              --server-url http://172.16.1.10:8080
             echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'
           fi
         done

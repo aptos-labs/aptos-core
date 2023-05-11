@@ -19,6 +19,7 @@ aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-network = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-telemetry = { workspace = true }
 futures = { workspace = true }

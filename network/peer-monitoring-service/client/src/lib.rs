@@ -103,7 +103,7 @@ async fn start_peer_monitor_with_state(
     // Create an interval ticker for the monitor loop
     let monitoring_service_config = node_config.peer_monitoring_service;
     let peer_monitor_duration =
-        Duration::from_millis(monitoring_service_config.peer_monitor_interval_ms);
+        Duration::from_micros(monitoring_service_config.peer_monitor_interval_usec);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);
     futures::pin_mut!(peer_monitor_ticker);
 

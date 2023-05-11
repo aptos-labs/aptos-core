@@ -14,7 +14,11 @@ use aptos_peer_monitoring_service_types::{
     response::{NodeInformationResponse, PeerMonitoringServiceResponse},
 };
 use aptos_time_service::TimeService;
-use std::sync::Arc;
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 /// A simple container that holds a single peer's node info
 #[derive(Clone, Debug)]
@@ -101,7 +105,7 @@ impl StateValueInterface for NodeInfoState {
     }
 
     fn handle_monitoring_service_response_error(
-        &self,
+        &mut self,
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
@@ -114,6 +118,16 @@ impl StateValueInterface for NodeInfoState {
             .message("Error encountered when requesting node information from the peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+}
+
+impl Display for NodeInfoState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NodeInfoState {{ recorded_node_info_response: {:?} }}",
+            self.recorded_node_info_response
+        )
     }
 }
 
