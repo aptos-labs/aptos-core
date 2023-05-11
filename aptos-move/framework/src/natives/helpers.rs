@@ -92,17 +92,6 @@ pub fn make_test_only_native_from_func(
     Arc::new(func)
 }
 
-/// Used to pass gas parameters into native functions.
-pub fn make_native_from_func<G>(
-    gas_params: G,
-    func: fn(&G, &mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>,
-) -> NativeFunction
-where
-    G: Send + Sync + 'static,
-{
-    Arc::new(move |context, ty_args, args| func(&gas_params, context, ty_args, args))
-}
-
 /// Like `pop_arg!` but for safe natives that return `SafeNativeResult<T>`. Will return a
 /// `SafeNativeError::InvariantViolation(UNKNOWN_INVARIANT_VIOLATION_ERROR)` when there aren't
 /// enough arguments on the stack.
@@ -203,11 +192,7 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     pub fn charge(&mut self, amount: InternalGas) -> SafeNativeResult<()> {
         self.gas_used += amount;
 
-        if self.gas_used > self.gas_budget
-            && self
-                .timed_features
-                .is_enabled(TimedFeatureFlag::NativesAbortEarlyIfOutOfGas)
-        {
+        if self.gas_used > self.gas_budget {
             Err(SafeNativeError::OutOfGas)
         } else {
             Ok(())
