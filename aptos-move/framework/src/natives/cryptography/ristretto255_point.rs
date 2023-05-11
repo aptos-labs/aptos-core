@@ -14,7 +14,6 @@ use crate::{
     },
     safely_assert_eq, safely_pop_arg, safely_pop_type_arg,
 };
-use aptos_types::on_chain_config::TimedFeatureFlag;
 use better_any::{Tid, TidAble};
 use curve25519_dalek::{
     constants::RISTRETTO_BASEPOINT_TABLE,
@@ -135,17 +134,9 @@ impl PointStore {
         }
     }
 
-    /// Adds the point to the store and returns its RistrettoPointHandle ID
-    pub fn add_point(&mut self, point: RistrettoPoint) -> u64 {
-        let id = self.points.len();
-        self.points.push(point);
-
-        id as u64
-    }
-
     /// Adds the point to the store and returns its RistrettoPointHandle ID.
     /// Aborts if the number of points has exceeded a limit.
-    pub fn safe_add_point(&mut self, point: RistrettoPoint) -> SafeNativeResult<u64> {
+    fn safe_add_point(&mut self, point: RistrettoPoint) -> SafeNativeResult<u64> {
         let id = self.points.len();
         if id >= NUM_POINTS_LIMIT {
             Err(SafeNativeError::Abort {
@@ -197,13 +188,7 @@ pub(crate) fn native_point_identity(
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
     let point = RistrettoPoint::identity();
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(point)?
-    } else {
-        point_data.add_point(point)
-    };
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -249,13 +234,7 @@ pub(crate) fn native_point_decompress(
     // Take the # of points produced so far, which creates a unique and deterministic global ID
     // within the temporary scope of this current transaction. Then, store the RistrettoPoint in
     // a vector using this global ID as an index.
-    let id = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(point)?
-    } else {
-        point_data.add_point(point)
-    };
+    let id = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(id), Value::bool(true)])
 }
@@ -302,13 +281,7 @@ pub(crate) fn native_point_mul(
     let result_handle = match in_place {
         false => {
             let point = point_data.get_point(&point_handle).mul(scalar);
-            if context
-                .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-            {
-                point_data.safe_add_point(point)?
-            } else {
-                point_data.add_point(point)
-            }
+            point_data.safe_add_point(point)?
         },
         true => {
             point_data.get_point_mut(&point_handle).mul_assign(scalar);
@@ -364,13 +337,7 @@ pub(crate) fn native_point_neg(
     let result_handle = match in_place {
         false => {
             let point = point_data.get_point(&point_handle).neg();
-            if context
-                .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-            {
-                point_data.safe_add_point(point)?
-            } else {
-                point_data.add_point(point)
-            }
+            point_data.safe_add_point(point)?
         },
         true => {
             let neg = point_data.get_point_mut(&point_handle).neg();
@@ -407,13 +374,7 @@ pub(crate) fn native_point_add(
             let b = point_data.get_point(&b_handle);
 
             let point = a.add(b);
-            if context
-                .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-            {
-                point_data.safe_add_point(point)?
-            } else {
-                point_data.add_point(point)
-            }
+            point_data.safe_add_point(point)?
         },
         true => {
             // NOTE: When calling Move's add_assign, Move's linear types ensure that we will never
@@ -456,13 +417,7 @@ pub(crate) fn native_point_sub(
             let b = point_data.get_point(&b_handle);
 
             let point = a.sub(b);
-            if context
-                .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-            {
-                point_data.safe_add_point(point)?
-            } else {
-                point_data.add_point(point)
-            }
+            point_data.safe_add_point(point)?
         },
         true => {
             // NOTE: When calling Move's sub_assign, Move's linear types ensure that we will never
@@ -497,13 +452,7 @@ pub(crate) fn native_basepoint_mul(
 
     let basepoint = RISTRETTO_BASEPOINT_TABLE;
     let result = basepoint.mul(&a);
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(result)?
-    } else {
-        point_data.add_point(result)
-    };
+    let result_handle = point_data.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -530,13 +479,7 @@ pub(crate) fn native_basepoint_double_mul(
     // Compute result = a * A + b * BASEPOINT and return a RistrettoPointHandle
     let A_ref = point_data.get_point(&A_handle);
     let result = RistrettoPoint::vartime_double_scalar_mul_basepoint(&a, A_ref, &b);
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(result)?
-    } else {
-        point_data.add_point(result)
-    };
+    let result_handle = point_data.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -561,13 +504,7 @@ pub(crate) fn native_new_point_from_sha512(
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
     let point = RistrettoPoint::hash_from_bytes::<Sha512>(&bytes);
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(point)?
-    } else {
-        point_data.add_point(point)
-    };
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -589,13 +526,7 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     let slice = pop_64_byte_slice(&mut args)?;
 
     let point = RistrettoPoint::from_uniform_bytes(&slice);
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data.safe_add_point(point)?
-    } else {
-        point_data.add_point(point)
-    };
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -673,13 +604,7 @@ pub(crate) fn native_multi_scalar_mul(
         .point_data
         .borrow_mut();
 
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data_mut.safe_add_point(result)?
-    } else {
-        point_data_mut.add_point(result)
-    };
+    let result_handle = point_data_mut.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -755,13 +680,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
         .point_data
         .borrow_mut();
 
-    let result_handle = if context
-        .timed_feature_enabled(TimedFeatureFlag::LimitedNumOfRistretto255PointsPerSession)
-    {
-        point_data_mut.safe_add_point(result)?
-    } else {
-        point_data_mut.add_point(result)
-    };
+    let result_handle = point_data_mut.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
