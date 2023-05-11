@@ -184,33 +184,33 @@ Also learn how to run a public fullnode on a local network and connect to either
           <a href="./deployments" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Aptos blockchain deployments</h4>
-            </div>
           </a>
-          <small>See a snapshot of all Aptos deployments.</small>
+              <small>See a snapshot of all Aptos deployments.</small>
+            </div>
           <a href="./identity-and-configuration" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Identity and configuration</h4>
-            </div>
           </a>
-          <small>A mental-model of identity and configuration plus a description of the identity YAMLs.</small>
+              <small>A mental-model of identity and configuration plus a description of the identity YAMLs.</small>
+            </div>
           <a href="./node-files-all-networks/node-files" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Node files</h4>
-            </div>
           </a>
-          <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
+              <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
+            </div>
           <a href="../integration/indexing" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexing</h4>
-            </div>
           </a>
-          <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+              <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+            </div>
           <a href="../guides/state-sync" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">State synchronization</h4>
-            </div>
           </a>
-          <small>Synchronize your nodes to the latest Aptos blockchain state.</small>
+              <small>Synchronize your nodes to the latest Aptos blockchain state.</small>
+            </div>
         </div>
       </div>
     </div>
