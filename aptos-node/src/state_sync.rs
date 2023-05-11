@@ -13,7 +13,10 @@ use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationLi
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network::application::{
+    interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+    storage::PeersAndMetadata,
+};
 use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
@@ -86,8 +89,10 @@ pub fn start_state_sync_and_get_notification_handles(
     let network_service_events = storage_network_interfaces.network_service_events;
 
     // Start the state sync storage service
+    let peers_and_metadata = network_client.get_peers_and_metadata();
     let storage_service_runtime = setup_state_sync_storage_service(
         node_config.state_sync.storage_service,
+        peers_and_metadata,
         network_service_events,
         &db_rw,
     )?;
@@ -191,6 +196,7 @@ fn setup_aptos_data_client(
 /// Sets up the state sync storage service runtime
 fn setup_state_sync_storage_service(
     config: StorageServiceConfig,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
 ) -> anyhow::Result<Runtime> {
@@ -204,6 +210,7 @@ fn setup_state_sync_storage_service(
         storage_service_runtime.handle().clone(),
         storage_reader,
         TimeService::real(),
+        peers_and_metadata,
         StorageServiceNetworkEvents::new(network_service_events),
     );
     storage_service_runtime.spawn(service.start());

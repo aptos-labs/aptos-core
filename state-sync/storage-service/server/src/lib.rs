@@ -12,16 +12,17 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest,
     responses::{ProtocolMetadata, StorageServerSummary, StorageServiceResponse},
-    Result, StorageServiceError,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::stream::StreamExt;
 use handler::Handler;
 use lru::LruCache;
+use moderator::RequestModerator;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
 use subscription::DataSubscriptionRequest;
@@ -32,6 +33,7 @@ mod error;
 mod handler;
 mod logging;
 pub mod metrics;
+mod moderator;
 pub mod network;
 pub mod storage;
 mod subscription;
@@ -59,6 +61,9 @@ pub struct StorageServiceServer<T> {
     // Note: This is not just a database cache because it contains
     // responses that have already been serialized and compressed.
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+
+    // A moderator for incoming peer requests
+    request_moderator: Arc<RequestModerator>,
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
@@ -67,6 +72,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         executor: Handle,
         storage: T,
         time_service: TimeService,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         network_requests: StorageServiceNetworkEvents,
     ) -> Self {
         let bounded_executor =
@@ -76,6 +82,12 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
         )));
+        let request_moderator = Arc::new(RequestModerator::new(
+            cached_storage_server_summary.clone(),
+            peers_and_metadata,
+            config,
+            time_service.clone(),
+        ));
 
         Self {
             config,
@@ -86,6 +98,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             cached_storage_server_summary,
             data_subscriptions,
             lru_response_cache,
+            request_moderator,
         }
     }
 
@@ -114,11 +127,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         storage.clone(),
                         config,
                     ) {
-                        let error = format!(
-                            "Failed to refresh the cached storage summary! Error: {:?}",
-                            error
-                        );
-                        error!(LogSchema::new(LogEntry::StorageSummaryRefresh).message(&error));
+                        error!(LogSchema::new(LogEntry::StorageSummaryRefresh)
+                            .error(&error)
+                            .message("Failed to refresh the cached storage summary!"));
                     }
                 }
             })
@@ -131,6 +142,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let config = self.config;
         let data_subscriptions = self.data_subscriptions.clone();
         let lru_response_cache = self.lru_response_cache.clone();
+        let request_moderator = self.request_moderator.clone();
         let storage = self.storage.clone();
         let time_service = self.time_service.clone();
 
@@ -147,14 +159,49 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                     ticker.next().await;
 
                     // Check and handle the active subscriptions
-                    subscription::handle_active_data_subscriptions(
+                    if let Err(error) = subscription::handle_active_data_subscriptions(
                         cached_storage_server_summary.clone(),
                         config,
                         data_subscriptions.clone(),
                         lru_response_cache.clone(),
+                        request_moderator.clone(),
                         storage.clone(),
                         time_service.clone(),
-                    )
+                    ) {
+                        error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                            .error(&error)
+                            .message("Failed to handle active data subscriptions!"));
+                    }
+                }
+            })
+            .await;
+    }
+
+    /// Spawns a non-terminating task that refreshes the unhealthy
+    /// peer states in the request moderator.
+    async fn spawn_moderator_peer_refresher(&mut self) {
+        let config = self.config;
+        let request_moderator = self.request_moderator.clone();
+        let time_service = self.time_service.clone();
+
+        // Spawn the task
+        self.bounded_executor
+            .spawn(async move {
+                // Create a ticker for the refresh interval
+                let duration = Duration::from_millis(config.request_moderator_refresh_interval_ms);
+                let ticker = time_service.interval(duration);
+                futures::pin_mut!(ticker);
+
+                // Periodically refresh the peer states
+                loop {
+                    ticker.next().await;
+
+                    // Refresh the unhealthy peer states
+                    if let Err(error) = request_moderator.refresh_unhealthy_peer_states() {
+                        error!(LogSchema::new(LogEntry::RequestModeratorRefresh)
+                            .error(&error)
+                            .message("Failed to refresh the request moderator!"));
+                    }
                 }
             })
             .await;
@@ -167,6 +214,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
         // Spawn the subscription handler
         self.spawn_subscription_handler().await;
+
+        // Spawn the refresher for the request moderator
+        self.spawn_moderator_peer_refresher().await;
 
         // Handle the storage requests
         while let Some(network_request) = self.network_requests.next().await {
@@ -188,6 +238,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
             let data_subscriptions = self.data_subscriptions.clone();
             let lru_response_cache = self.lru_response_cache.clone();
+            let request_moderator = self.request_moderator.clone();
             let time_service = self.time_service.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
@@ -195,6 +246,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                         cached_storage_server_summary,
                         data_subscriptions,
                         lru_response_cache,
+                        request_moderator,
                         storage,
                         time_service,
                     )
@@ -212,14 +264,14 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 
 /// Refreshes the cached storage server summary
 fn refresh_cached_storage_summary<T: StorageReaderInterface>(
-    cached_storage_summary: Arc<RwLock<StorageServerSummary>>,
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     storage: T,
     storage_config: StorageServiceConfig,
-) -> Result<()> {
+) -> Result<(), Error> {
     // Fetch the data summary from storage
     let data_summary = storage
         .get_data_summary()
-        .map_err(|error| StorageServiceError::InternalError(error.to_string()))?;
+        .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
 
     // Initialize the protocol metadata
     let protocol_metadata = ProtocolMetadata {
@@ -234,7 +286,7 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
         protocol_metadata,
         data_summary,
     };
-    *cached_storage_summary.write() = storage_server_summary;
+    *cached_storage_server_summary.write() = storage_server_summary;
 
     Ok(())
 }
