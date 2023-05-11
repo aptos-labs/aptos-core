@@ -197,8 +197,8 @@ mod test {
         aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, aggregator_enabled);
         aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, aggregator_enabled);
         aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, aggregator_enabled);
-        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, aggregator_enabled);
-        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, aggregator_enabled);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, aggregator_enabled).add(100).unwrap();
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, aggregator_enabled).add(200).unwrap();
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
         aggregator_data.remove_aggregator(aggregator_id_for_test(300));
@@ -219,8 +219,10 @@ mod test {
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
         assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
         assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
-        assert!(changes.contains_key(&aggregator_id_for_test(600)));
-        assert!(changes.contains_key(&aggregator_id_for_test(700)));
+        let _delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
+        assert_matches!(changes.get(&aggregator_id_for_test(600)).unwrap(), Merge(_delta_100));
+        let _delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
+        assert_matches!(changes.get(&aggregator_id_for_test(700)).unwrap(), Merge(_delta_200));
         assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
     }
 
@@ -237,8 +239,8 @@ mod test {
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
         assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
         assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
-        assert!(changes.contains_key(&aggregator_id_for_test(600)));
-        assert!(changes.contains_key(&aggregator_id_for_test(700)));
+        assert_matches!(changes.get(&aggregator_id_for_test(600)).unwrap(), Write(100));
+        assert_matches!(changes.get(&aggregator_id_for_test(700)).unwrap(), Write(200));
         assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
     }
 }
