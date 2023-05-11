@@ -34,6 +34,7 @@ use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
+use crate::dag::dag_storage::DagStorage;
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 pub struct DagDriver {
@@ -54,10 +55,11 @@ pub struct DagDriver {
 }
 
 impl DagDriver {
-    pub fn new(
+    pub(crate) fn new(
         epoch: u64,
         author: Author,
         config: DagConfig,
+        dag_storage: Arc<dyn DagStorage>,
         rb_storage: Arc<dyn ReliableBroadcastStorage>,
         payload_client: Arc<dyn PayloadClient>,
         network_sender: NetworkSender,
@@ -114,6 +116,7 @@ impl DagDriver {
                 verifier.clone(),
                 proposer_election,
                 payload_manager,
+                dag_storage,
             ),
             bullshark,
             rb_tx,

@@ -27,6 +27,7 @@ use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+use crate::dag::dag_storage::NaiveDagStore;
 use crate::dag::reliable_broadcast::storage::NaiveReliableBroadcastDB;
 
 /// Helper function to start consensus based on configuration and return the runtime
@@ -42,6 +43,7 @@ pub fn start_consensus(
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
+    let dag_store = Arc::new(NaiveDagStore::new(node_config.storage.dir()));
     let reliable_broadcast_db = Arc::new(NaiveReliableBroadcastDB::new(node_config.storage.dir()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),
@@ -75,6 +77,7 @@ pub fn start_consensus(
         quorum_store_db,
         reconfig_events,
         bounded_executor,
+        dag_store,
         reliable_broadcast_db,
     );
 

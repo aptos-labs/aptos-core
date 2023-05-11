@@ -44,6 +44,7 @@ use futures_channel::oneshot;
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
+use crate::dag::dag_storage::MockDagStore;
 use crate::dag::reliable_broadcast::storage::MockReliableBroadcastDB;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -150,6 +151,7 @@ impl NodeSetup {
 
         let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
+        let dag_storage = Arc::new(MockDagStore::new());
         let rb_storage = Arc::new(MockReliableBroadcastDB::new());
         let payload_client = Arc::new(MockPayloadManager::new(None));
 
@@ -160,6 +162,7 @@ impl NodeSetup {
             epoch_state.epoch,
             author,
             DagConfig::default(),
+            dag_storage,
             rb_storage,
             payload_client,
             network,
