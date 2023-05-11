@@ -176,42 +176,54 @@ Also learn how to run a public fullnode on a local network and connect to either
 
 <div class="docs-card-container">
   <div class="row row-cols-1 row-cols-md-3a g-4">
-    <div class="col">
+        <div class="col">
       <div class="card-no-border card-body h-100 d-flex flex-column">
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="./deployments" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">Aptos blockchain deployments</h4>
-          </a>
-              <small>See a snapshot of all Aptos deployments.</small>
+          <div class="w-100">
+            <div class="d-flex justify-content-between">
+              <a href="./deployments" class="list-group-item">
+                <h4 class="mb-1">Aptos blockchain deployments</h4>
+              </a>
             </div>
-          <a href="./identity-and-configuration" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">Identity and configuration</h4>
-          </a>
-              <small>A mental-model of identity and configuration plus a description of the identity YAMLs.</small>
+            <small>See a snapshot of all Aptos deployments.</small>
+          </div>
+          <div class="w-100">
+            <div class="d-flex justify-content-between">
+              <a href="./identity-and-configuration" class="list-group-item">
+                <h4 class="mb-1">Identity and configuration</h4>
+              </a>
             </div>
-          <a href="./node-files-all-networks/node-files" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">Node files</h4>
-          </a>
-              <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
+            <small>A mental-model of identity and configuration plus a description of the identity YAMLs.</small>
+          </div>
+          <div class="w-100">
+            <div class="d-flex justify-content-between">
+              <a href="./node-files-all-networks/node-files" class="list-group-item">
+                <h4 class="mb-1">Node files</h4>
+              </a>
             </div>
-          <a href="../integration/indexing" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">Indexing</h4>
-          </a>
-              <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+            <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
+          </div>
+          <div class="w-100">
+            <div class="d-flex justify-content-between">
+              <a href="../integration/indexing" class="list-group-item">
+                <h4 class="mb-1">Indexing</h4>
+              </a>
             </div>
-          <a href="../guides/state-sync" class="list-group-item">
-            <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">State synchronization</h4>
-          </a>
-              <small>Synchronize your nodes to the latest Aptos blockchain state.</small>
+            <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+          </div>
+          <div class="w-100">
+            <div class="d-flex justify-content-between">
+              <a href="../guides/state-sync" class="list-group-item">
+                <h4 class="mb-1">State synchronization</h4>
+              </a>
             </div>
+            <small>Synchronize your nodes to the latest Aptos blockchain state.</small>
+          </div>
         </div>
+      </div>
+    </div>
       </div>
     </div>
     <div class="col">
