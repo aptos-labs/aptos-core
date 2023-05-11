@@ -32,6 +32,7 @@ module fungible_asset_extension::managed_coin {
             utf8(b"Libra Coin"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
