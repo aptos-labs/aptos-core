@@ -16,6 +16,7 @@ pub enum TimedFeatureFlag {
     Ristretto255NativeFloatingPointFix,
     DisableInvariantViolationCheckInSwapLoc,
     EntryTypeSizeLimit,
+    LimitedNumOfRistretto255PointsPerSession,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -92,6 +93,8 @@ impl TimedFeatureFlag {
             (EntryTypeSizeLimit, TESTNET) => 1680231600000, /* Thu Mar 30 2023 20:00:00 GMT-0700 */
             (EntryTypeSizeLimit, MAINNET) => 1680318000000, /* Fri Mar 31 2023 20:00:00 GMT-0700 */
 
+            (LimitedNumOfRistretto255PointsPerSession, TESTNET) => 1683306000000, /* Fri May 5 2023 10:00:00 GMT-0700 */
+            (LimitedNumOfRistretto255PointsPerSession, MAINNET) => 1683824400000, /* Thu May 11 2023 10:00:00 GMT-0700 */
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
         }
