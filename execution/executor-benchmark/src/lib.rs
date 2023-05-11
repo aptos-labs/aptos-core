@@ -385,7 +385,7 @@ mod tests {
         println!("db_generator::create_db_with_accounts");
 
         crate::db_generator::create_db_with_accounts::<E>(
-            40, /* num_accounts */
+            100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
             5,           /* block_size */
@@ -408,7 +408,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize()),
+            transaction_type.map(|t| t.materialize(2)),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */

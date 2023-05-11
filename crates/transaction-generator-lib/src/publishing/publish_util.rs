@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::publishing::module_simple;
+use crate::publishing::{module_simple, raw_module_data};
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
@@ -44,6 +44,7 @@ impl PackageTracker {
 #[derive(Clone, Debug)]
 pub struct PackageHandler {
     packages: Vec<PackageTracker>,
+    is_simple: bool,
 }
 
 impl Default for PackageHandler {
@@ -59,7 +60,10 @@ impl PackageHandler {
             suffix: 0,
             package: Package::by_name(name),
         }];
-        PackageHandler { packages }
+        PackageHandler {
+            packages,
+            is_simple: name == "simple",
+        }
     }
 
     // Return a `Package` to be published. Packages are tracked by publisher so if
@@ -89,10 +93,12 @@ impl PackageHandler {
             tracker.publishers[idx].publisher,
             tracker.publishers[idx].suffix,
         );
-        if version {
-            package.version(rng);
+        if self.is_simple {
+            if version {
+                package.version(rng);
+            }
+            package.scramble(tracker.publishers[idx].fn_count, rng);
         }
-        package.scramble(tracker.publishers[idx].fn_count, rng);
         // info!("PACKAGE: {:#?}", package);
         package
     }
@@ -106,11 +112,26 @@ pub enum Package {
 
 impl Package {
     pub fn by_name(name: &str) -> Self {
-        let (modules, metadata) = match name {
-            "simple" => module_simple::load_package(),
-            _ => unreachable!(),
-        };
+        let (modules, metadata) = Self::load_package(
+            &raw_module_data::PACKAGE_TO_METADATA[name],
+            &raw_module_data::PACKAGE_TO_MODULES[name],
+        );
         Self::Simple(modules, metadata)
+    }
+
+    fn load_package(
+        package_bytes: &[u8],
+        modules_bytes: &[Vec<u8>],
+    ) -> (HashMap<String, CompiledModule>, PackageMetadata) {
+        let metadata = bcs::from_bytes::<PackageMetadata>(package_bytes)
+            .expect("PackageMetadata for GenericModule must deserialize");
+        let mut modules = HashMap::new();
+        for module_content in modules_bytes {
+            let module =
+                CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
+            modules.insert(module.self_id().name().to_string(), module);
+        }
+        (modules, metadata)
     }
 
     // Given an "original" package, updates all modules with the given publisher.
@@ -190,23 +211,29 @@ fn update(
             .module_handles
             .get(module.self_handle_idx().0 as usize)
             .expect("ModuleId for self must exists");
+        let original_address_idx = module_handle.address.0;
         let _ = std::mem::replace(
-            &mut new_module.address_identifiers[module_handle.address.0 as usize],
+            &mut new_module.address_identifiers[original_address_idx as usize],
             publisher,
         );
-        let mut new_name = new_module.identifiers[module_handle.name.0 as usize].to_string();
-        new_name.push_str(suffix.to_string().as_str());
-        let _ = std::mem::replace(
-            &mut new_module.identifiers[module_handle.name.0 as usize],
-            Identifier::new(new_name).expect("Identifier must be legal"),
-        );
+
+        if suffix > 0 {
+            let mut new_name = new_module.identifiers[module_handle.name.0 as usize].to_string();
+            new_name.push_str(suffix.to_string().as_str());
+            let _ = std::mem::replace(
+                &mut new_module.identifiers[module_handle.name.0 as usize],
+                Identifier::new(new_name).expect("Identifier must be legal"),
+            );
+        }
         new_modules.insert(original_name.clone(), new_module);
     }
     let mut metadata = metadata.clone();
-    for module in &mut metadata.modules {
-        let mut new_name = module.name.clone();
-        new_name.push_str(suffix.to_string().as_str());
-        module.name = new_name;
+    if suffix > 0 {
+        for module in &mut metadata.modules {
+            let mut new_name = module.name.clone();
+            new_name.push_str(suffix.to_string().as_str());
+            module.name = new_name;
+        }
     }
     (new_modules, metadata)
 }
