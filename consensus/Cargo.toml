@@ -67,6 +67,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
+uuid = {worspace = true, features = ["v4"] }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["fuzzing"] }

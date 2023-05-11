@@ -14,6 +14,8 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
+use std::borrow::Borrow;
+use std::collections::hash_map::Iter;
 use tokio::sync::Mutex;
 use crate::dag::dag_storage::DagStorage;
 
@@ -330,6 +332,36 @@ impl MissingDagNodeStatus {
     }
 }
 
+pub(crate) struct PeerIdToCertifiedNodeMap {
+    id: [u8; 16],
+    inner: HashMap<PeerId, CertifiedNode>,
+}
+
+impl PeerIdToCertifiedNodeMap {
+    pub(crate) fn new() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: HashMap::new()
+        }
+    }
+
+    pub fn get(&self, k: &PeerId) -> Option<&CertifiedNode> {
+        self.inner.get(k)
+    }
+
+    pub fn insert(&mut self, k: PeerId, v: CertifiedNode) -> Option<CertifiedNode> {
+        self.inner.insert(k, v)
+    }
+
+    pub fn iter(&self) -> Iter<PeerId, CertifiedNode> {
+        self.inner.iter()
+    }
+
+    pub fn contains_key(&self, k: &PeerId) -> bool {
+        self.inner.contains_key(k)
+    }
+}
+
 /// The part of the DAG data that should be persisted.
 pub(crate) struct DagInMem {
     my_id: PeerId,
@@ -337,7 +369,7 @@ pub(crate) struct DagInMem {
     current_round: u64,
     // starts from 0, which is genesys
     front: WeakLinksCreator,
-    dag: Vec<HashMap<PeerId, CertifiedNode>>,
+    dag: Vec<PeerIdToCertifiedNodeMap>,
     // TODO: protect from DDoS - currently validators can add unbounded number of entries
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
 }
@@ -365,15 +397,15 @@ impl Dag {
         payload_manager: Arc<PayloadManager>,
         storage: Arc<dyn DagStorage>,
     ) -> Self {
-        let in_mem = match storage.load_all(epoch) {
-            Ok(in_mem) => in_mem,
-            Err(_) => {
+        let in_mem = match storage.load_all(epoch).expect("235922") {
+            Some(in_mem) => in_mem,
+            None => {
                 let in_mem = DagInMem {
                     my_id,
                     epoch,
                     current_round: 0,
                     front: WeakLinksCreator::new(my_id, &verifier),
-                    dag: vec![HashMap::new()],
+                    dag: vec![PeerIdToCertifiedNodeMap::new()],
                     missing_nodes: HashMap::new(),
                 };
                 storage.save_all(&in_mem).expect("161310");
@@ -470,7 +502,7 @@ impl Dag {
         // assert!(self.in_mem.dag.len() >= round - 1);
 
         if self.in_mem.dag.len() <= round {
-            self.in_mem.dag.push(HashMap::new());
+            self.in_mem.dag.push(PeerIdToCertifiedNodeMap::new());
         }
         self.in_mem.dag[round].insert(certified_node.node().source(), certified_node.clone());
         self.storage.insert_node(round, certified_node.node().source(), &certified_node).expect("Failed in persisting a new node.");
@@ -642,7 +674,8 @@ impl Dag {
 
         if self.in_mem.dag.get(self.in_mem.current_round as usize).is_none() {
             // self.in_mem.dag[self.in_mem.current_round as usize] = HashMap::new();
-            self.in_mem.dag.push(HashMap::new());
+            let new_node_map = PeerIdToCertifiedNodeMap::new();
+            self.in_mem.dag.push(new_node_map);
             // self.storage.inc_dag_round_count();
         }
 

@@ -8,7 +8,7 @@ use aptos_types::PeerId;
 use crate::dag::dag::DagInMem;
 
 pub(crate) trait DagStorage: Sync + Send {
-    fn load_all(&self, epoch: u64) -> Result<DagInMem>;
+    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>>;
     fn save_all(&self, in_mem: &DagInMem) -> Result<()>;
     fn insert_node(&self, round: usize, source: PeerId, node: &CertifiedNode) -> Result<()>;
 }
@@ -22,7 +22,7 @@ impl MockDagStore {
 }
 
 impl DagStorage for MockDagStore {
-    fn load_all(&self, epoch: u64) -> Result<DagInMem> {
+    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>> {
         todo!()
     }
 
@@ -52,7 +52,7 @@ impl NaiveDagStore {
             "DagState.dag",
             "DagState.front",
             "DagState.missing_nodes",
-            "Map<PeerId,CertifiedNode>",
+            "PeerIdToCertifiedNodeMap",
             "Map<HashValue,MissingDagNodeStatus>",
             "MissingDagNodeStatus",
             "PendingInfo",
@@ -67,7 +67,7 @@ impl NaiveDagStore {
             "WeakLinksCreator.latest_nodes_metadata",
             "WeakLinksCreator.address_to_validator_index",
             "Map<PeerId,u64>",
-            "Vec<Map<PeerId,CertifiedNode>>",
+            "Vec<PeerIdToCertifiedNodeMap>",
             "Vec<Option<PeerStatus>>",
             "Option<PeerStatus>",
             "PeerStatus",
@@ -88,15 +88,18 @@ impl NaiveDagStore {
     }
 }
 impl DagStorage for NaiveDagStore {
-    fn load_all(&self, epoch: u64) -> Result<DagInMem> {
-        todo!()
+    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>> {
+        //TODO
+        Ok(None)
     }
 
     fn save_all(&self, in_mem: &DagInMem) -> Result<()> {
-        todo!()
+        //TODO
+        Ok(())
     }
 
     fn insert_node(&self, round: usize, source: PeerId, node: &CertifiedNode) -> Result<()> {
-        todo!()
+        //TODO
+        Ok(())
     }
 }
