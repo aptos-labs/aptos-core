@@ -92,6 +92,7 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
+    aggregator_enabled: bool,
 }
 
 impl FakeExecutor {
@@ -106,11 +107,16 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: chain_id.id(),
+            aggregator_enabled: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
         aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
+    }
+
+    pub fn set_aggregator_enabled(&mut self, aggregator_enabled: bool) {
+        self.aggregator_enabled = aggregator_enabled;
     }
 
     /// Configure this executor to not use parallel execution.
@@ -160,6 +166,7 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            aggregator_enabled: true,
         }
     }
 
@@ -582,7 +589,6 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-        aggregator_enabled: bool,
     ) {
         let write_set = {
             // FIXME: should probably read the timestamp from storage.
@@ -599,7 +605,8 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void(), aggregator_enabled);
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -635,7 +642,6 @@ impl FakeExecutor {
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-        aggregator_enabled: bool,
     ) -> Result<WriteSet, VMStatus> {
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
@@ -649,7 +655,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void(), aggregator_enabled);
+        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
