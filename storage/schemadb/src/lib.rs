@@ -150,7 +150,6 @@ impl DB {
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
         let inner = rocksdb::DB::open_cf_for_read_only(opts, path, cfs, error_if_log_file_exists)?;
-
         Ok(Self::log_construct(name, inner))
     }
 
@@ -240,8 +239,10 @@ impl DB {
             }
         }
         let serialized_size = db_batch.size_in_bytes();
-
-        self.inner.write_opt(db_batch, &default_write_options())?;
+        let mut opt = default_write_options();
+        // opt.disable_wal(true);
+        opt.set_sync(false);
+        self.inner.write_opt(db_batch, &opt)?;
 
         // Bump counters only after DB write succeeds.
         for (cf_name, rows) in rows_locked.iter() {

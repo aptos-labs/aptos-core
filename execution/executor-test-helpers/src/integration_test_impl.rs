@@ -31,7 +31,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;
@@ -45,10 +45,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
     );
 
-    let path = aptos_temppath::TempPath::new();
-    path.create_as_dir().unwrap();
-    let (aptos_db, db, executor, waypoint) = create_db_and_executor(path.path(), &genesis_txn);
-
+    let path = PathBuf::from("/Users/bowu/Downloads/tmp/testdb");
+    let (aptos_db, db, executor, waypoint) = create_db_and_executor(path.as_path(), &genesis_txn);
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
         validators[0].data.owner_address,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DBTool;
+use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use clap::Parser;
 
 #[test]
@@ -252,4 +253,9 @@ mod compaction_tests {
         assert_metadata_view_eq(&old_metaview, &new_metaview);
         rt.shutdown_timeout(Duration::from_secs(1));
     }
+}
+
+#[test]
+fn test_rocksdb_options() {
+    let _ = test_execution_with_storage_impl();
 }

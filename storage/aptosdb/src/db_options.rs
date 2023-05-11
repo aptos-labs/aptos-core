@@ -69,6 +69,7 @@ where
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
         let mut cf_opts = Options::default();
+        // cf_opts.set_disable_auto_compactions(true);
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);
         cf_opts_post_processor(cf_name, &mut cf_opts);
