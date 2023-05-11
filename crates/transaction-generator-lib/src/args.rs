@@ -8,17 +8,26 @@ use serde::{Deserialize, Serialize};
 /// Utility class for specifying transaction type with predefined configurations through CLI
 #[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
 pub enum TransactionTypeArg {
+    NoOp,
     CoinTransfer,
     CoinTransferWithInvalid,
     AccountGeneration,
     AccountGenerationLargePool,
     NftMintAndTransfer,
     PublishPackage,
-    CustomFunctionLargeModuleWorkingSet,
-    CreateNewResource,
+    LargeModuleWorkingSetNoOp,
+    CreateNewAccountResource,
     ModifyGlobalResource,
     ModifyTenGlobalResources,
-    NoOp,
+    TokenV1NFTMintAndStoreSequential,
+    TokenV1NFTMintAndTransferSequential,
+    TokenV1NFTMintAndTransferSequential20Collections,
+    TokenV1NFTMintAndStoreParallel,
+    TokenV1NFTMintAndTransferParallel,
+    TokenV1FTMintAndStore,
+    TokenV1FTMintAndTransfer,
+    TokenV1FTMintAndTransfer20Collections,
+    Batch100Transfer,
 }
 
 impl Default for TransactionTypeArg {
@@ -46,16 +55,14 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NftMintAndTransfer => TransactionType::NftMintAndTransfer,
             TransactionTypeArg::PublishPackage => TransactionType::PublishPackage {
+                use_account_pool: true,
+            },
+            TransactionTypeArg::LargeModuleWorkingSetNoOp => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::Nop,
+                num_modules: 1000,
                 use_account_pool: false,
             },
-            TransactionTypeArg::CustomFunctionLargeModuleWorkingSet => {
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::Nop,
-                    num_modules: 1000,
-                    use_account_pool: false,
-                }
-            },
-            TransactionTypeArg::CreateNewResource => TransactionType::CallCustomModules {
+            TransactionTypeArg::CreateNewAccountResource => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::BytesMakeOrChange {
                     data_length: Some(32),
                 },
@@ -76,6 +83,61 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::Nop,
                 num_modules: 1,
                 use_account_pool: false,
+            },
+            TransactionTypeArg::TokenV1NFTMintAndStoreSequential => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndStoreNFTSequential,
+                    num_modules: 1,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::TokenV1NFTMintAndTransferSequential => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
+                    num_modules: 1,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::TokenV1NFTMintAndTransferSequential20Collections => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferNFTSequential,
+                    num_modules: 20,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::TokenV1NFTMintAndStoreParallel => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndStoreNFTParallel,
+                    num_modules: 1,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::TokenV1NFTMintAndTransferParallel => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
+                    num_modules: 1,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::TokenV1FTMintAndStore => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV1MintAndStoreFT,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::TokenV1FTMintAndTransfer => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            TransactionTypeArg::TokenV1FTMintAndTransfer20Collections => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                    num_modules: 20,
+                    use_account_pool: false,
+                }
+            },
+            TransactionTypeArg::Batch100Transfer => {
+                TransactionType::BatchTransfer { batch_size: 100 }
             },
         }
     }

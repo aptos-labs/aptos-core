@@ -7,7 +7,7 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutedChunk;
+use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -19,6 +19,7 @@ use aptos_types::{
 };
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
+use move_core_types::vm_status::StatusCode;
 use std::time::Duration;
 
 pub struct ChunkOutput {
@@ -104,10 +105,23 @@ impl ChunkOutput {
         base_view: &ExecutedTrees,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::vm_execute_chunk", |_| {
+        fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply(self, base_view, append_state_checkpoint_to_block)
+        ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
+    }
+
+    pub fn apply_to_ledger_for_block(
+        self,
+        base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
+    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
+        fail_point!("executor::apply_to_ledger_for_block", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in apply_to_ledger_for_block."
+            ))
+        });
+        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
     }
 
     pub fn trace_log_transaction_status(&self) {
@@ -233,7 +247,12 @@ pub fn update_counters_for_processed_chunk(
                     )
                 );
                 (
-                    "discard",
+                    // Specialize duplicate txns for alerts
+                    if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
+                        "discard_sequence_number_too_old"
+                    } else {
+                        "discard"
+                    },
                     "error_code",
                     if detailed_counters {
                         format!("{:?}", discard_status_code).to_lowercase()

@@ -18,6 +18,7 @@ use crate::{
         signatures::Signature,
         transactions::{TransactionDetail, TransactionModel},
         user_transactions::UserTransactionModel,
+        v2_objects::{CurrentObject, Object},
         write_set_changes::{WriteSetChangeDetail, WriteSetChangeModel},
     },
     schema,
@@ -67,10 +68,12 @@ fn insert_to_db_impl(
         &[CurrentTableItem],
         &[TableMetadata],
     ),
+    object_core: (&[Object], &[CurrentObject]),
 ) -> Result<(), diesel::result::Error> {
     let (user_transactions, signatures, block_metadata_transactions) = txn_details;
     let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
         wsc_details;
+    let (objects, current_objects) = object_core;
     insert_transactions(conn, txns)?;
     insert_user_transactions(conn, user_transactions)?;
     insert_signatures(conn, signatures)?;
@@ -82,6 +85,8 @@ fn insert_to_db_impl(
     insert_table_items(conn, table_items)?;
     insert_current_table_items(conn, current_table_items)?;
     insert_table_metadata(conn, table_metadata)?;
+    insert_objects(conn, objects)?;
+    insert_current_objects(conn, current_objects)?;
     Ok(())
 }
 
@@ -105,6 +110,7 @@ fn insert_to_db(
         Vec<CurrentTableItem>,
         Vec<TableMetadata>,
     ),
+    object_core: (Vec<Object>, Vec<CurrentObject>),
 ) -> Result<(), diesel::result::Error> {
     aptos_logger::trace!(
         name = name,
@@ -115,6 +121,7 @@ fn insert_to_db(
     let (user_transactions, signatures, block_metadata_transactions) = txn_details;
     let (move_modules, move_resources, table_items, current_table_items, table_metadata) =
         wsc_details;
+    let (objects, current_objects) = object_core;
     match conn
         .build_transaction()
         .read_write()
@@ -136,6 +143,7 @@ fn insert_to_db(
                     &current_table_items,
                     &table_metadata,
                 ),
+                (&objects, &current_objects),
             )
         }) {
         Ok(_) => Ok(()),
@@ -151,6 +159,8 @@ fn insert_to_db(
             let table_items = clean_data_for_db(table_items, true);
             let current_table_items = clean_data_for_db(current_table_items, true);
             let table_metadata = clean_data_for_db(table_metadata, true);
+            let objects = clean_data_for_db(objects, true);
+            let current_objects = clean_data_for_db(current_objects, true);
 
             conn.build_transaction()
                 .read_write()
@@ -172,6 +182,7 @@ fn insert_to_db(
                             &current_table_items,
                             &table_metadata,
                         ),
+                        (&objects, &current_objects),
                     )
                 })
         },
@@ -335,7 +346,11 @@ fn insert_move_resources(
             diesel::insert_into(schema::move_resources::table)
                 .values(&items_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, write_set_change_index))
-                .do_nothing(),
+                .do_update()
+                .set((
+                    inserted_at.eq(excluded(inserted_at)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                )),
             None,
         )?;
     }
@@ -407,6 +422,53 @@ fn insert_table_metadata(
     Ok(())
 }
 
+fn insert_objects(
+    conn: &mut PgConnection,
+    items_to_insert: &[Object],
+) -> Result<(), diesel::result::Error> {
+    use schema::objects::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), Object::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::objects::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict((transaction_version, write_set_change_index))
+                .do_nothing(),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn insert_current_objects(
+    conn: &mut PgConnection,
+    items_to_insert: &[CurrentObject],
+) -> Result<(), diesel::result::Error> {
+    use schema::current_objects::dsl::*;
+    let chunks = get_chunks(items_to_insert.len(), CurrentObject::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::current_objects::table)
+                .values(&items_to_insert[start_ind..end_ind])
+                .on_conflict(object_address)
+                .do_update()
+                .set((
+                    owner_address.eq(excluded(owner_address)),
+                    state_key_hash.eq(excluded(state_key_hash)),
+                    allow_ungated_transfer.eq(excluded(allow_ungated_transfer)),
+                    last_guid_creation_num.eq(excluded(last_guid_creation_num)),
+                    last_transaction_version.eq(excluded(last_transaction_version)),
+                    is_deleted.eq(excluded(is_deleted)),
+                    inserted_at.eq(excluded(inserted_at)),
+                )),
+                Some(" WHERE current_objects.last_transaction_version <= excluded.last_transaction_version "),
+        )?;
+    }
+    Ok(())
+}
+
 #[async_trait]
 impl TransactionProcessor for DefaultTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -460,15 +522,29 @@ impl TransactionProcessor for DefaultTransactionProcessor {
                 },
             }
         }
+
+        // TODO, merge this loop with above
+        let mut all_objects = vec![];
+        let mut all_current_objects = HashMap::new();
+        for txn in &transactions {
+            let (mut objects, current_objects) = Object::from_transaction(txn);
+            all_objects.append(&mut objects);
+            all_current_objects.extend(current_objects);
+        }
         // Getting list of values and sorting by pk in order to avoid postgres deadlock since we're doing multi threaded db writes
         let mut current_table_items = current_table_items
             .into_values()
             .collect::<Vec<CurrentTableItem>>();
         let mut table_metadata = table_metadata.into_values().collect::<Vec<TableMetadata>>();
+        let mut all_current_objects = all_current_objects
+            .into_values()
+            .collect::<Vec<CurrentObject>>();
+
         // Sort by PK
         current_table_items
             .sort_by(|a, b| (&a.table_handle, &a.key_hash).cmp(&(&b.table_handle, &b.key_hash)));
         table_metadata.sort_by(|a, b| a.handle.cmp(&b.handle));
+        all_current_objects.sort_by(|a, b| a.object_address.cmp(&b.object_address));
 
         let mut conn = self.get_conn();
         let tx_result = insert_to_db(
@@ -487,6 +563,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
                 current_table_items,
                 table_metadata,
             ),
+            (all_objects, all_current_objects),
         );
         match tx_result {
             Ok(_) => Ok(ProcessingResult::new(

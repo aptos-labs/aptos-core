@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 use crate::publishing::raw_module_data;
-use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
@@ -18,6 +18,7 @@ use move_binary_format::{
 };
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
+use std::collections::HashMap;
 
 //
 // Contains all the code to work on the Simple package
@@ -27,13 +28,15 @@ use rand_core::RngCore;
 // Functions to load and update the original package
 //
 
-pub fn load_package() -> (Vec<CompiledModule>, PackageMetadata) {
-    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA_SIMPLE)
+pub fn load_package() -> (HashMap<String, CompiledModule>, PackageMetadata) {
+    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA)
         .expect("PackageMetadata for GenericModule must deserialize");
-    let mut modules = vec![];
-    let module = CompiledModule::deserialize(&raw_module_data::MODULE_SIMPLE)
-        .expect("Simple.move must deserialize");
-    modules.push(module);
+    let mut modules = HashMap::new();
+    for module_content in &*raw_module_data::MODULES {
+        let module =
+            CompiledModule::deserialize(module_content).expect("Simple.move must deserialize");
+        modules.insert(module.self_id().name().to_string(), module);
+    }
     (modules, metadata)
 }
 
@@ -146,9 +149,73 @@ pub enum EntryPoints {
     },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
+
+    /// Initialize Token V1 NFT collection
+    TokenV1InitializeCollection,
+    /// Mint an NFT token. Should be called only after InitializeCollection is called
+    TokenV1MintAndStoreNFTParallel,
+    TokenV1MintAndStoreNFTSequential,
+    TokenV1MintAndTransferNFTParallel,
+    TokenV1MintAndTransferNFTSequential,
+    TokenV1MintAndStoreFT,
+    TokenV1MintAndTransferFT,
 }
 
 impl EntryPoints {
+    pub fn package_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "simple",
+        }
+    }
+
+    pub fn module_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+        }
+    }
+
     pub fn create_payload(
         &self,
         module_id: ModuleId,
@@ -201,6 +268,55 @@ impl EntryPoints {
                 bytes_make_or_change(rng, module_id, data_len)
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
+            EntryPoints::TokenV1InitializeCollection => get_payload_void(
+                module_id,
+                ident_str!("token_v1_initialize_collection").to_owned(),
+            ),
+            EntryPoints::TokenV1MintAndStoreNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+
+            EntryPoints::TokenV1MintAndTransferNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+        }
+    }
+
+    pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
+        match self {
+            EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential => {
+                Some(EntryPoints::TokenV1InitializeCollection)
+            },
+            _ => None,
         }
     }
 }
@@ -321,6 +437,12 @@ fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
 fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
     get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
         bcs::to_bytes(dst).unwrap(),
+    ])
+}
+
+fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
+    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
+        bcs::to_bytes(&other).unwrap(),
     ])
 }
 

@@ -33,7 +33,7 @@ module fungible_asset_extension::coin_example {
         managed_fungible_asset::mint(admin, get_metadata(), amount, to);
     }
 
-    /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Transfer as the owner of metadata object ignoring `frozen` field.
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) {
         managed_fungible_asset::transfer(admin, get_metadata(), from, to, amount);
     }
@@ -53,12 +53,12 @@ module fungible_asset_extension::coin_example {
         managed_fungible_asset::unfreeze_account(admin, get_metadata(), account);
     }
 
-    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Withdraw as the owner of metadata object ignoring `frozen` field.
     public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset {
         managed_fungible_asset::withdraw(admin, get_metadata(), amount, from)
     }
 
-    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Deposit as the owner of metadata object ignoring `frozen` field.
     public fun deposit(admin: &signer, to: address, fa: FungibleAsset) {
         managed_fungible_asset::deposit(admin, get_metadata(), to, fa);
     }
@@ -78,12 +78,12 @@ module fungible_asset_extension::coin_example {
         let metadata = get_metadata();
         assert!(primary_fungible_store::balance(creator_address, metadata) == 100, 4);
         freeze_account(creator, creator_address);
-        assert!(!primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 5);
+        assert!(primary_fungible_store::is_frozen(creator_address, metadata), 5);
         transfer(creator, creator_address, aaron_address, 10);
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 10, 6);
 
         unfreeze_account(creator, creator_address);
-        assert!(primary_fungible_store::ungated_balance_transfer_allowed(creator_address, metadata), 7);
+        assert!(!primary_fungible_store::is_frozen(creator_address, metadata), 7);
         burn(creator, creator_address, 90);
     }
 

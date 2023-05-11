@@ -25,7 +25,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     ExecutedTrees,
 };
 use aptos_types::{
@@ -131,7 +131,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
             Arc::clone(&self.db.reader),
-            Arc::new(SyncProofFetcher::new(self.db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )
     }
 

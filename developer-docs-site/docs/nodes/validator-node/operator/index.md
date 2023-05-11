@@ -16,10 +16,6 @@ For participating in the Aptos mainnet, you must deploy both a validator node an
 
 ## Deploy the nodes and register
 
-:::tip Petra on Chrome browser
-Although the [Petra wallet](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser, you can also use the Petra extension on [Brave browser](https://brave.com/), [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge).
-:::
-
 **Step 1:** Read the [**Node Requirements**](./node-requirements.md) and make sure that your hardware, storage and network resources satisfy the node requirements.
 
 **Step 2:** **Deploy the nodes**. Follow the detailed node installation steps provided in [**Running Validator Node**](running-validator-node/index.md) and deploy a validator node and a validator fullnode.

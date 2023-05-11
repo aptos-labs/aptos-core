@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
+use crate::{
+    async_proof_fetcher::AsyncProofFetcher, metrics::TIMER, state_view::DbStateView, DbReader,
+};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
@@ -84,7 +86,7 @@ pub struct CachedStateView {
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
     state_cache: DashMap<StateKey, Option<StateValue>>,
-    proof_fetcher: Arc<dyn ProofFetcher>,
+    proof_fetcher: Arc<AsyncProofFetcher>,
 }
 
 impl CachedStateView {
@@ -96,7 +98,7 @@ impl CachedStateView {
         reader: Arc<dyn DbReader>,
         next_version: Version,
         speculative_state: SparseMerkleTree<StateValue>,
-        proof_fetcher: Arc<dyn ProofFetcher>,
+        proof_fetcher: Arc<AsyncProofFetcher>,
     ) -> Result<Self> {
         // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
         // after we got the snapshot, in-mem trees newer than it gets dropped before being frozen,

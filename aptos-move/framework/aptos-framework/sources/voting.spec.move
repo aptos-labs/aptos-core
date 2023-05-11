@@ -150,6 +150,10 @@ spec aptos_framework::voting {
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
     }
 
+    spec next_proposal_id<ProposalType: store>(voting_forum_address: address): u64 {
+        aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
+    }
+
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
         use aptos_framework::chain_status;
         requires chain_status::is_operating(); // Ensures existence of Timestamp
@@ -172,6 +176,13 @@ spec aptos_framework::voting {
         // Any way to specify the result?
     }
 
+    spec get_proposal_creation_secs<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64 {
+        include AbortsIfNotContainProposalID<ProposalType>;
+    }
+
     spec get_proposal_expiration_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
@@ -183,6 +194,27 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): vector<u8> {
+        include AbortsIfNotContainProposalID<ProposalType>;
+    }
+
+    spec get_min_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u128 {
+        include AbortsIfNotContainProposalID<ProposalType>;
+    }
+
+    spec get_early_resolution_vote_threshold<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): Option<u128> {
+        include AbortsIfNotContainProposalID<ProposalType>;
+    }
+
+    spec get_votes<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): (u128, u128) {
         include AbortsIfNotContainProposalID<ProposalType>;
     }
 

@@ -22,7 +22,7 @@ Install your preferred SDK from the below list:
 
 ## Step 2: Install the CLI
 
-[Install the precompiled binary for the Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli.md).
+[Install the precompiled binary for the Aptos CLI](../tools/install-cli/index.md).
 
 ---
 
@@ -299,7 +299,7 @@ There are two separate withdraw and deposit events instead of a single transfer 
 :::
 
 ## Supporting documentation
-* [Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md)
+* [Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md)
 * [TypeScript SDK](../sdks/ts-sdk/index.md)
 * [Python SDK](../sdks/python-sdk.md)
 * [Rust SDK](../sdks/rust-sdk.md)

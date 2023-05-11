@@ -20,7 +20,7 @@ use aptos_executor_types::{
 };
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -478,7 +478,7 @@ fn apply_transaction_by_writeset(
         .verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
         )
         .unwrap();
 
@@ -617,7 +617,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 .verified_state_view(
                     StateViewId::Miscellaneous,
                     Arc::clone(&db.reader),
-                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                    Arc::new(AsyncProofFetcher::new(db.reader.clone())),
                 )
                 .unwrap(),
         )
@@ -640,78 +640,6 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
-
-    #[test]
-    #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
-    fn test_executor_two_branches(
-        a_size in 0..30u64,
-        b_size in 0..30u64,
-        c_size in 0..30u64,
-        amount in any::<u32>(),
-    ) {
-        let executor = TestExecutor::new();
-        let maybe_gas_limit = executor.get_block_gas_limit();
-        // Genesis -> A -> B
-        //            |
-        //            └--> C
-        let block_a = TestBlock::new(a_size, amount, gen_block_id(1), maybe_gas_limit);
-        let block_b = TestBlock::new(b_size, amount, gen_block_id(2), maybe_gas_limit);
-        let block_c = TestBlock::new(c_size, amount, gen_block_id(3), maybe_gas_limit);
-        // Execute block A, B and C. Hold all results in memory.
-        let parent_block_id = executor.committed_block_id();
-
-        let output_a = executor.execute_block(
-            (block_a.id, block_a.txns.clone()), parent_block_id
-        ).unwrap();
-        let root_hash_a = output_a.root_hash();
-        prop_assert_eq!(output_a.version(), ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) as u64);
-        let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_b.version(), (ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) + ledger_version_from_block_size(block_b.txns.len(), maybe_gas_limit)) as u64);
-        let output_c = executor.execute_block((block_c.id, block_c.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_c.version(), (ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) + ledger_version_from_block_size(block_c.txns.len(), maybe_gas_limit)) as u64);
-
-        let root_hash_b = output_b.root_hash();
-        let root_hash_c = output_c.root_hash();
-
-        // Execute block A and B. Execute and commit one transaction at a time.
-        let expected_root_hash_a = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            if maybe_gas_limit.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_a.id));
-            }
-            txns
-        });
-        prop_assert_eq!(root_hash_a, expected_root_hash_a);
-
-        let expected_root_hash_b = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            if maybe_gas_limit.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_a.id));
-            }
-            txns.extend(block_b.txns.iter().cloned());
-            if maybe_gas_limit.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_b.id));
-            }
-            txns
-        });
-        prop_assert_eq!(root_hash_b, expected_root_hash_b);
-
-        let expected_root_hash_c = run_transactions_naive({
-            let mut txns = vec![];
-            txns.extend(block_a.txns.iter().cloned());
-            if maybe_gas_limit.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_a.id));
-            }
-            txns.extend(block_c.txns.iter().cloned());
-            if maybe_gas_limit.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_c.id));
-            }
-            txns
-        });
-        prop_assert_eq!(root_hash_c, expected_root_hash_c);
-    }
 
     #[test]
     #[cfg_attr(feature = "consensus-only-perf-test", ignore)]

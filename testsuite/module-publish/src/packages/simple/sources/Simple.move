@@ -7,7 +7,7 @@
 // contains a `CompiledModule` for the module below.
 // A helper file is provided to manipulate that file to generate
 // multiple, publishable module.
-module 0xABCD::Simple {
+module 0xABCD::simple {
     use std::error;
     use std::signer;
     use std::string::{Self, String, utf8};
@@ -402,4 +402,7 @@ module 0xABCD::Simple {
             ret2
         }
     }
+
+
+
 }

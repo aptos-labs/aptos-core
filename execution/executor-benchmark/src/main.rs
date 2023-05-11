@@ -7,7 +7,7 @@ use aptos_config::config::{
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{
-    benchmark_transaction::BenchmarkTransaction, fake_executor::FakeExecutor,
+    benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
     pipeline::PipelineConfig,
 };
 use aptos_metrics_core::{register_int_gauge, IntGauge};
@@ -86,7 +86,11 @@ impl PrunerOpt {
 #[derive(Debug, Parser)]
 pub struct PipelineOpt {
     #[clap(long)]
+    generate_then_execute: bool,
+    #[clap(long)]
     split_stages: bool,
+    #[clap(long)]
+    skip_commit: bool,
     #[clap(long)]
     allow_discards: bool,
     #[clap(long)]
@@ -96,7 +100,9 @@ pub struct PipelineOpt {
 impl PipelineOpt {
     fn pipeline_config(&self) -> PipelineConfig {
         PipelineConfig {
+            delay_execution_start: self.generate_then_execute,
             split_stages: self.split_stages,
+            skip_commit: self.skip_commit,
             allow_discards: self.allow_discards,
             allow_aborts: self.allow_aborts,
         }
@@ -110,9 +116,6 @@ struct Opt {
 
     #[clap(long, default_value = "5")]
     transactions_per_sender: usize,
-
-    #[clap(long, default_value = "1000000")]
-    main_signer_accounts: usize,
 
     #[clap(long)]
     concurrency_level: Option<usize>,
@@ -137,7 +140,7 @@ struct Opt {
     verify_sequence_numbers: bool,
 
     #[clap(long)]
-    use_fake_executor: bool,
+    use_native_executor: bool,
 }
 
 impl Opt {
@@ -172,6 +175,12 @@ enum Command {
         /// number of transfer blocks to run
         #[clap(long, default_value = "1000")]
         blocks: usize,
+
+        #[clap(long, default_value = "1000000")]
+        main_signer_accounts: usize,
+
+        #[clap(long, default_value = "0")]
+        additional_dst_pool_accounts: usize,
 
         /// Workload (transaction type). Uses raw coin transfer if not set,
         /// and if set uses transaction-generator-lib to generate it
@@ -223,6 +232,8 @@ where
         },
         Command::RunExecutor {
             blocks,
+            main_signer_accounts,
+            additional_dst_pool_accounts,
             transaction_type,
             data_dir,
             checkpoint_dir,
@@ -232,7 +243,8 @@ where
                 blocks,
                 transaction_type.map(|t| t.materialize()),
                 opt.transactions_per_sender,
-                opt.main_signer_accounts,
+                main_signer_accounts,
+                additional_dst_pool_accounts,
                 data_dir,
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
@@ -280,10 +292,10 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
-    FakeExecutor::set_concurrency_level_once(opt.concurrency_level());
+    NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
-    if opt.use_fake_executor {
-        run::<FakeExecutor>(opt);
+    if opt.use_native_executor {
+        run::<NativeExecutor>(opt);
     } else {
         run::<AptosVM>(opt);
     }

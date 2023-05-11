@@ -3,6 +3,7 @@
 
 import { AptosAccount, AptosAccountObject, getAddressFromAccountOrAddress } from "../../account";
 import { HexString } from "../../utils";
+import nacl from "tweetnacl";
 
 const aptosAccountObject: AptosAccountObject = {
   address: "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",
@@ -59,12 +60,14 @@ test("Serializes/Deserializes", () => {
   expect(a1.address().hex()).toBe(a2.address().hex());
 });
 
-test("Signs Strings", () => {
+test("Signs and verifies strings", () => {
   const a1 = AptosAccount.fromAptosAccountObject(aptosAccountObject);
-  expect(a1.signHexString("0x7777").hex()).toBe(
-    // eslint-disable-next-line max-len
-    "0xc5de9e40ac00b371cd83b1c197fa5b665b7449b33cd3cdd305bb78222e06a671a49625ab9aea8a039d4bb70e275768084d62b094bc1b31964f2357b7c1af7e0d",
-  );
+  const messageHex = "0x7777";
+  const expectedSignedMessage =
+    "0xc5de9e40ac00b371cd83b1c197fa5b665b7449b33cd3cdd305bb78222e06a671a49625ab9aea8a039d4bb70e275768084d62b094bc1b31964f2357b7c1af7e0d";
+  expect(a1.signHexString(messageHex).hex()).toBe(expectedSignedMessage);
+  expect(a1.verifySignature(messageHex, expectedSignedMessage)).toBe(true);
+  expect(a1.verifySignature(messageHex + "00", expectedSignedMessage)).toBe(false);
 });
 
 test("Gets the resource account address", () => {

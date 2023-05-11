@@ -3,7 +3,7 @@ id: rust-coding-guidelines
 title: Rust Coding Guidelines
 ---
 
-This document describes the coding guidelines for the [Aptos Core](https://github.com/aptos-labs/aptos-core) Rust codebase. For the Move language, see the [Move Coding Conventions](../guides/move-guides/book/coding-conventions.md).
+This document describes the coding guidelines for the [Aptos Core](https://github.com/aptos-labs/aptos-core) Rust codebase. For the Move language, see the [Move Coding Conventions](../move/book/coding-conventions.md).
 
 ## Code formatting
 

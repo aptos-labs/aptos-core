@@ -22,8 +22,8 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref, sync::Arc};
 
-struct FormatContext<'a, 'b, 'c, 'd> {
-    context: &'d mut SafeNativeContext<'a, 'b, 'c>,
+struct FormatContext<'a, 'b, 'c, 'd, 'e> {
+    context: &'d mut SafeNativeContext<'a, 'b, 'c, 'e>,
     base_gas: InternalGas,
     per_byte_gas: InternalGas,
     max_depth: usize,
@@ -287,6 +287,30 @@ fn native_format_impl(
         write!(out, "{}", suffix).unwrap();
     };
     Ok(())
+}
+
+/// For old debug implementation
+/// TODO: remove when old framework is completely removed
+pub(crate) fn native_format_debug(
+    context: &mut SafeNativeContext,
+    ty: &Type,
+    v: Value,
+) -> SafeNativeResult<String> {
+    let layout = context.deref().type_to_fully_annotated_layout(ty)?.unwrap();
+    let mut format_context = FormatContext {
+        context,
+        base_gas: 0.into(),
+        per_byte_gas: 0.into(),
+        max_depth: usize::MAX,
+        max_len: usize::MAX,
+        type_tag: true,
+        canonicalize: false,
+        single_line: false,
+        include_int_type: false,
+    };
+    let mut out = String::new();
+    native_format_impl(&mut format_context, &layout, v, 0, &mut out)?;
+    Ok(out)
 }
 
 fn native_format(

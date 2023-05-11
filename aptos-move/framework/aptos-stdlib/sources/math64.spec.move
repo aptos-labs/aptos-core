@@ -25,7 +25,7 @@ spec aptos_std::math64 {
         ensures [abstract] result == spec_pow(n, e);
     }
 
-    spec fun spec_pow(e: u64, n: u64): u64 {
+    spec fun spec_pow(n: u64, e: u64): u64 {
         if (e == 0) {
             1
         }

@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
+use anyhow::{bail, Error};
 use itertools::Itertools;
 use move_async_vm::{
     actor_metadata,
@@ -19,6 +19,7 @@ use move_compiler::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
@@ -106,8 +107,8 @@ impl Harness {
             };
 
             // Put a start message for this actor into the mailbox.
-            let entry_point_id = Identifier::from_str("start")?;
-            let hash = actor_metadata::message_hash(&actor, &entry_point_id);
+            let entry_point_id = ident_str!("start");
+            let hash = actor_metadata::message_hash(&actor, entry_point_id);
             mailbox.push_back((addr, hash, vec![]));
         }
 
@@ -141,7 +142,7 @@ impl Harness {
 
     fn publish_module(
         &self,
-        session: &mut AsyncSession<HarnessProxy>,
+        session: &mut AsyncSession,
         id: &IdentStr,
         gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
@@ -377,9 +378,7 @@ struct HarnessProxy<'a> {
 }
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
-    type Error = ();
-
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         Ok(self
             .harness
             .module_cache
@@ -389,13 +388,11 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    type Error = ();
-
     fn get_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let res = self
             .harness
             .resource_store

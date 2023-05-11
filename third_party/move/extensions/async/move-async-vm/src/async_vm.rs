@@ -77,12 +77,12 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session<'r, 'l, S: MoveResolver>(
+    pub fn new_session<'r, 'l>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut S,
-    ) -> AsyncSession<'r, 'l, S> {
+        move_resolver: &'r mut dyn MoveResolver,
+    ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
             virtual_time,
@@ -92,13 +92,13 @@ impl AsyncVM {
     }
 
     /// Creates a new session.
-    pub fn new_session_with_extensions<'r, 'l, S: MoveResolver>(
+    pub fn new_session_with_extensions<'r, 'l>(
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut S,
+        move_resolver: &'r mut dyn MoveResolver,
         ext: NativeContextExtensions<'r>,
-    ) -> AsyncSession<'r, 'l, S> {
+    ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
         AsyncSession {
             vm: self,
@@ -130,9 +130,9 @@ impl AsyncVM {
 }
 
 /// Represents an Async Move execution session.
-pub struct AsyncSession<'r, 'l, S> {
+pub struct AsyncSession<'r, 'l> {
     vm: &'l AsyncVM,
-    vm_session: Session<'r, 'l, S>,
+    vm_session: Session<'r, 'l>,
 }
 
 /// Represents a message being sent, consisting of target address, message hash, and arguments.
@@ -157,9 +157,9 @@ pub struct AsyncError {
 /// Result type for operations of an AsyncSession.
 pub type AsyncResult<'r> = Result<AsyncSuccess<'r>, AsyncError>;
 
-impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
+impl<'r, 'l> AsyncSession<'r, 'l> {
     /// Get the underlying Move VM session.
-    pub fn get_move_session(&mut self) -> &mut Session<'r, 'l, S> {
+    pub fn get_move_session(&mut self) -> &mut Session<'r, 'l> {
         &mut self.vm_session
     }
 
@@ -186,7 +186,6 @@ impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
         // Check whether the actor state already exists.
         let state = self
             .vm_session
-            .get_data_store()
             .load_resource(actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
@@ -281,7 +280,6 @@ impl<'r, 'l, S: MoveResolver> AsyncSession<'r, 'l, S> {
 
         let actor_state_global = self
             .vm_session
-            .get_data_store()
             .load_resource(actor_addr, &state_type)
             .map(|(gv, _)| gv)
             .map_err(partial_vm_error_to_async)?;
