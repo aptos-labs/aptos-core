@@ -9,7 +9,7 @@ async fn test_inspection_service_connection() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let info = swarm.aptos_public_info();
 
-    let resp = reqwest::get(info.inspection_service_url().to_owned() + "metrics")
+    let resp = reqwest::get(info.inspection_service_url().to_owned())
         .await
         .unwrap();
     assert_eq!(reqwest::StatusCode::OK, resp.status());
