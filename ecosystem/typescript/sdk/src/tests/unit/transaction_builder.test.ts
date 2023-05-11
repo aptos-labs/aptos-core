@@ -78,7 +78,6 @@ test("gets the signing message", () => {
     BigInt(TXN_EXPIRE),
     new ChainId(4),
   );
-  console.log(rawTxn);
 
   const message = TransactionBuilder.getSigningMessage(rawTxn);
 
