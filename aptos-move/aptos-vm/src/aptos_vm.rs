@@ -233,7 +233,9 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, TransactionOutputExt) {
-        let mut session = self.0.new_session(resolver, SessionId::txn_meta(txn_data), true);
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::txn_meta(txn_data), true);
 
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
@@ -311,7 +313,9 @@ impl AptosVM {
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
         let resolver = delta_state_view.as_move_resolver();
 
-        let mut session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data), true);
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::txn_meta(txn_data), true);
 
         self.0
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
@@ -659,7 +663,9 @@ impl AptosVM {
             .try_into_write_set(resolver)?;
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
         let resolver = delta_state_view.as_move_resolver();
-        let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data), true);
+        let mut cleanup_session =
+            self.0
+                .new_session(&resolver, SessionId::txn_meta(txn_data), true);
         cleanup_session.execute_function_bypass_visibility(
             &MULTISIG_ACCOUNT_MODULE,
             SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
@@ -689,7 +695,9 @@ impl AptosVM {
     ) -> Result<ChangeSetExt, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
-        let mut cleanup_session = self.0.new_session(resolver, SessionId::txn_meta(txn_data), true);
+        let mut cleanup_session = self
+            .0
+            .new_session(resolver, SessionId::txn_meta(txn_data), true);
         let execution_error = ExecutionError::try_from(execution_error)
             .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE, None))?;
         // Serialization is not expected to fail so we're using invariant_violation error here.
@@ -1290,9 +1298,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self
-            .0
-            .new_session(resolver, SessionId::block_meta(&block_metadata), true);
+        let mut session =
+            self.0
+                .new_session(resolver, SessionId::block_meta(&block_metadata), true);
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
