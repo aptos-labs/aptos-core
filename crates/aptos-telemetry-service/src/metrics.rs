@@ -13,10 +13,13 @@ use anyhow::anyhow;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec,
 };
-use chrono::Utc;
 use flate2::{write::GzEncoder, Compression};
 use once_cell::sync::Lazy;
-use std::{env, io::Write, time::Duration};
+use std::{
+    env,
+    io::Write,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time::{self, Instant};
 use warp::hyper::body::Bytes;
 
@@ -143,14 +146,15 @@ impl PrometheusExporter {
         ];
 
         let start_timer = Instant::now();
-        let timestamp = Utc::now().timestamp() as usize;
+        let now = SystemTime::now();
+        let unix_timestamp = now.duration_since(UNIX_EPOCH).unwrap().as_secs();
         let res = self
             .client
             .post_prometheus_metrics(
                 Bytes::from(metrics_body),
                 extra_labels,
                 "gzip".into(),
-                timestamp,
+                unix_timestamp,
             )
             .await;
 

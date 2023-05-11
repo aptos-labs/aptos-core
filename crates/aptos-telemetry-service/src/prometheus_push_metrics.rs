@@ -12,8 +12,8 @@ use crate::{
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
-use chrono::Utc;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
@@ -42,13 +42,14 @@ pub async fn handle_metrics_ingest(
     metrics_body: Bytes,
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling prometheus metrics ingest");
-    let timestamp = Utc::now().timestamp() as usize;
+    let now = SystemTime::now();
+    let unix_timestamp = now.duration_since(UNIX_EPOCH).unwrap().as_secs();
     push_metrics_to_clients(
         context,
         claims,
         encoding,
         metrics_body,
-        timestamp,
+        unix_timestamp,
         Vec::new(),
     )
     .await
@@ -59,7 +60,7 @@ pub async fn push_metrics_to_clients(
     claims: Claims,
     encoding: Option<String>,
     metrics_body: Bytes,
-    timestamp: usize,
+    timestamp: u64,
     ignore_clients: Vec<String>,
 ) -> anyhow::Result<impl Reply, Rejection> {
     let extra_labels = claims_to_extra_labels(

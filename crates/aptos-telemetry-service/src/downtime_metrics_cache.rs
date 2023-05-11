@@ -13,7 +13,7 @@ pub struct MetricsEntry {
     pub claims: Claims,
     pub encoding: Option<String>,
     pub metrics_body: Bytes,
-    pub timestamp: usize, // The timestamp at which the metrics was originally submitted to a client.
+    pub timestamp: u64, // The timestamp at which the metrics was originally submitted to a client.
     pub ignore_clients: Vec<String>, // Don't resubmit these metrics to these clients.
 }
 
