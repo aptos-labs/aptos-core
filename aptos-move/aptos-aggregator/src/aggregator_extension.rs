@@ -439,6 +439,22 @@ mod test {
     }
 
     #[test]
+    fn test_materialize_unknown_aggregator_disabled() {
+        let mut aggregator_data = AggregatorData::default();
+        let aggregator = aggregator_data.get_aggregator(
+            aggregator_id_for_test(200),
+            200,
+            &*TEST_RESOLVER,
+            false,
+        );
+        assert_eq!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 0);
+        assert_ok!(aggregator.add(50));
+        assert_eq!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 50);
+    }
+
+    #[test]
     fn test_materialize_overflow() {
         let mut aggregator_data = AggregatorData::default();
 
