@@ -177,9 +177,9 @@ impl BlockAptosVM {
                     .collect();
 
                 // Flush the speculative logs of the committed transactions.
-                let pos = output_vec.iter().position(|o| o.status().is_retry());
+                let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                flush_speculative_logs(pos.unwrap_or(num_txns));
+                flush_speculative_logs(pos);
 
                 Ok(output_vec)
             },

@@ -254,6 +254,10 @@ impl Scheduler {
         }
     }
 
+    pub fn num_txns(&self) -> TxnIndex {
+        self.num_txns
+    }
+
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
     /// Should not be called after the last transaction is committed.
@@ -541,7 +545,7 @@ impl Scheduler {
     }
 
     /// This function can halt the BlockSTM early, even if there are unfinished tasks.
-    /// It will set the done_marker to be true, resolve all pending dependencies, and return the previous value of the done_marker.
+    /// It will set the done_marker to be true, resolve all pending dependencies.
     ///
     /// Currently there are 4 scenarios to early halt the BlockSTM execution.
     /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.

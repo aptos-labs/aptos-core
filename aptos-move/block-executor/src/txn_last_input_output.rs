@@ -222,10 +222,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.inputs[txn_idx as usize].load_full()
     }
 
-    pub fn success_gas(&self, txn_idx: TxnIndex) -> anyhow::Result<u64> {
-        match &self.outputs[txn_idx as usize].load_full().expect("[BlockSTM]: Execution output must be recorded after execution").output_status {
-            ExecutionStatus::Success(output) => Ok(output.gas_used()),
-            _ => anyhow::bail!("[BlockSTM] Committing transaction with status SkipRest or Abort, early halt BlockSTM.")
+    pub fn gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
+        match &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            ExecutionStatus::Success(output) => Some(output.gas_used()),
+            _ => None,
         }
     }
 
