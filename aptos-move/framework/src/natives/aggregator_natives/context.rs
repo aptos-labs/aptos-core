@@ -186,7 +186,7 @@ mod test {
     //     |  700  |               |          | yes |         |
     //     |  800  |               |          |     |   yes   |
     //     +-------+---------------+----------+-----+---------+
-    fn test_set_up(context: &NativeAggregatorContext) {
+    fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
         aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
@@ -194,31 +194,11 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
 
-        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, true);
-        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, true);
-        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, true);
-        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, true);
-        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, true);
-
-        aggregator_data.remove_aggregator(aggregator_id_for_test(100));
-        aggregator_data.remove_aggregator(aggregator_id_for_test(300));
-        aggregator_data.remove_aggregator(aggregator_id_for_test(500));
-        aggregator_data.remove_aggregator(aggregator_id_for_test(800));
-    }
-
-    fn test_set_up_aggregator_disabled(context: &NativeAggregatorContext) {
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
-
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(100), 100);
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
-        aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
-
-        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, false);
-        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, false);
-        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, false);
-        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, false);
-        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, false);
+        aggregator_data.get_aggregator(aggregator_id_for_test(100), 100, context.resolver, aggregator_enabled);
+        aggregator_data.get_aggregator(aggregator_id_for_test(200), 200, context.resolver, aggregator_enabled);
+        aggregator_data.get_aggregator(aggregator_id_for_test(500), 500, context.resolver, aggregator_enabled);
+        aggregator_data.get_aggregator(aggregator_id_for_test(600), 600, context.resolver, aggregator_enabled);
+        aggregator_data.get_aggregator(aggregator_id_for_test(700), 700, context.resolver, aggregator_enabled);
 
         aggregator_data.remove_aggregator(aggregator_id_for_test(100));
         aggregator_data.remove_aggregator(aggregator_id_for_test(300));
@@ -231,7 +211,7 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, true);
         use AggregatorChange::*;
 
-        test_set_up(&context);
+        test_set_up(&context, true);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
@@ -249,7 +229,7 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, false);
         use AggregatorChange::*;
 
-        test_set_up_aggregator_disabled(&context);
+        test_set_up(&context, false);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));

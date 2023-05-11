@@ -468,7 +468,6 @@ mod test {
             &*TEST_RESOLVER,
             false,
         );
-        println!("::{}", aggregator.value);
         assert_err!(aggregator.add(400));
     }
 
