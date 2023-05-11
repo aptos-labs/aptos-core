@@ -41,7 +41,6 @@ impl ExecutedBlock {
         Self {
             result_view: self.result_view.clone(),
             next_epoch_state: self.next_epoch_state.clone(),
-            block_state_updates: self.block_state_updates.clone(),
             ..Default::default()
         }
     }

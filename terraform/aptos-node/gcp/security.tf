@@ -1,6 +1,8 @@
 # Security-related resources
 
-data "kubernetes_all_namespaces" "all" {}
+data "kubernetes_all_namespaces" "all" {
+  count = var.cluster_bootstrap ? 0 : 1
+}
 
 locals {
   kubernetes_master_version = substr(google_container_cluster.aptos.master_version, 0, 4)
@@ -11,9 +13,9 @@ locals {
   }
 }
 
-# FIXME: Remove when migrating to K8s 1.25
+# FIXME: Remove after migration to K8s 1.25
 resource "kubernetes_role_binding" "disable-psp" {
-  for_each = toset(local.kubernetes_master_version <= "1.24" ? data.kubernetes_all_namespaces.all.namespaces : [])
+  for_each = toset(var.cluster_bootstrap ? [] : local.kubernetes_master_version <= "1.24" ? data.kubernetes_all_namespaces.all[0].namespaces : [])
   metadata {
     name      = "privileged-psp"
     namespace = each.value

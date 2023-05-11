@@ -275,8 +275,14 @@ impl SubmissionWorker {
             .accounts
             .iter_mut()
             .choose_multiple(&mut self.rng, batch_size);
-        self.txn_generator
-            .generate_transactions(accounts, self.params.transactions_per_account)
+
+        accounts
+            .into_iter()
+            .flat_map(|account| {
+                self.txn_generator
+                    .generate_transactions(account, self.params.transactions_per_account)
+            })
+            .collect()
     }
 }
 

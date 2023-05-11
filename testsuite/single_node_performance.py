@@ -34,6 +34,8 @@ EXPECTED_TPS = {
     ("token-v1nft-mint-and-transfer-parallel", False): (1000.0, False),
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
+    ("no-op2-signers", False): (18200.0, False),
+    ("no-op5-signers", False): (18200.0, False),
 }
 
 NOISE_LOWER_LIMIT = 0.8
