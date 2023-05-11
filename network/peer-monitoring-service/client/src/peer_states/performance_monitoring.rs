@@ -305,7 +305,6 @@ impl StateValueInterface for PerformanceMonitoringState {
                     .peer(peer_network_id)
                     .request(&request));
                 self.handle_request_failure(&error);
-
                 return;
             },
         };
@@ -322,7 +321,6 @@ impl StateValueInterface for PerformanceMonitoringState {
                     .event(LogEvent::ResponseError)
                     .peer(peer_network_id));
                 self.handle_request_failure(&error);
-
                 return;
             },
         };
@@ -331,14 +329,6 @@ impl StateValueInterface for PerformanceMonitoringState {
         let request_counter = monitoring_service_request.request_counter;
         let response_counter = performance_monitoring_response.response_counter;
         if request_counter != response_counter {
-            warn!(LogSchema::new(LogEntry::PerformanceMonitoringRequest)
-                .event(LogEvent::ResponseError)
-                .peer(peer_network_id)
-                .message(&format!(
-                    "Peer responded with the incorrect request counter! Expected: {:?}, found: {:?}",
-                    request_counter, response_counter
-                )));
-            self.handle_request_failure();
             let error = Error::UnexpectedError(format!(
                 "Peer responded with the incorrect request counter! Expected: {:?}, found: {:?}",
                 request_counter, response_counter
@@ -386,7 +376,6 @@ impl Display for PerformanceMonitoringState {
         )
     }
 }
-
 
 /// Creates the request data for the performance monitoring requests
 fn create_request_data(performance_monitoring_config: &PerformanceMonitoringConfig) -> Vec<u8> {
