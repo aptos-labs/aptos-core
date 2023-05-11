@@ -321,10 +321,7 @@ impl AggregatorData {
 
         let aggregator = self.aggregators.get_mut(&id).unwrap();
         if !aggregator_enabled {
-            let result = aggregator.read_and_materialize(resolver, &id);
-            if let Ok(value) = result {
-                aggregator.value = value;
-            }
+            aggregator.value = aggregator.read_and_materialize(resolver, &id).unwrap_or(0);
             aggregator.state = AggregatorState::Data;
         }
         aggregator
