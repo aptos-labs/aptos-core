@@ -166,8 +166,9 @@ impl fmt::Display for ConnectionMetadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "[{},{},{},{},{:?},{:?}]",
+            "[{},{:?},{},{},{},{:?},{:?}]",
             self.remote_peer_id,
+            self.connection_id,
             self.addr,
             self.origin,
             self.messaging_protocol,

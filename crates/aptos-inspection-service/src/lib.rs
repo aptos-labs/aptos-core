@@ -1,4 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod lib_test;
+pub mod inspection_client;
+pub mod server;
+
+pub use server::*;

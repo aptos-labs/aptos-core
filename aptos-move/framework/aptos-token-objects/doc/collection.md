@@ -339,6 +339,25 @@ Unlimited supply tracker, this is useful for adding events and supply tracking t
 ## Constants
 
 
+<a name="0x4_collection_EURI_TOO_LONG"></a>
+
+The URI is over the maximum length
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x4_collection_MAX_URI_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
+</code></pre>
+
+
+
 <a name="0x4_collection_ECOLLECTION_DOES_NOT_EXIST"></a>
 
 The collection does not exist
@@ -389,16 +408,6 @@ The max supply must be positive
 
 
 
-<a name="0x4_collection_EURI_TOO_LONG"></a>
-
-The URI is over the maximum length
-
-
-<pre><code><b>const</b> <a href="collection.md#0x4_collection_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 4;
-</code></pre>
-
-
-
 <a name="0x4_collection_MAX_COLLECTION_NAME_LENGTH"></a>
 
 
@@ -413,15 +422,6 @@ The URI is over the maximum length
 
 
 <pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>: u64 = 2048;
-</code></pre>
-
-
-
-<a name="0x4_collection_MAX_URI_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="collection.md#0x4_collection_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
 </code></pre>
 
 

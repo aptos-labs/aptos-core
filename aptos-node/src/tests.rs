@@ -37,9 +37,11 @@ fn test_mutual_authentication_validators() {
     );
 
     // Set up the networks and gather the application network handles. This should panic.
+    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     let _ = network::setup_networks_and_get_interfaces(
         &node_config,
         ChainId::test(),
+        peers_and_metadata,
         &mut event_subscription_service,
     );
 }
