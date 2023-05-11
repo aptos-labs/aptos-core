@@ -112,13 +112,13 @@ let crane;
 
 if (process.env.CI === "true") {
   console.log("installing crane automatically in CI");
-  await $`curl -sL https://github.com/google/go-containerregistry/releases/download/v0.11.0/go-containerregistry_Linux_x86_64.tar.gz > crane.tar.gz`;
-  await $`tar -xf crane.tar.gz`;
-  const sha = (await $`shasum -a 256 ./crane | awk '{ print $1 }'`).toString().trim();
-  if (sha !== "2af448965b5feb6c315f4c8e79b18bd15f8c916ead0396be3962baf2f0c815bf") {
-    console.error(chalk.red(`ERROR: sha256 mismatch for crane- got: ${sha}`));
+  await $`curl -sL https://github.com/google/go-containerregistry/releases/download/v0.15.1/go-containerregistry_Linux_x86_64.tar.gz > crane.tar.gz`;
+  const sha = (await $`shasum -a 256 ./crane.tar.gz | awk '{ print $1 }'`).toString().trim();
+  if (sha !== "d4710014a3bd135eb1d4a9142f509cfd61d2be242e5f5785788e404448a4f3f2") {
+    console.error(chalk.red(`ERROR: sha256 mismatch for crane.tar.gz got: ${sha}`));
     process.exit(1);
   }
+  await $`tar -xf crane.tar.gz`;
   crane = "./crane";
 } else {
   if ((await $`command -v crane`.exitCode) !== 0) {
@@ -168,11 +168,8 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
         const imageTarget = `${targetRegistry}/${image}:${joinTagSegments(parsedArgs.IMAGE_TAG_PREFIX, profilePrefix, featureSuffix)}`;
         console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
         await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
-        // use docker pull/tag/push instead of crane copy for now to circumvent bug: https://github.com/google/go-containerregistry/issues/1679
-        await dockerMirrorRepo(imageSource, imageTarget);
-        await dockerMirrorRepo(imageSource, joinTagSegments(imageTarget, parsedArgs.GIT_SHA));
-        // await $`${crane} copy ${imageSource} ${imageTarget}`;
-        // await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+        await $`${crane} copy ${imageSource} ${imageTarget}`;
+        await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
       }
     }
   }
@@ -181,14 +178,6 @@ for (const [image, imageConfig] of Object.entries(IMAGES_TO_RELEASE)) {
 // joinTagSegments joins tag segments with a dash, but only if the segment is not empty
 function joinTagSegments(...segments) {
   return segments.filter((s) => s).join("_");
-}
-
-// dockerMirrorRepo mirrors a docker image from one repo to another
-// Simply does what crane copy does, but with docker pull/tag/push
-async function dockerMirrorRepo(imageSource, imageTarget) {
-  await $`docker pull ${imageSource}`;
-  await $`docker tag ${imageSource} ${imageTarget}`;
-  await $`docker push ${imageTarget}`;
 }
 
 async function waitForImageToBecomeAvailable(imageToWaitFor, waitForImageSeconds) {
