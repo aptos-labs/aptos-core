@@ -549,3 +549,6 @@ MultiSig
 IndexerClient
 Hasura
 AptosClient
+ANSClient
+FaucetClient
+CoinClient
