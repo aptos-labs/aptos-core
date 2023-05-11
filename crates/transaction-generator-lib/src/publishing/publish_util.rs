@@ -169,7 +169,10 @@ impl Package {
 
     pub fn get_module_id(&self, module_name: &str) -> ModuleId {
         match self {
-            Self::Simple(modules, _) => modules.get(module_name).unwrap().self_id(),
+            Self::Simple(modules, _) => modules
+                .get(module_name)
+                .expect("Wanted module doesn't exist")
+                .self_id(),
         }
     }
 }
