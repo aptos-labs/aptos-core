@@ -3,15 +3,18 @@ import { Timer } from "timer-node";
 import { fetch } from "fetch-h2";
 import { exit } from "process";
 
-const FULLNODE_URL = "http2://0.0.0.0:8080/v1";
-const FAUCET_URL = "http2://0.0.0.0:8081";
+// const FULLNODE_URL = "http://0.0.0.0:8080/v1";
+// const FAUCET_URL = "http://0.0.0.0:8081";
+
+const FULLNODE_URL = "https://fullnode.testnet.aptoslabs.com/v1";
+const FAUCET_URL = "https://faucet.testnet.aptoslabs.com";
 
 async function main() {
   const timer = new Timer();
 
-  const accountsCount = 50;
+  const accountsCount = 5; // creates 400 accounts in total
   const firstPass = 100;
-  const readAmplification = 100;
+  const readAmplification = 100; // tests 200 accounts * 3 = 600 get calls
   let accountSequenceNumber: AccountSequenceNumbers | null = null;
 
   console.log("starting...");
@@ -23,35 +26,53 @@ async function main() {
     accounts.push(new AptosAccount());
     recipients.push(new AptosAccount());
   }
-  console.log("accounts created");
+  console.log(`${accounts.length * 2} accounts created`);
   console.log(timer.time());
 
   // funds accounts
-  const funds: Promise<any>[] = [];
+  const funds: string[] = [];
 
   for (let i = 0; i < accounts.length; i++) {
-    funds.push(faucet(accounts[i], 100000000));
+    funds.push(`${FAUCET_URL}/mint?address=${HexString.ensure(accounts[i].address()).noPrefix()}&amount=${100000000}`);
   }
   for (let i = 0; i < recipients.length; i++) {
-    funds.push(faucet(recipients[i], 0));
+    funds.push(`${FAUCET_URL}/mint?address=${HexString.ensure(recipients[i].address()).noPrefix()}&amount=${0}`);
   }
-  await Promise.all(funds);
+  // send requests
+  const responses = await Promise.all(
+    funds.map((fund) =>
+      fetch(fund, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ejfklsdfj7vr4388fhhfh3f78hf345345hf00da0`,
+        },
+      }),
+    ),
+  );
+
+  // read bodies
+  await Promise.all(responses.map((resp) => resp.json()));
+
   // sleeps to let faucet do its work without the need to implement
   // waitForTransaction in this new client
   await sleep(15000); // 15 seconds
-  console.log("accounts funded");
+  console.log(`${funds.length} accounts funded`);
   console.log(timer.time());
 
   // read accounts
-  const balances: Promise<any>[] = [];
+  const balances: string[] = [];
   for (let j = 0; j < readAmplification; j++) {
     for (let i = 0; i < accounts.length; i++) {
-      balances.push(get(`accounts/${accounts[i].address().hex()}`));
+      balances.push(`${FULLNODE_URL}/accounts/${accounts[i].address().hex()}`);
     }
   }
+  // send requests
+  const balancesresponses = await Promise.all(balances.map((balance) => fetch(balance)));
+  // read bodies
+  await Promise.all(balancesresponses.map((resp) => resp.json()));
 
-  await Promise.all(balances);
-  console.log("accounts checked");
+  //await Promise.all(balances);
+  console.log(`${balances.length} balances checked`);
   console.log(timer.time());
 
   // initialize accounts with sequence number
@@ -67,27 +88,41 @@ async function main() {
   }
 
   await Promise.all(awaitSequenceNumbers);
-  console.log("accounts initialized");
+  console.log(`${accounts.length} accounts initialized`);
   console.log(timer.time());
 
   // submit transactions
-  let transactionsHashes: string[] = [];
+  let bcsTxns: Uint8Array[] = [];
   for (let i = 0; i < firstPass; i++) {
     for (let j = 0; j < accountsCount; j++) {
       let sender = accounts[j];
       let recipient = recipients[j].address().hex();
       let sequenceNumber: bigint = await accountSequenceNumbers[j].nextSequenceNumber();
-      let txnHash = await transafer(sender, recipient, sequenceNumber, 1);
-      transactionsHashes.push(txnHash);
+      let bcsTxn = transafer(sender, recipient, sequenceNumber, 1);
+      bcsTxns.push(bcsTxn);
     }
   }
 
-  transactionsHashes = await Promise.all(transactionsHashes);
-  console.log("transactions submitted");
+  // send requests
+  const bcsTxnsresponses = await Promise.all(
+    bcsTxns.map((bcsTxn) =>
+      fetch(`${FULLNODE_URL}/transactions`, {
+        method: "POST",
+        body: Buffer.from(bcsTxn),
+        headers: {
+          "content-type": "application/x.aptos.signed_transaction+bcs",
+        },
+      }),
+    ),
+  );
+  // read bodies
+  const transactions = await Promise.all(bcsTxnsresponses.map((resp) => resp.json()));
+  console.log(`${bcsTxns.length} transaction submitted`);
   console.log(timer.time());
+
   // check for transactions
   const waitFor: Promise<void>[] = [];
-  for (let i = 0; i < transactionsHashes.length; i++) {
+  for (let i = 0; i < transactions.length; i++) {
     waitFor.push(accountSequenceNumber!.synchronize());
   }
 
@@ -98,7 +133,7 @@ async function main() {
   exit(0);
 }
 
-async function transafer(sender: AptosAccount, recipient: string, sequenceNumber: bigint, amount: number) {
+function transafer(sender: AptosAccount, recipient: string, sequenceNumber: bigint, amount: number): Uint8Array {
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
   const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
@@ -121,12 +156,13 @@ async function transafer(sender: AptosAccount, recipient: string, sequenceNumber
     BigInt(100),
     // Expiration timestamp. Transaction is discarded if it is not executed within 20 seconds from now.
     BigInt(Math.floor(Date.now() / 1000) + 20),
-    new TxnBuilderTypes.ChainId(4),
+    new TxnBuilderTypes.ChainId(2),
   );
 
   const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
-  const txn = await submitTransaction(bcsTxn);
-  return txn.hash;
+  return bcsTxn;
+  // const txn = await submitTransaction(bcsTxn);
+  // return txn.hash;
 }
 
 async function get(path: string): Promise<any> {
@@ -135,29 +171,6 @@ async function get(path: string): Promise<any> {
       "Content-Type": "application/json",
     },
   });
-  const res = await response.json();
-  return res;
-}
-
-async function submitTransaction(bcsTxn: any): Promise<any> {
-  const response = await fetch(`${FULLNODE_URL}/transactions`, {
-    method: "POST",
-    body: Buffer.from(bcsTxn),
-    headers: {
-      "content-type": "application/x.aptos.signed_transaction+bcs",
-    },
-  });
-  const res = await response.json();
-  return res;
-}
-
-async function faucet(account: AptosAccount, amount: number) {
-  const response = await fetch(
-    `${FAUCET_URL}/mint?address=${HexString.ensure(account.address()).noPrefix()}&amount=${amount}`,
-    {
-      method: "POST",
-    },
-  );
   const res = await response.json();
   return res;
 }
@@ -181,6 +194,8 @@ class AccountSequenceNumbers {
 
   async initialize(): Promise<void> {
     const data = await get(`accounts/${this.account.address().hex()}`);
+
+    const response = Promise.all(`accounts/${this.account.address().hex()}`);
     this.currentNumber = BigInt(data.sequence_number);
     this.lastUncommintedNumber = BigInt(data.sequence_number);
   }
