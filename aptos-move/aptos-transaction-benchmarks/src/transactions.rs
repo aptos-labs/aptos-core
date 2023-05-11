@@ -155,16 +155,13 @@ where
     }
 }
 
-struct TransactionBenchState<S>
-where
-    S: Strategy,
-    S::Value: AUTransactionGen,
-{
+struct TransactionBenchState<S> {
     num_transactions: usize,
     strategy: S,
     account_universe: AccountUniverse,
     parallel_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     sequential_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
+    validator_set: ValidatorSet,
 }
 
 impl<S> TransactionBenchState<S>
@@ -219,12 +216,20 @@ where
         ));
         let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1), state_view));
 
+        let validator_set = ValidatorSet::fetch_config(
+            &FakeExecutor::from_head_genesis()
+                .get_state_view()
+                .as_move_resolver(),
+        )
+        .expect("Unable to retrieve the validator set from storage");
+
         Self {
             num_transactions,
             strategy,
             account_universe: universe,
             parallel_block_executor,
             sequential_block_executor,
+            validator_set,
         }
     }
 
@@ -247,19 +252,17 @@ where
             .collect();
 
         // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
-        let validator_set = ValidatorSet::fetch_config(
-            &FakeExecutor::from_head_genesis()
-                .get_state_view()
-                .as_move_resolver(),
-        )
-        .expect("Unable to retrieve the validator set from storage");
-
         let new_block = BlockMetadata::new(
             HashValue::zero(),
             0,
             0,
-            *validator_set.payload().next().unwrap().account_address(),
-            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
+            *self
+                .validator_set
+                .payload()
+                .next()
+                .unwrap()
+                .account_address(),
+            BitVec::with_num_bits(self.validator_set.num_validators() as u16).into(),
             vec![],
             1,
         );
@@ -272,9 +275,10 @@ where
     fn execute_sequential(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        let executor = self.sequential_block_executor.clone();
+        let txns = self.gen_transaction(false);
+        let executor = self.sequential_block_executor;
         executor
-            .execute_block(self.gen_transaction(false))
+            .execute_block(txns)
             .expect("VM should not fail to start");
     }
 
@@ -282,9 +286,10 @@ where
     fn execute_parallel(mut self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
+        let txns = self.gen_transaction(false);
         let executor = self.parallel_block_executor.clone();
         executor
-            .execute_block(self.gen_transaction(false))
+            .execute_block(txns)
             .expect("VM should not fail to start");
     }
 
@@ -309,7 +314,6 @@ where
         run_seq: bool,
         no_conflict_txns: bool,
     ) -> (usize, usize) {
-        //self.account_universe.reset_pick_s
         let transactions = self.gen_transaction(no_conflict_txns);
         let par_tps = if run_par {
             println!("Parallel execution starts...");

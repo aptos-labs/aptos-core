@@ -19,7 +19,7 @@ pub struct ExecutorShard<S: StateView + Sync> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     num_executor_threads: usize,
     command_rx: Receiver<ExecutorShardCommand>,
-    result_tx: Sender<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
+    result_tx: Sender<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
     state_view: Arc<S>,
 }
 
@@ -29,7 +29,7 @@ impl<S: StateView + Sync> ExecutorShard<S> {
         concurrency_level: usize,
         state_view: Arc<S>,
         command_rx: Receiver<ExecutorShardCommand>,
-        result_tx: Sender<(usize, Result<Vec<TransactionOutput>, Error<VMStatus>>)>,
+        result_tx: Sender<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -63,7 +63,7 @@ impl<S: StateView + Sync> ExecutorShard<S> {
                         self.state_view.as_ref(),
                         self.num_executor_threads,
                     );
-                    self.result_tx.send((self.shard_id, ret)).unwrap();
+                    self.result_tx.send(ret).unwrap();
                 },
                 ExecutorShardCommand::Stop => {
                     break;

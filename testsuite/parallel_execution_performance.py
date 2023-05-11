@@ -47,9 +47,9 @@ fail = False
 for threads in THREADS:
     operating_system = platform.system()
     if operating_system == "Linux":
-        command = f"taskset -c 0-{threads-1} cargo run --profile performance compare-parallel-and-seq --run-sequential --run-parallel"
+        command = f"taskset -c 0-{threads-1} cargo run --profile performance param-sweep"
     else:
-        command = f"cargo run --profile performance compare-parallel-and-seq --run-sequential --run-parallel"
+        command = f"cargo run --profile performance param-sweep"
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )

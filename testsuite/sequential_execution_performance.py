@@ -10,7 +10,7 @@ THRESHOLD_NOISE = 0.1
 # Run the VM sequential execution with performance optimizations enabled
 target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
 output = subprocess.check_output(
-    "cargo run --profile performance  compare-parallel-and-seq  --run-sequential",
+    "cargo run --profile performance  param-sweep  --skip-parallel",
     shell=True,
     text=True,
     cwd=target_directory,

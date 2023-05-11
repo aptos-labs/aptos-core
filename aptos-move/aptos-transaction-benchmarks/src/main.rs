@@ -24,23 +24,23 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum BenchmarkCommand {
-    CompareParallelAndSeq(ParallelAndSeqOpt),
-    ParallelExecution(ParallelExecutionOpt),
+    ParamSweep(ParamSweepOpt),
+    Execute(ExecuteOpt),
 }
 
 #[derive(Debug, Parser)]
-struct ParallelAndSeqOpt {
+struct ParamSweepOpt {
     #[clap(long, default_value = "200000")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
-    pub num_txns: Option<Vec<usize>>,
+    pub block_sizes: Option<Vec<usize>>,
 
     #[clap(long)]
-    pub run_parallel: bool,
+    pub skip_parallel: bool,
 
     #[clap(long)]
-    pub run_sequential: bool,
+    pub skip_sequential: bool,
 
     #[clap(long, default_value = "2")]
     pub num_warmups: usize,
@@ -50,7 +50,7 @@ struct ParallelAndSeqOpt {
 }
 
 #[derive(Debug, Parser)]
-struct ParallelExecutionOpt {
+struct ExecuteOpt {
     #[clap(long, default_value = "200000")]
     pub num_accounts: usize,
 
@@ -73,8 +73,8 @@ struct ParallelExecutionOpt {
     pub no_conflict_txns: bool,
 }
 
-fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
-    let num_txns = opt.num_txns.unwrap_or_else(|| vec![1000, 10000, 50000]);
+fn param_sweep(opt: ParamSweepOpt) {
+    let block_sizes = opt.block_sizes.unwrap_or_else(|| vec![1000, 10000, 50000]);
     let concurrency_level = num_cpus::get();
 
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
@@ -82,13 +82,21 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
     let mut par_measurements: Vec<Vec<usize>> = Vec::new();
     let mut seq_measurements: Vec<Vec<usize>> = Vec::new();
 
-    for block_size in &num_txns {
+    let run_parallel = !opt.skip_parallel;
+    let run_sequential = !opt.skip_sequential;
+
+    assert!(
+        run_sequential || run_parallel,
+        "Must run at least one of parallel or sequential"
+    );
+
+    for block_size in &block_sizes {
         for num_accounts in &opt.num_accounts {
             let (mut par_tps, mut seq_tps) = bencher.blockstm_benchmark(
                 *num_accounts,
                 *block_size,
-                opt.run_parallel,
-                opt.run_sequential,
+                run_parallel,
+                run_sequential,
                 opt.num_warmups,
                 opt.num_runs,
                 1,
@@ -105,7 +113,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
     println!("\nconcurrency_level = {}\n", concurrency_level);
 
     let mut i = 0;
-    for block_size in &num_txns {
+    for block_size in &block_sizes {
         for num_accounts in &opt.num_accounts {
             println!(
                 "PARAMS: num_account = {}, block_size = {}",
@@ -113,7 +121,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
             );
 
             let mut seq_tps = 1;
-            if opt.run_sequential {
+            if run_sequential {
                 println!("Sequential TPS: {:?}", seq_measurements[i]);
                 let mut seq_sum = 0;
                 for m in &seq_measurements[i] {
@@ -123,7 +131,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
                 println!("Avg Sequential TPS = {:?}", seq_tps,);
             }
 
-            if opt.run_parallel {
+            if run_parallel {
                 println!("Parallel TPS: {:?}", par_measurements[i]);
                 let mut par_sum = 0;
                 for m in &par_measurements[i] {
@@ -131,7 +139,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
                 }
                 let par_tps = par_sum / par_measurements[i].len();
                 println!("Avg Parallel TPS = {:?}", par_tps,);
-                if opt.run_sequential {
+                if run_sequential {
                     println!("Speed up {}x over sequential", par_tps / seq_tps);
                 }
             }
@@ -141,16 +149,7 @@ fn compare_parallel_and_seq(opt: ParallelAndSeqOpt) {
     }
 }
 
-fn parallel_execution(opt: ParallelExecutionOpt) {
-    aptos_logger::Logger::new().init();
-    START_TIME.set(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64,
-    );
-    let _mp = MetricsPusher::start_for_local_run("blockstm-benchmark");
-
+fn execute(opt: ExecuteOpt) {
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
     let (par_tps, _) = bencher.blockstm_benchmark(
@@ -170,11 +169,19 @@ fn parallel_execution(opt: ParallelExecutionOpt) {
 }
 
 fn main() {
+    aptos_logger::Logger::new().init();
+    START_TIME.set(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64,
+    );
+    let _mp = MetricsPusher::start_for_local_run("block-stm-benchmark");
     let args = Args::parse();
 
     // TODO: Check if I need DisplayChain here in the error case.
     match args.command {
-        BenchmarkCommand::CompareParallelAndSeq(opt) => compare_parallel_and_seq(opt),
-        BenchmarkCommand::ParallelExecution(opt) => parallel_execution(opt),
+        BenchmarkCommand::ParamSweep(opt) => param_sweep(opt),
+        BenchmarkCommand::Execute(opt) => execute(opt),
     }
 }
