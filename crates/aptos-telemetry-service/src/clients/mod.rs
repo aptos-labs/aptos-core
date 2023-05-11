@@ -40,15 +40,16 @@ pub mod victoria_metrics_api {
             encoding: String,
             timestamp: usize,
         ) -> Result<reqwest::Response, anyhow::Error> {
-            let labels: Vec<(String, String)> = extra_labels
+            let mut labels: Vec<(String, String)> = extra_labels
                 .iter()
                 .map(|label| ("extra_label".into(), label.into()))
                 .collect();
+            labels.push(("timestamp".into(), timestamp.to_string()));
 
             self.inner
                 .post(format!(
-                    "{}api/v1/import/prometheus?timestamp={}",
-                    self.base_url, timestamp
+                    "{}api/v1/import/prometheus",
+                    self.base_url
                 ))
                 .bearer_auth(self.auth_token.clone())
                 .header(CONTENT_ENCODING, encoding)
