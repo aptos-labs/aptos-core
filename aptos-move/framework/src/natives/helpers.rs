@@ -217,6 +217,10 @@ impl<'a, 'b, 'c> SafeNativeContext<'a, 'b, 'c> {
     pub fn get_feature_flags(&self) -> &Features {
         self.features.deref()
     }
+
+    pub fn timed_feature_enabled(&self, flag: TimedFeatureFlag) -> bool {
+        self.timed_features.is_enabled(flag)
+    }
 }
 
 #[allow(unused)]
