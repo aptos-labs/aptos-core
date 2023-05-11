@@ -11,6 +11,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     wget \
     curl \
     perl-base=5.32.1-4+deb11u1 \
+    libtinfo6=6.2+20201114-2+deb11u1 \
     git \
     libssl1.1 \
     ca-certificates \
