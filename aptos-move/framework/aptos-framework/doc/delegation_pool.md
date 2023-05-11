@@ -118,8 +118,8 @@ transferred to A
 -  [Struct `ObservedLockupCycle`](#0x1_delegation_pool_ObservedLockupCycle)
 -  [Resource `DelegationPool`](#0x1_delegation_pool_DelegationPool)
 -  [Struct `VotingRecordKey`](#0x1_delegation_pool_VotingRecordKey)
--  [Struct `VotingPowerDelegation`](#0x1_delegation_pool_VotingPowerDelegation)
--  [Struct `VoterVotingPower`](#0x1_delegation_pool_VoterVotingPower)
+-  [Struct `VoteDelegation`](#0x1_delegation_pool_VoteDelegation)
+-  [Struct `DelegatedVotes`](#0x1_delegation_pool_DelegatedVotes)
 -  [Resource `GovernanceRecords`](#0x1_delegation_pool_GovernanceRecords)
 -  [Struct `AddStakeEvent`](#0x1_delegation_pool_AddStakeEvent)
 -  [Struct `ReactivateStakeEvent`](#0x1_delegation_pool_ReactivateStakeEvent)
@@ -128,6 +128,7 @@ transferred to A
 -  [Struct `DistributeCommissionEvent`](#0x1_delegation_pool_DistributeCommissionEvent)
 -  [Struct `VoteEvent`](#0x1_delegation_pool_VoteEvent)
 -  [Struct `CreateProposalEvent`](#0x1_delegation_pool_CreateProposalEvent)
+-  [Struct `DelegateVotingPowerEvent`](#0x1_delegation_pool_DelegateVotingPowerEvent)
 -  [Constants](#@Constants_0)
 -  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
 -  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
@@ -160,14 +161,14 @@ transferred to A
 -  [Function `get_delegator_active_shares`](#0x1_delegation_pool_get_delegator_active_shares)
 -  [Function `get_delegator_pending_inactive_shares`](#0x1_delegation_pool_get_delegator_pending_inactive_shares)
 -  [Function `get_used_voting_power`](#0x1_delegation_pool_get_used_voting_power)
--  [Function `get_latest_delegator_voting_power_delegation`](#0x1_delegation_pool_get_latest_delegator_voting_power_delegation)
--  [Function `update_and_borrow_mut_delegator_voting_power_delegation`](#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation)
--  [Function `get_latest_voter_voting_power`](#0x1_delegation_pool_get_latest_voter_voting_power)
--  [Function `update_and_borrow_mut_voter_voting_power`](#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power)
+-  [Function `get_latest_delegator_vote_delegation`](#0x1_delegation_pool_get_latest_delegator_vote_delegation)
+-  [Function `update_and_borrow_mut_delegator_vote_delegation`](#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation)
+-  [Function `get_latest_vote_delegation`](#0x1_delegation_pool_get_latest_vote_delegation)
+-  [Function `update_and_borrow_mut_vote_delegation`](#0x1_delegation_pool_update_and_borrow_mut_vote_delegation)
 -  [Function `olc_with_index`](#0x1_delegation_pool_olc_with_index)
 -  [Function `calculate_total_voting_power`](#0x1_delegation_pool_calculate_total_voting_power)
 -  [Function `calculate_and_update_delegator_voter_internal`](#0x1_delegation_pool_calculate_and_update_delegator_voter_internal)
--  [Function `calculate_and_update_voter_voting_power`](#0x1_delegation_pool_calculate_and_update_voter_voting_power)
+-  [Function `calculate_and_update_vote_delegation`](#0x1_delegation_pool_calculate_and_update_vote_delegation)
 -  [Function `set_operator`](#0x1_delegation_pool_set_operator)
 -  [Function `set_delegated_voter`](#0x1_delegation_pool_set_delegated_voter)
 -  [Function `delegate_voting_power`](#0x1_delegation_pool_delegate_voting_power)
@@ -201,6 +202,7 @@ transferred to A
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/pool_u64_unbound.md#0x1_pool_u64_unbound">0x1::pool_u64_unbound</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
@@ -391,13 +393,14 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_VotingPowerDelegation"></a>
+<a name="0x1_delegation_pool_VoteDelegation"></a>
 
-## Struct `VotingPowerDelegation`
+## Struct `VoteDelegation`
+
+Track delgated voter of each delegator.
 
 
-
-<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">VotingPowerDelegation</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -414,7 +417,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </dd>
 <dt>
-<code>voter_next_lockup: <b>address</b></code>
+<code>pending_voter: <b>address</b></code>
 </dt>
 <dd>
 
@@ -430,13 +433,14 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
-<a name="0x1_delegation_pool_VoterVotingPower"></a>
+<a name="0x1_delegation_pool_DelegatedVotes"></a>
 
-## Struct `VoterVotingPower`
+## Struct `DelegatedVotes`
+
+Track total voteing power of each voter.
 
 
-
-<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">VoterVotingPower</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -492,19 +496,25 @@ Capability that represents ownership over privileged operations on the underlyin
 
 <dl>
 <dt>
-<code>votes: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_VotingRecordKey">delegation_pool::VotingRecordKey</a>, u64&gt;</code>
+<code>votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_VotingRecordKey">delegation_pool::VotingRecordKey</a>, u64&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>voting_power_delegation: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<b>address</b>, <a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">delegation_pool::VotingPowerDelegation</a>&gt;</code>
+<code>votes_per_proposal: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;u64, u64&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>voting_power_per_voter: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<b>address</b>, <a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">delegation_pool::VoterVotingPower</a>&gt;</code>
+<code>vote_delegation: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<b>address</b>, <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">delegation_pool::VoteDelegation</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegated_votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<b>address</b>, <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">delegation_pool::DelegatedVotes</a>&gt;</code>
 </dt>
 <dd>
 
@@ -517,6 +527,12 @@ Capability that represents ownership over privileged operations on the underlyin
 </dd>
 <dt>
 <code>create_proposal_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">delegation_pool::CreateProposalEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegate_voting_power_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">delegation_pool::DelegateVotingPowerEvent</a>&gt;</code>
 </dt>
 <dd>
 
@@ -823,6 +839,45 @@ Capability that represents ownership over privileged operations on the underlyin
 
 </details>
 
+<a name="0x1_delegation_pool_DelegateVotingPowerEvent"></a>
+
+## Struct `DelegateVotingPowerEvent`
+
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>voter: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -898,10 +953,20 @@ The voter does not have sufficient stake to create a proposal.
 
 <a name="0x1_delegation_pool_ENO_VOTING_POWER"></a>
 
-The voter does not any voting power on this proposal.
+The voter does not have any voting power on this proposal.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>: u64 = 17;
+</code></pre>
+
+
+
+<a name="0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING"></a>
+
+The stake pool has already voted on the proposal before enabling partial governance voting on this delegation pool.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>: u64 = 19;
 </code></pre>
 
 
@@ -938,7 +1003,7 @@ Delegator's active balance cannot be less than <code><a href="delegation_pool.md
 
 <a name="0x1_delegation_pool_EDELEGATOR_NOT_EXISTS"></a>
 
-The delegator doesn't have any share in this delegation pool.
+The specified account is not part of this delegation pool
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_NOT_EXISTS">EDELEGATOR_NOT_EXISTS</a>: u64 = 18;
@@ -1011,7 +1076,7 @@ Additionally, the inactive stake does not count on the voting power of validator
 
 <a name="0x1_delegation_pool_EVOTING_POWER_OVERUSE"></a>
 
-A delegator is using voting power more than it has. This should never happen.
+A delegator is using voting power more than it has.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EVOTING_POWER_OVERUSE">EVOTING_POWER_OVERUSE</a>: u64 = 15;
@@ -1169,7 +1234,7 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 ## Function `partial_governance_voting_enabled`
 
-Return whether a delegation pool has alrady enabled partial govnernance voting.
+Return whether a delegation pool has already enabled partial govnernance voting.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address: <b>address</b>): bool
@@ -1511,7 +1576,7 @@ the validator had gone inactive before its lockup expired.
 
 ## Function `calculate_and_update_voter_total_voting_power`
 
-Return the total voting power of a delegator in a delegation pool. This funciton synces DelegationPool to the
+Return the total voting power of a delegator in a delegation pool. This function syncs DelegationPool to the
 latest state.
 
 
@@ -1531,9 +1596,9 @@ latest state.
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
     <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> governance_records = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    <b>let</b> (latest_voter_voting_power, _, _) = <a href="delegation_pool.md#0x1_delegation_pool_get_latest_voter_voting_power">get_latest_voter_voting_power</a>(pool, governance_records, voter);
+    <b>let</b> (latest_vote_delegation, _, _) = <a href="delegation_pool.md#0x1_delegation_pool_get_latest_vote_delegation">get_latest_vote_delegation</a>(pool, governance_records, voter);
     <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, &latest_voter_voting_power)
+    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, &latest_vote_delegation)
 }
 </code></pre>
 
@@ -1545,7 +1610,7 @@ latest state.
 
 ## Function `calculate_and_update_remaining_voting_power`
 
-Return the remaining voting power of a delegator in a delegation pool on a proposal. This funciton synces DelegationPool to the
+Return the remaining voting power of a delegator in a delegation pool on a proposal. This function syncs DelegationPool to the
 latest state.
 
 
@@ -1581,7 +1646,7 @@ latest state.
 
 ## Function `calculate_and_update_delegator_voter`
 
-Return the latest delegated voter of a delegator in a delegation pool. This funciton synces DelegationPool to the
+Return the latest delegated voter of a delegator in a delegation pool. This function syncs DelegationPool to the
 latest state.
 
 
@@ -1678,7 +1743,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     <b>move_to</b>(owner, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
     // All delegation pool enable partial governace <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
         <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
     }
 }
@@ -1708,7 +1773,7 @@ THe existing voter will be replaced. The function is permissionless.
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(
     pool_address: <b>address</b>,
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDISABLED_FUNCTION">EDISABLED_FUNCTION</a>));
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> stake_pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>);
@@ -1718,11 +1783,13 @@ THe existing voter will be replaced. The function is permissionless.
 
     <b>if</b> (!<b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address)) {
         <b>move_to</b>(&stake_pool_signer, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
-            votes: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
-            voting_power_delegation: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
-            voting_power_per_voter: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
+            votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+            votes_per_proposal: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+            vote_delegation: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+            delegated_votes: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
             vote_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a>&gt;(&stake_pool_signer),
             create_proposal_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a>&gt;(&stake_pool_signer),
+            delegate_voting_power_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a>&gt;(&stake_pool_signer),
         });
     }
 }
@@ -1760,12 +1827,22 @@ THe existing voter will be replaced. The function is permissionless.
     };
     <b>assert</b>!(voting_power &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ENO_VOTING_POWER">ENO_VOTING_POWER</a>));
 
-    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
-    <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
-
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
+    <b>let</b> stake_pool_remaining_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">aptos_governance::get_remaining_voting_power</a>(pool_address, proposal_id);
+    <b>let</b> stake_pool_used_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address) - stake_pool_remaining_voting_power;
+    <b>let</b> proposal_used_voting_power = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(&<b>mut</b> governance_records.votes_per_proposal, proposal_id, 0);
+    // A edge case: Before enabling partial governance <a href="voting.md#0x1_voting">voting</a> on a delegation pool, the delegation pool <b>has</b>
+    // a voter which can vote <b>with</b> all <a href="voting.md#0x1_voting">voting</a> power of this delegation pool. If the voter votes on a proposal after
+    // partial governance <a href="voting.md#0x1_voting">voting</a> flag is enabled, the delegation pool doesn't have enough <a href="voting.md#0x1_voting">voting</a> power on this
+    // proposal for all the delegators. To be fair, no one can vote on this proposal through this delegation pool.
+    // To detect this case, check <b>if</b> the <a href="stake.md#0x1_stake">stake</a> pool had used <a href="voting.md#0x1_voting">voting</a> power not through <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> <b>module</b>.
+    <b>assert</b>!(stake_pool_used_voting_power == *proposal_used_voting_power, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>));
+    *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
     <b>let</b> used_voting_power = borrow_mut_used_voting_power(governance_records, voter_address, proposal_id);
     *used_voting_power = *used_voting_power + voting_power;
+
+    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
+    <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> governance_records.vote_events,
@@ -1815,7 +1892,7 @@ THe existing voter will be replaced. The function is permissionless.
     <b>let</b> voter_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
     <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    <b>let</b> total_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_voting_power">calculate_and_update_voter_voting_power</a>(pool, governance_records, voter_addr);
+    <b>let</b> total_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_vote_delegation">calculate_and_update_vote_delegation</a>(pool, governance_records, voter_addr);
     <b>assert</b>!(
         total_voting_power &gt;= <a href="aptos_governance.md#0x1_aptos_governance_get_required_proposer_stake">aptos_governance::get_required_proposer_stake</a>(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EINSUFFICIENT_PROPOSER_STAKE">EINSUFFICIENT_PROPOSER_STAKE</a>));
@@ -2173,7 +2250,7 @@ Get the used voting power of a voter on a proposal.
         voter,
         proposal_id,
     };
-    *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_with_default">table::borrow_with_default</a>(votes, key, &0)
+    *<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_with_default">smart_table::borrow_with_default</a>(votes, key, &0)
 }
 </code></pre>
 
@@ -2181,16 +2258,16 @@ Get the used voting power of a voter on a proposal.
 
 </details>
 
-<a name="0x1_delegation_pool_get_latest_delegator_voting_power_delegation"></a>
+<a name="0x1_delegation_pool_get_latest_delegator_vote_delegation"></a>
 
-## Function `get_latest_delegator_voting_power_delegation`
+## Function `get_latest_delegator_vote_delegation`
 
-Get the latest VotingPowerDelegation of a delegator.
-The 2nd bool return value is true when VotingPowerDelegation has already been created before calling this function.
-The 3rd bool return value is true when the latest VotingPowerDelegation is different from the existing VotingPowerDelegation.
+Get the latest VoteDelegation of a delegator.
+The 2nd bool return value is true when VoteDelegation has already been created before calling this function.
+The 3rd bool return value is true when the latest VoteDelegation is different from the existing VoteDelegation.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_voting_power_delegation">get_latest_delegator_voting_power_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, delegator: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">delegation_pool::VotingPowerDelegation</a>, bool, bool)
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_vote_delegation">get_latest_delegator_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, delegator: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">delegation_pool::VoteDelegation</a>, bool, bool)
 </code></pre>
 
 
@@ -2199,26 +2276,26 @@ The 3rd bool return value is true when the latest VotingPowerDelegation is diffe
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_voting_power_delegation">get_latest_delegator_voting_power_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, delegator: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">VotingPowerDelegation</a>, bool, bool) {
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_vote_delegation">get_latest_delegator_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, delegator: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a>, bool, bool) {
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
     <b>let</b> locked_until_secs = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
-    <b>let</b> voting_power_delegation = &governance_records.voting_power_delegation;
+    <b>let</b> vote_delegation = &governance_records.vote_delegation;
     // By default, a delegator's delegated voter is itself.
-    <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(voting_power_delegation, delegator)) {
-        <b>return</b> (<a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">VotingPowerDelegation</a> {
+    <b>if</b> (!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(vote_delegation, delegator)) {
+        <b>return</b> (<a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> {
             voter: delegator,
             last_locked_until_secs: locked_until_secs,
-            voter_next_lockup: delegator,
+            pending_voter: delegator,
         }, <b>false</b>, <b>false</b>)
     };
-    <b>let</b> voting_power_delegation = *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(voting_power_delegation, delegator);
+    <b>let</b> vote_delegation = *<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(vote_delegation, delegator);
     <b>let</b> needs_update = <b>false</b>;
-    <b>if</b> (voting_power_delegation.last_locked_until_secs &lt; locked_until_secs &&
-        voting_power_delegation.voter != voting_power_delegation.voter_next_lockup) {
-        voting_power_delegation.voter = voting_power_delegation.voter_next_lockup;
+    <b>if</b> (vote_delegation.last_locked_until_secs &lt; locked_until_secs &&
+        vote_delegation.voter != vote_delegation.pending_voter) {
+        vote_delegation.voter = vote_delegation.pending_voter;
         needs_update = <b>true</b>;
     };
-    (voting_power_delegation, <b>true</b>, needs_update)
+    (vote_delegation, <b>true</b>, needs_update)
 }
 </code></pre>
 
@@ -2226,14 +2303,14 @@ The 3rd bool return value is true when the latest VotingPowerDelegation is diffe
 
 </details>
 
-<a name="0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation"></a>
+<a name="0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation"></a>
 
-## Function `update_and_borrow_mut_delegator_voting_power_delegation`
+## Function `update_and_borrow_mut_delegator_vote_delegation`
 
-Update VotingPowerDelegation of a delegator to up-to-date then borrow_mut it.
+Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, delegator: <b>address</b>): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">delegation_pool::VotingPowerDelegation</a>
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, delegator: <b>address</b>): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">delegation_pool::VoteDelegation</a>
 </code></pre>
 
 
@@ -2242,22 +2319,22 @@ Update VotingPowerDelegation of a delegator to up-to-date then borrow_mut it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
     pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>,
     governance_records :&<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>,
     delegator: <b>address</b>
-): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VotingPowerDelegation">VotingPowerDelegation</a> {
-    <b>let</b> (latest_voting_power_delegation, is_existed, needs_update) =
-        <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_voting_power_delegation">get_latest_delegator_voting_power_delegation</a>(pool, governance_records, delegator);
-    <b>let</b> voting_power_delegation_table = &<b>mut</b> governance_records.voting_power_delegation;
+): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> {
+    <b>let</b> (latest_vote_delegation, is_existed, needs_update) =
+        <a href="delegation_pool.md#0x1_delegation_pool_get_latest_delegator_vote_delegation">get_latest_delegator_vote_delegation</a>(pool, governance_records, delegator);
+    <b>let</b> vote_delegation_table = &<b>mut</b> governance_records.vote_delegation;
     <b>if</b> (!is_existed) {
-        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(voting_power_delegation_table, delegator, latest_voting_power_delegation);
+        <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(vote_delegation_table, delegator, latest_vote_delegation);
     };
-    <b>let</b> voting_power_delegation = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(voting_power_delegation_table, delegator);
+    <b>let</b> vote_delegation = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut">smart_table::borrow_mut</a>(vote_delegation_table, delegator);
     <b>if</b> (needs_update) {
-        *voting_power_delegation = latest_voting_power_delegation;
+        *vote_delegation = latest_vote_delegation;
     };
-    voting_power_delegation
+    vote_delegation
 }
 </code></pre>
 
@@ -2265,16 +2342,16 @@ Update VotingPowerDelegation of a delegator to up-to-date then borrow_mut it.
 
 </details>
 
-<a name="0x1_delegation_pool_get_latest_voter_voting_power"></a>
+<a name="0x1_delegation_pool_get_latest_vote_delegation"></a>
 
-## Function `get_latest_voter_voting_power`
+## Function `get_latest_vote_delegation`
 
-Get the latest VoterVotingPower of a voter.
-The 2nd bool return value is true when VoterVotingPower has already been created before calling this function.
-The 3rd bool return value is true when the latest VoterVotingPower is different from the existing VotingPowerDelegation.
+Get the latest VoteDelegation of a voter.
+The 2nd bool return value is true when VoteDelegation has already been created before calling this function.
+The 3rd bool return value is true when the latest VoteDelegation is different from the existing VoteDelegation.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_voter_voting_power">get_latest_voter_voting_power</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">delegation_pool::VoterVotingPower</a>, bool, bool)
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_vote_delegation">get_latest_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): (<a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">delegation_pool::DelegatedVotes</a>, bool, bool)
 </code></pre>
 
 
@@ -2283,35 +2360,35 @@ The 3rd bool return value is true when the latest VoterVotingPower is different 
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_voter_voting_power">get_latest_voter_voting_power</a>(
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_latest_vote_delegation">get_latest_vote_delegation</a>(
     pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>,
     governance_records: &<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>,
     voter: <b>address</b>
-): (<a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">VoterVotingPower</a>, bool, bool) {
+): (<a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a>, bool, bool) {
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_pool_address">get_pool_address</a>(pool);
     <b>let</b> locked_until_secs = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(pool_address);
-    <b>let</b> voting_power_per_voter = &governance_records.voting_power_per_voter;
+    <b>let</b> voting_power_per_voter = &governance_records.delegated_votes;
     // By default, a delegator's voter is itself.
-    <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(voting_power_per_voter, voter)) {
+    <b>if</b> (!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(voting_power_per_voter, voter)) {
         <b>let</b> active_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(pool, voter);
         <b>let</b> inactive_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_pending_inactive_shares">get_delegator_pending_inactive_shares</a>(pool, voter);
-        <b>return</b> (<a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">VoterVotingPower</a> {
+        <b>return</b> (<a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> {
             active_shares,
             pending_inactive_shares: inactive_shares,
             active_shares_next_lockup: active_shares,
             last_locked_until_secs: locked_until_secs,
         }, <b>false</b>, <b>false</b>)
     };
-    <b>let</b> latest_voter_voting_power = *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(voting_power_per_voter, voter);
+    <b>let</b> latest_vote_delegation = *<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(voting_power_per_voter, voter);
     <b>let</b> needs_updated = <b>false</b>;
-    <b>if</b> (latest_voter_voting_power.last_locked_until_secs &lt; locked_until_secs) {
-        latest_voter_voting_power.active_shares = latest_voter_voting_power.active_shares_next_lockup;
-        latest_voter_voting_power.pending_inactive_shares = 0;
-        latest_voter_voting_power.active_shares_next_lockup = latest_voter_voting_power.active_shares;
-        latest_voter_voting_power.last_locked_until_secs = locked_until_secs;
+    <b>if</b> (latest_vote_delegation.last_locked_until_secs &lt; locked_until_secs) {
+        latest_vote_delegation.active_shares = latest_vote_delegation.active_shares_next_lockup;
+        latest_vote_delegation.pending_inactive_shares = 0;
+        latest_vote_delegation.active_shares_next_lockup = latest_vote_delegation.active_shares;
+        latest_vote_delegation.last_locked_until_secs = locked_until_secs;
         needs_updated = <b>true</b>;
     };
-    (latest_voter_voting_power, <b>true</b>, needs_updated)
+    (latest_vote_delegation, <b>true</b>, needs_updated)
 }
 </code></pre>
 
@@ -2319,14 +2396,14 @@ The 3rd bool return value is true when the latest VoterVotingPower is different 
 
 </details>
 
-<a name="0x1_delegation_pool_update_and_borrow_mut_voter_voting_power"></a>
+<a name="0x1_delegation_pool_update_and_borrow_mut_vote_delegation"></a>
 
-## Function `update_and_borrow_mut_voter_voting_power`
+## Function `update_and_borrow_mut_vote_delegation`
 
 Update VoterVotingPower of a voter to up-to-date then borrow_mut it.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">delegation_pool::VoterVotingPower</a>
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">delegation_pool::DelegatedVotes</a>
 </code></pre>
 
 
@@ -2335,21 +2412,21 @@ Update VoterVotingPower of a voter to up-to-date then borrow_mut it.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(
     pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>,
     governance_records :&<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>,
     voter: <b>address</b>
-): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">VoterVotingPower</a> {
-    <b>let</b> (latest_voter_voting_power, is_existed, is_updated) = <a href="delegation_pool.md#0x1_delegation_pool_get_latest_voter_voting_power">get_latest_voter_voting_power</a>(pool, governance_records, voter);
-    <b>let</b> voting_power_per_voter = &<b>mut</b> governance_records.voting_power_per_voter;
+): &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> {
+    <b>let</b> (latest_vote_delegation, is_existed, is_updated) = <a href="delegation_pool.md#0x1_delegation_pool_get_latest_vote_delegation">get_latest_vote_delegation</a>(pool, governance_records, voter);
+    <b>let</b> voting_power_per_voter = &<b>mut</b> governance_records.delegated_votes;
     <b>if</b> (!is_existed) {
-        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(voting_power_per_voter, voter, latest_voter_voting_power);
+        <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(voting_power_per_voter, voter, latest_vote_delegation);
     };
-    <b>let</b> voter_voting_power = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(voting_power_per_voter, voter);
+    <b>let</b> vote_delegation = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut">smart_table::borrow_mut</a>(voting_power_per_voter, voter);
     <b>if</b> (is_updated) {
-        *voter_voting_power = latest_voter_voting_power;
+        *vote_delegation = latest_vote_delegation;
     };
-    voter_voting_power
+    vote_delegation
 }
 </code></pre>
 
@@ -2389,7 +2466,7 @@ Given the amounts of shares in <code>active_shares</code> pool and <code>inactiv
 power, which equals to the sum of the coin amounts.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, latest_voter_voting_power: &<a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">delegation_pool::VoterVotingPower</a>): u64
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, latest_vote_delegation: &<a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">delegation_pool::DelegatedVotes</a>): u64
 </code></pre>
 
 
@@ -2398,14 +2475,14 @@ power, which equals to the sum of the coin amounts.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, latest_voter_voting_power: &<a href="delegation_pool.md#0x1_delegation_pool_VoterVotingPower">VoterVotingPower</a>): u64 {
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, latest_vote_delegation: &<a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a>): u64 {
     <b>let</b> active_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(
         &<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>.active_shares,
-        latest_voter_voting_power.active_shares);
-    <b>let</b> inactive_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(
+        latest_vote_delegation.active_shares);
+    <b>let</b> pending_inactive_amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount">pool_u64::shares_to_amount</a>(
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>),
-        latest_voter_voting_power.pending_inactive_shares);
-    active_amount + inactive_amount
+        latest_vote_delegation.pending_inactive_shares);
+    active_amount + pending_inactive_amount
 }
 </code></pre>
 
@@ -2417,7 +2494,7 @@ power, which equals to the sum of the coin amounts.
 
 ## Function `calculate_and_update_delegator_voter_internal`
 
-Update VotingPowerDelegation of a delegator to up-to-date then return the latest voter.
+Update VoteDelegation of a delegator to up-to-date then return the latest voter.
 
 
 <pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, delegator: <b>address</b>): <b>address</b>
@@ -2430,8 +2507,8 @@ Update VotingPowerDelegation of a delegator to up-to-date then return the latest
 
 
 <pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, delegator: <b>address</b>): <b>address</b> {
-    <b>let</b> voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(pool, governance_records, delegator);
-    voting_power_delegation.voter
+    <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(pool, governance_records, delegator);
+    vote_delegation.voter
 }
 </code></pre>
 
@@ -2439,14 +2516,14 @@ Update VotingPowerDelegation of a delegator to up-to-date then return the latest
 
 </details>
 
-<a name="0x1_delegation_pool_calculate_and_update_voter_voting_power"></a>
+<a name="0x1_delegation_pool_calculate_and_update_vote_delegation"></a>
 
-## Function `calculate_and_update_voter_voting_power`
+## Function `calculate_and_update_vote_delegation`
 
 Update VoterVotingPower of a voter to up-to-date then return the total voting power of this voter.
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_voting_power">calculate_and_update_voter_voting_power</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): u64
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_vote_delegation">calculate_and_update_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">delegation_pool::DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>): u64
 </code></pre>
 
 
@@ -2455,9 +2532,9 @@ Update VoterVotingPower of a voter to up-to-date then return the total voting po
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voter_voting_power">calculate_and_update_voter_voting_power</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, voter: <b>address</b>): u64 {
-    <b>let</b> voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, voter);
-    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(pool, voter_voting_power)
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_vote_delegation">calculate_and_update_vote_delegation</a>(pool: &<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, voter: <b>address</b>): u64 {
+    <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, voter);
+    <a href="delegation_pool.md#0x1_delegation_pool_calculate_total_voting_power">calculate_total_voting_power</a>(pool, vote_delegation)
 }
 </code></pre>
 
@@ -2518,7 +2595,7 @@ Allows an owner to change the delegated voter of the underlying stake pool.
     new_voter: <b>address</b>
 ) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
     // No one can change delegated_voter once the partial governance <a href="voting.md#0x1_voting">voting</a> feature is enabled.
-    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>));
+    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDEPRECATED_FUNCTION">EDEPRECATED_FUNCTION</a>));
     <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
@@ -2563,37 +2640,43 @@ this change won't take effects until the next lockup period.
 
     <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-    <b>let</b> delegator_voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(
+    <b>let</b> delegator_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
             <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
             governance_records,
             delegator_address
         );
-    <b>let</b> pending_voter: <b>address</b> = delegator_voting_power_delegation.voter_next_lockup;
-    // This delegator <b>has</b> already delegated <b>to</b> this voter since last time the delegator calls this function.
-    <b>if</b> (pending_voter == new_voter) {
-        <b>return</b>
+    <b>let</b> pending_voter: <b>address</b> = delegator_vote_delegation.pending_voter;
+
+    // No need <b>to</b> <b>update</b> <b>if</b> the voter doesn't really change.
+    <b>if</b> (pending_voter != new_voter) {
+        delegator_vote_delegation.pending_voter = new_voter;
+
+        <b>let</b> active_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, delegator_address);
+
+        // &lt;active shares&gt; of &lt;pending voter of shareholder&gt; -= &lt;active_shares&gt;
+        // &lt;active shares&gt; of &lt;new voter of shareholder&gt; += &lt;active_shares&gt;
+        <b>let</b> pending_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(
+            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
+            governance_records,
+            pending_voter
+        );
+        pending_vote_delegation.active_shares_next_lockup =
+            pending_vote_delegation.active_shares_next_lockup - active_shares;
+
+        <b>let</b> new_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(
+            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
+            governance_records,
+            new_voter
+        );
+        new_vote_delegation.active_shares_next_lockup =
+            new_vote_delegation.active_shares_next_lockup + active_shares;
     };
-    delegator_voting_power_delegation.voter_next_lockup = new_voter;
 
-    <b>let</b> active_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(<a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>, delegator_address);
-
-    // &lt;active shares&gt; of &lt;pending voter of shareholder&gt; -= &lt;active_shares&gt;
-    // &lt;active shares&gt; of &lt;new voter of shareholder&gt; += &lt;active_shares&gt;
-    <b>let</b> pending_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(
-        <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
-        governance_records,
-        pending_voter
-    );
-    pending_voter_voting_power.active_shares_next_lockup =
-        pending_voter_voting_power.active_shares_next_lockup - active_shares;
-
-    <b>let</b> new_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(
-        <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>,
-        governance_records,
-        new_voter
-    );
-    new_voter_voting_power.active_shares_next_lockup =
-        new_voter_voting_power.active_shares_next_lockup + active_shares;
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> governance_records.delegate_voting_power_events, <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> {
+        pool_address,
+        delegator: delegator_address,
+        voter: new_voter,
+    });
 }
 </code></pre>
 
@@ -3024,20 +3107,20 @@ deposited <code>coins_amount</code>. This function doesn't make any coin transfe
     // &lt;active shares&gt; of &lt;next voter of shareholder&gt; += &lt;new_shares&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-        <b>let</b> voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(pool, governance_records, shareholder);
-        <b>let</b> current_voter = voting_power_delegation.voter;
-        <b>let</b> pending_voter = voting_power_delegation.voter_next_lockup;
-        <b>let</b> current_voter_voting_power =
-            <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, current_voter);
-        current_voter_voting_power.active_shares = current_voter_voting_power.active_shares + new_shares;
+        <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(pool, governance_records, shareholder);
+        <b>let</b> current_voter = vote_delegation.voter;
+        <b>let</b> pending_voter = vote_delegation.pending_voter;
+        <b>let</b> current_vote_delegation =
+            <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, current_voter);
+        current_vote_delegation.active_shares = current_vote_delegation.active_shares + new_shares;
         <b>if</b> (pending_voter == current_voter) {
-            current_voter_voting_power.active_shares_next_lockup =
-                current_voter_voting_power.active_shares_next_lockup + new_shares;
+            current_vote_delegation.active_shares_next_lockup =
+                current_vote_delegation.active_shares_next_lockup + new_shares;
         } <b>else</b> {
-            <b>let</b> pending_voter_voting_power =
-                <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, pending_voter);
-            pending_voter_voting_power.active_shares_next_lockup =
-                pending_voter_voting_power.active_shares_next_lockup + new_shares;
+            <b>let</b> pending_vote_delegation =
+                <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, pending_voter);
+            pending_vote_delegation.active_shares_next_lockup =
+                pending_vote_delegation.active_shares_next_lockup + new_shares;
         };
     };
 
@@ -3086,8 +3169,8 @@ to ensure there is always only one withdrawal request.
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
-        <b>let</b> current_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, current_voter);
-        current_voter_voting_power.pending_inactive_shares = current_voter_voting_power.pending_inactive_shares + new_shares;
+        <b>let</b> current_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, current_voter);
+        current_vote_delegation.pending_inactive_shares = current_vote_delegation.pending_inactive_shares + new_shares;
     };
 
     // cannot buy inactive shares, only pending_inactive at current lockup cycle
@@ -3185,23 +3268,23 @@ be available for withdrawal when current OLC ends.
     // &lt;active shares&gt; of &lt;next voter of shareholder&gt; -= &lt;shares_to_redeem&gt;
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-        <b>let</b> voting_power_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_voting_power_delegation">update_and_borrow_mut_delegator_voting_power_delegation</a>(
+        <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
             pool,
             governance_records,
             shareholder
         );
-        <b>let</b> current_voter = voting_power_delegation.voter;
-        <b>let</b> pending_voter = voting_power_delegation.voter_next_lockup;
-        <b>let</b> current_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, current_voter);
-        current_voter_voting_power.active_shares = current_voter_voting_power.active_shares - shares_to_redeem;
+        <b>let</b> current_voter = vote_delegation.voter;
+        <b>let</b> pending_voter = vote_delegation.pending_voter;
+        <b>let</b> current_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, current_voter);
+        current_vote_delegation.active_shares = current_vote_delegation.active_shares - shares_to_redeem;
         <b>if</b> (current_voter == pending_voter) {
-            current_voter_voting_power.active_shares_next_lockup =
-                current_voter_voting_power.active_shares_next_lockup - shares_to_redeem;
+            current_vote_delegation.active_shares_next_lockup =
+                current_vote_delegation.active_shares_next_lockup - shares_to_redeem;
         } <b>else</b> {
-            <b>let</b> pending_voter_voting_power =
-                <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, pending_voter);
-            pending_voter_voting_power.active_shares_next_lockup =
-                pending_voter_voting_power.active_shares_next_lockup - shares_to_redeem;
+            <b>let</b> pending_vote_delegation =
+                <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, pending_voter);
+            pending_vote_delegation.active_shares_next_lockup =
+                pending_vote_delegation.active_shares_next_lockup - shares_to_redeem;
         };
     };
 
@@ -3255,8 +3338,8 @@ escape inactivation when current lockup ends.
     <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address)) {
         <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
         <b>let</b> current_voter = <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_delegator_voter_internal">calculate_and_update_delegator_voter_internal</a>(pool, governance_records, shareholder);
-        <b>let</b> current_voter_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_voter_voting_power">update_and_borrow_mut_voter_voting_power</a>(pool, governance_records, current_voter);
-        current_voter_voting_power.pending_inactive_shares = current_voter_voting_power.pending_inactive_shares - shares_to_redeem;
+        <b>let</b> current_vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_vote_delegation">update_and_borrow_mut_vote_delegation</a>(pool, governance_records, current_voter);
+        current_vote_delegation.pending_inactive_shares = current_vote_delegation.pending_inactive_shares - shares_to_redeem;
     };
 
     <b>let</b> inactive_shares = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(&<b>mut</b> pool.inactive_shares, lockup_cycle);

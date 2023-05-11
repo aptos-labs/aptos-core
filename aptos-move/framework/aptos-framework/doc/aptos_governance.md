@@ -1513,7 +1513,7 @@ Only called in testnet where the core resources account exists and has been gran
 Return the voting power a stake pool has with respect to governance proposals.
 
 
-<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1522,7 +1522,7 @@ Return the voting power a stake pool has with respect to governance proposals.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64 {
     <b>let</b> allow_validator_set_change = <a href="staking_config.md#0x1_staking_config_get_allow_validator_set_change">staking_config::get_allow_validator_set_change</a>(&<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
     <b>if</b> (allow_validator_set_change) {
         <b>let</b> (active, _, pending_active, pending_inactive) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
@@ -2419,7 +2419,7 @@ Address @aptos_framework must exist GovernanceResponsbility.
 ### Function `get_voting_power`
 
 
-<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">get_voting_power</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
