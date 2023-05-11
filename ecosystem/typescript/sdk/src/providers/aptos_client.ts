@@ -771,7 +771,8 @@ export class AptosClient {
   }
 
   /**
-   * Publishes a move packages by creating a resource account. The package cannot be upgraded since it is deployed by resource account
+   * Publishes a move packages by creating a resource account. 
+   * The package cannot be upgraded since it is deployed by resource account
    * `packageMetadata` and `modules` can be generated with command
    * `aptos move compile --save-metadata [ --included-artifacts=<...> ]`. 
    * @param sender
