@@ -176,7 +176,7 @@ Also learn how to run a public fullnode on a local network and connect to either
 
 <div class="docs-card-container">
   <div class="row row-cols-1 row-cols-md-3a g-4">
-        <div class="col">
+    <div class="col">
       <div class="card-no-border card-body h-100 d-flex flex-column">
         <div class="card-body">
         </div>
@@ -211,7 +211,8 @@ Also learn how to run a public fullnode on a local network and connect to either
                 <h4 class="mb-1">Indexing</h4>
               </a>
             </div>
-            <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos blockchain.</small>
+            <small>Access Aptos-provided indexer service or build your own custom indexer for the Aptos
+              blockchain.</small>
           </div>
           <div class="w-100">
             <div class="d-flex justify-content-between">
@@ -224,14 +225,12 @@ Also learn how to run a public fullnode on a local network and connect to either
         </div>
       </div>
     </div>
-      </div>
-    </div>
     <div class="col">
       <div class="card-no-border card-body h-100 d-flex flex-column">
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-        <a href="../guides/data-pruning" class="list-group-item">
+          <a href="../guides/data-pruning" class="list-group-item">
             <div class="d-flex w-100 justify-content-between align-items-start">
               <h4 class="mb-1">Data pruning</h4>
             </div>
