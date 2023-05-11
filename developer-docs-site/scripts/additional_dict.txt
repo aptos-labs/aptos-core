@@ -552,3 +552,4 @@ AptosClient
 ANSClient
 FaucetClient
 CoinClient
+RESTful
