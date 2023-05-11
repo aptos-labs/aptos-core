@@ -28,19 +28,14 @@ module fungible_asset_extension::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     public fun initialize(
         constructor_ref: &ConstructorRef,
-        monitoring_supply: bool,
         maximum_supply: u128,
         name: String,
         symbol: String,
         decimals: u8,
         icon_uri: String,
     ) {
-        let supply = if (monitoring_supply) {
-            option::some(if (maximum_supply != 0) {
-                option::some(maximum_supply)
-            } else {
-                option::none()
-            })
+        let supply = if (maximum_supply != 0) {
+            option::some(maximum_supply)
         } else {
             option::none()
         };
@@ -169,7 +164,6 @@ module fungible_asset_extension::managed_fungible_asset {
         let constructor_ref = &object::create_named_object(creator, b"APT");
         initialize(
             constructor_ref,
-            true,
             0,
             utf8(b"Aptos Token"), /* name */
             utf8(b"APT"), /* symbol */

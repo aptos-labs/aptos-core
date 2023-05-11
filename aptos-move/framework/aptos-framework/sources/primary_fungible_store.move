@@ -32,7 +32,7 @@ module aptos_framework::primary_fungible_store {
     /// so that users can easily deposit/withdraw/transfer fungible assets.
     public fun create_primary_store_enabled_fungible_asset(
         constructor_ref: &ConstructorRef,
-        monitoring_supply_with_maximum: Option<Option<u128>>,
+        maximum_supply: Option<u128>,
         name: String,
         symbol: String,
         decimals: u8,
@@ -40,7 +40,7 @@ module aptos_framework::primary_fungible_store {
     ) {
         fungible_asset::add_fungibility(
             constructor_ref,
-            monitoring_supply_with_maximum,
+            maximum_supply,
             name,
             symbol,
             decimals,
@@ -158,9 +158,9 @@ module aptos_framework::primary_fungible_store {
     ): (MintRef, TransferRef, BurnRef) {
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(option::some(100)), // max supply
-            string::utf8(b"USDA"),
-            string::utf8(b"$$$"),
+            option::some(100), // max supply
+            string::utf8(b"TEST COIN"),
+            string::utf8(b"@T"),
             0,
             string::utf8(b"http://example.com/icon"),
         );

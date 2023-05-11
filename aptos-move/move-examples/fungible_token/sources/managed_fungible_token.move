@@ -46,7 +46,7 @@ module fungible_token::managed_fungible_token {
 
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(option::none()),
+            option::none(),
             utf8(b"test fungible asset name"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             2, /* decimals */
