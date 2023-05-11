@@ -44,7 +44,7 @@ use aptos_types::{
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_vm::{
-    data_cache::{IntoMoveResolver, StorageAdapter, StorageAdapterOwned},
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::MoveResolverExt,
 };
 use futures::{channel::oneshot, SinkExt};
@@ -105,17 +105,16 @@ impl Context {
         self.node_config.api.max_account_modules_page_size
     }
 
-    pub fn move_resolver(&self) -> Result<StorageAdapterOwned<DbStateView>> {
-        self.db
-            .latest_state_checkpoint_view()
-            .map(|state_view| state_view.into_move_resolver())
+    pub fn latest_state_view(&self) -> Result<DbStateView> {
+        self.db.latest_state_checkpoint_view()
     }
 
-    pub fn move_resolver_poem<E: InternalError>(
+    pub fn latest_state_view_poem<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
-    ) -> Result<StorageAdapterOwned<DbStateView>, E> {
-        self.move_resolver()
+    ) -> Result<DbStateView, E> {
+        self.db
+            .latest_state_checkpoint_view()
             .context("Failed to read latest state checkpoint from DB")
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info))
     }
@@ -328,13 +327,13 @@ impl Context {
             .collect::<Result<Vec<(StructTag, Vec<u8>)>>>()?;
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
-        let resolver = self.state_view_at_version(version)?.into_move_resolver();
+        let state_view = self.state_view_at_version(version)?;
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                if resolver.is_resource_group(&key) {
+                if state_view.as_move_resolver().is_resource_group(&key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
@@ -556,7 +555,8 @@ impl Context {
             return Ok(vec![]);
         }
 
-        let resolver = self.move_resolver_poem(ledger_info)?;
+        let state_view = self.latest_state_view_poem(ledger_info)?;
+        let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -586,7 +586,8 @@ impl Context {
             return Ok(vec![]);
         }
 
-        let resolver = self.move_resolver_poem(ledger_info)?;
+        let state_view = self.latest_state_view_poem(ledger_info)?;
+        let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()

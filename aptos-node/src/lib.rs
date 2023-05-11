@@ -406,7 +406,8 @@ pub fn setup_environment_and_start_node(
     info!("Using node config {:?}", &node_config);
 
     // Start the node inspection service
-    services::start_node_inspection_service(&node_config);
+    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
+    services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
 
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
@@ -446,6 +447,7 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
+        peers_and_metadata,
         &mut event_subscription_service,
     );
 

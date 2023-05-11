@@ -5,7 +5,7 @@ use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use cfg_block::cfg_block;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, fmt, fmt::Display, time::Duration};
 use thiserror::Error;
 
 /// A peer monitoring service response
@@ -61,6 +61,18 @@ pub struct NetworkInformationResponse {
     pub distance_from_validators: u64, // The distance of the peer from the validator set
 }
 
+// Display formatting provides a high-level summary of the response
+impl Display for NetworkInformationResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{ num_connected_peers: {:?}, distance_from_validators: {:?} }}",
+            self.connected_peers.len(),
+            self.distance_from_validators,
+        )
+    }
+}
+
 /// Simple connection metadata associated with each peer
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConnectionMetadata {
@@ -94,6 +106,22 @@ pub struct NodeInformationResponse {
     pub ledger_timestamp_usecs: u64, // The latest timestamp of the blockchain (in microseconds)
     pub lowest_available_version: u64, // The lowest stored version of the node (in storage)
     pub uptime: Duration,            // The amount of time the peer has been running
+}
+
+// Display formatting provides a high-level summary of the response
+impl Display for NodeInformationResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{ highest_synced_epoch: {:?}, highest_synced_version: {:?}, ledger_timestamp_usecs: {:?}, \
+            lowest_available_version: {:?}, uptime: {:?} }}",
+            self.highest_synced_epoch,
+            self.highest_synced_version,
+            self.ledger_timestamp_usecs,
+            self.lowest_available_version,
+            self.uptime,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Error)]
