@@ -413,7 +413,16 @@ Only called during genesis to initialize system resources for this module.
     );
 
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; num_secondary_signers) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= num_secondary_signers;
+            <b>invariant</b> <b>forall</b> j in 0..i:
+                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[j])
+                && secondary_signer_public_key_hashes[j]
+                   == <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[j]);
+        };
+        (i &lt; num_secondary_signers)
+    }) {
         <b>let</b> secondary_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&secondary_signer_addresses, i);
         <b>assert</b>!(<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EACCOUNT_DOES_NOT_EXIST">PROLOGUE_EACCOUNT_DOES_NOT_EXIST</a>));
 
@@ -620,15 +629,20 @@ Give some constraints that may abort according to the conditions.
 Aborts if length of public key hashed vector
 not equal the number of singers.
 
-TODO: complex while loop condition.
 
-
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
+<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     txn_authentication_key: txn_sender_public_key
 };
 <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
-<b>aborts_if</b> !(len(secondary_signer_public_key_hashes) == num_secondary_signers);
+<b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
+<b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
+    !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
+        || secondary_signer_public_key_hashes[i] !=
+            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
+<b>ensures</b> <b>forall</b> i in 0..num_secondary_signers:
+    <a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
+        && secondary_signer_public_key_hashes[i] ==
+            <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(secondary_signer_addresses[i]);
 </code></pre>
 
 
@@ -647,8 +661,7 @@ Abort according to the conditions.
 Skip transaction_fee::burn_fee verification.
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> !(txn_max_gas_units &gt;= gas_units_remaining);
+<pre><code><b>aborts_if</b> !(txn_max_gas_units &gt;= gas_units_remaining);
 <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
 <b>aborts_if</b> !(txn_gas_price * gas_used &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
 <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
@@ -663,6 +676,31 @@ Skip transaction_fee::burn_fee verification.
 <b>let</b> <b>post</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>ensures</b> balance == pre_balance - transaction_fee_amount;
 <b>ensures</b> <a href="account.md#0x1_account">account</a>.sequence_number == pre_account.sequence_number + 1;
+<b>let</b> collected_fees = <b>global</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;
+<b>let</b> aggr = collected_fees.value;
+<b>let</b> aggr_val = <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr);
+<b>let</b> aggr_lim = <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
+<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+<b>let</b> apt_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+<b>let</b> maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;
+<b>let</b> apt_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_apt_supply);
+<b>let</b> apt_supply_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(apt_supply);
+<b>aborts_if</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">features::COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)) {
+    !<b>exists</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework)
+        || transaction_fee_amount &gt; 0 &&
+            ( // `<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr)` checked above.
+              // Sufficiency of funds is checked above.
+              aggr_val + transaction_fee_amount &gt; aggr_lim
+                || aggr_val + transaction_fee_amount &gt; MAX_U128)
+} <b>else</b> {
+    // Existence of CoinStore in `addr` is checked above.
+    // Sufficiency of funds is checked above.
+    !<b>exists</b>&lt;AptosCoinCapabilities&gt;(@aptos_framework) ||
+    // Existence of APT's CoinInfo
+    transaction_fee_amount &gt; 0 && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr) ||
+    // Sufficiency of APT's supply
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply) && apt_supply_value &lt; transaction_fee_amount
+};
 </code></pre>
 
 
