@@ -6,6 +6,7 @@
 
 use crate::{
     metrics,
+    moderator::RequestModerator,
     network::{ResponseSender, StorageServiceNetworkEvents},
     storage::StorageReader,
     subscription::{
@@ -25,7 +26,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_network::{
-    application::interface::NetworkServiceEvents,
+    application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
     peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
@@ -131,12 +132,18 @@ async fn test_peers_with_ready_subscriptions() {
     // Create test data with an empty storage server summary
     let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
     let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let request_moderator = Arc::new(RequestModerator::new(
+        cached_storage_server_summary.clone(),
+        create_peers_and_metadata(),
+        time_service.clone(),
+    ));
 
     // Verify that there are no peers with ready subscriptions
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
         lru_response_cache.clone(),
+        request_moderator.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -157,6 +164,7 @@ async fn test_peers_with_ready_subscriptions() {
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
         lru_response_cache.clone(),
+        request_moderator.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -184,6 +192,7 @@ async fn test_peers_with_ready_subscriptions() {
         cached_storage_server_summary,
         data_subscriptions,
         lru_response_cache,
+        request_moderator,
         storage_reader,
         time_service,
     )
@@ -2547,6 +2556,7 @@ impl MockClient {
             executor,
             storage_reader,
             mock_time_service.clone(),
+            create_peers_and_metadata(),
             storage_service_network_events,
         );
 
@@ -2618,6 +2628,13 @@ impl MockClient {
             panic!("Timed out while waiting for a response from the storage service!")
         }
     }
+}
+
+/// Creates a peers and metadata struct for test purposes
+/// (using all registered networks).
+fn create_peers_and_metadata() -> Arc<PeersAndMetadata> {
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+    PeersAndMetadata::new(&network_ids)
 }
 
 /// A helper method to request a states with proof chunk using the

@@ -6,13 +6,14 @@ use crate::{
     handler::Handler,
     metrics,
     metrics::{increment_counter, increment_network_frame_overflow, SUBSCRIPTION_EVENT_EXPIRE},
+    moderator::RequestModerator,
     network::ResponseSender,
     storage::StorageReaderInterface,
     LogEntry, LogSchema,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, error, warn};
+use aptos_logger::{debug, warn};
 use aptos_network::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
@@ -171,27 +172,22 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
     config: StorageServiceConfig,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
-) {
+) -> Result<(), Error> {
     // Remove all expired subscriptions
     remove_expired_data_subscriptions(config, data_subscriptions.clone());
 
     // Identify the peers with ready subscriptions
-    let peers_with_ready_subscriptions = match get_peers_with_ready_subscriptions(
+    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
         lru_response_cache.clone(),
+        request_moderator.clone(),
         storage.clone(),
         time_service.clone(),
-    ) {
-        Ok(peers_with_ready_subscriptions) => peers_with_ready_subscriptions,
-        Err(error) => {
-            error!(LogSchema::new(LogEntry::SubscriptionRefresh)
-                .error(&Error::UnexpectedErrorEncountered(error.to_string())));
-            return;
-        },
-    };
+    )?;
 
     // Remove and handle the ready subscriptions
     for (peer, target_ledger_info) in peers_with_ready_subscriptions {
@@ -201,6 +197,7 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
                 config,
                 data_subscriptions.clone(),
                 lru_response_cache.clone(),
+                request_moderator.clone(),
                 storage.clone(),
                 time_service.clone(),
                 &peer,
@@ -212,6 +209,8 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
             }
         }
     }
+
+    Ok(())
 }
 
 /// Identifies the data subscriptions that can be handled now.
@@ -221,6 +220,7 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
 ) -> aptos_storage_service_types::Result<Vec<(PeerNetworkId, LedgerInfoWithSignatures)>, Error> {
@@ -247,6 +247,7 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
                     data_subscriptions.clone(),
                     highest_known_epoch,
                     lru_response_cache.clone(),
+                    request_moderator.clone(),
                     peer,
                     data_subscription.protocol,
                     storage.clone(),
@@ -269,7 +270,7 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     // Remove the invalid subscriptions
     for peer in invalid_peer_subscriptions {
         if let Some(data_subscription) = data_subscriptions.lock().remove(&peer) {
-            debug!(LogSchema::new(LogEntry::SubscriptionRefresh)
+            warn!(LogSchema::new(LogEntry::SubscriptionRefresh)
                 .error(&Error::InvalidRequest(
                     "Mismatch between known version and epoch!".into()
                 ))
@@ -288,6 +289,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
     peer_network_id: &PeerNetworkId,
     protocol: ProtocolId,
     storage: T,
@@ -308,6 +310,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
         cached_storage_server_summary,
         data_subscriptions,
         lru_response_cache,
+        request_moderator,
         storage,
         time_service,
     );
@@ -344,6 +347,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     config: StorageServiceConfig,
     data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
     peer_network_id: &PeerNetworkId,
@@ -358,6 +362,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 cached_storage_server_summary,
                 data_subscriptions,
                 lru_response_cache,
+                request_moderator,
                 storage,
                 time_service,
             );
