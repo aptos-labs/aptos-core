@@ -6,6 +6,7 @@ use crate::{
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use anyhow::anyhow;
+use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
 use arc_swap::ArcSwapOption;
@@ -129,6 +130,8 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
     module_reads: DashSet<AccessPath>,
 
     module_read_write_intersection: AtomicBool,
+
+    commit_locks: Vec<Mutex<bool>>, // Shared locks to prevent race during commit
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
@@ -143,6 +146,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
             module_read_write_intersection: AtomicBool::new(false),
+            commit_locks: (0..num_txns).map(|_| Mutex::new(false)).collect(),
         }
     }
 
@@ -226,6 +230,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        let lock = self.commit_locks[txn_idx as usize].lock();
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
@@ -233,6 +238,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         } else {
             unreachable!();
         }
+        drop(lock);
     }
 
     // Extracts a set of paths written or updated during execution from transaction
@@ -259,7 +265,11 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         usize,
         Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
     ) {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
+        let lock = self.commit_locks[txn_idx as usize].lock();
+        let ret: (
+            usize,
+            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
+        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
             (
                 0,
                 Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
@@ -274,7 +284,9 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                     Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
                 ),
             },
-        )
+        );
+        drop(lock);
+        ret
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
@@ -284,6 +296,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
         delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
+        let lock = self.commit_locks[txn_idx as usize].lock();
+        println!("txn {} recorded {}", txn_idx, delta_writes.len());
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
@@ -294,6 +308,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             },
             ExecutionStatus::Abort(_) => {},
         };
+        drop(lock);
     }
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if

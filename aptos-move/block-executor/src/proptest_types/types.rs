@@ -482,7 +482,11 @@ where
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
-        self.3.get().cloned().expect("Delta writes must be set")
+        if self.3.get().is_some() {
+            self.3.get().cloned().expect("Delta writes must be set")
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -543,6 +547,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
         let mut result_vec = vec![];
         for (idx, txn) in txns.iter().enumerate() {
+            println!("txn {} gas limit {:?}", idx, maybe_gas_limit);
             let delta_writes_at_idx = resolved_deltas.as_ref().map(|delta_writes| {
                 delta_writes[idx]
                     .iter()
