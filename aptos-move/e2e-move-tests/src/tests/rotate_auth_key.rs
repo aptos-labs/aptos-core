@@ -239,7 +239,7 @@ pub fn verify_originating_address(
         AccountAddress::from_bytes(auth_key).unwrap().to_vec(),
     );
     // Verify that the value in the address redirection table is expected
-    let result = harness.read_state_value(state_key).unwrap();
+    let result = harness.read_state_value_bytes(state_key).unwrap();
     assert_eq!(result, expected_address.to_vec());
 
     let account_resource = parse_struct_tag("0x1::account::Account").unwrap();

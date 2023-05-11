@@ -20,7 +20,10 @@ use aptos_types::{
     account_config::{AccountResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
-    state_store::state_key::StateKey,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
         TransactionPayload, TransactionStatus,
@@ -394,14 +397,12 @@ impl MoveHarness {
             .run_block_with_metadata(proposer, failed_proposer_indices, txns)
     }
 
-    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        self.executor.read_state_value(state_key).and_then(|bytes| {
-            if bytes.is_empty() {
-                None
-            } else {
-                Some(bytes)
-            }
-        })
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
+        self.executor.read_state_value(state_key)
+    }
+
+    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        self.read_state_value(state_key).map(StateValue::into_bytes)
     }
 
     /// Reads the raw, serialized data of a resource.
@@ -412,7 +413,7 @@ impl MoveHarness {
     ) -> Option<Vec<u8>> {
         let path =
             AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test");
-        self.read_state_value(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::access_path(path))
     }
 
     /// Reads the resource data `T`.
@@ -428,13 +429,24 @@ impl MoveHarness {
         )
     }
 
+    pub fn read_resource_metadata(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<Option<StateValueMetadata>> {
+        self.read_state_value(&StateKey::access_path(
+            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
+        ))
+        .map(StateValue::into_metadata)
+    }
+
     pub fn read_resource_group(
         &self,
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
         let path = AccessPath::resource_group_access_path(*addr, struct_tag);
-        self.read_state_value(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::access_path(path))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 

@@ -3,36 +3,49 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Scratchpad for on chain values during the execution.
 
-use crate::move_vm_ext::MoveResolverExt;
+use crate::{
+    aptos_vm_impl::gas_config,
+    move_vm_ext::{get_max_binary_format_version, MoveResolverExt},
+};
 #[allow(unused_imports)]
 use anyhow::Error;
-use aptos_framework::{natives::state_storage::StateStorageUsageResolver, RuntimeModuleMetadataV1};
+use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    on_chain_config::ConfigStorage,
+    on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
 };
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use move_vm_runtime::move_vm::MoveVM;
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-};
+use std::{collections::BTreeMap, ops::Deref};
 
-pub(crate) fn get_any_resource(
+pub(crate) fn get_resource_group_from_metadata(
+    struct_tag: &StructTag,
+    metadata: &[Metadata],
+) -> Option<StructTag> {
+    let metadata = aptos_framework::get_metadata(metadata)?;
+    metadata
+        .struct_attributes
+        .get(struct_tag.name.as_ident_str().as_str())?
+        .iter()
+        .find_map(|attr| attr.get_resource_group_member())
+}
+
+fn get_any_resource(
     move_resolver: &impl MoveResolverExt,
     address: &AccountAddress,
     struct_tag: &StructTag,
+    metadata: &[Metadata],
 ) -> Result<Option<Vec<u8>>, VMError> {
-    let resource_group = move_resolver.get_resource_group(struct_tag);
+    let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
     if let Some(resource_group) = resource_group {
         let group_data = move_resolver.get_resource_group_data(address, &resource_group)?;
         if let Some(group_data) = group_data {
@@ -47,92 +60,6 @@ pub(crate) fn get_any_resource(
         }
     } else {
         move_resolver.get_standard_resource(address, struct_tag)
-    }
-}
-
-pub struct MoveResolverWithVMMetadata<'a, 'm, S> {
-    move_resolver: &'a S,
-    move_vm: &'m MoveVM,
-}
-
-impl<'a, 'm, S: MoveResolverExt> MoveResolverWithVMMetadata<'a, 'm, S> {
-    pub fn new(move_resolver: &'a S, move_vm: &'m MoveVM) -> Self {
-        Self {
-            move_resolver,
-            move_vm,
-        }
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> MoveResolverExt for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        aptos_framework::get_vm_metadata(self.move_vm, module_id)
-    }
-
-    fn get_resource_group_data(
-        &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.move_resolver
-            .get_resource_group_data(address, resource_group)
-    }
-
-    fn get_standard_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.move_resolver
-            .get_standard_resource(address, struct_tag)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
-        self.move_resolver.get_module(module_id)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag)?)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> TableResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn resolve_table_entry(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
-        self.move_resolver.resolve_table_entry(handle, key)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> ConfigStorage for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.move_resolver.fetch_config(access_path)
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> StateStorageUsageResolver
-    for MoveResolverWithVMMetadata<'a, 'm, S>
-{
-    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, anyhow::Error> {
-        self.move_resolver.get_state_storage_usage()
-    }
-}
-
-impl<'a, 'm, S: MoveResolverExt> Deref for MoveResolverWithVMMetadata<'a, 'm, S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        self.move_resolver
     }
 }
 
@@ -152,12 +79,6 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
 }
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        let module_bytes = self.get_module(&module_id).ok()??;
-        let module = CompiledModule::deserialize(&module_bytes).ok()?;
-        aptos_framework::get_metadata_from_compiled_module(&module)
-    }
-
     fn get_resource_group_data(
         &self,
         address: &AccountAddress,
@@ -179,21 +100,41 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     }
 }
 
+impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
+    fn get_resource_with_metadata(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(get_any_resource(self, address, struct_tag, metadata)?)
+    }
+}
+
 impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
+    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
+        let module_bytes = match self.get_module(module_id) {
+            Ok(Some(bytes)) => bytes,
+            _ => return vec![],
+        };
+        let (_, gas_feature_version) = gas_config(self);
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let max_binary_format_version =
+            get_max_binary_format_version(&features, gas_feature_version);
+        let module = match CompiledModule::deserialize_with_max_version(
+            &module_bytes,
+            max_binary_format_version,
+        ) {
+            Ok(module) => module,
+            _ => return vec![],
+        };
+        module.metadata
+    }
+
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         // REVIEW: cache this?
         let ap = AccessPath::from(module_id);
         Ok(self.get(ap).map_err(|e| e.finish(Location::Undefined))?)
-    }
-}
-
-impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag)?)
     }
 }
 
@@ -234,96 +175,5 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         StorageAdapter::new(self)
-    }
-}
-
-/// Owned version of `StorageAdapter`.
-pub struct StorageAdapterOwned<S> {
-    state_view: S,
-}
-
-impl<S> Deref for StorageAdapterOwned<S> {
-    type Target = S;
-
-    fn deref(&self) -> &Self::Target {
-        &self.state_view
-    }
-}
-
-impl<S> DerefMut for StorageAdapterOwned<S> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.state_view
-    }
-}
-
-impl<S: StateView> ModuleResolver for StorageAdapterOwned<S> {
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
-        self.as_move_resolver().get_module(module_id)
-    }
-}
-
-impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
-    fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-        self.as_move_resolver().get_module_metadata(module_id)
-    }
-
-    fn get_resource_group_data(
-        &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.as_move_resolver()
-            .get_resource_group_data(address, resource_group)
-    }
-
-    fn get_standard_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError> {
-        self.as_move_resolver()
-            .get_standard_resource(address, struct_tag)
-    }
-}
-
-impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        self.as_move_resolver().get_resource(address, struct_tag)
-    }
-}
-
-impl<S: StateView> TableResolver for StorageAdapterOwned<S> {
-    fn resolve_table_entry(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Vec<u8>>, Error> {
-        self.as_move_resolver().resolve_table_entry(handle, key)
-    }
-}
-
-impl<S: StateView> ConfigStorage for StorageAdapterOwned<S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.as_move_resolver().fetch_config(access_path)
-    }
-}
-
-impl<S: StateView> StateStorageUsageResolver for StorageAdapterOwned<S> {
-    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, anyhow::Error> {
-        self.as_move_resolver().get_usage()
-    }
-}
-
-pub trait IntoMoveResolver<S> {
-    fn into_move_resolver(self) -> StorageAdapterOwned<S>;
-}
-
-impl<S: StateView> IntoMoveResolver<S> for S {
-    fn into_move_resolver(self) -> StorageAdapterOwned<S> {
-        StorageAdapterOwned { state_view: self }
     }
 }

@@ -563,7 +563,7 @@ mod test {
     #[test]
     fn test_successful_delta_application() {
         let mut state_view = FakeDataStore::default();
-        state_view.set(KEY.clone(), serialize(&100));
+        state_view.set_legacy(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should succeed!
         let add_op = delta_add(100, 200);
@@ -579,7 +579,7 @@ mod test {
     #[test]
     fn test_unsuccessful_delta_application() {
         let mut state_view = FakeDataStore::default();
-        state_view.set(KEY.clone(), serialize(&100));
+        state_view.set_legacy(KEY.clone(), serialize(&100));
 
         // Both addition and subtraction should fail!
         let add_op = delta_add(15, 100);

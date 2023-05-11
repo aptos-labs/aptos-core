@@ -44,8 +44,7 @@ impl Tailer {
         processor: Arc<dyn TransactionProcessor>,
         options: TransactionFetcherOptions,
     ) -> Result<Tailer, ParseError> {
-        let resolver = Arc::new(context.move_resolver().unwrap());
-        let transaction_fetcher = TransactionFetcher::new(context, resolver, 0, options);
+        let transaction_fetcher = TransactionFetcher::new(context, 0, options);
 
         Ok(Self {
             transaction_fetcher: Arc::new(Mutex::new(transaction_fetcher)),
