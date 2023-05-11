@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple, EntryPoints};
+use crate::publishing::module_simple;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
-    move_types::identifier::Identifier,
+    move_types::{identifier::Identifier, language_storage::ModuleId},
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
 };
@@ -162,30 +162,14 @@ impl Package {
         account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        match self {
-            Self::Simple(modules, _) => {
-                let module_id = modules.get("simple").unwrap().self_id();
-                // let payload = module_simple::rand_gen_function(rng, module_id);
-                let payload = module_simple::rand_simple_function(rng, module_id);
-                account.sign_with_transaction_builder(txn_factory.payload(payload))
-            },
-        }
+        // let payload = module_simple::rand_gen_function(rng, module_id);
+        let payload = module_simple::rand_simple_function(rng, self.get_module_id("simple"));
+        account.sign_with_transaction_builder(txn_factory.payload(payload))
     }
 
-    pub fn use_specific_transaction(
-        &self,
-        fun: EntryPoints,
-        account: &mut LocalAccount,
-        txn_factory: &TransactionFactory,
-        rng: Option<&mut StdRng>,
-        other: Option<&AccountAddress>,
-    ) -> SignedTransaction {
+    pub fn get_module_id(&self, module_name: &str) -> ModuleId {
         match self {
-            Self::Simple(modules, _) => {
-                let module_id = modules.get(fun.module_name()).unwrap().self_id();
-                let payload = fun.create_payload(module_id, rng, other);
-                account.sign_with_transaction_builder(txn_factory.payload(payload))
-            },
+            Self::Simple(modules, _) => modules.get(module_name).unwrap().self_id(),
         }
     }
 }

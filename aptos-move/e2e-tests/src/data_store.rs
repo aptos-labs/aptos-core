@@ -15,7 +15,7 @@ use aptos_types::{
         table::TableHandle as AptosTableHandle,
     },
     transaction::ChangeSet,
-    write_set::{WriteOp, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
@@ -43,43 +43,49 @@ pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
 /// `RemoteCache` is needed.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
-    state_data: HashMap<StateKey, Vec<u8>>,
+    state_data: HashMap<StateKey, StateValue>,
 }
 
 impl FakeDataStore {
     /// Creates a new `FakeDataStore` with the provided initial data.
     pub fn new(data: HashMap<StateKey, Vec<u8>>) -> Self {
-        FakeDataStore { state_data: data }
+        FakeDataStore {
+            state_data: data
+                .into_iter()
+                .map(|(k, v)| (k, StateValue::new_legacy(v)))
+                .collect(),
+        }
     }
 
     /// Adds a [`WriteSet`] to this data store.
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
-            match write_op {
-                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
-                    self.set(state_key.clone(), blob.clone());
-                },
-                WriteOp::ModificationWithMetadata { .. } | WriteOp::CreationWithMetadata { .. } => {
-                    unimplemented!()
-                },
-                WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => {
-                    self.remove(state_key);
-                },
-            }
+            match write_op.as_state_value() {
+                None => self.remove(state_key),
+                Some(state_value) => self.set(state_key.clone(), state_value),
+            };
         }
+    }
+
+    /// Sets a `(key, bytes)` pair within this data store. Wraps `bytes` in StateValue::new_legacy().
+    ///
+    /// Returns the previous data if the key was occupied.
+    pub fn set_legacy(&mut self, state_key: StateKey, bytes: Vec<u8>) -> Option<StateValue> {
+        self.state_data
+            .insert(state_key, StateValue::new_legacy(bytes))
     }
 
     /// Sets a (key, value) pair within this data store.
     ///
     /// Returns the previous data if the key was occupied.
-    pub fn set(&mut self, state_key: StateKey, data_blob: Vec<u8>) -> Option<Vec<u8>> {
-        self.state_data.insert(state_key, data_blob)
+    pub fn set(&mut self, state_key: StateKey, state_value: StateValue) -> Option<StateValue> {
+        self.state_data.insert(state_key, state_value)
     }
 
     /// Deletes a key from this data store.
     ///
     /// Returns the previous data if the key was occupied.
-    pub fn remove(&mut self, state_key: &StateKey) -> Option<Vec<u8>> {
+    pub fn remove(&mut self, state_key: &StateKey) -> Option<StateValue> {
         self.state_data.remove(state_key)
     }
 
@@ -101,12 +107,10 @@ impl FakeDataStore {
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
         let access_path = AccessPath::from(module_id);
-        self.set(StateKey::access_path(access_path), blob);
-    }
-
-    /// Yields a reference to the internal data structure of the global state
-    pub fn inner(&self) -> &HashMap<StateKey, Vec<u8>> {
-        &self.state_data
+        self.set(
+            StateKey::access_path(access_path),
+            StateValue::new_legacy(blob),
+        );
     }
 }
 
@@ -115,11 +119,7 @@ impl TStateView for FakeDataStore {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        Ok(self
-            .state_data
-            .get(state_key)
-            .cloned()
-            .map(StateValue::new_legacy))
+        Ok(self.state_data.get(state_key).cloned())
     }
 
     fn is_genesis(&self) -> bool {
@@ -129,7 +129,7 @@ impl TStateView for FakeDataStore {
     fn get_usage(&self) -> Result<StateStorageUsage> {
         let mut usage = StateStorageUsage::new_untracked();
         for (k, v) in self.state_data.iter() {
-            usage.add_item(k.size() + v.len())
+            usage.add_item(k.size() + v.size())
         }
         Ok(usage)
     }

@@ -121,22 +121,31 @@ impl KnownAttribute {
 }
 
 /// Extract metadata from the VM, upgrading V0 to V1 representation as needed
-pub fn get_vm_metadata(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = vm.get_module_metadata(module_id.clone(), APTOS_METADATA_KEY_V1) {
+pub fn get_metadata(md: &[Metadata]) -> Option<RuntimeModuleMetadataV1> {
+    if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY_V1) {
         bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value).ok()
     } else {
-        get_vm_metadata_v0(vm, module_id)
+        get_metadata_v0(md)
     }
 }
 
-/// Extract metadata from the VM, legacy V0 format upgraded to V1
-pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1> {
-    if let Some(data) = vm.get_module_metadata(module_id, APTOS_METADATA_KEY) {
+pub fn get_metadata_v0(md: &[Metadata]) -> Option<RuntimeModuleMetadataV1> {
+    if let Some(data) = md.iter().find(|md| md.key == APTOS_METADATA_KEY) {
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
     } else {
         None
     }
+}
+
+/// Extract metadata from the VM, upgrading V0 to V1 representation as needed
+pub fn get_vm_metadata(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+    vm.with_module_metadata(module_id, get_metadata)
+}
+
+/// Extract metadata from the VM, legacy V0 format upgraded to V1
+pub fn get_vm_metadata_v0(vm: &MoveVM, module_id: &ModuleId) -> Option<RuntimeModuleMetadataV1> {
+    vm.with_module_metadata(module_id, get_metadata_v0)
 }
 
 /// Check if the metadata has unknown key/data types
