@@ -49,9 +49,7 @@ impl DowntimeMetricsCacheUpdater {
         let len = self.downtime_metrics.read().len();
 
         for _i in 0..len {
-            let entry = {
-                self.downtime_metrics.write().pop_front()
-             };
+            let entry = { self.downtime_metrics.write().pop_front() };
             if let Some(entry) = entry {
                 let _result = push_metrics_to_clients(
                     entry.context,

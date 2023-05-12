@@ -12,6 +12,7 @@ use crate::{
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
+use futures::lock::Mutex;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Instant;
@@ -79,12 +80,12 @@ pub async fn push_metrics_to_clients(
     };
 
     let start_timer = Instant::now();
-    let successful_clients = aptos_infallible::RwLock::new(Vec::<String>::new());
+    let successful_clients = Mutex::new(Vec::<String>::new());
 
     let post_futures = client.iter().map(|(name, client)| async {
         // If the metrics were successfully pushed to a client before, then that client is included in `ignore_clients` vector
         if ignore_clients.contains(name) {
-            successful_clients.write().push(name.clone());
+            successful_clients.lock().await.push(name.clone());
             return Ok(());
         }
         let result = client
@@ -103,7 +104,7 @@ pub async fn push_metrics_to_clients(
                     .observe(start_timer.elapsed().as_secs_f64());
                 if res.status().is_success() {
                     debug!("remote write to victoria metrics succeeded");
-                    successful_clients.write().push(name.clone());
+                    successful_clients.lock().await.push(name.clone());
                 } else {
                     error!(
                         "remote write failed to victoria_metrics for client {}: {}",
@@ -128,7 +129,8 @@ pub async fn push_metrics_to_clients(
         Ok(())
     });
 
-    if successful_clients.read().len() < client.len() {
+    let successful_clients_gaurd = successful_clients.lock().await;
+    if successful_clients_gaurd.len() < client.len() {
         context
             .downtime_metrics_cache()
             .write()
@@ -138,7 +140,7 @@ pub async fn push_metrics_to_clients(
                 encoding: encoding.clone(),
                 metrics_body: metrics_body.clone(),
                 timestamp,
-                ignore_clients: successful_clients.read().clone(),
+                ignore_clients: successful_clients_gaurd.clone(),
             });
     }
 
