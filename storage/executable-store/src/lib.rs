@@ -573,11 +573,11 @@ mod tests {
     }
 
     proptest! {
-    #[test]
-    fn concurrent_ops_size_proptest(
+        #[test]
+        fn concurrent_ops_size_proptest(
             cache_ops in vec((any::<usize>(), any::<usize>(), any::<usize>()), 2000 * 4),
-    ) {
+        ) {
             test_concurrent_ops_size(cache_ops);
-    }
+        }
     }
 }
