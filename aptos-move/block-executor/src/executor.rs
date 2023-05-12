@@ -27,13 +27,14 @@ use aptos_types::{
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
-use once_cell::sync::Lazy;
+use rayon::ThreadPool;
 use std::{
     collections::btree_map::BTreeMap,
     marker::PhantomData,
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
+        Arc,
     },
 };
 
@@ -43,18 +44,11 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get())
-        .thread_name(|index| format!("par_exec_{}", index))
-        .build()
-        .unwrap()
-});
-
 pub struct BlockExecutor<T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
+    executor_thread_pool: Arc<ThreadPool>,
     phantom: PhantomData<(T, E, S)>,
 }
 
@@ -66,7 +60,7 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize) -> Self {
+    pub fn new(concurrency_level: usize, executor_thread_pool: Arc<ThreadPool>) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
@@ -74,6 +68,7 @@ where
         );
         Self {
             concurrency_level,
+            executor_thread_pool,
             phantom: PhantomData,
         }
     }
@@ -381,7 +376,7 @@ where
         roles.push(CommitRole::Coordinator(senders, 0));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        RAYON_EXEC_POOL.scope(|s| {
+        self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
@@ -424,7 +419,7 @@ where
             ret
         };
 
-        RAYON_EXEC_POOL.spawn(move || {
+        self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
             drop(scheduler);
@@ -524,7 +519,7 @@ where
             )
         }
 
-        RAYON_EXEC_POOL.spawn(move || {
+        self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(signature_verified_block);
         });

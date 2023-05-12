@@ -67,7 +67,7 @@ use move_core_types::{
 use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use std::{
     cmp::min,
     collections::{BTreeMap, BTreeSet},
@@ -84,6 +84,16 @@ static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
+
+pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .thread_name(|index| format!("par_exec_{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
@@ -1454,8 +1464,12 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let ret =
-            BlockAptosVM::execute_block(transactions, state_view, Self::get_concurrency_level());
+        let ret = BlockAptosVM::execute_block(
+            Arc::clone(&RAYON_EXEC_POOL),
+            transactions,
+            state_view,
+            Self::get_concurrency_level(),
+        );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

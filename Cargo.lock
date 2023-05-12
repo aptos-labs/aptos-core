@@ -1783,6 +1783,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
+ "rayon",
  "serde 1.0.149",
 ]
 
@@ -2991,8 +2992,12 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-language-e2e-tests",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
+ "clap 3.2.23",
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
