@@ -57,7 +57,7 @@ pub fn get_app_version() -> Result<String, AptosLedgerError> {
                 let error_string = response
                     .error_code()
                     .map(|error_code| error_code.to_string())
-                    .unwrap_or_else(|retcode| format!("Error with retcode: {}", retcode));
+                    .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
                 Err(AptosLedgerError::UnexpectedError(error_string))
             }
         },
@@ -91,7 +91,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
                 let error_string = response
                     .error_code()
                     .map(|error_code| error_code.to_string())
-                    .unwrap_or_else(|retcode| format!("Error with retcode: {}", retcode));
+                    .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
                 Err(AptosLedgerError::UnexpectedError(error_string))
             }
         },
@@ -146,7 +146,7 @@ pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
                 let error_string = response
                     .error_code()
                     .map(|error_code| error_code.to_string())
-                    .unwrap_or_else(|retcode| format!("Error with retcode: {}", retcode));
+                    .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
                 Err(AptosLedgerError::UnexpectedError(error_string))
             }
         },
@@ -204,7 +204,7 @@ pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
                         .error_code()
                         .map(|error_code| error_code.to_string())
                         .unwrap_or_else(|retcode| {
-                            format!("Unknown Ledger APDU retcode: {}", retcode)
+                            format!("Unknown Ledger APDU retcode: {:x}", retcode)
                         });
                     return Err(AptosLedgerError::UnexpectedError(error_string));
                 }
