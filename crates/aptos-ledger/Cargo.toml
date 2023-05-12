@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+bcs = "0.1.5"
 hex = "0.4.3"
 ledger-apdu = "0.10.0"
 ledger-transport-hid = "0.10.0"
-bcs = "0.1.5"
