@@ -2881,6 +2881,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-netcore",
  "aptos-network",
  "aptos-storage-interface",
  "aptos-storage-service-types",

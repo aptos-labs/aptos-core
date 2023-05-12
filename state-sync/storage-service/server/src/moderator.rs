@@ -20,6 +20,7 @@ use std::{
 };
 
 /// A simple struct that tracks the state of an unhealthy peer
+#[derive(Clone, Debug)]
 pub struct UnhealthyPeerState {
     ignore_start_time: Option<Instant>, // The time when we first started ignoring the peer
     invalid_request_count: u64,         // The total number of invalid requests from the peer
@@ -218,5 +219,177 @@ impl RequestModerator {
         );
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    /// Returns a copy of the unhealthy peer states for testing
+    pub(crate) fn get_unhealthy_peer_states(
+        &self,
+    ) -> Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>> {
+        self.unhealthy_peer_states.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::PeerId;
+
+    #[test]
+    fn test_unhealthy_peer_ignored() {
+        // Create a new unhealthy peer state
+        let max_invalid_requests = 5;
+        let min_time_to_ignore_peers_secs = 1;
+        let time_service = TimeService::mock();
+        let mut unhealthy_peer_state = UnhealthyPeerState::new(
+            max_invalid_requests,
+            min_time_to_ignore_peers_secs,
+            time_service.clone(),
+        );
+
+        // Verify the initial peer state
+        assert_eq!(unhealthy_peer_state.invalid_request_count, 0);
+        assert_eq!(unhealthy_peer_state.ignore_start_time, None);
+        assert_eq!(
+            unhealthy_peer_state.max_invalid_requests,
+            max_invalid_requests
+        );
+        assert!(!unhealthy_peer_state.is_ignored());
+
+        // Handle the maximum number of invalid requests
+        let peer_network_id = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+        for _ in 0..max_invalid_requests {
+            unhealthy_peer_state.increment_invalid_request_count(&peer_network_id);
+        }
+
+        // Verify the peer is now ignored
+        assert_eq!(unhealthy_peer_state.invalid_request_count, 5);
+        assert!(unhealthy_peer_state.is_ignored());
+        assert_eq!(
+            unhealthy_peer_state.ignore_start_time,
+            Some(time_service.now())
+        );
+
+        // Elapse the minimum time to unblock peers
+        let time_service = time_service.into_mock();
+        time_service.advance(Duration::from_secs(min_time_to_ignore_peers_secs));
+
+        // Refresh the peer state and verify it is no longer ignored
+        unhealthy_peer_state.refresh_peer_state(&peer_network_id);
+        assert!(!unhealthy_peer_state.is_ignored());
+
+        // Verify the peer state is reset
+        assert_eq!(unhealthy_peer_state.invalid_request_count, 0);
+        assert_eq!(unhealthy_peer_state.ignore_start_time, None);
+    }
+
+    #[test]
+    fn test_unhealthy_peer_exponential_backoff() {
+        // Create a new unhealthy peer state
+        let max_invalid_requests = 10;
+        let min_time_to_ignore_peers_secs = 1;
+        let time_service = TimeService::mock();
+        let mut unhealthy_peer_state = UnhealthyPeerState::new(
+            max_invalid_requests,
+            min_time_to_ignore_peers_secs,
+            time_service.clone(),
+        );
+
+        // Verify the initial ignore duration
+        assert_eq!(
+            unhealthy_peer_state.min_time_to_ignore_secs,
+            min_time_to_ignore_peers_secs
+        );
+
+        // Perform several iterations of ignore and unblock loops
+        let time_service = time_service.into_mock();
+        for i in 0..10 {
+            // Verify the initial peer state
+            let expected_min_time_to_ignore_secs =
+                min_time_to_ignore_peers_secs * 2_i32.pow(i) as u64;
+            assert_eq!(
+                unhealthy_peer_state.min_time_to_ignore_secs,
+                expected_min_time_to_ignore_secs
+            );
+
+            // Handle the maximum number of invalid requests
+            let peer_network_id = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+            for _ in 0..max_invalid_requests {
+                unhealthy_peer_state.increment_invalid_request_count(&peer_network_id);
+            }
+
+            // Verify the peer is now ignored
+            assert!(unhealthy_peer_state.is_ignored());
+            assert_eq!(
+                unhealthy_peer_state.ignore_start_time,
+                Some(time_service.now())
+            );
+
+            // Elapse the minimum time to unblock peers
+            time_service.advance(Duration::from_secs(expected_min_time_to_ignore_secs));
+
+            // Refresh the peer state and verify it is no longer ignored
+            unhealthy_peer_state.refresh_peer_state(&peer_network_id);
+            assert!(!unhealthy_peer_state.is_ignored());
+
+            // Verify the peer state is reset
+            assert_eq!(unhealthy_peer_state.ignore_start_time, None);
+        }
+    }
+
+    #[test]
+    fn test_unhealthy_peer_networks() {
+        // Create a new unhealthy peer state
+        let max_invalid_requests = 10;
+        let time_service = TimeService::mock();
+        let mut unhealthy_peer_state =
+            UnhealthyPeerState::new(max_invalid_requests, 1, time_service.clone());
+
+        // Handle a lot of invalid requests for a validator
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+        for _ in 0..max_invalid_requests * 10 {
+            unhealthy_peer_state.increment_invalid_request_count(&peer_network_id);
+        }
+
+        // Verify the peer is not ignored and that the number of invalid requests is correct
+        assert!(!unhealthy_peer_state.is_ignored());
+        assert_eq!(
+            unhealthy_peer_state.invalid_request_count,
+            max_invalid_requests * 10
+        );
+
+        // Create another unhealthy peer state
+        let mut unhealthy_peer_state =
+            UnhealthyPeerState::new(max_invalid_requests, 1, time_service.clone());
+
+        // Handle a lot of invalid requests for a VFN
+        let peer_network_id = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
+        for _ in 0..max_invalid_requests * 20 {
+            unhealthy_peer_state.increment_invalid_request_count(&peer_network_id);
+        }
+
+        // Verify the peer is not ignored and that the number of invalid requests is correct
+        assert!(!unhealthy_peer_state.is_ignored());
+        assert_eq!(
+            unhealthy_peer_state.invalid_request_count,
+            max_invalid_requests * 20
+        );
+
+        // Create another unhealthy peer state
+        let mut unhealthy_peer_state =
+            UnhealthyPeerState::new(max_invalid_requests, 1, time_service);
+
+        // Handle a lot of invalid requests for a PFN
+        let peer_network_id = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+        for _ in 0..max_invalid_requests * 5 {
+            unhealthy_peer_state.increment_invalid_request_count(&peer_network_id);
+        }
+
+        // Verify the peer is ignored and that the number of invalid requests is correct
+        assert!(unhealthy_peer_state.is_ignored());
+        assert_eq!(
+            unhealthy_peer_state.invalid_request_count,
+            max_invalid_requests * 5
+        );
     }
 }
