@@ -15,7 +15,7 @@ THRESHOLDS = {
     "10k_8": 22000,
     "10k_16": 32000,
     "10k_32": 43000,
-    "50k_8": 40000,
+    "50k_8": 49000,
     "50k_16": 64000,
     "50k_32": 86000,
 }
@@ -32,7 +32,7 @@ SPEEDUPS = {
     "50k_32": 10,
 }
 
-THRESHOLDS_NOISE = 0.15
+THRESHOLDS_NOISE = 0.20
 SPEEDUPS_NOISE_BELOW = 1
 SPEEDUPS_NOISE_ABOVE = 2
 
