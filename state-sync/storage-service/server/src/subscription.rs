@@ -5,7 +5,7 @@ use crate::{
     error::Error,
     handler::Handler,
     metrics,
-    metrics::{increment_counter, increment_network_frame_overflow, SUBSCRIPTION_EVENT_EXPIRE},
+    metrics::{increment_counter, SUBSCRIPTION_EVENT_EXPIRE},
     moderator::RequestModerator,
     network::ResponseSender,
     storage::StorageReaderInterface,
@@ -13,7 +13,7 @@ use crate::{
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, warn};
+use aptos_logger::warn;
 use aptos_network::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
@@ -341,7 +341,11 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     }
 }
 
-/// Notifies a subscriber of new data according to the target ledger info
+/// Notifies a subscriber of new data according to the target ledger info.
+///
+/// Note: we don't need to check the size of the subscription response
+/// because: (i) each sub-part should already be checked; and (ii)
+/// subscription responses are best effort.
 fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
@@ -432,24 +436,6 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                         )));
                     },
                 };
-
-            // If the storage response has overflown the network frame size
-            // return an error. We don't need to retry with less data because
-            // subscription requests are best effort.
-            let (overflow_frame, num_bytes) = crate::storage::check_overflow_network_frame(
-                &storage_response,
-                config.max_network_chunk_bytes,
-            )?;
-            if overflow_frame {
-                increment_network_frame_overflow(&storage_response.get_label());
-                debug!(
-                    "The request for the new data was too large (num bytes: {:?})!",
-                    num_bytes
-                );
-                return Err(Error::UnexpectedErrorEncountered(
-                    "Failed to notify the peer of new data! The response overflowed the network frame size!".into(),
-                ));
-            }
 
             // Send the response to the peer
             handler.send_response(

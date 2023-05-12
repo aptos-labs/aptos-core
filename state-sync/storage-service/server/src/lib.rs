@@ -260,6 +260,12 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                 .await;
         }
     }
+
+    #[cfg(test)]
+    /// Returns a copy of the request moderator for test purposes
+    pub(crate) fn get_request_moderator(&self) -> Arc<RequestModerator> {
+        self.request_moderator.clone()
+    }
 }
 
 /// Refreshes the cached storage server summary
