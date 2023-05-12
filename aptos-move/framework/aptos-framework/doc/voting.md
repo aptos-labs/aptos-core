@@ -33,6 +33,8 @@ the resolution process.
 -  [Struct `RegisterForumEvent`](#0x1_voting_RegisterForumEvent)
 -  [Struct `VoteEvent`](#0x1_voting_VoteEvent)
 -  [Struct `ResolveProposal`](#0x1_voting_ResolveProposal)
+-  [Resource `Ghost$ghost_state`](#0x1_voting_Ghost$ghost_state)
+-  [Resource `Ghost$ghost_time`](#0x1_voting_Ghost$ghost_time)
 -  [Constants](#@Constants_0)
 -  [Function `register`](#0x1_voting_register)
 -  [Function `create_proposal`](#0x1_voting_create_proposal)
@@ -444,6 +446,60 @@ Extra metadata (e.g. description, code url) can be part of the ProposalType stru
 </dd>
 <dt>
 <code>resolved_early: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_voting_Ghost$ghost_state"></a>
+
+## Resource `Ghost$ghost_state`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="voting.md#0x1_voting_ghost_state">ghost_state</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_voting_Ghost$ghost_time"></a>
+
+## Resource `Ghost$ghost_time`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="voting.md#0x1_voting_ghost_time">ghost_time</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u64</code>
 </dt>
 <dd>
 
@@ -932,6 +988,11 @@ Common checks on if a proposal is resolvable, regardless if the proposal is sing
     proposal_id: u64,
 ) <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> proposal_state = <a href="voting.md#0x1_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
+
+    <b>spec</b> {
+        <b>assume</b> <a href="voting.md#0x1_voting_ghost_state">ghost_state</a> == proposal_state;
+    };
+
     <b>assert</b>!(proposal_state == <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_EPROPOSAL_CANNOT_BE_RESOLVED">EPROPOSAL_CANNOT_BE_RESOLVED</a>));
 
     <b>let</b> voting_forum = <b>borrow_global_mut</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
@@ -940,7 +1001,13 @@ Common checks on if a proposal is resolvable, regardless if the proposal is sing
 
     // We need <b>to</b> make sure that the resolution is happening in
     // a separate transaction from the last vote <b>to</b> guard against <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> potential flashloan attacks.
+
     <b>let</b> resolvable_time = to_u64(*<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&proposal.metadata, &utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
+
+    <b>spec</b> {
+        <b>assume</b> <a href="voting.md#0x1_voting_ghost_time">ghost_time</a> == resolvable_time;
+    };
+
     <b>assert</b>!(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; resolvable_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="voting.md#0x1_voting_ERESOLUTION_CANNOT_BE_ATOMIC">ERESOLUTION_CANNOT_BE_ATOMIC</a>));
 
     <b>assert</b>!(
@@ -1502,6 +1569,10 @@ Return true if the voting period of the given proposal has already ended.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+<a name="0x1_voting_ghost_state"></a>
+<b>global</b> <a href="voting.md#0x1_voting_ghost_state">ghost_state</a>: u64;
+<a name="0x1_voting_ghost_time"></a>
+<b>global</b> <a href="voting.md#0x1_voting_ghost_time">ghost_time</a>: u64;
 </code></pre>
 
 
@@ -1637,7 +1708,16 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>aborts_if</b> <a href="voting.md#0x1_voting_ghost_state">ghost_state</a> != <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>;
+<b>let</b> voting_forum =  <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>aborts_if</b> proposal.is_resolved;
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, std::string::spec_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>));
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;u64&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, std::string::spec_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
+<b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &lt;= <a href="voting.md#0x1_voting_ghost_time">ghost_time</a>;
+<b>aborts_if</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">transaction_context::spec_get_script_hash</a>() != proposal.execution_hash;
 </code></pre>
 
 

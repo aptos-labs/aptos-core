@@ -34,6 +34,7 @@ This module supports functionality related to code management.
     -  [Function `check_upgradability`](#@Specification_1_check_upgradability)
     -  [Function `check_coexistence`](#@Specification_1_check_coexistence)
     -  [Function `check_dependencies`](#@Specification_1_check_dependencies)
+    -  [Function `get_module_names`](#@Specification_1_get_module_names)
     -  [Function `request_publish`](#@Specification_1_request_publish)
     -  [Function `request_publish_with_allowed_deps`](#@Specification_1_request_publish_with_allowed_deps)
 
@@ -644,7 +645,13 @@ Checks whether the given package is upgradable, and returns true if a compatibil
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="code.md#0x1_code_EUPGRADE_WEAKER_POLICY">EUPGRADE_WEAKER_POLICY</a>));
     <b>let</b> old_modules = <a href="code.md#0x1_code_get_module_names">get_module_names</a>(old_pack);
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&old_modules)) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= len(old_modules);
+            <b>invariant</b> <b>forall</b> j in 0..i: contains(new_modules, old_modules[j]);
+        };
+        i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&old_modules)
+    }) {
         <b>assert</b>!(
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(new_modules, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&old_modules, i)),
             <a href="code.md#0x1_code_EMODULE_MISSING">EMODULE_MISSING</a>
@@ -819,7 +826,14 @@ Get the names of the modules in a package.
 <pre><code><b>fun</b> <a href="code.md#0x1_code_get_module_names">get_module_names</a>(pack: &<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt; {
     <b>let</b> module_names = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pack.modules)) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> i &lt;= len(pack.modules);
+            <b>invariant</b> i == len(module_names);
+            <b>invariant</b> <b>forall</b> j in 0..i: module_names[j] == pack.modules[j].name;
+        };
+        i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pack.modules)
+    }) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> module_names, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&pack.modules, i).name);
         i = i + 1
     };
@@ -995,6 +1009,24 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_get_module_names"></a>
+
+### Function `get_module_names`
+
+
+<pre><code><b>fun</b> <a href="code.md#0x1_code_get_module_names">get_module_names</a>(pack: &<a href="code.md#0x1_code_PackageMetadata">code::PackageMetadata</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> len(result) == len(pack.modules);
+<b>ensures</b> <b>forall</b> i in 0..len(result): result[i] == pack.modules[i].name;
 </code></pre>
 
 

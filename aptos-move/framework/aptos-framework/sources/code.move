@@ -202,7 +202,13 @@ module aptos_framework::code {
             error::invalid_argument(EUPGRADE_WEAKER_POLICY));
         let old_modules = get_module_names(old_pack);
         let i = 0;
-        while (i < vector::length(&old_modules)) {
+        while ({
+            spec {
+                invariant i <= len(old_modules);
+                invariant forall j in 0..i: contains(new_modules, old_modules[j]);
+            };
+            i < vector::length(&old_modules)
+        }) {
             assert!(
                 vector::contains(new_modules, vector::borrow(&old_modules, i)),
                 EMODULE_MISSING
@@ -297,7 +303,14 @@ module aptos_framework::code {
     fun get_module_names(pack: &PackageMetadata): vector<String> {
         let module_names = vector::empty();
         let i = 0;
-        while (i < vector::length(&pack.modules)) {
+        while ({
+            spec {
+                invariant i <= len(pack.modules);
+                invariant i == len(module_names);
+                invariant forall j in 0..i: module_names[j] == pack.modules[j].name;
+            };
+            i < vector::length(&pack.modules)
+        }) {
             vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name);
             i = i + 1
         };
