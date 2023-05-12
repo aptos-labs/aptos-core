@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_types::executable::Executable;
 use dashmap::DashMap;
 use std::{
@@ -150,6 +150,11 @@ impl<K: Eq + Hash, X: Executable, ID: Clone + Debug + PartialEq> ExecutableStore
     /// merging the 'Updated' and 'Pruned' states.
     pub fn prune(&self, size_threshold: usize) {
         if self.size() > size_threshold {
+            info!(
+                "Clear ExecutableStore on prune size = {} > threshold = {}",
+                self.size(),
+                size_threshold
+            );
             self.clear();
         } else {
             let mut state = self.state.lock();
