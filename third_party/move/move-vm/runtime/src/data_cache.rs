@@ -6,16 +6,18 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Event, Op},
+    effects::{Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    effects::{AccountChangeSet, ChangeSet},
     loaded_data::runtime_types::Type,
+    resolver::MoveRefResolver,
+    types::{Resource, ResourceRef},
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
@@ -48,7 +50,7 @@ impl AccountDataCache {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver,
+    remote: &'r dyn MoveRefResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
     event_data: Vec<(Vec<u8>, u64, Type, MoveTypeLayout, Value)>,
 }
@@ -56,7 +58,7 @@ pub(crate) struct TransactionDataCache<'r> {
 impl<'r> TransactionDataCache<'r> {
     /// Create a `TransactionDataCache` with a `RemoteCache` that provides access to data
     /// not updated in the transaction.
-    pub(crate) fn new(remote: &'r dyn MoveResolver) -> Self {
+    pub(crate) fn new(remote: &'r dyn MoveRefResolver) -> Self {
         TransactionDataCache {
             remote,
             account_map: BTreeMap::new(),
@@ -68,7 +70,10 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
+    pub(crate) fn into_effects(
+        self,
+        loader: &Loader,
+    ) -> PartialVMResult<(ChangeSet<Vec<u8>, Resource>, Vec<Event>)> {
         let mut change_set = ChangeSet::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -95,16 +100,12 @@ impl<'r> TransactionDataCache<'r> {
 
                 match op {
                     Op::New(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::New(resource_blob));
+                        let resource = Resource::from_value(val, layout)?;
+                        resources.insert(struct_tag, Op::New(resource));
                     },
                     Op::Modify(val) => {
-                        let resource_blob = val
-                            .simple_serialize(&layout)
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
-                        resources.insert(struct_tag, Op::Modify(resource_blob));
+                        let resource = Resource::from_value(val, layout)?;
+                        resources.insert(struct_tag, Op::Modify(resource));
                     },
                     Op::Delete => {
                         resources.insert(struct_tag, Op::Delete);
@@ -113,10 +114,7 @@ impl<'r> TransactionDataCache<'r> {
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set
-                    .add_account_changeset(
-                        addr,
-                        AccountChangeSet::from_modules_resources(modules, resources),
-                    )
+                    .add_account_change_set(addr, AccountChangeSet::new(modules, resources))
                     .expect("accounts should be unique");
             }
         }
@@ -182,22 +180,33 @@ impl<'r> TransactionDataCache<'r> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_resource(&addr, &ty_tag) {
-                Ok(Some(blob)) => {
-                    load_res = Some(Some(NumBytes::new(blob.len() as u64)));
-                    let val = match Value::simple_deserialize(&blob, &ty_layout) {
-                        Some(val) => val,
-                        None => {
-                            let msg =
-                                format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
-                            return Err(PartialVMError::new(
-                                StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
-                            )
-                            .with_message(msg));
-                        },
-                    };
+            let gv = match self.remote.get_resource_ref(&addr, &ty_tag) {
+                Ok(Some(resource_ref)) => {
+                    match resource_ref {
+                        ResourceRef::Serialized(blob) => {
+                            load_res = Some(Some(NumBytes::new(blob.len() as u64)));
+                            let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                                Some(val) => val,
+                                None => {
+                                    let msg = format!(
+                                        "Failed to deserialize resource {} at {}!",
+                                        ty_tag, addr
+                                    );
+                                    return Err(PartialVMError::new(
+                                        StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
+                                    )
+                                    .with_message(msg));
+                                },
+                            };
 
-                    GlobalValue::cached(val)?
+                            GlobalValue::cached(val)?
+                        },
+                        ResourceRef::Cached(val) => {
+                            // TODO(Gas): Shall we charge for this?
+                            load_res = Some(None);
+                            GlobalValue::cached(val)?
+                        },
+                    }
                 },
                 Ok(None) => {
                     load_res = Some(None);

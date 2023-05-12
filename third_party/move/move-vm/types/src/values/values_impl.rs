@@ -2938,6 +2938,14 @@ impl Value {
         })
         .ok()
     }
+
+    pub fn serialized_size(&self, layout: &MoveTypeLayout) -> Option<usize> {
+        bcs::serialized_size(&AnnotatedValue {
+            layout,
+            val: &self.0,
+        })
+        .ok()
+    }
 }
 
 impl Struct {
@@ -2947,6 +2955,14 @@ impl Struct {
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&AnnotatedValue {
+            layout,
+            val: &self.fields,
+        })
+        .ok()
+    }
+
+    pub fn serialized_size(&self, layout: &MoveStructLayout) -> Option<usize> {
+        bcs::serialized_size(&AnnotatedValue {
             layout,
             val: &self.fields,
         })

@@ -9,13 +9,13 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::ModuleResolver,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::gas::UnmeteredGasMeter;
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver, types::ResourceRef};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -105,7 +105,7 @@ fn test_malformed_resource() {
     let (changeset, _) = sess.finish().unwrap();
     storage.apply(changeset).unwrap();
 
-    // Execut the second script and make sure it succeeds. This script simply checks
+    // Execute the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure
     // the testing environment is indeed free of errors without external interference.
     let mut script_blob = vec![];
@@ -515,12 +515,22 @@ impl ModuleResolver for BogusStorage {
     }
 }
 
-impl ResourceResolver for BogusStorage {
-    fn get_resource(
+impl ResourceRefResolver for BogusStorage {
+    fn get_resource_ref(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        Ok(Err(
+            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
+        )?)
+    }
+
+    fn get_resource_bytes(
+        &self,
+        _address: &AccountAddress,
+        _tag: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

@@ -45,6 +45,19 @@ impl<T> Op<T> {
         }
     }
 
+    pub fn and_then<U, E, F>(self, f: F) -> Result<Op<U>, E>
+    where
+        F: FnOnce(T) -> Result<U, E>,
+    {
+        use Op::*;
+
+        match self {
+            New(data) => Ok(New(f(data)?)),
+            Modify(data) => Ok(Modify(f(data)?)),
+            Delete => Ok(Delete),
+        }
+    }
+
     pub fn ok(self) -> Option<T> {
         use Op::*;
 

@@ -23,13 +23,13 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    resolver::MoveRefResolver,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -49,13 +49,13 @@ impl VMRuntime {
         })
     }
 
-    pub fn new_session<'r>(&self, remote: &'r dyn MoveResolver) -> Session<'r, '_> {
+    pub fn new_session<'r>(&self, remote: &'r dyn MoveRefResolver) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r dyn MoveResolver,
+        remote: &'r dyn MoveRefResolver,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
