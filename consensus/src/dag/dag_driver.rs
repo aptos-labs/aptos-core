@@ -30,11 +30,13 @@ use aptos_types::{
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
 use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::borrow::BorrowMut;
 use tokio::{
     sync::{mpsc::Sender, Mutex},
     time,
 };
-use crate::dag::dag_storage::DagStorage;
+use aptos_schemadb::SchemaBatch;
+use crate::dag::dag_storage::{DagStorage, NaiveDagStoreWriteBatch};
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 pub struct DagDriver {
@@ -52,6 +54,7 @@ pub struct DagDriver {
     rb_close_tx: oneshot::Sender<oneshot::Sender<()>>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     time_service: Arc<dyn TimeService>,
+    dag_store: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
 }
 
 impl DagDriver {
@@ -59,7 +62,7 @@ impl DagDriver {
         epoch: u64,
         author: Author,
         config: DagConfig,
-        dag_storage: Arc<dyn DagStorage>,
+        dag_storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
         rb_storage: Arc<dyn ReliableBroadcastStorage>,
         payload_client: Arc<dyn PayloadClient>,
         network_sender: NetworkSender,
@@ -116,13 +119,14 @@ impl DagDriver {
                 verifier.clone(),
                 proposer_election,
                 payload_manager,
-                dag_storage,
+                dag_storage.clone(),
             ),
             bullshark,
             rb_tx,
             rb_close_tx,
             network_msg_rx,
             time_service,
+            dag_store: dag_storage,
         }
     }
 

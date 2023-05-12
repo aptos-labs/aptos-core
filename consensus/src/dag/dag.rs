@@ -16,10 +16,19 @@ use std::{
 };
 use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
+use std::io::Write;
+use std::ops::{Index, IndexMut};
+use chrono::format::Item;
 use tokio::sync::Mutex;
-use crate::dag::dag_storage::DagStorage;
+use aptos_network::peer::Peer;
+use aptos_schemadb::{define_schema, SchemaBatch};
+use aptos_schemadb::schema::{KeyCodec, ValueCodec};
+use crate::dag::dag_storage::{DagStorage, ContainsKey, ItemId, NaiveDagStoreWriteBatch, DagStoreWriteBatch};
+use serde::{Serialize, Deserialize};
+
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum PeerStatus {
     Linked(Round),
     NotLinked(NodeMetaData),
@@ -58,6 +67,7 @@ impl PeerStatus {
 }
 
 ///keeps track of weak links. None indicates that a (strong or weak) link was already added.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct WeakLinksCreator {
     my_id: PeerId,
     latest_nodes_metadata: Vec<Option<PeerStatus>>,
@@ -130,6 +140,7 @@ impl WeakLinksCreator {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct AbsentInfo {
     metadata: NodeMetaData, //88
     peers_to_request: HashSet<PeerId>,
@@ -170,6 +181,7 @@ impl AbsentInfo {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 struct PendingInfo {
     certified_node: CertifiedNode,
     missing_parents: HashSet<HashValue>,
@@ -226,6 +238,7 @@ impl PendingInfo {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 enum MissingDagNodeStatus {
     Absent(AbsentInfo),
     Pending(PendingInfo),
@@ -332,8 +345,11 @@ impl MissingDagNodeStatus {
     }
 }
 
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMap {
-    id: [u8; 16],
+    id: ItemId,
     inner: HashMap<PeerId, CertifiedNode>,
 }
 
@@ -362,17 +378,103 @@ impl PeerIdToCertifiedNodeMap {
     }
 }
 
+impl ContainsKey for PeerIdToCertifiedNodeMap {
+    type Key = ItemId;
+
+    fn key(&self) -> Self::Key {
+        self.id
+    }
+}
+
+
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagRoundList {
+    id: ItemId,
+    inner: Vec<PeerIdToCertifiedNodeMap>,
+}
+
+impl DagRoundList {
+    pub(crate) fn new() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: vec![],
+        }
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&PeerIdToCertifiedNodeMap> {
+        self.inner.get(index)
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub(crate) fn push(&mut self, dag_round: PeerIdToCertifiedNodeMap) {
+        self.inner.push(dag_round)
+    }
+}
+
+impl ContainsKey for DagRoundList {
+    type Key = ItemId;
+
+    fn key(&self) -> Self::Key {
+        self.id
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub (crate) struct DagInMem_Key {
+    my_id: PeerId,
+    epoch: u64,
+}
+
 /// The part of the DAG data that should be persisted.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct DagInMem {
     my_id: PeerId,
     epoch: u64,
     current_round: u64,
     // starts from 0, which is genesys
     front: WeakLinksCreator,
-    dag: Vec<PeerIdToCertifiedNodeMap>,
+    dag: DagRoundList,
     // TODO: protect from DDoS - currently validators can add unbounded number of entries
     missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
 }
+
+impl ContainsKey for DagInMem {
+    type Key = DagInMem_Key;
+
+    fn key(&self) -> Self::Key {
+        DagInMem_Key {
+            my_id: self.my_id,
+            epoch: self.epoch,
+        }
+    }
+}
+
+impl KeyCodec<DagInMemSchema> for DagInMem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<DagInMemSchema> for DagInMem {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+define_schema!(DagInMemSchema, DagInMem_Key, DagInMem, "DagInMem");
 
 // TODO: persist all every update
 #[allow(dead_code)]
@@ -383,7 +485,7 @@ pub(crate) struct Dag {
     bullshark: Arc<Mutex<Bullshark>>,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,
-    storage: Arc<dyn DagStorage>,
+    storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
 }
 
 #[allow(dead_code)]
@@ -395,20 +497,25 @@ impl Dag {
         verifier: ValidatorVerifier,
         proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
-        storage: Arc<dyn DagStorage>,
+        mut storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
     ) -> Self {
-        let in_mem = match storage.load_all(epoch).expect("235922") {
+        let key = DagInMem_Key { my_id, epoch };
+        let in_mem = match storage.get_dag_in_mem(&key).expect("235922") {
             Some(in_mem) => in_mem,
             None => {
+                let mut round_list = DagRoundList::new();
+                round_list.push(PeerIdToCertifiedNodeMap::new());
                 let in_mem = DagInMem {
                     my_id,
                     epoch,
                     current_round: 0,
                     front: WeakLinksCreator::new(my_id, &verifier),
-                    dag: vec![PeerIdToCertifiedNodeMap::new()],
+                    dag: round_list,
                     missing_nodes: HashMap::new(),
                 };
-                storage.save_all(&in_mem).expect("161310");
+                let mut batch = storage.new_write_batch();
+                batch.put_dag_in_mem(&in_mem).unwrap();
+                storage.commit_write_batch(batch).unwrap();
                 in_mem
             }
         };
@@ -490,6 +597,8 @@ impl Dag {
     }
 
     fn current_round_peers(&self) -> impl Iterator<Item = &PeerId> {
+        info!("current_round={}", self.in_mem.current_round);
+        info!("dag_len={}", self.in_mem.dag.len());
         self.in_mem.dag
             .get(self.in_mem.current_round as usize)
             .unwrap()
@@ -504,12 +613,15 @@ impl Dag {
         if self.in_mem.dag.len() <= round {
             self.in_mem.dag.push(PeerIdToCertifiedNodeMap::new());
         }
-        self.in_mem.dag[round].insert(certified_node.node().source(), certified_node.clone());
-        self.storage.insert_node(round, certified_node.node().source(), &certified_node).expect("Failed in persisting a new node.");
+        self.in_mem.dag.inner[round].insert(certified_node.node().source(), certified_node.clone());
 
         self.in_mem.front
             .update_peer_latest_node(certified_node.node().metadata().clone());
 
+        //TODO: write the diff only.
+        let mut batch = self.storage.new_write_batch();
+        batch.put_dag_in_mem(&self.in_mem).expect("111715");
+        self.storage.commit_write_batch(batch).expect("111714");
 
         self.payload_manager
             .prefetch_payload_data_inner(
@@ -673,11 +785,13 @@ impl Dag {
         self.in_mem.current_round += 1;
 
         if self.in_mem.dag.get(self.in_mem.current_round as usize).is_none() {
-            // self.in_mem.dag[self.in_mem.current_round as usize] = HashMap::new();
             let new_node_map = PeerIdToCertifiedNodeMap::new();
             self.in_mem.dag.push(new_node_map);
-            // self.storage.inc_dag_round_count();
         }
+
+        let mut batch = self.storage.new_write_batch();
+        batch.put_dag_in_mem(&self.in_mem).unwrap();
+        self.storage.commit_write_batch(batch).unwrap();
 
         return Some(
             parents

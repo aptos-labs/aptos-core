@@ -1,41 +1,55 @@
 // Copyright © Aptos Foundation
 
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use aptos_consensus_types::node::CertifiedNode;
 use anyhow::Result;
-use aptos_schemadb::{DB, Options};
+use aptos_schemadb::{DB, Options, SchemaBatch};
+use aptos_schemadb::schema::Schema;
 use aptos_types::PeerId;
-use crate::dag::dag::DagInMem;
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, PeerIdToCertifiedNodeMap, DagRoundList};
+
+pub type ItemId = [u8; 16];
+
+pub(crate) trait ContainsKey {
+    type Key;
+    fn key(&self) -> Self::Key;
+}
 
 pub(crate) trait DagStorage: Sync + Send {
-    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>>;
-    fn save_all(&self, in_mem: &DagInMem) -> Result<()>;
-    fn insert_node(&self, round: usize, source: PeerId, node: &CertifiedNode) -> Result<()>;
+    type WriteBatch;
+    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>>;
+    fn new_write_batch(&self) -> Self::WriteBatch;
+    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()>;
 }
 
-pub struct MockDagStore {}
+pub(crate) trait DagStoreWriteBatch {
+    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()>;
+}
 
-impl MockDagStore {
-    pub fn new() -> Self {
-        Self {}
+pub struct NaiveDagStoreWriteBatch {
+    inner: SchemaBatch,
+}
+
+impl NaiveDagStoreWriteBatch {
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: SchemaBatch::new()
+        }
     }
 }
 
-impl DagStorage for MockDagStore {
-    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>> {
-        todo!()
-    }
-
-    fn save_all(&self, in_mem: &DagInMem) -> Result<()> {
-        todo!()
-    }
-
-    fn insert_node(&self, round: usize, source: PeerId, node: &CertifiedNode) -> Result<()> {
-        todo!()
+impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
+    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()> {
+        self.inner.put::<DagInMemSchema>(&dag_in_mem.key(), dag_in_mem)
     }
 }
 
 pub struct NaiveDagStore {
+    batch_counter: AtomicUsize,
+    write_batches: HashMap<usize, SchemaBatch>,
     db: DB,
 }
 
@@ -45,7 +59,7 @@ impl NaiveDagStore {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![
             "AbsentInfo",
-            "DagState",
+            "DagInMem",
             "DagState.my_id",
             "DagState.epoch",
             "DagState.current_round",
@@ -83,23 +97,53 @@ impl NaiveDagStore {
         let db = DB::open(path.clone(), DAG_DB_NAME, column_families, &opts)
             .expect("ReliableBroadcastDB open failed; unable to continue");
         Self {
+            batch_counter: AtomicUsize::new(0),
+            write_batches: HashMap::new(),
             db
         }
     }
 }
+
+
 impl DagStorage for NaiveDagStore {
-    fn load_all(&self, epoch: u64) -> Result<Option<DagInMem>> {
+    type WriteBatch = NaiveDagStoreWriteBatch;
+
+    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
         //TODO
         Ok(None)
     }
 
-    fn save_all(&self, in_mem: &DagInMem) -> Result<()> {
-        //TODO
-        Ok(())
+    fn new_write_batch(&self) -> Self::WriteBatch {
+        Self::WriteBatch::new()
     }
 
-    fn insert_node(&self, round: usize, source: PeerId, node: &CertifiedNode) -> Result<()> {
-        //TODO
-        Ok(())
+    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()> {
+        self.db.write_schemas(batch.inner)
+    }
+}
+
+
+
+pub struct MockDagStore {}
+
+impl MockDagStore {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl DagStorage for MockDagStore {
+    type WriteBatch = NaiveDagStoreWriteBatch;
+
+    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
+        todo!()
+    }
+
+    fn new_write_batch(&self) -> Self::WriteBatch {
+        todo!()
+    }
+
+    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()> {
+        todo!()
     }
 }
