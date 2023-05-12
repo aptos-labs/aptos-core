@@ -7,7 +7,7 @@
 # explicitly include stuff we actually need via negation
 
 !docker/build-rust-all.sh
-!docker/experimental/*.sh
+!docker/builder/*.sh
 !docker/tools/boto.cfg
 
 
