@@ -17,6 +17,7 @@ import {
   GetTokenOwnersDataQuery,
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
+  GetAccountTokensQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -33,6 +34,7 @@ import {
   GetTokenOwnersData,
   GetTopUserTransactions,
   GetUserTransactions,
+  GetAccountTokens,
 } from "../indexer/generated/queries";
 
 /**
@@ -307,6 +309,22 @@ export class IndexerClient {
     const graphqlQuery = {
       query: GetNumberOfDelegators,
       variables: { poolAddress: address },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries account's current tokens.
+   * This query queries for any type of tokens (i.e NFT, Fungiable, soul bound, etc).
+   *
+   * @returns GetAccountTokensQuery response type
+   */
+  async getAccountTokens(accountAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountTokensQuery> {
+    const address = HexString.ensure(accountAddress).hex();
+    IndexerClient.validateAddress(address);
+    const graphqlQuery = {
+      query: GetAccountTokens,
+      variables: { accountAddress: address, offset: options?.offset, limit: options?.limit },
     };
     return this.queryIndexer(graphqlQuery);
   }
