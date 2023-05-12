@@ -1,0 +1,15 @@
+on:
+  pull_request:
+
+
+jobs:
+  build-oss-fuzz:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: rustielin/oss-fuzz
+          ref: aptos-core
+
+      - run: python3 infra/helper.py build_fuzzers aptos-core
+        shell: bash
