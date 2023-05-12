@@ -18,7 +18,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
@@ -823,10 +823,18 @@ impl Context {
             }
         }
 
+        // TODO: configure consensus to have faster and consecutive non-empty rounds
+        info!(
+            "BCHO: versions: {} {}, blocks: {}",
+            ledger_info.ledger_version.0,
+            lookup_version,
+            blocks.len()
+        );
+
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
         // TODO: make configurable, 250
-        let block_full_threshold = 1;
+        let full_block_threshold = self.node_config.api.gas_estimate_full_block_threshold;
         // TODO: if multiple calls to db is a perf issue, combine the calls and then split it up
         for (first, last) in blocks {
             let min_inclusion_price =
@@ -835,7 +843,7 @@ impl Context {
                     .get_gas_prices(first, last - first, ledger_info.ledger_version.0)
                 {
                     Ok(prices) => {
-                        if prices.len() < block_full_threshold {
+                        if prices.len() < full_block_threshold {
                             min_gas_unit_price
                         } else {
                             prices.iter().min().unwrap() + 1
@@ -845,6 +853,7 @@ impl Context {
                 };
             min_inclusion_prices.push(min_inclusion_price);
         }
+        info!("BCHO: min_inclusion_prices: {:?}", min_inclusion_prices);
 
         // 3. Get values
         // (1) low
@@ -867,7 +876,7 @@ impl Context {
             .mempool
             .broadcast_buckets
             .iter()
-            .find(|bucket| **bucket >= p90_price)
+            .find(|bucket| **bucket > p90_price)
         {
             None => p90_price,
             Some(bucket) => *bucket,

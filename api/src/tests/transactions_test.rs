@@ -1051,14 +1051,30 @@ async fn test_gas_estimation_empty() {
     context.check_golden_output(resp);
 }
 
+async fn fill_block(
+    block: &mut Vec<SignedTransaction>,
+    ctx: &mut TestContext,
+    creator: &mut LocalAccount,
+) {
+    let owner = &mut ctx.gen_account();
+    for _i in 0..(500 - block.len()) {
+        let txn = ctx.account_transfer(creator, owner, 1);
+        block.push(txn);
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_one_block() {
     let mut context = new_test_context(current_function_name!());
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
-    let txn1 = ctx.mint_user_account(creator).await;
-    ctx.commit_block(&vec![txn1]).await;
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the block
+    let mut block = vec![mint_txn];
+    fill_block(&mut block, ctx, creator).await;
+    ctx.commit_block(&block).await;
 
     let resp = context.get("/estimate_gas_price").await;
     context.check_golden_output(resp);
@@ -1081,9 +1097,14 @@ async fn test_gas_estimation_ten_blocks() {
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the first block
+    let mut block = vec![mint_txn];
     for _i in 0..10 {
-        let txn1 = ctx.mint_user_account(creator).await;
-        ctx.commit_block(&vec![txn1]).await;
+        fill_block(&mut block, ctx, creator).await;
+        ctx.commit_block(&block).await;
+        block.clear();
     }
 
     let resp = context.get("/estimate_gas_price").await;

@@ -67,6 +67,8 @@ pub struct ApiConfig {
     ///
     /// If `max_runtime_workers` is set, this is ignored
     pub runtime_worker_multiplier: usize,
+    // TODO: where does this config belong?
+    pub gas_estimate_full_block_threshold: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -110,6 +112,7 @@ impl Default for ApiConfig {
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
+            gas_estimate_full_block_threshold: 250,
         }
     }
 }

@@ -17,6 +17,8 @@ mod full_nodes;
 #[cfg(test)]
 mod fullnode;
 #[cfg(test)]
+mod gas_estimate;
+#[cfg(test)]
 mod genesis;
 #[cfg(test)]
 mod indexer;
