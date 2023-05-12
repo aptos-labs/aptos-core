@@ -162,6 +162,7 @@ struct TransactionBenchState<S> {
     parallel_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     sequential_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     validator_set: ValidatorSet,
+    state_view: Arc<FakeDataStore>,
 }
 
 impl<S> TransactionBenchState<S>
@@ -212,9 +213,8 @@ where
         let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
             num_executor_shards,
             Some(concurrency_level_per_shard),
-            state_view.clone(),
         ));
-        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1), state_view));
+        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1)));
 
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()
@@ -230,6 +230,7 @@ where
             parallel_block_executor,
             sequential_block_executor,
             validator_set,
+            state_view,
         }
     }
 
@@ -278,7 +279,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.sequential_block_executor;
         executor
-            .execute_block(txns)
+            .execute_block(self.state_view.clone(), txns)
             .expect("VM should not fail to start");
     }
 
@@ -289,7 +290,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.parallel_block_executor.clone();
         executor
-            .execute_block(txns)
+            .execute_block(self.state_view.clone(), txns)
             .expect("VM should not fail to start");
     }
 
@@ -301,7 +302,7 @@ where
         let block_size = transactions.len();
         let timer = Instant::now();
         block_executor
-            .execute_block(transactions)
+            .execute_block(self.state_view.clone(), transactions)
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 

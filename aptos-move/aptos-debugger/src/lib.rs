@@ -26,6 +26,7 @@ use aptos_validator_interface::{
 use aptos_vm::{
     data_cache::StorageAdapter,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    sharded_block_executor::ShardedBlockExecutor,
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -56,8 +57,9 @@ impl AptosDebugger {
         version: Version,
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(txns, &state_view)
+        let state_view = Arc::new(DebuggerStateView::new(self.debugger.clone(), version));
+        let sharded_block_executor = ShardedBlockExecutor::new(1, Some(1));
+        AptosVM::execute_block(&sharded_block_executor, txns, state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 

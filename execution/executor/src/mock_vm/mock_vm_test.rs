@@ -12,8 +12,8 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use aptos_vm::VMExecutor;
-use std::collections::BTreeMap;
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use std::{collections::BTreeMap, sync::Arc};
 
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
@@ -45,8 +45,14 @@ fn test_mock_vm_different_senders() {
         txns.push(encode_mint_transaction(gen_address(i), amount));
     }
 
-    let outputs = MockVM::execute_block(txns.clone(), &MockStateView)
-        .expect("MockVM should not fail to start");
+    let sharded_block_executor = ShardedBlockExecutor::new(1, Some(1));
+
+    let outputs = MockVM::execute_block(
+        &sharded_block_executor,
+        txns.clone(),
+        Arc::new(MockStateView),
+    )
+    .expect("MockVM should not fail to start");
 
     for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
         let sender = txn.try_as_signed_user_txn().unwrap().sender();
@@ -81,8 +87,10 @@ fn test_mock_vm_same_sender() {
         txns.push(encode_mint_transaction(sender, amount));
     }
 
-    let outputs =
-        MockVM::execute_block(txns, &MockStateView).expect("MockVM should not fail to start");
+    let sharded_block_executor = ShardedBlockExecutor::new(1, Some(1));
+
+    let outputs = MockVM::execute_block(&sharded_block_executor, txns, Arc::new(MockStateView))
+        .expect("MockVM should not fail to start");
 
     for (i, output) in outputs.iter().enumerate() {
         assert_eq!(
@@ -114,9 +122,10 @@ fn test_mock_vm_payment() {
         encode_mint_transaction(gen_address(1), 100),
         encode_transfer_transaction(gen_address(0), gen_address(1), 50),
     ];
+    let sharded_block_executor = ShardedBlockExecutor::new(1, Some(1));
 
-    let output =
-        MockVM::execute_block(txns, &MockStateView).expect("MockVM should not fail to start");
+    let output = MockVM::execute_block(&sharded_block_executor, txns, Arc::new(MockStateView))
+        .expect("MockVM should not fail to start");
 
     let mut output_iter = output.iter();
     output_iter.next();

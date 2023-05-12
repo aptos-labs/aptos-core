@@ -78,7 +78,7 @@ impl ReplayVerifyCoordinator {
     }
 
     async fn run_impl(self) -> Result<()> {
-        AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_concurrency_per_shard_once(self.replay_concurrency_level);
         AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(

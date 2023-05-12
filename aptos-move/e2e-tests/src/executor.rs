@@ -42,9 +42,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    block_executor::BlockAptosVM,
     data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionId},
+    sharded_block_executor::ShardedBlockExecutor,
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
@@ -83,10 +83,9 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
-#[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore>,
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
@@ -99,15 +98,10 @@ pub struct FakeExecutor {
 impl FakeExecutor {
     /// Creates an executor from a genesis [`WriteSet`].
     pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
+        let sharded_block_executor = ShardedBlockExecutor::new(1, Some(num_cpus::get()));
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
-            executor_thread_pool,
+            sharded_block_executor,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -160,15 +154,10 @@ impl FakeExecutor {
 
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
-                .build()
-                .unwrap(),
-        );
+        let sharded_block_executor = ShardedBlockExecutor::new(1, Some(num_cpus::get()));
         FakeExecutor {
             data_store: FakeDataStore::default(),
-            executor_thread_pool,
+            sharded_block_executor,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -405,11 +394,10 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(
-            self.executor_thread_pool.clone(),
+        AptosVM::execute_block(
+            &self.sharded_block_executor,
             txn_block,
-            &self.data_store,
-            usize::min(4, num_cpus::get()),
+            Arc::new(self.data_store.clone()),
         )
     }
 
@@ -430,7 +418,11 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
+        let output = AptosVM::execute_block(
+            &self.sharded_block_executor,
+            txn_block.clone(),
+            Arc::new(self.data_store.clone()),
+        );
         if !self.no_parallel_exec {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);

@@ -30,10 +30,10 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -67,9 +67,10 @@ impl TransactionBlockExecutor<Transaction> for MockVM {
 }
 
 impl VMExecutor for MockVM {
-    fn execute_block(
+    fn execute_block<S: StateView + Sync + Send>(
+        _sharded_block_executor: &ShardedBlockExecutor<S>,
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        state_view: Arc<S>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         if state_view.is_genesis() {
             assert_eq!(
@@ -110,12 +111,12 @@ impl VMExecutor for MockVM {
 
             if matches!(txn, Transaction::GenesisTransaction(_)) {
                 read_state_value_from_storage(
-                    state_view,
+                    state_view.as_ref(),
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
                         .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
                 read_state_value_from_storage(
-                    state_view,
+                    state_view.as_ref(),
                     &AccessPath::new(CORE_CODE_ADDRESS, ConfigurationResource::resource_path()),
                 );
                 outputs.push(TransactionOutput::new(
@@ -136,9 +137,9 @@ impl VMExecutor for MockVM {
 
             match decode_transaction(txn.try_as_signed_user_txn().unwrap()) {
                 MockVMTransaction::Mint { sender, amount } => {
-                    let old_balance = read_balance(&output_cache, state_view, sender);
+                    let old_balance = read_balance(&output_cache, state_view.as_ref(), sender);
                     let new_balance = old_balance + amount;
-                    let old_seqnum = read_seqnum(&output_cache, state_view, sender);
+                    let old_seqnum = read_seqnum(&output_cache, state_view.as_ref(), sender);
                     let new_seqnum = old_seqnum + 1;
 
                     output_cache.insert(balance_ap(sender), new_balance);
@@ -158,8 +159,10 @@ impl VMExecutor for MockVM {
                     recipient,
                     amount,
                 } => {
-                    let sender_old_balance = read_balance(&output_cache, state_view, sender);
-                    let recipient_old_balance = read_balance(&output_cache, state_view, recipient);
+                    let sender_old_balance =
+                        read_balance(&output_cache, state_view.as_ref(), sender);
+                    let recipient_old_balance =
+                        read_balance(&output_cache, state_view.as_ref(), recipient);
                     if sender_old_balance < amount {
                         outputs.push(TransactionOutput::new(
                             WriteSet::default(),
@@ -170,7 +173,7 @@ impl VMExecutor for MockVM {
                         continue;
                     }
 
-                    let sender_old_seqnum = read_seqnum(&output_cache, state_view, sender);
+                    let sender_old_seqnum = read_seqnum(&output_cache, state_view.as_ref(), sender);
                     let sender_new_seqnum = sender_old_seqnum + 1;
                     let sender_new_balance = sender_old_balance - amount;
                     let recipient_new_balance = recipient_old_balance + amount;

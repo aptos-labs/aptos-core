@@ -25,7 +25,9 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
+use aptos_vm::{
+    data_cache::AsMoveResolver, sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor,
+};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::StructOpt;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -74,6 +76,7 @@ struct AptosTestAdapter<'a> {
     storage: FakeDataStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
+    sharded_block_executor: ShardedBlockExecutor<FakeDataStore>,
 }
 
 /// Parameters *required* to create a transaction.
@@ -468,7 +471,11 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage)?;
+        let mut outputs = AptosVM::execute_block(
+            &self.sharded_block_executor,
+            vec![txn],
+            Arc::new(self.storage.clone()),
+        )?;
 
         assert_eq!(outputs.len(), 1);
 
@@ -606,6 +613,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         let mut adapter = Self {
+            sharded_block_executor: ShardedBlockExecutor::new(1, Some(1)),
             compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
             default_syntax,
             storage,

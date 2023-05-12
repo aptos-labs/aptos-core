@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Transaction;
 
-pub trait BlockPartitioner {
+pub trait BlockPartitioner: Send + Sync {
     fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
         -> Vec<Vec<Transaction>>;
 }
