@@ -141,7 +141,7 @@ impl ReliableBroadcast {
     }
 
     // TODO: consider marge node and certified node and use a trait to resend message.
-    async fn handle_tick(&mut self) {
+    fn handle_tick(&mut self) {
         match &self.status {
             // Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick peer_id {},", self.my_id),
             Status::NothingToSend => info!("DAG: reliable broadcast has nothing to resend on tick"),
@@ -194,7 +194,7 @@ impl ReliableBroadcast {
                 biased;
 
                 _ = interval.tick() => {
-                    self.handle_tick().await;
+                    self.handle_tick();
                 },
 
                 Some(command) = command_rx.recv() => {
@@ -217,6 +217,7 @@ impl ReliableBroadcast {
     }
 
     async fn process_message(&mut self, msg: VerifiedEvent) {
+        info!("RB: process_message {:?}", msg);
         match msg {
             VerifiedEvent::NodeMsg(node) => self.handle_node_message(*node).await,
 
@@ -236,6 +237,7 @@ impl ReliableBroadcast {
     }
 
     async fn process_command(&mut self, command: ReliableBroadcastCommand) {
+        info!("RB: process_command {:?}", command);
         match command {
             ReliableBroadcastCommand::BroadcastRequest(node) => {
                 self.handle_broadcast_request(node).await;
@@ -279,7 +281,7 @@ impl ReliableBroadcast {
 impl StateMachine for ReliableBroadcast {
     async fn tick(&mut self) {
         if self.broadcast_timer.tick() {
-            self.handle_tick().await;
+            self.handle_tick();
             self.broadcast_timer.reset();
         }
     }
@@ -309,11 +311,14 @@ impl StateMachine for ReliableBroadcast {
             return None;
         }
 
+        info!("preparing ready {:?}", self.messages);
+
         Some(Actions {
             messages: mem::take(&mut self.messages),
             command: None,
             generate_proposal: None,
             ordered_blocks: None,
+            state_sync: None,
         })
     }
 }

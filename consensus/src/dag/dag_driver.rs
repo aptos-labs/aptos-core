@@ -7,6 +7,7 @@ use crate::{
         anchor_election::RoundRobinAnchorElection,
         bullshark::Bullshark,
         dag::Dag,
+        dag_driver::Mode::{Normal, StateSync},
         reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
         timer::TickingTimer,
     },
@@ -25,7 +26,7 @@ use aptos_consensus_types::{
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{error, spawn_named};
+use aptos_logger::{debug, error, spawn_named};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
@@ -40,17 +41,23 @@ use tokio::{
     time,
 };
 
+#[derive(PartialEq)]
+pub enum Mode {
+    Normal,
+    StateSync(LedgerInfoWithSignatures),
+}
+
 pub struct DagDriver {
     epoch: u64,
     round: Round,
     author: Author,
     config: DagConfig,
     // payload_client: Arc<dyn PayloadClient>,
-    timeout: bool,
+    // timeout: bool,
     // network_sender: NetworkSender,
     // TODO: Should we clean more often than once an epoch?
     dag: Dag,
-    bullshark: Arc<Mutex<Bullshark>>,
+    // bullshark: Bullshark,
     // rb_tx: Sender<ReliableBroadcastCommand>,
     // rb_close_tx: oneshot::Sender<oneshot::Sender<()>>,
     // network_msg_rx: Receiver<PeerId, VerifiedEvent>,
@@ -63,6 +70,9 @@ pub struct DagDriver {
     awaiting_proposal: bool,
     next_round_payload_filter: Option<PayloadFilter>,
     next_round_parents: Option<HashSet<NodeMetaData>>,
+
+    mode: Mode,
+    state_sync_in_progress: bool,
 
     rb_command: Option<ReliableBroadcastCommand>,
 
@@ -90,14 +100,14 @@ impl DagDriver {
         root_commit_ledger_info: LedgerInfoWithSignatures,
     ) -> Self {
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
-        let bullshark = Arc::new(Mutex::new(Bullshark::new(
+        let bullshark = Bullshark::new(
             epoch,
             author,
             // state_computer,
             proposer_election.clone(),
             verifier.clone(),
             genesis_block_id,
-        )));
+        );
 
         // let (rb_close_tx, close_rx) = oneshot::channel();
 
@@ -113,17 +123,17 @@ impl DagDriver {
             author,
             config,
             // payload_client,
-            timeout: false,
+            // timeout: false,
             // network_sender,
             dag: Dag::new(
                 author,
                 epoch,
-                bullshark.clone(),
+                bullshark,
                 verifier.clone(),
                 proposer_election,
                 payload_manager,
             ),
-            bullshark,
+            // bullshark,
             // rb_tx,
             // rb_close_tx,
             // network_msg_rx,
@@ -141,6 +151,9 @@ impl DagDriver {
             highest_commit_info: root_commit_ledger_info,
 
             validator_verifier: verifier,
+
+            mode: Mode::Normal,
+            state_sync_in_progress: false,
         };
         dag_driver.init();
 
@@ -166,7 +179,7 @@ impl DagDriver {
         }
     }
 
-    async fn create_node(&mut self, parents: HashSet<NodeMetaData>, payload: Payload) -> Node {
+    fn create_node(&mut self, parents: HashSet<NodeMetaData>, payload: Payload) -> Node {
         let timestamp = self.time_service.get_current_timestamp().as_micros() as u64;
 
         Node::new(
@@ -180,36 +193,39 @@ impl DagDriver {
         )
     }
 
-    async fn try_advance_round(&mut self) -> bool {
-        if let Some(parents) = self.dag.try_advance_round(self.timeout) {
+    async fn try_advance_round(&mut self, timeout: bool) -> bool {
+        if let Some(parents) = self.dag.try_advance_round(timeout) {
             self.round += 1;
             self.awaiting_proposal = true;
             self.next_round_parents = Some(parents);
-            self.next_round_payload_filter = Some(self.bullshark.lock().await.pending_payload());
+            self.next_round_payload_filter = Some(self.dag.bullshark.pending_payload());
             true
         } else {
             false
         }
     }
 
-    async fn process_highest_commit_ledger_info(&self, commit_info: &LedgerInfoWithSignatures) {
+    async fn process_highest_commit_ledger_info(&mut self, commit_info: LedgerInfoWithSignatures) {
         // FIXME(ibalajiarun) handle unwraps
         // TODO(ibalajiarun) move signature verification to bounded_executor in EpochManager
+        if self.highest_commit_info.commit_info().round() >= commit_info.commit_info().round() {
+            return;
+        }
+
         commit_info
             .verify_signatures(&self.validator_verifier)
             .unwrap();
 
-        if commit_info.commit_info().round()
-            > self.highest_commit_info.commit_info().round() + self.config.state_sync_window
+        if self.mode == Normal
+            && commit_info.commit_info().round()
+                > self.highest_commit_info.commit_info().round() + self.config.state_sync_window
         {
-            todo!()
+            // change mode
+            self.mode = StateSync(commit_info.clone());
         }
     }
 
     async fn handle_certified_node(&mut self, certified_node: CertifiedNode, ack_required: bool) {
-        self.process_highest_commit_ledger_info(certified_node.highest_commit_info())
-            .await;
-
         let digest = certified_node.digest();
         let source = certified_node.source();
         self.dag.try_add_node(certified_node).await;
@@ -220,20 +236,19 @@ impl DagDriver {
         }
     }
 
-    async fn tick(&mut self) {
-        for timer in self.timers.iter_mut() {
-            timer.tick();
-        }
-    }
-
     async fn process_message(&mut self, msg: VerifiedEvent) {
         match msg {
+            VerifiedEvent::CommitDecision(commit_decision) => {
+                self.process_highest_commit_ledger_info(commit_decision.ledger_info().clone())
+                    .await;
+            },
             VerifiedEvent::CertifiedNodeRequestMsg(node_request) => {
                 self.handle_node_request(*node_request).await
             },
             VerifiedEvent::CertifiedNodeMsg(certified_node, ack_required) => {
                 self.handle_certified_node(*certified_node, ack_required)
-                    .await
+                    .await;
+                self.try_advance_round(false).await;
             },
             _ => {
                 error!("DAG: unexpected message type: {:?}", msg);
@@ -241,21 +256,28 @@ impl DagDriver {
         }
     }
 
-    async fn advance_round(&mut self, payload: Payload) {
+    fn advance_round(&mut self, payload: Payload) {
         // FIXME(ibalajiarun): Fix the unwrap
         let parents = self.next_round_parents.take().unwrap();
-        let node = self.create_node(parents, payload).await;
+        let node = self.create_node(parents, payload);
         self.rb_command = Some(ReliableBroadcastCommand::BroadcastRequest(node));
-        self.timeout = false;
+        // self.timeout = false;
         self.interval_timer.reset();
     }
 
     async fn process_command(&mut self, cmd: Command) {
-        assert!(self.awaiting_proposal);
-
-        self.awaiting_proposal = false;
-        if let Command::DagNodeProposal(payload) = cmd {
-            self.advance_round(payload).await
+        match cmd {
+            Command::DagNodeProposal(payload) => {
+                debug!("DAG: proposing {}", payload);
+                assert!(self.awaiting_proposal);
+                self.awaiting_proposal = false;
+                self.advance_round(payload)
+            },
+            Command::DagStateSyncNotification => {
+                self.state_sync_in_progress = false;
+                self.mode = Normal
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -266,18 +288,18 @@ impl DagDriver {
     }
 
     async fn on_remote_fetch_timer(&mut self) {
-        self.remote_fetch_missing_nodes();
+        self.remote_fetch_missing_nodes().await;
         self.remote_fetch_timer.reset();
     }
 
     async fn on_interval_timer(&mut self) {
-        if self.timeout == false {
-            self.timeout = true;
-            if self.try_advance_round().await {
-                // TODO(ibalajiarun): stop the timer here
-                self.interval_timer.stop();
-            }
+        if self.try_advance_round(true).await {
+            // TODO(ibalajiarun): stop the timer here
+            self.interval_timer.stop();
         }
+        // if self.timeout == false {
+        //     self.timeout = true;
+        // }
     }
 
     async fn send_certified_node(
@@ -319,9 +341,12 @@ impl DagDriver {
 impl StateMachine for DagDriver {
     async fn tick(&mut self) {
         if self.interval_timer.tick() {
+            // debug!("interval_timer ticking...");
             self.on_interval_timer().await;
+            self.interval_timer.reset();
         }
         if self.remote_fetch_timer.tick() {
+            // debug!("remote_fetch_timer ticking...");
             self.on_remote_fetch_timer().await;
         }
     }
@@ -335,10 +360,11 @@ impl StateMachine for DagDriver {
     }
 
     async fn has_ready(&self) -> bool {
-        self.awaiting_proposal
+        (self.awaiting_proposal && self.next_round_payload_filter.is_some())
             || !self.messages.is_empty()
             || self.rb_command.is_some()
-            || !self.bullshark.lock().await.ordered_blocks().is_empty()
+            || { !self.dag.bullshark.ordered_blocks().is_empty() }
+            || (!self.state_sync_in_progress && self.mode != Normal)
     }
 
     async fn ready(&mut self) -> Option<Actions> {
@@ -347,7 +373,7 @@ impl StateMachine for DagDriver {
         }
         let mut actions = Actions::default();
 
-        if self.awaiting_proposal {
+        if self.awaiting_proposal && self.next_round_payload_filter.is_some() {
             actions.generate_proposal = self.next_round_payload_filter.take();
         }
 
@@ -362,8 +388,18 @@ impl StateMachine for DagDriver {
                 .map(|cmd| Command::ReliableBroadcastCommand(cmd))
         }
 
-        if !self.bullshark.lock().await.ordered_blocks().is_empty() {
-            actions.ordered_blocks = Some(self.bullshark.lock().await.take_ordered_blocks());
+        {
+            let bs = &mut self.dag.bullshark;
+            if !bs.ordered_blocks().is_empty() {
+                actions.ordered_blocks = Some(bs.take_ordered_blocks());
+            }
+        }
+
+        if let StateSync(ref sync) = self.mode {
+            if !self.state_sync_in_progress {
+                self.state_sync_in_progress = true;
+                actions.state_sync = Some(sync.clone());
+            }
         }
 
         Some(actions)

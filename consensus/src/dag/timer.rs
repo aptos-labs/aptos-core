@@ -31,7 +31,7 @@ impl TickingTimer {
     }
 
     pub(crate) fn elapsed(&self) -> bool {
-        self.ticks_elapsed >= self.timeout
+        self.ticks_elapsed == self.timeout
     }
 }
 

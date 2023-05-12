@@ -10,7 +10,7 @@ use aptos_consensus_types::{
     node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::info;
+use aptos_logger::{info, debug};
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
 use async_recursion::async_recursion;
 use std::{
@@ -344,7 +344,7 @@ pub(crate) struct Dag {
     // Arc to something that returns the anchors
     proposer_election: Arc<dyn AnchorElection>,
     // FIXME(ibalajiarun): Remove this Arc Mutex
-    bullshark: Arc<Mutex<Bullshark>>,
+    pub bullshark: Bullshark,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,
 }
@@ -354,7 +354,7 @@ impl Dag {
     pub fn new(
         my_id: PeerId,
         epoch: u64,
-        bullshark: Arc<Mutex<Bullshark>>,
+        bullshark: Bullshark,
         verifier: ValidatorVerifier,
         proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
@@ -472,9 +472,9 @@ impl Dag {
             )
             .await;
 
-        let mut bs = self.bullshark.lock().await;
-
-        bs.try_ordering(certified_node.take_node()).await;
+        self.bullshark
+            .try_ordering(certified_node.take_node())
+            .await;
 
         // TODO: send/call to all subscribed application and make sure shutdown logic is safe with the expect.
     }
@@ -568,11 +568,13 @@ impl Dag {
     }
 
     fn round_ready(&self, timeout: bool) -> bool {
+        debug!("round ready: {}", self.current_round);
         if self
             .verifier
             .check_voting_power(self.current_round_peers())
             .is_err()
         {
+            debug!("round ready: {:?} not enough voting power", self.current_round_peers().collect::<Vec<_>>());
             return false;
         }
         if timeout {
@@ -583,6 +585,8 @@ impl Dag {
         let anchor = self.proposer_election.get_round_anchor_peer_id(wave);
         let maybe_anchor_node_meta_data =
             self.get_node_metadata_from_dag(self.current_round, anchor);
+
+        debug!("maybe anchor: {:?}", maybe_anchor_node_meta_data);
 
         return if self.current_round % 2 == 0 {
             maybe_anchor_node_meta_data.is_some()

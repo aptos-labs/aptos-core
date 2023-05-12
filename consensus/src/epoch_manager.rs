@@ -138,8 +138,7 @@ pub struct EpochManager {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
-    rb_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
-    dag_driver_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
+    dag_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     dag_driver_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<Arc<EpochState>>,
@@ -191,8 +190,7 @@ impl EpochManager {
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
-            rb_tx: None,
-            dag_driver_tx: None,
+            dag_tx: None,
             dag_driver_close_tx: None,
             round_manager_close_tx: None,
             epoch_state: None,
@@ -459,6 +457,8 @@ impl EpochManager {
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;
+
+        debug!("going to state sync");
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
         // panic if this doesn't succeed since the current processors are already shutdown.
         self.commit_state_computer
@@ -469,6 +469,8 @@ impl EpochManager {
                 ledger_info
             ))
             .expect("Failed to sync to new epoch");
+
+        debug!("state synced, await_reconfig_notif");
 
         monitor!("reconfig", self.await_reconfig_notification().await);
         Ok(())
@@ -749,8 +751,8 @@ impl EpochManager {
             None,
         );
 
-        self.dag_driver_tx = Some(dag_driver_msg_tx);
-        self.rb_tx = Some(rb_msg_tx);
+        self.dag_tx = Some(dag_driver_msg_tx);
+        // self.rb_tx = Some(rb_msg_tx);
 
         let ledger_info_with_sigs = self
             .storage
@@ -789,7 +791,7 @@ impl EpochManager {
             dag_driver,
             rb,
             dag_driver_msg_rx,
-            rb_msg_rx,
+            // rb_msg_rx,
             self.config.dag_config.clone(),
             payload_client,
             network_sender,
@@ -1078,8 +1080,7 @@ impl EpochManager {
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
-            let dag_driver_tx = self.dag_driver_tx.clone();
-            let rb_tx = self.rb_tx.clone();
+            let dag_tx = self.dag_tx.clone();
             // TODO(ibalajiarun): check if this multi-threaded executor is okay in terms of Node reordering
             self.bounded_executor
                 .spawn(async move {
@@ -1098,8 +1099,7 @@ impl EpochManager {
                                 quorum_store_msg_tx,
                                 buffer_manager_msg_tx,
                                 round_manager_tx,
-                                dag_driver_tx,
-                                rb_tx,
+                                dag_tx,
                                 peer_id,
                                 verified_event,
                             );
@@ -1236,8 +1236,7 @@ impl EpochManager {
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
-        dag_driver_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-        rb_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+        dag_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) {
@@ -1248,16 +1247,12 @@ impl EpochManager {
             );
         }
         if let Err(e) = match event {
-            dag_driver_event @ (VerifiedEvent::CertifiedNodeMsg(_, _)
-            | VerifiedEvent::CertifiedNodeRequestMsg(_)) => {
-                Self::forward_event_to(dag_driver_tx, peer_id, dag_driver_event)
-                    .context("dag driver sender")
-            },
-
-            rb_event @ (VerifiedEvent::NodeMsg(_)
+            dag_event @ (VerifiedEvent::NodeMsg(_)
             | VerifiedEvent::SignedNodeDigestMsg(_)
-            | VerifiedEvent::CertifiedNodeAckMsg(_)) => {
-                Self::forward_event_to(rb_tx, peer_id, rb_event).context("rb sender")
+            | VerifiedEvent::CertifiedNodeAckMsg(_)
+            | VerifiedEvent::CertifiedNodeMsg(_, _)
+            | VerifiedEvent::CertifiedNodeRequestMsg(_)) => {
+                Self::forward_event_to(dag_tx, peer_id, dag_event).context("dag sender")
             },
 
             quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)

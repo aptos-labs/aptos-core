@@ -18,6 +18,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor::components::block_tree::epoch_genesis_block_id;
 use aptos_executor_types::StateComputeResult;
+use aptos_logger::debug;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -175,6 +176,7 @@ impl Bullshark {
     }
 
     pub async fn try_ordering(&mut self, node: Node) {
+        debug!("try_ordering: {:?}", node);
         let round = node.round();
         let wave = round / 2;
         let author = node.source();
@@ -209,6 +211,8 @@ impl Bullshark {
             .filter(|(_, node)| node.strong_links().contains(&anchor_author))
             .map(|(peer_id, _)| peer_id);
 
+        debug!("voters: {:?}", voters.clone().cloned().collect::<Vec<_>>());
+
         if self.verifier.check_minority_voting_power(voters).is_ok() {
             let anchor = self.dag[round as usize - 1].remove(&anchor_author).unwrap();
             let order_anchor_stack = self.order_anchors(anchor);
@@ -218,7 +222,8 @@ impl Bullshark {
     }
 
     async fn push_to_execution(&mut self, ordered_history: Vec<Node>) {
-        let mut payload = Payload::empty(false);
+        debug!("push_to_execution: {:?}", ordered_history);
+        let mut payload = Payload::empty(true);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
         let round = ordered_history[0].round();
         let timestamp = ordered_history[0].timestamp();

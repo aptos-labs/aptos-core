@@ -181,7 +181,7 @@ impl NodeSetup {
             dag_driver,
             rb,
             network_msg_rx,
-            rb_network_msg_rx,
+            // rb_network_msg_rx,
             DagConfig::default(),
             payload_client,
             network,
@@ -215,13 +215,13 @@ impl NodeSetup {
         loop {
             match self.next_network_message().await {
                 ConsensusMsg::NodeMsg(msg) => self
-                    .rb_network_msg_tx
+                    .network_msg_tx
                     .push(msg.source(), VerifiedEvent::NodeMsg(msg)),
                 ConsensusMsg::SignedNodeDigestMsg(msg) => self
-                    .rb_network_msg_tx
+                    .network_msg_tx
                     .push(msg.peer_id(), VerifiedEvent::SignedNodeDigestMsg(msg)),
                 ConsensusMsg::CertifiedNodeAckMsg(msg) => self
-                    .rb_network_msg_tx
+                    .network_msg_tx
                     .push(msg.peer_id(), VerifiedEvent::CertifiedNodeAckMsg(msg)),
                 ConsensusMsg::CertifiedNodeMsg(msg, ack) => self
                     .network_msg_tx
