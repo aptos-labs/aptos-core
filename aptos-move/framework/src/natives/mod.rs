@@ -429,7 +429,10 @@ pub fn all_natives(
         "object",
         object::make_all(gas_params.object, timed_features.clone(), features.clone())
     );
-    add_natives_from_module!("debug", debug::make_all());
+    add_natives_from_module!(
+        "debug",
+        debug::make_all(timed_features.clone(), features.clone())
+    );
     add_natives_from_module!(
         "string_utils",
         string_utils::make_all(gas_params.string_utils, timed_features, features)

@@ -36,7 +36,6 @@ fullnode:
         identity: {}
         inbound_rate_limit_config:
         outbound_rate_limit_config:
-        max_inbound_connections: 100
 
 # -- Log level for the fullnode
 rust_log: info

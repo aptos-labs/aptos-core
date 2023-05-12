@@ -5,8 +5,9 @@
 use crate::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
 };
-use std::fmt::Debug;
+use anyhow::Error;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -20,9 +21,9 @@ use std::fmt::Debug;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
-    type Error: Debug;
+    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Vec<u8>>, Error>;
 }
 
 /// A persistent storage backend that can resolve resources by address + type
@@ -35,44 +36,44 @@ pub trait ModuleResolver {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    type Error: Debug;
+    fn get_resource_with_metadata(
+        &self,
+        address: &AccountAddress,
+        typ: &StructTag,
+        metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>, Error>;
+}
 
+/// A persistent storage implementation that can resolve both resources and modules
+pub trait MoveResolver: ModuleResolver + ResourceResolver {
     fn get_resource(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error>;
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
+    }
 }
 
-/// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver:
-    ModuleResolver<Error = Self::Err> + ResourceResolver<Error = Self::Err>
-{
-    type Err: Debug;
-}
-
-impl<E: Debug, T: ModuleResolver<Error = E> + ResourceResolver<Error = E> + ?Sized> MoveResolver
-    for T
-{
-    type Err = E;
-}
+impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
 
 impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
-    type Error = T::Error;
-
-    fn get_resource(
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        (**self).get_resource(address, tag)
+        metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>, Error> {
+        (**self).get_resource_with_metadata(address, tag, metadata)
     }
 }
 
 impl<T: ModuleResolver + ?Sized> ModuleResolver for &T {
-    type Error = T::Error;
+    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
+        (**self).get_module_metadata(module_id)
+    }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         (**self).get_module(module_id)
     }
 }

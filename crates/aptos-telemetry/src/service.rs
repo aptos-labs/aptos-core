@@ -467,23 +467,27 @@ async fn send_telemetry_event(
         timestamp_micros,
         events: vec![telemetry_event],
     };
-    let _handle = spawn_telemetry_service_event_sender(
-        event_name.clone(),
-        telemetry_sender,
-        telemetry_dump.clone(),
-    );
-    spawn_telemetry_event_sender(api_secret, measurement_id, event_name, telemetry_dump)
+    if telemetry_sender.is_none() {
+        // telemetry_sender is None for Aptos CLI.
+        spawn_event_sender_to_google_analytics(
+            api_secret,
+            measurement_id,
+            event_name,
+            telemetry_dump,
+        )
+    } else {
+        // Aptos nodes send their metrics to aptos-telemetry-service crate.
+        spawn_event_sender_to_telemetry_service(event_name, telemetry_sender, telemetry_dump)
+    }
 }
 
-fn spawn_telemetry_service_event_sender(
+/// Spawns the telemetry event sender on a new thread to avoid blocking
+fn spawn_event_sender_to_telemetry_service(
     event_name: String,
     telemetry_sender: Option<TelemetrySender>,
     telemetry_dump: TelemetryDump,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        if telemetry_sender.is_none() {
-            return;
-        }
         telemetry_sender
             .unwrap()
             .try_send_custom_metrics(event_name, telemetry_dump)
@@ -492,7 +496,7 @@ fn spawn_telemetry_service_event_sender(
 }
 
 /// Spawns the telemetry event sender on a new thread to avoid blocking
-fn spawn_telemetry_event_sender(
+fn spawn_event_sender_to_google_analytics(
     api_secret: String,
     measurement_id: String,
     event_name: String,

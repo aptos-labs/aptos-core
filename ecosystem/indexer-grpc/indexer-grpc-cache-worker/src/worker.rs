@@ -7,18 +7,21 @@ use crate::metrics::{
 };
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
-    config::IndexerGrpcConfig,
+    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
     create_grpc_client,
-    file_store_operator::{FileStoreMetadata, FileStoreOperator},
+    file_store_operator::{
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
+    },
     time_diff_since_pb_timestamp_in_secs,
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
-use aptos_protos::datastream::v1::{
-    self as datastream, raw_datastream_response::Response, stream_status::StatusType,
-    RawDatastreamRequest, RawDatastreamResponse,
+use aptos_protos::internal::fullnode::v1::{
+    stream_status::StatusType, transactions_from_node_response::Response,
+    GetTransactionsFromNodeRequest, TransactionsFromNodeResponse,
 };
 use futures::{self, StreamExt};
+use prost::Message;
 
 type ChainID = u32;
 type StartingVersion = u64;
@@ -30,8 +33,8 @@ pub struct Worker {
     redis_client: redis::Client,
     /// Fullnode grpc address.
     fullnode_grpc_address: String,
-    /// File store bucket name.
-    pub file_store_bucket_name: String,
+    /// File store config
+    file_store: IndexerGrpcFileStoreConfig,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -63,14 +66,14 @@ impl Worker {
             redis_client,
             // The fullnode grpc address is required.
             fullnode_grpc_address: format!("http://{}", config.fullnode_grpc_address.unwrap()),
-            file_store_bucket_name: config.file_store_bucket_name,
+            file_store: config.file_store,
         }
     }
 
     /// The main loop of the worker is:
     /// 1. Fetch metadata from file store; if not present, exit after 1 minute.
     /// 2. Start the streaming RPC with version from file store or 0 if not present.
-    /// 3. Handle the INIT frame from RawDatastreamResponse:
+    /// 3. Handle the INIT frame from TransactionsFromNodeResponse:
     ///    * If metadata is not present and cache is empty, start from 0.
     ///    * If metadata is not present and cache is not empty, crash.
     ///    * If metadata is present, start from file store version.
@@ -87,7 +90,15 @@ impl Worker {
             let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
 
             // 1. Fetch metadata.
-            let file_store_operator = FileStoreOperator::new(self.file_store_bucket_name.clone());
+            let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store {
+                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                    GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
+                ),
+                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                    LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
+                ),
+            };
+
             file_store_operator.verify_storage_bucket_existence().await;
             let mut starting_version = 0;
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;
@@ -107,12 +118,15 @@ impl Worker {
             }
 
             // 2. Start streaming RPC.
-            let request = tonic::Request::new(RawDatastreamRequest {
+            let request = tonic::Request::new(GetTransactionsFromNodeRequest {
                 starting_version: Some(starting_version),
                 ..Default::default()
             });
 
-            let response = rpc_client.raw_datastream(request).await.unwrap();
+            let response = rpc_client
+                .get_transactions_from_node(request)
+                .await
+                .unwrap();
 
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
             process_streaming_response(conn, file_store_metadata, response.into_inner()).await;
@@ -120,12 +134,12 @@ impl Worker {
     }
 }
 
-async fn process_raw_datastream_response(
-    response: RawDatastreamResponse,
+async fn process_transactions_from_node_response(
+    response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::Connection>,
 ) -> anyhow::Result<GrpcDataStatus> {
     match response.response.unwrap() {
-        datastream::raw_datastream_response::Response::Status(status) => {
+        Response::Status(status) => {
             match StatusType::from_i32(status.r#type).expect("[Indexer Cache] Invalid status type.")
             {
                 StatusType::Init => Ok(GrpcDataStatus::StreamInit(status.start_version)),
@@ -133,7 +147,7 @@ async fn process_raw_datastream_response(
                     let start_version = status.start_version;
                     let num_of_transactions = status
                         .end_version
-                        .expect("RawDatastreamResponse status end_version is None")
+                        .expect("TransactionsFromNodeResponse status end_version is None")
                         - start_version
                         + 1;
                     Ok(GrpcDataStatus::BatchEnd {
@@ -144,7 +158,7 @@ async fn process_raw_datastream_response(
                 StatusType::Unspecified => unreachable!("Unspecified status type."),
             }
         },
-        datastream::raw_datastream_response::Response::Data(data) => {
+        Response::Data(data) => {
             let transaction_len = data.transactions.len();
             let start_version = data.transactions.first().unwrap().version;
             let first_transaction_pb_timestamp =
@@ -154,10 +168,14 @@ async fn process_raw_datastream_response(
                 .into_iter()
                 .map(|tx| {
                     let timestamp_in_seconds = match tx.timestamp {
-                        Some(timestamp) => timestamp.seconds as u64,
+                        Some(ref timestamp) => timestamp.seconds as u64,
                         None => 0,
                     };
-                    (tx.version, tx.encoded_proto_data, timestamp_in_seconds)
+                    let mut encoded_proto_data = vec![];
+                    tx.encode(&mut encoded_proto_data)
+                        .expect("Encode transaction failed.");
+                    let base64_encoded_proto_data = base64::encode(encoded_proto_data);
+                    (tx.version, base64_encoded_proto_data, timestamp_in_seconds)
                 })
                 .collect::<Vec<(u64, String, u64)>>();
 
@@ -185,7 +203,7 @@ async fn process_raw_datastream_response(
 /// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
 async fn setup_cache_with_init_signal(
     conn: redis::aio::Connection,
-    init_signal: RawDatastreamResponse,
+    init_signal: TransactionsFromNodeResponse,
 ) -> (
     CacheOperator<redis::aio::Connection>,
     ChainID,
@@ -220,7 +238,7 @@ async fn setup_cache_with_init_signal(
 async fn process_streaming_response(
     conn: redis::aio::Connection,
     file_store_metadata: Option<FileStoreMetadata>,
-    mut resp_stream: impl futures_core::Stream<Item = Result<RawDatastreamResponse, tonic::Status>>
+    mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
 ) {
     let mut tps_calculator = MovingAverage::new(10_000);
@@ -247,7 +265,7 @@ async fn process_streaming_response(
 
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
-        let received: RawDatastreamResponse = match received {
+        let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
                 error!("[Indexer Cache] Streaming error: {}", err);
@@ -260,7 +278,7 @@ async fn process_streaming_response(
             panic!("[Indexer Cache] Chain id mismatch happens during data streaming.");
         }
 
-        match process_raw_datastream_response(received, &mut cache_operator).await {
+        match process_transactions_from_node_response(received, &mut cache_operator).await {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
                     start_version,
@@ -322,7 +340,7 @@ async fn process_streaming_response(
             },
             Err(e) => {
                 error!(
-                    "[Indexer Cache] Process raw datastream response failed: {}",
+                    "[Indexer Cache] Process transactions from fullnode failed: {}",
                     e
                 );
                 ERROR_COUNT.with_label_values(&["response_error"]).inc();

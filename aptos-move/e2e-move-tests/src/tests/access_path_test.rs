@@ -113,8 +113,5 @@ fn access_path_panic() {
         Vec::<Vec<u8>>::new(),
     );
 
-    assert_eq!(
-        res.status().unwrap_err(),
-        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-    );
+    assert_eq!(res.status().unwrap_err(), StatusCode::STORAGE_ERROR);
 }

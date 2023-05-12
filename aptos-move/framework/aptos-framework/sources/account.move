@@ -685,6 +685,22 @@ module aptos_framework::account {
     }
 
     ///////////////////////////////////////////////////////////////////////////
+    // Test-only create signerCapabilityOfferProofChallengeV2 and return it
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test_only]
+    public fun get_signer_capability_offer_proof_challenge_v2(
+        source_address: address,
+        recipient_address: address,
+    ): SignerCapabilityOfferProofChallengeV2 acquires Account {
+        SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global_mut<Account>(source_address).sequence_number,
+            source_address,
+            recipient_address,
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
     /// Capability based functions for efficient use.
     ///////////////////////////////////////////////////////////////////////////
 

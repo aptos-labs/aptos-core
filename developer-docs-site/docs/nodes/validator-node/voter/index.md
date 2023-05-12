@@ -8,10 +8,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Voter 
 
-:::tip Petra on Chrome browser only
-The [Petra wallet extension](../../../guides/install-petra-wallet.md) is supported only on the Chrome browser. However, the extensions for [Brave browser](https://brave.com/) and [Kiwi browser](https://kiwibrowser.com/) and [Microsoft Edge browser](https://www.microsoft.com/en-us/edge) will also work.
-:::
-
 If you are a voter, then we recommend strongly that you do not store your Aptos voter keys with a custodian before the custodian supports this function. Until then, we suggest you store your voter keys in an Aptos wallet like [Petra](https://petra.app/) or [Martian](https://martianwallet.xyz/).
 
 This document describes how to perform voter operations while using an Aptos wallet. 
@@ -21,16 +17,10 @@ This document describes how to perform voter operations while using an Aptos wal
 To participate as a voter in the Aptos governance, follow the below steps. 
 
 1. Go to the [**Proposals section** of the Aptos Governance page](https://governance.aptosfoundation.org/).
-2. Next you should connect your wallet, but before you click on **CONNECT WALLET** (top-right):
-   1. Make sure you selected Mainnnet from the top-right drop-down menu.
-   2. Delete any previous versions of Aptos Wallet you have installed on Chrome.
-   3. **Install** the Petra (Aptos Wallet) extension on your Chrome browser by [following the instructions](../../../guides/install-petra-wallet.md).
-3. Click on **CONNECT WALLET** to connect your wallet to the Aptos Governance. 
-4. Make sure that the Mainnet network is selected on the wallet also. On Petra you can do this by the following:
-   - On Petra wallet window, click on the bottom right gear box icon. This will take you to **Settings** page on the wallet.
-   - Select **Network** > Mainnet.
-5. View the proposals. When you are ready to vote on a proposal, click on the proposal and vote.
-6. You will see a green snackbar indicating that the transaction is successful.
+2. Connect your wallet by clicking on **CONNECT WALLET** (top-right):
+3. Make sure that wallet is set to connect to Mainnet.
+4. View the proposals. When you are ready to vote on a proposal, click on the proposal and vote.
+5. You will see a green snackbar indicating that the transaction is successful.
 
 ### Steps Using Aptos CLI
 

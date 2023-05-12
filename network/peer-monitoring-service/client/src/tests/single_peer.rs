@@ -7,7 +7,7 @@ use crate::{
         mock::MockMonitoringServer,
         utils::{
             config_with_latency_ping_requests, config_with_network_info_requests,
-            config_with_node_info_requests, config_without_node_info_requests,
+            config_with_node_info_requests, config_with_only_latency_and_network_requests,
             create_connected_peers_map, create_network_info_response,
             create_random_network_info_response, create_random_node_info_response,
             elapse_latency_update_interval, elapse_metadata_updater_interval,
@@ -40,8 +40,8 @@ async fn test_basic_peer_monitor_loop() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(vec![network_id]);
 
-    // Create a node config where node info requests don't refresh
-    let node_config = config_without_node_info_requests();
+    // Create a node config where only latency and network requests are refreshed
+    let node_config = config_with_only_latency_and_network_requests();
 
     // Spawn the peer monitoring client
     start_peer_monitor(

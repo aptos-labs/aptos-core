@@ -19,7 +19,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -50,14 +50,20 @@ fn run_transactions<K, V>(
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        >::new(num_cpus::get(), executor_thread_pool.clone())
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -65,7 +71,6 @@ fn run_transactions<K, V>(
         }
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
-
         baseline.assert_output(&output);
     }
 }
@@ -176,14 +181,20 @@ fn deltas_writes_mixed() {
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .map(|zipped| zipped.into_iter().map(|(res, _)| res).collect());
+        >::new(num_cpus::get(), executor_thread_pool.clone())
+        .execute_transactions_parallel((), &transactions, &data_view);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None);
         baseline.assert_output(&output);
@@ -217,19 +228,30 @@ fn deltas_resolver() {
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
-        let (output, resolved) = BlockExecutor::<
+        let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
-        .execute_transactions_parallel((), &transactions, &data_view)
-        .unwrap()
-        .into_iter()
-        .unzip();
+        >::new(num_cpus::get(), executor_thread_pool.clone())
+        .execute_transactions_parallel((), &transactions, &data_view);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(resolved));
-        baseline.assert_output(&Ok(output));
+        let delta_writes = output
+            .as_ref()
+            .expect("Must be success")
+            .iter()
+            .map(|out| out.delta_writes())
+            .collect();
+
+        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(delta_writes));
+        baseline.assert_output(&output);
     }
 }
 
@@ -354,12 +376,19 @@ fn publishing_fixed_params() {
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     // Confirm still no intersection
     let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get())
+    >::new(num_cpus::get(), executor_thread_pool)
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
@@ -390,12 +419,19 @@ fn publishing_fixed_params() {
         },
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..200 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), executor_thread_pool.clone())
         .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

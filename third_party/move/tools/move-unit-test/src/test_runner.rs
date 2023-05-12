@@ -9,17 +9,10 @@ use crate::{
     },
 };
 use anyhow::Result;
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
-};
 use colored::*;
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_bytecode_utils::Modules;
-use move_compiler::{
-    shared::{Flags, NumericalAddress, PackagePaths},
-    unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan},
-};
+use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPlan};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -27,16 +20,7 @@ use move_core_types::{
     value::serialize_values,
     vm_status::StatusCode,
 };
-use move_model::{
-    model::GlobalEnv, options::ModelBuilderOptions,
-    run_model_builder_with_options_and_compilation_flags,
-};
 use move_resource_viewer::MoveValueAnnotator;
-use move_stackless_bytecode_interpreter::{
-    concrete::{settings::InterpreterSettings, value::GlobalState},
-    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
-    StacklessBytecodeInterpreter,
-};
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
@@ -46,7 +30,7 @@ use move_vm_test_utils::{
     InMemoryStorage,
 };
 use rayon::prelude::*;
-use std::{collections::BTreeMap, io::Write, marker::Send, sync::Mutex, time::Instant};
+use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
 #[cfg(feature = "evm-backend")]
 use {
     evm::{backend::MemoryVicinity, ExitReason},
@@ -65,10 +49,8 @@ pub struct SharedTestingConfig {
     cost_table: CostTable,
     native_function_table: NativeFunctionTable,
     starting_storage_state: InMemoryStorage,
+    #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
-    named_address_values: BTreeMap<String, NumericalAddress>,
-    check_stackless_vm: bool,
-    verbose: bool,
     record_writeset: bool,
 
     #[cfg(feature = "evm-backend")]
@@ -142,8 +124,6 @@ impl TestRunner {
     pub fn new(
         execution_bound: u64,
         num_threads: usize,
-        check_stackless_vm: bool,
-        verbose: bool,
         save_storage_state_on_failure: bool,
         report_stacktrace_on_abort: bool,
         tests: TestPlan,
@@ -151,7 +131,6 @@ impl TestRunner {
         // we don't have to make assumptions about their gas parameters.
         native_function_table: Option<NativeFunctionTable>,
         cost_table: Option<CostTable>,
-        named_address_values: BTreeMap<String, NumericalAddress>,
         record_writeset: bool,
         #[cfg(feature = "evm-backend")] evm: bool,
     ) -> Result<Self> {
@@ -182,9 +161,6 @@ impl TestRunner {
                 // From the API standpoint, we should let the client specify the cost table.
                 cost_table: cost_table.unwrap_or_else(unit_cost_table),
                 source_files,
-                check_stackless_vm,
-                verbose,
-                named_address_values,
                 record_writeset,
                 #[cfg(feature = "evm-backend")]
                 evm,
@@ -325,94 +301,11 @@ impl SharedTestingConfig {
         }
     }
 
-    fn execute_via_stackless_vm(
-        &self,
-        env: &GlobalEnv,
-        test_plan: &ModuleTestPlan,
-        function_name: &str,
-        test_info: &TestCase,
-    ) -> (
-        VMResult<ChangeSet>,
-        VMResult<Vec<Vec<u8>>>,
-        TestRunInfo,
-        Option<String>,
-    ) {
-        let now = Instant::now();
-
-        let settings = if self.verbose {
-            InterpreterSettings::verbose_default()
-        } else {
-            InterpreterSettings::default()
-        };
-        let interpreter = StacklessBytecodeInterpreter::new(env, None, settings);
-
-        // NOTE: as of now, `self.starting_storage_state` contains modules only and no resources.
-        // The modules are captured by `env: &GlobalEnv` and the default GlobalState captures the
-        // empty-resource state.
-        let global_state = GlobalState::default();
-        let (return_result, change_set, _) = interpreter.interpret(
-            &test_plan.module_id,
-            IdentStr::new(function_name).unwrap(),
-            &[], // no ty args, at least for now
-            &test_info.arguments,
-            &global_state,
-        );
-        let prop_check_result = interpreter.report_property_checking_results();
-
-        let test_run_info = TestRunInfo::new(
-            function_name.to_string(),
-            now.elapsed(),
-            // NOTE (mengxu) instruction counting on stackless VM might not be very useful because
-            // gas is not charged against stackless VM instruction.
-            0,
-        );
-        (
-            Ok(change_set),
-            return_result,
-            test_run_info,
-            prop_check_result,
-        )
-    }
-
     fn exec_module_tests_move_vm_and_stackless_vm(
         &self,
         test_plan: &ModuleTestPlan,
         output: &TestOutput<impl Write>,
     ) -> TestStatistics {
-        // TODO: Somehow, paths of some temporary Move interface files are being passed in after those files
-        // have been removed. This is a dirty hack to work around the problem while we investigate the root
-        // cause.
-        let filtered_sources = self
-            .source_files
-            .iter()
-            .filter(|s| !s.contains("mv_interfaces"))
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let stackless_model = if self.check_stackless_vm {
-            let model = run_model_builder_with_options_and_compilation_flags(
-                vec![PackagePaths {
-                    name: None,
-                    paths: filtered_sources,
-                    named_address_map: self.named_address_values.clone(),
-                }],
-                vec![],
-                ModelBuilderOptions::default(),
-                Flags::testing(),
-            )
-            .unwrap_or_else(|e| panic!("Unable to build stackless bytecode: {}", e));
-
-            if model.has_errors() {
-                let mut stderr = StandardStream::stderr(ColorChoice::Always);
-                model.report_diag(&mut stderr, Severity::Error);
-                panic!("Move model has errors");
-            }
-
-            Some(model)
-        } else {
-            None
-        };
-
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
@@ -425,52 +318,6 @@ impl SharedTestingConfig {
                     test_plan,
                     format!("{:?}", cs_result),
                 );
-            }
-
-            if self.check_stackless_vm {
-                let (stackless_vm_change_set, stackless_vm_result, _, prop_check_result) = self
-                    .execute_via_stackless_vm(
-                        stackless_model.as_ref().unwrap(),
-                        test_plan,
-                        function_name,
-                        test_info,
-                    );
-                let move_vm_result = adapt_move_vm_result(exec_result.clone());
-                let move_vm_change_set =
-                    adapt_move_vm_change_set(cs_result.clone(), &self.starting_storage_state);
-                if stackless_vm_result != move_vm_result
-                    || stackless_vm_change_set != move_vm_change_set
-                {
-                    output.fail(function_name);
-                    stats.test_failure(
-                        TestFailure::new(
-                            FailureReason::mismatch(
-                                move_vm_result,
-                                move_vm_change_set,
-                                stackless_vm_result,
-                                stackless_vm_change_set,
-                            ),
-                            test_run_info,
-                            None,
-                            None,
-                        ),
-                        test_plan,
-                    );
-                    continue;
-                }
-                if let Some(prop_failure) = prop_check_result {
-                    output.fail(function_name);
-                    stats.test_failure(
-                        TestFailure::new(
-                            FailureReason::property(prop_failure),
-                            test_run_info,
-                            None,
-                            None,
-                        ),
-                        test_plan,
-                    );
-                    continue;
-                }
             }
 
             let save_session_state = || {

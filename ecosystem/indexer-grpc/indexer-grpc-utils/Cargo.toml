@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-protos = { workspace = true }
+async-trait = { workspace = true }
 backoff = { workspace = true }
 base64  = { workspace = true }
 cloud-storage = { workspace = true }

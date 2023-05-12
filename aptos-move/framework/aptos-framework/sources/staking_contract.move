@@ -618,7 +618,7 @@ module aptos_framework::staking_contract {
         }
     }
 
-    // Assert that a staking_contract exists for the staker/operator pair.
+    /// Assert that a staking_contract exists for the staker/operator pair.
     fun assert_staking_contract_exists(staker: address, operator: address) acquires Store {
         assert!(exists<Store>(staker), error::not_found(ENO_STAKING_CONTRACT_FOUND_FOR_STAKER));
         let staking_contracts = &mut borrow_global_mut<Store>(staker).staking_contracts;
@@ -628,7 +628,7 @@ module aptos_framework::staking_contract {
         );
     }
 
-    // Add a new distribution for `recipient` and `amount` to the staking contract's distributions list.
+    /// Add a new distribution for `recipient` and `amount` to the staking contract's distributions list.
     fun add_distribution(
         operator: address,
         staking_contract: &mut StakingContract,
@@ -649,7 +649,7 @@ module aptos_framework::staking_contract {
         );
     }
 
-    // Calculate accumulated rewards and commissions since last update.
+    /// Calculate accumulated rewards and commissions since last update.
     fun get_staking_contract_amounts_internal(staking_contract: &StakingContract): (u64, u64, u64) {
         // Pending_inactive is not included in the calculation because pending_inactive can only come from:
         // 1. Outgoing commissions. This means commission has already been extracted.
@@ -726,7 +726,7 @@ module aptos_framework::staking_contract {
         pool_u64::update_total_coins(distribution_pool, updated_total_coins);
     }
 
-    // Create a new staking_contracts resource.
+    /// Create a new staking_contracts resource.
     fun new_staking_contracts_holder(staker: &signer): Store {
         Store {
             staking_contracts: simple_map::create<address, StakingContract>(),

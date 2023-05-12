@@ -7,7 +7,7 @@
 // contains a `CompiledModule` for the module below.
 // A helper file is provided to manipulate that file to generate
 // multiple, publishable module.
-module 0xABCD::Simple {
+module 0xABCD::simple {
     use std::error;
     use std::signer;
     use std::string::{Self, String, utf8};
@@ -43,6 +43,12 @@ module 0xABCD::Simple {
     // though there is a lot happening to get to this point.
     // In a sense compute the cost of an "empty" transaction.
     public entry fun nop(_s: &signer) {
+    }
+
+    public entry fun nop_2_signers(_s1: &signer, _s2: &signer) {
+    }
+
+    public entry fun nop_5_signers(_s1: &signer, _s2: &signer, _s3: &signer, _s4: &signer, _s5: &signer) {
     }
 
     // Test simple CPU usage. Loop as defined by the input `count`.
@@ -402,4 +408,7 @@ module 0xABCD::Simple {
             ret2
         }
     }
+
+
+
 }

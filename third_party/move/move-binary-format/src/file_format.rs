@@ -619,6 +619,13 @@ impl Ability {
             Self::Key => AbilitySet::EMPTY,
         }
     }
+
+    /// Returns an interator that iterates over all abilities.
+    pub fn all() -> impl ExactSizeIterator<Item = Ability> {
+        use Ability::*;
+
+        [Copy, Drop, Store, Key].into_iter()
+    }
 }
 
 /// A set of `Ability`s
@@ -673,6 +680,11 @@ impl AbilitySet {
         self.has_ability(Ability::Key)
     }
 
+    #[allow(clippy::should_implement_trait)]
+    pub fn add(self, ability: Ability) -> Self {
+        Self(self.0 | ability as u8)
+    }
+
     pub fn remove(self, ability: Ability) -> Self {
         Self(self.0 & (!(ability as u8)))
     }
@@ -683,6 +695,18 @@ impl AbilitySet {
 
     pub fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    pub fn requires(self) -> Self {
+        let mut requires = Self::EMPTY;
+
+        for ability in Ability::all() {
+            if self.has_ability(ability) {
+                requires = requires.add(ability.requires())
+            }
+        }
+
+        requires
     }
 
     #[inline]

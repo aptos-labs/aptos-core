@@ -13,17 +13,11 @@ const PER_PAGE = 100;
 // you might need to go find the contributor based on their email and ask what their
 // GitHub username is and add it to this map.
 const ADDITIONAL_EMAIL_TO_USERNAME = Object.freeze({
-  "aching@calibra.com": "aching",
-  "bo@aptoslabs.com": "areshand",
-  "christian@aptoslabs.com": "geekflyer",
-  "jijunleng@gmail.com": "jjleng",
-  "josh.lind@hotmail.com": "joshlind",
-  "kent@aptoslabs.com": "kent-white",
-  "kevin@aptoslabs.com": "movekevin",
-  "max@aptoslabs.com": "capcap",
-  "msmouse@gmail.com": "msmouse",
+  "109111707+zihan-aptos@users.noreply.github.com": "0xZihan",
+  "128556004+jin-aptos@users.noreply.github.com": "0xjinn",
+  "alex@alexs-macbook-pro.local": "markuze",
   "raj@aptoslabs.com": "rajkaramchedu",
-  "wgrieskamp@gmail.com": "wrwg",
+  "siddharthjain@siddharths-mbp.lan": "MartianSiddharth",
 });
 
 // Fetch the token for using the GitHub GraphQL API. First try the environment (for CI)
@@ -31,7 +25,6 @@ const ADDITIONAL_EMAIL_TO_USERNAME = Object.freeze({
 function getGitHubToken() {
   const { GITHUB_TOKEN } = process.env;
   if (GITHUB_TOKEN) {
-    console.log("Using token from the GITHUB_TOKEN environment variable");
     return GITHUB_TOKEN;
   }
   // If no token was provided via the environment, try to use the GH CLI.
@@ -62,9 +55,9 @@ function getGitHubToken() {
 //
 // See here for where this code originally came from:
 // https://stackoverflow.com/questions/75868720/how-to-lookup-github-username-for-many-users-by-email
-async function fetchEmailToUsername() {
+async function fetchEmailToUsername(docRoot) {
   // Read contributor emails from the git log and store them in an array.
-  const out = shell.exec('git log --format="%ae" | sort -u', { silent: true });
+  const out = shell.exec(`git log --format="%aE" -- ${docRoot} | sort -u`, { silent: true });
   const emailsUnfiltered = out.stdout.split("\n").filter(Boolean);
 
   // Filter out emails ending with @users.noreply.github.com since the first part of
@@ -85,7 +78,7 @@ async function fetchEmailToUsername() {
     // chunk. See https://docs.github.com/en/graphql/reference/queries
     let query = "query {";
     for (const [idx, email] of emailChunk.entries()) {
-      query += ` query${idx}: search(query: "in:email ${email}", type: USER, first: 1) { nodes { ... on User { login email } } }`;
+      query += ` query${idx}: search(query: "in:email ${email}", type: USER, first: 1) { nodes { ... on User { login } } }`;
     }
     query += " }";
 
@@ -102,14 +95,15 @@ async function fetchEmailToUsername() {
     const responseBody = await response.json();
 
     // Parse the JSON response and append to the email => username map.
-    const nodes = Object.values(responseBody.data).flatMap((value) => value.nodes);
-
-    for (let i = 0; i < nodes.length; i++) {
-      const { email, login } = nodes[i];
-      if (!email) {
-        continue;
+    for (const [idx, [_, value]] of Object.entries(Object.entries(responseBody.data))) {
+      const email = emailChunk.at(idx);
+      let login = Array.prototype.at(value.nodes, 0);
+      if (!login) {
+        login = await fetchEmailToUsernameViaCommit(email, docRoot);
       }
-      emailUsernameMap.set(email.toLowerCase(), login);
+      if (login) {
+        emailUsernameMap.set(email.toLowerCase(), login);
+      }
     }
 
     console.log(`Fetched ${page + emailChunk.length} usernames out of ${emails.length} emails`);
@@ -118,9 +112,50 @@ async function fetchEmailToUsername() {
   return emailUsernameMap;
 }
 
+async function fetchEmailToUsernameViaCommit(email, docRoot) {
+  const commit = shell
+    .exec(`git log --author="${email}" --format="%H" --max-count=1 -- ${docRoot}`, { silent: true })
+    .trim();
+  if (!commit) {
+    return null;
+  }
+  const githubToken = getGitHubToken();
+
+  // Build the GraphQL query string with one search query per email address in this
+  // chunk. See https://docs.github.com/en/graphql/reference/queries
+  let query = `
+    query {
+      repository(owner: "aptos-labs", name: "aptos-core") {
+        object(oid: "${commit}") {
+          ... on Commit {
+            author {
+              user {
+                login
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const fetchOptions = {
+    method: "POST",
+    headers: {
+      Authorization: `token ${githubToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query }),
+  };
+
+  const response = await fetch("https://api.github.com/graphql", fetchOptions);
+  const responseBody = await response.json();
+
+  return responseBody?.data?.repository?.object?.author?.user?.login;
+}
+
 const GITHUB_USERS_EMAIL_REGEX = /(\d+\+)?([^@]+)@users\.noreply\.github\.com/;
 
-const lookupEmailToUsername = (email, emailToUsername) => {
+function lookupEmailToUsername(email, emailToUsername) {
   email = email.toLowerCase();
   if (ADDITIONAL_EMAIL_TO_USERNAME[email]) {
     return ADDITIONAL_EMAIL_TO_USERNAME[email];
@@ -130,43 +165,29 @@ const lookupEmailToUsername = (email, emailToUsername) => {
     return email.match(GITHUB_USERS_EMAIL_REGEX)[2];
   }
   return null;
-};
+}
 
-const resolveContributors = (contributors, emailToUsername) => {
-  const result = [];
-
-  // Group by email.
-  const emails = {};
-  for (const contributor of contributors) {
-    if (emails[contributor.email]) {
-      continue;
+function resolveContributors(contributors, emailToUsername) {
+  for (let contributor of contributors) {
+    if (!contributor.username) {
+      contributor.username = lookupEmailToUsername(contributor.email, emailToUsername);
     }
-    emails[contributor.email] = true;
-    result.push(contributor);
   }
+  contributors.sort(compare_contributors);
+  return contributors;
+}
 
-  // Group by name.
-  const names = {};
-  for (const contributor of result.slice()) {
-    if (names[contributor.name]) {
-      if (names[contributor.name].username == null) {
-        names[contributor.name].username = lookupEmailToUsername(contributor.email, emailToUsername);
-      }
-      result.splice(result.indexOf(contributor), 1);
-      continue;
-    }
-    names[contributor.name] = contributor;
+function compare_contributors(left, right) {
+  if (left.username < right.username) {
+    return -1;
+  } else if (right.username < left.username) {
+    return 1;
   }
+  return 0;
+}
 
-  return result;
-};
-
-async function contributorsForFile(filePath, emailToUsername) {
-  const shortlog = shell.exec(`git shortlog -sne -- "${path.basename(filePath)}" < /dev/tty`, {
-    cwd: path.dirname(filePath),
-    silent: true,
-  });
-
+function contributorsForPath(filePath, emailToUsername) {
+  const shortlog = shell.exec(`git log --format="%aN <%aE>" -- "${filePath}" | sort -u`, { silent: true });
   if (shortlog.code !== 0) {
     return;
   }
@@ -187,19 +208,6 @@ async function contributorsForFile(filePath, emailToUsername) {
   );
 }
 
-async function urlPath(docRoot, docPath) {
-  const relativePath = path.relative(docRoot, docPath);
-  const urlRoot = relativePath.includes("/") ? "/" + path.dirname(relativePath) + "/" : "/";
-  const docContents = await fs.readFile(docPath, "utf8");
-  const slugMatch = docContents.match(/^slug:\s*["']?([^"']+)["']?$/im);
-  if (slugMatch) {
-    return urlRoot + slugMatch[1];
-  } else {
-    const filename = path.basename(relativePath);
-    return urlRoot + filename.substring(0, filename.length - 3); // Remove .md suffix
-  }
-}
-
 async function* docPaths(rootDir) {
   const files = await fs.readdir(rootDir, { withFileTypes: true });
 
@@ -214,14 +222,9 @@ async function* docPaths(rootDir) {
 }
 
 (async function () {
-  const emailToUsername = await fetchEmailToUsername();
-  const result = {};
   const docRoot = path.join(__dirname, "../docs");
-  for await (const docPath of docPaths(docRoot)) {
-    const url = await urlPath(docRoot, docPath);
-    result[url] = await contributorsForFile(docPath, emailToUsername);
-    console.log("Determining contributors for", url);
-  }
+  const emailToUsername = await fetchEmailToUsername(docRoot);
+  const result = await contributorsForPath(docRoot, emailToUsername);
   const json = JSON.stringify(result, null, 2);
   await fs.writeFile(path.join(__dirname, "../src/contributors.json"), json);
   console.log("Done!!");

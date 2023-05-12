@@ -17,7 +17,8 @@ provider "helm" {
 module "validator" {
   source = "../../aptos-node/gcp"
 
-  manage_via_tf = var.manage_via_tf
+  cluster_bootstrap = var.cluster_bootstrap
+  manage_via_tf     = var.manage_via_tf
 
   # Project config
   project = var.project
@@ -61,7 +62,7 @@ module "validator" {
 
   # addons
   enable_monitoring      = var.enable_monitoring
-  enable_node_exporter   = var.enable_node_exporter
+  enable_node_exporter   = var.enable_prometheus_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
 }
 

@@ -73,7 +73,7 @@ struct Baseline<K, V>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
-    K: Hash + Eq + Clone,
+    K: Hash + Eq + Clone + Debug,
     V: Clone + Into<Vec<u8>> + Debug + PartialEq,
 {
     pub fn new(txns: &[(K, Operator<V>)]) -> Self {
@@ -180,7 +180,7 @@ fn run_and_assert<K, V>(
     transaction_gens: Vec<(Index, Operator<V>)>,
 ) -> Result<(), TestCaseError>
 where
-    K: PartialOrd + Send + Clone + Hash + Eq + Sync,
+    K: PartialOrd + Send + Clone + Hash + Eq + Sync + Debug,
     V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Sync,
 {
     let transactions: Vec<(K, Operator<V>)> = transaction_gens

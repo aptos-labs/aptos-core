@@ -12,6 +12,10 @@ inputs:
   GCP_SERVICE_ACCOUNT_EMAIL:
     required: true
     description: "GCP service account email"
+  EXPORT_GCP_PROJECT_VARIABLES:
+    required: false
+    description: "Whether to export GCP credentials to the environment. Useful for running gcloud commands"
+    default: "true"
   # AWS auth
   AWS_ACCESS_KEY_ID:
     required: true
@@ -26,6 +30,10 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+outputs:
+  CLOUDSDK_AUTH_ACCESS_TOKEN:
+    description: "GCP access token"
+    value: ${{ steps.auth.outputs.access_token }}
 
 runs:
   using: composite
@@ -65,6 +73,7 @@ runs:
         access_token_lifetime: 5400 # setting this to 1.5h since sometimes docker builds (special performance builds etc.) take that long. Default is 1h.
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
+        export_environment_variables: ${{ inputs.EXPORT_GCP_PROJECT_VARIABLES }}
 
     - name: Login to us-west1 Google Artifact Registry
       uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # pin@v2

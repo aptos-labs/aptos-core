@@ -4,17 +4,25 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::helpers::make_module_natives;
-use move_binary_format::errors::PartialVMResult;
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use crate::{
+    natives::{
+        helpers::{
+            make_module_natives, make_safe_native, SafeNativeContext, SafeNativeError,
+            SafeNativeResult,
+        },
+        string_utils::native_format_debug,
+    },
+    safely_pop_arg,
+};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
+use move_vm_runtime::native_functions::NativeFunction;
 #[allow(unused_imports)]
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
-    pop_arg,
     values::{Reference, Struct, Value},
 };
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
@@ -22,12 +30,17 @@ use std::{collections::VecDeque, sync::Arc};
  *
  **************************************************************************************************/
 #[inline]
-fn native_print(ty_args: Vec<Type>, mut args: VecDeque<Value>) -> PartialVMResult<NativeResult> {
+fn native_print(
+    _: &(),
+    _: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
     if cfg!(feature = "testing") {
-        let val = pop_arg!(args, Struct);
+        let val = safely_pop_arg!(args, Struct);
         let bytes = val.unpack()?.next().unwrap();
 
         println!(
@@ -36,15 +49,7 @@ fn native_print(ty_args: Vec<Type>, mut args: VecDeque<Value>) -> PartialVMResul
         );
     }
 
-    Ok(NativeResult::ok(0.into(), smallvec![]))
-}
-
-pub fn make_native_print() -> NativeFunction {
-    Arc::new(
-        move |_context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_print(ty_args, args)
-        },
-    )
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
@@ -54,10 +59,11 @@ pub fn make_native_print() -> NativeFunction {
 #[allow(unused_variables)]
 #[inline]
 fn native_stack_trace(
-    context: &mut NativeContext,
+    _: &(),
+    context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.is_empty());
 
@@ -68,35 +74,81 @@ fn native_stack_trace(
     }
 
     let move_str = Value::struct_(Struct::pack(vec![Value::vector_u8(s.into_bytes())]));
-    Ok(NativeResult::ok(0.into(), smallvec![move_str]))
+    Ok(smallvec![move_str])
 }
 
-pub fn make_native_stack_trace() -> NativeFunction {
-    Arc::new(
-        move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_stack_trace(context, ty_args, args)
-        },
-    )
+#[inline]
+fn native_old_debug_print(
+    _: &(),
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if cfg!(feature = "testing") {
+        let x = safely_pop_arg!(args, Reference);
+        let val = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
+
+        println!(
+            "[debug] {}",
+            native_format_debug(context, &ty_args[0], val)?
+        );
+    }
+    Ok(smallvec![])
 }
 
-pub fn make_dummy() -> NativeFunction {
-    Arc::new(
-        move |_context, _ty_args, _args| -> PartialVMResult<NativeResult> {
-            Ok(NativeResult::ok(0.into(), smallvec![]))
-        },
-    )
+#[inline]
+fn native_old_print_stacktrace(
+    _: &(),
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.is_empty());
+    debug_assert!(args.is_empty());
+
+    if cfg!(feature = "testing") {
+        let mut s = String::new();
+        context.print_stack_trace(&mut s)?;
+        println!("{}", s);
+    }
+    Ok(smallvec![])
 }
 
 /***************************************************************************************************
  * module
  **************************************************************************************************/
-pub fn make_all() -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
-        ("native_print", make_native_print()),
-        ("native_stack_trace", make_native_stack_trace()),
-        // For replayability on-chain we need dummy implementations of these functions
-        ("print", make_dummy()),
-        ("print_stack_trace", make_dummy()),
+        (
+            "native_print",
+            make_safe_native((), timed_features.clone(), features.clone(), native_print),
+        ),
+        (
+            "native_stack_trace",
+            make_safe_native(
+                (),
+                timed_features.clone(),
+                features.clone(),
+                native_stack_trace,
+            ),
+        ),
+        // For re-playability on-chain we still implement the old versions of these functions
+        (
+            "print",
+            make_safe_native(
+                (),
+                timed_features.clone(),
+                features.clone(),
+                native_old_debug_print,
+            ),
+        ),
+        (
+            "print_stack_trace",
+            make_safe_native((), timed_features, features, native_old_print_stacktrace),
+        ),
     ];
 
     make_module_natives(natives)

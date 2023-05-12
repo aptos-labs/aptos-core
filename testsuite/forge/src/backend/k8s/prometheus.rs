@@ -188,6 +188,7 @@ mod tests {
             ])),
             string_data: None,
             type_: None,
+            immutable: None,
         })));
 
         create_prometheus_client_from_environment(secret_api)

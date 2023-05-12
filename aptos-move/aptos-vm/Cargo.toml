@@ -20,12 +20,14 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 bcs = { workspace = true }
 dashmap = { workspace = true }

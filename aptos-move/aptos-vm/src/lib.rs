@@ -103,7 +103,7 @@
 
 mod access_path_cache;
 #[macro_use]
-mod counters;
+pub mod counters;
 pub mod data_cache;
 
 #[cfg(feature = "mirai-contracts")]
@@ -118,6 +118,7 @@ mod errors;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod read_write_set_analysis;
+pub mod sharded_block_executor;
 pub mod system_module_names;
 pub mod transaction_metadata;
 mod verifier;

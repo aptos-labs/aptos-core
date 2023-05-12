@@ -6,8 +6,8 @@
 use crate::config::persistable_config::PersistableConfig;
 use crate::{
     config::{
-        config_sanitizer::ConfigSanitizer, Error, IdentityBlob, LoggerConfig, NodeConfig, RoleType,
-        SecureBackend, WaypointConfig,
+        config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, IdentityBlob,
+        LoggerConfig, NodeConfig, SecureBackend, WaypointConfig,
     },
     keys::ConfigKey,
 };
@@ -71,22 +71,21 @@ impl SafetyRulesConfig {
 }
 
 impl ConfigSanitizer for SafetyRulesConfig {
-    /// Validate and process the safety rules config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        node_role: RoleType,
+        node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let safety_rules_config = &node_config.consensus.safety_rules;
 
         // If the node is not a validator, there's nothing to be done
-        if !node_role.is_validator() {
+        if !node_type.is_validator() {
             return Ok(());
         }
 
         // Verify that the secure backend is appropriate for mainnet validators
-        if chain_id.is_mainnet() && node_role.is_validator() {
+        if chain_id.is_mainnet() && node_type.is_validator() {
             if safety_rules_config.backend.is_github() {
                 return Err(Error::ConfigSanitizerFailed(
                     sanitizer_name,
@@ -118,7 +117,7 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the initial safety rules config is set for validators
-        if node_role.is_validator() {
+        if node_type.is_validator() {
             if let InitialSafetyRulesConfig::None = safety_rules_config.initial_safety_rules_config
             {
                 return Err(Error::ConfigSanitizerFailed(
@@ -253,7 +252,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -273,8 +272,12 @@ mod tests {
         };
 
         // Verify that the config sanitizer passes because the node is a fullnode
-        SafetyRulesConfig::sanitize(&mut node_config, RoleType::FullNode, ChainId::mainnet())
-            .unwrap();
+        SafetyRulesConfig::sanitize(
+            &mut node_config,
+            NodeType::PublicFullnode,
+            ChainId::mainnet(),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -293,7 +296,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -314,7 +317,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -335,7 +338,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, RoleType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
