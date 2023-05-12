@@ -66,14 +66,14 @@ group "forge-images" {
 }
 
 target "debian-base" {
-  dockerfile = "docker/experimental/debian-base.Dockerfile"
+  dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    debian = "docker-image://debian:bullseye-20220912@sha256:3e82b1af33607aebaeb3641b75d6e80fd28d36e17993ef13708e9493e30e8ff9"
+    debian = "docker-image://debian:bullseye-20230502@sha256:32888a3c745e38e72a5f49161afc7bb52a263b8f5ea1b3b4a6af537678f29491"
   }
 }
 
 target "builder-base" {
-  dockerfile = "docker/experimental/builder.Dockerfile"
+  dockerfile = "docker/builder/builder.Dockerfile"
   target = "builder-base"
   context = "."
   contexts = {
@@ -91,7 +91,7 @@ target "builder-base" {
 }
 
 target "aptos-node-builder" {
-  dockerfile = "docker/experimental/builder.Dockerfile"
+  dockerfile = "docker/builder/builder.Dockerfile"
   target = "aptos-node-builder"
   contexts = {
     builder-base = "target:builder-base"
@@ -102,7 +102,7 @@ target "aptos-node-builder" {
 }
 
 target "tools-builder" {
-  dockerfile = "docker/experimental/builder.Dockerfile"
+  dockerfile = "docker/builder/builder.Dockerfile"
   target = "tools-builder"
   contexts = {
     builder-base =  "target:builder-base"
@@ -135,7 +135,7 @@ target "_common" {
 
 target "validator-testing" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/validator-testing.Dockerfile"
+  dockerfile = "docker/builder/validator-testing.Dockerfile"
   target     = "validator-testing"
   cache-from = generate_cache_from("validator-testing") 
   cache-to   = generate_cache_to("validator-testing")
@@ -144,7 +144,7 @@ target "validator-testing" {
 
 target "tools" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/tools.Dockerfile"
+  dockerfile = "docker/builder/tools.Dockerfile"
   target     = "tools"
   cache-from = generate_cache_from("tools") 
   cache-to   = generate_cache_to("tools")
@@ -153,7 +153,7 @@ target "tools" {
 
 target "forge" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/forge.Dockerfile"
+  dockerfile = "docker/builder/forge.Dockerfile"
   target     = "forge"
   cache-from = generate_cache_from("forge") 
   cache-to   = generate_cache_to("forge")
@@ -162,7 +162,7 @@ target "forge" {
 
 target "validator" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/validator.Dockerfile"
+  dockerfile = "docker/builder/validator.Dockerfile"
   target     = "validator"
   cache-from = generate_cache_from("validator") 
   cache-to   = generate_cache_to("validator")
@@ -171,7 +171,7 @@ target "validator" {
 
 target "tools" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/tools.Dockerfile"
+  dockerfile = "docker/builder/tools.Dockerfile"
   target     = "tools"
   cache-from = generate_cache_from("tools") 
   cache-to   = generate_cache_to("tools")
@@ -180,7 +180,7 @@ target "tools" {
 
 target "node-checker" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/node-checker.Dockerfile"
+  dockerfile = "docker/builder/node-checker.Dockerfile"
   target     = "node-checker"
   cache-from = generate_cache_from("node-checker") 
   cache-to   = generate_cache_to("node-checker")
@@ -189,7 +189,7 @@ target "node-checker" {
 
 target "faucet" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/faucet.Dockerfile"
+  dockerfile = "docker/builder/faucet.Dockerfile"
   target     = "faucet"
   cache-from = generate_cache_from("faucet") 
   cache-to   = generate_cache_to("faucet")  
@@ -198,7 +198,7 @@ target "faucet" {
 
 target "telemetry-service" {
   inherits   = ["_common"]
-  dockerfile = "docker/experimental/telemetry-service.Dockerfile"
+  dockerfile = "docker/builder/telemetry-service.Dockerfile"
   target     = "telemetry-service"
   cache-from = generate_cache_from("telemetry-service") 
   cache-to   = generate_cache_to("telemetry-service")  
@@ -207,7 +207,7 @@ target "telemetry-service" {
 
 target "indexer-grpc" {
   inherits = ["_common"]
-  dockerfile = "docker/experimental/indexer-grpc.Dockerfile"
+  dockerfile = "docker/builder/indexer-grpc.Dockerfile"
   target   = "indexer-grpc"
   cache-to = generate_cache_to("indexer-grpc")
   tags     = generate_tags("indexer-grpc")
