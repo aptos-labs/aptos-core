@@ -17,7 +17,6 @@ use move_binary_format::{
 };
 use rand::{distributions::Alphanumeric, prelude::StdRng, seq::SliceRandom, Rng};
 use rand_core::RngCore;
-use std::collections::HashMap;
 
 //
 // Contains all the code to work on the Simple package
