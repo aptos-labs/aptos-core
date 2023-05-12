@@ -958,6 +958,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executable-store"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "claims",
+ "dashmap",
+ "proptest",
+ "proptest-derive",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
