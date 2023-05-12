@@ -31,7 +31,8 @@ module "validator" {
   record_name  = var.record_name
   # do not create the main fullnode and validator DNS records
   # instead, rely on external-dns from the testnet-addons
-  create_dns_records = false
+  create_dns_records = var.create_dns_records
+  dns_ttl            = var.dns_ttl
 
   # General chain config
   era            = var.era
@@ -99,6 +100,7 @@ resource "helm_release" "genesis" {
       genesis = {
         numValidators   = var.num_validators
         username_prefix = local.aptos_node_helm_prefix
+        domain          = local.domain
         validator = {
           enable_onchain_discovery = false
         }

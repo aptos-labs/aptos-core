@@ -1,3 +1,6 @@
+# Cloud provider
+cloud: EKS
+
 # -- Default image tag to use for all aptos images
 imageTag: devnet
 
@@ -50,7 +53,7 @@ load_test:
   # -- The fullnode groups to target
   fullnode:
     groups:
-    - name: fullnode
+      - name: fullnode
   config:
     # -- The number of fullnode groups to run traffic against
     numFullnodeGroups:

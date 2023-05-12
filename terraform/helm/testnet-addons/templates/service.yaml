@@ -6,7 +6,9 @@ metadata:
   labels:
     {{- include "testnet-addons.labels" . | nindent 4 }}
   annotations:
+    {{- if eq .Values.cloud "EKS" }}
     alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy
+    {{- end }}
 spec:
   selector:
     app.kubernetes.io/part-of: aptos-node
