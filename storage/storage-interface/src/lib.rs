@@ -27,6 +27,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
+        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -655,7 +656,7 @@ pub trait DbWriter: Send + Sync {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        block_state_updates: ShardedStateUpdates,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         unimplemented!()

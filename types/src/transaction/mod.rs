@@ -11,6 +11,7 @@ use crate::{
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
+    state_store::ShardedStateUpdates,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
@@ -29,7 +30,6 @@ use move_core_types::transaction_argument::convert_txn_args;
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     convert::TryFrom,
     fmt,
     fmt::{Debug, Display, Formatter},
@@ -42,7 +42,6 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-use crate::state_store::{state_key::StateKey, state_value::StateValue};
 #[cfg(any(test, feature = "fuzzing"))]
 pub use change_set::NoOpChangeSetChecker;
 pub use change_set::{ChangeSet, CheckChangeSet};
@@ -1170,7 +1169,7 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
-    state_updates: HashMap<StateKey, Option<StateValue>>,
+    state_updates: ShardedStateUpdates,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
     is_reconfig: bool,
@@ -1180,7 +1179,7 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: HashMap<StateKey, Option<StateValue>>,
+        state_updates: ShardedStateUpdates,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1212,7 +1211,7 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
+    pub fn state_updates(&self) -> &ShardedStateUpdates {
         &self.state_updates
     }
 

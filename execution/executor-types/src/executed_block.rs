@@ -11,10 +11,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     proof::accumulator::InMemoryAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::ShardedStateUpdates,
     transaction::{Transaction, TransactionStatus, TransactionToCommit},
 };
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ExecutedBlock {
@@ -25,7 +25,7 @@ pub struct ExecutedBlock {
     pub next_epoch_state: Option<EpochState>,
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
-    pub block_state_updates: HashMap<StateKey, Option<StateValue>>,
+    pub block_state_updates: ShardedStateUpdates,
     pub sharded_state_cache: ShardedStateCache,
 }
 
