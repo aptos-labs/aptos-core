@@ -147,7 +147,9 @@ impl AptosVM {
     }
 
     pub fn set_num_shards_once(mut num_shards: usize) {
-        num_shards = min(num_shards, 2);
+        num_shards = min(num_shards, 1
+
+        );
         // Only the first call succeeds, due to OnceCell semantics.
         NUM_EXECUTION_SHARD.set(num_shards).ok();
     }
