@@ -6,7 +6,7 @@ use crate::sharded_block_executor::{
     block_partitioner::{BlockPartitioner, UniformPartitioner},
     executor_shard::ExecutorShard,
 };
-use aptos_logger::{info, trace};
+use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use move_core_types::vm_status::VMStatus;
@@ -105,15 +105,20 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
 }
 
 impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
+    /// Best effort stops all the executor shards and waits for the thread to finish.
     fn drop(&mut self) {
         // send stop command to all executor shards
         for command_tx in self.command_txs.iter() {
-            command_tx.send(ExecutorShardCommand::Stop).unwrap();
+            if let Err(e) = command_tx.send(ExecutorShardCommand::Stop) {
+                error!("Failed to send stop command to executor shard: {:?}", e);
+            }
         }
 
         // wait for all executor shards to stop
         for shard_thread in self.shard_threads.drain(..) {
-            shard_thread.join().unwrap();
+            shard_thread.join().unwrap_or_else(|e| {
+                error!("Failed to join executor shard thread: {:?}", e);
+            });
         }
     }
 }
