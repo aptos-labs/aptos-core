@@ -23,9 +23,8 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver};
+use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver, types::ResourceRef};
 use std::collections::HashMap;
-use move_vm_types::types::ResourceRef;
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -259,7 +258,7 @@ impl ResourceRefResolver for RemoteStore {
     fn get_resource_ref(
         &self,
         _address: &AccountAddress,
-        _tag: &StructTag
+        _tag: &StructTag,
     ) -> anyhow::Result<Option<ResourceRef>> {
         Ok(None)
     }
@@ -267,7 +266,7 @@ impl ResourceRefResolver for RemoteStore {
     fn get_resource_bytes(
         &self,
         _address: &AccountAddress,
-        _tag: &StructTag
+        _tag: &StructTag,
     ) -> anyhow::Result<Option<Vec<u8>>> {
         Ok(None)
     }
