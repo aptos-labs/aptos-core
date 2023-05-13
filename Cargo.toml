@@ -51,6 +51,7 @@ members = [
     "crates/aptos-genesis",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
+    "crates/aptos-inspection-service",
     "crates/aptos-keygen",
     "crates/aptos-log-derive",
     "crates/aptos-logger",
@@ -77,7 +78,6 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
-    "crates/inspection-service",
     "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -293,7 +293,7 @@ aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-full
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-parser = { path = "ecosystem/indexer-grpc/indexer-grpc-parser" }
 aptos-infallible = { path = "crates/aptos-infallible" }
-aptos-inspection-service = { path = "crates/inspection-service" }
+aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }

@@ -16,7 +16,20 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [],
+      "targetBlank": true,
+      "title": "aptos-core",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -50,9 +63,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -98,9 +112,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -179,7 +194,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "aptos_backup_handler_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "hide": false,
+          "hide": true,
           "interval": "",
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
           "range": true,
@@ -203,6 +218,15 @@
           "legendFormat": "latest",
           "range": true,
           "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_db_backup_coordinator_epoch_ending_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "hide": false,
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "D"
         }
       ],
       "title": "Epoch Ending Backup: Epoch vs Latest Epoch",
@@ -229,9 +253,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -306,6 +331,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "aptos_backup_handler_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "hide": true,
           "interval": "",
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
           "range": true,
@@ -329,6 +355,16 @@
           "legendFormat": "latest",
           "range": true,
           "refId": "latest"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_db_backup_coordinator_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "C"
         }
       ],
       "title": "Transaction Backup: Version vs latest version",
@@ -362,7 +398,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -415,9 +451,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -492,6 +529,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "aptos_backup_handler_state_snapshot_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
+          "hide": true,
           "interval": "",
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
           "range": true,
@@ -511,13 +549,32 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "max(aptos_storage_latest_transaction_version{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
-          "hide": false,
+          "hide": true,
           "legendFormat": "latest",
           "range": true,
           "refId": "latest"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "max(aptos_storage_next_block_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"})",
+          "hide": false,
+          "legendFormat": "latest",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "aptos_db_backup_coordinator_state_snapshot_epoch{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{cluster}} {{kubernetes_pod_name}} backed up",
+          "range": true,
+          "refId": "D"
         }
       ],
-      "title": "State Snapshot: Version vs Latest Version",
+      "title": "State Snapshot: epoch vs Latest epoch",
       "type": "timeseries"
     },
     {
@@ -548,7 +605,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.4.7",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -672,7 +729,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
@@ -685,9 +742,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -738,7 +796,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -795,7 +853,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -834,7 +892,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
@@ -847,9 +905,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -900,7 +959,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -957,7 +1016,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -996,7 +1055,7 @@
           "color": { "mode": "continuous-RdYlGr" },
           "links": [],
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
           "unit": "none"
         },
         "overrides": []
@@ -1009,9 +1068,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "repeatDirection": "h",
       "targets": [
         {
@@ -1062,7 +1122,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.1.f9fd074b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1119,7 +1179,13 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "dateTimeAsLocal"
         },
         "overrides": [
@@ -1147,7 +1213,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d])",
+          "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]))",
           "hide": false,
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} running since",
           "range": true,
@@ -1156,7 +1222,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d])",
+          "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]))",
           "hide": false,
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} succeeded since",
           "range": true,
@@ -1165,7 +1231,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d])",
+          "expr": "sort_desc(last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\"}[2d]) * 1000\r\nunless last_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d])\r\nunless last_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[2d]) >  last_over_time(aptos_db_backup_verify_coordinator_fail_timestamp_s[2d]))",
           "hide": false,
           "legendFormat": "{{cluster}} {{kubernetes_pod_name}} failed since",
           "range": true,
@@ -2283,8 +2349,8 @@
         "multi": true,
         "name": "role",
         "options": [
-          { "selected": false, "text": "All", "value": "$__all" },
-          { "selected": true, "text": "fullnode", "value": "fullnode" },
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "fullnode", "value": "fullnode" },
           { "selected": false, "text": "validator_fullnode", "value": "validator_fullnode" }
         ],
         "query": "fullnode, validator_fullnode",
@@ -2321,6 +2387,6 @@
   "timezone": "",
   "title": "storage-backup-and-restore",
   "uid": "9oXpx4n4z",
-  "version": 4,
+  "version": 14,
   "weekStart": ""
 }
