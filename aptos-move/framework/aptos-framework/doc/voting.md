@@ -42,6 +42,7 @@ the resolution process.
 -  [Function `resolve`](#0x1_voting_resolve)
 -  [Function `resolve_proposal_v2`](#0x1_voting_resolve_proposal_v2)
 -  [Function `next_proposal_id`](#0x1_voting_next_proposal_id)
+-  [Function `is_proposal_id_assigned`](#0x1_voting_is_proposal_id_assigned)
 -  [Function `is_voting_closed`](#0x1_voting_is_voting_closed)
 -  [Function `can_be_resolved_early`](#0x1_voting_can_be_resolved_early)
 -  [Function `get_proposal_state`](#0x1_voting_get_proposal_state)
@@ -63,6 +64,7 @@ the resolution process.
     -  [Function `resolve`](#@Specification_1_resolve)
     -  [Function `resolve_proposal_v2`](#@Specification_1_resolve_proposal_v2)
     -  [Function `next_proposal_id`](#@Specification_1_next_proposal_id)
+    -  [Function `is_proposal_id_assigned`](#@Specification_1_is_proposal_id_assigned)
     -  [Function `is_voting_closed`](#@Specification_1_is_voting_closed)
     -  [Function `can_be_resolved_early`](#@Specification_1_can_be_resolved_early)
     -  [Function `get_proposal_state`](#@Specification_1_get_proposal_state)
@@ -1116,9 +1118,36 @@ Return the next unassigned proposal id
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>,): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     voting_forum.next_proposal_id
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_voting_is_proposal_id_assigned"></a>
+
+## Function `is_proposal_id_assigned`
+
+Return true if the proposal id has been assigned
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+    // Since the proposal id is simply an increasing nonce, we can just do cheap equality check. If this
+    // ever changes, the <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> of proposals on the <a href="voting.md#0x1_voting">voting</a> forum should be directly checked
+    proposal_id &lt; <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType&gt;(voting_forum_address)
 }
 </code></pre>
 
@@ -1717,6 +1746,23 @@ Return true if the voting period of the given proposal has already ended.
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+</code></pre>
+
+
+
+<a name="@Specification_1_is_proposal_id_assigned"></a>
+
+### Function `is_proposal_id_assigned`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
 </code></pre>
 
 

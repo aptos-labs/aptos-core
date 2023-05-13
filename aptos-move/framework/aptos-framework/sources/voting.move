@@ -488,9 +488,17 @@ module aptos_framework::voting {
 
     #[view]
     /// Return the next unassigned proposal id
-    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address,): u64 acquires VotingForum {
+    public fun next_proposal_id<ProposalType: store>(voting_forum_address: address): u64 acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         voting_forum.next_proposal_id
+    }
+
+    #[view]
+    /// Return true if the proposal id has been assigned
+    public fun is_proposal_id_assigned<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
+        // Since the proposal id is simply an increasing nonce, we can just do cheap equality check. If this
+        // ever changes, the table of proposals on the voting forum should be directly checked
+        proposal_id < next_proposal_id<ProposalType>(voting_forum_address)
     }
 
     #[view]
