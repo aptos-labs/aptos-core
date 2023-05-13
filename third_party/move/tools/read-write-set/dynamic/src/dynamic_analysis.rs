@@ -12,10 +12,10 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, ResourceKey, TypeTag},
-    resolver::MoveResolver,
     value::MoveValue,
 };
 use move_read_write_set_types::{Access, AccessPath, Offset, ReadWriteSet, RootAddress};
+use move_vm_types::resolver::MoveRefResolver;
 use std::{
     borrow::Borrow,
     fmt::{self, Formatter},
@@ -52,7 +52,7 @@ impl ConcretizedFormals {
     /// example: if `self` is 0x7/0x1::AModule::AResource/addr_field/0x2::M2::R/f -> Write and the
     /// value of 0x7/0x1::AModule::AResource/addr_field is 0xA in `blockchain_view`, this will
     /// return { 0x7/0x1::AModule::AResource/addr_field -> Read, 0xA/0x2::M2::R/f -> Write }
-    pub fn concretize_secondary_indexes<R: MoveResolver>(
+    pub fn concretize_secondary_indexes<R: MoveRefResolver>(
         self,
         blockchain_view: &R,
     ) -> Option<ConcretizedSecondaryIndexes> {
@@ -123,7 +123,7 @@ impl ConcretizedFormals {
 
     /// Concretize the secondary in `offsets` -> `access` using `annotator` and add the results to
     /// `acc`.
-    fn concretize_offsets<R: MoveResolver>(
+    fn concretize_offsets<R: MoveRefResolver>(
         module_cache: &ModuleCache<&R>,
         blockchain_view: &R,
         access_path: AccessPath,
@@ -199,7 +199,7 @@ impl ConcretizedFormals {
     }
 
     /// Concretize the secondary indexes in `access_path` and add the result to `acc`. For example
-    fn concretize_secondary_indexes_<R: MoveResolver>(
+    fn concretize_secondary_indexes_<R: MoveRefResolver>(
         module_cache: &ModuleCache<&R>,
         blockchain_view: &R,
         access_path: &AccessPath,
@@ -216,7 +216,7 @@ impl ConcretizedFormals {
                     anyhow!("Unbound type variable found: {:?}", access_path.root.type_)
                 })?;
             if let Some(resource_bytes) = blockchain_view
-                .get_resource(g, &tag)
+                .get_resource_bytes(g, &tag)
                 .map_err(|_| anyhow!("Failed to get resource for {:?}::{:?}", g, tag))?
             {
                 let layout =
@@ -304,7 +304,7 @@ pub fn concretize(
     signers: &[AccountAddress],
     actuals: &[Vec<u8>],
     type_actuals: &[TypeTag],
-    blockchain_view: &impl MoveResolver,
+    blockchain_view: &impl MoveRefResolver,
 ) -> Result<ConcretizedSecondaryIndexes> {
     let module_cache = ModuleCache::new(blockchain_view);
     bind_formals(

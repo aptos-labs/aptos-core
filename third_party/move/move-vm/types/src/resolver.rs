@@ -23,6 +23,24 @@ pub trait ResourceRefResolver {
     ) -> anyhow::Result<Option<Vec<u8>>>;
 }
 
+impl<T: ResourceRefResolver> ResourceRefResolver for &T {
+    fn get_resource_ref(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        (**self).get_resource_ref(address, tag)
+    }
+
+    fn get_resource_bytes(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        (**self).get_resource_bytes(address, tag)
+    }
+}
+
 pub trait MoveRefResolver: ModuleResolver + ResourceRefResolver {}
 
 impl<T: ModuleResolver + ResourceRefResolver> MoveRefResolver for T {}

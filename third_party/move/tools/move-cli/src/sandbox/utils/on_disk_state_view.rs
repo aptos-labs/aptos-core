@@ -16,11 +16,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     parser,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::ModuleResolver,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
+use move_vm_types::{resolver::ResourceRefResolver, types::ResourceRef};
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -407,13 +408,23 @@ impl ModuleResolver for OnDiskStateView {
     }
 }
 
-impl ResourceResolver for OnDiskStateView {
-    fn get_resource(
+impl ResourceRefResolver for OnDiskStateView {
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        self.get_resource_bytes(*address, struct_tag.clone())
+        tag: &StructTag,
+    ) -> Result<Option<ResourceRef>> {
+        Ok(self
+            .get_resource_bytes(*address, tag.clone())?
+            .map(|bytes| ResourceRef::Serialized(bytes)))
+    }
+
+    fn get_resource_bytes(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>> {
+        self.get_resource_bytes(*address, tag.clone())
     }
 }
 

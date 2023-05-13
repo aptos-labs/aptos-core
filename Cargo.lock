@@ -8308,6 +8308,7 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
+ "move-vm-types",
  "once_cell",
  "serde 1.0.149",
 ]
@@ -10094,6 +10095,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-read-write-set-types",
+ "move-vm-types",
 ]
 
 [[package]]
