@@ -147,9 +147,7 @@ impl AptosVM {
     }
 
     pub fn set_num_shards_once(mut num_shards: usize) {
-        num_shards = min(num_shards, 1
-
-        );
+        num_shards = min(num_shards, 1);
         // Only the first call succeeds, due to OnceCell semantics.
         NUM_EXECUTION_SHARD.set(num_shards).ok();
     }
@@ -1481,7 +1479,11 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let ret = sharded_block_executor.execute_block(state_view, transactions);
+        let ret = sharded_block_executor.execute_block(
+            state_view,
+            transactions,
+            AptosVM::get_concurrency_per_shard(),
+        );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
             BLOCK_TRANSACTION_COUNT.observe(count as f64);

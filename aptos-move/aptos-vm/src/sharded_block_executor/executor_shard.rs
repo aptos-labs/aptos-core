@@ -16,7 +16,6 @@ use std::sync::{
 pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
     shard_id: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    num_executor_threads: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
 }
@@ -24,20 +23,19 @@ pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
 impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
     pub fn new(
         shard_id: usize,
-        concurrency_level: usize,
+        num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
         result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                .num_threads(concurrency_level)
+                .num_threads(num_executor_threads)
                 .build()
                 .unwrap(),
         );
         Self {
             shard_id,
             executor_thread_pool,
-            num_executor_threads: concurrency_level,
             command_rx,
             result_tx,
         }
@@ -47,7 +45,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
         loop {
             let command = self.command_rx.recv().unwrap();
             match command {
-                ExecutorShardCommand::ExecuteBlock(state_view, transactions) => {
+                ExecutorShardCommand::ExecuteBlock(
+                    state_view,
+                    transactions,
+                    concurrency_level_per_shard,
+                ) => {
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
@@ -57,7 +59,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                         self.executor_thread_pool.clone(),
                         transactions,
                         state_view.as_ref(),
-                        self.num_executor_threads,
+                        concurrency_level_per_shard,
                     );
                     self.result_tx.send(ret).unwrap();
                 },

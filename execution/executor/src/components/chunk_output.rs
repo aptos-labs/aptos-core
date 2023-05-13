@@ -27,7 +27,7 @@ pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedSta
     Lazy::new(|| {
         Arc::new(Mutex::new(ShardedBlockExecutor::new(
             AptosVM::get_num_shards(),
-            Some(AptosVM::get_concurrency_per_shard()),
+            None, // Defaults to num_cpus / num_shards
         )))
     });
 

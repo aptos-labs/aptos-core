@@ -33,14 +33,14 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
 }
 
 pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
-    ExecuteBlock(Arc<S>, Vec<Transaction>),
+    ExecuteBlock(Arc<S>, Vec<Transaction>, usize),
     Stop,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
-    pub fn new(num_executor_shards: usize, concurrency_per_shard: Option<usize>) -> Self {
+    pub fn new(num_executor_shards: usize, executor_threads_per_shard: Option<usize>) -> Self {
         assert!(num_executor_shards > 0, "num_executor_shards must be > 0");
-        let concurrency_per_shard = concurrency_per_shard.unwrap_or_else(|| {
+        let executor_threads_per_shard = executor_threads_per_shard.unwrap_or_else(|| {
             (num_cpus::get() as f64 / num_executor_shards as f64).ceil() as usize
         });
         let mut command_txs = vec![];
@@ -53,14 +53,14 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             result_rxs.push(result_rx);
             shard_join_handles.push(spawn_executor_shard(
                 i,
-                concurrency_per_shard,
+                executor_threads_per_shard,
                 transactions_rx,
                 result_tx,
             ));
         }
         info!(
             "Creating a new ShardedBlockExecutor with {} shards and concurrency per shard {}",
-            num_executor_shards, concurrency_per_shard
+            num_executor_shards, executor_threads_per_shard
         );
         Self {
             num_executor_shards,
@@ -78,6 +78,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         &self,
         state_view: Arc<S>,
         block: Vec<Transaction>,
+        concurrency_level_per_shard: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
         // Number of partitions might be smaller than the number of executor shards in case of
@@ -88,6 +89,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
                 .send(ExecutorShardCommand::ExecuteBlock(
                     state_view.clone(),
                     transactions,
+                    concurrency_level_per_shard,
                 ))
                 .unwrap();
         }
