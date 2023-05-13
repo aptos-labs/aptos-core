@@ -59,6 +59,7 @@ impl ApplyChunkOutput {
             result_state,
             next_epoch_state,
             block_state_updates,
+            sharded_state_cache,
         ) = {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["calculate_for_transaction_block"])
@@ -95,6 +96,7 @@ impl ApplyChunkOutput {
                 reconfig_events,
                 transaction_info_hashes,
                 block_state_updates,
+                sharded_state_cache,
             },
             to_discard,
             to_retry,
