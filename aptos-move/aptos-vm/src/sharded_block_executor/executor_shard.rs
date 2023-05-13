@@ -61,6 +61,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                         state_view.as_ref(),
                         concurrency_level_per_shard,
                     );
+                    drop(state_view);
                     self.result_tx.send(ret).unwrap();
                 },
                 ExecutorShardCommand::Stop => {
