@@ -4,12 +4,12 @@
 
 use crate::{
     block_storage::{
-        tracing::{observe_block, BlockStage},
         BlockStore,
+        tracing::{BlockStage, observe_block},
     },
     counters,
     dag::dag_driver::DagDriver,
-    error::{error_kind, DbError},
+    error::{DbError, error_kind},
     experimental::{
         buffer_manager::{OrderedBlocks, ResetRequest},
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
@@ -18,7 +18,7 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
+            AptosDBBackend, extract_epoch_to_proposers, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::{
@@ -50,7 +50,7 @@ use crate::{
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{bail, Context, ensure};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, NodeConfig};
@@ -82,7 +82,7 @@ use fail::fail_point;
 use futures::{
     channel::{
         mpsc,
-        mpsc::{unbounded, Sender, UnboundedSender},
+        mpsc::{Sender, unbounded, UnboundedSender},
         oneshot,
     },
     SinkExt, StreamExt,
@@ -97,7 +97,8 @@ use std::{
     time::Duration,
 };
 use aptos_schemadb::SchemaBatch;
-use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, NaiveDagStoreWriteBatch};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch};
+use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 /// Range of rounds (window) that we might be calling proposer election

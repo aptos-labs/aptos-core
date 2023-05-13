@@ -5,10 +5,10 @@ use crate::{
     dag::{anchor_election::AnchorElection, bullshark::Bullshark},
     payload_manager::PayloadManager,
 };
-use aptos_consensus_types::{node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData}, block::Block};
+use aptos_consensus_types::{block::Block, node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData}};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
-use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{block_info::Round, PeerId, validator_verifier::ValidatorVerifier};
 use async_recursion::async_recursion;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -16,15 +16,19 @@ use std::{
 };
 use std::borrow::Borrow;
 use std::collections::hash_map::Iter;
-use std::io::Write;
+use std::io::{Cursor, Read, Write};
 use std::ops::{Index, IndexMut};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use bytes::Buf;
 use chrono::format::Item;
+use futures::AsyncWriteExt;
 use tokio::sync::Mutex;
 use aptos_network::peer::Peer;
-use aptos_schemadb::{define_schema, SchemaBatch};
-use aptos_schemadb::schema::{KeyCodec, ValueCodec};
-use crate::dag::dag_storage::{DagStorage, ContainsKey, ItemId, NaiveDagStoreWriteBatch, DagStoreWriteBatch};
-use serde::{Serialize, Deserialize};
+use aptos_schemadb::{ColumnFamilyName, define_schema, SchemaBatch};
+use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
+use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
+use serde::{Deserialize, Serialize};
+use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
 
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
@@ -69,6 +73,7 @@ impl PeerStatus {
 ///keeps track of weak links. None indicates that a (strong or weak) link was already added.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct WeakLinksCreator {
+    id: ItemId,
     my_id: PeerId,
     latest_nodes_metadata: Vec<Option<PeerStatus>>,
     address_to_validator_index: HashMap<PeerId, usize>,
@@ -77,6 +82,7 @@ pub(crate) struct WeakLinksCreator {
 impl WeakLinksCreator {
     pub fn new(my_id: PeerId, verifier: &ValidatorVerifier) -> Self {
         Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
             my_id,
             latest_nodes_metadata: verifier
                 .address_to_validator_index()
@@ -140,8 +146,41 @@ impl WeakLinksCreator {
     }
 }
 
+impl ContainsKey for WeakLinksCreator {
+    type Key = ItemId;
+
+    fn key(&self) -> Self::Key {
+        self.id
+    }
+}
+
+define_schema!(WeakLinksCreatorSchema, ItemId, WeakLinksCreator, "WeakLinksCreator");
+
+impl KeyCodec<WeakLinksCreatorSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let x = ItemId::try_from(data)?;
+        Ok(x)
+    }
+}
+
+impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreator {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-struct AbsentInfo {
+pub(crate) struct AbsentInfo {
     metadata: NodeMetaData, //88
     peers_to_request: HashSet<PeerId>,
     immediate_dependencies: HashSet<HashValue>,
@@ -182,7 +221,7 @@ impl AbsentInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-struct PendingInfo {
+pub(crate) struct PendingInfo {
     certified_node: CertifiedNode,
     missing_parents: HashSet<HashValue>,
     immediate_dependencies: HashSet<HashValue>,
@@ -239,7 +278,7 @@ impl PendingInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-enum MissingDagNodeStatus {
+pub(crate) enum MissingDagNodeStatus {
     Absent(AbsentInfo),
     Pending(PendingInfo),
 }
@@ -424,6 +463,34 @@ impl ContainsKey for DagRoundList {
     }
 }
 
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct MissingNodeIdToStatusMap {
+    id: ItemId,
+    inner: HashMap<HashValue, MissingDagNodeStatus>,
+}
+
+impl MissingNodeIdToStatusMap {
+}
+
+impl MissingNodeIdToStatusMap {
+    fn new() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn get(&self, k: &HashValue) -> Option<&MissingDagNodeStatus> {
+        self.inner.get(k)
+    }
+
+    fn key(&self) -> ItemId {
+        self.id
+    }
+}
+
+
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub (crate) struct DagInMem_Key {
     my_id: PeerId,
@@ -440,8 +507,32 @@ pub(crate) struct DagInMem {
     front: WeakLinksCreator,
     dag: DagRoundList,
     // TODO: protect from DDoS - currently validators can add unbounded number of entries
-    missing_nodes: HashMap<HashValue, MissingDagNodeStatus>,
+    missing_nodes: MissingNodeIdToStatusMap,
 }
+
+impl DagInMem {
+    pub(crate) fn partial(&self) -> DagInMem_Partial {
+        DagInMem_Partial {
+            my_id: self.my_id,
+            epoch: self.epoch,
+            current_round: self.current_round,
+            front: self.front.key(),
+            dag: self.dag.key(),
+            missing_nodes: self.missing_nodes.key(),
+        }
+    }
+}
+/// The part of the DAG data that should be persisted.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagInMem_Partial {
+    my_id: PeerId,
+    epoch: u64,
+    current_round: u64,
+    front: ItemId,
+    dag: ItemId,
+    missing_nodes: ItemId,
+}
+
 
 impl ContainsKey for DagInMem {
     type Key = DagInMem_Key;
@@ -464,17 +555,48 @@ impl KeyCodec<DagInMemSchema> for DagInMem_Key {
     }
 }
 
-impl ValueCodec<DagInMemSchema> for DagInMem {
+impl ValueCodec<DagInMemSchema> for DagInMem_Partial {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(bcs::to_bytes(self)?)
+        let mut buf = vec![];
+        Write::write(&mut buf, self.my_id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.epoch)?;
+        buf.write_u64::<BigEndian>(self.current_round)?;
+        Write::write(&mut buf, self.front.as_slice())?;
+        Write::write(&mut buf, self.dag.as_slice())?;
+        Write::write(&mut buf, self.missing_nodes.as_slice())?;
+        Ok(buf)
     }
 
     fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
-        Ok(bcs::from_bytes(data)?)
+        let mut c = Cursor::new(data);
+        let my_id = PeerId::from_bytes(read_bytes(&mut c, 32)?).unwrap();
+        let epoch = c.read_u64::<BigEndian>()?;
+        let current_round = c.read_u64::<BigEndian>()?;
+        let front = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let dag = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let missing_nodes = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let ret = Self {
+            my_id,
+            epoch,
+            current_round,
+            front,
+            dag,
+            missing_nodes,
+        };
+        Ok(ret)
     }
 }
 
-define_schema!(DagInMemSchema, DagInMem_Key, DagInMem, "DagInMem");
+fn read_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> anyhow::Result<Vec<u8>> {
+    let mut bytes = Vec::with_capacity(n);
+    for _ in 0..n {
+        let byte = cursor.read_u8()?;
+        bytes.push(byte);
+    }
+    Ok(bytes)
+}
+
+define_schema!(DagInMemSchema, DagInMem_Key, DagInMem_Partial, "DagInMem");
 
 // TODO: persist all every update
 #[allow(dead_code)]
@@ -511,7 +633,7 @@ impl Dag {
                     current_round: 0,
                     front: WeakLinksCreator::new(my_id, &verifier),
                     dag: round_list,
-                    missing_nodes: HashMap::new(),
+                    missing_nodes: MissingNodeIdToStatusMap::new(),
                 };
                 let mut batch = storage.new_write_batch();
                 batch.put_dag_in_mem(&in_mem).unwrap();
@@ -556,7 +678,7 @@ impl Dag {
             .unwrap_or_default();
 
         let maybe_from_pending = self
-            .in_mem.missing_nodes
+            .in_mem.missing_nodes.inner
             .get(&node_request.digest())
             .map(|status| status.get_certified_node())
             .unwrap_or_default();
@@ -575,7 +697,7 @@ impl Dag {
     }
 
     pub fn missing_nodes_metadata(&self) -> HashSet<(NodeMetaData, Vec<PeerId>)> {
-        self.in_mem.missing_nodes
+        self.in_mem.missing_nodes.inner
             .iter()
             .filter(|(_, status)| status.absent())
             .map(|(_, status)| {
@@ -656,7 +778,7 @@ impl Dag {
     ) {
         for digest in recently_added_node_dependencies {
             let mut maybe_status = None;
-            match self.in_mem.missing_nodes.entry(digest) {
+            match self.in_mem.missing_nodes.inner.entry(digest) {
                 Entry::Occupied(mut entry) => {
                     entry
                         .get_mut()
@@ -683,7 +805,7 @@ impl Dag {
         };
 
         for parent_digest in missing_parents {
-            match self.in_mem.missing_nodes.entry(parent_digest) {
+            match self.in_mem.missing_nodes.inner.entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
                     entry.get_mut().add_peer_to_request(source);
                     self.add_peers_recursively(parent_digest, source);
@@ -706,7 +828,7 @@ impl Dag {
             .collect();
 
         let pending_info = PendingInfo::new(certified_node, missing_parents_digest, HashSet::new());
-        self.in_mem.missing_nodes
+        self.in_mem.missing_nodes.inner
             .insert(pending_digest, MissingDagNodeStatus::Pending(pending_info));
 
         // TODO: Persist
@@ -714,7 +836,7 @@ impl Dag {
         for node_meta_data in missing_parents {
             let digest = node_meta_data.digest();
             let status = self
-                .in_mem.missing_nodes
+                .in_mem.missing_nodes.inner
                 .entry(digest)
                 .or_insert(MissingDagNodeStatus::Absent(AbsentInfo::new(
                     node_meta_data,
@@ -821,7 +943,7 @@ impl Dag {
 
         let mut maybe_node_status = None;
 
-        match self.in_mem.missing_nodes.entry(certified_node.digest()) {
+        match self.in_mem.missing_nodes.inner.entry(certified_node.digest()) {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {

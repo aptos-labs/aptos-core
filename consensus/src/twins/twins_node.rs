@@ -50,7 +50,7 @@ use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
-use crate::dag::dag_storage::MockDagStore;
+use crate::dag::dag_storage::mock::MockDagStore;
 use crate::dag::reliable_broadcast::storage::MockReliableBroadcastDB;
 
 /// Auxiliary struct that is preparing SMR for the test

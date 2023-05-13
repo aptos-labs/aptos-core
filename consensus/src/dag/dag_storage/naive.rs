@@ -1,34 +1,10 @@
 // Copyright © Aptos Foundation
 
-use std::any::Any;
-use std::collections::HashMap;
-use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use aptos_consensus_types::node::CertifiedNode;
-use anyhow::Result;
 use aptos_schemadb::{DB, Options, SchemaBatch};
-use aptos_schemadb::schema::Schema;
-use aptos_types::PeerId;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, PeerIdToCertifiedNodeMap, DagRoundList};
-
-pub type ItemId = [u8; 16];
-
-pub(crate) trait ContainsKey {
-    type Key;
-    fn key(&self) -> Self::Key;
-}
-
-pub(crate) trait DagStorage: Sync + Send {
-    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>>;
-    fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch>;
-    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()>;
-}
-
-pub(crate) trait DagStoreWriteBatch: Sync + Send {
-    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()>;
-    fn as_any(&self) -> &dyn Any;
-}
+use std::path::Path;
+use std::any::Any;
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema};
+use crate::dag::dag_storage::{ContainsKey, DAG_DB_NAME, DagStorage, DagStoreWriteBatch};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -43,8 +19,8 @@ impl NaiveDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
-    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()> {
-        self.inner.put::<DagInMemSchema>(&dag_in_mem.key(), dag_in_mem)
+    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> anyhow::Result<()> {
+        self.inner.put::<DagInMemSchema>(&dag_in_mem.key(), &dag_in_mem.partial())
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -55,8 +31,6 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
 pub struct NaiveDagStore {
     db: DB,
 }
-
-const DAG_DB_NAME: &str = "DagDB";
 
 impl NaiveDagStore {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
@@ -107,8 +81,8 @@ impl NaiveDagStore {
 
 
 impl DagStorage for NaiveDagStore {
-    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
-        //TODO
+    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> anyhow::Result<Option<DagInMem>> {
+        let x = self.db.get::<DagInMemSchema>(key)?;
         Ok(None)
     }
 
@@ -116,77 +90,8 @@ impl DagStorage for NaiveDagStore {
         Box::new(NaiveDagStoreWriteBatch::new())
     }
 
-    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()> {
+    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> anyhow::Result<()> {
         let x = batch.as_any().downcast_ref::<NaiveDagStoreWriteBatch>().unwrap();
         self.db.write_schemas_ref(&x.inner)
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-pub struct MockDagStoreWriteBatch {}
-
-impl MockDagStoreWriteBatch {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl DagStoreWriteBatch for MockDagStoreWriteBatch {
-    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()> {
-        Ok(())
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-pub struct MockDagStore {}
-
-impl MockDagStore {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl DagStorage for MockDagStore {
-    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
-        Ok(None)
-    }
-
-    fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {
-        Box::new(MockDagStoreWriteBatch::new())
-    }
-
-    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()> {
-        Ok(())
     }
 }

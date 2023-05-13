@@ -44,7 +44,7 @@ use futures_channel::oneshot;
 use maplit::hashmap;
 use std::{iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
-use crate::dag::dag_storage::MockDagStore;
+use crate::dag::dag_storage::mock::MockDagStore;
 use crate::dag::reliable_broadcast::storage::MockReliableBroadcastDB;
 
 /// Auxiliary struct that is setting up node environment for the test.

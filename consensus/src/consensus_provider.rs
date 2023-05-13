@@ -27,7 +27,7 @@ use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-use crate::dag::dag_storage::NaiveDagStore;
+use crate::dag::dag_storage::naive::NaiveDagStore;
 use crate::dag::reliable_broadcast::storage::NaiveReliableBroadcastDB;
 
 /// Helper function to start consensus based on configuration and return the runtime

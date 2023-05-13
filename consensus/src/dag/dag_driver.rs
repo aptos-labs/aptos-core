@@ -25,7 +25,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::spawn_named;
 use aptos_types::{
-    validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
+    PeerId, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
 };
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
@@ -36,7 +36,8 @@ use tokio::{
     time,
 };
 use aptos_schemadb::SchemaBatch;
-use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, NaiveDagStoreWriteBatch};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch};
+use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 pub struct DagDriver {
