@@ -224,6 +224,10 @@ impl DB {
 
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
+        self.write_schemas_ref(&batch)
+    }
+
+    pub fn write_schemas_ref(&self, batch: &SchemaBatch) -> Result<()> {
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
             .with_label_values(&[&self.name])
             .start_timer();

@@ -36,7 +36,7 @@ use tokio::{
     time,
 };
 use aptos_schemadb::SchemaBatch;
-use crate::dag::dag_storage::{DagStorage, NaiveDagStoreWriteBatch};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, NaiveDagStoreWriteBatch};
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 pub struct DagDriver {
@@ -54,7 +54,7 @@ pub struct DagDriver {
     rb_close_tx: oneshot::Sender<oneshot::Sender<()>>,
     network_msg_rx: aptos_channel::Receiver<PeerId, VerifiedEvent>,
     time_service: Arc<dyn TimeService>,
-    dag_store: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+    dag_store: Arc<dyn DagStorage>,
 }
 
 impl DagDriver {
@@ -62,7 +62,7 @@ impl DagDriver {
         epoch: u64,
         author: Author,
         config: DagConfig,
-        dag_storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+        dag_storage: Arc<dyn DagStorage>,
         rb_storage: Arc<dyn ReliableBroadcastStorage>,
         payload_client: Arc<dyn PayloadClient>,
         network_sender: NetworkSender,

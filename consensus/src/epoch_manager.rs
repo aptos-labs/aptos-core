@@ -97,7 +97,7 @@ use std::{
     time::Duration,
 };
 use aptos_schemadb::SchemaBatch;
-use crate::dag::dag_storage::{DagStorage, NaiveDagStoreWriteBatch};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, NaiveDagStoreWriteBatch};
 use crate::dag::reliable_broadcast::storage::ReliableBroadcastStorage;
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -151,7 +151,7 @@ pub struct EpochManager {
     bounded_executor: BoundedExecutor,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
-    dag_store: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+    dag_store: Arc<dyn DagStorage>,
     rb_storage: Arc<dyn ReliableBroadcastStorage>,
 }
 
@@ -169,7 +169,7 @@ impl EpochManager {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener,
         bounded_executor: BoundedExecutor,
-        dag_store: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+        dag_store: Arc<dyn DagStorage>,
         rb_storage: Arc<dyn ReliableBroadcastStorage>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();

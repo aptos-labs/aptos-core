@@ -485,7 +485,7 @@ pub(crate) struct Dag {
     bullshark: Arc<Mutex<Bullshark>>,
     verifier: ValidatorVerifier,
     payload_manager: Arc<PayloadManager>,
-    storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+    storage: Arc<dyn DagStorage>,
 }
 
 #[allow(dead_code)]
@@ -497,7 +497,7 @@ impl Dag {
         verifier: ValidatorVerifier,
         proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
-        mut storage: Arc<dyn DagStorage<WriteBatch = NaiveDagStoreWriteBatch>>,
+        mut storage: Arc<dyn DagStorage>,
     ) -> Self {
         let key = DagInMem_Key { my_id, epoch };
         let in_mem = match storage.get_dag_in_mem(&key).expect("235922") {
@@ -620,8 +620,8 @@ impl Dag {
 
         //TODO: write the diff only.
         let mut batch = self.storage.new_write_batch();
-        batch.put_dag_in_mem(&self.in_mem).expect("111715");
-        self.storage.commit_write_batch(batch).expect("111714");
+        batch.put_dag_in_mem(&self.in_mem).unwrap();
+        self.storage.commit_write_batch(batch).unwrap();
 
         self.payload_manager
             .prefetch_payload_data_inner(

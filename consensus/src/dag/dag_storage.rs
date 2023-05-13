@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::any::Any;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -19,14 +20,14 @@ pub(crate) trait ContainsKey {
 }
 
 pub(crate) trait DagStorage: Sync + Send {
-    type WriteBatch;
     fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>>;
-    fn new_write_batch(&self) -> Self::WriteBatch;
-    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()>;
+    fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch>;
+    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()>;
 }
 
-pub(crate) trait DagStoreWriteBatch {
+pub(crate) trait DagStoreWriteBatch: Sync + Send {
     fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()>;
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct NaiveDagStoreWriteBatch {
@@ -45,11 +46,13 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()> {
         self.inner.put::<DagInMemSchema>(&dag_in_mem.key(), dag_in_mem)
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct NaiveDagStore {
-    batch_counter: AtomicUsize,
-    write_batches: HashMap<usize, SchemaBatch>,
     db: DB,
 }
 
@@ -97,8 +100,6 @@ impl NaiveDagStore {
         let db = DB::open(path.clone(), DAG_DB_NAME, column_families, &opts)
             .expect("ReliableBroadcastDB open failed; unable to continue");
         Self {
-            batch_counter: AtomicUsize::new(0),
-            write_batches: HashMap::new(),
             db
         }
     }
@@ -106,23 +107,67 @@ impl NaiveDagStore {
 
 
 impl DagStorage for NaiveDagStore {
-    type WriteBatch = NaiveDagStoreWriteBatch;
-
     fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
         //TODO
         Ok(None)
     }
 
-    fn new_write_batch(&self) -> Self::WriteBatch {
-        Self::WriteBatch::new()
+    fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {
+        Box::new(NaiveDagStoreWriteBatch::new())
     }
 
-    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()> {
-        self.db.write_schemas(batch.inner)
+    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()> {
+        let x = batch.as_any().downcast_ref::<NaiveDagStoreWriteBatch>().unwrap();
+        self.db.write_schemas_ref(&x.inner)
     }
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pub struct MockDagStoreWriteBatch {}
+
+impl MockDagStoreWriteBatch {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl DagStoreWriteBatch for MockDagStoreWriteBatch {
+    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> Result<()> {
+        Ok(())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 pub struct MockDagStore {}
 
@@ -133,17 +178,15 @@ impl MockDagStore {
 }
 
 impl DagStorage for MockDagStore {
-    type WriteBatch = NaiveDagStoreWriteBatch;
-
     fn get_dag_in_mem(&self, key: &DagInMem_Key) -> Result<Option<DagInMem>> {
-        todo!()
+        Ok(None)
     }
 
-    fn new_write_batch(&self) -> Self::WriteBatch {
-        todo!()
+    fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {
+        Box::new(MockDagStoreWriteBatch::new())
     }
 
-    fn commit_write_batch(&self, batch: Self::WriteBatch) -> Result<()> {
-        todo!()
+    fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()> {
+        Ok(())
     }
 }
