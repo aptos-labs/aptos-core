@@ -466,6 +466,16 @@ module aptos_framework::fungible_asset {
         deposit_with_ref(transfer_ref, to, fa);
     }
 
+    /// Create a fungible asset with zero amount.
+    /// This can be useful when starting a series of computations where the initial value is 0.
+    public fun zero<T: key>(metadata: Object<T>): FungibleAsset {
+        let metadata = object::convert<T, Metadata>(metadata);
+        FungibleAsset {
+            metadata,
+            amount: 0,
+        }
+    }
+
     /// Extract a given amount from the given fungible asset and return a new one.
     public fun extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
         assert!(fungible_asset.amount >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
