@@ -18,6 +18,9 @@ impl BlockPartitioner for UniformPartitioner {
         num_shards: usize,
     ) -> Vec<Vec<Transaction>> {
         let total_txns = transactions.len();
+        if total_txns == 0 {
+            return vec![];
+        }
         let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
 
         let mut result = Vec::new();
