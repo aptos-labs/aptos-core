@@ -17,11 +17,12 @@ use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::ModuleResolver,
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
 use move_vm_runtime::move_vm::MoveVM;
+use move_vm_types::{resolver::ResourceRefResolver, types::ResourceRef};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -94,13 +95,23 @@ impl<'a, 'm, S: MoveResolverExt> ModuleResolver for MoveResolverWithVMMetadata<'
     }
 }
 
-impl<'a, 'm, S: MoveResolverExt> ResourceResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
-    fn get_resource(
+impl<'a, 'm, S: MoveResolverExt> ResourceRefResolver for MoveResolverWithVMMetadata<'a, 'm, S> {
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag)?)
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        Ok(self
+            .get_resource_bytes(address, tag)?
+            .map(|bytes| ResourceRef::Serialized(bytes)))
+    }
+
+    fn get_resource_bytes(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(get_any_resource(self, address, tag)?)
     }
 }
 
@@ -187,13 +198,23 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
-    fn get_resource(
+impl<'a, S: StateView> ResourceRefResolver for StorageAdapter<'a, S> {
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag)?)
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        Ok(self
+            .get_resource_bytes(address, tag)?
+            .map(|bytes| ResourceRef::Serialized(bytes)))
+    }
+
+    fn get_resource_bytes(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(get_any_resource(self, address, tag)?)
     }
 }
 
@@ -286,13 +307,21 @@ impl<S: StateView> MoveResolverExt for StorageAdapterOwned<S> {
     }
 }
 
-impl<S: StateView> ResourceResolver for StorageAdapterOwned<S> {
-    fn get_resource(
+impl<S: StateView> ResourceRefResolver for StorageAdapterOwned<S> {
+    fn get_resource_ref(
         &self,
         address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Error> {
-        self.as_move_resolver().get_resource(address, struct_tag)
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        self.as_move_resolver().get_resource_ref(address, tag)
+    }
+
+    fn get_resource_bytes(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        self.as_move_resolver().get_resource_bytes(address, tag)
     }
 }
 

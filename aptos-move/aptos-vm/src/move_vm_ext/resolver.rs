@@ -5,13 +5,13 @@ use aptos_framework::{natives::state_storage::StateStorageUsageResolver, Runtime
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::{aptos_try, return_on_failure};
-use move_binary_format::errors::VMError;
+use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
 };
 use move_table_extension::TableResolver;
+use move_vm_types::resolver::MoveRefResolver;
 
 fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
@@ -25,7 +25,7 @@ fn get_resource_group_from_metadata(
 }
 
 pub trait MoveResolverExt:
-    MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveRefResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
 {
     fn get_module_metadata(&self, module_id: ModuleId) -> Option<RuntimeModuleMetadataV1>;
 
@@ -33,13 +33,13 @@ pub trait MoveResolverExt:
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> VMResult<Option<Vec<u8>>>;
 
     fn get_standard_resource(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, VMError>;
+    ) -> VMResult<Option<Vec<u8>>>;
 
     fn get_resource_group(&self, struct_tag: &StructTag) -> Option<StructTag> {
         let metadata = self.get_module_metadata(struct_tag.module_id());
