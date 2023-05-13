@@ -18,8 +18,24 @@ fn next_bucket(gas_unit_price: u64) -> u64 {
 async fn test_gas_estimate() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_init_config(Arc::new(|_, conf, _| {
-            conf.api.gas_estimate_full_block_threshold = 1;
-            // TODO: configure consensus to have faster and consecutive non-empty rounds
+            let max_block_txns = 3;
+            // Use a small full block threshold to make gas estimates update sooner.
+            conf.api.gas_estimate_full_block_threshold = max_block_txns as usize;
+            // Wait for full blocks with small block size to advance consensus at a fast rate.
+            conf.consensus.quorum_store_poll_time_ms = 200;
+            conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
+            conf.consensus.max_sending_block_txns = max_block_txns;
+            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
+            conf.consensus.quorum_store.sender_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .sender_max_batch_txns
+                .min(max_block_txns as usize);
+            conf.consensus.quorum_store.receiver_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .receiver_max_batch_txns
+                .min(max_block_txns as usize);
         }))
         .build()
         .await;
@@ -42,14 +58,14 @@ async fn test_gas_estimate() {
     let txn_stat = generate_traffic(
         &mut swarm,
         &all_validators,
-        Duration::from_secs(40),
+        Duration::from_secs(20),
         txn_gas_price,
         vec![vec![(
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
             },
-            70,
+            100,
         )]],
     )
     .await
@@ -69,7 +85,7 @@ async fn test_gas_estimate() {
     );
 
     // Empty blocks will reset the prices
-    std::thread::sleep(Duration::from_secs(40));
+    std::thread::sleep(Duration::from_secs(20));
     let estimation = match client.estimate_gas_price().await {
         Ok(res) => res.into_inner(),
         Err(e) => panic!("Client error: {:?}", e),
@@ -83,5 +99,7 @@ async fn test_gas_estimate() {
         estimation.prioritized_gas_estimate
     );
 
-    panic!("BCHO log")
+    // // Give some time to flush the logs
+    // std::thread::sleep(Duration::from_secs(5));
+    // panic!("BCHO log")
 }
