@@ -610,15 +610,14 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set_ext = session
+            let change_set = session
                 .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (_delta_change_set, change_set) = change_set_ext.into_inner();
-            let (write_set, _events) = change_set.into_inner();
-            write_set
+            let (writes, _deltas, _events) = change_set.into_inner();
+            writes.into_write_set().unwrap()
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -653,16 +652,16 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set_ext = session
+        let change_set = session
             .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (_delta_change_set, change_set) = change_set_ext.into_inner();
-        let (writeset, _events) = change_set.into_inner();
-        Ok(writeset)
+        let (writes, _deltas, _events) = change_set.into_inner();
+        let write_set = writes.into_write_set().unwrap();
+        Ok(write_set)
     }
 
     pub fn execute_view_function(

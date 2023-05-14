@@ -1173,14 +1173,17 @@ impl TransactionsApi {
 
         // Simulate transaction
         let move_resolver = self.context.move_resolver_poem(&ledger_info)?;
-        let (_, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, vm_output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
 
-        // Apply transaction outputs to build up a transaction
-        // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly. Fix this when
-        // VM error handling is fixed.
-        let output = output_ext.into_transaction_output(&move_resolver);
+        let output = match vm_output.try_materialize(&move_resolver) {
+            Ok(vm_output) => vm_output.output_with_materialized_deltas(vec![]),
+            Err(_) => return Err(SubmitTransactionError::internal_with_code(
+                "Application of aggregator deltas failed during transaction simulation",
+                AptosErrorCode::InternalError,
+                &ledger_info,
+            ))
+        };
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match output.status().clone() {

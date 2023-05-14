@@ -138,7 +138,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
+    let mut change_set = session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
@@ -154,30 +154,30 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let cs2 = session
+    change_set.squash(session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
-        .unwrap();
-    let change_set_ext = cs1.squash(cs2).unwrap();
+        .unwrap()).unwrap();
 
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        deltas.is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
+    assert!(!writes
         .iter()
         .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
+    verify_genesis_write_set(&events);
+
+    let write_set = writes.into_write_set().unwrap();
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new_unchecked(write_set, events)))
 }
 
 pub fn encode_genesis_transaction(
@@ -257,7 +257,7 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
+    let mut change_set = session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
@@ -273,31 +273,30 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
     publish_framework(&mut session, framework);
-    let cs2 = session
+
+    change_set.squash(session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
         )
-        .unwrap();
+        .unwrap()).unwrap();
 
-    let change_set_ext = cs1.squash(cs2).unwrap();
-
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (writes, deltas, events) = change_set.into_inner();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        delta_change_set.is_empty(),
+        deltas.is_empty(),
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
+    assert!(!writes
         .iter()
         .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    change_set
+    verify_genesis_write_set(&events);
+    let write_set = writes.into_write_set().unwrap();
+    ChangeSet::new_unchecked(write_set, events)
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {

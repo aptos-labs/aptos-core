@@ -919,6 +919,7 @@ dependencies = [
  "aptos-validator-interface",
  "aptos-vm",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "clap 3.2.23",
  "move-binary-format",
  "move-cli",

@@ -490,7 +490,7 @@ where
         ) -> PartialVMResult<()>;
     }
 
-    fn charge_io_gas_for_write_set<'a>(
+    fn charge_io_gas_for_writes<'a>(
         &mut self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> VMResult<()> {
