@@ -42,7 +42,7 @@ the resolution process.
 -  [Function `resolve`](#0x1_voting_resolve)
 -  [Function `resolve_proposal_v2`](#0x1_voting_resolve_proposal_v2)
 -  [Function `next_proposal_id`](#0x1_voting_next_proposal_id)
--  [Function `is_proposal_id_assigned`](#0x1_voting_is_proposal_id_assigned)
+-  [Function `proposal_exists`](#0x1_voting_proposal_exists)
 -  [Function `is_voting_closed`](#0x1_voting_is_voting_closed)
 -  [Function `can_be_resolved_early`](#0x1_voting_can_be_resolved_early)
 -  [Function `get_proposal_state`](#0x1_voting_get_proposal_state)
@@ -64,7 +64,7 @@ the resolution process.
     -  [Function `resolve`](#@Specification_1_resolve)
     -  [Function `resolve_proposal_v2`](#@Specification_1_resolve_proposal_v2)
     -  [Function `next_proposal_id`](#@Specification_1_next_proposal_id)
-    -  [Function `is_proposal_id_assigned`](#@Specification_1_is_proposal_id_assigned)
+    -  [Function `proposal_exists`](#@Specification_1_proposal_exists)
     -  [Function `is_voting_closed`](#@Specification_1_is_voting_closed)
     -  [Function `can_be_resolved_early`](#@Specification_1_can_be_resolved_early)
     -  [Function `get_proposal_state`](#@Specification_1_get_proposal_state)
@@ -1128,14 +1128,14 @@ Return the next unassigned proposal id
 
 </details>
 
-<a name="0x1_voting_is_proposal_id_assigned"></a>
+<a name="0x1_voting_proposal_exists"></a>
 
-## Function `is_proposal_id_assigned`
+## Function `proposal_exists`
 
-Return true if the proposal id has been assigned
+Return true if the proposal with the specified id exists
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_proposal_exists">proposal_exists</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
 </code></pre>
 
 
@@ -1144,7 +1144,7 @@ Return true if the proposal id has been assigned
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_proposal_exists">proposal_exists</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
     // Since the proposal id is simply an increasing nonce, we can just do cheap equality check. If this
     // ever changes, the <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a> of proposals on the <a href="voting.md#0x1_voting">voting</a> forum should be directly checked
     proposal_id &lt; <a href="voting.md#0x1_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType&gt;(voting_forum_address)
@@ -1750,12 +1750,12 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
-<a name="@Specification_1_is_proposal_id_assigned"></a>
+<a name="@Specification_1_proposal_exists"></a>
 
-### Function `is_proposal_id_assigned`
+### Function `proposal_exists`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_is_proposal_id_assigned">is_proposal_id_assigned</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_proposal_exists">proposal_exists</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
 </code></pre>
 
 

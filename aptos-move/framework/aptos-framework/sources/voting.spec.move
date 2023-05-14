@@ -175,7 +175,7 @@ spec aptos_framework::voting {
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
     }
 
-    spec is_proposal_id_assigned<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
+    spec proposal_exists<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
         use aptos_framework::chain_status;
         requires chain_status::is_operating(); // Ensures existence of Timestamp
         include AbortsIfNotContainProposalID<ProposalType>;

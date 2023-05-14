@@ -494,8 +494,8 @@ module aptos_framework::voting {
     }
 
     #[view]
-    /// Return true if the proposal id has been assigned
-    public fun is_proposal_id_assigned<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
+    /// Return true if the proposal with the specified id exists
+    public fun proposal_exists<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         // Since the proposal id is simply an increasing nonce, we can just do cheap equality check. If this
         // ever changes, the table of proposals on the voting forum should be directly checked
         proposal_id < next_proposal_id<ProposalType>(voting_forum_address)
