@@ -10,8 +10,7 @@ use anyhow::Result;
 use aptos_schemadb::{DB, Options, SchemaBatch};
 use aptos_schemadb::schema::Schema;
 use aptos_types::PeerId;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, PeerIdToCertifiedNodeMap, WeakLinksCreator};
-use crate::dag::types::{DagRoundList, MissingNodeIdToStatusMap};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, WeakLinksCreator};
 
 pub type ItemId = [u8; 16];
 
