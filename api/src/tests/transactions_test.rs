@@ -1034,20 +1034,12 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
     context.check_golden_output(resp);
 }
 
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation() {
-    let mut context = new_test_context(current_function_name!());
-    let resp = context.get("/estimate_gas_price").await;
-    assert!(context.last_updated_gas_schedule().is_some());
-    context.check_golden_output(resp);
-}
-
-// TODO: the min_gas returned is 0, how to make it something more reasonable like 100?
+// Note: in tests, the min gas unit price is 0
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_empty() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get("/estimate_gas_price").await;
+    assert!(context.last_updated_gas_schedule().is_some());
     context.check_golden_output(resp);
 }
 
@@ -1064,34 +1056,6 @@ async fn fill_block(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_one_block() {
-    let mut context = new_test_context(current_function_name!());
-
-    let ctx = &mut context;
-    let creator = &mut ctx.gen_account();
-    let mint_txn = ctx.mint_user_account(creator).await;
-
-    // Include the mint txn in the block
-    let mut block = vec![mint_txn];
-    fill_block(&mut block, ctx, creator).await;
-    ctx.commit_block(&block).await;
-
-    let resp = context.get("/estimate_gas_price").await;
-    context.check_golden_output(resp);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation_one_empty_block() {
-    let mut context = new_test_context(current_function_name!());
-
-    let ctx = &mut context;
-    ctx.commit_block(&vec![]).await;
-
-    let resp = context.get("/estimate_gas_price").await;
-    context.check_golden_output(resp);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_ten_blocks() {
     let mut context = new_test_context(current_function_name!());
 
@@ -1101,13 +1065,19 @@ async fn test_gas_estimation_ten_blocks() {
 
     // Include the mint txn in the first block
     let mut block = vec![mint_txn];
-    for _i in 0..10 {
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
         fill_block(&mut block, ctx, creator).await;
         ctx.commit_block(&block).await;
         block.clear();
     }
 
     let resp = context.get("/estimate_gas_price").await;
+    // multiple times, to exercise cache
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
     context.check_golden_output(resp);
 }
 
@@ -1116,11 +1086,17 @@ async fn test_gas_estimation_ten_empty_blocks() {
     let mut context = new_test_context(current_function_name!());
 
     let ctx = &mut context;
-    for _i in 0..10 {
-        ctx.commit_block(&vec![]).await;
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        ctx.commit_block(&[]).await;
     }
 
     let resp = context.get("/estimate_gas_price").await;
+    // multiple times, to exercise cache
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
     context.check_golden_output(resp);
 }
 

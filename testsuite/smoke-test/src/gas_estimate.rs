@@ -86,20 +86,19 @@ async fn test_gas_estimate() {
 
     // Empty blocks will reset the prices
     std::thread::sleep(Duration::from_secs(20));
-    let estimation = match client.estimate_gas_price().await {
-        Ok(res) => res.into_inner(),
-        Err(e) => panic!("Client error: {:?}", e),
-    };
-    println!("{:?}", estimation);
-    // Note: in testing GAS_UNIT_PRICE = 0
-    assert_eq!(Some(GAS_UNIT_PRICE), estimation.deprioritized_gas_estimate);
-    assert_eq!(GAS_UNIT_PRICE, estimation.gas_estimate);
-    assert_eq!(
-        Some(next_bucket(GAS_UNIT_PRICE)),
-        estimation.prioritized_gas_estimate
-    );
-
-    // // Give some time to flush the logs
-    // std::thread::sleep(Duration::from_secs(5));
-    // panic!("BCHO log")
+    // Multiple times, to exercise cache
+    for _i in 0..2 {
+        let estimation = match client.estimate_gas_price().await {
+            Ok(res) => res.into_inner(),
+            Err(e) => panic!("Client error: {:?}", e),
+        };
+        println!("{:?}", estimation);
+        // Note: in testing GAS_UNIT_PRICE = 0
+        assert_eq!(Some(GAS_UNIT_PRICE), estimation.deprioritized_gas_estimate);
+        assert_eq!(GAS_UNIT_PRICE, estimation.gas_estimate);
+        assert_eq!(
+            Some(next_bucket(GAS_UNIT_PRICE)),
+            estimation.prioritized_gas_estimate
+        );
+    }
 }

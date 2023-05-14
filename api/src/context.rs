@@ -50,8 +50,10 @@ use aptos_vm::{
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
+    ops::Bound::Included,
     sync::{Arc, RwLock},
+    time::Instant,
 };
 
 // Context holds application scope context
@@ -62,6 +64,7 @@ pub struct Context {
     mp_sender: MempoolClientSender,
     pub node_config: NodeConfig,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
+    gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -85,6 +88,12 @@ impl Context {
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,
+            })),
+            gas_estimation_cache: Arc::new(RwLock::new(GasEstimationCache {
+                last_updated_epoch: None,
+                last_updated_time: None,
+                estimation: None,
+                min_inclusion_prices: BTreeMap::new(),
             })),
         }
     }
@@ -797,20 +806,79 @@ impl Context {
         }
     }
 
+    fn next_bucket(&self, gas_unit_price: u64) -> u64 {
+        match self
+            .node_config
+            .mempool
+            .broadcast_buckets
+            .iter()
+            .find(|bucket| **bucket > gas_unit_price)
+        {
+            None => gas_unit_price,
+            Some(bucket) => *bucket,
+        }
+    }
+
+    fn default_estimate_gas_price(&self, min_gas_unit_price: u64) -> GasEstimation {
+        GasEstimation {
+            deprioritized_gas_estimate: Some(min_gas_unit_price),
+            gas_estimate: min_gas_unit_price,
+            prioritized_gas_estimate: Some(self.next_bucket(min_gas_unit_price)),
+        }
+    }
+
+    fn cached_gas_estimation(&self, current_epoch: u64) -> Option<GasEstimation> {
+        let cache = self.gas_estimation_cache.read().unwrap();
+        if let Some(epoch) = cache.last_updated_epoch {
+            if let Some(time) = cache.last_updated_time {
+                if let Some(estimation) = cache.estimation {
+                    // TODO: config for updated time
+                    if epoch == current_epoch && time.elapsed().as_millis() < 500 {
+                        return Some(estimation);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn estimate_gas_price<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
+        let max_block_history = 120;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        let epoch = ledger_info.epoch.0;
 
-        // TODO: cache, the estimation and per-block for computing future estimations
+        // 0. Return cached result if it exists
+        if let Some(cached_gas_estimation) = self.cached_gas_estimation(epoch) {
+            return Ok(cached_gas_estimation);
+        }
+
+        let mut cache = self.gas_estimation_cache.write().unwrap();
         // 1. Get the block metadata txns
         let mut lookup_version = ledger_info.ledger_version.0;
         let mut blocks = vec![];
-        // TODO: discard the first block, because it's an incomplete block?
-        for _i in 0..120 {
+        // Skip the first block, which may be partial
+        if let Ok((first, _, block)) = self.db.get_block_info_by_version(lookup_version) {
+            if block.epoch() == epoch {
+                lookup_version = first.saturating_sub(1);
+            }
+        }
+        let mut cached_blocks_hit = false;
+        for _i in 0..max_block_history {
+            if cache
+                .min_inclusion_prices
+                .contains_key(&(epoch, lookup_version))
+            {
+                cached_blocks_hit = true;
+                break;
+            }
             match self.db.get_block_info_by_version(lookup_version) {
-                Ok((first, last, _)) => {
+                Ok((first, last, block)) => {
+                    if block.epoch() != epoch {
+                        break;
+                    }
                     lookup_version = first.saturating_sub(1);
                     blocks.push((first, last));
                     if lookup_version == 0 {
@@ -822,6 +890,14 @@ impl Context {
                 },
             }
         }
+        if blocks.is_empty() && !cached_blocks_hit {
+            let estimation = self.default_estimate_gas_price(min_gas_unit_price);
+            cache.estimation = Some(estimation);
+            cache.last_updated_epoch = Some(epoch);
+            cache.last_updated_time = Some(Instant::now());
+            return Ok(estimation);
+        }
+        let remaining = max_block_history - blocks.len();
 
         // TODO: configure consensus to have faster and consecutive non-empty rounds
         info!(
@@ -852,6 +928,19 @@ impl Context {
                     Err(_) => min_gas_unit_price,
                 };
             min_inclusion_prices.push(min_inclusion_price);
+            cache
+                .min_inclusion_prices
+                .insert((epoch, last), min_inclusion_price);
+        }
+        if cached_blocks_hit {
+            for (_, v) in cache
+                .min_inclusion_prices
+                .range((Included(&(epoch, 0)), Included(&(epoch, lookup_version))))
+                .rev()
+                .take(remaining)
+            {
+                min_inclusion_prices.push(*v);
+            }
         }
         info!("BCHO: min_inclusion_prices: {:?}", min_inclusion_prices);
 
@@ -871,22 +960,32 @@ impl Context {
         min_inclusion_prices.sort();
         let p90_price = min_inclusion_prices[min_inclusion_prices.len() * 9 / 10];
         // round up to next bucket
-        let aggressive_price = match self
-            .node_config
-            .mempool
-            .broadcast_buckets
-            .iter()
-            .find(|bucket| **bucket > p90_price)
-        {
-            None => p90_price,
-            Some(bucket) => *bucket,
-        };
+        let aggressive_price = self.next_bucket(p90_price);
 
-        Ok(GasEstimation {
+        let estimation = GasEstimation {
             deprioritized_gas_estimate: Some(low_price),
             gas_estimate: market_price,
             prioritized_gas_estimate: Some(aggressive_price),
-        })
+        };
+        // 4. Update cache
+        // GC old entries
+        let mut removed = 0;
+        if cache.min_inclusion_prices.len() > max_block_history {
+            for _i in max_block_history..cache.min_inclusion_prices.len() {
+                cache.min_inclusion_prices.pop_first();
+                removed += 1;
+            }
+        }
+        let first = cache.min_inclusion_prices.first_key_value();
+        let last = cache.min_inclusion_prices.last_key_value();
+        info!(
+            "BCHO: removed: {}, first: {:?}, last: {:?}",
+            removed, first, last
+        );
+        cache.estimation = Some(estimation);
+        cache.last_updated_epoch = Some(epoch);
+        cache.last_updated_time = Some(Instant::now());
+        Ok(estimation)
     }
 
     fn min_gas_unit_price<E: InternalError>(&self, ledger_info: &LedgerInfo) -> Result<u64, E> {
@@ -996,4 +1095,12 @@ impl Context {
 pub struct GasScheduleCache {
     last_updated_epoch: Option<u64>,
     gas_schedule_params: Option<AptosGasParameters>,
+}
+
+pub struct GasEstimationCache {
+    last_updated_epoch: Option<u64>,
+    last_updated_time: Option<Instant>,
+    estimation: Option<GasEstimation>,
+    /// (epoch, lookup_version) -> min_inclusion_price
+    min_inclusion_prices: BTreeMap<(u64, u64), u64>,
 }

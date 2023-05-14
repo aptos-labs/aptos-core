@@ -950,7 +950,7 @@ impl TestContext {
         self.fake_time_usecs += (Duration::from_millis(500).as_micros()) as u64;
         BlockMetadata::new(
             id,
-            0,
+            1,
             round,
             self.validator_owner,
             vec![0],
