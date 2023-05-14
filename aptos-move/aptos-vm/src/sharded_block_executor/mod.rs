@@ -4,6 +4,7 @@
 
 use crate::sharded_block_executor::{
     block_partitioner::{BlockPartitioner, UniformPartitioner},
+    counters::NUM_EXECUTOR_SHARDS,
     executor_shard::ExecutorShard,
 };
 use aptos_logger::{error, info, trace};
@@ -20,6 +21,7 @@ use std::{
 };
 
 mod block_partitioner;
+mod counters;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
@@ -80,6 +82,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         block: Vec<Transaction>,
         concurrency_level_per_shard: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        NUM_EXECUTOR_SHARDS.set(self.num_executor_shards as i64);
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
         // Number of partitions might be smaller than the number of executor shards in case of
         // block size is smaller than number of executor shards.

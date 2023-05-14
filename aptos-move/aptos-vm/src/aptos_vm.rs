@@ -147,8 +147,12 @@ impl AptosVM {
         }
     }
 
+    /// Sets the number of execution shards when invoked the first time.
+    /// Please note that this should only be overridden for testing purpose only as
+    /// sharded block-STM only works for non-conflicting transactions for now.
     pub fn set_num_shards_once(mut num_shards: usize) {
         num_shards = max(num_shards, 1);
+        info!("Setting the number of shards to {}", num_shards);
         // Only the first call succeeds, due to OnceCell semantics.
         NUM_EXECUTION_SHARD.set(num_shards).ok();
     }

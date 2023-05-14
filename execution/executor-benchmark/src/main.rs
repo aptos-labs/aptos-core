@@ -118,7 +118,13 @@ struct Opt {
     transactions_per_sender: usize,
 
     #[clap(long)]
+    non_conflicting_txns_per_block: bool,
+
+    #[clap(long)]
     concurrency_level: Option<usize>,
+
+    #[clap(long, default_value = "1")]
+    num_executor_shards: usize,
 
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
@@ -147,7 +153,8 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level = num_cpus::get();
+                let level =
+                    (num_cpus::get() as f64 / self.num_executor_shards as f64).ceil() as usize;
                 println!(
                     "\nVM concurrency level defaults to num of cpus: {}\n",
                     level
@@ -247,6 +254,7 @@ where
                 blocks,
                 transaction_type.map(|t| t.materialize(module_working_set_size)),
                 opt.transactions_per_sender,
+                opt.non_conflicting_txns_per_block,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
@@ -296,6 +304,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
+    AptosVM::set_num_shards_once(opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
     if opt.use_native_executor {

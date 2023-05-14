@@ -21,11 +21,14 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
@@ -81,11 +84,13 @@ fn create_checkpoint(
 }
 
 /// Runs the benchmark with given parameters.
+#[allow(clippy::too_many_arguments)]
 pub fn run_benchmark<V>(
     block_size: usize,
     num_blocks: usize,
     transaction_type: Option<TransactionType>,
-    transactions_per_sender: usize,
+    mut transactions_per_sender: usize,
+    non_conflicting_txns_per_block: bool,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -144,17 +149,31 @@ pub fn run_benchmark<V>(
         Some(num_main_signer_accounts),
     );
 
+    if non_conflicting_txns_per_block && transactions_per_sender > 1 {
+        warn!(
+            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+        );
+        transactions_per_sender = 1;
+    }
+
     let mut start_time = Instant::now();
     let start_gas = TXN_GAS_USAGE.get_sample_sum();
+    let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     if let Some(transaction_generator_creator) = transaction_generator_creator {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generator_creator,
             transactions_per_sender,
+            // TODO add support for non_conflicting_txns_per_block in workload generator
         );
     } else {
-        generator.run_transfer(block_size, num_blocks, transactions_per_sender);
+        generator.run_transfer(
+            block_size,
+            num_blocks,
+            transactions_per_sender,
+            non_conflicting_txns_per_block,
+        );
     }
     if pipeline_config.delay_execution_start {
         start_time = Instant::now();
@@ -166,6 +185,11 @@ pub fn run_benchmark<V>(
     let elapsed = start_time.elapsed().as_secs_f32();
     let delta_v = db.reader.get_latest_version().unwrap() - version;
     let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+    let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
+    info!(
+        "VM execution TPS {} txn/s",
+        (delta_v as f64 / delta_vm_time) as usize
+    );
     info!(
         "Executed workload {}",
         if let Some(ttype) = transaction_type {
@@ -409,9 +433,10 @@ mod tests {
             6, /* block_size */
             5, /* num_blocks */
             transaction_type.map(|t| t.materialize(2)),
-            2,  /* transactions per sender */
-            25, /* num_main_signer_accounts */
-            30, /* num_dst_pool_accounts */
+            2,     /* transactions per sender */
+            false, /* randomized accounts with potential conflicts */
+            25,    /* num_main_signer_accounts */
+            30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
