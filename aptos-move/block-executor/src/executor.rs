@@ -180,7 +180,7 @@ where
                 // a read without this error. However, if the failure is real, passing
                 // validation here allows to avoid infinitely looping and instead panic when
                 // materializing deltas as writes in the final output preparation state. Panic
-                // is also preferrable as it allows testing for this scenario.
+                // is also preferable as it allows testing for this scenario.
                 Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
             }
         });
@@ -215,13 +215,13 @@ where
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
         for k in delta_keys {
-            // Note that delta materialization happens concurrenty, but under concurrent
+            // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
             // contending on delta materialization of the same aggregator. However, the
             // materialization is based on previously materialized values and should not
             // introduce long critical sections. Moreover, with more aggregators, and given
             // that the commit_hook will be performed at dispersed times based on the
-            // completion of the respetive previous tasks of threads, this should not be
+            // completion of the respective previous tasks of threads, this should not be
             // an immediate bottleneck - confirmed by an experiment with 32 core and a
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
@@ -372,7 +372,7 @@ where
         // indices and assigning post-commit work per index to other workers.
         // Note: It is important that the Coordinator is the first thread that
         // picks up a role will be a coordinator. Hence, if multiple parallel
-        // executors are running concurrently, they will all havean active coordinator.
+        // executors are running concurrently, they will all have active coordinator.
         roles.push(CommitRole::Coordinator(senders, 0));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
