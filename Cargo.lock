@@ -276,6 +276,7 @@ dependencies = [
  "mime",
  "move-core-types",
  "move-package",
+ "move-vm-types",
  "num_cpus",
  "once_cell",
  "paste",
