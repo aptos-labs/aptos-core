@@ -5,7 +5,7 @@ use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -20,15 +20,7 @@ impl NaiveDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
-    fn put_dag_in_mem(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
-        self.inner.put::<DagInMemSchema>(&obj.key(), &obj.partial())?;
-        self.put_dag_round_list(obj.get_dag())?;
-        self.put_weak_link_creator(obj.get_front())?;
-        self.put_missing_node_id_to_status_map(obj.get_missing_nodes())?;
-        Ok(())
-    }
-
-    fn put_dag_round_list(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
+    fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
         for (idx, item) in obj.iter().enumerate() {
             let wrapped_item = DagRoundListItem {
                 list_id: obj.id,
@@ -37,6 +29,18 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
             };
             self.put_dag_round_list_item(&wrapped_item)?;
         }
+        self.put_dag_round_list__shallow(obj)
+    }
+
+    fn put_dag_in_mem__deep(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
+        self.inner.put::<DagInMemSchema>(&obj.key(), &obj.partial())?;
+        self.put_dag_round_list__shallow(obj.get_dag())?;
+        self.put_weak_link_creator__deep(obj.get_front())?;
+        self.put_missing_node_id_to_status_map(obj.get_missing_nodes())?;
+        Ok(())
+    }
+
+    fn put_dag_round_list__shallow(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
         self.inner.put::<DagRoundListSchema>(&obj.key(), &obj.metadata())?;
         Ok(())
     }
@@ -45,7 +49,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self.inner.put::<DagRoundListItemSchema>(&obj.key(), obj)
     }
 
-    fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
+    fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
         self.inner.put::<WeakLinksCreatorSchema>(&obj.key(), obj)
     }
 
@@ -53,8 +57,12 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.key(), obj)
     }
 
-    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+    fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
         self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), obj)
+    }
+
+    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> anyhow::Result<()> {
+        self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(&obj.key(), obj)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -73,6 +81,8 @@ impl NaiveDagStore {
             "DagRoundList",
             "DagRoundListItem",
             "MissingNodeIdToStatusMap",
+            "PeerIdToCertifiedNodeMap",
+            "PeerIdToCertifiedNodeMapEntry",
             "WeakLinksCreator",
         ];
 
@@ -164,6 +174,10 @@ impl DagStorage for NaiveDagStore {
 
     fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
         Ok(self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)?)
+    }
+
+    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
+        Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?)
     }
 
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {

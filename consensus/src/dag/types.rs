@@ -656,7 +656,7 @@ impl MissingDagNodeStatus {
     }
 }
 
-////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMap {
     pub(crate) id: ItemId,
@@ -717,7 +717,66 @@ impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerIdToCertifiedNodeMap {
 
 define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerIdToCertifiedNodeMap, "PeerIdToCertifiedNodeMap");
 
-////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerIdToCertifiedNodeMapEntry {
+    pub(crate) map_id: ItemId,
+    pub(crate) key: PeerId,
+    pub(crate) value: CertifiedNode,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerIdToCertifiedNodeMapEntry_Key {
+    map_id: ItemId,
+    key: PeerId,
+}
+
+impl PeerIdToCertifiedNodeMapEntry {
+    pub(crate) fn key(&self) -> PeerIdToCertifiedNodeMapEntry_Key {
+        PeerIdToCertifiedNodeMapEntry_Key {
+            map_id: self.map_id,
+            key: self.key,
+        }
+    }
+}
+
+impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapEntry_Key {
+    /// Key format: map_id (16 bytes) + [0x00] + key (32 bytes).
+    /// In a `*MapEntry` column family, for a map with ID `map_id`, a key `map_id + [0xff]` always exist to help seek.
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.map_id.as_slice())?;
+        buf.write_u8(0)?;
+        buf.write(self.key.as_slice())?;
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let map_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        assert_eq!(0, cursor.read_u8()?);
+        let key = PeerId::from_bytes(read_bytes(&mut cursor, 32)?).unwrap();
+        Ok(Self {
+            map_id,
+            key
+        })
+    }
+}
+
+impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapEntry {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntry, "PeerIdToCertifiedNodeMapEntry");
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
     fn encode_key(&self) -> anyhow::Result<Vec<u8>> {

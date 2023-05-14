@@ -3,7 +3,7 @@
 use std::any::Any;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -14,11 +14,15 @@ impl MockDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for MockDagStoreWriteBatch {
-    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> anyhow::Result<()> {
+    fn put_dag_in_mem__deep(&mut self, dag_in_mem: &DagInMem) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn put_dag_round_list(&mut self, dag_round_list: &DagRoundList) -> anyhow::Result<()> {
+    fn put_dag_round_list__shallow(&mut self, dag_round_list: &DagRoundList) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -26,7 +30,7 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
+    fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -34,7 +38,11 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+    fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -73,6 +81,10 @@ impl DagStorage for MockDagStore {
     }
 
     fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
+        todo!()
+    }
+
+    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
         todo!()
     }
 

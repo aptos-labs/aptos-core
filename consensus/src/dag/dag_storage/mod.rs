@@ -10,7 +10,7 @@ use anyhow::Result;
 use aptos_schemadb::{DB, Options, SchemaBatch};
 use aptos_schemadb::schema::Schema;
 use aptos_types::PeerId;
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, WeakLinksCreator};
 
 pub type ItemId = [u8; 16];
 
@@ -30,18 +30,20 @@ pub(crate) trait DagStorage: Sync + Send {
     fn load_dag_round_list_item(&self, key: &DagRoundListItem_Key) -> Result<Option<DagRoundListItem>>;
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> Result<Option<MissingNodeIdToStatusMap>>;
     fn load_peer_to_node_map(&self, key: &ItemId) -> Result<Option<PeerIdToCertifiedNodeMap>>;
+    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> Result<Option<PeerIdToCertifiedNodeMapEntry>>;
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch>;
     fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()>;
 }
 
 pub(crate) trait DagStoreWriteBatch: Sync + Send {
-    fn put_dag_in_mem(&mut self, obj: &DagInMem) -> Result<()>;
-    fn put_dag_round_list(&mut self, obj: &DagRoundList) -> Result<()>;
+    fn put_dag_in_mem__deep(&mut self, obj: &DagInMem) -> Result<()>;
+    fn put_dag_round_list__shallow(&mut self, obj: &DagRoundList) -> Result<()>;
+    fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> Result<()>;
     fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> Result<()>;
-    fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> Result<()>;
+    fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> Result<()>;
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> Result<()>;
-    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> Result<()>;
-
+    fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> Result<()>;
+    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> Result<()>;
     fn as_any(&self) -> &dyn Any;
 }
 

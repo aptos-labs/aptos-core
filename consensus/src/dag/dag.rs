@@ -30,7 +30,7 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
-use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, MissingDagNodeStatus, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PendingInfo, WeakLinksCreator};
+use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PendingInfo, WeakLinksCreator};
 
 // TODO: persist all every update
 #[allow(dead_code)]
@@ -70,7 +70,7 @@ impl Dag {
                     missing_nodes: MissingNodeIdToStatusMap::new(),
                 };
                 let mut batch = storage.new_write_batch();
-                batch.put_dag_in_mem(&in_mem).unwrap();
+                batch.put_dag_in_mem__deep(&in_mem).unwrap();
                 storage.commit_write_batch(batch).unwrap();
                 in_mem
             }
@@ -167,17 +167,31 @@ impl Dag {
         // assert!(self.in_mem.dag.len() >= round - 1);
 
         if self.in_mem.get_dag().len() <= round {
-            self.in_mem.get_dag_mut().push(PeerIdToCertifiedNodeMap::new());
+            let dag_round = PeerIdToCertifiedNodeMap::new();
+            storage_diff.put_peer_to_node_map__deep(&dag_round).unwrap();
+            storage_diff.put_dag_round_list_item(&DagRoundListItem{
+                list_id: self.in_mem.get_dag().id,
+                index: self.in_mem.get_dag().len() as u64,
+                content_id: dag_round.id,
+            }).unwrap();
+            self.in_mem.get_dag_mut().push(dag_round);
+            storage_diff.put_dag_round_list__shallow(self.in_mem.get_dag()).unwrap();
         }
-        self.in_mem.get_dag_mut().get_mut(round).unwrap().insert(certified_node.node().source(), certified_node.clone());
+
+        let round = self.in_mem.get_dag_mut().get_mut(round).unwrap();
+        round.insert(certified_node.node().source(), certified_node.clone());
+        let entry = PeerIdToCertifiedNodeMapEntry {
+            map_id: round.id,
+            key: certified_node.node().source(),
+            value: certified_node.clone(),//TODO: avoid clone
+        };
+        storage_diff.put_peer_to_node_map_entry__deep(&entry).unwrap();
 
         self.in_mem.get_front_mut()
             .update_peer_latest_node(certified_node.node().metadata().clone());
 
         //TODO: write the diff only.
-        let mut batch = self.storage.new_write_batch();
-        batch.put_dag_in_mem(&self.in_mem).unwrap();
-        self.storage.commit_write_batch(batch).unwrap();
+        storage_diff.put_weak_link_creator__deep(&self.in_mem.get_front()).unwrap();
 
         self.payload_manager
             .prefetch_payload_data_inner(
@@ -349,7 +363,7 @@ impl Dag {
         }
 
         let mut batch = self.storage.new_write_batch();
-        batch.put_dag_in_mem(&self.in_mem).unwrap();
+        batch.put_dag_in_mem__deep(&self.in_mem).unwrap();
         self.storage.commit_write_batch(batch).unwrap();
         let new_round = self.in_mem.current_round;
         return Some(
