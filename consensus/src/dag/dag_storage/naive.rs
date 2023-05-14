@@ -5,7 +5,7 @@ use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -29,7 +29,20 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     }
 
     fn put_dag_round_list(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
-        self.inner.put::<DagRoundListSchema>(&obj.key(), obj)
+        for (idx, item) in obj.iter().enumerate() {
+            let wrapped_item = DagRoundListItem {
+                list_id: obj.id,
+                index: idx as u64,
+                content: item.clone(),
+            };
+            self.put_dag_round_list_item(&wrapped_item)?;
+        }
+        self.inner.put::<DagRoundListSchema>(&obj.key(), &obj.metadata())?;
+        Ok(())
+    }
+
+    fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> anyhow::Result<()> {
+        self.inner.put::<DagRoundListItemSchema>(&obj.key(), obj)
     }
 
     fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
@@ -54,6 +67,7 @@ impl NaiveDagStore {
         let column_families = vec![
             "DagInMem",
             "DagRoundList",
+            "DagRoundListItem",
             "MissingNodeIdToStatusMap",
             "WeakLinksCreator",
         ];
@@ -98,15 +112,49 @@ impl DagStorage for NaiveDagStore {
     }
 
     fn load_weak_link_creator(&self, key: &ItemId) -> anyhow::Result<Option<WeakLinksCreator>> {
-        todo!()
+        if let Some(obj) = self.db.get::<WeakLinksCreatorSchema>(key)? {
+            Ok(Some(obj))
+        } else {
+            Ok(None)
+        }
     }
 
     fn load_dag_round_list(&self, key: &ItemId) -> anyhow::Result<Option<DagRoundList>> {
-        todo!()
+        match self.db.get::<DagRoundListSchema>(key)? {
+            Some(metadata) => {
+                let mut list = Vec::with_capacity(metadata.len as usize);
+                for i in 0..metadata.len {
+                    let key = DagRoundListItem_Key { id: metadata.id, index: i };
+                    let list_item = self.load_dag_round_list_item(&key)?.unwrap();
+                    list.push(list_item.content);
+                }
+                let obj = DagRoundList {
+                    id: metadata.id,
+                    inner: list,
+                };
+                Ok(Some(obj))
+            },
+            None => {
+                Ok(None)
+            },
+        }
+    }
+
+    fn load_dag_round_list_item(&self, key: &DagRoundListItem_Key) -> anyhow::Result<Option<DagRoundListItem>> {
+        if let Some(item) = self.db.get::<DagRoundListItemSchema>(key)? {
+            Ok(Some(item))
+        } else {
+            Ok(None)
+        }
+
     }
 
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
-        todo!()
+        if let Some(obj) = self.db.get::<MissingNodeIdToStatusMapSchema>(key)? {
+            Ok(Some(obj))
+        } else {
+            Ok(None)
+        }
     }
 
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {

@@ -9,7 +9,6 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, PeerId, validator_verifier::ValidatorVerifier,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::collections::hash_map::{Entry, Iter};
 use serde::{Deserialize, Serialize};
 use aptos_logger::info;
 use aptos_schemadb::schema::{KeyCodec, ValueCodec};
@@ -145,11 +144,11 @@ impl MissingNodeIdToStatusMap {
         self.inner.get(k)
     }
 
-    pub(crate) fn entry(&mut self, k: HashValue) -> Entry<'_, HashValue, MissingDagNodeStatus> {
+    pub(crate) fn entry(&mut self, k: HashValue) -> std::collections::hash_map::Entry<'_, HashValue, MissingDagNodeStatus> {
         self.inner.entry(k)
     }
 
-    pub(crate) fn iter(&self) -> Iter<'_, HashValue, MissingDagNodeStatus> {
+    pub(crate) fn iter(&self) -> std::collections::hash_map::Iter<'_, HashValue, MissingDagNodeStatus> {
         self.inner.iter()
     }
 
@@ -172,8 +171,8 @@ impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeIdToStatusMap {
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct DagRoundList {
-    id: ItemId,
-    inner: Vec<PeerIdToCertifiedNodeMap>,
+    pub(crate) id: ItemId,
+    pub(crate) inner: Vec<PeerIdToCertifiedNodeMap>,
 }
 
 impl DagRoundList {
@@ -181,6 +180,13 @@ impl DagRoundList {
         Self {
             id: uuid::Uuid::new_v4().into_bytes(),
             inner: vec![],
+        }
+    }
+
+    pub(crate) fn metadata(&self) -> DagRoundList_Metadata {
+        DagRoundList_Metadata {
+            id: self.id,
+            len: self.inner.len() as u64,
         }
     }
 
@@ -198,6 +204,10 @@ impl DagRoundList {
 
     pub(crate) fn push(&mut self, dag_round: PeerIdToCertifiedNodeMap) {
         self.inner.push(dag_round)
+    }
+
+    pub(crate) fn iter(&self) -> core::slice::Iter<PeerIdToCertifiedNodeMap> {
+        self.inner.iter()
     }
 }
 
@@ -220,7 +230,7 @@ impl KeyCodec<DagRoundListSchema> for ItemId {
     }
 }
 
-impl ValueCodec<DagRoundListSchema> for DagRoundList {
+impl ValueCodec<DagRoundListSchema> for DagRoundList_Metadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         let buf = bcs::to_bytes(self)?;
         Ok(buf)
@@ -231,6 +241,68 @@ impl ValueCodec<DagRoundListSchema> for DagRoundList {
         Ok(obj)
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagRoundList_Metadata {
+    pub(crate) id: ItemId,
+    pub(crate) len: u64,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagRoundListItem_Key {
+    pub(crate) id: ItemId,
+    pub(crate) index: u64,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagRoundListItem {
+    pub(crate) list_id: ItemId,
+    pub(crate) index: u64,
+    pub(crate) content: PeerIdToCertifiedNodeMap,
+}
+
+impl DagRoundListItem {
+    pub(crate) fn key(&self) -> DagRoundListItem_Key {
+        DagRoundListItem_Key {
+            id: self.list_id,
+            index: self.index,
+        }
+    }
+}
+
+
+impl KeyCodec<DagRoundListItemSchema> for DagRoundListItem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.index)?;
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let id_serialized = read_bytes(&mut cursor, 16)?;
+        let id = ItemId::try_from(id_serialized).unwrap();
+        let index = cursor.read_u64::<BigEndian>()?;
+        Ok(Self {
+            id,
+            index,
+        })
+    }
+}
+
+impl ValueCodec<DagRoundListItemSchema> for DagRoundListItem {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
 
 ///keeps track of weak links. None indicates that a (strong or weak) link was already added.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -585,9 +657,9 @@ impl MissingDagNodeStatus {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMap {
-    id: ItemId,
+    pub(crate) id: ItemId,
     inner: HashMap<PeerId, CertifiedNode>,
 }
 
@@ -607,7 +679,7 @@ impl PeerIdToCertifiedNodeMap {
         self.inner.insert(k, v)
     }
 
-    pub fn iter(&self) -> Iter<PeerId, CertifiedNode> {
+    pub fn iter(&self) -> std::collections::hash_map::Iter<PeerId, CertifiedNode> {
         self.inner.iter()
     }
 
@@ -634,6 +706,15 @@ impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
     }
 }
 
+impl ValueCodec<MissingNodeIdToStatusMapSchema> for PeerIdToCertifiedNodeMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct DagInMem_Key {
@@ -689,9 +770,6 @@ impl DagInMem {
     pub(crate) fn get_missing_nodes_mut(&mut self) -> &mut MissingNodeIdToStatusMap {
         &mut self.missing_nodes
     }
-
-
-
 }
 
 /// The part of the DAG data that should be persisted.
@@ -770,7 +848,9 @@ fn read_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> anyhow::Result<Vec<u8>> {
 
 define_schema!(WeakLinksCreatorSchema, ItemId, WeakLinksCreator, "WeakLinksCreator");
 
-define_schema!(DagRoundListSchema, ItemId, DagRoundList, "DagRoundList");
+define_schema!(DagRoundListSchema, ItemId, DagRoundList_Metadata, "DagRoundList");
+
+define_schema!(DagRoundListItemSchema, DagRoundListItem_Key, DagRoundListItem, "DagRoundListItem");
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
 

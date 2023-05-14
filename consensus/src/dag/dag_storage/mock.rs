@@ -3,7 +3,7 @@
 use std::any::Any;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, MissingNodeIdToStatusMap, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -19,6 +19,10 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
     }
 
     fn put_dag_round_list(&mut self, dag_round_list: &DagRoundList) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -53,6 +57,10 @@ impl DagStorage for MockDagStore {
     }
 
     fn load_dag_round_list(&self, key: &ItemId) -> anyhow::Result<Option<DagRoundList>> {
+        todo!()
+    }
+
+    fn load_dag_round_list_item(&self, key: &DagRoundListItem_Key) -> anyhow::Result<Option<DagRoundListItem>> {
         todo!()
     }
 
