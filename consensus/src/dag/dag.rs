@@ -30,7 +30,7 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
-use crate::dag::types::MissingNodeIdToStatusMap;
+use crate::dag::types::{DagRoundList, MissingNodeIdToStatusMap};
 
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
@@ -427,68 +427,7 @@ impl ContainsKey for PeerIdToCertifiedNodeMap {
     }
 }
 
-
-
-
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct DagRoundList {
-    id: ItemId,
-    inner: Vec<PeerIdToCertifiedNodeMap>,
-}
-
-impl DagRoundList {
-    pub(crate) fn new() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().into_bytes(),
-            inner: vec![],
-        }
-    }
-
-    pub(crate) fn get(&self, index: usize) -> Option<&PeerIdToCertifiedNodeMap> {
-        self.inner.get(index)
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    pub(crate) fn push(&mut self, dag_round: PeerIdToCertifiedNodeMap) {
-        self.inner.push(dag_round)
-    }
-}
-
-impl ContainsKey for DagRoundList {
-    type Key = ItemId;
-
-    fn key(&self) -> Self::Key {
-        self.id
-    }
-}
-
 define_schema!(DagRoundListSchema, ItemId, DagRoundList, "DagRoundList");
-
-impl KeyCodec<DagRoundListSchema> for ItemId {
-    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
-        Ok(self.to_vec())
-    }
-
-    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
-        let obj = ItemId::try_from(data)?;
-        Ok(obj)
-    }
-}
-
-impl ValueCodec<DagRoundListSchema> for DagRoundList {
-    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
-        let buf = bcs::to_bytes(self)?;
-        Ok(buf)
-    }
-
-    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
-        let obj = bcs::from_bytes(data)?;
-        Ok(obj)
-    }
-}
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
 
@@ -774,7 +713,7 @@ impl Dag {
         if self.in_mem.get_dag().len() <= round {
             self.in_mem.get_dag_mut().push(PeerIdToCertifiedNodeMap::new());
         }
-        self.in_mem.get_dag_mut().inner[round].insert(certified_node.node().source(), certified_node.clone());
+        self.in_mem.get_dag_mut().get_mut(round).unwrap().insert(certified_node.node().source(), certified_node.clone());
 
         self.in_mem.get_front_mut()
             .update_peer_latest_node(certified_node.node().metadata().clone());

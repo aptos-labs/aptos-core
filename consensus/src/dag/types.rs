@@ -14,8 +14,8 @@ use aptos_types::{
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::{Entry, Iter};
 use serde::{Deserialize, Serialize};
-use aptos_schemadb::schema::ValueCodec;
-use crate::dag::dag::{MissingDagNodeStatus, MissingNodeIdToStatusMapSchema};
+use aptos_schemadb::schema::{KeyCodec, ValueCodec};
+use crate::dag::dag::{DagRoundListSchema, MissingDagNodeStatus, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap};
 use crate::dag::dag_storage::{ContainsKey, ItemId};
 // pub(crate) trait MissingPeers {
 //     fn get_peers_signatures() -> HashSet<PeerId>;
@@ -165,5 +165,68 @@ impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeIdToStatusMap {
 
     fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
         Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct DagRoundList {
+    id: ItemId,
+    inner: Vec<PeerIdToCertifiedNodeMap>,
+}
+
+impl DagRoundList {
+    pub(crate) fn new() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: vec![],
+        }
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&PeerIdToCertifiedNodeMap> {
+        self.inner.get(index)
+    }
+
+    pub(crate) fn get_mut(&mut self, index: usize) -> Option<&mut PeerIdToCertifiedNodeMap> {
+        self.inner.get_mut(index)
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub(crate) fn push(&mut self, dag_round: PeerIdToCertifiedNodeMap) {
+        self.inner.push(dag_round)
+    }
+}
+
+impl ContainsKey for DagRoundList {
+    type Key = ItemId;
+
+    fn key(&self) -> Self::Key {
+        self.id
+    }
+}
+
+impl KeyCodec<DagRoundListSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let obj = ItemId::try_from(data)?;
+        Ok(obj)
+    }
+}
+
+impl ValueCodec<DagRoundListSchema> for DagRoundList {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        let obj = bcs::from_bytes(data)?;
+        Ok(obj)
     }
 }
