@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 
 use std::any::Any;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagRoundList, MissingNodeIdToStatusMap, WeakLinksCreator};
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagRoundList, WeakLinksCreator};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
+use crate::dag::types::MissingNodeIdToStatusMap;
 
 pub struct MockDagStoreWriteBatch {}
 

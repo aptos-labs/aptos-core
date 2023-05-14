@@ -10,7 +10,8 @@ use anyhow::Result;
 use aptos_schemadb::{DB, Options, SchemaBatch};
 use aptos_schemadb::schema::Schema;
 use aptos_types::PeerId;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, WeakLinksCreator};
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, PeerIdToCertifiedNodeMap, WeakLinksCreator};
+use crate::dag::types::MissingNodeIdToStatusMap;
 
 pub type ItemId = [u8; 16];
 
@@ -43,5 +44,3 @@ pub(crate) trait DagStoreWriteBatch: Sync + Send {
 
 pub(crate) mod naive;
 pub(crate) mod mock;
-
-const DAG_DB_NAME: &str = "DagDB";

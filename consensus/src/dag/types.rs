@@ -9,10 +9,14 @@ use aptos_consensus_types::node::{
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_types::{
-    aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
+    aggregate_signature::PartialSignatures, PeerId, validator_verifier::ValidatorVerifier,
 };
-use std::collections::{BTreeMap, HashSet};
-use serde::{Serialize, Deserialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::hash_map::{Entry, Iter};
+use serde::{Deserialize, Serialize};
+use aptos_schemadb::schema::ValueCodec;
+use crate::dag::dag::{MissingDagNodeStatus, MissingNodeIdToStatusMapSchema};
+use crate::dag::dag_storage::{ContainsKey, ItemId};
 // pub(crate) trait MissingPeers {
 //     fn get_peers_signatures() -> HashSet<PeerId>;
 // }
@@ -110,5 +114,56 @@ impl AckSet {
             .cloned()
             .collect();
         all_peers.difference(&self.set).cloned().collect()
+    }
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct MissingNodeIdToStatusMap {
+    id: ItemId,
+    inner: HashMap<HashValue, MissingDagNodeStatus>,
+}
+
+impl ContainsKey for MissingNodeIdToStatusMap {
+    type Key = ItemId;
+
+    fn key(&self) -> ItemId {
+        self.id
+    }
+}
+
+impl MissingNodeIdToStatusMap {
+    pub(crate) fn new() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn get(&self, k: &HashValue) -> Option<&MissingDagNodeStatus> {
+        self.inner.get(k)
+    }
+
+    pub(crate) fn entry(&mut self, k: HashValue) -> Entry<'_, HashValue, MissingDagNodeStatus> {
+        self.inner.entry(k)
+    }
+
+    pub(crate) fn iter(&self) -> Iter<'_, HashValue, MissingDagNodeStatus> {
+        self.inner.iter()
+    }
+
+    pub(crate) fn insert(&mut self, k: HashValue, v: MissingDagNodeStatus) -> Option<MissingDagNodeStatus> {
+        self.inner.insert(k, v)
+    }
+}
+
+impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeIdToStatusMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
     }
 }

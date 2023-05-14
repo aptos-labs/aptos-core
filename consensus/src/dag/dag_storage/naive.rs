@@ -4,8 +4,9 @@ use aptos_schemadb::{DB, Options, SchemaBatch};
 use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
-use crate::dag::dag_storage::{ContainsKey, DAG_DB_NAME, DagStorage, DagStoreWriteBatch, ItemId};
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListSchema, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
+use crate::dag::types::MissingNodeIdToStatusMap;
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -118,3 +119,5 @@ impl DagStorage for NaiveDagStore {
         self.db.write_schemas_ref(&x.inner)
     }
 }
+
+const DAG_DB_NAME: &str = "DagDB";

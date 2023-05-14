@@ -30,6 +30,7 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
+use crate::dag::types::MissingNodeIdToStatusMap;
 
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
@@ -489,35 +490,6 @@ impl ValueCodec<DagRoundListSchema> for DagRoundList {
     }
 }
 
-
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct MissingNodeIdToStatusMap {
-    id: ItemId,
-    inner: HashMap<HashValue, MissingDagNodeStatus>,
-}
-
-impl ContainsKey for MissingNodeIdToStatusMap {
-    type Key = ItemId;
-
-    fn key(&self) -> ItemId {
-        self.id
-    }
-}
-
-impl MissingNodeIdToStatusMap {
-    fn new() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().into_bytes(),
-            inner: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn get(&self, k: &HashValue) -> Option<&MissingDagNodeStatus> {
-        self.inner.get(k)
-    }
-
-}
-
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
 
 impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
@@ -529,24 +501,6 @@ impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
         Ok(ItemId::try_from(data)?)
     }
 }
-
-impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeIdToStatusMap {
-    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
-        let buf = bcs::to_bytes(self)?;
-        Ok(buf)
-    }
-
-    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
-        Ok(bcs::from_bytes(data)?)
-    }
-}
-
-
-
-
-
-
-
 
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -763,7 +717,7 @@ impl Dag {
             .unwrap_or_default();
 
         let maybe_from_pending = self
-            .in_mem.get_missing_nodes().inner
+            .in_mem.get_missing_nodes()
             .get(&node_request.digest())
             .map(|status| status.get_certified_node())
             .unwrap_or_default();
@@ -782,7 +736,7 @@ impl Dag {
     }
 
     pub fn missing_nodes_metadata(&self) -> HashSet<(NodeMetaData, Vec<PeerId>)> {
-        self.in_mem.get_missing_nodes().inner
+        self.in_mem.get_missing_nodes()
             .iter()
             .filter(|(_, status)| status.absent())
             .map(|(_, status)| {
@@ -863,7 +817,7 @@ impl Dag {
     ) {
         for digest in recently_added_node_dependencies {
             let mut maybe_status = None;
-            match self.in_mem.get_missing_nodes_mut().inner.entry(digest) {
+            match self.in_mem.get_missing_nodes_mut().entry(digest) {
                 Entry::Occupied(mut entry) => {
                     entry
                         .get_mut()
@@ -890,7 +844,7 @@ impl Dag {
         };
 
         for parent_digest in missing_parents {
-            match self.in_mem.get_missing_nodes_mut().inner.entry(parent_digest) {
+            match self.in_mem.get_missing_nodes_mut().entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
                     entry.get_mut().add_peer_to_request(source);
                     self.add_peers_recursively(parent_digest, source);
@@ -913,7 +867,7 @@ impl Dag {
             .collect();
 
         let pending_info = PendingInfo::new(certified_node, missing_parents_digest, HashSet::new());
-        self.in_mem.get_missing_nodes_mut().inner
+        self.in_mem.get_missing_nodes_mut()
             .insert(pending_digest, MissingDagNodeStatus::Pending(pending_info));
 
         // TODO: Persist
@@ -921,7 +875,7 @@ impl Dag {
         for node_meta_data in missing_parents {
             let digest = node_meta_data.digest();
             let status = self
-                .in_mem.get_missing_nodes_mut().inner
+                .in_mem.get_missing_nodes_mut()
                 .entry(digest)
                 .or_insert(MissingDagNodeStatus::Absent(AbsentInfo::new(
                     node_meta_data,
@@ -1029,7 +983,7 @@ impl Dag {
 
         let mut maybe_node_status = None;
 
-        match self.in_mem.get_missing_nodes_mut().inner.entry(certified_node.digest()) {
+        match self.in_mem.get_missing_nodes_mut().entry(certified_node.digest()) {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {
