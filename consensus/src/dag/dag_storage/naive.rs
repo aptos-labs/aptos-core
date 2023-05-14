@@ -5,7 +5,7 @@ use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -33,7 +33,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
             let wrapped_item = DagRoundListItem {
                 list_id: obj.id,
                 index: idx as u64,
-                content: item.clone(),
+                content_id: item.id,
             };
             self.put_dag_round_list_item(&wrapped_item)?;
         }
@@ -51,6 +51,10 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
 
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
         self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.key(), obj)
+    }
+
+    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), obj)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -126,7 +130,8 @@ impl DagStorage for NaiveDagStore {
                 for i in 0..metadata.len {
                     let key = DagRoundListItem_Key { id: metadata.id, index: i };
                     let list_item = self.load_dag_round_list_item(&key)?.unwrap();
-                    list.push(list_item.content);
+                    let map = self.load_peer_to_node_map(&list_item.content_id)?.expect("Inconsistency");
+                    list.push(map);
                 }
                 let obj = DagRoundList {
                     id: metadata.id,
@@ -155,6 +160,10 @@ impl DagStorage for NaiveDagStore {
         } else {
             Ok(None)
         }
+    }
+
+    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
+        Ok(self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)?)
     }
 
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {

@@ -29,7 +29,7 @@ pub(crate) trait DagStorage: Sync + Send {
     fn load_dag_round_list(&self, key: &ItemId) -> Result<Option<DagRoundList>>;
     fn load_dag_round_list_item(&self, key: &DagRoundListItem_Key) -> Result<Option<DagRoundListItem>>;
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> Result<Option<MissingNodeIdToStatusMap>>;
-
+    fn load_peer_to_node_map(&self, key: &ItemId) -> Result<Option<PeerIdToCertifiedNodeMap>>;
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch>;
     fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()>;
 }
@@ -40,6 +40,8 @@ pub(crate) trait DagStoreWriteBatch: Sync + Send {
     fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> Result<()>;
     fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> Result<()>;
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> Result<()>;
+    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> Result<()>;
+
     fn as_any(&self) -> &dyn Any;
 }
 

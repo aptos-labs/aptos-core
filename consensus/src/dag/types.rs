@@ -260,7 +260,7 @@ pub(crate) struct DagRoundListItem_Key {
 pub(crate) struct DagRoundListItem {
     pub(crate) list_id: ItemId,
     pub(crate) index: u64,
-    pub(crate) content: PeerIdToCertifiedNodeMap,
+    pub(crate) content_id: ItemId,
 }
 
 impl DagRoundListItem {
@@ -656,7 +656,7 @@ impl MissingDagNodeStatus {
     }
 }
 
-
+////////////////////////////////////////////
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMap {
     pub(crate) id: ItemId,
@@ -695,6 +695,29 @@ impl ContainsKey for PeerIdToCertifiedNodeMap {
         self.id
     }
 }
+
+impl KeyCodec<PeerIdToCertifiedNodeMapSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerIdToCertifiedNodeMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerIdToCertifiedNodeMap, "PeerIdToCertifiedNodeMap");
+
+////////////////////////////////////////////
 
 impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
     fn encode_key(&self) -> anyhow::Result<Vec<u8>> {

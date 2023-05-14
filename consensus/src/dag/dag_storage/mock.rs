@@ -3,7 +3,7 @@
 use std::any::Any;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -31,6 +31,10 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
     }
 
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_peer_to_node_map(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -65,6 +69,10 @@ impl DagStorage for MockDagStore {
     }
 
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
+        todo!()
+    }
+
+    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
         todo!()
     }
 
