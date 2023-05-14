@@ -188,7 +188,9 @@ impl DagDriver {
     async fn handle_certified_node(&mut self, certified_node: CertifiedNode, ack_required: bool) {
         let digest = certified_node.digest();
         let source = certified_node.source();
-        self.dag.try_add_node(certified_node).await;
+        let mut storage_diff = self.dag_store.new_write_batch();
+        self.dag.try_add_node(certified_node, &mut storage_diff).await;
+        self.dag_store.commit_write_batch(storage_diff).unwrap();
 
         if ack_required {
             let ack = CertifiedNodeAck::new(self.epoch, digest, self.author);

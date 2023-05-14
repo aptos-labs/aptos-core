@@ -162,7 +162,7 @@ impl Dag {
             .map(|(_, certified_node)| certified_node.node().source_ref())
     }
 
-    async fn add_to_dag(&mut self, certified_node: CertifiedNode) {
+    async fn add_to_dag(&mut self, certified_node: CertifiedNode, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         let round = certified_node.node().round() as usize;
         // assert!(self.in_mem.dag.len() >= round - 1);
 
@@ -196,11 +196,11 @@ impl Dag {
     }
 
     #[async_recursion]
-    async fn add_to_dag_and_update_pending(&mut self, node_status: MissingDagNodeStatus) {
+    async fn add_to_dag_and_update_pending(&mut self, node_status: MissingDagNodeStatus, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         let (certified_node, dependencies) = node_status.take_node_and_dependencies();
         let digest = certified_node.digest();
-        self.add_to_dag(certified_node).await;
-        self.update_pending_nodes(dependencies, digest).await;
+        self.add_to_dag(certified_node, storage_diff).await;
+        self.update_pending_nodes(dependencies, digest, storage_diff).await;
         // TODO: should we persist?
     }
 
@@ -209,6 +209,7 @@ impl Dag {
         &mut self,
         recently_added_node_dependencies: HashSet<HashValue>,
         recently_added_node_digest: HashValue,
+        storage_diff: &mut Box<dyn DagStoreWriteBatch>,
     ) {
         for digest in recently_added_node_dependencies {
             let mut maybe_status = None;
@@ -227,7 +228,7 @@ impl Dag {
                 Entry::Vacant(_) => unreachable!("pending node is missing"),
             }
             if let Some(status) = maybe_status {
-                self.add_to_dag_and_update_pending(status).await;
+                self.add_to_dag_and_update_pending(status, storage_diff).await;
             }
         }
     }
@@ -253,6 +254,7 @@ impl Dag {
         &mut self,
         certified_node: CertifiedNode, // assumption that node not pending.
         missing_parents: HashSet<NodeMetaData>,
+        storage_diff: &mut Box<dyn DagStoreWriteBatch>,
     ) {
         let pending_peer_id = certified_node.node().source();
         let pending_digest = certified_node.node().digest();
@@ -358,7 +360,7 @@ impl Dag {
         );
     }
 
-    pub async fn try_add_node(&mut self, certified_node: CertifiedNode) {
+    pub async fn try_add_node(&mut self, certified_node: CertifiedNode, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         info!(
             "DAG: trying to add node: my_id {}, round {}, peer_id {}",
             self.in_mem.my_id,
@@ -382,9 +384,9 @@ impl Dag {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {
-                    self.add_to_dag(certified_node).await;
+                    self.add_to_dag(certified_node, storage_diff).await;
                 } else {
-                    self.add_to_pending(certified_node, missing_parents);
+                    self.add_to_pending(certified_node, missing_parents, storage_diff);
                 }
             },
 
@@ -400,7 +402,7 @@ impl Dag {
         }
 
         if let Some(node_status) = maybe_node_status {
-            self.add_to_dag_and_update_pending(node_status).await;
+            self.add_to_dag_and_update_pending(node_status, storage_diff).await;
         }
     }
 }
