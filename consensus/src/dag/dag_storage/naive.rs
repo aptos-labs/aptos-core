@@ -3,8 +3,9 @@
 use aptos_schemadb::{DB, Options, SchemaBatch};
 use std::path::Path;
 use std::any::Any;
-use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema};
-use crate::dag::dag_storage::{ContainsKey, DAG_DB_NAME, DagStorage, DagStoreWriteBatch};
+use anyhow::Error;
+use crate::dag::dag::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::dag_storage::{ContainsKey, DAG_DB_NAME, DagStorage, DagStoreWriteBatch, ItemId};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -19,8 +20,24 @@ impl NaiveDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
-    fn put_dag_in_mem(&mut self, dag_in_mem: &DagInMem) -> anyhow::Result<()> {
-        self.inner.put::<DagInMemSchema>(&dag_in_mem.key(), &dag_in_mem.partial())
+    fn put_dag_in_mem(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
+        self.inner.put::<DagInMemSchema>(&obj.key(), &obj.partial())?;
+        self.put_dag_round_list(obj.get_dag())?;
+        self.put_weak_link_creator(obj.get_front())?;
+        self.put_missing_node_id_to_status_map(obj.get_missing_nodes())?;
+        Ok(())
+    }
+
+    fn put_dag_round_list(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
+        self.inner.put::<DagRoundListSchema>(&obj.key(), obj)
+    }
+
+    fn put_weak_link_creator(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
+        self.inner.put::<WeakLinksCreatorSchema>(&obj.key(), obj)
+    }
+
+    fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
+        self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.key(), obj)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -35,36 +52,10 @@ pub struct NaiveDagStore {
 impl NaiveDagStore {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![
-            "AbsentInfo",
             "DagInMem",
-            "DagState.my_id",
-            "DagState.epoch",
-            "DagState.current_round",
-            "DagState.dag",
-            "DagState.front",
-            "DagState.missing_nodes",
-            "PeerIdToCertifiedNodeMap",
-            "Map<HashValue,MissingDagNodeStatus>",
-            "MissingDagNodeStatus",
-            "PendingInfo",
-            "PendingInfo.certified_node",
-            "PendingInfo.missing_parents",
-            "PendingInfo.immediate_dependencies",
-            "Set<[u8;32]>",
-            "CertifiedNode",
-            "NodeMetadata",
+            "DagRoundList",
+            "MissingNodeIdToStatusMap",
             "WeakLinksCreator",
-            "WeakLinksCreator.my_id",
-            "WeakLinksCreator.latest_nodes_metadata",
-            "WeakLinksCreator.address_to_validator_index",
-            "Map<PeerId,u64>",
-            "Vec<PeerIdToCertifiedNodeMap>",
-            "Vec<Option<PeerStatus>>",
-            "Option<PeerStatus>",
-            "PeerStatus",
-            "PeerStatus.case",
-            "PeerStatus.caseLinked",
-            "PeerStatus.caseNotLinked",
         ];
 
         let path = db_root_path.as_ref().join(DAG_DB_NAME);
@@ -81,9 +72,41 @@ impl NaiveDagStore {
 
 
 impl DagStorage for NaiveDagStore {
-    fn get_dag_in_mem(&self, key: &DagInMem_Key) -> anyhow::Result<Option<DagInMem>> {
-        let x = self.db.get::<DagInMemSchema>(key)?;
-        Ok(None)
+
+    fn load_dag_in_mem(&self, key: &DagInMem_Key) -> anyhow::Result<Option<DagInMem>> {
+        let maybe_partial = self.db.get::<DagInMemSchema>(key)?;
+        if let Some(partial) = maybe_partial {
+            let maybe_front = self.load_weak_link_creator(&partial.front)?;
+            let maybe_dag =  self.load_dag_round_list(&partial.dag)?;
+            let maybe_missing_nodes = self.load_missing_node_id_to_status_map(&partial.missing_nodes)?;
+            if let (Some(front), Some(dag), Some(missing_nodes)) = (maybe_front, maybe_dag, maybe_missing_nodes) {
+                let obj = DagInMem{
+                    my_id: partial.my_id,
+                    epoch: partial.epoch,
+                    current_round: partial.current_round,
+                    front,
+                    dag,
+                    missing_nodes,
+                };
+                Ok(Some(obj))
+            } else {
+                Err(Error::msg("Inconsistency."))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn load_weak_link_creator(&self, key: &ItemId) -> anyhow::Result<Option<WeakLinksCreator>> {
+        todo!()
+    }
+
+    fn load_dag_round_list(&self, key: &ItemId) -> anyhow::Result<Option<DagRoundList>> {
+        todo!()
+    }
+
+    fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
+        todo!()
     }
 
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {
