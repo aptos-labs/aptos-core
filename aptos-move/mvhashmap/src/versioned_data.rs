@@ -44,7 +44,7 @@ struct VersionedValue<V> {
     aggregator_base_value: Option<u128>,
 }
 
-/// Maps each key (access path) to an interal VersionedValue.
+/// Maps each key (access path) to an internal VersionedValue.
 pub struct VersionedData<K, V> {
     values: DashMap<K, VersionedValue<V>>,
 }
