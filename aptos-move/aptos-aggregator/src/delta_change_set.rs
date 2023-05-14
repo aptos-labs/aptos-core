@@ -10,10 +10,10 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     vm_status::{StatusCode, VMStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::WriteOp,
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -309,6 +309,16 @@ impl DeltaChangeSet {
     }
 
     #[inline]
+    pub fn contains_key(&self, key: &StateKey) -> bool {
+        self.delta_change_set.contains_key(key)
+    }
+
+    #[inline]
+    pub fn entry(&mut self, key: StateKey) -> Entry<StateKey, DeltaOp> {
+        self.delta_change_set.entry(key)
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.delta_change_set.is_empty()
     }
@@ -317,7 +327,7 @@ impl DeltaChangeSet {
         &mut self.delta_change_set
     }
 
-    pub(crate) fn take(
+    pub fn take(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
@@ -329,22 +339,6 @@ impl DeltaChangeSet {
         }
 
         Ok(ret)
-    }
-
-    /// Consumes the delta change set and tries to materialize it. Returns a
-    /// mutable write set if materialization succeeds (mutability since we want
-    /// to merge these writes with transaction outputs).
-    pub fn try_into_write_set(
-        self,
-        state_view: &impl StateView,
-    ) -> anyhow::Result<WriteSet, VMStatus> {
-        let materialized_write_set = self
-            .take(state_view)
-            .expect("something terrible happened when applying aggregator deltas");
-
-        WriteSetMut::new(materialized_write_set)
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 }
 

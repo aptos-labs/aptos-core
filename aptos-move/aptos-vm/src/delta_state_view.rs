@@ -7,17 +7,18 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::TransactionWrite,
 };
+use aptos_vm_types::write_change_set::WriteChangeSet;
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
-    write_set: &'b WriteSet,
+    writes: &'b WriteChangeSet,
 }
 
 impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, write_set: &'b WriteSet) -> Self {
-        Self { base, write_set }
+    pub fn new(base: &'a S, writes: &'b WriteChangeSet) -> Self {
+        Self { base, writes }
     }
 }
 
@@ -32,7 +33,7 @@ where
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        match self.write_set.get(state_key) {
+        match self.writes.get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base.get_state_value(state_key),
         }

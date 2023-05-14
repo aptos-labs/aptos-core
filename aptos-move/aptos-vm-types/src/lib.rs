@@ -1,4 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod change_set;
+pub mod change_set;
+pub mod vm_output;
+pub mod write_change_set;

@@ -262,7 +262,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// `fn io_gas_per_write`.
     /// Due to this reason, you should normally not override the default implementation,
     /// unless you are doing something special, such as injecting additional logging logic.
-    fn charge_io_gas_for_write_set<'a>(
+    fn charge_io_gas_for_writes<'a>(
         &mut self,
         ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
     ) -> VMResult<()> {

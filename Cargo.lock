@@ -1381,6 +1381,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-package-builder",
  "aptos-types",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "clap 3.2.23",
  "move-binary-format",
@@ -3198,6 +3199,7 @@ dependencies = [
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
  "fail 0.5.0",
@@ -3289,6 +3291,7 @@ name = "aptos-vm-types"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "aptos-aggregator",
  "aptos-state-view",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",

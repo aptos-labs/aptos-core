@@ -8,7 +8,6 @@ use crate::{
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaChangeSet},
-    transaction::ChangeSetExt,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -21,9 +20,10 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
-    transaction::{ChangeSet, SignatureCheckedTransaction},
-    write_set::{WriteOp, WriteSetMut},
+    transaction::SignatureCheckedTransaction,
+    write_set::WriteOp,
 };
+use aptos_vm_types::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -39,7 +39,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
@@ -107,7 +106,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<ChangeSetExt> {
+    ) -> VMResult<AptosChangeSet> {
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(self.remote, change_set)?;
@@ -254,9 +253,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
-        let mut write_set_mut = WriteSetMut::new(Vec::new());
-        let mut delta_change_set = DeltaChangeSet::empty();
+    ) -> Result<AptosChangeSet, VMStatus> {
+        let mut writes = WriteChangeSet::empty();
+        let mut deltas = DeltaChangeSet::empty();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -266,14 +265,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
                 );
-                write_set_mut.insert((state_key, op))
+                writes.insert((state_key, op))
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
                 let op = Self::convert_write_op(blob_op, false);
-                write_set_mut.insert((state_key, op))
+                writes.insert((state_key, op))
             }
         }
 
@@ -283,7 +282,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
                 let op = Self::convert_write_op(blob_op, false);
-                write_set_mut.insert((state_key, op))
+                writes.insert((state_key, op))
             }
         }
 
@@ -291,7 +290,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 let op = Self::convert_write_op(value_op, false);
-                write_set_mut.insert((state_key, op))
+                writes.insert((state_key, op))
             }
         }
 
@@ -303,19 +302,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = WriteOp::Modification(serialize(&value));
-                    write_set_mut.insert((state_key, write_op));
+                    writes.insert((state_key, write_op));
                 },
-                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => deltas.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = WriteOp::Deletion;
-                    write_set_mut.insert((state_key, write_op));
+                    writes.insert((state_key, write_op));
                 },
             }
         }
-
-        let write_set = write_set_mut
-            .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
@@ -326,12 +321,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        let change_set = ChangeSet::new(write_set, events, configs)?;
-        Ok(ChangeSetExt::new(
-            delta_change_set,
-            change_set,
-            Arc::new(configs.clone()),
-        ))
+        Ok(AptosChangeSet::new(writes, deltas, events, configs)?)
     }
 
     fn convert_write_op(

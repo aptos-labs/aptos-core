@@ -218,15 +218,15 @@ where
         base_view: &S,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
-        let mut delta_writes = Vec::with_capacity(num_deltas);
+        let mut materialized_deltas = Vec::with_capacity(num_deltas);
         for k in delta_keys {
-            // Note that delta materialization happens concurrenty, but under concurrent
+            // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
             // contending on delta materialization of the same aggregator. However, the
             // materialization is based on previously materialized values and should not
             // introduce long critical sections. Moreover, with more aggregators, and given
             // that the commit_hook will be performed at dispersed times based on the
-            // completion of the respetive previous tasks of threads, this should not be
+            // completion of the respective previous tasks of threads, this should not be
             // an immediate bottleneck - confirmed by an experiment with 32 core and a
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
@@ -245,12 +245,12 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            delta_writes.push((
+            materialized_deltas.push((
                 k.clone(),
                 WriteOp::Modification(serialize(&committed_delta)),
             ));
         }
-        last_input_output.record_delta_writes(txn_idx, delta_writes);
+        last_input_output.record_materialized_deltas(txn_idx, materialized_deltas);
     }
 
     fn work_task_with_scope(

@@ -3,11 +3,13 @@
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
+    contract_event::ContractEvent,
     on_chain_config::StorageGasSchedule,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, CheckChangeSet},
     write_set::WriteOp,
 };
+use aptos_vm_types::{change_set::SizeChecker, write_change_set::WriteChangeSet};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
@@ -265,6 +267,46 @@ impl ChangeSetConfigs {
     }
 }
 
+#[inline]
+fn size_error() -> VMStatus {
+    VMStatus::Error(StatusCode::STORAGE_ERROR, None)
+}
+
+impl SizeChecker for ChangeSetConfigs {
+    fn check_writes(&self, writes: &WriteChangeSet) -> Result<(), VMStatus> {
+        let mut write_set_size = 0;
+        for (key, op) in writes.iter() {
+            if let Some(bytes) = op.bytes() {
+                let write_op_size = (bytes.len() + key.size()) as u64;
+                if write_op_size > self.max_bytes_per_write_op {
+                    return Err(size_error());
+                }
+                write_set_size += write_op_size;
+            }
+            if write_set_size > self.max_bytes_all_write_ops_per_transaction {
+                return Err(size_error());
+            }
+        }
+        Ok(())
+    }
+
+    fn check_events(&self, events: &[ContractEvent]) -> Result<(), VMStatus> {
+        let mut total_event_size = 0;
+        for event in events {
+            let size = event.event_data().len() as u64;
+            if size > self.max_bytes_per_event {
+                return Err(size_error());
+            }
+            total_event_size += size;
+            if total_event_size > self.max_bytes_all_events_per_transaction {
+                return Err(size_error());
+            }
+        }
+        Ok(())
+    }
+}
+
+// TODO: Do we need this anymore?
 impl CheckChangeSet for ChangeSetConfigs {
     fn check_change_set(&self, change_set: &ChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
