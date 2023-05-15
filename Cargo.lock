@@ -2159,6 +2159,8 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "serde_json",
+ "serde_merge",
+ "serde_yaml 0.8.26",
  "tokio",
  "tokio-stream",
  "url",
@@ -10815,6 +10817,17 @@ dependencies = [
  "itoa",
  "ryu",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "serde_merge"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "606e91878516232ac3b16c12e063d4468d762f16d77e7aef14a1f2326c5f409b"
+dependencies = [
+ "serde 1.0.149",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
