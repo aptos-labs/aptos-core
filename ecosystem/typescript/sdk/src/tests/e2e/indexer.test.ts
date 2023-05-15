@@ -6,14 +6,17 @@ import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
 import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import { Provider } from "../../providers";
+import { AptosToken } from "../../plugins";
 
-const aptosClient = new AptosClient(NetworkToNodeAPI[Network.TESTNET]);
+const provider = new Provider(Network.TESTNET);
+const aptosToken = new AptosToken(provider);
 const faucetClient = new FaucetClient(
   "https://fullnode.testnet.aptoslabs.com",
   "https://faucet.testnet.aptoslabs.com",
   { TOKEN: FAUCET_AUTH_TOKEN },
 );
-const tokenClient = new TokenClient(aptosClient);
+const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
 const collectionName = "AliceCollection";
 const tokenName = "Alice Token";
@@ -39,11 +42,11 @@ describe("Indexer", () => {
   beforeAll(async () => {
     await faucetClient.fundAccount(alice.address(), 100000000);
     // Create collection and token on Alice's account
-    await aptosClient.waitForTransaction(
+    await provider.waitForTransaction(
       await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
       { checkSuccess: true },
     );
-    await aptosClient.waitForTransaction(
+    await provider.waitForTransaction(
       await tokenClient.createTokenWithMutabilityConfig(
         alice,
         collectionName,
@@ -59,6 +62,28 @@ describe("Indexer", () => {
         [bcsSerializeBool(true)],
         ["bool"],
         [false, false, false, false, true],
+      ),
+      { checkSuccess: true },
+    );
+
+    await provider.waitForTransaction(
+      await aptosToken.createCollection(alice, "Alice's simple collection", collectionName, "https://aptos.dev", 5, {
+        royaltyNumerator: 10,
+        royaltyDenominator: 10,
+      }),
+      { checkSuccess: true },
+    );
+
+    await provider.waitForTransactionWithResult(
+      await aptosToken.mint(
+        alice,
+        collectionName,
+        "Alice's simple token",
+        tokenName,
+        "https://aptos.dev/img/nyan.jpeg",
+        ["key"],
+        ["bool"],
+        ["true"],
       ),
       { checkSuccess: true },
     );
@@ -117,7 +142,7 @@ describe("Indexer", () => {
       "gets account transactions count",
       async () => {
         const accountTransactionsCount = await indexerClient.getAccountTransactionsCount(alice.address().hex());
-        expect(accountTransactionsCount.move_resources_aggregate.aggregate?.count).toEqual(3);
+        expect(accountTransactionsCount.move_resources_aggregate.aggregate?.count).toEqual(5);
       },
       longTestTimeout,
     );
@@ -200,5 +225,47 @@ describe("Indexer", () => {
       const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });
+
+    it("gets account current tokens", async () => {
+      const tokens = await indexerClient.getAccountTokens(alice.address().hex());
+      expect(tokens.current_token_ownerships_v2).toHaveLength(2);
+    });
+
+    it("gets the account collection data", async () => {
+      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
+      expect(collectionData.current_collections_v2).toHaveLength(2);
+    });
+
+    it(
+      "gets account current tokens of a specific collection by the collection address",
+      async () => {
+        const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionName, {
+          tokenStandard: "v2",
+        });
+        const tokens = await indexerClient.getAccountCollectionTokensByCollectionAddress(
+          alice.address().hex(),
+          collectionAddress,
+        );
+        expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+        expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account current tokens of a specific collection by the collection address",
+      async () => {
+        const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionName, {
+          tokenStandard: "v1",
+        });
+        const tokens = await indexerClient.getAccountCollectionTokensByCollectionAddress(
+          alice.address().hex(),
+          collectionAddress,
+        );
+        expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+        expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v1");
+      },
+      longTestTimeout,
+    );
   });
 });

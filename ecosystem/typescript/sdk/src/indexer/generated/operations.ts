@@ -9,6 +9,16 @@ export type GetAccountCoinsDataQueryVariables = Types.Exact<{
 
 export type GetAccountCoinsDataQuery = { __typename?: 'query_root', current_coin_balances: Array<{ __typename?: 'current_coin_balances', amount: any, coin_type: string, coin_info?: { __typename?: 'coin_infos', name: string, decimals: number, symbol: string } | null }> };
 
+export type GetAccountCollectionTokensQueryVariables = Types.Exact<{
+  collection_id: Types.Scalars['String'];
+  owner_address: Types.Scalars['String'];
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
+
+
+export type GetAccountCollectionTokensQuery = { __typename?: 'query_root', current_token_ownerships_v2: Array<{ __typename?: 'current_token_ownerships_v2', token_standard: string, is_fungible_v2?: boolean | null, is_soulbound_v2?: boolean | null, property_version_v1: any, table_type_v1?: string | null, token_properties_mutated_v1?: any | null, amount: any, last_transaction_timestamp: any, last_transaction_version: any, storage_id: string, owner_address: string, current_token_data?: { __typename?: 'current_token_datas_v2', token_name: string, token_data_id: string, token_uri: string, token_properties: any, supply: any, maximum?: any | null, last_transaction_version: any, last_transaction_timestamp: any, largest_property_version_v1?: any | null, current_collection?: { __typename?: 'current_collections_v2', collection_name: string, creator_address: string, description: string, uri: string, collection_id: string, last_transaction_version: any, current_supply: any, mutable_description?: boolean | null, total_minted_v2?: any | null, table_handle_v1?: string | null, mutable_uri?: boolean | null } | null } | null }> };
+
 export type GetAccountCurrentTokensQueryVariables = Types.Exact<{
   address: Types.Scalars['String'];
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
@@ -53,6 +63,15 @@ export type GetAccountTransactionsDataQueryVariables = Types.Exact<{
 
 
 export type GetAccountTransactionsDataQuery = { __typename?: 'query_root', move_resources: Array<{ __typename?: 'move_resources', transaction_version: any }> };
+
+export type GetCollectionDataQueryVariables = Types.Exact<{
+  where_condition: Types.Current_Collections_V2_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
+
+
+export type GetCollectionDataQuery = { __typename?: 'query_root', current_collections_v2: Array<{ __typename?: 'current_collections_v2', collection_id: string, token_standard: string, collection_name: string, creator_address: string, current_supply: any, description: string, uri: string }> };
 
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;

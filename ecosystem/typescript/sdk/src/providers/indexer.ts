@@ -1,4 +1,5 @@
 import axios from "axios";
+import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 
 import { AnyNumber } from "../bcs/types";
 import { HexString, MaybeHexString } from "../utils";
@@ -18,6 +19,8 @@ import {
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
   GetAccountTokensQuery,
+  GetAccountCollectionTokensQuery,
+  GetCollectionDataQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -35,7 +38,11 @@ import {
   GetTopUserTransactions,
   GetUserTransactions,
   GetAccountTokens,
+  GetAccountCollectionTokens,
+  GetCollectionData,
 } from "../indexer/generated/queries";
+import { AccountAddress } from "../aptos_types";
+import { bcsToBytes } from "../bcs";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -49,6 +56,8 @@ interface PaginationArgs {
   offset?: AnyNumber;
   limit?: number;
 }
+
+type TokenStandard = "v1" | "v2";
 
 type GraphqlQuery = {
   query: string;
@@ -319,13 +328,89 @@ export class IndexerClient {
    *
    * @returns GetAccountTokensQuery response type
    */
-  async getAccountTokens(accountAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountTokensQuery> {
-    const address = HexString.ensure(accountAddress).hex();
+  async getAccountTokens(ownerAddress: MaybeHexString, options?: PaginationArgs): Promise<GetAccountTokensQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
       query: GetAccountTokens,
-      variables: { accountAddress: address, offset: options?.offset, limit: options?.limit },
+      variables: { address, offset: options?.offset, limit: options?.limit },
     };
     return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns
+   *
+   * @param ownerAddress owner address
+   * @param collectionAddress the collection address
+   * @returns GetAccountCollectionTokensQuery response type
+   */
+  async getAccountCollectionTokensByCollectionAddress(
+    ownerAddress: MaybeHexString,
+    collectionAddress: MaybeHexString,
+    options?: PaginationArgs,
+  ): Promise<GetAccountCollectionTokensQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const graphqlQuery = {
+      query: GetAccountCollectionTokens,
+      variables: {
+        collection_id: collectionAddress,
+        owner_address: address,
+        offset: options?.offset,
+        limit: options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries a collection data
+   *
+   * @param creatorAddress the collection creator address
+   * @param collectionName the collection name
+   * @returns GetCollectionDataQuery response type
+   */
+  async getCollectionData(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetCollectionDataQuery> {
+    const address = HexString.ensure(creatorAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    let whereCondition: any = {
+      collection_name: { _eq: collectionName },
+      creator_address: { _eq: address },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetCollectionData,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  async getCollectionAddress(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<string> {
+    return (await this.getCollectionData(creatorAddress, collectionName, extraArgs)).current_collections_v2[0]
+      .collection_id;
   }
 }

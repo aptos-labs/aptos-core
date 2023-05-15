@@ -41,6 +41,52 @@ export const GetAccountCoinsData = `
   }
 }
     `;
+export const GetAccountCollectionTokens = `
+    query getAccountCollectionTokens($collection_id: String!, $owner_address: String!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(
+    where: {owner_address: {_eq: $owner_address}, current_token_data: {collection_id: {_eq: $collection_id}}, amount: {_gt: 0}}
+    offset: $offset
+    limit: $limit
+  ) {
+    token_standard
+    is_fungible_v2
+    is_soulbound_v2
+    is_soulbound_v2
+    property_version_v1
+    table_type_v1
+    token_properties_mutated_v1
+    amount
+    last_transaction_timestamp
+    last_transaction_version
+    storage_id
+    owner_address
+    current_token_data {
+      token_name
+      token_data_id
+      token_uri
+      token_properties
+      supply
+      maximum
+      last_transaction_version
+      last_transaction_timestamp
+      largest_property_version_v1
+      current_collection {
+        collection_name
+        creator_address
+        description
+        uri
+        collection_id
+        last_transaction_version
+        current_supply
+        mutable_description
+        total_minted_v2
+        table_handle_v1
+        mutable_uri
+      }
+    }
+  }
+}
+    `;
 export const GetAccountCurrentTokens = `
     query getAccountCurrentTokens($address: String!, $offset: Int, $limit: Int) {
   current_token_ownerships(
@@ -141,6 +187,19 @@ export const GetAccountTransactionsData = `
     offset: $offset
   ) {
     transaction_version
+  }
+}
+    `;
+export const GetCollectionData = `
+    query getCollectionData($where_condition: current_collections_v2_bool_exp!, $offset: Int, $limit: Int) {
+  current_collections_v2(where: $where_condition, offset: $offset, limit: $limit) {
+    collection_id
+    token_standard
+    collection_name
+    creator_address
+    current_supply
+    description
+    uri
   }
 }
     `;
@@ -265,6 +324,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getAccountCoinsData(variables?: Types.GetAccountCoinsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCoinsDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCoinsDataQuery>(GetAccountCoinsData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCoinsData', 'query');
     },
+    getAccountCollectionTokens(variables: Types.GetAccountCollectionTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCollectionTokensQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCollectionTokensQuery>(GetAccountCollectionTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCollectionTokens', 'query');
+    },
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
     },
@@ -279,6 +341,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getAccountTransactionsData(variables?: Types.GetAccountTransactionsDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTransactionsDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTransactionsDataQuery>(GetAccountTransactionsData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTransactionsData', 'query');
+    },
+    getCollectionData(variables: Types.GetCollectionDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionDataQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionDataQuery>(GetCollectionData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionData', 'query');
     },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');
