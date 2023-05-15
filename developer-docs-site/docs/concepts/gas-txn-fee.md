@@ -5,17 +5,14 @@ slug: "gas-txn-fee"
 
 # Gas and Storage Fees
 
-To conduct any transaction with the Aptos blockchain on the mainnet, you are required to pay a processing fee. This fee is derived from transactions with a client application, stake owner, node operator, or voter.
-
-As of today, this fee comprises two components:
+Any transaction execution on the Aptos blockchain requires a processing fee. As of today, this fee comprises two components:
 1. Execution & IO costs
   - This covers your usage of transient computation resources, such as processing your transactions and propagating the validated record throughout the distributed network of the mainnet.
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
   - It is measured in fixed APT prices.
-  - In the future, such fees will evolve into deposits that are refundable, should you choose to delete the data you stored. The refunds can be full or partial, depending
-  on the time frame.
+  - In the future, such fees will evolve into deposits that are refundable, should you choose to delete the data you stored. The refunds can be full or partial, depending on the time frame.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
