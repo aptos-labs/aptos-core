@@ -49,6 +49,7 @@ members = [
     "crates/aptos-faucet/metrics-server",
     "crates/aptos-faucet/service",
     "crates/aptos-genesis",
+    "crates/aptos-github-client",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
@@ -111,7 +112,6 @@ members = [
     "sdk",
     "secure/net",
     "secure/storage",
-    "secure/storage/github",
     "secure/storage/vault",
     "state-sync/aptos-data-client",
     "state-sync/inter-component/consensus-notifications",
@@ -282,7 +282,7 @@ aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-genesis = { path = "crates/aptos-genesis" }
-aptos-github-client = { path = "secure/storage/github" }
+aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
