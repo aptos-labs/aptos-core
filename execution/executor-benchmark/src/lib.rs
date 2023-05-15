@@ -21,7 +21,13 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
-use aptos_executor::{block_executor::{BlockExecutor, TransactionBlockExecutor}, metrics::{APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS}};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
@@ -34,10 +40,11 @@ use aptos_vm::counters::TXN_GAS_USAGE;
 use gen_executor::DbGenInitTransactionExecutor;
 use pipeline::PipelineConfig;
 use std::{
+    collections::HashMap,
     fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
-    time::Instant, collections::HashMap,
+    time::Instant,
 };
 use tokio::runtime::Runtime;
 
@@ -164,7 +171,17 @@ pub fn run_benchmark<V>(
         ("4.", true, "get_txns_to_commit"),
     ];
 
-    let start_by_other = other_labels.iter().map(|other_label| (other_label.2.to_string(), APTOS_EXECUTOR_OTHER_TIMERS_SECONDS.with_label_values(&[other_label.2]).get_sample_sum())).collect::<HashMap<_, _>>();
+    let start_by_other = other_labels
+        .iter()
+        .map(|other_label| {
+            (
+                other_label.2.to_string(),
+                APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&[other_label.2])
+                    .get_sample_sum(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
     if let Some(transaction_generator_creator) = transaction_generator_creator {
@@ -196,18 +213,36 @@ pub fn run_benchmark<V>(
         }
     );
     info!("Overall TPS: {} txn/s", delta_v as f64 / elapsed);
-    info!("Overall GPS: {} gas/s", delta_gas as f64 / elapsed);
+    info!("Overall GPS: {} gas/s", delta_gas / elapsed);
 
-    let time_in_execution = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
-    info!("Overall fraction of total: {:.3} in execution", time_in_execution / elapsed);
-    info!("Overall fraction of execution {:.3} in VM", (APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_only) / time_in_execution);
-    for (prefix, top_level,  other_label) in other_labels {
-        let fraction_in_label = (APTOS_EXECUTOR_OTHER_TIMERS_SECONDS.with_label_values(&[other_label]).get_sample_sum() - start_by_other.get(other_label).unwrap()) / time_in_execution;
+    let time_in_execution =
+        APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
+    info!(
+        "Overall fraction of total: {:.3} in execution",
+        time_in_execution / elapsed
+    );
+    info!(
+        "Overall fraction of execution {:.3} in VM",
+        (APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_only)
+            / time_in_execution
+    );
+    for (prefix, top_level, other_label) in other_labels {
+        let fraction_in_label = (APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&[other_label])
+            .get_sample_sum()
+            - start_by_other.get(other_label).unwrap())
+            / time_in_execution;
         if top_level || fraction_in_label > 0.01 {
-            info!("Overall fraction of execution {:.3} in {} {}", fraction_in_label, prefix, other_label);
+            info!(
+                "Overall fraction of execution {:.3} in {} {}",
+                fraction_in_label, prefix, other_label
+            );
         }
     }
-    info!("Overall fraction of total: {:.3} in commit", (APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total) / elapsed);
+    info!(
+        "Overall fraction of total: {:.3} in commit",
+        (APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total) / elapsed
+    );
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
@@ -257,7 +292,6 @@ where
 
         create_txn_generator_creator(
             &[vec![(transaction_type, 1)]],
-            1,
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -440,7 +474,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize(2)),
+            transaction_type.map(|t| t.materialize(2, false)),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */

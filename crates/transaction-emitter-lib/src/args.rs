@@ -137,6 +137,12 @@ pub struct EmitArgs {
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
 
+    #[clap(long)]
+    pub module_working_set_size: Option<usize>,
+
+    #[clap(long)]
+    pub sender_use_account_pool: Option<bool>,
+
     #[clap(long, min_values = 0)]
     pub transaction_weights: Vec<usize>,
 
