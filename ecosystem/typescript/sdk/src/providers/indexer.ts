@@ -367,6 +367,7 @@ export class IndexerClient {
 
   /**
    * Queries a collection data
+   * if, for some reason, a creator account has 2 collections with the same name in v1 and v2, can pass an optional `tokenStandard` parameter to query a specific standard
    *
    * @param creatorAddress the collection creator address
    * @param collectionName the collection name
