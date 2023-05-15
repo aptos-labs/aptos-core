@@ -199,6 +199,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
+            let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
@@ -213,17 +214,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error.clone())?;
                 } else {
-                    change_set_filtered
-                        .add_resource_op(addr, struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
+                    resources_filtered.insert(struct_tag, blob_op);
                 }
             }
 
-            for (name, blob_op) in modules {
-                change_set_filtered
-                    .add_module_op(ModuleId::new(addr, name), blob_op)
-                    .map_err(|_| common_error.clone())?;
-            }
+            change_set_filtered.add_account_changeset(addr, AccountChangeSet::from_modules_resources(modules, resources_filtered)).map_err(|_| common_error.clone())?;
 
             for (resource_tag, resources) in resource_groups {
                 let source_data = remote
