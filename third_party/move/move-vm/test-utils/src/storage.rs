@@ -47,7 +47,7 @@ impl ResourceRefResolver for BlankStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-        _metadata: &[Metadata]
+        _metadata: &[Metadata],
     ) -> Result<Option<ResourceRef>> {
         Ok(None)
     }
@@ -56,7 +56,7 @@ impl ResourceRefResolver for BlankStorage {
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-        _metadata: &[Metadata]
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
@@ -120,7 +120,8 @@ impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b
             }
         }
 
-        self.base.get_resource_bytes_with_metadata(address, tag, metadata)
+        self.base
+            .get_resource_bytes_with_metadata(address, tag, metadata)
     }
 }
 

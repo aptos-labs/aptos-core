@@ -3,9 +3,7 @@
 
 use crate::types::ResourceRef;
 use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::StructTag,
-    metadata::Metadata,
+    account_address::AccountAddress, language_storage::StructTag, metadata::Metadata,
     resolver::ModuleResolver,
 };
 
@@ -54,7 +52,11 @@ pub trait MoveRefResolver: ModuleResolver + ResourceRefResolver {
         address: &AccountAddress,
         typ: &StructTag,
     ) -> anyhow::Result<Option<ResourceRef>> {
-        self.get_resource_ref_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
+        self.get_resource_ref_with_metadata(
+            address,
+            typ,
+            &self.get_module_metadata(&typ.module_id()),
+        )
     }
 
     fn get_resource_bytes(
@@ -62,7 +64,11 @@ pub trait MoveRefResolver: ModuleResolver + ResourceRefResolver {
         address: &AccountAddress,
         typ: &StructTag,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        self.get_resource_bytes_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
+        self.get_resource_bytes_with_metadata(
+            address,
+            typ,
+            &self.get_module_metadata(&typ.module_id()),
+        )
     }
 }
 

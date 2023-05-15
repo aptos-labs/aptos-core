@@ -9,12 +9,8 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-<<<<<<< HEAD
-    resolver::ModuleResolver,
-=======
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
->>>>>>> main
+    resolver::ModuleResolver,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };

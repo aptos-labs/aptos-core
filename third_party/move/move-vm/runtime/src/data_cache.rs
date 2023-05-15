@@ -198,12 +198,14 @@ impl<'r> TransactionDataCache<'r> {
                             let val = match Value::simple_deserialize(&blob, &ty_layout) {
                                 Some(val) => val,
                                 None => {
-                                    let msg =
-                                        format!("Failed to deserialize resource {} at {}!", ty_tag, addr);
+                                    let msg = format!(
+                                        "Failed to deserialize resource {} at {}!",
+                                        ty_tag, addr
+                                    );
                                     return Err(PartialVMError::new(
                                         StatusCode::FAILED_TO_DESERIALIZE_RESOURCE,
                                     )
-                                        .with_message(msg));
+                                    .with_message(msg));
                                 },
                             };
 
