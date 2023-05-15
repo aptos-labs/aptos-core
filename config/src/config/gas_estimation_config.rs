@@ -15,6 +15,9 @@ pub struct GasEstimationConfig {
     pub enabled: bool,
     /// Number of transactions for blocks to be classified as full for gas estimation
     pub full_block_txns: usize,
+    // TODO: Move this to use the onchain config introduced in AIP-33
+    /// The amount of gas used for blocks to be classified as full for gas estimation
+    pub full_block_gas_used: u64,
     /// Maximum number of blocks read for low gas estimation
     pub low_block_history: usize,
     /// Maximum number of blocks read for market gas estimation
@@ -30,6 +33,7 @@ impl Default for GasEstimationConfig {
         GasEstimationConfig {
             enabled: false,
             full_block_txns: 250,
+            full_block_gas_used: 1000000,
             low_block_history: 10,
             market_block_history: 30,
             aggressive_block_history: 120,

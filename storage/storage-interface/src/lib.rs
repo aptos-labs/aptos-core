@@ -129,12 +129,12 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    fn get_gas_prices(
+    fn get_gas_prices_and_used(
         &self,
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<Vec<u64>> {
+    ) -> Result<Vec<(u64, u64)>> {
         unimplemented!()
     }
 

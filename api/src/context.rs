@@ -927,20 +927,29 @@ impl Context {
         let mut min_inclusion_prices = vec![];
         // TODO: if multiple calls to db is a perf issue, combine into a single call and then split
         for (first, last) in blocks {
-            let min_inclusion_price =
-                match self
-                    .db
-                    .get_gas_prices(first, last - first, ledger_info.ledger_version.0)
-                {
-                    Ok(prices) => {
-                        if prices.len() < config.full_block_txns {
-                            min_gas_unit_price
-                        } else {
-                            self.next_bucket(*prices.iter().min().unwrap())
-                        }
-                    },
-                    Err(_) => min_gas_unit_price,
-                };
+            let min_inclusion_price = match self.db.get_gas_prices_and_used(
+                first,
+                last - first,
+                ledger_info.ledger_version.0,
+            ) {
+                Ok(prices_and_used) => {
+                    if prices_and_used.len() < config.full_block_txns
+                        && prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
+                            < config.full_block_gas_used
+                    {
+                        min_gas_unit_price
+                    } else {
+                        self.next_bucket(
+                            prices_and_used
+                                .iter()
+                                .map(|(price, _)| *price)
+                                .min()
+                                .unwrap(),
+                        )
+                    }
+                },
+                Err(_) => min_gas_unit_price,
+            };
             min_inclusion_prices.push(min_inclusion_price);
             cache
                 .min_inclusion_prices

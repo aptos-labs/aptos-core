@@ -489,14 +489,14 @@ impl DbReader for FakeAptosDB {
         })
     }
 
-    fn get_gas_prices(
+    fn get_gas_prices_and_used(
         &self,
         start_version: Version,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<Vec<u64>> {
+    ) -> Result<Vec<(u64, u64)>> {
         self.inner
-            .get_gas_prices(start_version, limit, ledger_version)
+            .get_gas_prices_and_used(start_version, limit, ledger_version)
     }
 
     fn get_transaction_by_hash(
