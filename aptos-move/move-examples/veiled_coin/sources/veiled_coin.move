@@ -522,8 +522,11 @@ module veiled_coin::veiled_coin {
 
         let coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
 
+        let veiled_balance = elgamal::decompress_ciphertext(&coin_store.veiled_balance);
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
+
         // Since `veiled_amount` was created from a `u32` public `amount`, no ZK range proof is needed for it.
-        veiled_withdraw(veiled_amount, coin_store, new_balance_proof, &std::option::none());
+        veiled_withdraw(veiled_amount, coin_store, &veiled_balance, new_balance_proof, &std::option::none());
 
         // Note: If the above `withdraw` aborts, the whole TXN aborts, so there are no atomicity issues.
         coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount))
@@ -547,8 +550,11 @@ module veiled_coin::veiled_coin {
 
         // Note: The `get_pk_from_addr` call from above already asserts that `sender_addr` has a coin store.
         let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
-        let balance = elgamal::decompress_ciphertext(&sender_coin_store.veiled_balance);
-        elgamal::ciphertext_sub_assign(&mut balance, &veiled_withdraw_amount);
+
+        // Fetch the veiled balance of the veiled account
+        let veiled_balance = elgamal::decompress_ciphertext(&sender_coin_store.veiled_balance);
+        // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
+        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_withdraw_amount);
 
         // Checks that `veiled_withdraw_amount` and `veiled_deposit_amount` encrypt the same amount of coins, under the
         // sender and recipient's PKs, respectively, by verifying the $\Sigma$-protocol proof in `transfer_proof`.
@@ -557,7 +563,7 @@ module veiled_coin::veiled_coin {
             &recipient_pk,
             &veiled_withdraw_amount,
             &veiled_deposit_amount,
-            &balance,
+            &veiled_balance,
             &updated_balance_comm,
             &veiled_amount_comm,
             &transfer_proof.sigma_proof);
@@ -567,6 +573,7 @@ module veiled_coin::veiled_coin {
         veiled_withdraw<CoinType>(
             veiled_withdraw_amount,
             sender_coin_store,
+            &veiled_balance,
             &transfer_proof.new_balance_proof,
             &std::option::some(transfer_proof.veiled_amount_proof));
 
@@ -618,17 +625,12 @@ module veiled_coin::veiled_coin {
     public fun veiled_withdraw<CoinType>(
         veiled_amount: elgamal::Ciphertext,
         coin_store: &mut VeiledCoinStore<CoinType>,
+        updated_veiled_balance: &elgamal::Ciphertext,
         new_balance_proof: &RangeProof,
         veiled_amount_proof: &Option<RangeProof>)
     {
         // Fetch the ElGamal public key of the veiled account
         let pk = &coin_store.pk;
-
-        // Fetch the veiled balance of the veiled account
-        let veiled_balance = elgamal::decompress_ciphertext(&coin_store.veiled_balance);
-
-        // Update the account's veiled balance by homomorphically subtracting the veiled amount from the veiled balance.
-        elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
 
         // This function checks if it is possible to withdraw a veiled `amount` from a veiled `bal`, obtaining a new
         // veiled balance `new_bal = bal - amount`. It maintains an invariant that `new_bal \in [0, 2^{32})` as follows.
@@ -653,7 +655,7 @@ module veiled_coin::veiled_coin {
         // Checks range condition (3)
         assert!(
             bulletproofs::verify_range_proof_elgamal(
-                &veiled_balance,
+                updated_veiled_balance,
                 new_balance_proof,
                 pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST
             ),
@@ -673,7 +675,7 @@ module veiled_coin::veiled_coin {
         };
 
         // Update the veiled balance to reflect the veiled withdrawal
-        coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
+        coin_store.veiled_balance = elgamal::compress_ciphertext(updated_veiled_balance);
 
         // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
         event::emit_event<WithdrawEvent>(
