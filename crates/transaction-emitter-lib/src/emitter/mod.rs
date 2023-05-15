@@ -572,7 +572,6 @@ impl TxnEmitter {
 
         let (mut txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
-            num_workers,
             &mut all_accounts,
             vec![],
             &txn_executor,
