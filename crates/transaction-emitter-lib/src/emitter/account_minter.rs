@@ -125,11 +125,21 @@ impl<'t> AccountMinter<'t> {
                 .get_account_balance(self.source_account.address())
                 .await?;
             info!(
-                "Source account {} current balance is {}, needed {} coins",
+                "Source account {} current balance is {}, needed {} coins, or {:.3}% of its balance",
                 self.source_account.address(),
                 balance,
-                coins_for_source
+                coins_for_source,
+                coins_for_source as f64 / balance as f64 * 100.0,
             );
+
+            if balance < coins_for_source {
+                return Err(anyhow!(
+                    "Source ({}) doesn't have enough coins, balance {} < needed {}",
+                    self.source_account.address(),
+                    balance,
+                    coins_for_source
+                ));
+            }
 
             if req.prompt_before_spending {
                 if !prompt_yes(&format!(
@@ -147,15 +157,6 @@ impl<'t> AccountMinter<'t> {
                     coins_for_source,
                     max_allowed,
                 );
-            }
-
-            if balance < coins_for_source {
-                return Err(anyhow!(
-                    "Source ({}) doesn't have enough coins, balance {} < needed {}",
-                    self.source_account.address(),
-                    balance,
-                    coins_for_source
-                ));
             }
         }
 

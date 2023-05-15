@@ -5,6 +5,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::ConsensusConfig;
 use aptos_forge::{
+    args::TransactionTypeArg,
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
@@ -19,7 +20,7 @@ use aptos_testcases::{
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
-    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
+    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
     multi_region_simulation_test::MultiRegionMultiCloudSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
@@ -768,15 +769,46 @@ fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmark,
             workloads: Workloads::TRANSACTIONS(&[
-                TransactinWorkload::NoOp,
-                TransactinWorkload::NoOpUnique,
-                TransactinWorkload::CoinTransfer,
-                TransactinWorkload::CoinTransferUnique,
-                TransactinWorkload::WriteResourceSmall,
-                TransactinWorkload::WriteResourceBig,
-                TransactinWorkload::LargeModuleWorkingSet,
-                TransactinWorkload::PublishPackages,
-                // TransactinWorkload::NftMint,
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1,
+                    unique_senders: false,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1000,
+                    unique_senders: false,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::AccountResource32B,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::AccountResource1KB,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::PublishPackage,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
             ]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -807,7 +839,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             inner_tps: 15000,
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             inner_init_gas_price_multiplier: 20,
-            // because it is static, cannot use ::default_coin_transfer() method
+            // because it is static, cannot use TransactionTypeArg::materialize method
             inner_transaction_type: TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
@@ -861,7 +893,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 inner_tps: 15000,
                 inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
                 inner_init_gas_price_multiplier: 20,
-                // Cannot use default_coin_transfer(), as this needs to be static
+                // Cannot use TransactionTypeArg::materialize, as this needs to be static
                 inner_transaction_type: TransactionType::CoinTransfer {
                     invalid_transaction_ratio: 0,
                     sender_use_account_pool: false,
@@ -940,16 +972,11 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                 ])
             } else {
                 job.transaction_type(match test_name.as_str() {
-                    "account_creation" => TransactionType::default_account_generation(),
-                    "nft_mint" => TransactionType::NftMintAndTransfer,
-                    "publishing" => TransactionType::PublishPackage {
-                        use_account_pool: false,
+                    "account_creation" => {
+                        TransactionTypeArg::AccountGeneration.materialize_default()
                     },
-                    "module_loading" => TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::Nop,
-                        num_modules: 1000,
-                        use_account_pool: false,
-                    },
+                    "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
+                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
                     _ => unreachable!("{}", test_name),
                 })
             },
@@ -957,7 +984,6 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
                 "account_creation" => 3600,
-                "nft_mint" => 1000,
                 "publishing" => 60,
                 "write_new_resource" => 3700,
                 "module_loading" => 1800,
@@ -1185,7 +1211,7 @@ fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> Fo
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionType::default_account_generation()), // Create many state values
+                .transaction_type(TransactionTypeArg::AccountGeneration.materialize_default()), // Create many state values
         )
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -1419,8 +1445,11 @@ fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::default_coin_transfer(), 80),
-                    (TransactionType::default_account_generation(), 20),
+                    (TransactionTypeArg::CoinTransfer.materialize_default(), 80),
+                    (
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+                        20,
+                    ),
                 ]),
         )
         .with_success_criteria(
@@ -1470,9 +1499,16 @@ fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::default_coin_transfer(), 75),
-                    (TransactionType::default_account_generation(), 20),
-                    (TransactionType::NftMintAndTransfer, 5),
+                    (TransactionTypeArg::CoinTransfer.materialize_default(), 75),
+                    (
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+                        20,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
+                            .materialize_default(),
+                        5,
+                    ),
                 ]),
         )
         .with_success_criteria(
