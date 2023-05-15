@@ -25,8 +25,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use std::{collections::BTreeMap, ops::Deref};
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
@@ -42,13 +41,17 @@ pub(crate) fn get_resource_group_from_metadata(
 
 /// Adapter to convert a `StateView` into a `MoveResolverExt`.
 pub struct StorageAdapter<'a, S> {
-    state_store: & 'a S,
-    resource_group_cache: RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
+    state_store: &'a S,
+    resource_group_cache:
+        RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
-        Self { state_store, resource_group_cache: RefCell::new(BTreeMap::new()) }
+        Self {
+            state_store,
+            resource_group_cache: RefCell::new(BTreeMap::new()),
+        }
     }
 
     pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
@@ -70,7 +73,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
             if let Some(group_data) = cache.get_mut(&resource_group) {
                 // This resource group is already cached for this address. So just return the
                 // cached value.
-                return Ok(group_data.get(struct_tag).cloned())
+                return Ok(group_data.get(struct_tag).cloned());
             }
             let group_data = self.get_resource_group_data(address, &resource_group)?;
             if let Some(group_data) = group_data {
@@ -90,7 +93,6 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
             self.get_standard_resource(address, struct_tag)
         }
     }
-
 }
 
 impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
@@ -114,8 +116,15 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn release_resource_group_cache(&self, address: &AccountAddress, resource_group: &StructTag) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        self.resource_group_cache.borrow_mut().get_mut(address)?.remove(resource_group)
+    fn release_resource_group_cache(
+        &self,
+        address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.resource_group_cache
+            .borrow_mut()
+            .get_mut(address)?
+            .remove(resource_group)
     }
 }
 
