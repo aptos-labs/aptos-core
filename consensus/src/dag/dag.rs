@@ -212,7 +212,6 @@ impl Dag {
         let digest = certified_node.digest();
         self.add_to_dag(certified_node, storage_diff).await;
         self.update_pending_nodes(dependencies, digest, storage_diff).await;
-        // TODO: should we persist?
     }
 
     #[async_recursion]
@@ -244,21 +243,29 @@ impl Dag {
         }
     }
 
-    fn add_peers_recursively(&mut self, digest: HashValue, source: PeerId) {
+    fn add_peers_recursively(&mut self, digest: HashValue, source: PeerId, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         let missing_parents = match self.in_mem.get_missing_nodes_mut().get(&digest).unwrap() {
             MissingDagNodeStatus::Absent(_) => HashSet::new(),
             MissingDagNodeStatus::Pending(info) => info.missing_parents().clone(),
         };
 
+        let map_id = self.in_mem.get_missing_nodes().key().clone();
         for parent_digest in missing_parents {
             match self.in_mem.get_missing_nodes_mut().entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
                     entry.get_mut().add_peer_to_request(source);
-                    self.add_peers_recursively(parent_digest, source);
+                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry{
+                        map_id,
+                        key: entry.key().clone(),
+                        value: entry.get().clone(),
+                    }).unwrap(); //TODO: only write the diff.
+                    self.add_peers_recursively(parent_digest, source, storage_diff);
                 },
                 Entry::Vacant(_) => unreachable!("node should exist in missing nodes"),
             };
         }
+
+
     }
 
     fn add_to_pending(
@@ -275,24 +282,35 @@ impl Dag {
             .collect();
 
         let pending_info = PendingInfo::new(certified_node, missing_parents_digest, HashSet::new());
+        let new_status = MissingDagNodeStatus::Pending(pending_info);
         self.in_mem.get_missing_nodes_mut()
-            .insert(pending_digest, MissingDagNodeStatus::Pending(pending_info));
-
-        // TODO: Persist
+            .insert(pending_digest, new_status.clone());
+        let map_id = self.in_mem.get_missing_nodes().key().clone();
+        storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry {
+            map_id,
+            key: pending_digest,
+            value: new_status,
+        }).unwrap();
 
         for node_meta_data in missing_parents {
-            let digest = node_meta_data.digest();
+            let missing_parent_node_digest = node_meta_data.digest();
             let status = self
                 .in_mem.get_missing_nodes_mut()
-                .entry(digest)
+                .entry(missing_parent_node_digest)
                 .or_insert(MissingDagNodeStatus::Absent(AbsentInfo::new(
                     node_meta_data,
                 )));
 
             status.add_dependency(pending_digest);
             status.add_peer_to_request(pending_peer_id);
+            storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry{
+                map_id,
+                key: missing_parent_node_digest,
+                value: status.clone(),
+            }).unwrap(); //TODO: only write the diff.
 
-            self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
+            //TODO: can a missing/pending node be visited in this DFS traversal? Do we need to deduplicate?
+            self.add_peers_recursively(missing_parent_node_digest, pending_peer_id, storage_diff); // Recursively update source_peers.
         }
     }
 
@@ -360,7 +378,7 @@ impl Dag {
         }
 
         let mut batch = self.storage.new_write_batch();
-        batch.put_dag_in_mem__deep(&self.in_mem).unwrap();
+        batch.put_dag_in_mem__deep(&self.in_mem).unwrap();//TODO: only write the diff.
         self.storage.commit_write_batch(batch).unwrap();
         let new_round = self.in_mem.current_round;
         return Some(
