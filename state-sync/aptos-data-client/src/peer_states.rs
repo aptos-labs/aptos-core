@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::logging::{LogEntry, LogEvent, LogSchema},
-    AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
+    global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
+    interface::ResponseError,
+    logging::{LogEntry, LogEvent, LogSchema},
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -105,7 +106,7 @@ impl PeerState {
 
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
 /// advertisements and data-client internal metadata for scoring.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct PeerStates {
     base_config: BaseConfig,
     data_client_config: AptosDataClientConfig,

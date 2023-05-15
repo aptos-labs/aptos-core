@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptosnet::{
-        logging::{LogEntry, LogEvent, LogSchema},
-        metrics::{
-            increment_request_counter, set_gauge, start_request_timer, DataType, PRIORITIZED_PEER,
-            REGULAR_PEER,
-        },
-        state::{ErrorType, PeerStates},
+    error::Error,
+    global_summary::GlobalDataSummary,
+    interface::{
+        AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+        ResponseId,
     },
-    AptosDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
-    ResponseError, ResponseId, Result,
+    logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
+    metrics::{
+        increment_request_counter, set_gauge, start_request_timer, PRIORITIZED_PEER, REGULAR_PEER,
+    },
+    peer_states::{ErrorType, PeerStates},
+    poller::DataSummaryPoller,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -19,8 +22,8 @@ use aptos_config::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
-use aptos_logger::prelude::*;
-use aptos_network::{application::interface::NetworkClient, protocols::rpc::error::RpcError};
+use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
+use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
@@ -32,7 +35,7 @@ use aptos_storage_service_types::{
     responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof},
     Epoch, StorageServiceMessage,
 };
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
@@ -40,29 +43,18 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use async_trait::async_trait;
-use futures::StreamExt;
-use rand::seq::SliceRandom;
-use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
-use tokio::{runtime::Handle, task::JoinHandle};
+use rand::prelude::SliceRandom;
+use std::{fmt, sync::Arc, time::Duration};
+use tokio::runtime::Handle;
 
-mod logging;
-mod metrics;
-mod state;
-#[cfg(test)]
-mod tests;
-
-// Useful constants for the Aptos Data Client
-const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 10;
-const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
+// Useful constants
 const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
-const POLLER_LOG_FREQ_SECS: u64 = 2;
-const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
-/// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
+/// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
-/// The `AptosNetDataClient`:
+/// The `AptosDataClient`:
 ///
 /// 1. Sends requests to connected Aptos peers.
 /// 2. Does basic type conversions and error handling on the responses.
@@ -78,7 +70,7 @@ const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 /// The client is expected to be cloneable and usable from many concurrent tasks
 /// and/or threads.
 #[derive(Clone, Debug)]
-pub struct AptosNetDataClient {
+pub struct AptosDataClient {
     /// Config for AptosNet data client.
     data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
@@ -91,7 +83,7 @@ pub struct AptosNetDataClient {
     response_id_generator: Arc<U64IdGenerator>,
 }
 
-impl AptosNetDataClient {
+impl AptosDataClient {
     pub fn new(
         data_client_config: AptosDataClientConfig,
         base_config: BaseConfig,
@@ -112,7 +104,7 @@ impl AptosNetDataClient {
         };
         let poller = DataSummaryPoller::new(
             client.clone(),
-            Duration::from_millis(client.data_client_config.summary_poll_interval_ms),
+            Duration::from_millis(client.data_client_config.summary_poll_loop_interval_ms),
             runtime,
             time_service,
         );
@@ -120,8 +112,13 @@ impl AptosNetDataClient {
     }
 
     /// Returns true iff compression should be requested
-    fn use_compression(&self) -> bool {
+    pub fn use_compression(&self) -> bool {
         self.data_client_config.use_compression
+    }
+
+    /// Returns the response timeout in milliseconds
+    pub fn get_response_timeout_ms(&self) -> u64 {
+        self.data_client_config.response_timeout_ms
     }
 
     /// Returns the max number of output reductions as defined by the config
@@ -135,12 +132,12 @@ impl AptosNetDataClient {
     }
 
     /// Update a peer's data summary.
-    fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
+    pub fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
         self.peer_states.write().update_summary(peer, summary)
     }
 
     /// Recompute and update the global data summary cache
-    fn update_global_summary_cache(&self) -> Result<(), Error> {
+    pub fn update_global_summary_cache(&self) -> crate::error::Result<(), Error> {
         // Before calculating the summary, we should garbage collect
         // the peer states (to handle disconnected peers).
         self.garbage_collect_peer_states()?;
@@ -153,7 +150,7 @@ impl AptosNetDataClient {
     }
 
     /// Garbage collects the peer states to remove data for disconnected peers
-    fn garbage_collect_peer_states(&self) -> Result<(), Error> {
+    fn garbage_collect_peer_states(&self) -> crate::error::Result<(), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
@@ -167,10 +164,10 @@ impl AptosNetDataClient {
 
     /// Choose a connected peer that can service the given request.
     /// Returns an error if no such peer can be found.
-    fn choose_peer_for_request(
+    pub(crate) fn choose_peer_for_request(
         &self,
         request: &StorageServiceRequest,
-    ) -> Result<PeerNetworkId, Error> {
+    ) -> crate::error::Result<PeerNetworkId, Error> {
         // All requests should be sent to prioritized peers (if possible).
         // If none can handle the request, fall back to the regular peers.
         let (priority_peers, regular_peers) = self.get_priority_and_regular_peers()?;
@@ -206,7 +203,9 @@ impl AptosNetDataClient {
     }
 
     /// Fetches the next prioritized peer to poll
-    fn fetch_prioritized_peer_to_poll(&self) -> Result<Option<PeerNetworkId>, Error> {
+    pub fn fetch_prioritized_peer_to_poll(
+        &self,
+    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
         let num_in_flight_polls = self.peer_states.read().num_in_flight_priority_polls();
         update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
@@ -222,7 +221,7 @@ impl AptosNetDataClient {
     }
 
     /// Fetches the next regular peer to poll
-    fn fetch_regular_peer_to_poll(&self) -> Result<Option<PeerNetworkId>, Error> {
+    pub fn fetch_regular_peer_to_poll(&self) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
         let num_in_flight_polls = self.peer_states.read().num_in_flight_regular_polls();
         update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
@@ -241,7 +240,7 @@ impl AptosNetDataClient {
     fn select_peer_to_poll(
         &self,
         mut peers: Vec<PeerNetworkId>,
-    ) -> Result<Option<PeerNetworkId>, Error> {
+    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Identify the peers who do not already have in-flight requests.
         peers.retain(|peer| !self.peer_states.read().existing_in_flight_request(peer));
 
@@ -251,19 +250,19 @@ impl AptosNetDataClient {
     }
 
     /// Marks the given peers as having an in-flight poll request
-    fn in_flight_request_started(&self, peer: &PeerNetworkId) {
+    pub fn in_flight_request_started(&self, peer: &PeerNetworkId) {
         self.peer_states.write().new_in_flight_request(peer);
     }
 
     /// Marks the given peers as polled
-    fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
+    pub fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
         self.peer_states
             .write()
             .mark_in_flight_request_complete(peer);
     }
 
     /// Returns all peers connected to us
-    fn get_all_connected_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+    fn get_all_connected_peers(&self) -> crate::error::Result<Vec<PeerNetworkId>, Error> {
         let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
             return Err(Error::DataIsUnavailable(
@@ -275,9 +274,9 @@ impl AptosNetDataClient {
     }
 
     /// Returns all priority and regular peers
-    fn get_priority_and_regular_peers(
+    pub(crate) fn get_priority_and_regular_peers(
         &self,
-    ) -> Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
+    ) -> crate::error::Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
@@ -306,7 +305,7 @@ impl AptosNetDataClient {
         &self,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -326,12 +325,12 @@ impl AptosNetDataClient {
     }
 
     /// Sends a request to a specific peer and decodes the response
-    async fn send_request_to_peer_and_decode<T, E>(
+    pub async fn send_request_to_peer_and_decode<T, E>(
         &self,
         peer: PeerNetworkId,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -374,7 +373,7 @@ impl AptosNetDataClient {
         peer: PeerNetworkId,
         request: StorageServiceRequest,
         request_timeout_ms: u64,
-    ) -> Result<Response<StorageServiceResponse>, Error> {
+    ) -> crate::error::Result<Response<StorageServiceResponse>, Error> {
         let id = self.next_response_id();
         trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
@@ -489,7 +488,7 @@ impl AptosNetDataClient {
         &self,
         request_timeout_ms: u64,
         data_request: DataRequest,
-    ) -> Result<Response<T>>
+    ) -> crate::error::Result<Response<T>>
     where
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
@@ -498,10 +497,16 @@ impl AptosNetDataClient {
         self.send_request_and_decode(storage_request, request_timeout_ms)
             .await
     }
+
+    /// Returns a copy of the peer states for testing
+    #[cfg(test)]
+    pub(crate) fn get_peer_states(&self) -> PeerStates {
+        self.peer_states.read().clone()
+    }
 }
 
 #[async_trait]
-impl AptosDataClient for AptosNetDataClient {
+impl AptosDataClientInterface for AptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
     }
@@ -511,7 +516,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_epoch: Epoch,
         expected_end_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>> {
+    ) -> crate::error::Result<Response<Vec<LedgerInfoWithSignatures>>> {
         let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
             start_epoch,
             expected_end_epoch,
@@ -527,7 +532,8 @@ impl AptosDataClient for AptosNetDataClient {
         known_version: Version,
         known_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
         let data_request =
             DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
                 known_version,
@@ -543,7 +549,7 @@ impl AptosDataClient for AptosNetDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
         let data_request =
             DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
                 known_version,
@@ -560,7 +566,8 @@ impl AptosDataClient for AptosNetDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>> {
+    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
         let data_request = DataRequest::GetNewTransactionsOrOutputsWithProof(
             NewTransactionsOrOutputsWithProofRequest {
                 known_version,
@@ -577,7 +584,7 @@ impl AptosDataClient for AptosNetDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<u64>> {
+    ) -> crate::error::Result<Response<u64>> {
         let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
@@ -589,7 +596,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
-    ) -> Result<Response<StateValueChunkWithProof>> {
+    ) -> crate::error::Result<Response<StateValueChunkWithProof>> {
         let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
             start_index,
@@ -605,7 +612,7 @@ impl AptosDataClient for AptosNetDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOutputListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionOutputListWithProof>> {
         let data_request =
             DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version,
@@ -623,7 +630,7 @@ impl AptosDataClient for AptosNetDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionListWithProof>> {
         let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
             proof_version,
             start_version,
@@ -641,7 +648,7 @@ impl AptosDataClient for AptosNetDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOrOutputListWithProof>> {
+    ) -> crate::error::Result<Response<TransactionOrOutputListWithProof>> {
         let data_request =
             DataRequest::GetTransactionsOrOutputsWithProof(TransactionsOrOutputsWithProofRequest {
                 proof_version,
@@ -657,7 +664,7 @@ impl AptosDataClient for AptosNetDataClient {
 
 /// The AptosNet-specific request context needed to update a peer's scoring.
 struct AptosNetResponseCallback {
-    data_client: AptosNetDataClient,
+    data_client: AptosDataClient,
     id: ResponseId,
     peer: PeerNetworkId,
     request: StorageServiceRequest,
@@ -680,139 +687,6 @@ impl fmt::Debug for AptosNetResponseCallback {
             .field("request", &self.request)
             .finish()
     }
-}
-
-/// A poller for storage summaries that is responsible for periodically refreshing
-/// the view of advertised data in the network.
-pub struct DataSummaryPoller {
-    data_client: AptosNetDataClient, // The data client through which to poll peers
-    poll_interval: Duration,         // The interval between polling rounds
-    runtime: Option<Handle>,         // An optional runtime on which to spawn the poller threads
-    time_service: TimeService,       // The service to monitor elapsed time
-}
-
-impl DataSummaryPoller {
-    fn new(
-        data_client: AptosNetDataClient,
-        poll_interval: Duration,
-        runtime: Option<Handle>,
-        time_service: TimeService,
-    ) -> Self {
-        Self {
-            data_client,
-            poll_interval,
-            runtime,
-            time_service,
-        }
-    }
-
-    /// Runs the poller that continuously updates the global data summary
-    pub async fn start_poller(self) {
-        info!(
-            (LogSchema::new(LogEntry::DataSummaryPoller)
-                .message("Starting the Aptos data poller!"))
-        );
-        let ticker = self.time_service.interval(self.poll_interval);
-        futures::pin_mut!(ticker);
-
-        loop {
-            // Wait for next round before polling
-            ticker.next().await;
-
-            // Update the global storage summary
-            if let Err(error) = self.data_client.update_global_summary_cache() {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-                    warn!(
-                        (LogSchema::new(LogEntry::DataSummaryPoller)
-                            .event(LogEvent::AggregateSummary)
-                            .message("Unable to update global summary cache!")
-                            .error(&error))
-                    );
-                );
-            }
-
-            // Fetch the prioritized and regular peers to poll (if any)
-            let prioritized_peer = self.try_fetch_peer(true);
-            let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
-
-            // Ensure the peers to poll exist
-            if prioritized_peer.is_none() && regular_peer.is_none() {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-                    debug!(
-                        (LogSchema::new(LogEntry::DataSummaryPoller)
-                            .event(LogEvent::NoPeersToPoll)
-                            .message("No prioritized or regular peers to poll this round!"))
-                    );
-                );
-                continue;
-            }
-
-            // Go through each peer and poll them individually
-            if let Some(prioritized_peer) = prioritized_peer {
-                poll_peer(
-                    self.data_client.clone(),
-                    prioritized_peer,
-                    self.runtime.clone(),
-                );
-            }
-            if let Some(regular_peer) = regular_peer {
-                poll_peer(self.data_client.clone(), regular_peer, self.runtime.clone());
-            }
-        }
-    }
-
-    /// Fetches the next regular peer to poll based on the sample frequency
-    fn fetch_regular_peer(&self, always_poll: bool) -> Option<PeerNetworkId> {
-        if always_poll {
-            self.try_fetch_peer(false)
-        } else {
-            sample!(SampleRate::Frequency(REGULAR_PEER_SAMPLE_FREQ), {
-                return self.try_fetch_peer(false);
-            });
-            None
-        }
-    }
-
-    /// Attempts to fetch the next peer to poll from the data client.
-    /// If an error is encountered, the error is logged and None is returned.
-    fn try_fetch_peer(&self, is_priority_peer: bool) -> Option<PeerNetworkId> {
-        let result = if is_priority_peer {
-            self.data_client.fetch_prioritized_peer_to_poll()
-        } else {
-            self.data_client.fetch_regular_peer_to_poll()
-        };
-        result.unwrap_or_else(|error| {
-            log_poller_error(error);
-            None
-        })
-    }
-}
-
-/// Logs the given poller error based on the logging frequency
-fn log_poller_error(error: Error) {
-    sample!(
-        SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-        warn!(
-            (LogSchema::new(LogEntry::StorageSummaryRequest)
-                .event(LogEvent::PeerPollingError)
-                .message("Unable to fetch peers to poll!")
-                .error(&error))
-        );
-    );
-}
-
-/// Updates the metrics for the number of in-flight polls
-fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
-    sample!(
-        SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
-        set_gauge(
-            &metrics::IN_FLIGHT_POLLS,
-            label,
-            num_in_flight_polls,
-        );
-    );
 }
 
 /// Updates the metrics for the number of connected peers (priority and regular)
@@ -840,134 +714,14 @@ fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: u
     );
 }
 
-/// Spawns a dedicated poller for the given peer.
-pub(crate) fn poll_peer(
-    data_client: AptosNetDataClient,
-    peer: PeerNetworkId,
-    runtime: Option<Handle>,
-) -> JoinHandle<()> {
-    // Mark the in-flight poll as started. We do this here to prevent
-    // the main polling loop from selecting the same peer concurrently.
-    data_client.in_flight_request_started(&peer);
-
-    // Create the poller for the peer
-    let poller = async move {
-        // Construct the request for polling
-        let data_request = DataRequest::GetStorageServerSummary;
-        let storage_request =
-            StorageServiceRequest::new(data_request, data_client.use_compression());
-        let request_timeout = data_client.data_client_config.response_timeout_ms;
-
-        // Start the peer polling timer
-        let timer = start_request_timer(
-            &metrics::REQUEST_LATENCIES,
-            &storage_request.get_label(),
-            peer,
-        );
-
-        // Fetch the storage summary for the peer and stop the timer
-        let result: Result<StorageServerSummary> = data_client
-            .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
-            .await
-            .map(Response::into_payload);
-        drop(timer);
-
-        // Mark the in-flight poll as now complete
-        data_client.in_flight_request_complete(&peer);
-
-        // Check the storage summary response
-        let storage_summary = match result {
-            Ok(storage_summary) => storage_summary,
-            Err(error) => {
-                warn!(
-                    (LogSchema::new(LogEntry::StorageSummaryResponse)
-                        .event(LogEvent::PeerPollingError)
-                        .message("Error encountered when polling peer!")
-                        .error(&error)
-                        .peer(&peer))
-                );
-                return;
-            },
-        };
-
-        // Update the summary for the peer
-        data_client.update_summary(peer, storage_summary);
-
-        // Log the new global data summary and update the metrics
-        sample!(
-            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_LOG_FREQ_SECS)),
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::AggregateSummary)
-                    .message(&format!(
-                        "Global data summary: {}",
-                        data_client.get_global_data_summary()
-                    )))
-            );
-        );
-        sample!(
-            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_METRIC_FREQ_SECS)),
-            let global_data_summary = data_client.get_global_data_summary();
-            update_advertised_data_metrics(global_data_summary);
-        );
-    };
-
-    // Spawn the poller
-    if let Some(runtime) = runtime {
-        runtime.spawn(poller)
-    } else {
-        tokio::spawn(poller)
-    }
-}
-
-/// Updates the advertised data metrics using the given global
-/// data summary.
-fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
-    // Update the optimal chunk sizes
-    let optimal_chunk_sizes = &global_data_summary.optimal_chunk_sizes;
-    for data_type in DataType::get_all_types() {
-        let optimal_chunk_size = match data_type {
-            DataType::LedgerInfos => optimal_chunk_sizes.epoch_chunk_size,
-            DataType::States => optimal_chunk_sizes.state_chunk_size,
-            DataType::TransactionOutputs => optimal_chunk_sizes.transaction_output_chunk_size,
-            DataType::Transactions => optimal_chunk_sizes.transaction_chunk_size,
-        };
+/// Updates the metrics for the number of in-flight polls
+fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
+    sample!(
+        SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
         set_gauge(
-            &metrics::OPTIMAL_CHUNK_SIZES,
-            data_type.as_str(),
-            optimal_chunk_size,
+            &metrics::IN_FLIGHT_POLLS,
+            label,
+            num_in_flight_polls,
         );
-    }
-
-    // Update the highest advertised data
-    let advertised_data = &global_data_summary.advertised_data;
-    let highest_advertised_version = advertised_data
-        .highest_synced_ledger_info()
-        .map(|ledger_info| ledger_info.ledger_info().version());
-    if let Some(highest_advertised_version) = highest_advertised_version {
-        for data_type in DataType::get_all_types() {
-            set_gauge(
-                &metrics::HIGHEST_ADVERTISED_DATA,
-                data_type.as_str(),
-                highest_advertised_version,
-            );
-        }
-    }
-
-    // Update the lowest advertised data
-    for data_type in DataType::get_all_types() {
-        let lowest_advertised_version = match data_type {
-            DataType::LedgerInfos => Some(0), // All nodes contain all epoch ending ledger infos
-            DataType::States => advertised_data.lowest_state_version(),
-            DataType::TransactionOutputs => advertised_data.lowest_transaction_output_version(),
-            DataType::Transactions => advertised_data.lowest_transaction_version(),
-        };
-        if let Some(lowest_advertised_version) = lowest_advertised_version {
-            set_gauge(
-                &metrics::LOWEST_ADVERTISED_DATA,
-                data_type.as_str(),
-                lowest_advertised_version,
-            );
-        }
-    }
+    );
 }

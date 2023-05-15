@@ -9,11 +9,11 @@ import "aptos/transaction/testing1/v1/transaction.proto";
 
 message GetTransactionsRequest {
   // Required; start version of current stream.
-  optional uint64 starting_version = 1;
+  optional uint64 starting_version = 1 [jstype = JS_STRING];
 
   // Optional; number of transactions to return in current stream.
   // If not present, return an infinite stream of transactions.
-  optional uint64 transactions_count = 2;
+  optional uint64 transactions_count = 2 [jstype = JS_STRING];
 }
 
 // TransactionsResponse is a batch of transactions.
@@ -22,7 +22,7 @@ message TransactionsResponse {
     repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
     
     // Required; chain id.
-    optional uint64 chain_id = 2;
+    optional uint64 chain_id = 2 [jstype = JS_STRING];
 }
 
 service RawData {
