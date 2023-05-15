@@ -1,7 +1,7 @@
 ---
 title: "Delegated Staking"
-slug: " Delegated staking"
----
+slug: "delegated-staking"
+--
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
