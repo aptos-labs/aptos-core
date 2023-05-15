@@ -302,7 +302,7 @@ impl AggregatorData {
     /// If the `aggregator_enabled` flag is true, the new aggregator instance
     /// is initialized with zero and in a delta state.
     /// If the `aggregator_enabled` flag is false, the new aggregator instance
-    /// is set initialized with its latest value and in a Data state.
+    /// is initialized in the Data state with its latest value.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(

@@ -246,19 +246,19 @@ mod test {
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), AggregatorChange::Write(0));
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
-        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
-        let _delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
+        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), AggregatorChange::Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), AggregatorChange::Delete);
+        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
         assert_matches!(
             changes.get(&aggregator_id_for_test(600)).unwrap(),
-            Merge(_delta_100)
+            AggregatorChange::Merge(delta_100)
         );
-        let _delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
+        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
         assert_matches!(
             changes.get(&aggregator_id_for_test(700)).unwrap(),
-            Merge(_delta_200)
+            AggregatorChange::Merge(delta_200)
         );
         assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
     }
@@ -272,18 +272,18 @@ mod test {
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), AggregatorChange::Write(0));
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), Write(0));
+        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), AggregatorChange::Write(0));
         assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
         assert_matches!(
             changes.get(&aggregator_id_for_test(600)).unwrap(),
-            Write(100)
+            AggregatorChange::Write(100)
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(700)).unwrap(),
-            Write(200)
+            AggregatorChange::Write(200)
         );
-        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
+        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), AggregatorChange::Delete);
     }
 }
