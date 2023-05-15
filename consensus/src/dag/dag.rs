@@ -27,12 +27,11 @@ use tokio::sync::Mutex;
 use aptos_network::peer::Peer;
 use aptos_schemadb::{ColumnFamilyName, define_schema, SchemaBatch};
 use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
-use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
-use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PendingInfo, WeakLinksCreator};
+use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerNodeMap, PendingInfo, WeakLinksCreator};
 
-// TODO: persist all every update
 #[allow(dead_code)]
 pub(crate) struct Dag {
     in_mem: DagInMem,
@@ -60,14 +59,14 @@ impl Dag {
             Some(in_mem) => in_mem,
             None => {
                 let mut round_list = DagRoundList::new();
-                round_list.push(PeerIdToCertifiedNodeMap::new());
+                round_list.push(PeerNodeMap::new());
                 let in_mem = DagInMem {
                     my_id,
                     epoch,
                     current_round: 0,
                     front: WeakLinksCreator::new(my_id, &verifier),
                     dag: round_list,
-                    missing_nodes: MissingNodeIdToStatusMap::new(),
+                    missing_nodes: MissingNodeStatusMap::new(),
                 };
                 let mut batch = storage.new_write_batch();
                 batch.put_dag_in_mem__deep(&in_mem).unwrap();
@@ -167,7 +166,7 @@ impl Dag {
         // assert!(self.in_mem.dag.len() >= round - 1);
 
         if self.in_mem.get_dag().len() <= round {
-            let dag_round = PeerIdToCertifiedNodeMap::new();
+            let dag_round = PeerNodeMap::new();
             storage_diff.put_peer_to_node_map__deep(&dag_round).unwrap();
             storage_diff.put_dag_round_list_item(&DagRoundListItem{
                 list_id: self.in_mem.get_dag().id,
@@ -249,7 +248,7 @@ impl Dag {
             MissingDagNodeStatus::Pending(info) => info.missing_parents().clone(),
         };
 
-        let map_id = self.in_mem.get_missing_nodes().key().clone();
+        let map_id = self.in_mem.get_missing_nodes().id;
         for parent_digest in missing_parents {
             match self.in_mem.get_missing_nodes_mut().entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
@@ -264,8 +263,6 @@ impl Dag {
                 Entry::Vacant(_) => unreachable!("node should exist in missing nodes"),
             };
         }
-
-
     }
 
     fn add_to_pending(
@@ -285,7 +282,7 @@ impl Dag {
         let new_status = MissingDagNodeStatus::Pending(pending_info);
         self.in_mem.get_missing_nodes_mut()
             .insert(pending_digest, new_status.clone());
-        let map_id = self.in_mem.get_missing_nodes().key().clone();
+        let map_id = self.in_mem.get_missing_nodes().id;
         storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry {
             map_id,
             key: pending_digest,
@@ -376,7 +373,7 @@ impl Dag {
         storage_diff.put_dag_in_mem__shallow(&self.in_mem).unwrap();
 
         if self.in_mem.get_dag().get(self.in_mem.current_round as usize).is_none() {
-            let new_node_map = PeerIdToCertifiedNodeMap::new();
+            let new_node_map = PeerNodeMap::new();
             storage_diff.put_peer_to_node_map__deep(&new_node_map).unwrap();
 
             storage_diff.put_dag_round_list_item(&DagRoundListItem{
@@ -417,7 +414,7 @@ impl Dag {
             .collect();
 
         let mut maybe_node_status = None;
-        let map_id = self.in_mem.get_missing_nodes().key();
+        let map_id = self.in_mem.get_missing_nodes().id;
         let node_digest = certified_node.digest();
         match self.in_mem.get_missing_nodes_mut().entry(node_digest) {
             // Node not in the system

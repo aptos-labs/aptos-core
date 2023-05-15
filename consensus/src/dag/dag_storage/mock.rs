@@ -3,9 +3,8 @@
 use std::any::Any;
 use aptos_consensus_types::node::CertifiedNode;
 use aptos_crypto::HashValue;
-use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerNodeMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -48,7 +47,7 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
+    fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeStatusMap) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -56,7 +55,7 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+    fn put_peer_to_node_map__deep(&mut self, obj: &PeerNodeMap) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -110,7 +109,7 @@ impl DagStorage for MockDagStore {
         todo!()
     }
 
-    fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
+    fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeStatusMap>> {
         todo!()
     }
 
@@ -118,7 +117,7 @@ impl DagStorage for MockDagStore {
         todo!()
     }
 
-    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
+    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerNodeMap>> {
         todo!()
     }
 

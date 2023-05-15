@@ -1,15 +1,19 @@
 // Copyright © Aptos Foundation
 
-use aptos_schemadb::{DB, Options, ReadOptions, SchemaBatch};
+use aptos_schemadb::{DB, define_schema, Options, ReadOptions, SchemaBatch};
 use std::path::Path;
 use std::any::Any;
 use std::collections::HashMap;
+use std::io::{Cursor, Write};
 use anyhow::Error;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use aptos_consensus_types::node::CertifiedNode;
 use aptos_crypto::HashValue;
+use aptos_schemadb::schema::{KeyCodec, ValueCodec};
 use aptos_types::PeerId;
-use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{CertifiedNodeSchema, DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
+use crate::dag::types;
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMem_Metadata, DagRoundList, DagRoundList_Metadata, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerNodeMap, PeerNodeMapMetadata, PeerStatusList, PeerStatusList_Metadata, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator, WeakLinksCreatorMetadata};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -24,16 +28,16 @@ impl NaiveDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
-    fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
-        for (idx, item) in obj.iter().enumerate() {
-            let wrapped_item = DagRoundListItem {
-                list_id: obj.id,
-                index: idx as u64,
-                content_id: item.id,
-            };
-            self.put_dag_round_list_item(&wrapped_item)?;
-        }
-        self.put_dag_round_list__shallow(obj)
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn del_missing_node_id_to_status_map_entry(&mut self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+        self.inner.delete::<MissingNodeIdToStatusMapEntrySchema>(key)
+    }
+
+    fn put_certified_node(&self, obj: &CertifiedNode) -> anyhow::Result<()> {
+        self.inner.put::<CertifiedNodeSchema>(&obj.digest(), obj)
     }
 
     fn put_dag_in_mem__deep(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
@@ -49,26 +53,55 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     }
 
     fn put_dag_round_list__shallow(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
-        self.inner.put::<DagRoundListSchema>(&obj.key(), &obj.metadata())?;
+        self.inner.put::<DagRoundListSchema>(&obj.id, &obj.metadata())?;
         Ok(())
+    }
+
+    fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
+        for (idx, item) in obj.iter().enumerate() {
+            let wrapped_item = DagRoundListItem {
+                list_id: obj.id,
+                index: idx as u64,
+                content_id: item.id,
+            };
+            self.put_dag_round_list_item(&wrapped_item)?;
+        }
+        self.put_dag_round_list__shallow(obj)
     }
 
     fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> anyhow::Result<()> {
         self.inner.put::<DagRoundListItemSchema>(&obj.key(), obj)
     }
 
-    fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
-        self.put_peer_status_list__deep(&obj.latest_nodes_metadata)?;
-        self.put_peer_index_map__deep(&obj.address_to_validator_index)?;
-        self.inner.put::<WeakLinksCreatorSchema>(&obj.key(), &obj.metadata())?;
-        Ok(())
+    fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeStatusMap) -> anyhow::Result<()> {
+        self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.id, obj)
     }
 
-    fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
-        self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.key(), obj)
+    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
+        self.inner.put::<MissingNodeIdToStatusMapEntrySchema>(&obj.key(), obj)
     }
 
-    fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
+    fn put_peer_index_map__deep(&mut self, obj: &PeerIndexMap) -> anyhow::Result<()> {
+        self.inner.put::<PeerIndexMapSchema>(&obj.id, obj)
+    }
+
+    fn put_peer_status_list__deep(&mut self, obj: &PeerStatusList) -> anyhow::Result<()> {
+        for (i, maybe_peer_status) in obj.iter().enumerate() {
+            let sub_obj = PeerStatusListItem {
+                list_id: obj.id,
+                index: i,
+                content: maybe_peer_status.clone(),
+            };
+            self.put_peer_status_list_item(&sub_obj)?;
+        }
+        self.inner.put::<PeerStatusListSchema>(&obj.id, &obj.metadata())
+    }
+
+    fn put_peer_status_list_item(&mut self, obj: &PeerStatusListItem) -> anyhow::Result<()> {
+        self.inner.put::<PeerStatusListItemSchema>(&obj.key(), obj)
+    }
+
+    fn put_peer_to_node_map__deep(&mut self, obj: &PeerNodeMap) -> anyhow::Result<()> {
         // The entries.
         for (peer, node) in obj.iter() {
             self.put_certified_node(node)?;
@@ -86,7 +119,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         )?;
 
         // The metadata.
-        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), &obj.metadata())?;
+        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.id, &obj.metadata())?;
         Ok(())
     }
 
@@ -94,40 +127,11 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(&obj.key(), &Some(obj.clone()))
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn put_peer_status_list__deep(&mut self, obj: &PeerStatusList) -> anyhow::Result<()> {
-        for (i, maybe_peer_status) in obj.iter().enumerate() {
-            let sub_obj = PeerStatusListItem {
-                list_id: obj.id,
-                index: i,
-                content: maybe_peer_status.clone(),
-            };
-            self.put_peer_status_list_item(&sub_obj)?;
-        }
-        self.inner.put::<PeerStatusListSchema>(&obj.id, &obj.metadata())
-    }
-
-    fn put_peer_index_map__deep(&mut self, obj: &PeerIndexMap) -> anyhow::Result<()> {
-        self.inner.put::<PeerIndexMapSchema>(&obj.id, obj)
-    }
-
-    fn put_peer_status_list_item(&mut self, obj: &PeerStatusListItem) -> anyhow::Result<()> {
-        self.inner.put::<PeerStatusListItemSchema>(&obj.key(), obj)
-    }
-
-    fn del_missing_node_id_to_status_map_entry(&mut self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
-        self.inner.delete::<MissingNodeIdToStatusMapEntrySchema>(key)
-    }
-
-    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
-        self.inner.put::<MissingNodeIdToStatusMapEntrySchema>(&obj.key(), obj)
-    }
-
-    fn put_certified_node(&self, obj: &CertifiedNode) -> anyhow::Result<()> {
-        self.inner.put::<CertifiedNodeSchema>(&obj.digest(), obj)
+    fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
+        self.put_peer_status_list__deep(&obj.latest_nodes_metadata)?;
+        self.put_peer_index_map__deep(&obj.address_to_validator_index)?;
+        self.inner.put::<WeakLinksCreatorSchema>(&obj.id, &obj.metadata())?;
+        Ok(())
     }
 }
 
@@ -193,26 +197,6 @@ impl DagStorage for NaiveDagStore {
         }
     }
 
-    fn load_weak_link_creator(&self, key: &ItemId) -> anyhow::Result<Option<WeakLinksCreator>> {
-        if let Some(obj) = self.db.get::<WeakLinksCreatorSchema>(key)? {
-            let maybe_latest_nodes_metadata = self.load_peer_status_list(&obj.latest_nodes_metadata)?;
-            let maybe_address_to_validator_index = self.load_peer_index_map(&obj.address_to_validator_index)?;
-            if let (Some(latest_nodes_metadata), Some(address_to_validator_index)) = (maybe_latest_nodes_metadata, maybe_address_to_validator_index) {
-                let obj = WeakLinksCreator {
-                    id: obj.id,
-                    my_id: obj.my_id,
-                    latest_nodes_metadata,
-                    address_to_validator_index,
-                };
-                Ok(Some(obj))
-            } else {
-                Err(Error::msg("Inconsistency"))
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
     fn load_dag_round_list(&self, key: &ItemId) -> anyhow::Result<Option<DagRoundList>> {
         match self.db.get::<DagRoundListSchema>(key)? {
             Some(metadata) => {
@@ -244,7 +228,7 @@ impl DagStorage for NaiveDagStore {
 
     }
 
-    fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
+    fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeStatusMap>> {
         if let Some(obj) = self.db.get::<MissingNodeIdToStatusMapSchema>(key)? {
             Ok(Some(obj))
         } else {
@@ -256,31 +240,8 @@ impl DagStorage for NaiveDagStore {
         Ok(self.db.get::<MissingNodeIdToStatusMapEntrySchema>(key)?)
     }
 
-    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
-        if let Some(metadata) = self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)? {
-            let mut iter = self.db.iter::<PeerIdToCertifiedNodeMapEntrySchema>(ReadOptions::default())?;
-            iter.seek(&PeerIdToCertifiedNodeMapEntry_Key{
-                map_id: metadata.id,
-                key: Some(PeerId::ZERO),
-            })?;
-            let mut inner = HashMap::new();
-            loop {
-                let (k, v) = iter.next().unwrap()?;
-                if let Some(key) = k.key {
-                    let certified_node = self.load_certified_node(&v.unwrap().value_id)?.unwrap();
-                    inner.insert(key, certified_node);
-                } else {
-                    break;
-                }
-            }
-            Ok(Some(PeerIdToCertifiedNodeMap { id: *key, inner }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
-        Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?.unwrap())
+    fn load_peer_index_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIndexMap>> {
+        self.db.get::<PeerIndexMapSchema>(key)
     }
 
     fn load_peer_status_list(&self, key: &ItemId) -> anyhow::Result<Option<PeerStatusList>> {
@@ -306,8 +267,51 @@ impl DagStorage for NaiveDagStore {
         self.db.get::<PeerStatusListItemSchema>(key)
     }
 
-    fn load_peer_index_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIndexMap>> {
-        self.db.get::<PeerIndexMapSchema>(key)
+    fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerNodeMap>> {
+        if let Some(metadata) = self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)? {
+            let mut iter = self.db.iter::<PeerIdToCertifiedNodeMapEntrySchema>(ReadOptions::default())?;
+            iter.seek(&PeerIdToCertifiedNodeMapEntry_Key{
+                map_id: metadata.id,
+                key: Some(PeerId::ZERO),
+            })?;
+            let mut inner = HashMap::new();
+            loop {
+                let (k, v) = iter.next().unwrap()?;
+                if let Some(key) = k.key {
+                    let certified_node = self.load_certified_node(&v.unwrap().value_id)?.unwrap();
+                    inner.insert(key, certified_node);
+                } else {
+                    break;
+                }
+            }
+            Ok(Some(PeerNodeMap { id: *key, inner }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
+        Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?.unwrap())
+    }
+
+    fn load_weak_link_creator(&self, key: &ItemId) -> anyhow::Result<Option<WeakLinksCreator>> {
+        if let Some(obj) = self.db.get::<WeakLinksCreatorSchema>(key)? {
+            let maybe_latest_nodes_metadata = self.load_peer_status_list(&obj.latest_nodes_metadata)?;
+            let maybe_address_to_validator_index = self.load_peer_index_map(&obj.address_to_validator_index)?;
+            if let (Some(latest_nodes_metadata), Some(address_to_validator_index)) = (maybe_latest_nodes_metadata, maybe_address_to_validator_index) {
+                let obj = WeakLinksCreator {
+                    id: obj.id,
+                    my_id: obj.my_id,
+                    latest_nodes_metadata,
+                    address_to_validator_index,
+                };
+                Ok(Some(obj))
+            } else {
+                Err(Error::msg("Inconsistency"))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch> {
@@ -321,3 +325,401 @@ impl DagStorage for NaiveDagStore {
 }
 
 const DAG_DB_NAME: &str = "DagDB";
+
+fn read_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> anyhow::Result<Vec<u8>> {
+    let mut bytes = Vec::with_capacity(n);
+    for _ in 0..n {
+        let byte = cursor.read_u8()?;
+        bytes.push(byte);
+    }
+    Ok(bytes)
+}
+
+
+define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeStatusMap, "MissingNodeIdToStatusMap");
+
+define_schema!(MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMap_Entry, "MissingNodeIdToStatusMapEntry");
+
+
+impl KeyCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.map_id.as_slice())?;
+        match self.key {
+            None => {
+                buf.write_u8(0xff)?;
+            }
+            Some(k) => {
+                buf.write_u8(0x00)?;
+                buf.write(k.as_slice())?;
+            }
+        }
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let map_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        let key = match cursor.read_u8()? {
+            0x00 => {
+                let node_id = HashValue::from_slice(read_bytes(&mut cursor, 32)?.as_slice())?;
+                Some(node_id)
+            },
+            0xff => None,
+            _ => unreachable!(),
+        };
+        Ok(MissingNodeIdToStatusMap_Entry_Key{
+            map_id,
+            key,
+        })
+    }
+}
+
+impl ValueCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+define_schema!(WeakLinksCreatorSchema, ItemId, WeakLinksCreatorMetadata, "WeakLinksCreator");
+
+define_schema!(DagRoundListSchema, ItemId, DagRoundList_Metadata, "DagRoundList");
+
+define_schema!(DagRoundListItemSchema, DagRoundListItem_Key, DagRoundListItem, "DagRoundListItem");
+
+define_schema!(DagInMemSchema, DagInMem_Key, DagInMem_Metadata, "DagInMem");
+
+define_schema!(PeerStatusListSchema, ItemId, PeerStatusList_Metadata, "PeerStatusList");
+
+define_schema!(PeerStatusListItemSchema, PeerStatusListItem_Key, PeerStatusListItem, "PeerStatusListItem");
+
+define_schema!(PeerIndexMapSchema, ItemId, PeerIndexMap, "PeerIndexMap");
+
+define_schema!(CertifiedNodeSchema, HashValue, CertifiedNode, "CertifiedNode");
+
+impl KeyCodec<CertifiedNodeSchema> for HashValue {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(HashValue::from_slice(data)?)
+    }
+}
+
+impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<DagInMemSchema> for DagInMem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<DagInMemSchema> for DagInMem_Metadata {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        Write::write(&mut buf, self.my_id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.epoch)?;
+        buf.write_u64::<BigEndian>(self.current_round)?;
+        Write::write(&mut buf, self.front.as_slice())?;
+        Write::write(&mut buf, self.dag.as_slice())?;
+        Write::write(&mut buf, self.missing_nodes.as_slice())?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        let mut c = Cursor::new(data);
+        let my_id = PeerId::from_bytes(read_bytes(&mut c, 32)?).unwrap();
+        let epoch = c.read_u64::<BigEndian>()?;
+        let current_round = c.read_u64::<BigEndian>()?;
+        let front = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let dag = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let missing_nodes = ItemId::try_from(read_bytes(&mut c, 16)?).unwrap();
+        let ret = Self {
+            my_id,
+            epoch,
+            current_round,
+            front,
+            dag,
+            missing_nodes,
+        };
+        Ok(ret)
+    }
+}
+
+
+define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapEntry_Key, Option<PeerIdToCertifiedNodeMapEntry>, "PeerIdToCertifiedNodeMapEntry");
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+impl KeyCodec<MissingNodeIdToStatusMapSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+
+impl ValueCodec<MissingNodeIdToStatusMapSchema> for PeerNodeMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for Option<PeerIdToCertifiedNodeMapEntry> {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapEntry_Key {
+    /// Key format: map_id (16 bytes) + [0x00] + key (32 bytes).
+    /// In a `*MapEntry` column family, for a map with ID `map_id`, a key `map_id + [0xff]` always exist to help seek.
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.map_id.as_slice())?;
+        match self.key {
+            Some(account) => {
+                buf.write_u8(0)?;
+                buf.write(account.as_slice())?;
+            },
+            None => {
+                buf.write_u8(0xff)?;
+            },
+        }
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let map_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        match cursor.read_u8()? {
+            0 => {
+                let key = PeerId::from_bytes(read_bytes(&mut cursor, 32)?).unwrap();
+                Ok(Self {
+                    map_id,
+                    key: Some(key),
+                })
+            },
+            0xff => {
+                Ok(Self {
+                    map_id,
+                    key: None,
+                })
+            },
+            _ => unreachable!()
+        }
+    }
+}
+
+impl KeyCodec<PeerIdToCertifiedNodeMapSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerNodeMapMetadata {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerNodeMapMetadata, "PeerIdToCertifiedNodeMap");
+
+
+impl KeyCodec<WeakLinksCreatorSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let x = ItemId::try_from(data)?;
+        Ok(x)
+    }
+}
+
+impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreatorMetadata {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<PeerIndexMapSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+
+impl ValueCodec<PeerIndexMapSchema> for PeerIndexMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<PeerStatusListSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+
+impl ValueCodec<PeerStatusListSchema> for PeerStatusList_Metadata {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl KeyCodec<PeerStatusListItemSchema> for PeerStatusListItem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.list_id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.index as u64)?;
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let list_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        let index = cursor.read_u64::<BigEndian>()? as usize;
+        let obj = PeerStatusListItem_Key {
+            list_id,
+            index,
+        };
+        Ok(obj)
+    }
+}
+
+impl ValueCodec<PeerStatusListItemSchema> for PeerStatusListItem {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<DagRoundListItemSchema> for DagRoundListItem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.index)?;
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let id_serialized = read_bytes(&mut cursor, 16)?;
+        let id = ItemId::try_from(id_serialized).unwrap();
+        let index = cursor.read_u64::<BigEndian>()?;
+        Ok(Self {
+            id,
+            index,
+        })
+    }
+}
+
+impl ValueCodec<DagRoundListItemSchema> for DagRoundListItem {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+
+impl KeyCodec<DagRoundListSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let obj = ItemId::try_from(data)?;
+        Ok(obj)
+    }
+}
+
+impl ValueCodec<DagRoundListSchema> for DagRoundList_Metadata {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        let obj = bcs::from_bytes(data)?;
+        Ok(obj)
+    }
+}
+
+impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeStatusMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        let buf = bcs::to_bytes(self)?;
+        Ok(buf)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
