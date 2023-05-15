@@ -1,5 +1,4 @@
 import axios from "axios";
-import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 
 import { AnyNumber } from "../bcs/types";
 import { HexString, MaybeHexString } from "../utils";
@@ -41,8 +40,6 @@ import {
   GetAccountCollectionTokens,
   GetCollectionData,
 } from "../indexer/generated/queries";
-import { AccountAddress } from "../aptos_types";
-import { bcsToBytes } from "../bcs";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -367,7 +364,8 @@ export class IndexerClient {
 
   /**
    * Queries a collection data
-   * if, for some reason, a creator account has 2 collections with the same name in v1 and v2, can pass an optional `tokenStandard` parameter to query a specific standard
+   * if, for some reason, a creator account has 2 collections with the same name in v1 and v2,
+   * can pass an optional `tokenStandard` parameter to query a specific standard
    *
    * @param creatorAddress the collection creator address
    * @param collectionName the collection name
@@ -384,7 +382,7 @@ export class IndexerClient {
     const address = HexString.ensure(creatorAddress).hex();
     IndexerClient.validateAddress(address);
 
-    let whereCondition: any = {
+    const whereCondition: any = {
       collection_name: { _eq: collectionName },
       creator_address: { _eq: address },
     };
