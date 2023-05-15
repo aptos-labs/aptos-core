@@ -15,7 +15,7 @@ use aptos_consensus_types::{
     experimental::commit_decision::CommitDecision,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info};
+use aptos_logger::{debug, info, warn};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -153,7 +153,12 @@ impl StateMachineLoop {
                         AggregateSignature::empty(),
                     ),
                     Box::new(move |committed_blocks, ledger_info| {
-                        block_on(commit_tx.send(ledger_info)).unwrap();
+                        match block_on(commit_tx.send(ledger_info)) {
+                            Ok(_) => {},
+                            Err(e) => {
+                                warn!("Failed to send commit notification: {:?}", e);
+                            },
+                        }
                     }),
                 )
                 .await
@@ -162,7 +167,10 @@ impl StateMachineLoop {
 
         if let Some(ledger_info) = actions.state_sync {
             // FIXME(ibalajiarun) move to another task
+            let version = ledger_info.ledger_info().version();
+            debug!("syncing to {}", ledger_info);
             self.state_computer.sync_to(ledger_info).await.unwrap();
+            debug!("synced to version {}", version);
             self.dag_driver
                 .step(StateMachineEvent::Command(
                     Command::DagStateSyncNotification,

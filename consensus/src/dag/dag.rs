@@ -522,6 +522,8 @@ impl Dag {
             MissingDagNodeStatus::Pending(info) => info.missing_parents().clone(),
         };
 
+        // debug!("adding peers recursively for digest: {}; missing_parents {:?}", digest, missing_parents);
+
         for parent_digest in missing_parents {
             match self.missing_nodes.entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
@@ -662,26 +664,29 @@ impl Dag {
             .collect();
 
         let mut maybe_node_status = None;
+        let mut add_to_pending = false;
 
         let mut add_to_pending = false;
 
         match self.missing_nodes.entry(certified_node.digest()) {
             // Node not in the system
             Entry::Vacant(_) => {
+                debug!("node is not in the system: {:?}; missing_parents {:?}", certified_node.metadata(), missing_parents);
                 if missing_parents.is_empty() {
-                    self.add_to_dag(certified_node).await;
+                    self.add_to_dag(certified_node.clone()).await;
                 } else {
-                    self.add_to_pending(certified_node, missing_parents.clone());
+                    self.add_to_pending(certified_node.clone(), missing_parents.clone());
                 }
             },
 
             // Node is absent
             Entry::Occupied(mut entry) => {
+                debug!("node is marked absent: {:?}", entry.get().metadata());
                 entry
                     .get_mut()
-                    .update_to_pending(certified_node, missing_parents.clone());
+                    .update_to_pending(certified_node.clone(), missing_parents.clone());
                 add_to_pending = true;
-                if entry.get_mut().ready_to_be_added() {
+                if entry.get().ready_to_be_added() {
                     maybe_node_status = Some(entry.remove());
                 }
             },
