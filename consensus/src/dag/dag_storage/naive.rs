@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 
-use aptos_schemadb::{DB, Options, SchemaBatch};
+use aptos_schemadb::{DB, Options, ReadOptions, SchemaBatch};
 use std::path::Path;
 use std::any::Any;
+use std::collections::HashMap;
 use anyhow::Error;
+use aptos_consensus_types::node::CertifiedNode;
+use aptos_crypto::HashValue;
+use aptos_types::PeerId;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{CertifiedNodeSchema, DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -67,10 +71,11 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
         // The entries.
         for (peer, node) in obj.iter() {
+            self.put_certified_node(node)?;
             self.put_peer_to_node_map_entry__deep(&PeerIdToCertifiedNodeMapEntry{
                 map_id: obj.id,
                 key: *peer,
-                value: node.clone(),
+                value_id: node.digest(),
             })?;
         }
 
@@ -81,7 +86,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         )?;
 
         // The metadata.
-        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), obj)?;
+        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), &obj.metadata())?;
         Ok(())
     }
 
@@ -120,6 +125,10 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
         self.inner.put::<MissingNodeIdToStatusMapEntrySchema>(&obj.key(), obj)
     }
+
+    fn put_certified_node(&self, obj: &CertifiedNode) -> anyhow::Result<()> {
+        self.inner.put::<CertifiedNodeSchema>(&obj.digest(), obj)
+    }
 }
 
 pub struct NaiveDagStore {
@@ -129,6 +138,7 @@ pub struct NaiveDagStore {
 impl NaiveDagStore {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         let column_families = vec![
+            "CertifiedNode",
             "DagInMem",
             "DagRoundList",
             "DagRoundListItem",
@@ -155,6 +165,9 @@ impl NaiveDagStore {
 
 
 impl DagStorage for NaiveDagStore {
+    fn load_certified_node(&self, key: &HashValue) -> anyhow::Result<Option<CertifiedNode>> {
+        self.db.get::<CertifiedNodeSchema>(key)
+    }
 
     fn load_dag_in_mem(&self, key: &DagInMem_Key) -> anyhow::Result<Option<DagInMem>> {
         let maybe_partial = self.db.get::<DagInMemSchema>(key)?;
@@ -244,7 +257,26 @@ impl DagStorage for NaiveDagStore {
     }
 
     fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {
-        Ok(self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)?)
+        if let Some(metadata) = self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)? {
+            let mut iter = self.db.iter::<PeerIdToCertifiedNodeMapEntrySchema>(ReadOptions::default())?;
+            iter.seek(&PeerIdToCertifiedNodeMapEntry_Key{
+                map_id: metadata.id,
+                key: Some(PeerId::ZERO),
+            })?;
+            let mut inner = HashMap::new();
+            loop {
+                let (k, v) = iter.next().unwrap()?;
+                if let Some(key) = k.key {
+                    let certified_node = self.load_certified_node(&v.unwrap().value_id)?.unwrap();
+                    inner.insert(key, certified_node);
+                } else {
+                    break;
+                }
+            }
+            Ok(Some(PeerIdToCertifiedNodeMap { id: *key, inner }))
+        } else {
+            Ok(None)
+        }
     }
 
     fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {

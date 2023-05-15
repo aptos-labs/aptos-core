@@ -183,7 +183,7 @@ impl Dag {
         let entry = PeerIdToCertifiedNodeMapEntry {
             map_id: round.id,
             key: certified_node.node().source(),
-            value: certified_node.clone(),//TODO: avoid clone
+            value_id: certified_node.digest(),
         };
         storage_diff.put_peer_to_node_map_entry__deep(&entry).unwrap();
 

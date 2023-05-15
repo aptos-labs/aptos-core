@@ -914,7 +914,13 @@ impl MissingDagNodeStatus {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMap {
     pub(crate) id: ItemId,
-    inner: HashMap<PeerId, CertifiedNode>,
+    pub(crate) inner: HashMap<PeerId, CertifiedNode>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerIdToCertifiedNodeMap_Metadata {
+    pub(crate) id: ItemId,
+    //TODO: either add some fields (like len), or delete this column family.
 }
 
 impl PeerIdToCertifiedNodeMap {
@@ -923,6 +929,10 @@ impl PeerIdToCertifiedNodeMap {
             id: uuid::Uuid::new_v4().into_bytes(),
             inner: HashMap::new()
         }
+    }
+
+    pub(crate) fn metadata(&self) -> PeerIdToCertifiedNodeMap_Metadata {
+        PeerIdToCertifiedNodeMap_Metadata { id: self.id }
     }
 
     pub fn get(&self, k: &PeerId) -> Option<&CertifiedNode> {
@@ -959,7 +969,7 @@ impl KeyCodec<PeerIdToCertifiedNodeMapSchema> for ItemId {
         Ok(ItemId::try_from(data)?)
     }
 }
-impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerIdToCertifiedNodeMap {
+impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerIdToCertifiedNodeMap_Metadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         Ok(bcs::to_bytes(self)?)
     }
@@ -969,7 +979,7 @@ impl ValueCodec<PeerIdToCertifiedNodeMapSchema> for PeerIdToCertifiedNodeMap {
     }
 }
 
-define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerIdToCertifiedNodeMap, "PeerIdToCertifiedNodeMap");
+define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerIdToCertifiedNodeMap_Metadata, "PeerIdToCertifiedNodeMap");
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -977,7 +987,7 @@ define_schema!(PeerIdToCertifiedNodeMapSchema, ItemId, PeerIdToCertifiedNodeMap,
 pub(crate) struct PeerIdToCertifiedNodeMapEntry {
     pub(crate) map_id: ItemId,
     pub(crate) key: PeerId,
-    pub(crate) value: CertifiedNode,
+    pub(crate) value_id: HashValue,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -1216,3 +1226,25 @@ define_schema!(PeerStatusListSchema, ItemId, PeerStatusList_Metadata, "PeerStatu
 define_schema!(PeerStatusListItemSchema, PeerStatusListItem_Key, PeerStatusListItem, "PeerStatusListItem");
 
 define_schema!(PeerIndexMapSchema, ItemId, PeerIndexMap, "PeerIndexMap");
+
+define_schema!(CertifiedNodeSchema, HashValue, CertifiedNode, "CertifiedNode");
+
+impl KeyCodec<CertifiedNodeSchema> for HashValue {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(HashValue::from_slice(data)?)
+    }
+}
+
+impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}

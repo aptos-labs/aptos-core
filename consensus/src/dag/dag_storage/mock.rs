@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 use std::any::Any;
+use aptos_consensus_types::node::CertifiedNode;
+use aptos_crypto::HashValue;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
 use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
@@ -15,6 +17,10 @@ impl MockDagStoreWriteBatch {
 
 impl DagStoreWriteBatch for MockDagStoreWriteBatch {
     fn del_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_certified_node(&self, obj: &CertifiedNode) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -84,6 +90,10 @@ impl MockDagStore {
 }
 
 impl DagStorage for MockDagStore {
+    fn load_certified_node(&self, key: &HashValue) -> anyhow::Result<Option<CertifiedNode>> {
+        todo!()
+    }
+
     fn load_dag_in_mem(&self, key: &DagInMem_Key) -> anyhow::Result<Option<DagInMem>> {
         Ok(None)
     }
