@@ -13,13 +13,12 @@
 ///
 /// TODO: Collection offers
 /// TODO: Fungible asset support
-/// TODO: Other object support
 module marketplace_contract::marketplace {
 
     use aptos_framework::aptos_account;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle, emit_event};
-    use aptos_framework::object::{Self, Object, DeleteRef, ExtendRef, new_event_handle};
+    use aptos_framework::object::{Self, Object, DeleteRef, ExtendRef, new_event_handle, ObjectCore};
     use aptos_framework::timestamp;
     use aptos_std::math64;
     use aptos_token_objects::royalty;
@@ -60,14 +59,18 @@ module marketplace_contract::marketplace {
 
     const FIVE_MINUTES_SECS: u64 = 300;
 
+    const TOKEN: vector<u8> = b"Token";
+
     /// A listing for a single Token object on the market place
     ///
     /// The listing will own the token until it is bought by a buyer or it is
     /// removed from listing.
     /// TODO: Allow extending the expiration time?
     struct Listing<phantom CoinType> has key {
-        /// Token to be sold.  While listed, this listing will own the token
-        item: Object<token::Token>,
+        /// Object to be sold.  While listed, this listing will own the object
+        item: Object<ObjectCore>,
+        /// Type of object
+        type: String,
         /// Seller of the token
         seller: address,
         /// Minimum price accepted for a bid
@@ -88,7 +91,8 @@ module marketplace_contract::marketplace {
 
     /// Combined events for an individual listing
     struct ListingEvent has drop, store {
-        item: Object<token::Token>,
+        item: Object<ObjectCore>,
+        type: String,
         start: Option<StartEvent>,
         bid: Option<BidEvent>,
         sale: Option<SaleEvent>,
@@ -295,12 +299,12 @@ module marketplace_contract::marketplace {
     entry fun list_token_object<ObjectType: key, Coin>(
         seller: &signer,
         marketplace_address: address,
-        token: Object<ObjectType>,
+        item: Object<ObjectType>,
         min_bid: u64,
         price: u64,
         duration_seconds: u64
     ) acquires Marketplace {
-        list_token_object_inner<ObjectType, Coin>(seller, marketplace_address, token, min_bid, price, duration_seconds);
+        list_token_object_inner<ObjectType, Coin>(seller, marketplace_address, item, min_bid, price, duration_seconds);
     }
 
     /// Internal helper function to allow tests to know what the address of the listings are
@@ -309,20 +313,24 @@ module marketplace_contract::marketplace {
     fun list_token_object_inner<ObjectType: key, CoinType>(
         seller: &signer,
         marketplace_address: address,
-        token: Object<ObjectType>,
+        item: Object<ObjectType>,
         min_bid: u64,
         price: u64,
         duration_seconds: u64
     ): address acquires Marketplace {
         // Ensure that the seller is the owner of the token
         let seller_address = signer::address_of(seller);
-        assert!(object::is_owner(token, seller_address), ENOT_OWNER);
+        assert!(object::is_owner(item, seller_address), ENOT_OWNER);
 
         assert!(duration_seconds > FIVE_MINUTES_SECS, ETOO_SHORT_DURATION);
 
-        // Only support tokens or derivatives of it
+        // Ensure this is in fact a token object
         // TODO: provide better error messaging
-        let token_object = object::convert<ObjectType, token::Token>(token);
+        let _ = object::convert<ObjectType, token::Token>(item);
+
+        // Convert to a shared form
+        let item = object::convert<ObjectType, ObjectCore>(item);
+        let type = string::utf8(TOKEN);
 
         // Determine listing end time
         let start_time_seconds = timestamp::now_seconds();
@@ -339,7 +347,8 @@ module marketplace_contract::marketplace {
         let listing_signer = object::generate_signer(&listing_object_constructor_ref);
 
         let listing = Listing<CoinType> {
-            item: token_object,
+            item,
+            type,
             seller: seller_address,
             min_bid,
             price,
@@ -354,7 +363,8 @@ module marketplace_contract::marketplace {
         };
 
         emit_event(&mut listing.events, ListingEvent {
-            item: token_object,
+            item,
+            type,
             start: option::some(StartEvent {
                 price,
                 start_time_secs: start_time_seconds,
@@ -376,7 +386,7 @@ module marketplace_contract::marketplace {
         };
 
         // Point the token to this listing
-        object::transfer(seller, token, listing_address);
+        object::transfer(seller, item, listing_address);
         listing_address
     }
 
@@ -403,6 +413,7 @@ module marketplace_contract::marketplace {
 
         emit_event(&mut listing.events, ListingEvent {
             item: listing.item,
+            type: listing.type,
             start: option::none(),
             bid: option::none(),
             sale: option::none(),
@@ -410,7 +421,7 @@ module marketplace_contract::marketplace {
         });
 
         // Point token V2 back to the original seller
-        transfer_and_drop_listing<CoinType, token::Token>(listing_address, listing.item, seller_address);
+        transfer_and_drop_listing<CoinType, ObjectCore>(listing_address, listing.item, seller_address);
     }
 
     /// Accepts the highest current bid on a listing
@@ -499,6 +510,7 @@ module marketplace_contract::marketplace {
 
         emit_event(&mut listing.events, ListingEvent {
             item: listing.item,
+            type: listing.type,
             start: option::none(),
             bid: option::some(BidEvent {
                 old_bid,
@@ -581,7 +593,13 @@ module marketplace_contract::marketplace {
         return_bid<CoinType>(listing);
 
         // Transfer the royalties before commission, creators deserve to be paid first
-        let royalty_resource = token::royalty(listing.item);
+        let royalty_resource = if (listing.type == string::utf8(TOKEN)) {
+            token::royalty(listing.item)
+        } else {
+            // For non-tokens, just get the royalty from the object only
+            royalty::get(listing.item)
+        };
+
         let royalties = if (option::is_some(&royalty_resource)) {
             let royalty = option::extract(&mut royalty_resource);
             let royalty_address = royalty::payee_address(&royalty);
@@ -612,6 +630,7 @@ module marketplace_contract::marketplace {
         aptos_account::deposit_coins(listing.seller, coins);
         emit_event(&mut listing.events, ListingEvent {
             item: listing.item,
+            type: listing.type,
             start: option::none(),
             bid: option::none(),
             sale: option::some(SaleEvent {
@@ -624,7 +643,7 @@ module marketplace_contract::marketplace {
         });
 
         // Transfer the token to the buyer
-        transfer_and_drop_listing<CoinType, token::Token>(listing_address, listing.item, buyer_address);
+        transfer_and_drop_listing<CoinType, ObjectCore>(listing_address, listing.item, buyer_address);
     }
 
     /// Returns the current highest bid to the original owner
@@ -656,7 +675,8 @@ module marketplace_contract::marketplace {
 
     struct ListingView {
         marketplace: address,
-        item: Object<token::Token>,
+        item: Object<ObjectCore>,
+        type: String,
         seller: address,
         price: u64,
         start_time_seconds: u64,
@@ -675,6 +695,7 @@ module marketplace_contract::marketplace {
         ListingView {
             marketplace: object::owner(listing_object),
             item: listing.item,
+            type: listing.type,
             seller: listing.seller,
             price: listing.price,
             start_time_seconds: listing.start_time_seconds,
