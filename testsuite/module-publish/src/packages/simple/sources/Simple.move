@@ -12,6 +12,7 @@ module 0xABCD::simple {
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
+    use aptos_framework::event::{Self, EventHandle};
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
@@ -411,4 +412,23 @@ module 0xABCD::simple {
 
 
 
+    struct SimpleEvent has drop, store {
+        event_id: u64
+    }
+
+    struct EventStore has key {
+        simple_events: EventHandle<SimpleEvent>,
+    }
+
+    fun emit_events(owner: &signer, count: u64) acquires EventStore
+    {
+        let event_store = borrow_global_mut<EventStore>(signer::address_of(owner));
+        while (count > 0) {
+            count = count - 1;
+            event::emit_event<SimpleEvent>(
+                &mut event_store.simple_events,
+                SimpleEvent { event_id: count },
+            );
+        }
+    }
 }
