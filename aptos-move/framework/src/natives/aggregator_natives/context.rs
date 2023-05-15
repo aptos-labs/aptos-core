@@ -246,10 +246,19 @@ mod test {
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), AggregatorChange::Write(0));
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(200)).unwrap(),
+            AggregatorChange::Write(0)
+        );
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), AggregatorChange::Write(0));
-        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), AggregatorChange::Delete);
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(400)).unwrap(),
+            AggregatorChange::Write(0)
+        );
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(500)).unwrap(),
+            AggregatorChange::Delete
+        );
         let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(600)).unwrap(),
@@ -272,9 +281,15 @@ mod test {
         let AggregatorChangeSet { changes } = context.into_change_set();
 
         assert!(!changes.contains_key(&aggregator_id_for_test(100)));
-        assert_matches!(changes.get(&aggregator_id_for_test(200)).unwrap(), AggregatorChange::Write(0));
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(200)).unwrap(),
+            AggregatorChange::Write(0)
+        );
         assert!(!changes.contains_key(&aggregator_id_for_test(300)));
-        assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), AggregatorChange::Write(0));
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(400)).unwrap(),
+            AggregatorChange::Write(0)
+        );
         assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
         assert_matches!(
             changes.get(&aggregator_id_for_test(600)).unwrap(),
@@ -284,6 +299,9 @@ mod test {
             changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Write(200)
         );
-        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), AggregatorChange::Delete);
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(800)).unwrap(),
+            AggregatorChange::Delete
+        );
     }
 }
