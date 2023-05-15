@@ -12,6 +12,8 @@
 /// is owned by its creator.
 ///
 /// TODO: Collection offers
+/// TODO: Fungible asset support
+/// TODO: Other object support
 module marketplace_contract::marketplace {
 
     use aptos_framework::aptos_account;
@@ -68,6 +70,8 @@ module marketplace_contract::marketplace {
         item: Object<token::Token>,
         /// Seller of the token
         seller: address,
+        /// Minimum price accepted for a bid
+        min_bid: u64,
         /// Price accepted for instant buy
         price: u64,
         /// timestamp in secs for the listing starting time
@@ -292,10 +296,11 @@ module marketplace_contract::marketplace {
         seller: &signer,
         marketplace_address: address,
         token: Object<ObjectType>,
+        min_bid: u64,
         price: u64,
         duration_seconds: u64
     ) acquires Marketplace {
-        list_token_object_inner<ObjectType, Coin>(seller, marketplace_address, token, price, duration_seconds);
+        list_token_object_inner<ObjectType, Coin>(seller, marketplace_address, token, min_bid, price, duration_seconds);
     }
 
     /// Internal helper function to allow tests to know what the address of the listings are
@@ -305,7 +310,8 @@ module marketplace_contract::marketplace {
         seller: &signer,
         marketplace_address: address,
         token: Object<ObjectType>,
-        min_price: u64,
+        min_bid: u64,
+        price: u64,
         duration_seconds: u64
     ): address acquires Marketplace {
         // Ensure that the seller is the owner of the token
@@ -335,7 +341,8 @@ module marketplace_contract::marketplace {
         let listing = Listing<CoinType> {
             item: token_object,
             seller: seller_address,
-            price: min_price,
+            min_bid,
+            price,
             start_time_seconds,
             expiration_time_seconds,
             highest_bid: option::none(),
@@ -349,7 +356,7 @@ module marketplace_contract::marketplace {
         emit_event(&mut listing.events, ListingEvent {
             item: token_object,
             start: option::some(StartEvent {
-                price: min_price,
+                price,
                 start_time_secs: start_time_seconds,
                 end_time_secs: expiration_time_seconds,
             }),
@@ -486,7 +493,7 @@ module marketplace_contract::marketplace {
             (option::some(old_bid), option::some(bid.bidder))
         } else {
             // Bid must be greater than 0
-            assert!(price > 0, EBID_TOO_LOW);
+            assert!(price >= listing.min_bid, EBID_TOO_LOW);
             (option::none(), option::none())
         };
 
@@ -763,6 +770,8 @@ module marketplace_contract::marketplace {
     #[test_only]
     const TOKEN_NAME_3: vector<u8> = b"Woodrow";
     #[test_only]
+    const MIN_BID: u64 = 1;
+    #[test_only]
     const LIST_PRICE: u64 = 100000000 * 2;
     #[test_only]
     const LIST_FEE: u64 = 5000000;
@@ -815,6 +824,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -835,6 +845,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_2,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -842,6 +853,7 @@ module marketplace_contract::marketplace {
             creator,
             marketplace_address,
             token_3,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -928,6 +940,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1000,6 +1013,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1057,6 +1071,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1094,6 +1109,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1127,6 +1143,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1155,6 +1172,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
@@ -1184,6 +1202,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             5
         );
@@ -1211,6 +1230,7 @@ module marketplace_contract::marketplace {
             seller,
             marketplace_address,
             token_1,
+            MIN_BID,
             LIST_PRICE,
             HOUR_SECONDS
         );
