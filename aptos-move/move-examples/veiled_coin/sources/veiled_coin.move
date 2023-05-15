@@ -338,7 +338,6 @@ module veiled_coin::veiled_coin {
         recipient: address,
         withdraw_ct: vector<u8>,
         deposit_ct: vector<u8>,
-        updated_balance_ct: vector<u8>,
         updated_balance_comm: vector<u8>,
         transfer_value_comm: vector<u8>,
         range_proof_new_balance: vector<u8>,
@@ -350,9 +349,6 @@ module veiled_coin::veiled_coin {
 
         let veiled_deposit_amount = elgamal::new_ciphertext_from_bytes(deposit_ct);
         assert!(std::option::is_some(&veiled_deposit_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
-
-        let updated_balance_ct = elgamal::new_ciphertext_from_bytes(updated_balance_ct);
-        assert!(std::option::is_some(&updated_balance_ct), error::invalid_argument(EDESERIALIZATION_FAILED));
 
         let updated_balance_comm = pedersen::new_commitment_from_bytes(updated_balance_comm);
         assert!(std::option::is_some(&updated_balance_comm), error::invalid_argument(EDESERIALIZATION_FAILED));
@@ -383,7 +379,6 @@ module veiled_coin::veiled_coin {
             recipient,
             std::option::extract(&mut veiled_withdraw_amount),
             std::option::extract(&mut veiled_deposit_amount),
-            std::option::extract(&mut updated_balance_ct),
             std::option::extract(&mut updated_balance_comm),
             std::option::extract(&mut transfer_value),
             &transfer_proof,
@@ -541,7 +536,6 @@ module veiled_coin::veiled_coin {
         recipient_addr: address,
         veiled_withdraw_amount: elgamal::Ciphertext,
         veiled_deposit_amount: elgamal::Ciphertext,
-        updated_balance_ct: elgamal::Ciphertext,
         updated_balance_comm: pedersen::Commitment,
         veiled_amount_comm: pedersen::Commitment,
         transfer_proof: &VeiledTransferProof<CoinType>) acquires VeiledCoinStore
@@ -553,6 +547,8 @@ module veiled_coin::veiled_coin {
 
         // Note: The `get_pk_from_addr` call from above already asserts that `sender_addr` has a coin store.
         let sender_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(sender_addr);
+        let balance = elgamal::decompress_ciphertext(&sender_coin_store.veiled_balance);
+        elgamal::ciphertext_sub_assign(&mut balance, &veiled_withdraw_amount);
 
         // Checks that `veiled_withdraw_amount` and `veiled_deposit_amount` encrypt the same amount of coins, under the
         // sender and recipient's PKs, respectively, by verifying the $\Sigma$-protocol proof in `transfer_proof`.
@@ -561,7 +557,7 @@ module veiled_coin::veiled_coin {
             &recipient_pk,
             &veiled_withdraw_amount,
             &veiled_deposit_amount,
-            &updated_balance_ct,
+            &balance,
             &updated_balance_comm,
             &veiled_amount_comm,
             &transfer_proof.sigma_proof);
@@ -1555,7 +1551,6 @@ module veiled_coin::veiled_coin {
             signer::address_of(&recipient),
             elgamal::ciphertext_to_bytes(&withdraw_ct),
             elgamal::ciphertext_to_bytes(&deposit_ct),
-            elgamal::ciphertext_to_bytes(&new_balance_ct),
             pedersen::commitment_to_bytes(&new_balance_comm),
             pedersen::commitment_to_bytes(&amount_comm),
             bulletproofs::range_proof_to_bytes(&new_balance_range_proof),
