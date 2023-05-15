@@ -653,7 +653,7 @@ impl AptosVM {
             txn_data.gas_unit_price,
         )?;
 
-        let storage_with_changes = DeltaStateView::new(resover, change_set.writes());
+        let storage_with_changes = DeltaStateView::new(resolver, change_set.writes());
 
         // TODO: Avoid delta materialization here.
         let deltas = change_set.deltas().clone();
@@ -1265,7 +1265,7 @@ impl AptosVM {
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (writes, deltas, events) = change_set.into_inner();
-        self.read_writeset(storage, &writes)?;
+        self.read_writeset(resolver, &writes)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = VMOutput::new(writes, deltas, events, 0, VMStatus::Executed.into());

@@ -21,7 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
-    transaction::{ChangeSet, SignatureCheckedTransaction},
+    transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
@@ -290,7 +291,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
+    ) -> Result<AptosChangeSet, VMStatus> {
         let mut writes = WriteChangeSet::empty();
         let mut deltas = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
@@ -314,7 +315,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     &state_key,
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
-                );
+                )?;
                 writes.insert((state_key, op))
             }
 
