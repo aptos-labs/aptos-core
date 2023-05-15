@@ -5,7 +5,7 @@ use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -90,6 +90,14 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
 
     fn put_peer_status_list_item(&mut self, obj: &PeerStatusListItem) -> anyhow::Result<()> {
         self.inner.put::<PeerStatusListItemSchema>(&obj.key(), obj)
+    }
+
+    fn del_missing_node_id_to_status_map_entry(&mut self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+        self.inner.delete::<MissingNodeIdToStatusMapEntrySchema>(key)
+    }
+
+    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
+        self.inner.put::<MissingNodeIdToStatusMapEntrySchema>(&obj.key(), obj)
     }
 }
 
@@ -208,6 +216,10 @@ impl DagStorage for NaiveDagStore {
         } else {
             Ok(None)
         }
+    }
+
+    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<Option<MissingNodeIdToStatusMap_Entry>> {
+        Ok(self.db.get::<MissingNodeIdToStatusMapEntrySchema>(key)?)
     }
 
     fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIdToCertifiedNodeMap>> {

@@ -30,7 +30,7 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId, null_id};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
-use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PendingInfo, WeakLinksCreator};
+use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PendingInfo, WeakLinksCreator};
 
 // TODO: persist all every update
 #[allow(dead_code)]
@@ -390,8 +390,9 @@ impl Dag {
             .collect();
 
         let mut maybe_node_status = None;
-
-        match self.in_mem.get_missing_nodes_mut().entry(certified_node.digest()) {
+        let map_id = self.in_mem.get_missing_nodes().key();
+        let node_digest = certified_node.digest();
+        match self.in_mem.get_missing_nodes_mut().entry(node_digest) {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {
@@ -408,6 +409,18 @@ impl Dag {
                     .update_to_pending(certified_node, missing_parents);
                 if entry.get_mut().ready_to_be_added() {
                     maybe_node_status = Some(entry.remove());
+                    let entry_db_key = MissingNodeIdToStatusMap_Entry_Key {
+                        map_id,
+                        key: Some(node_digest),
+                    };
+                    storage_diff.del_missing_node_id_to_status_map_entry(&entry_db_key).unwrap();
+                } else {
+                    let db_entry = MissingNodeIdToStatusMap_Entry {
+                        map_id,
+                        key: entry.key().clone(),
+                        value: entry.get().clone(),
+                    };
+                    storage_diff.put_missing_node_id_to_status_map_entry(&db_entry).unwrap(); //TODO: only write the diff.
                 }
             },
         }

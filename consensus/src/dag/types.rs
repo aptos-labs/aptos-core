@@ -116,7 +116,7 @@ impl AckSet {
         all_peers.difference(&self.set).cloned().collect()
     }
 }
-
+/////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct MissingNodeIdToStatusMap {
@@ -168,8 +168,75 @@ impl ValueCodec<MissingNodeIdToStatusMapSchema> for MissingNodeIdToStatusMap {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct MissingNodeIdToStatusMap_Entry_Key {
+    pub(crate) map_id: ItemId,
+    pub(crate) key: Option<HashValue>,
+}
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct MissingNodeIdToStatusMap_Entry {
+    pub(crate) map_id: ItemId,
+    pub(crate) key: HashValue,
+    pub(crate) value: MissingDagNodeStatus,
+}
+
+impl MissingNodeIdToStatusMap_Entry {
+    pub(crate) fn key(&self) -> MissingNodeIdToStatusMap_Entry_Key {
+        MissingNodeIdToStatusMap_Entry_Key {
+            map_id: self.map_id,
+            key: Some(self.key),
+        }
+    }
+}
+
+impl KeyCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.map_id.as_slice())?;
+        match self.key {
+            None => {
+                buf.write_u8(0xff)?;
+            }
+            Some(k) => {
+                buf.write_u8(0x00)?;
+                buf.write(k.as_slice())?;
+            }
+        }
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let map_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        let key = match cursor.read_u8()? {
+            0x00 => {
+                let node_id = HashValue::from_slice(read_bytes(&mut cursor, 32)?.as_slice())?;
+                Some(node_id)
+            },
+            0xff => None,
+            _ => unreachable!(),
+        };
+        Ok(MissingNodeIdToStatusMap_Entry_Key{
+            map_id,
+            key,
+        })
+    }
+}
+impl ValueCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct DagRoundList {
     pub(crate) id: ItemId,
     pub(crate) inner: Vec<PeerIdToCertifiedNodeMap>,
@@ -633,7 +700,7 @@ impl PeerStatus {
 }
 
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct AbsentInfo {
     metadata: NodeMetaData, //88
     peers_to_request: HashSet<PeerId>,
@@ -674,7 +741,7 @@ impl AbsentInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PendingInfo {
     certified_node: CertifiedNode,
     missing_parents: HashSet<HashValue>,
@@ -731,7 +798,7 @@ impl PendingInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) enum MissingDagNodeStatus {
     Absent(AbsentInfo),
     Pending(PendingInfo),
@@ -1134,6 +1201,8 @@ define_schema!(DagRoundListSchema, ItemId, DagRoundList_Metadata, "DagRoundList"
 define_schema!(DagRoundListItemSchema, DagRoundListItem_Key, DagRoundListItem, "DagRoundListItem");
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
+
+define_schema!(MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMap_Entry, "MissingNodeIdToStatusMapEntry");
 
 define_schema!(DagInMemSchema, DagInMem_Key, DagInMem_Metadata, "DagInMem");
 

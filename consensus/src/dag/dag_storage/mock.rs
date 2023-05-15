@@ -3,7 +3,7 @@
 use std::any::Any;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -14,6 +14,10 @@ impl MockDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for MockDagStoreWriteBatch {
+    fn del_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn put_dag_in_mem__deep(&mut self, dag_in_mem: &DagInMem) -> anyhow::Result<()> {
         Ok(())
     }
@@ -35,6 +39,10 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
     }
 
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -89,6 +97,10 @@ impl DagStorage for MockDagStore {
     }
 
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> anyhow::Result<Option<MissingNodeIdToStatusMap>> {
+        todo!()
+    }
+
+    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<Option<MissingNodeIdToStatusMap_Entry>> {
         todo!()
     }
 
