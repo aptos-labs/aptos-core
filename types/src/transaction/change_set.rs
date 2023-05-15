@@ -37,10 +37,7 @@ impl ChangeSet {
         Ok(myself)
     }
 
-    pub fn new_unchecked(
-        write_set: WriteSet,
-        events: Vec<ContractEvent>,
-    ) -> Self {
+    pub fn new_unchecked(write_set: WriteSet, events: Vec<ContractEvent>) -> Self {
         Self { write_set, events }
     }
 

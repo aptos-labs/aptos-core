@@ -655,7 +655,7 @@ impl AptosVM {
 
         let storage_with_changes = DeltaStateView::new(resover, change_set.writes());
 
-        // TODO: Avoid delta materialization here.    
+        // TODO: Avoid delta materialization here.
         let deltas = change_set.deltas().clone();
         let materialized_deltas = WriteChangeSet::from_deltas(deltas, resolver)?;
 
