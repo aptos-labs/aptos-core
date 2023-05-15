@@ -502,7 +502,7 @@ where
         Self(vec![], vec![], vec![], OnceCell::new())
     }
 
-    fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
+    fn incorporate_materialized_deltas(&self, delta_writes: Vec<(K, WriteOp)>) {
         assert_ok!(self.3.set(delta_writes));
     }
 }

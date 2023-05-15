@@ -84,9 +84,13 @@ impl<T> ChangeSet<T> {
     pub fn iter(&self) -> Iter<'_, StateKey, T> {
         self.inner.iter()
     }
+}
 
-    #[inline]
-    pub fn into_iter(self) -> IntoIter<StateKey, T> {
+impl<T> IntoIterator for ChangeSet<T> {
+    type IntoIter = IntoIter<StateKey, T>;
+    type Item = (StateKey, T);
+
+    fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
     }
 }

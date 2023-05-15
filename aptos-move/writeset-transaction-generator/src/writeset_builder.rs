@@ -121,7 +121,7 @@ where
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
-    let change_set_ext = {
+    let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session = GenesisSession(
@@ -141,6 +141,12 @@ where
     };
 
     // Genesis never produces the delta change set.
-    let (_delta_change_set, change_set) = change_set_ext.into_inner();
-    change_set
+    assert!(change_set.deltas().is_empty());
+
+    let (writes, _deltas, events) = change_set.into_inner();
+    let write_set = writes
+        .into_write_set()
+        .map_err(|err| format_err!("Unable to build a WriteSet : {:?}", err))
+        .unwrap();
+    ChangeSet::new_unchecked(write_set, events)
 }

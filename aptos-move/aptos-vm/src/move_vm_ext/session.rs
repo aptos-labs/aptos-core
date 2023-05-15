@@ -372,7 +372,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
-        Ok(AptosChangeSet::new(writes, deltas, events, configs)?)
+        AptosChangeSet::new(writes, deltas, events, configs)
     }
 }
 
