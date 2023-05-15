@@ -171,7 +171,7 @@ impl DeltaOp {
     /// error VM status is returned.
     pub fn try_into_write_op(
         self,
-        state_view: &impl StateView,
+        state_view: &dyn StateView,
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         // In case storage fails to fetch the value, return immediately.
@@ -325,7 +325,7 @@ impl DeltaChangeSet {
     /// failed, the error is propagated to the caller.
     pub(crate) fn take_materialized(
         self,
-        state_view: &impl StateView,
+        state_view: &dyn StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
         let mut ret = Vec::with_capacity(self.delta_change_set.len());
 
@@ -340,7 +340,7 @@ impl DeltaChangeSet {
     /// Consumes the delta change set and tries to materialize it into a write set.
     pub fn try_into_write_set(
         self,
-        state_view: &impl StateView,
+        state_view: &dyn StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
         let materialized_write_set = self.take_materialized(state_view)?;
         WriteSetMut::new(materialized_write_set)
