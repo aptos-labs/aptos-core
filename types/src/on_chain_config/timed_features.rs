@@ -91,7 +91,6 @@ impl TimedFeatureFlag {
 
             (EntryTypeSizeLimit, TESTNET) => 1680231600000, /* Thu Mar 30 2023 20:00:00 GMT-0700 */
             (EntryTypeSizeLimit, MAINNET) => 1680318000000, /* Fri Mar 31 2023 20:00:00 GMT-0700 */
-
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,
         }

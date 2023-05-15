@@ -331,6 +331,7 @@ where
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
                 block.output.block_state_updates.clone(),
+                &block.output.sharded_state_cache,
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

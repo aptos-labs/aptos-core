@@ -648,8 +648,30 @@ Only called during genesis.
 <code><a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a></code> should be exists.
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
+<b>let</b> account_addr = <a href="account.md#0x1_account">account</a>;
+<b>let</b> amount = fee;
+<b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
+<b>let</b> coin_store = <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);
+<b>let</b> <b>post</b> post_coin_store = <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);
+<b>modifies</b> <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>modifies</b> <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr);
+<b>aborts_if</b> amount != 0 && !(<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr)
+    && <b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(account_addr));
+<b>aborts_if</b> coin_store.<a href="coin.md#0x1_coin">coin</a>.value &lt; amount;
+<b>let</b> maybe_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;
+<b>let</b> supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_supply);
+<b>let</b> value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(supply);
+<b>let</b> <b>post</b> post_maybe_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr).supply;
+<b>let</b> <b>post</b> post_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(post_maybe_supply);
+<b>let</b> <b>post</b> post_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(post_supply);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply) && value &lt; amount;
+<b>ensures</b> post_coin_store.<a href="coin.md#0x1_coin">coin</a>.value == coin_store.<a href="coin.md#0x1_coin">coin</a>.value - amount;
+<b>ensures</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply)) {
+    post_value == value - amount
+} <b>else</b> {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_maybe_supply)
+};
 </code></pre>
 
 

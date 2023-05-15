@@ -218,16 +218,6 @@ directly understand the behavior in a writeset.
 ## Constants
 
 
-<a name="0x4_token_EDESCRIPTION_TOO_LONG"></a>
-
-The description is over the maximum length
-
-
-<pre><code><b>const</b> <a href="token.md#0x4_token_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>: u64 = 6;
-</code></pre>
-
-
-
 <a name="0x4_token_EURI_TOO_LONG"></a>
 
 The URI is over the maximum length
@@ -238,20 +228,30 @@ The URI is over the maximum length
 
 
 
-<a name="0x4_token_MAX_DESCRIPTION_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="token.md#0x4_token_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>: u64 = 2048;
-</code></pre>
-
-
-
 <a name="0x4_token_MAX_URI_LENGTH"></a>
 
 
 
 <pre><code><b>const</b> <a href="token.md#0x4_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
+</code></pre>
+
+
+
+<a name="0x4_token_EDESCRIPTION_TOO_LONG"></a>
+
+The description is over the maximum length
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_EDESCRIPTION_TOO_LONG">EDESCRIPTION_TOO_LONG</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x4_token_MAX_DESCRIPTION_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_MAX_DESCRIPTION_LENGTH">MAX_DESCRIPTION_LENGTH</a>: u64 = 2048;
 </code></pre>
 
 

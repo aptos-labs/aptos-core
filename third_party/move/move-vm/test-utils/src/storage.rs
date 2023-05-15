@@ -8,6 +8,7 @@ use move_core_types::{
     effects::{AccountChangeSet, ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::ModuleResolver,
 };
 #[cfg(feature = "table-extension")]
@@ -32,24 +33,30 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 }
 
 impl ResourceRefResolver for BlankStorage {
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata]
     ) -> Result<Option<ResourceRef>> {
         Ok(None)
     }
 
-    fn get_resource_bytes(
+    fn get_resource_bytes_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata]
     ) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
@@ -75,6 +82,10 @@ pub struct DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
@@ -87,19 +98,21 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
 }
 
 impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b, S> {
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> Result<Option<ResourceRef>> {
-        let maybe_bytes = self.get_resource_bytes(address, tag)?;
+        let maybe_bytes = self.get_resource_bytes_with_metadata(address, tag, metadata)?;
         Ok(maybe_bytes.map(|bytes| ResourceRef::Serialized(bytes)))
     }
 
-    fn get_resource_bytes(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
@@ -107,7 +120,7 @@ impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b
             }
         }
 
-        self.base.get_resource_bytes(address, tag)
+        self.base.get_resource_bytes_with_metadata(address, tag, metadata)
     }
 }
 
@@ -294,6 +307,10 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
@@ -303,10 +320,11 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceRefResolver for InMemoryStorage {
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<ResourceRef>> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage
@@ -318,10 +336,11 @@ impl ResourceRefResolver for InMemoryStorage {
         Ok(None)
     }
 
-    fn get_resource_bytes(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage.resources.get(tag).cloned());

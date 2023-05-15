@@ -9,7 +9,12 @@ use move_core_types::{
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+<<<<<<< HEAD
     resolver::ModuleResolver,
+=======
+    metadata::Metadata,
+    resolver::{ModuleResolver, ResourceResolver},
+>>>>>>> main
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
@@ -508,6 +513,10 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
@@ -516,20 +525,22 @@ impl ModuleResolver for BogusStorage {
 }
 
 impl ResourceRefResolver for BogusStorage {
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> anyhow::Result<Option<ResourceRef>> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)
     }
 
-    fn get_resource_bytes(
+    fn get_resource_bytes_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> anyhow::Result<Option<Vec<u8>>> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)

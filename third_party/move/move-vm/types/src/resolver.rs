@@ -1,46 +1,68 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fs::metadata;
 use crate::types::ResourceRef;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::ModuleResolver,
 };
+use move_core_types::metadata::Metadata;
 
 pub trait ResourceRefResolver {
     /// Returns a resource reference if it exists.
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> anyhow::Result<Option<ResourceRef>>;
 
     /// Returns resource bytes if the resource exists. This allows avoiding
     /// passing MoveTypeLayout between MoveVM and cache/storage.
-    fn get_resource_bytes(
+    fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> anyhow::Result<Option<Vec<u8>>>;
 }
 
 impl<T: ResourceRefResolver> ResourceRefResolver for &T {
-    fn get_resource_ref(
+    fn get_resource_ref_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
+        metadata: &[Metadata],
     ) -> anyhow::Result<Option<ResourceRef>> {
-        (**self).get_resource_ref(address, tag)
+        (**self).get_resource_ref_with_metadata(address, tag, metadata)
+    }
+
+    fn get_resource_bytes_with_metadata(
+        &self,
+        address: &AccountAddress,
+        tag: &StructTag,
+        metadata: &[Metadata],
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        (**self).get_resource_bytes(address, tag, metadata())
+    }
+}
+
+pub trait MoveRefResolver: ModuleResolver + ResourceRefResolver {
+    fn get_resource(
+        &self,
+        address: &AccountAddress,
+        typ: &StructTag,
+    ) -> anyhow::Result<Option<ResourceRef>> {
+        self.get_resource_ref_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
     }
 
     fn get_resource_bytes(
         &self,
         address: &AccountAddress,
-        tag: &StructTag,
+        typ: &StructTag,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        (**self).get_resource_bytes(address, tag)
+        self.get_resource_bytes_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
     }
 }
-
-pub trait MoveRefResolver: ModuleResolver + ResourceRefResolver {}
 
 impl<T: ModuleResolver + ResourceRefResolver> MoveRefResolver for T {}
