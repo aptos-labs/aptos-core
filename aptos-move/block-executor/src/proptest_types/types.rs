@@ -139,7 +139,7 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     pub V,
     /// Determines whether V is going to contain a value (o.w. deletion). This is useful for
-    /// testing the bahavior of deleting aggregators, in which case we shouldn't panic
+    /// testing the behavior of deleting aggregators, in which case we shouldn't panic
     /// but let the Move-VM handle the read the same as for any deleted resource.
     pub bool,
 );

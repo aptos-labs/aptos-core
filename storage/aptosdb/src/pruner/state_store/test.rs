@@ -54,6 +54,7 @@ fn put_value_set(
             vec![&value_set],
             version,
             StateStorageUsage::new_untracked(),
+            None,
             &ledger_batch,
             &sharded_state_kv_batches,
         )

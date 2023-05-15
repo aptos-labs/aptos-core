@@ -10,7 +10,7 @@ use crate::{
     storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::{BaseConfig, NodeConfig, RoleType};
+use aptos_config::config::{BaseConfig, NodeConfig};
 use aptos_logger::prelude::*;
 use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
 use aptos_peer_monitoring_service_types::{
@@ -313,39 +313,44 @@ fn get_distance_from_validators(
     base_config: &BaseConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> u64 {
-    match base_config.role {
-        RoleType::Validator => 0, // We're a validator!
-        RoleType::FullNode => {
-            match peers_and_metadata.get_connected_peers_and_metadata() {
-                Ok(peers_and_metadata) => {
-                    // Go through our peers, find the min, and return a distance relative to the min
-                    let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
-                    for peer_metadata in peers_and_metadata.values() {
-                        if let Some(latest_network_info_response) = peer_metadata
-                            .get_peer_monitoring_metadata()
-                            .latest_network_info_response
-                        {
-                            min_peer_distance_from_validators = min(
-                                min_peer_distance_from_validators,
-                                latest_network_info_response.distance_from_validators,
-                            );
-                        }
-                    }
-
-                    // We're one hop away from the peer
-                    min(
-                        MAX_DISTANCE_FROM_VALIDATORS,
-                        min_peer_distance_from_validators + 1,
-                    )
-                },
-                Err(error) => {
-                    // Log the error and return the max distance
-                    warn!(LogSchema::new(LogEntry::PeerMonitoringServiceError).error(&error.into()));
-                    MAX_DISTANCE_FROM_VALIDATORS
-                },
-            }
+    // Get the connected peers and metadata
+    let connected_peers_and_metadata = match peers_and_metadata.get_connected_peers_and_metadata() {
+        Ok(connected_peers_and_metadata) => connected_peers_and_metadata,
+        Err(error) => {
+            warn!(LogSchema::new(LogEntry::PeerMonitoringServiceError).error(&error.into()));
+            return MAX_DISTANCE_FROM_VALIDATORS;
         },
+    };
+
+    // If we're a validator and we have active validator peers, we're in the validator set.
+    // TODO: figure out if we need to deal with validator set forks here.
+    if base_config.role.is_validator() {
+        for peer_metadata in connected_peers_and_metadata.values() {
+            if peer_metadata.get_connection_metadata().role.is_validator() {
+                return 0;
+            }
+        }
     }
+
+    // Otherwise, go through our peers, find the min, and return a distance relative to the min
+    let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
+    for peer_metadata in connected_peers_and_metadata.values() {
+        if let Some(latest_network_info_response) = peer_metadata
+            .get_peer_monitoring_metadata()
+            .latest_network_info_response
+        {
+            min_peer_distance_from_validators = min(
+                min_peer_distance_from_validators,
+                latest_network_info_response.distance_from_validators,
+            );
+        }
+    }
+
+    // We're one hop away from the peer
+    min(
+        MAX_DISTANCE_FROM_VALIDATORS,
+        min_peer_distance_from_validators + 1,
+    )
 }
 
 /// Logs the response sent by the monitoring service for a request

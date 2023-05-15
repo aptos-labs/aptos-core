@@ -75,6 +75,8 @@ module aptos_std::ristretto255 {
     const E_ZERO_POINTS: u64 = 2;
     /// Expected more than zero scalars as input.
     const E_ZERO_SCALARS: u64 = 3;
+    /// Too many points have been created in the current transaction execution.
+    const E_TOO_MANY_POINTS_CREATED: u64 = 4;
 
     //
     // Scalar and point structs
@@ -1167,5 +1169,26 @@ module aptos_std::ristretto255 {
         *last_byte = 128;
         assert!(scalar_is_canonical_internal(non_can.data), 1);
         assert!(scalar_equals(&non_can, &scalar_zero()), 1);
+    }
+
+    #[test]
+    fun test_num_points_within_limit() {
+        let limit = 10000;
+        let i = 0;
+        while (i < limit) {
+            point_identity();
+            i = i + 1;
+        }
+    }
+
+    #[test]
+    #[expected_failure(abort_code=0x090004, location=Self)]
+    fun test_num_points_limit_exceeded() {
+        let limit = 10001;
+        let i = 0;
+        while (i < limit) {
+            point_identity();
+            i = i + 1;
+        }
     }
 }

@@ -23,8 +23,10 @@ File store fetches data from cache and stores in Google Cloud Storage.
 ```bash
 fullnode_grpc_address: 127.0.0.1:50051
 redis_address: 127.0.0.1:6379
-file_store_bucket_name: indexer-grpc-file-store-testnet 
 health_check_port: 8083
+file_store:
+  file_store_type: GcsFileStore
+  gcs_file_store_bucket_name: indexer-grpc-file-store-testnet 
 ```
 
 * Your bucket looks like:
@@ -36,4 +38,18 @@ indexer-grpc-file-store-testnet/
         1000.json
         ...
     metadata.json
+```
+
+## [TEST ONLY] Run it with a local filestore
+
+For developing and testing locally, it might be easier to use a local filestore.
+
+Create a local directory to store the filestore: `mkdir test_indexer_grpc_filestore`
+
+Then in your config:
+```
+...
+file_store:
+  file_store_type: LocalFileStore
+  local_file_store_path: test_indexer_grpc_filestore
 ```
