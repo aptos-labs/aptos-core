@@ -113,6 +113,10 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
+
+    fn release_resource_group_cache(&self, address: &AccountAddress, resource_group: &StructTag) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.resource_group_cache.borrow_mut().get_mut(address)?.remove(resource_group)
+    }
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {

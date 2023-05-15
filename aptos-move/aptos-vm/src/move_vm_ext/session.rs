@@ -191,7 +191,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        let common_error = || PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
             .with_message("split_and_merge_resource_groups error".to_string())
             .finish(Location::Undefined);
         let mut change_set_filtered = MoveChangeSet::new();
@@ -212,43 +212,40 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         .entry(resource_group)
                         .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
+                        .map_err(|_| common_error())?;
                 } else {
                     resources_filtered.insert(struct_tag, blob_op);
                 }
             }
 
-            change_set_filtered.add_account_changeset(addr, AccountChangeSet::from_modules_resources(modules, resources_filtered)).map_err(|_| common_error.clone())?;
+            change_set_filtered.add_account_changeset(addr, AccountChangeSet::from_modules_resources(modules, resources_filtered)).map_err(|_| common_error())?;
 
             for (resource_tag, resources) in resource_groups {
-                let source_data = remote
-                    .get_resource_group_data(&addr, &resource_tag)
-                    .map_err(|_| common_error.clone())?;
-                let (mut source_data, create) = if let Some(source_data) = source_data {
-                    let source_data =
-                        bcs::from_bytes(&source_data).map_err(|_| common_error.clone())?;
-                    (source_data, false)
+                let source_data = remote.release_resource_group_cache(&addr, &resource_tag);
+                let mut source_data = if let Some(source_data) = source_data {
+                    source_data
                 } else {
-                    (BTreeMap::new(), true)
+                    BTreeMap::new()
                 };
+                let create = source_data.is_empty();
 
                 for (struct_tag, current_op) in resources.into_resources() {
                     match current_op {
                         MoveStorageOp::Delete => {
                             source_data
                                 .remove(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
+                                .ok_or_else(common_error)?;
                         },
                         MoveStorageOp::Modify(new_data) => {
                             let data = source_data
                                 .get_mut(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
+                                .ok_or_else(common_error)?;
                             *data = new_data;
                         },
                         MoveStorageOp::New(data) => {
                             let data = source_data.insert(struct_tag, data);
                             if data.is_some() {
-                                return Err(common_error);
+                                return Err(common_error());
                             }
                         },
                     }
@@ -258,16 +255,16 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     MoveStorageOp::Delete
                 } else if create {
                     MoveStorageOp::New(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
+                        bcs::to_bytes(&source_data).map_err(|_| common_error())?,
                     )
                 } else {
                     MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
+                        bcs::to_bytes(&source_data).map_err(|_| common_error())?,
                     )
                 };
                 resource_group_change_set
                     .add_resource_op(addr, resource_tag, op)
-                    .map_err(|_| common_error.clone())?;
+                    .map_err(|_| common_error())?;
             }
         }
 
