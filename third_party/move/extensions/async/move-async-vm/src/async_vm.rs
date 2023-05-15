@@ -14,7 +14,6 @@ use move_core_types::{
     effects::{ChangeSet, Event, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
@@ -30,6 +29,7 @@ use std::{
     error::Error,
     fmt::{Debug, Display, Formatter},
 };
+use move_vm_types::resolver::MoveRefResolver;
 
 /// Represents an instance of an async VM.
 pub struct AsyncVM {
@@ -81,7 +81,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut dyn MoveResolver,
+        move_resolver: &'r mut dyn MoveRefResolver,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -96,7 +96,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut dyn MoveResolver,
+        move_resolver: &'r mut dyn MoveRefResolver,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
