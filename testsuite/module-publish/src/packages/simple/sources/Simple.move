@@ -13,6 +13,7 @@ module 0xABCD::simple {
     use std::string::{Self, String, utf8};
     use std::vector;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::account;
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
@@ -422,7 +423,13 @@ module 0xABCD::simple {
 
     fun emit_events(owner: &signer, count: u64) acquires EventStore
     {
-        let event_store = borrow_global_mut<EventStore>(signer::address_of(owner));
+        let owner_address = signer::address_of(owner);
+        if (!exists<EventStore>(owner_address)) {
+            move_to<EventStore>(owner, EventStore {
+                simple_events: account::new_event_handle<SimpleEvent>(owner)
+            });
+        };
+        let event_store = borrow_global_mut<EventStore>(owner_address);
         while (count > 0) {
             count = count - 1;
             event::emit_event<SimpleEvent>(
