@@ -105,7 +105,7 @@ impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b
         metadata: &[Metadata],
     ) -> Result<Option<ResourceRef>> {
         let maybe_bytes = self.get_resource_bytes_with_metadata(address, tag, metadata)?;
-        Ok(maybe_bytes.map(|bytes| ResourceRef::Serialized(bytes)))
+        Ok(maybe_bytes.map(ResourceRef::Serialized))
     }
 
     fn get_resource_bytes_with_metadata(
@@ -332,7 +332,7 @@ impl ResourceRefResolver for InMemoryStorage {
                 .resources
                 .get(tag)
                 .cloned()
-                .map(|bytes| ResourceRef::Serialized(bytes)));
+                .map(ResourceRef::Serialized));
         }
         Ok(None)
     }

@@ -110,7 +110,7 @@ impl<'a, S: StateView> ResourceRefResolver for StorageAdapter<'a, S> {
     ) -> anyhow::Result<Option<ResourceRef>> {
         Ok(self
             .get_resource_bytes_with_metadata(address, tag, metadata)?
-            .map(|bytes| ResourceRef::Serialized(bytes)))
+            .map(ResourceRef::Serialized))
     }
 
     fn get_resource_bytes_with_metadata(

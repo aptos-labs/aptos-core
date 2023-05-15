@@ -422,7 +422,7 @@ impl ResourceRefResolver for OnDiskStateView {
     ) -> Result<Option<ResourceRef>> {
         Ok(self
             .get_resource_bytes(*address, tag.clone())?
-            .map(|bytes| ResourceRef::Serialized(bytes)))
+            .map(ResourceRef::Serialized))
     }
 
     fn get_resource_bytes_with_metadata(
