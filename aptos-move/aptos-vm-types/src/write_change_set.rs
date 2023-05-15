@@ -96,23 +96,4 @@ impl WriteChangeSet {
         }
         Ok(())
     }
-
-    /// Materializes a set of deltas and merges it with a set of writes. If
-    /// materialization was not successful, an error is returned.
-    pub fn extend_with_deltas(
-        &mut self,
-        deltas: DeltaChangeSet,
-        view: &impl StateView,
-    ) -> anyhow::Result<(), VMStatus> {
-        // Make sure we assert state keys are indeed disjoint.
-        debug_assert!(self.0.keys().all(|k| !deltas.contains_key(k)));
-        let materialized_deltas = WriteChangeSet::from_deltas(deltas, view)?;
-
-        // It is safe to simply extend writes because writes and deltas have
-        // different state keys within a single transaction.
-        for (key, write) in materialized_deltas {
-            self.0.insert((key, write));
-        }
-        Ok(())
-    }
 }
