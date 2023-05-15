@@ -188,10 +188,7 @@ impl Dag {
         storage_diff.put_peer_to_node_map_entry__deep(&entry).unwrap();
 
         self.in_mem.get_front_mut()
-            .update_peer_latest_node(certified_node.node().metadata().clone());
-
-        //TODO: write the diff only.
-        storage_diff.put_weak_link_creator__deep(&self.in_mem.get_front()).unwrap();
+            .update_peer_latest_node(certified_node.node().metadata().clone(), storage_diff);
 
         self.payload_manager
             .prefetch_payload_data_inner(

@@ -16,7 +16,7 @@ use aptos_types::block_info::Round;
 use std::io::{Cursor, Write};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use aptos_schemadb::define_schema;
-use crate::dag::dag_storage::{ContainsKey, ItemId};
+use crate::dag::dag_storage::{ContainsKey, DagStoreWriteBatch, ItemId};
 // pub(crate) trait MissingPeers {
 //     fn get_peers_signatures() -> HashSet<PeerId>;
 // }
@@ -304,11 +304,68 @@ impl ValueCodec<DagRoundListItemSchema> for DagRoundListItem {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerStatusListItem {
+    pub(crate) list_id: ItemId,
+    pub(crate) index: usize,
+    pub(crate) content: Option<PeerStatus>,
+}
+
+impl PeerStatusListItem {
+    pub(crate) fn key(&self) -> PeerStatusListItem_Key {
+        PeerStatusListItem_Key {
+            list_id: self.list_id,
+            index: self.index,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerStatusListItem_Key {
+    pub(crate) list_id: ItemId,
+    pub(crate) index: usize,
+}
+
+impl KeyCodec<PeerStatusListItemSchema> for PeerStatusListItem_Key {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = vec![];
+        buf.write(self.list_id.as_slice())?;
+        buf.write_u64::<BigEndian>(self.index as u64)?;
+        Ok(buf)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        let mut cursor = Cursor::new(data);
+        let list_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
+        let index = cursor.read_u64::<BigEndian>()? as usize;
+        let obj = PeerStatusListItem_Key {
+            list_id,
+            index,
+        };
+        Ok(obj)
+    }
+}
+
+impl ValueCodec<PeerStatusListItemSchema> for PeerStatusListItem {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerStatusList_Metadata {
+    pub(crate) id: ItemId,
+    pub(crate) len: u64,
+}
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerStatusList {
     pub(crate) id: ItemId,
-    inner: Vec<Option<PeerStatus>>,
+    pub(crate) inner: Vec<Option<PeerStatus>>,
 }
 
 impl PeerStatusList {
@@ -317,6 +374,17 @@ impl PeerStatusList {
             id: uuid::Uuid::new_v4().into_bytes(),
             inner: list
         }
+    }
+
+    pub(crate) fn metadata(&self) -> PeerStatusList_Metadata {
+        PeerStatusList_Metadata {
+            id: self.id,
+            len: self.inner.len() as u64,
+        }
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Option<PeerStatus>>{
+        self.inner.iter()
     }
 
     pub(crate) fn iter_mut(&mut self) -> std::slice::IterMut<Option<PeerStatus>>{
@@ -342,7 +410,7 @@ impl KeyCodec<PeerStatusListSchema> for ItemId {
     }
 }
 
-impl ValueCodec<PeerStatusListSchema> for PeerStatusList {
+impl ValueCodec<PeerStatusListSchema> for PeerStatusList_Metadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         Ok(bcs::to_bytes(self)?)
     }
@@ -444,7 +512,7 @@ impl WeakLinksCreator {
             .collect()
     }
 
-    pub fn update_peer_latest_node(&mut self, node_meta_data: NodeMetaData) {
+    pub fn update_peer_latest_node(&mut self, node_meta_data: NodeMetaData, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         let peer_index = self
             .address_to_validator_index
             .get(&node_meta_data.source())
@@ -461,7 +529,15 @@ impl WeakLinksCreator {
                 node_meta_data.round(),
                 *peer_index
             );
-            *self.latest_nodes_metadata.get_mut(*peer_index).unwrap() = Some(PeerStatus::NotLinked(node_meta_data));
+            let new_val = Some(PeerStatus::NotLinked(node_meta_data));
+            *self.latest_nodes_metadata.get_mut(*peer_index).unwrap() = new_val.clone();
+            let list_item = PeerStatusListItem {
+                list_id: self.latest_nodes_metadata.id,
+                index: *peer_index,
+                content: new_val.clone(),
+            };
+            storage_diff.put_peer_status_list_item(&list_item).unwrap();
+            // storage_diff.put_peer_status_list(&self.latest_nodes_metadata).unwrap(); //TODO: only write the diff.
         } else {
             info!("DAG: not updating peer latest node: my_id {},", self.my_id);
         }
@@ -518,7 +594,7 @@ impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreatorMetadata {
 
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) enum PeerStatus {
     Linked(Round),
     NotLinked(NodeMetaData),
@@ -835,14 +911,14 @@ pub(crate) struct PeerIdToCertifiedNodeMapEntry {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMapEntry_Key {
     map_id: ItemId,
-    key: PeerId,
+    key: Option<PeerId>,
 }
 
 impl PeerIdToCertifiedNodeMapEntry {
     pub(crate) fn key(&self) -> PeerIdToCertifiedNodeMapEntry_Key {
         PeerIdToCertifiedNodeMapEntry_Key {
             map_id: self.map_id,
-            key: self.key,
+            key: Some(self.key),
         }
     }
 }
@@ -853,20 +929,37 @@ impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapE
     fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
         let mut buf = vec![];
         buf.write(self.map_id.as_slice())?;
-        buf.write_u8(0)?;
-        buf.write(self.key.as_slice())?;
+        match self.key {
+            Some(account) => {
+                buf.write_u8(0)?;
+                buf.write(account.as_slice())?;
+            },
+            None => {
+                buf.write_u8(0xff)?;
+            },
+        }
         Ok(buf)
     }
 
     fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
         let mut cursor = Cursor::new(data);
         let map_id = ItemId::try_from(read_bytes(&mut cursor, 16)?).unwrap();
-        assert_eq!(0, cursor.read_u8()?);
-        let key = PeerId::from_bytes(read_bytes(&mut cursor, 32)?).unwrap();
-        Ok(Self {
-            map_id,
-            key
-        })
+        match cursor.read_u8()? {
+            0 => {
+                let key = PeerId::from_bytes(read_bytes(&mut cursor, 32)?).unwrap();
+                Ok(Self {
+                    map_id,
+                    key: Some(key),
+                })
+            },
+            0xff => {
+                Ok(Self {
+                    map_id,
+                    key: None,
+                })
+            },
+            _ => unreachable!()
+        }
     }
 }
 
@@ -924,8 +1017,8 @@ pub(crate) struct DagInMem {
 }
 
 impl DagInMem {
-    pub(crate) fn partial(&self) -> DagInMemMetadata {
-        DagInMemMetadata {
+    pub(crate) fn partial(&self) -> DagInMem_Metadata {
+        DagInMem_Metadata {
             my_id: self.my_id,
             epoch: self.epoch,
             current_round: self.current_round,
@@ -962,7 +1055,7 @@ impl DagInMem {
 
 /// The part of the DAG data that should be persisted.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct DagInMemMetadata {
+pub(crate) struct DagInMem_Metadata {
     pub(crate) my_id: PeerId,
     pub(crate) epoch: u64,
     pub(crate) current_round: u64,
@@ -993,7 +1086,7 @@ impl KeyCodec<DagInMemSchema> for DagInMem_Key {
     }
 }
 
-impl ValueCodec<DagInMemSchema> for DagInMemMetadata {
+impl ValueCodec<DagInMemSchema> for DagInMem_Metadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         let mut buf = vec![];
         Write::write(&mut buf, self.my_id.as_slice())?;
@@ -1042,8 +1135,10 @@ define_schema!(DagRoundListItemSchema, DagRoundListItem_Key, DagRoundListItem, "
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
 
-define_schema!(DagInMemSchema, DagInMem_Key, DagInMemMetadata, "DagInMem");
+define_schema!(DagInMemSchema, DagInMem_Key, DagInMem_Metadata, "DagInMem");
 
-define_schema!(PeerStatusListSchema, ItemId, PeerStatusList, "PeerStatusList");
+define_schema!(PeerStatusListSchema, ItemId, PeerStatusList_Metadata, "PeerStatusList");
+
+define_schema!(PeerStatusListItemSchema, PeerStatusListItem_Key, PeerStatusListItem, "PeerStatusListItem");
 
 define_schema!(PeerIndexMapSchema, ItemId, PeerIndexMap, "PeerIndexMap");

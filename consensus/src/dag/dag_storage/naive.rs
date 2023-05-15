@@ -5,7 +5,7 @@ use std::path::Path;
 use std::any::Any;
 use anyhow::Error;
 use crate::dag::dag_storage::{ContainsKey, DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagInMemSchema, DagRoundList, DagRoundListItem, DagRoundListItem_Key, DagRoundListItemSchema, DagRoundListSchema, MissingNodeIdToStatusMap, MissingNodeIdToStatusMapSchema, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapSchema, PeerIndexMap, PeerIndexMapSchema, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, PeerStatusListItemSchema, PeerStatusListSchema, WeakLinksCreator, WeakLinksCreatorSchema};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -50,8 +50,8 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     }
 
     fn put_weak_link_creator__deep(&mut self, obj: &WeakLinksCreator) -> anyhow::Result<()> {
-        self.put_peer_status_list(&obj.latest_nodes_metadata)?;
-        self.put_peer_index_map(&obj.address_to_validator_index)?;
+        self.put_peer_status_list__deep(&obj.latest_nodes_metadata)?;
+        self.put_peer_index_map__deep(&obj.address_to_validator_index)?;
         self.inner.put::<WeakLinksCreatorSchema>(&obj.key(), &obj.metadata())?;
         Ok(())
     }
@@ -72,12 +72,24 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self
     }
 
-    fn put_peer_status_list(&mut self, obj: &PeerStatusList) -> anyhow::Result<()> {
-        self.inner.put::<PeerStatusListSchema>(&obj.id, obj)
+    fn put_peer_status_list__deep(&mut self, obj: &PeerStatusList) -> anyhow::Result<()> {
+        for (i, maybe_peer_status) in obj.iter().enumerate() {
+            let sub_obj = PeerStatusListItem {
+                list_id: obj.id,
+                index: i,
+                content: maybe_peer_status.clone(),
+            };
+            self.put_peer_status_list_item(&sub_obj)?;
+        }
+        self.inner.put::<PeerStatusListSchema>(&obj.id, &obj.metadata())
     }
 
-    fn put_peer_index_map(&mut self, obj: &PeerIndexMap) -> anyhow::Result<()> {
+    fn put_peer_index_map__deep(&mut self, obj: &PeerIndexMap) -> anyhow::Result<()> {
         self.inner.put::<PeerIndexMapSchema>(&obj.id, obj)
+    }
+
+    fn put_peer_status_list_item(&mut self, obj: &PeerStatusListItem) -> anyhow::Result<()> {
+        self.inner.put::<PeerStatusListItemSchema>(&obj.key(), obj)
     }
 }
 
@@ -94,9 +106,10 @@ impl NaiveDagStore {
             "MissingNodeIdToStatusMap",
             "PeerIdToCertifiedNodeMap",
             "PeerIdToCertifiedNodeMapEntry",
-            "WeakLinksCreator",
             "PeerStatusList",
+            "PeerStatusListItem",
             "PeerIndexMap",
+            "WeakLinksCreator",
         ];
 
         let path = db_root_path.as_ref().join(DAG_DB_NAME);
@@ -206,7 +219,26 @@ impl DagStorage for NaiveDagStore {
     }
 
     fn load_peer_status_list(&self, key: &ItemId) -> anyhow::Result<Option<PeerStatusList>> {
-        self.db.get::<PeerStatusListSchema>(key)
+        if let Some(metadata) = self.db.get::<PeerStatusListSchema>(key)? {
+            let list_len = metadata.len as usize;
+            let mut list = Vec::with_capacity(list_len);
+            for i in 0..list_len {//TODO: parallelize the DB reads?
+                let key = PeerStatusListItem_Key { list_id: metadata.id, index: i };
+                let list_item = self.load_peer_status_list_item(&key)?.expect("Inconsistency.");
+                list.push(list_item.content);
+            }
+            Ok(Some(PeerStatusList {
+                id: metadata.id,
+                inner: list,
+            }))
+        } else {
+            Ok(None)
+        }
+
+    }
+
+    fn load_peer_status_list_item(&self, key: &PeerStatusListItem_Key) -> anyhow::Result<Option<PeerStatusListItem>> {
+        self.db.get::<PeerStatusListItemSchema>(key)
     }
 
     fn load_peer_index_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIndexMap>> {
