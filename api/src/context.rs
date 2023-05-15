@@ -18,7 +18,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, info};
+use aptos_logger::error;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
@@ -899,13 +899,6 @@ impl Context {
         }
         let remaining = max_block_history - blocks.len();
 
-        info!(
-            "BCHO: versions: {} {}, blocks: {}",
-            ledger_info.ledger_version.0,
-            lookup_version,
-            blocks.len()
-        );
-
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
         let full_block_txns = self.node_config.api.gas_estimation_full_block_txns;
@@ -940,7 +933,6 @@ impl Context {
                 min_inclusion_prices.push(*v);
             }
         }
-        info!("BCHO: min_inclusion_prices: {:?}", min_inclusion_prices);
 
         // 3. Get values
         // (1) low
@@ -967,19 +959,11 @@ impl Context {
         };
         // 4. Update cache
         // GC old entries
-        let mut removed = 0;
         if cache.min_inclusion_prices.len() > max_block_history {
             for _i in max_block_history..cache.min_inclusion_prices.len() {
                 cache.min_inclusion_prices.pop_first();
-                removed += 1;
             }
         }
-        let first = cache.min_inclusion_prices.first_key_value();
-        let last = cache.min_inclusion_prices.last_key_value();
-        info!(
-            "BCHO: removed: {}, first: {:?}, last: {:?}",
-            removed, first, last
-        );
         cache.estimation = Some(estimation);
         cache.last_updated_epoch = Some(epoch);
         cache.last_updated_time = Some(Instant::now());
