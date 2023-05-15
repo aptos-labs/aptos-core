@@ -42,6 +42,7 @@ pub(crate) trait DagStorage: Sync + Send {
 pub(crate) trait DagStoreWriteBatch: Sync + Send {
     fn del_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry_Key) -> Result<()>;
     fn put_dag_in_mem__deep(&mut self, obj: &DagInMem) -> Result<()>;
+    fn put_dag_in_mem__shallow(&mut self, obj: &DagInMem) -> Result<()>;
     fn put_dag_round_list__shallow(&mut self, obj: &DagRoundList) -> Result<()>;
     fn put_dag_round_list__deep(&mut self, obj: &DagRoundList) -> Result<()>;
     fn put_dag_round_list_item(&mut self, obj: &DagRoundListItem) -> Result<()>;

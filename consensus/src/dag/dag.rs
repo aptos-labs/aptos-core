@@ -368,18 +368,27 @@ impl Dag {
         let parents = self.current_round_nodes_metadata();
         let strong_links_peers = parents.iter().map(|m| m.source().clone()).collect();
         let current_round = self.in_mem.current_round;
+        let mut storage_diff = self.storage.new_write_batch();
         self.in_mem.get_front_mut()
-            .update_with_strong_links(current_round, strong_links_peers);
+            .update_with_strong_links(current_round, strong_links_peers, &mut storage_diff);
+
         self.in_mem.current_round += 1;
+        storage_diff.put_dag_in_mem__shallow(&self.in_mem).unwrap();
 
         if self.in_mem.get_dag().get(self.in_mem.current_round as usize).is_none() {
             let new_node_map = PeerIdToCertifiedNodeMap::new();
+            storage_diff.put_peer_to_node_map__deep(&new_node_map).unwrap();
+
+            storage_diff.put_dag_round_list_item(&DagRoundListItem{
+                list_id: self.in_mem.get_dag().id,
+                index: self.in_mem.get_dag().len() as u64,
+                content_id: new_node_map.id,
+            }).unwrap();
             self.in_mem.get_dag_mut().push(new_node_map);
         }
 
-        let mut batch = self.storage.new_write_batch();
-        batch.put_dag_in_mem__deep(&self.in_mem).unwrap();//TODO: only write the diff.
-        self.storage.commit_write_batch(batch).unwrap();
+        self.storage.commit_write_batch(storage_diff).unwrap();
+
         let new_round = self.in_mem.current_round;
         return Some(
             parents
@@ -433,12 +442,11 @@ impl Dag {
                     };
                     storage_diff.del_missing_node_id_to_status_map_entry(&entry_db_key).unwrap();
                 } else {
-                    let db_entry = MissingNodeIdToStatusMap_Entry {
+                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry {
                         map_id,
                         key: entry.key().clone(),
                         value: entry.get().clone(),
-                    };
-                    storage_diff.put_missing_node_id_to_status_map_entry(&db_entry).unwrap(); //TODO: only write the diff.
+                    }).unwrap(); //TODO: only write the diff.
                 }
             },
         }

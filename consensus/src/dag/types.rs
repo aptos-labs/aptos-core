@@ -610,7 +610,7 @@ impl WeakLinksCreator {
         }
     }
 
-    pub fn update_with_strong_links(&mut self, round: Round, strong_links: Vec<PeerId>) {
+    pub fn update_with_strong_links(&mut self, round: Round, strong_links: Vec<PeerId>, storage_diff: &mut Box<dyn DagStoreWriteBatch>) {
         for peer_id in strong_links {
             let index = self.address_to_validator_index.get(&peer_id).unwrap();
             debug_assert!(self.latest_nodes_metadata.get(*index).unwrap().as_ref().unwrap().round() >= round);
@@ -624,6 +624,11 @@ impl WeakLinksCreator {
                     .as_mut()
                     .unwrap()
                     .mark_linked();
+                storage_diff.put_peer_status_list_item(&PeerStatusListItem{
+                    list_id: self.latest_nodes_metadata.id,
+                    index: *index,
+                    content: self.latest_nodes_metadata.get(*index).unwrap().clone(),
+                }).unwrap();
             }
         }
     }
@@ -662,7 +667,7 @@ impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreatorMetadata {
 
 // TODO: bug - what if I link to a node but before broadcasting I already create a node in the next round.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) enum PeerStatus {
+pub(crate) enum PeerStatus {// <=88
     Linked(Round),
     NotLinked(NodeMetaData),
 }
@@ -703,8 +708,8 @@ impl PeerStatus {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct AbsentInfo {
     metadata: NodeMetaData, //88
-    peers_to_request: HashSet<PeerId>,
-    immediate_dependencies: HashSet<HashValue>,
+    peers_to_request: HashSet<PeerId>, // <= 32 * 100
+    immediate_dependencies: HashSet<HashValue>, // <= 32 * 100
 }
 
 impl AbsentInfo {
@@ -977,8 +982,8 @@ pub(crate) struct PeerIdToCertifiedNodeMapEntry {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIdToCertifiedNodeMapEntry_Key {
-    map_id: ItemId,
-    key: Option<PeerId>,
+    pub(crate) map_id: ItemId,
+    pub(crate) key: Option<PeerId>,
 }
 
 impl PeerIdToCertifiedNodeMapEntry {
@@ -1030,7 +1035,7 @@ impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapE
     }
 }
 
-impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapEntry {
+impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for Option<PeerIdToCertifiedNodeMapEntry> {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         Ok(bcs::to_bytes(self)?)
     }
@@ -1040,7 +1045,7 @@ impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMa
     }
 }
 
-define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapEntry_Key, PeerIdToCertifiedNodeMapEntry, "PeerIdToCertifiedNodeMapEntry");
+define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapEntry_Key, Option<PeerIdToCertifiedNodeMapEntry>, "PeerIdToCertifiedNodeMapEntry");
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1084,7 +1089,7 @@ pub(crate) struct DagInMem {
 }
 
 impl DagInMem {
-    pub(crate) fn partial(&self) -> DagInMem_Metadata {
+    pub(crate) fn metadata(&self) -> DagInMem_Metadata {
         DagInMem_Metadata {
             my_id: self.my_id,
             epoch: self.epoch,

@@ -22,6 +22,10 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         Ok(())
     }
 
+    fn put_dag_in_mem__shallow(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn put_dag_round_list__shallow(&mut self, dag_round_list: &DagRoundList) -> anyhow::Result<()> {
         todo!()
     }

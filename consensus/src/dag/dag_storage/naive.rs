@@ -33,11 +33,15 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     }
 
     fn put_dag_in_mem__deep(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
-        self.inner.put::<DagInMemSchema>(&obj.key(), &obj.partial())?;
         self.put_dag_round_list__shallow(obj.get_dag())?;
         self.put_weak_link_creator__deep(obj.get_front())?;
         self.put_missing_node_id_to_status_map(obj.get_missing_nodes())?;
+        self.put_dag_in_mem__shallow(obj)?;
         Ok(())
+    }
+
+    fn put_dag_in_mem__shallow(&mut self, obj: &DagInMem) -> anyhow::Result<()> {
+        self.inner.put::<DagInMemSchema>(&obj.key(), &obj.metadata())
     }
 
     fn put_dag_round_list__shallow(&mut self, obj: &DagRoundList) -> anyhow::Result<()> {
@@ -61,11 +65,28 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
     }
 
     fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> anyhow::Result<()> {
-        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), obj)
+        // The entries.
+        for (peer, node) in obj.iter() {
+            self.put_peer_to_node_map_entry__deep(&PeerIdToCertifiedNodeMapEntry{
+                map_id: obj.id,
+                key: *peer,
+                value: node.clone(),
+            })?;
+        }
+
+        // The end of the entries.
+        self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(
+            &PeerIdToCertifiedNodeMapEntry_Key{ map_id: obj.id, key: None },
+            &None
+        )?;
+
+        // The metadata.
+        self.inner.put::<PeerIdToCertifiedNodeMapSchema>(&obj.key(), obj)?;
+        Ok(())
     }
 
     fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> anyhow::Result<()> {
-        self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(&obj.key(), obj)
+        self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(&obj.key(), &Some(obj.clone()))
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -227,7 +248,7 @@ impl DagStorage for NaiveDagStore {
     }
 
     fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
-        Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?)
+        Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?.unwrap())
     }
 
     fn load_peer_status_list(&self, key: &ItemId) -> anyhow::Result<Option<PeerStatusList>> {

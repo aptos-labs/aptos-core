@@ -114,12 +114,12 @@ impl NodeCertificate {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
-pub struct NodeMetaData {
-    epoch: u64,
-    round: u64,
-    source: PeerId,
-    digest: HashValue,
-    timestamp: u64, // TODO: maybe move it out to save space on the network.
+pub struct NodeMetaData {//88
+    epoch: u64,//8
+    round: u64,//8
+    source: PeerId,//32
+    digest: HashValue,//32
+    timestamp: u64, //8, TODO: maybe move it out to save space on the network.
 }
 
 impl NodeMetaData {
