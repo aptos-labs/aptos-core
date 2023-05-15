@@ -228,12 +228,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .map_err(|_| common_error())?;
 
             for (resource_tag, resources) in resource_groups {
-                let source_data = remote.release_resource_group_cache(&addr, &resource_tag);
-                let mut source_data = if let Some(source_data) = source_data {
-                    source_data
-                } else {
-                    BTreeMap::new()
-                };
+                let mut source_data = remote
+                    .release_resource_group_cache(&addr, &resource_tag)
+                    .unwrap_or_default();
                 let create = source_data.is_empty();
 
                 for (struct_tag, current_op) in resources.into_resources() {
