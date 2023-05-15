@@ -71,9 +71,9 @@ impl WriteChangeSet {
         for (key, write) in self {
             write_ops.push((key, write));
         }
-        Ok(WriteSetMut::new(write_ops)
+        WriteSetMut::new(write_ops)
             .freeze()
-            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?)
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))
     }
 
     /// Merges two sets of writes. Returns an error if an error occurred

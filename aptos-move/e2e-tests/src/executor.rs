@@ -39,7 +39,7 @@ use aptos_types::{
         VMValidatorResult,
     },
     vm_status::VMStatus,
-    write_set::{WriteSet, WriteSetMut},
+    write_set::WriteSet,
 };
 use aptos_vm::{
     block_executor::BlockAptosVM,
@@ -636,23 +636,16 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set = session
+            let (write_set, _events) = session
                 .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
-                .expect("Failed to generate txn effects");
-            let (resource_writes, module_writes, aggregator_writes, _deltas, _events) =
-                change_set.into_inner();
-            let resource_write_set = resource_writes.into_write_set().unwrap();
-            let module_write_set = module_writes.into_write_set().unwrap();
-            let aggregator_write_set = aggregator_writes.into_write_set().unwrap();
-            let combined_write_sets = resource_write_set.into_iter().chain(
-                module_write_set
-                    .into_iter()
-                    .chain(aggregator_write_set.into_iter()),
-            );
-            WriteSetMut::new(combined_write_sets).freeze().unwrap()
+                .expect("Failed to generate txn effects")
+                .into_change_set()
+                .expect("Failed to convert to ChangeSet")
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -693,18 +686,10 @@ impl FakeExecutor {
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .expect("Failed to generate txn effects");
-        // TODO: Support deltas in fake executor.
-        let (resource_writes, module_writes, aggregator_writes, _deltas, _events) =
-            change_set.into_inner();
-        let resource_write_set = resource_writes.into_write_set().unwrap();
-        let module_write_set = module_writes.into_write_set().unwrap();
-        let aggregator_write_set = aggregator_writes.into_write_set().unwrap();
-        let combined_write_sets = resource_write_set.into_iter().chain(
-            module_write_set
-                .into_iter()
-                .chain(aggregator_write_set.into_iter()),
-        );
-        let write_set = WriteSetMut::new(combined_write_sets).freeze().unwrap();
+        let (write_set, _events) = change_set
+            .into_change_set()
+            .expect("Failed to convert to ChangeSet")
+            .into_inner();
         Ok(write_set)
     }
 

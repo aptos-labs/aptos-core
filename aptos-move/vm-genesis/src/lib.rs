@@ -26,7 +26,6 @@ use aptos_types::{
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    write_set::WriteSetMut,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -85,6 +84,23 @@ pub fn default_gas_schedule() -> GasScheduleV2 {
         feature_version: aptos_gas::LATEST_GAS_FEATURE_VERSION,
         entries: AptosGasParameters::initial().to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION),
     }
+}
+
+macro_rules! assert_no_deletion {
+    ($change_set:ident) => {
+        assert!(!$change_set
+            .resource_writes()
+            .iter()
+            .any(|(_, op)| op.is_deletion()));
+        assert!(!$change_set
+            .module_writes()
+            .iter()
+            .any(|(_, op)| op.is_deletion()));
+        assert!(!$change_set
+            .aggregator_writes()
+            .iter()
+            .any(|(_, op)| op.is_deletion()));
+    };
 }
 
 pub fn encode_aptos_mainnet_genesis_transaction(
@@ -166,33 +182,19 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         )
         .unwrap();
 
-    let (resource_writes, module_writes, aggregator_writes, deltas, events) =
-        change_set.into_inner();
-
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
-    assert!(deltas.is_empty(), "non-empty delta change set in genesis");
-
-    assert!(!resource_writes.iter().any(|(_, op)| op.is_deletion()));
-    assert!(!module_writes.iter().any(|(_, op)| op.is_deletion()));
-    assert!(!aggregator_writes.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-
-    let resource_write_set = resource_writes.into_write_set().unwrap();
-    let module_write_set = module_writes.into_write_set().unwrap();
-    let aggregator_write_set = aggregator_writes.into_write_set().unwrap();
-    let combined_write_sets = resource_write_set.into_iter().chain(
-        module_write_set
-            .into_iter()
-            .chain(aggregator_write_set.into_iter()),
+    assert!(
+        change_set.deltas().is_empty(),
+        "non-empty delta change set in genesis"
     );
-    let write_set = WriteSetMut::new(combined_write_sets)
-        .freeze()
-        .expect("Freezing WriteSet should always succeed");
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new_unchecked(
-        write_set, events,
-    )))
+
+    assert_no_deletion!(change_set);
+    verify_genesis_write_set(change_set.events());
+
+    let change_set = change_set.into_change_set().unwrap();
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
 
 pub fn encode_genesis_transaction(
@@ -300,31 +302,19 @@ pub fn encode_genesis_change_set(
         )
         .unwrap();
 
-    let (resource_writes, module_writes, aggregator_writes, deltas, events) =
-        change_set.into_inner();
-
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
-    assert!(deltas.is_empty(), "non-empty delta change set in genesis");
-
-    assert!(!resource_writes.iter().any(|(_, op)| op.is_deletion()));
-    assert!(!module_writes.iter().any(|(_, op)| op.is_deletion()));
-    assert!(!aggregator_writes.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-
-    let resource_write_set = resource_writes.into_write_set().unwrap();
-    let module_write_set = module_writes.into_write_set().unwrap();
-    let aggregator_write_set = aggregator_writes.into_write_set().unwrap();
-    let combined_write_sets = resource_write_set.into_iter().chain(
-        module_write_set
-            .into_iter()
-            .chain(aggregator_write_set.into_iter()),
+    assert!(
+        change_set.deltas().is_empty(),
+        "non-empty delta change set in genesis"
     );
-    let write_set = WriteSetMut::new(combined_write_sets)
-        .freeze()
-        .expect("Freezing WriteSet should always succeed");
-    ChangeSet::new_unchecked(write_set, events)
+
+    assert_no_deletion!(change_set);
+    verify_genesis_write_set(change_set.events());
+
+    let change_set = change_set.into_change_set().unwrap();
+    change_set
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {

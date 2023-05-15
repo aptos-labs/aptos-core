@@ -7,9 +7,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::ChangeSet as StorageChangeSet,
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::vm_status::VMStatus;
+use move_core_types::vm_status::{StatusCode, VMStatus};
 use std::collections::{
     btree_map::{
         Entry,
@@ -196,6 +196,15 @@ impl AptosChangeSet {
         )
     }
 
+    /// Converts VM-friendly change set into storage-friendly change set on bytes.
+    /// Note that deltas ARE IGNORED during this conversion.
+    pub fn into_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
+        let (resource_writes, module_writes, aggregator_writes, _deltas, events) =
+            self.into_inner();
+        let write_set = into_write_set(resource_writes, module_writes, aggregator_writes)?;
+        Ok(StorageChangeSet::new_unchecked(write_set, events))
+    }
+
     fn squash_delta_change_set(&mut self, deltas: DeltaChangeSet) -> anyhow::Result<()> {
         use WriteOp::*;
         for (key, mut op) in deltas.into_iter() {
@@ -297,10 +306,36 @@ impl AptosChangeSet {
         let (resource_writes, module_writes, aggregator_writes, deltas, events) =
             change_set.into_inner();
         self.squash_delta_change_set(deltas)?;
+
+        // TODO: There seems to be quite a bit of duplication here. Let's refactor this
+        // when we support new types for resources and modules.
         self.squash_resource_write_change_set(resource_writes)?;
         self.squash_module_write_change_set(module_writes)?;
         self.squash_aggregator_write_change_set(aggregator_writes)?;
+
         self.squash_events(events)?;
         Ok(())
     }
+}
+
+/// Utility to merge writes into a single storage-friendly write set.
+pub(crate) fn into_write_set(
+    resource_writes: WriteChangeSet,
+    module_writes: WriteChangeSet,
+    aggregator_writes: WriteChangeSet,
+) -> anyhow::Result<WriteSet, VMStatus> {
+    // Convert to write sets.
+    let resource_write_set = resource_writes.into_write_set()?;
+    let module_write_set = module_writes.into_write_set()?;
+    let aggregator_write_set = aggregator_writes.into_write_set()?;
+
+    // Combine all write sets together
+    let combined_write_sets = resource_write_set.into_iter().chain(
+        module_write_set
+            .into_iter()
+            .chain(aggregator_write_set.into_iter()),
+    );
+    WriteSetMut::new(combined_write_sets)
+        .freeze()
+        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))
 }

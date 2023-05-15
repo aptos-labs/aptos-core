@@ -1,14 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
+use crate::{
+    change_set::{into_write_set, AptosChangeSet},
+    write_change_set::WriteChangeSet,
+};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSetMut},
+    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -165,25 +168,8 @@ impl VMOutput {
             .extend_with_writes(materialized_deltas)
             .expect("Extending with materialized deltas should always succeed");
 
-        // TODO: Reduce code duplication.
-        let resource_write_set = resource_writes
-            .into_write_set()
-            .expect("Conversion to WriteSet should always succeed");
-        let module_write_set = module_writes
-            .into_write_set()
-            .expect("Conversion to WriteSet should always succeed");
-        let aggregator_write_set = aggregator_writes
-            .into_write_set()
-            .expect("Conversion to WriteSet should always succeed");
-
-        let combined_write_sets = resource_write_set.into_iter().chain(
-            module_write_set
-                .into_iter()
-                .chain(aggregator_write_set.into_iter()),
-        );
-        let write_set = WriteSetMut::new(combined_write_sets)
-            .freeze()
-            .expect("Freezing WriteSet should always succeed");
+        let write_set = into_write_set(resource_writes, module_writes, aggregator_writes)
+            .expect("Conversion to WriteSet should succeed");
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 

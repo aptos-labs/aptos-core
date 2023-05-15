@@ -107,19 +107,19 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.write(&k, write_version, v);
+                versioned_cache.write_data(&k, write_version, v);
             }
             for (k, v) in output.get_module_writes().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.write(&k, write_version, v);
+                versioned_cache.write_code(&k, write_version, v);
             }
             for (k, v) in output.get_aggregator_writes().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.write(&k, write_version, v);
+                versioned_cache.write_data(&k, write_version, v);
             }
 
             // Then, apply deltas.
