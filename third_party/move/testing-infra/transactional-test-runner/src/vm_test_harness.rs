@@ -60,6 +60,7 @@ pub fn view_resource_in_move_storage(
         name: resource.to_owned(),
         type_params: type_args,
     };
+    // TODO
     match storage.get_resource(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
         Some(data) => {

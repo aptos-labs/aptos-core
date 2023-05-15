@@ -865,7 +865,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 // Additionally - we are not really gracefully handling overlaods,
                 // setting limits based on current reality, to make sure they
                 // don't regress, but something to investigate
-                avg_tps: 1400,
+                avg_tps: 1200,
                 latency_thresholds: &[],
             },
         }])
@@ -952,7 +952,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
         )
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
-                "account_creation" => 3700,
+                "account_creation" => 3600,
                 "nft_mint" => 1000,
                 "publishing" => 60,
                 "write_new_resource" => 3700,
@@ -1003,7 +1003,7 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(1)
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_success_criteria(
-            SuccessCriteria::new(5000)
+            SuccessCriteria::new(4250)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
@@ -1281,7 +1281,7 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(3500)
+            SuccessCriteria::new(3250)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.

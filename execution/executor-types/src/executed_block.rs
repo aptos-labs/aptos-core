@@ -6,7 +6,7 @@
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
-use aptos_storage_interface::ExecutedTrees;
+use aptos_storage_interface::{cached_state_view::ShardedStateCache, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -26,6 +26,7 @@ pub struct ExecutedBlock {
     pub reconfig_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
     pub block_state_updates: HashMap<StateKey, Option<StateValue>>,
+    pub sharded_state_cache: ShardedStateCache,
 }
 
 impl ExecutedBlock {

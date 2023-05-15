@@ -91,6 +91,11 @@ impl Amount {
             currency: native_coin(),
         }
     }
+
+    pub fn value(&self) -> ApiResult<i128> {
+        i128::from_str(&self.value)
+            .map_err(|_| ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid")))
+    }
 }
 
 /// [API Spec](https://www.rosetta-api.org/docs/models/BalanceExemption.html)
@@ -406,6 +411,102 @@ impl Operation {
                 operator, staker,
             )),
         )
+    }
+
+    pub fn account(&self) -> Option<AccountAddress> {
+        self.account
+            .as_ref()
+            .and_then(|inner| inner.account_address().ok())
+    }
+
+    pub fn currency(&self) -> Option<&Currency> {
+        self.amount.as_ref().map(|inner| &inner.currency)
+    }
+
+    pub fn amount(&self) -> Option<i128> {
+        self.amount.as_ref().and_then(|inner| inner.value().ok())
+    }
+
+    pub fn status(&self) -> Option<OperationStatusType> {
+        self.status
+            .as_ref()
+            .and_then(|inner| OperationStatusType::from_str(inner).ok())
+    }
+
+    pub fn operation_type(&self) -> Option<OperationType> {
+        OperationType::from_str(&self.operation_type).ok()
+    }
+
+    pub fn operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn old_operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .old_operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn new_operator(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .new_operator
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn sender(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .sender
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn staker(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .staker
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn new_voter(&self) -> Option<AccountAddress> {
+        self.metadata.as_ref().and_then(|inner| {
+            inner
+                .new_voter
+                .as_ref()
+                .and_then(|inner| inner.account_address().ok())
+        })
+    }
+
+    pub fn metadata_amount(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.amount.map(|inner| inner.0))
+    }
+
+    pub fn staked_balance(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.staked_balance.map(|inner| inner.0))
+    }
+
+    pub fn commission_percentage(&self) -> Option<u64> {
+        self.metadata
+            .as_ref()
+            .and_then(|inner| inner.commission_percentage.map(|inner| inner.0))
     }
 }
 
@@ -1471,6 +1572,7 @@ fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
         .filter_map(|event| parser(event_key, event))
         .collect()
 }
+
 /// An enum for processing which operation is in a transaction
 pub enum OperationDetails {
     CreateAccount,

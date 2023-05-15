@@ -187,6 +187,9 @@ enum Command {
         #[clap(long, arg_enum, ignore_case = true)]
         transaction_type: Option<TransactionTypeArg>,
 
+        #[clap(long, default_value = "1")]
+        module_working_set_size: usize,
+
         #[clap(long, parse(from_os_str))]
         data_dir: PathBuf,
 
@@ -235,13 +238,14 @@ where
             main_signer_accounts,
             additional_dst_pool_accounts,
             transaction_type,
+            module_working_set_size,
             data_dir,
             checkpoint_dir,
         } => {
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
-                transaction_type.map(|t| t.materialize()),
+                transaction_type.map(|t| t.materialize(module_working_set_size)),
                 opt.transactions_per_sender,
                 main_signer_accounts,
                 additional_dst_pool_accounts,

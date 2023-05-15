@@ -264,6 +264,19 @@ impl<'t> AptosPublicInfo<'t> {
         )
         .await
     }
+
+    /// Syncs the root account to it's sequence number in the event that a faucet changed it's value
+    pub async fn sync_root_account_sequence_number(&mut self) {
+        let root_address = self.root_account().address();
+        let root_sequence_number = self
+            .client()
+            .get_account_bcs(root_address)
+            .await
+            .unwrap()
+            .into_inner()
+            .sequence_number();
+        *self.root_account().sequence_number_mut() = root_sequence_number;
+    }
 }
 
 pub async fn reconfig(
