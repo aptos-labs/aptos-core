@@ -37,7 +37,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver};
+use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;

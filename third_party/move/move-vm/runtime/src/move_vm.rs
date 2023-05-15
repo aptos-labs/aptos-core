@@ -60,7 +60,7 @@ impl MoveVM {
     pub fn new_session_with_extensions<'r>(
         &self,
         remote: &'r dyn MoveRefResolver,
-        extensions: NativeContextExtensions<'r>,
+        native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
             move_vm: self,

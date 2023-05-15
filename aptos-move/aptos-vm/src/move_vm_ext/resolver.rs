@@ -5,9 +5,9 @@ use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
 use aptos_utils::aptos_try;
-use move_binary_format::errors::VMError;
+use move_binary_format::errors::VMResult;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
+    account_address::AccountAddress, language_storage::StructTag,
 };
 use move_table_extension::TableResolver;
 use move_vm_types::resolver::MoveRefResolver;

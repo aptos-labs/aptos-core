@@ -1,12 +1,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fs::metadata;
 use crate::types::ResourceRef;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, resolver::ModuleResolver,
+    account_address::AccountAddress,
+    language_storage::StructTag,
+    metadata::Metadata,
+    resolver::ModuleResolver,
 };
-use move_core_types::metadata::Metadata;
 
 pub trait ResourceRefResolver {
     /// Returns a resource reference if it exists.
@@ -43,7 +44,7 @@ impl<T: ResourceRefResolver> ResourceRefResolver for &T {
         tag: &StructTag,
         metadata: &[Metadata],
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        (**self).get_resource_bytes(address, tag, metadata())
+        (**self).get_resource_bytes_with_metadata(address, tag, metadata)
     }
 }
 

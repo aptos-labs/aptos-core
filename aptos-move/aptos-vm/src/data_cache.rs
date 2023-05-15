@@ -121,15 +121,6 @@ impl<'a, S: StateView> ResourceRefResolver for StorageAdapter<'a, S> {
     ) -> anyhow::Result<Option<Vec<u8>>> {
         Ok(get_any_resource(self, address, tag, metadata)?)
     }
-
-    fn get_resource_with_metadata(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag, metadata)?)
-    }
 }
 
 impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
