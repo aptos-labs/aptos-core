@@ -206,8 +206,14 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(5 * 6 * 60); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
+
+    let suite_name = if suite_name == "land_blocking" {
+        "workload_vs_perf_benchmark"
+    } else {
+        panic!();
+    };
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -765,45 +771,70 @@ fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmark,
             workloads: Workloads::TRANSACTIONS(&[
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::NoOp,
+                //     num_modules: 1,
+                //     unique_senders: false,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::NoOp,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::NoOp,
+                //     num_modules: 1000,
+                //     unique_senders: false,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::CoinTransfer,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::CoinTransfer,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::AccountResourceSmall,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::AccountResourceLarge,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
+                // TransactionWorkload {
+                //     transaction_type: TransactionTypeArg::PublishPackage,
+                //     num_modules: 1,
+                //     unique_senders: true,
+                // },
                 TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
+                    transaction_type: TransactionTypeArg::ModifyGlobalResource,
                     num_modules: 1,
                     unique_senders: false,
                 },
                 TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
+                    transaction_type: TransactionTypeArg::TokenV1NFTMintAndTransferSequential,
                     num_modules: 1,
-                    unique_senders: true,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::NoOp,
-                    num_modules: 1000,
                     unique_senders: false,
                 },
                 TransactionWorkload {
-                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                     num_modules: 1,
-                    unique_senders: true,
+                    unique_senders: false,
                 },
                 TransactionWorkload {
-                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    transaction_type: TransactionTypeArg::NbcuV1Mint,
                     num_modules: 1,
-                    unique_senders: true,
+                    unique_senders: false,
                 },
                 TransactionWorkload {
-                    transaction_type: TransactionTypeArg::AccountResourceSmall,
+                    transaction_type: TransactionTypeArg::NbcuPremintMint,
                     num_modules: 1,
-                    unique_senders: true,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::AccountResourceLarge,
-                    num_modules: 1,
-                    unique_senders: true,
-                },
-                TransactionWorkload {
-                    transaction_type: TransactionTypeArg::PublishPackage,
-                    num_modules: 1,
-                    unique_senders: true,
+                    unique_senders: false,
                 },
             ]),
         }])

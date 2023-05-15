@@ -1234,6 +1234,8 @@ def test(
 ) -> None:
     """Run a forge test"""
 
+    forge_enable_performance = "true"
+
     if verbose:
         log.setLevel(logging.DEBUG)
 
