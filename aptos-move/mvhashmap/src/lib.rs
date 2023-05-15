@@ -73,6 +73,14 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
         };
     }
 
+    /// Add a versioned write at a specified key, in code or data map according to the key.
+    pub fn write(&self, key: &K, version: Version, value: V) {
+        match key.module_path() {
+            Some(_) => self.code.write(key, version.0, value),
+            None => self.data.write(key, version, value),
+        }
+    }
+
     /// Add a versioned module write at a specified key.
     pub fn write_code(&self, key: &K, version: Version, value: V) {
         self.code.write(key, version.0, value)

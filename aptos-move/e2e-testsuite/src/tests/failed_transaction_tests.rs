@@ -55,7 +55,11 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(!out1.writes().is_empty());
+    assert!(
+        !out1.resource_writes().is_empty()
+            || !out1.aggregator_writes().is_empty()
+            || !out1.aggregator_writes().is_empty()
+    );
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());
     assert_eq!(
@@ -73,7 +77,9 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(out2.writes().is_empty());
+    assert!(out2.resource_writes().is_empty());
+    assert!(out2.module_writes().is_empty());
+    assert!(out2.aggregator_writes().is_empty());
     assert_eq!(out2.gas_used(), 0);
     assert!(out2.status().is_discarded());
     assert_eq!(

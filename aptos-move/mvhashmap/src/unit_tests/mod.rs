@@ -96,7 +96,7 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Err(NotFound), r_db);
 
     // Write by txn 10.
-    mvtbl.write(&ap1, (10, 1), value_for(10, 1));
+    mvtbl.write_data(&ap1, (10, 1), value_for(10, 1));
 
     // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.fetch_data(&ap1, 9);
@@ -119,8 +119,8 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
-    mvtbl.write(&ap1, (12, 0), value_for(12, 0));
-    mvtbl.write(&ap1, (8, 3), value_for(8, 3));
+    mvtbl.write_data(&ap1, (12, 0), value_for(12, 0));
+    mvtbl.write_data(&ap1, (8, 3), value_for(8, 3));
 
     // Verify reads.
     let r_12 = mvtbl.fetch_data(&ap1, 15);
@@ -143,15 +143,15 @@ fn create_write_read_placeholder_struct() {
 
     // Delete the entry written by 10, write to a different ap.
     mvtbl.delete(&ap1, 10);
-    mvtbl.write(&ap2, (10, 2), value_for(10, 2));
+    mvtbl.write_data(&ap2, (10, 2), value_for(10, 2));
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.fetch_data(&ap1, 11);
     assert_eq!(Ok(Versioned((8, 3), arc_value_for(8, 3))), r_8);
 
     // Reads, writes for ap2 and ap3.
-    mvtbl.write(&ap2, (5, 0), value_for(5, 0));
-    mvtbl.write(&ap3, (20, 4), value_for(20, 4));
+    mvtbl.write_data(&ap2, (5, 0), value_for(5, 0));
+    mvtbl.write_data(&ap3, (20, 4), value_for(20, 4));
     let r_5 = mvtbl.fetch_data(&ap2, 10);
     assert_eq!(Ok(Versioned((5, 0), arc_value_for(5, 0))), r_5);
     let r_20 = mvtbl.fetch_data(&ap3, 21);
@@ -183,7 +183,7 @@ fn create_write_read_placeholder_struct() {
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = AggregatorValue::from_write(&val).unwrap().into();
-    mvtbl.write(&ap2, (10, 3), val);
+    mvtbl.write_data(&ap2, (10, 3), val);
     mvtbl.add_delta(&ap2, 30, delta_sub(30 + sub_base, u128::MAX));
     let r_31 = mvtbl.fetch_data(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);

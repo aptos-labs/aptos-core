@@ -490,7 +490,15 @@ where
 {
     type Txn = Transaction<K, V>;
 
-    fn get_writes(&self) -> Vec<(K, V)> {
+    fn get_resource_writes(&self) -> Vec<(K, V)> {
+        self.0.clone()
+    }
+
+    fn get_module_writes(&self) -> Vec<(K, V)> {
+        self.0.clone()
+    }
+
+    fn get_aggregator_writes(&self) -> Vec<(K, V)> {
         self.0.clone()
     }
 

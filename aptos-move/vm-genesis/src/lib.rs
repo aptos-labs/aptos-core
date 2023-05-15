@@ -312,9 +312,7 @@ pub fn encode_genesis_change_set(
 
     assert_no_deletion!(change_set);
     verify_genesis_write_set(change_set.events());
-
-    let change_set = change_set.into_change_set().unwrap();
-    change_set
+    change_set.into_change_set().unwrap()
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {

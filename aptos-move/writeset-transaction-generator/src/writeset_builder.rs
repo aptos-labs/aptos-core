@@ -143,10 +143,8 @@ where
     // Genesis never produces the delta change set.
     assert!(change_set.deltas().is_empty());
 
-    let (writes, _deltas, events) = change_set.into_inner();
-    let write_set = writes
-        .into_write_set()
+    change_set
+        .into_change_set()
         .map_err(|err| format_err!("Unable to build a WriteSet : {:?}", err))
-        .unwrap();
-    ChangeSet::new_unchecked(write_set, events)
+        .unwrap()
 }
