@@ -896,23 +896,17 @@ module veiled_coin::veiled_coin {
         ristretto255::point_add_assign(&mut big_bar_c_acc, &proof.x3);
         let y_bar_alpha2 = ristretto255::point_mul(&recipient_pk_point, &proof.alpha2);
         ristretto255::point_add_assign(&mut y_bar_alpha2, &g_alpha1);
-        //assert!(ristretto255::point_equals(&big_bar_c_acc, &y_bar_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(ristretto255::point_equals(&big_bar_c_acc, &y_bar_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         let g_alpha3 = ristretto255::basepoint_mul(&proof.alpha3);
-        let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
-        print(&ristretto255::point_compress(&g_alpha3));
-        print(&ristretto255::point_compress(&g_alpha4));
         // \rho * c_1 + X4 =? \alpha_3 * g + \alpha_4 * y
         let c1_acc = ristretto255::point_mul(c1, &rho);
-        print(&ristretto255::point_compress(&c1_acc));
         ristretto255::point_add_assign(&mut c1_acc, &proof.x4);
-        print(&ristretto255::point_compress(&c1_acc));
         let y_alpha4 = ristretto255::point_mul(&sender_pk_point, &proof.alpha4);
-        print(&ristretto255::point_compress(&y_alpha4));
         ristretto255::point_add_assign(&mut y_alpha4, &g_alpha3);
-        print(&ristretto255::point_compress(&y_alpha4));
         assert!(ristretto255::point_equals(&c1_acc, &y_alpha4), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
+        let g_alpha4 = ristretto255::basepoint_mul(&proof.alpha4);
         // \rho * c_2 + X5 =? \alpha_4 * g
         let c2_acc = ristretto255::point_mul(c2, &rho);
         ristretto255::point_add_assign(&mut c2_acc, &proof.x5);
@@ -1090,7 +1084,7 @@ module veiled_coin::veiled_coin {
         // X4 <- x3 * g + x4 * y
         let big_x4 = ristretto255::basepoint_mul(&x3);
         let source_pk_x4 = ristretto255::point_mul(&source_pk_point, &x4);
-        ristretto255::point_add_assign(&mut big_x3, &source_pk_x4);
+        ristretto255::point_add_assign(&mut big_x4, &source_pk_x4);
 
         // X5 <- x4 * g
         let big_x5 = ristretto255::basepoint_mul(&x4);
