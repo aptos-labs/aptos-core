@@ -15,7 +15,7 @@ use std::{
 };
 
 /// Represents a single aggregator change.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum AggregatorChange {
     // A value should be written to storage.
     Write(u128),
@@ -251,13 +251,13 @@ mod test {
         assert_matches!(changes.get(&aggregator_id_for_test(400)).unwrap(), AggregatorChange::Write(0));
         assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), AggregatorChange::Delete);
         let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(600)).unwrap(),
+        assert_eq!(
+            *changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Merge(delta_100)
         );
         let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
-        assert_matches!(
-            changes.get(&aggregator_id_for_test(700)).unwrap(),
+        assert_eq!(
+            *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
         );
         assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
