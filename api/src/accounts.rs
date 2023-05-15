@@ -28,7 +28,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
 };
-use move_vm_types::resolver::ResourceRefResolver;
+use move_vm_types::resolver::MoveRefResolver;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -337,8 +337,11 @@ impl Account {
         match accept_type {
             AcceptType::Json => {
                 // Resolve the BCS encoded versions into `MoveResource`s
-                let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
-                let converted_resources = move_resolver
+                let state_view = self
+                    .context
+                    .latest_state_view_poem(&self.latest_ledger_info)?;
+                let converted_resources = state_view
+                    .as_move_resolver()
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -513,8 +516,8 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-
         let resolver = state_view.as_move_resolver();
+
         let bytes = resolver
             .get_resource_bytes(&self.address.into(), resource_type)
             .context(format!(

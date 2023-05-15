@@ -30,9 +30,18 @@ where
         phantom: PhantomData,
     };
 
-    let output =
-        BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(num_cpus::get())
-            .execute_transactions_parallel((), &transactions, &data_view);
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
+    let output = BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(
+        num_cpus::get(),
+        executor_thread_pool,
+    )
+    .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None);
     baseline.assert_output(&output);

@@ -113,7 +113,7 @@ async fn test_get_network_information_fullnode() {
     // Connect a new peer to the fullnode
     let peer_id_1 = PeerId::random();
     let peer_network_id_1 = PeerNetworkId::new(NetworkId::Public, peer_id_1);
-    let mut connection_metadata_1 = create_connection_metadata(peer_id_1);
+    let mut connection_metadata_1 = create_connection_metadata(peer_id_1, PeerRole::Unknown);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
         .unwrap();
@@ -134,7 +134,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -154,7 +154,7 @@ async fn test_get_network_information_fullnode() {
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -175,14 +175,14 @@ async fn test_get_network_information_fullnode() {
     let peer_id_2 = PeerId::random();
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Validator, peer_id_2);
     let peer_distance_2 = 0; // The peer is a validator
-    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let connection_metadata_2 = create_connection_metadata(peer_id_2, PeerRole::Validator);
     let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers),
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -223,13 +223,19 @@ async fn test_get_network_information_validator() {
         MockClient::new(Some(base_config), None, None);
     tokio::spawn(service.start());
 
-    // Process a client request to fetch the network information and verify distance is 0
-    verify_network_information(&mut mock_client, BTreeMap::new(), 0).await;
+    // Process a client request to fetch the network information and verify
+    // the distance is the max (the server has no peers!).
+    verify_network_information(
+        &mut mock_client,
+        BTreeMap::new(),
+        MAX_DISTANCE_FROM_VALIDATORS,
+    )
+    .await;
 
     // Connect a new peer to the validator (another validator)
     let peer_id_1 = PeerId::random();
     let peer_network_id_1 = PeerNetworkId::new(NetworkId::Validator, peer_id_1);
-    let connection_metadata_1 = create_connection_metadata(peer_id_1);
+    let connection_metadata_1 = create_connection_metadata(peer_id_1, PeerRole::Validator);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_1, connection_metadata_1.clone())
         .unwrap();
@@ -239,13 +245,13 @@ async fn test_get_network_information_validator() {
     verify_network_information(&mut mock_client, expected_peers.clone(), 0).await;
 
     // Update the peer monitoring metadata for peer 1
-    let peer_distance_1 = 0; // Peer 1 now has other connections
+    let peer_distance_1 = 1; // Peer 1 now has other connections
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers.clone()),
         distance_from_validators: peer_distance_1,
     };
     let peer_monitoring_metadata_1 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata_1.clone())
         .unwrap();
@@ -253,18 +259,18 @@ async fn test_get_network_information_validator() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(&mut mock_client, expected_peers, 0).await;
 
-    // Connect another peer to the validator
+    // Connect another peer to the validator (a VFN)
     let peer_id_2 = PeerId::random();
     let peer_network_id_2 = PeerNetworkId::new(NetworkId::Vfn, peer_id_2);
-    let peer_distance_2 = 1; // The peer is a VFN
-    let connection_metadata_2 = create_connection_metadata(peer_id_2);
+    let peer_distance_2 = 2; // The peer is a VFN
+    let connection_metadata_2 = create_connection_metadata(peer_id_2, PeerRole::ValidatorFullNode);
     let expected_peers = btreemap! {peer_network_id_1 => connection_metadata_1.clone(), peer_network_id_2 => connection_metadata_2.clone()};
     let latest_network_info_response = NetworkInformationResponse {
         connected_peers: transform_connection_metadata(expected_peers.clone()),
         distance_from_validators: peer_distance_2,
     };
     let peer_monitoring_metadata_2 =
-        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None);
+        PeerMonitoringMetadata::new(None, Some(latest_network_info_response), None, None);
     peers_and_metadata
         .insert_connection_metadata(peer_network_id_2, connection_metadata_2.clone())
         .unwrap();
@@ -275,16 +281,16 @@ async fn test_get_network_information_validator() {
     // Process a client request to fetch the network information and verify the response
     verify_network_information(&mut mock_client, expected_peers, 0).await;
 
-    // Disconnect peer 2
+    // Disconnect peer 1
     peers_and_metadata
-        .update_connection_state(peer_network_id_2, ConnectionState::Disconnected)
+        .update_connection_state(peer_network_id_1, ConnectionState::Disconnected)
         .unwrap();
 
     // Process a request to fetch the network information and verify the response
     verify_network_information(
         &mut mock_client,
-        btreemap! {peer_network_id_1 => connection_metadata_1},
-        0,
+        btreemap! {peer_network_id_2 => connection_metadata_2},
+        peer_distance_2 + 1,
     )
     .await;
 }
@@ -413,7 +419,7 @@ cfg_block! {
 }
 
 /// A simple utility function to create a new connection metadata for tests
-fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
+fn create_connection_metadata(peer_id: AccountAddress, peer_role: PeerRole) -> ConnectionMetadata {
     ConnectionMetadata::new(
         peer_id,
         ConnectionId::default(),
@@ -421,7 +427,7 @@ fn create_connection_metadata(peer_id: AccountAddress) -> ConnectionMetadata {
         ConnectionOrigin::Inbound,
         MessagingProtocolVersion::V1,
         ProtocolIdSet::empty(),
-        PeerRole::Unknown,
+        peer_role,
     )
 }
 

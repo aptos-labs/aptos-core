@@ -18,7 +18,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 pub struct Bencher<K, V> {
     transaction_size: usize,
@@ -113,11 +113,18 @@ where
             phantom: PhantomData,
         };
 
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_cpus::get())
+                .build()
+                .unwrap(),
+        );
+
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get())
+        >::new(num_cpus::get(), executor_thread_pool)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.expected_output.assert_output(&output);

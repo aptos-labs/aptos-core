@@ -1,9 +1,13 @@
 [tool.poetry]
 name = "aptos-sdk"
-version = "0.6.0"
+version = "0.6.1"
 description = "Aptos SDK"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk"
+keywords = ["web3", "sdk", "aptos", "blockchain"]
 
 [tool.poetry.dependencies]
 h2 = "^4.1.0"

@@ -71,9 +71,44 @@ spec aptos_framework::transaction_fee {
 
     /// `AptosCoinCapabilities` should be exists.
     spec burn_fee(account: address, fee: u64) {
-        // TODO: complex aborts conditions in `burn_from`
-        pragma aborts_if_is_partial;
+        use aptos_std::type_info;
+        use aptos_framework::optional_aggregator;
+        use aptos_framework::coin::{CoinInfo, CoinStore};
+
+
         aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
+
+        // This function essentially calls `coin::burn_coin`, monophormized for `AptosCoin`.
+        let account_addr = account;
+        let amount = fee;
+
+        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
+        let coin_store = global<CoinStore<AptosCoin>>(account_addr);
+        let post post_coin_store = global<CoinStore<AptosCoin>>(account_addr);
+
+        modifies global<CoinInfo<AptosCoin>>(aptos_addr);
+        modifies global<CoinStore<AptosCoin>>(account_addr);
+
+        aborts_if amount != 0 && !(exists<CoinInfo<AptosCoin>>(aptos_addr)
+            && exists<CoinStore<AptosCoin>>(account_addr));
+        aborts_if coin_store.coin.value < amount;
+
+        let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
+        let supply = option::spec_borrow(maybe_supply);
+        let value = optional_aggregator::optional_aggregator_value(supply);
+
+        let post post_maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
+        let post post_supply = option::spec_borrow(post_maybe_supply);
+        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
+
+        aborts_if option::spec_is_some(maybe_supply) && value < amount;
+
+        ensures post_coin_store.coin.value == coin_store.coin.value - amount;
+        ensures if (option::spec_is_some(maybe_supply)) {
+            post_value == value - amount
+        } else {
+            option::spec_is_none(post_maybe_supply)
+        };
     }
 
     spec collect_fee(account: address, fee: u64) {

@@ -6,7 +6,7 @@ pub mod config;
 pub mod constants;
 pub mod file_store_operator;
 
-use aptos_inspection_service::inspection_service::encode_metrics;
+use aptos_inspection_service::utils::get_encoded_metrics;
 use aptos_protos::{
     internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, util::timestamp::Timestamp,
 };
@@ -56,7 +56,7 @@ pub fn build_protobuf_encoded_transaction_wrappers(
 }
 
 fn metrics() -> Vec<u8> {
-    encode_metrics(TextEncoder)
+    get_encoded_metrics(TextEncoder)
 }
 
 pub async fn register_probes_and_metrics_handler(port: u16) {

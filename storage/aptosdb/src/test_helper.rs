@@ -70,6 +70,7 @@ pub(crate) fn update_store(
                 vec![&value_state_set],
                 version,
                 StateStorageUsage::new_untracked(),
+                None,
                 &ledger_batch,
                 &sharded_state_kv_batches,
             )

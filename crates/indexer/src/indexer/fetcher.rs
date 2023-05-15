@@ -5,8 +5,7 @@ use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
 use aptos_api::Context;
 use aptos_api_types::{AsConverter, LedgerInfo, Transaction, TransactionOnChainData};
 use aptos_logger::prelude::*;
-use aptos_storage_interface::state_view::DbStateView;
-use aptos_vm::data_cache::StorageAdapterOwned;
+use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::mpsc, SinkExt};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
@@ -243,7 +242,8 @@ async fn fetch_nexts(
     let mut block_height = block_event.height();
     let mut block_height_bcs = aptos_api_types::U64::from(block_height);
 
-    let resolver = context.move_resolver().unwrap();
+    let state_view = context.latest_state_view().unwrap();
+    let resolver = state_view.as_move_resolver();
     let converter = resolver.as_converter(context.db.clone());
 
     let mut transactions = vec![];
@@ -393,7 +393,6 @@ pub struct TransactionFetcher {
     starting_version: u64,
     options: TransactionFetcherOptions,
     pub context: Arc<Context>,
-    pub resolver: Arc<StorageAdapterOwned<DbStateView>>,
     fetcher_handle: Option<JoinHandle<()>>,
     transactions_sender: Option<mpsc::Sender<Vec<Transaction>>>,
     transaction_receiver: mpsc::Receiver<Vec<Transaction>>,
@@ -402,7 +401,6 @@ pub struct TransactionFetcher {
 impl TransactionFetcher {
     pub fn new(
         context: Arc<Context>,
-        resolver: Arc<StorageAdapterOwned<DbStateView>>,
         starting_version: u64,
         options: TransactionFetcherOptions,
     ) -> Self {
@@ -413,7 +411,6 @@ impl TransactionFetcher {
             starting_version,
             options,
             context,
-            resolver,
             fetcher_handle: None,
             transactions_sender: Some(transactions_sender),
             transaction_receiver,

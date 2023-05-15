@@ -46,7 +46,7 @@ pub enum SchedulerTask {
 /// condition variable is set, then an execution of a prior incarnation is waiting on it with
 /// a read dependency resolved (when dependency was encountered, the status changed to Suspended,
 /// and suspended changed to ReadyToExecute when the dependency finished its execution). In this case
-/// the caller need not create a new execution task, but just nofity the suspended execution.
+/// the caller need not create a new execution task, but just notify the suspended execution.
 ///
 /// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes, or
 /// if a dependency is encountered, it becomes 'ReadyToExecute(incarnation + 1)' once the
@@ -111,7 +111,7 @@ impl PartialEq for ExecutionStatus {
 /// 'required_wave' in addition records the wave that must be successfully validated in order
 /// for the transaction to be committed, required to handle the case of the optimization in
 /// finish_execution when only the transaction itself is validated (if last incarnation
-/// didn't write outside of the previous write-set). Initilized as 0.
+/// didn't write outside of the previous write-set). Initialized as 0.
 ///
 /// Other than ValidationStatus, the 'wave' information is also recorded in 'validation_idx' and 'commit_state'.
 /// Below is the description of the wave meanings and how they are updated. More details can be
@@ -181,7 +181,7 @@ pub struct Scheduler {
     // Note: with each thread reading both counters when deciding the next task, and being able
     // to choose either execution or validation task, separately padding these indices may increase
     // (real) cache invalidation traffic more than combat false sharing. Hence, currently we
-    // don't pad separately, but instead put them in between two padded members (same cacheline).
+    // don't pad separately, but instead put them in between two padded members (same cache line).
     // TODO: investigate the trade-off. Re-consider if we change task assignment logic (i.e. make
     // validation/execution preferences stick to the worker threads).
     /// A shared index that tracks the minimum of all transaction indices that require execution.
@@ -413,7 +413,7 @@ impl Scheduler {
         // Note: It is preferable to hold the validation lock throughout the finish_execution,
         // in particular before updating execution status. The point was that we don't want
         // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granularly, but shouldn't make performance
+        // It may be possible to make work more granular, but shouldn't make performance
         // difference and like this correctness argument is much easier to see, in fact also
         // the reason why we grab write lock directly, and never release it during the whole function.
         // So even validation status readers have to wait if they somehow end up at the same index.
@@ -657,7 +657,7 @@ impl Scheduler {
     }
 
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).
-    /// - If the index is out of bounds, return None (and invoke a check of whethre
+    /// - If the index is out of bounds, return None (and invoke a check of whether
     /// all txns can be committed).
     /// - If the transaction is ready for execution (ReadyToExecute state), attempt
     /// to create the next incarnation (should happen exactly once), and if successful,

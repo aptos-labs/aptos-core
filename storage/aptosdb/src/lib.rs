@@ -81,8 +81,8 @@ use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
+    DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -811,6 +811,7 @@ impl AptosDB {
         txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<(SchemaBatch, ShardedStateKvSchemaBatch, HashValue)> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_impl"])
@@ -837,6 +838,7 @@ impl AptosDB {
                     state_updates_vec,
                     first_version,
                     expected_state_db_usage,
+                    sharded_state_cache,
                     &ledger_batch,
                     &sharded_state_kv_batches,
                 )
@@ -1590,6 +1592,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_by_version", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.state_store
+                .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -1903,6 +1918,7 @@ impl DbWriter for AptosDB {
                     txns_to_commit,
                     first_version,
                     latest_in_memory_state.current.usage(),
+                    None,
                 )?;
 
             {
@@ -1940,6 +1956,7 @@ impl DbWriter for AptosDB {
         // TODO(grao): Consider remove this.
         latest_in_memory_state: StateDelta,
         block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         gauged_api("save_transaction_block", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -1968,6 +1985,7 @@ impl DbWriter for AptosDB {
                     txns_to_commit,
                     first_version,
                     latest_in_memory_state.current.usage(),
+                    Some(sharded_state_cache),
                 )?;
 
             {

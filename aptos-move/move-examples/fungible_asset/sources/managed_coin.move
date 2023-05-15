@@ -28,10 +28,11 @@ module fungible_asset_extension::managed_coin {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(option::none()),
+            option::none(),
             utf8(b"Libra Coin"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.

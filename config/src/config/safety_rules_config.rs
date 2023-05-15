@@ -52,8 +52,6 @@ impl SafetyRulesConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         if let SecureBackend::OnDiskStorage(backend) = &mut self.backend {
             backend.set_data_dir(data_dir);
-        } else if let SecureBackend::RocksDbStorage(backend) = &mut self.backend {
-            backend.set_data_dir(data_dir);
         }
     }
 
@@ -85,19 +83,14 @@ impl ConfigSanitizer for SafetyRulesConfig {
         }
 
         // Verify that the secure backend is appropriate for mainnet validators
-        if chain_id.is_mainnet() && node_type.is_validator() {
-            if safety_rules_config.backend.is_github() {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "The secure backend should not be set to GitHub in mainnet!".to_string(),
-                ));
-            } else if safety_rules_config.backend.is_in_memory() {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "The secure backend should not be set to in memory storage in mainnet!"
-                        .to_string(),
-                ));
-            }
+        if chain_id.is_mainnet()
+            && node_type.is_validator()
+            && safety_rules_config.backend.is_in_memory()
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "The secure backend should not be set to in memory storage in mainnet!".to_string(),
+            ));
         }
 
         // Verify that the safety rules service is set to local for optimal performance

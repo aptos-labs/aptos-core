@@ -24,7 +24,7 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::language_storage::{ModuleId, StructTag};
-use move_vm_types::resolver::ResourceRefResolver;
+use move_vm_types::resolver::MoveRefResolver;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -234,6 +234,7 @@ impl StateApi {
             })?;
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
+
         let resolver = state_view.as_move_resolver();
         let bytes = resolver
             .get_resource_bytes(&address.into(), &resource_type)
