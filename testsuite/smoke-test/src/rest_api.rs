@@ -85,7 +85,7 @@ async fn test_gas_estimation() {
         .with_init_config(Arc::new(|_, conf, _| {
             let max_block_txns = 3;
             // Use a small full block threshold to make gas estimates update sooner.
-            conf.api.gas_estimate_full_block_threshold = max_block_txns as usize;
+            conf.api.gas_estimation_full_block_txns = max_block_txns as usize;
             // Wait for full blocks with small block size to advance consensus at a fast rate.
             conf.consensus.quorum_store_poll_time_ms = 200;
             conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;

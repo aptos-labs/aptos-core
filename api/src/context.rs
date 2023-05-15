@@ -819,7 +819,7 @@ impl Context {
         }
     }
 
-    fn default_estimate_gas_price(&self, min_gas_unit_price: u64) -> GasEstimation {
+    fn default_gas_estimation(&self, min_gas_unit_price: u64) -> GasEstimation {
         GasEstimation {
             deprioritized_gas_estimate: Some(min_gas_unit_price),
             gas_estimate: min_gas_unit_price,
@@ -891,7 +891,7 @@ impl Context {
             }
         }
         if blocks.is_empty() && !cached_blocks_hit {
-            let estimation = self.default_estimate_gas_price(min_gas_unit_price);
+            let estimation = self.default_gas_estimation(min_gas_unit_price);
             cache.estimation = Some(estimation);
             cache.last_updated_epoch = Some(epoch);
             cache.last_updated_time = Some(Instant::now());
@@ -899,7 +899,6 @@ impl Context {
         }
         let remaining = max_block_history - blocks.len();
 
-        // TODO: configure consensus to have faster and consecutive non-empty rounds
         info!(
             "BCHO: versions: {} {}, blocks: {}",
             ledger_info.ledger_version.0,
@@ -909,9 +908,8 @@ impl Context {
 
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
-        // TODO: make configurable, 250
-        let full_block_threshold = self.node_config.api.gas_estimate_full_block_threshold;
-        // TODO: if multiple calls to db is a perf issue, combine the calls and then split it up
+        let full_block_txns = self.node_config.api.gas_estimation_full_block_txns;
+        // TODO: if multiple calls to db is a perf issue, combine into a single call and then split
         for (first, last) in blocks {
             let min_inclusion_price =
                 match self
@@ -919,7 +917,7 @@ impl Context {
                     .get_gas_prices(first, last - first, ledger_info.ledger_version.0)
                 {
                     Ok(prices) => {
-                        if prices.len() < full_block_threshold {
+                        if prices.len() < full_block_txns {
                             min_gas_unit_price
                         } else {
                             prices.iter().min().unwrap() + 1
