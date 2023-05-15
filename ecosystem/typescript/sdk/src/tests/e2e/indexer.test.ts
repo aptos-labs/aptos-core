@@ -231,7 +231,7 @@ describe("Indexer", () => {
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
     });
 
-    it("gets the account collection data", async () => {
+    it("gets the collection data", async () => {
       const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
       expect(collectionData.current_collections_v2).toHaveLength(2);
     });
