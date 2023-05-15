@@ -221,7 +221,7 @@ impl NetworkClientInterface for NetworkClient {
             let network_id = peer.network_id();
             if let Ok(prots) = self.get_supported_protocols(peer) {
                 if prots.contains(protocol_id) {
-                    if let Err(err) = self.send_bytes_to_peer(protocol_id, blob.into(), peer) {
+                    if let Err(err) = self.send_bytes_to_peer(protocol_id, blob.clone().into(), peer) {
                         // TODO: count send errors for metrics?
                         // TODO: log errors?
                     }

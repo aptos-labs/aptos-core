@@ -41,7 +41,9 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use std::cell::RefCell;
 use tokio::runtime::Handle;
+use tokio::sync::mpsc::Sender;
 
 pub mod builder;
 pub mod conn_notifs_channel;
@@ -62,6 +64,7 @@ use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
+use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>
@@ -83,7 +86,8 @@ where
         PeerId,
         (
             ConnectionMetadata,
-            aptos_channel::Sender<ProtocolId, PeerRequest>,
+            //aptos_channel::Sender<ProtocolId, PeerRequest>,
+            Sender<NetworkMessage>,
         ),
     >,
     /// Shared metadata storage about trusted peers and metadata
@@ -531,15 +535,24 @@ where
         self.sample_connected_peers();
         let (peer_id, protocol_id, peer_request) = match request {
             PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id(), PeerRequest::SendDirectSend(msg))
+                (peer_id, msg.protocol_id(), NetworkMessage::DirectSendMsg(DirectSendMsg{
+                    protocol_id: msg.protocol_id(),
+                    priority: 0,
+                    raw_msg: msg.mdata.to_vec(),
+                }))//PeerRequest::SendDirectSend(msg))
             },
             PeerManagerRequest::SendRpc(peer_id, req) => {
-                (peer_id, req.protocol_id(), PeerRequest::SendRpc(req))
+                (peer_id, req.protocol_id(), NetworkMessage::RpcRequest(RpcRequest{
+                    protocol_id: req.protocol_id(),
+                    request_id: 0, // TODO: set request_id?
+                    priority: 0,
+                    raw_request: req.data.to_vec(),
+                }))//PeerRequest::SendRpc(req))
             },
         };
 
         if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
-            if let Err(err) = sender.push(protocol_id, peer_request) {
+            if let Err(err) = sender.try_send(peer_request) {//sender.push(protocol_id, peer_request) {
                 info!(
                     NetworkSchema::new(&self.network_context).connection_metadata(conn_metadata),
                     protocol_id = %protocol_id,
@@ -668,17 +681,24 @@ where
         }
 
         // TODO: Add label for peer.
-        let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
-            QueueStyle::FIFO,
-            self.channel_size,
-            Some(&counters::PENDING_NETWORK_REQUESTS),
-        );
+        // messages towards network peer
+        // TODO: one per "Network" quality-of-service level (Validator, everyone-else)
+        let (peer_reqs_tx, peer_reqs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(self.channel_size);
+        let peer_reqs_rx = vec![RefCell::new(peer_reqs_rx)];
+        // let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
+        //     QueueStyle::FIFO,
+        //     self.channel_size,
+        //     Some(&counters::PENDING_NETWORK_REQUESTS),
+        // );
         // TODO: Add label for peer.
-        let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
-            QueueStyle::FIFO,
-            self.channel_size,
-            Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
-        );
+        // TODO: make this be tokio mpsc channel of NetworkMessage
+        // messages from network peer
+        let (peer_notifs_tx, peer_notifs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(self.channel_size);
+        // let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
+        //     QueueStyle::FIFO,
+        //     self.channel_size,
+        //     Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
+        // );
 
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
@@ -687,7 +707,7 @@ where
             self.time_service.clone(),
             connection,
             self.transport_notifs_tx.clone(),
-            peer_reqs_rx,
+            // peer_reqs_rx,
             peer_notifs_tx,
             Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
             constants::MAX_CONCURRENT_INBOUND_RPCS,
@@ -695,11 +715,11 @@ where
             self.max_frame_size,
             self.max_message_size,
         );
-        self.executor.spawn(peer.start());
+        self.executor.spawn(peer.start(peer_reqs_rx));
 
         // Start background task to handle events (RPCs and DirectSend messages) received from
         // peer.
-        self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
+        // self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
             .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
