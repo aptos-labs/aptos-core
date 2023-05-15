@@ -23,13 +23,15 @@ use move_vm_runtime::{
     session::{SerializedReturnValues, Session},
 };
 use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_types::{
+    resolver::MoveRefResolver,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display, Formatter},
 };
-use move_vm_types::resolver::MoveRefResolver;
 
 /// Represents an instance of an async VM.
 pub struct AsyncVM {
