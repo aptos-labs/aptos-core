@@ -782,7 +782,6 @@ export class AptosClient {
    * @param extraArgs
    * @returns Transaction hash
    */
-
   async createResourceAccountAndPublishPackage(
     sender: AptosAccount,
     seed: Bytes,
