@@ -15,7 +15,8 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -418,6 +419,7 @@ impl DbWriter for FakeAptosDB {
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
         _block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        _sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         self.save_transactions_impl(
             txns_to_commit,

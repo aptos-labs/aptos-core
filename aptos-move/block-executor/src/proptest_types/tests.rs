@@ -20,7 +20,7 @@ use proptest::{
     test_runner::TestRunner,
 };
 use rand::Rng;
-use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -52,12 +52,23 @@ fn run_transactions<K, V>(
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get(), maybe_gas_limit)
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
@@ -174,12 +185,23 @@ fn deltas_writes_mixed_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get(), maybe_gas_limit)
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
@@ -212,12 +234,23 @@ fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>)
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get(), maybe_gas_limit)
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         let delta_writes = output
@@ -362,12 +395,19 @@ fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Opti
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     // Confirm still no intersection
     let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get(), maybe_gas_limit)
+    >::new(num_cpus::get(), executor_thread_pool, maybe_gas_limit)
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
@@ -398,12 +438,23 @@ fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Opti
         },
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..200 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get(), Some(max(w_index, r_index) as u64 + 1)) // Ensure enough gas limit to commit the module txns
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            Some(max(w_index, r_index) as u64 + 1),
+        ) // Ensure enough gas limit to commit the module txns
         .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);

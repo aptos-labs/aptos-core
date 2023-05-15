@@ -8,9 +8,9 @@ use crate::metrics::{
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
-    config::IndexerGrpcConfig,
+    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
     constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
-    file_store_operator::FileStoreOperator,
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
 use aptos_logger::{error, info, warn};
@@ -116,7 +116,15 @@ impl RawData for RawDataServerWrapper {
         // This is to monitor the latest processed version.
         let (watch_sender, mut watch_receiver) = watch_channel(current_version);
 
-        let file_store_bucket_name = self.server_config.file_store_bucket_name.clone();
+        let file_store_operator: Box<dyn FileStoreOperator> = match &self.server_config.file_store {
+            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
+            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
+            ),
+        };
+
         let redis_client = self.redis_client.clone();
         let request_metadata_clone = request_metadata.clone();
         tokio::spawn(async move {
@@ -141,7 +149,6 @@ impl RawData for RawDataServerWrapper {
                 },
             };
             let mut cache_operator = CacheOperator::new(conn);
-            let file_store_operator = FileStoreOperator::new(file_store_bucket_name);
             file_store_operator.verify_storage_bucket_existence().await;
 
             let chain_id = match cache_operator.get_chain_id().await {
@@ -174,34 +181,32 @@ impl RawData for RawDataServerWrapper {
             );
             loop {
                 // 1. Fetch data from cache and file store.
-                let transaction_data =
-                    match data_fetch(current_version, &mut cache_operator, &file_store_operator)
-                        .await
-                    {
-                        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-                        Ok(TransactionsDataStatus::AheadOfCache) => {
-                            ahead_of_cache_data_handling().await;
-                            // Retry after a short sleep.
-                            continue;
-                        },
-                        Ok(TransactionsDataStatus::DataGap) => {
-                            data_gap_handling(current_version, &request_metadata);
-                            // End the data stream.
-                            break;
-                        },
-                        Err(e) => {
-                            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
-                            data_fetch_error_handling(
-                                e,
-                                current_version,
-                                chain_id,
-                                &request_metadata,
-                            )
+                let transaction_data = match data_fetch(
+                    current_version,
+                    &mut cache_operator,
+                    file_store_operator.as_ref(),
+                )
+                .await
+                {
+                    Ok(TransactionsDataStatus::Success(transactions)) => transactions,
+                    Ok(TransactionsDataStatus::AheadOfCache) => {
+                        ahead_of_cache_data_handling().await;
+                        // Retry after a short sleep.
+                        continue;
+                    },
+                    Ok(TransactionsDataStatus::DataGap) => {
+                        data_gap_handling(current_version, &request_metadata);
+                        // End the data stream.
+                        break;
+                    },
+                    Err(e) => {
+                        ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
+                        data_fetch_error_handling(e, current_version, chain_id, &request_metadata)
                             .await;
-                            // Retry after a short sleep.
-                            continue;
-                        },
-                    };
+                        // Retry after a short sleep.
+                        continue;
+                    },
+                };
 
                 // 2. Push the data to the response channel, i.e. stream the data to the client.
                 let resp_item =
@@ -347,7 +352,7 @@ fn get_transactions_response_builder(
 async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::Connection>,
-    file_store_operator: &FileStoreOperator,
+    file_store_operator: &dyn FileStoreOperator,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)

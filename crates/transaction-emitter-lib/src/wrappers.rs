@@ -87,7 +87,7 @@ pub async fn emit_transactions_with_cluster(
     let arg_transaction_types = args
         .transaction_type
         .iter()
-        .map(|t| t.materialize())
+        .map(|t| t.materialize(1))
         .collect::<Vec<_>>();
 
     let arg_transaction_weights = if args.transaction_weights.is_empty() {

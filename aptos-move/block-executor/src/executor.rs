@@ -27,13 +27,14 @@ use aptos_types::{
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
-use once_cell::sync::Lazy;
+use rayon::ThreadPool;
 use std::{
     collections::btree_map::BTreeMap,
     marker::PhantomData,
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
+        Arc,
     },
 };
 
@@ -43,18 +44,11 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(num_cpus::get())
-        .thread_name(|index| format!("par_exec_{}", index))
-        .build()
-        .unwrap()
-});
-
 pub struct BlockExecutor<T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
+    executor_thread_pool: Arc<ThreadPool>,
     maybe_gas_limit: Option<u64>,
     phantom: PhantomData<(T, E, S)>,
 }
@@ -67,7 +61,11 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize, maybe_gas_limit: Option<u64>) -> Self {
+    pub fn new(
+        concurrency_level: usize,
+        executor_thread_pool: Arc<ThreadPool>,
+        maybe_gas_limit: Option<u64>,
+    ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
@@ -75,6 +73,7 @@ where
         );
         Self {
             concurrency_level,
+            executor_thread_pool,
             maybe_gas_limit,
             phantom: PhantomData,
         }
@@ -195,7 +194,7 @@ where
                 // a read without this error. However, if the failure is real, passing
                 // validation here allows to avoid infinitely looping and instead panic when
                 // materializing deltas as writes in the final output preparation state. Panic
-                // is also preferrable as it allows testing for this scenario.
+                // is also preferable as it allows testing for this scenario.
                 Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
             }
         });
@@ -295,13 +294,13 @@ where
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
         for k in delta_keys {
-            // Note that delta materialization happens concurrenty, but under concurrent
+            // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
             // contending on delta materialization of the same aggregator. However, the
             // materialization is based on previously materialized values and should not
             // introduce long critical sections. Moreover, with more aggregators, and given
             // that the commit_hook will be performed at dispersed times based on the
-            // completion of the respetive previous tasks of threads, this should not be
+            // completion of the respective previous tasks of threads, this should not be
             // an immediate bottleneck - confirmed by an experiment with 32 core and a
             // single materialized aggregator. If needed, the contention may be further
             // mitigated by batching consecutive commit_hooks.
@@ -454,11 +453,11 @@ where
         // indices and assigning post-commit work per index to other workers.
         // Note: It is important that the Coordinator is the first thread that
         // picks up a role will be a coordinator. Hence, if multiple parallel
-        // executors are running concurrently, they will all havean active coordinator.
+        // executors are running concurrently, they will all have active coordinator.
         roles.push(CommitRole::Coordinator(senders, 0));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        RAYON_EXEC_POOL.scope(|s| {
+        self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
@@ -501,7 +500,7 @@ where
             ret
         };
 
-        RAYON_EXEC_POOL.spawn(move || {
+        self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
             drop(scheduler);
@@ -618,7 +617,7 @@ where
             )
         }
 
-        RAYON_EXEC_POOL.spawn(move || {
+        self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(signature_verified_block);
         });

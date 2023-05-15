@@ -589,13 +589,12 @@ fn test_reconfig_suffix_empty_blocks() {
         db: _,
         executor,
     } = TestExecutor::new();
-    let block_a = TestBlock::new(10000, 1, gen_block_id(1));
-    let mut block_b = TestBlock::new(10000, 1, gen_block_id(2));
-    let block_c = TestBlock::new(1, 1, gen_block_id(3));
-    let block_d = TestBlock::new(1, 1, gen_block_id(4));
-    let checkpoint_txn = block_b.txns.pop().unwrap();
+    // add gas limit to be consistent with block executor that will add state checkpoint txn
+    let block_a = TestBlock::new(10000, 1, gen_block_id(1), Some(0));
+    let mut block_b = TestBlock::new(10000, 1, gen_block_id(2), Some(0));
+    let block_c = TestBlock::new(1, 1, gen_block_id(3), Some(0));
+    let block_d = TestBlock::new(1, 1, gen_block_id(4), Some(0));
     block_b.txns.push(encode_reconfiguration_transaction());
-    block_b.txns.push(checkpoint_txn);
     let parent_block_id = executor.committed_block_id();
     executor
         .execute_block((block_a.id, block_a.txns), parent_block_id)
