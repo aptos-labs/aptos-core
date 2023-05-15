@@ -187,6 +187,15 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Fullnodes** are clients that ensure data are stored up-to-date on the network. They replicate blockchain state and transactions from other fullnodes and validator nodes.
 
+### Fungible Asset
+
+- A **fungible asset** is an asset, such as a currency, share, in-game resource, etc., that can be interchanged with another identical asset without any loss in its value. For example, APT is fungible because you can exchange one APT for another.
+- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the blockchain, including tokens and coins. 
+
+### Fungible Unit
+
+- A **fungible unit** is an individual unit of a fungible asset. These units are identical and can be interchanged without any loss in value. For example, each Octa (the smallest unit of APT) is a fungible unit.
+
 ## G
 
 ### Gas
