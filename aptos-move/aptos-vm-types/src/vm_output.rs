@@ -1,20 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::write_change_set::WriteChangeSet;
+use crate::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteSetMut},
 };
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Debug)]
 pub struct VMOutput {
-    writes: WriteChangeSet,
+    resource_writes: WriteChangeSet,
+    module_writes: WriteChangeSet,
+    aggregator_writes: WriteChangeSet,
     deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
     gas_used: u64,
@@ -23,14 +25,36 @@ pub struct VMOutput {
 
 impl VMOutput {
     pub fn new(
-        writes: WriteChangeSet,
+        resource_writes: WriteChangeSet,
+        module_writes: WriteChangeSet,
+        aggregator_writes: WriteChangeSet,
         deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
     ) -> Self {
         Self {
-            writes,
+            resource_writes,
+            module_writes,
+            aggregator_writes,
+            deltas,
+            events,
+            gas_used,
+            status,
+        }
+    }
+
+    pub fn from_change_set(
+        change_set: AptosChangeSet,
+        gas_used: u64,
+        status: TransactionStatus,
+    ) -> Self {
+        let (resource_writes, module_writes, aggregator_writes, deltas, events) =
+            change_set.into_inner();
+        Self {
+            resource_writes,
+            module_writes,
+            aggregator_writes,
             deltas,
             events,
             gas_used,
@@ -40,7 +64,9 @@ impl VMOutput {
 
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
-            writes: WriteChangeSet::empty(),
+            resource_writes: WriteChangeSet::empty(),
+            module_writes: WriteChangeSet::empty(),
+            aggregator_writes: WriteChangeSet::empty(),
             deltas: DeltaChangeSet::empty(),
             events: vec![],
             gas_used: 0,
@@ -48,13 +74,29 @@ impl VMOutput {
         }
     }
 
-    pub fn into(self) -> (WriteChangeSet, DeltaChangeSet, Vec<ContractEvent>) {
-        (self.writes, self.deltas, self.events)
+    pub fn into(
+        self,
+    ) -> (
+        WriteChangeSet,
+        WriteChangeSet,
+        WriteChangeSet,
+        DeltaChangeSet,
+        Vec<ContractEvent>,
+    ) {
+        (
+            self.resource_writes,
+            self.module_writes,
+            self.aggregator_writes,
+            self.deltas,
+            self.events,
+        )
     }
 
     pub fn unpack(
         self,
     ) -> (
+        WriteChangeSet,
+        WriteChangeSet,
         WriteChangeSet,
         DeltaChangeSet,
         Vec<ContractEvent>,
@@ -62,7 +104,9 @@ impl VMOutput {
         TransactionStatus,
     ) {
         (
-            self.writes,
+            self.resource_writes,
+            self.module_writes,
+            self.aggregator_writes,
             self.deltas,
             self.events,
             self.gas_used,
@@ -70,8 +114,16 @@ impl VMOutput {
         )
     }
 
-    pub fn writes(&self) -> &WriteChangeSet {
-        &self.writes
+    pub fn resource_writes(&self) -> &WriteChangeSet {
+        &self.resource_writes
+    }
+
+    pub fn module_writes(&self) -> &WriteChangeSet {
+        &self.module_writes
+    }
+
+    pub fn aggregator_writes(&self) -> &WriteChangeSet {
+        &self.aggregator_writes
     }
 
     pub fn deltas(&self) -> &DeltaChangeSet {
@@ -97,15 +149,41 @@ impl VMOutput {
         materialized_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         // We should have a materialized delta for every delta in the output.
-        let (mut writes, deltas, events, gas_used, status) = self.unpack();
+        let (
+            resource_writes,
+            module_writes,
+            mut aggregator_writes,
+            deltas,
+            events,
+            gas_used,
+            status,
+        ) = self.unpack();
         assert_eq!(deltas.len(), materialized_deltas.len());
 
-        writes
+        // First, extend aggregator writes with materialized deltas.
+        aggregator_writes
             .extend_with_writes(materialized_deltas)
             .expect("Extending with materialized deltas should always succeed");
-        let write_set = writes
+
+        // TODO: Reduce code duplication.
+        let resource_write_set = resource_writes
             .into_write_set()
             .expect("Conversion to WriteSet should always succeed");
+        let module_write_set = module_writes
+            .into_write_set()
+            .expect("Conversion to WriteSet should always succeed");
+        let aggregator_write_set = aggregator_writes
+            .into_write_set()
+            .expect("Conversion to WriteSet should always succeed");
+
+        let combined_write_sets = resource_write_set.into_iter().chain(
+            module_write_set
+                .into_iter()
+                .chain(aggregator_write_set.into_iter()),
+        );
+        let write_set = WriteSetMut::new(combined_write_sets)
+            .freeze()
+            .expect("Freezing WriteSet should always succeed");
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 
@@ -119,13 +197,23 @@ impl VMOutput {
             return Ok(self);
         }
 
-        let (mut writes, deltas, events, gas_used, status) = self.unpack();
+        let (
+            resource_writes,
+            module_writes,
+            mut aggregator_writes,
+            deltas,
+            events,
+            gas_used,
+            status,
+        ) = self.unpack();
         let materialized_deltas = WriteChangeSet::from_deltas(deltas, state_view)?;
-        writes
+        aggregator_writes
             .extend_with_writes(materialized_deltas)
             .expect("Extending with materialized deltas should always succeed");
         Ok(VMOutput::new(
-            writes,
+            resource_writes,
+            module_writes,
+            aggregator_writes,
             DeltaChangeSet::empty(),
             events,
             gas_used,

@@ -294,7 +294,8 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// unless you are doing something special, such as injecting additional logging logic.
     fn charge_storage_fee_for_all<'a>(
         &mut self,
-        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
@@ -312,9 +313,16 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         // Calculate the storage fees.
-        let write_fee = write_ops.into_iter().fold(Fee::new(0), |acc, (key, op)| {
-            acc + self.storage_fee_per_write(key, op)
-        });
+        let mut write_fee = resource_writes
+            .into_iter()
+            .fold(Fee::new(0), |acc, (key, op)| {
+                acc + self.storage_fee_per_write(key, op)
+            });
+        write_fee += module_writes
+            .into_iter()
+            .fold(Fee::new(0), |acc, (key, op)| {
+                acc + self.storage_fee_per_write(key, op)
+            });
         let event_fee = events.into_iter().fold(Fee::new(0), |acc, event| {
             acc + self.storage_fee_per_event(event)
         });

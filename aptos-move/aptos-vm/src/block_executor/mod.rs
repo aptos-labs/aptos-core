@@ -79,12 +79,34 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_materialized_deltas, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
+    fn get_resource_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
-            .writes()
+            .resource_writes()
+            .iter()
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect()
+    }
+
+    fn get_module_writes(&self) -> Vec<(StateKey, WriteOp)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .module_writes()
+            .iter()
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect()
+    }
+
+    fn get_aggregator_writes(&self) -> Vec<(StateKey, WriteOp)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .aggregator_writes()
             .iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()

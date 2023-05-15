@@ -273,20 +273,32 @@ fn size_error() -> VMStatus {
 }
 
 impl SizeChecker for ChangeSetConfigs {
-    fn check_writes(&self, writes: &WriteChangeSet) -> Result<(), VMStatus> {
+    fn check_writes(
+        &self,
+        resource_writes: &WriteChangeSet,
+        module_writes: &WriteChangeSet,
+    ) -> Result<(), VMStatus> {
         let mut write_set_size = 0;
-        for (key, op) in writes.iter() {
-            if let Some(bytes) = op.bytes() {
-                let write_op_size = (bytes.len() + key.size()) as u64;
-                if write_op_size > self.max_bytes_per_write_op {
-                    return Err(size_error());
+
+        macro_rules! write_set_size {
+            ($writes:ident) => {
+                for (key, op) in $writes.iter() {
+                    if let Some(bytes) = op.bytes() {
+                        let write_op_size = (bytes.len() + key.size()) as u64;
+                        if write_op_size > self.max_bytes_per_write_op {
+                            return Err(size_error());
+                        }
+                        write_set_size += write_op_size;
+                    }
+                    if write_set_size > self.max_bytes_all_write_ops_per_transaction {
+                        return Err(size_error());
+                    }
                 }
-                write_set_size += write_op_size;
-            }
-            if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return Err(size_error());
-            }
+            };
         }
+
+        write_set_size!(resource_writes);
+        write_set_size!(module_writes);
         Ok(())
     }
 

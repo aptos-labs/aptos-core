@@ -4,7 +4,10 @@
 use crate::write_change_set::WriteChangeSet;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaChangeSet};
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent,
+    state_store::state_key::{StateKey, StateKeyInner},
+    transaction::ChangeSet as StorageChangeSet,
+    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 use std::collections::{
@@ -92,36 +95,79 @@ impl<T> ChangeSet<T> {
 }
 
 pub trait SizeChecker {
-    fn check_writes(&self, writes: &WriteChangeSet) -> Result<(), VMStatus>;
+    fn check_writes(
+        &self,
+        resource_writes: &WriteChangeSet,
+        module_writes: &WriteChangeSet,
+    ) -> Result<(), VMStatus>;
     fn check_events(&self, events: &[ContractEvent]) -> Result<(), VMStatus>;
 }
 
 #[derive(Debug)]
 pub struct AptosChangeSet {
-    writes: WriteChangeSet,
+    resource_writes: WriteChangeSet,
+    module_writes: WriteChangeSet,
+    aggregator_writes: WriteChangeSet,
     deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
 }
 
 impl AptosChangeSet {
     pub fn new(
-        writes: WriteChangeSet,
+        resource_writes: WriteChangeSet,
+        module_writes: WriteChangeSet,
+        aggregator_writes: WriteChangeSet,
         deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
         checker: &dyn SizeChecker,
     ) -> anyhow::Result<Self, VMStatus> {
-        checker.check_writes(&writes)?;
+        // TODO: Check aggregator writes?
+        checker.check_writes(&resource_writes, &module_writes)?;
         checker.check_events(&events)?;
         let change_set = Self {
-            writes,
+            resource_writes,
+            module_writes,
+            aggregator_writes,
             deltas,
             events,
         };
         Ok(change_set)
     }
 
-    pub fn writes(&self) -> &WriteChangeSet {
-        &self.writes
+    pub fn from_change_set(change_set: StorageChangeSet) -> Self {
+        let (write_set, events) = change_set.into_inner();
+
+        let mut resource_writes = WriteChangeSet::empty();
+        let mut module_writes = WriteChangeSet::empty();
+        for (state_key, write_op) in write_set {
+            if let StateKeyInner::AccessPath(ap) = state_key.inner() {
+                if ap.is_code() {
+                    module_writes.insert((state_key, write_op));
+                    continue;
+                }
+            }
+            // Aggregator writes should never be included ina change set!
+            resource_writes.insert((state_key, write_op));
+        }
+        Self {
+            resource_writes,
+            module_writes,
+            aggregator_writes: WriteChangeSet::empty(),
+            deltas: DeltaChangeSet::empty(),
+            events,
+        }
+    }
+
+    pub fn resource_writes(&self) -> &WriteChangeSet {
+        &self.resource_writes
+    }
+
+    pub fn module_writes(&self) -> &WriteChangeSet {
+        &self.module_writes
+    }
+
+    pub fn aggregator_writes(&self) -> &WriteChangeSet {
+        &self.aggregator_writes
     }
 
     pub fn deltas(&self) -> &DeltaChangeSet {
@@ -132,14 +178,28 @@ impl AptosChangeSet {
         &self.events
     }
 
-    pub fn into_inner(self) -> (WriteChangeSet, DeltaChangeSet, Vec<ContractEvent>) {
-        (self.writes, self.deltas, self.events)
+    pub fn into_inner(
+        self,
+    ) -> (
+        WriteChangeSet,
+        WriteChangeSet,
+        WriteChangeSet,
+        DeltaChangeSet,
+        Vec<ContractEvent>,
+    ) {
+        (
+            self.resource_writes,
+            self.module_writes,
+            self.aggregator_writes,
+            self.deltas,
+            self.events,
+        )
     }
 
     fn squash_delta_change_set(&mut self, deltas: DeltaChangeSet) -> anyhow::Result<()> {
         use WriteOp::*;
         for (key, mut op) in deltas.into_iter() {
-            if let Some(r) = self.writes.get_mut(&key) {
+            if let Some(r) = self.aggregator_writes.get_mut(&key) {
                 match r {
                     Creation(data)
                     | Modification(data)
@@ -170,9 +230,50 @@ impl AptosChangeSet {
         Ok(())
     }
 
-    fn squash_write_change_set(&mut self, writes: WriteChangeSet) -> anyhow::Result<()> {
-        for (key, write) in writes.into_iter() {
-            match self.writes.entry(key) {
+    fn squash_module_write_change_set(
+        &mut self,
+        module_writes: WriteChangeSet,
+    ) -> anyhow::Result<()> {
+        for (key, write) in module_writes.into_iter() {
+            match self.module_writes.entry(key) {
+                Occupied(mut entry) => {
+                    if !WriteOp::squash(entry.get_mut(), write)? {
+                        entry.remove();
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(write);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_resource_write_change_set(
+        &mut self,
+        resource_writes: WriteChangeSet,
+    ) -> anyhow::Result<()> {
+        for (key, write) in resource_writes.into_iter() {
+            match self.resource_writes.entry(key) {
+                Occupied(mut entry) => {
+                    if !WriteOp::squash(entry.get_mut(), write)? {
+                        entry.remove();
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(write);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_aggregator_write_change_set(
+        &mut self,
+        aggregator_writes: WriteChangeSet,
+    ) -> anyhow::Result<()> {
+        for (key, write) in aggregator_writes.into_iter() {
+            match self.aggregator_writes.entry(key) {
                 Occupied(mut entry) => {
                     if !WriteOp::squash(entry.get_mut(), write)? {
                         entry.remove();
@@ -193,9 +294,12 @@ impl AptosChangeSet {
     }
 
     pub fn squash(&mut self, change_set: Self) -> anyhow::Result<()> {
-        let (writes, deltas, events) = change_set.into_inner();
+        let (resource_writes, module_writes, aggregator_writes, deltas, events) =
+            change_set.into_inner();
         self.squash_delta_change_set(deltas)?;
-        self.squash_write_change_set(writes)?;
+        self.squash_resource_write_change_set(resource_writes)?;
+        self.squash_module_write_change_set(module_writes)?;
+        self.squash_aggregator_write_change_set(aggregator_writes)?;
         self.squash_events(events)?;
         Ok(())
     }

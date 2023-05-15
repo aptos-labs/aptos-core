@@ -18,7 +18,6 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -303,7 +302,12 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let storage_with_changes = DeltaStateView::new(resolver, user_txn_change_set.writes());
+        let storage_with_changes =
+            DeltaStateView::new(resolver, user_txn_change_set.aggregator_writes());
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, user_txn_change_set.module_writes());
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, user_txn_change_set.resource_writes());
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use
@@ -332,20 +336,16 @@ impl AptosVM {
                 )
             })?;
 
-        let (writes, deltas, events) = user_txn_change_set.into_inner();
         let gas_used = txn_data
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount");
 
-        let output = VMOutput::new(
-            writes,
-            deltas,
-            events,
+        let output = VMOutput::from_change_set(
+            user_txn_change_set,
             gas_used.into(),
             TransactionStatus::Keep(ExecutionStatus::Success),
         );
-
         Ok((VMStatus::Executed, output))
     }
 
@@ -452,14 +452,22 @@ impl AptosVM {
             )?;
 
             let change_set = session.finish(&mut (), change_set_configs)?;
-            gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
-            gas_meter.charge_storage_fee_for_all(
-                change_set.writes().iter(),
+
+            // TODO(Gas): Charge for aggregator writes?
+            // TODO(Gas): Charge for aggregator deltas?
+            return_on_failure!(
+                gas_meter.charge_io_gas_for_writes(change_set.resource_writes().iter())
+            );
+            return_on_failure!(
+                gas_meter.charge_io_gas_for_writes(change_set.module_writes().iter())
+            );
+            return_on_failure!(gas_meter.charge_storage_fee_for_all(
+                change_set.resource_writes().iter(),
+                change_set.module_writes().iter(),
                 change_set.events(),
                 txn_data.transaction_size,
                 txn_data.gas_unit_price,
-            )?;
-            // TODO(Gas): Charge for aggregator writes
+            ));
 
             self.success_transaction_cleanup(
                 resolver,
@@ -645,15 +653,24 @@ impl AptosVM {
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
         let mut change_set = session.finish(&mut (), change_set_configs)?;
-        gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
-        gas_meter.charge_storage_fee_for_all(
-            change_set.writes().iter(),
+
+        // TODO(Gas): Charge for aggregator writes?
+        // TODO(Gas): Charge for aggregator deltas?
+        return_on_failure!(gas_meter.charge_io_gas_for_writes(change_set.resource_writes().iter()));
+        return_on_failure!(gas_meter.charge_io_gas_for_writes(change_set.module_writes().iter()));
+        return_on_failure!(gas_meter.charge_storage_fee_for_all(
+            change_set.resource_writes().iter(),
+            change_set.module_writes().iter(),
             change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
-        )?;
+        ));
 
-        let storage_with_changes = DeltaStateView::new(resolver, change_set.writes());
+        let storage_with_changes = DeltaStateView::new(resolver, change_set.aggregator_writes());
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, change_set.module_writes());
+        let storage_with_changes =
+            DeltaStateView::new(&storage_with_changes, change_set.resource_writes());
 
         // TODO: Avoid delta materialization here.
         let deltas = change_set.deltas().clone();
@@ -855,14 +872,18 @@ impl AptosVM {
         )?;
 
         let change_set = session.finish(&mut (), change_set_configs)?;
-        gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
-        gas_meter.charge_storage_fee_for_all(
-            change_set.writes().iter(),
+
+        // TODO(Gas): Charge for aggregator writes?
+        // TODO(Gas): Charge for aggregator deltas?
+        return_on_failure!(gas_meter.charge_io_gas_for_writes(change_set.resource_writes().iter()));
+        return_on_failure!(gas_meter.charge_io_gas_for_writes(change_set.module_writes().iter()));
+        return_on_failure!(gas_meter.charge_storage_fee_for_all(
+            change_set.resource_writes().iter(),
+            change_set.module_writes().iter(),
             change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
-        )?;
-        // TODO(Gas): Charge for aggregator writes
+        ));
 
         self.success_transaction_cleanup(
             resolver,
@@ -1171,13 +1192,7 @@ impl AptosVM {
 
         match writeset_payload {
             WriteSetPayload::Direct(change_set) => {
-                let (write_set, events) = change_set.clone().into_inner();
-                Ok(AptosChangeSet::new(
-                    WriteChangeSet::new(write_set),
-                    DeltaChangeSet::empty(),
-                    events,
-                    &change_set_configs,
-                )?)
+                Ok(AptosChangeSet::from_change_set(change_set.clone()))
             },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id);
@@ -1264,11 +1279,12 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        let (writes, deltas, events) = change_set.into_inner();
-        self.read_writeset(resolver, &writes)?;
+        assert!(change_set.aggregator_writes().is_empty());
+        self.read_writeset(resolver, change_set.resource_writes())?;
+        self.read_writeset(resolver, change_set.module_writes())?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = VMOutput::new(writes, deltas, events, 0, VMStatus::Executed.into());
+        let output = VMOutput::from_change_set(change_set, 0, VMStatus::Executed.into());
         Ok((VMStatus::Executed, output))
     }
 
@@ -1746,12 +1762,16 @@ impl AptosSimulationVM {
                                 let change_set = session
                                     .finish(&mut (), &storage_gas_params.change_set_configs)?;
 
-                                return_on_failure!(
-                                    gas_meter.charge_io_gas_for_writes(change_set.writes().iter(),)
-                                );
+                                // TODO(Gas): Charge for aggregator writes?
+                                // TODO(Gas): Charge for aggregator deltas?
+                                return_on_failure!(gas_meter
+                                    .charge_io_gas_for_writes(change_set.resource_writes().iter()));
+                                return_on_failure!(gas_meter
+                                    .charge_io_gas_for_writes(change_set.module_writes().iter()));
 
                                 return_on_failure!(gas_meter.charge_storage_fee_for_all(
-                                    change_set.writes().iter(),
+                                    change_set.resource_writes().iter(),
+                                    change_set.module_writes().iter(),
                                     change_set.events(),
                                     txn_data.transaction_size,
                                     txn_data.gas_unit_price,

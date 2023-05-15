@@ -509,7 +509,8 @@ where
 
     fn charge_storage_fee_for_all<'a>(
         &mut self,
-        write_ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
         gas_unit_price: aptos_gas::FeePerGasUnit,
@@ -529,7 +530,16 @@ where
         // Writes
         let mut write_fee = Fee::new(0);
         let mut write_set_storage = vec![];
-        for (key, op) in write_ops.into_iter() {
+        for (key, op) in resource_writes.into_iter() {
+            let fee = self.storage_fee_per_write(key, op);
+            write_set_storage.push(WriteStorage {
+                key: key.clone(),
+                op_type: write_op_type(op),
+                cost: fee,
+            });
+            write_fee += fee;
+        }
+        for (key, op) in module_writes.into_iter() {
             let fee = self.storage_fee_per_write(key, op);
             write_set_storage.push(WriteStorage {
                 key: key.clone(),

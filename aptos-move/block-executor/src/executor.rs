@@ -103,7 +103,19 @@ where
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
-            for (k, v) in output.get_writes().into_iter() {
+            for (k, v) in output.get_resource_writes().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_cache.write(&k, write_version, v);
+            }
+            for (k, v) in output.get_module_writes().into_iter() {
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
+                }
+                versioned_cache.write(&k, write_version, v);
+            }
+            for (k, v) in output.get_aggregator_writes().into_iter() {
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
@@ -465,7 +477,13 @@ where
                         "Sequential execution must materialize deltas"
                     );
                     // Apply the writes.
-                    for (ap, write_op) in output.get_writes().into_iter() {
+                    for (ap, write_op) in output.get_resource_writes().into_iter() {
+                        data_map.insert(ap, write_op);
+                    }
+                    for (ap, write_op) in output.get_module_writes().into_iter() {
+                        data_map.insert(ap, write_op);
+                    }
+                    for (ap, write_op) in output.get_aggregator_writes().into_iter() {
                         data_map.insert(ap, write_op);
                     }
                     ret.push(output);

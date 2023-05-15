@@ -668,12 +668,8 @@ pub(crate) fn get_transaction_output<A: AccessPathCache>(
         .expect("Balance should always be less than or equal to max gas amount");
 
     let change_set = session.finish(ap_cache, change_set_configs)?;
-    let (writes, deltas, events) = change_set.into_inner();
-
-    Ok(VMOutput::new(
-        writes,
-        deltas,
-        events,
+    Ok(VMOutput::from_change_set(
+        change_set,
         gas_used.into(),
         TransactionStatus::Keep(status),
     ))
