@@ -1794,6 +1794,7 @@ dependencies = [
  "hex",
  "ledger-apdu",
  "ledger-transport-hid",
+ "once_cell",
  "thiserror",
 ]
 

@@ -3,13 +3,14 @@
 
 //! # aptos-ledger
 //!
-//! `aptos-ledger` provides the convenience method to communicate with Aptos app on ledger
+//! `aptos-ledger` provides convenience methods to communicate with the Aptos app on ledger
 
 #![deny(missing_docs)]
 
 use hex::encode;
 use ledger_apdu::APDUCommand;
 use ledger_transport_hid::{hidapi::HidApi, LedgerHIDError, TransportNativeHID};
+use once_cell::sync::Lazy;
 use std::{
     fmt,
     fmt::{Debug, Display},
@@ -36,6 +37,8 @@ const P1_START: u8 = 0x00;
 const P2_MORE: u8 = 0x80;
 const P2_LAST: u8 = 0x00;
 
+static SERIALIZED_BIP32: Lazy<Vec<u8>> = Lazy::new(|| serialize_bip32(DERIVATIVE_PATH));
+
 #[derive(Debug, Error)]
 /// Aptos Ledger Error
 pub enum AptosLedgerError {
@@ -45,16 +48,17 @@ pub enum AptosLedgerError {
 
     /// Unexpected error
     #[error("Unexpected Error: {0}")]
-    UnexpectedError(String),
+    UnexpectedError(String, Option<u16>),
 }
 
 impl From<LedgerHIDError> for AptosLedgerError {
     fn from(e: LedgerHIDError) -> Self {
-        AptosLedgerError::UnexpectedError(e.to_string())
+        AptosLedgerError::UnexpectedError(e.to_string(), None)
     }
 }
 
 /// Aptos version in format major.minor.patch
+#[derive(Debug)]
 pub struct Version {
     major: u8,
     minor: u8,
@@ -62,12 +66,6 @@ pub struct Version {
 }
 
 impl Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
-    }
-}
-
-impl Debug for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
@@ -101,7 +99,10 @@ pub fn get_app_version() -> Result<Version, AptosLedgerError> {
                     .error_code()
                     .map(|error_code| error_code.to_string())
                     .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
-                Err(AptosLedgerError::UnexpectedError(error_string))
+                Err(AptosLedgerError::UnexpectedError(
+                    error_string,
+                    Option::from(response.retcode()),
+                ))
             }
         },
         Err(err) => Err(AptosLedgerError::from(err)),
@@ -124,7 +125,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
             if response.retcode() == APDU_CODE_SUCCESS {
                 let app_name = match str::from_utf8(response.data()) {
                     Ok(v) => v,
-                    Err(e) => return Err(AptosLedgerError::UnexpectedError(e.to_string())),
+                    Err(e) => return Err(AptosLedgerError::UnexpectedError(e.to_string(), None)),
                 };
                 Ok(app_name.to_string())
             } else {
@@ -132,7 +133,10 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
                     .error_code()
                     .map(|error_code| error_code.to_string())
                     .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
-                Err(AptosLedgerError::UnexpectedError(error_string))
+                Err(AptosLedgerError::UnexpectedError(
+                    error_string,
+                    Option::from(response.retcode()),
+                ))
             }
         },
         Err(err) => Err(AptosLedgerError::from(err)),
@@ -149,7 +153,7 @@ pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
     let transport = open_ledger_transport()?;
 
     // Serialize the derivative path
-    let cdata = serialize_bip32(DERIVATIVE_PATH);
+    let cdata = SERIALIZED_BIP32.clone();
 
     // APDU command's instruction parameter 1 or p1
     let p1: u8 = match display {
@@ -184,7 +188,10 @@ pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
                     .error_code()
                     .map(|error_code| error_code.to_string())
                     .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
-                Err(AptosLedgerError::UnexpectedError(error_string))
+                Err(AptosLedgerError::UnexpectedError(
+                    error_string,
+                    Option::from(response.retcode()),
+                ))
             }
         },
         Err(err) => Err(AptosLedgerError::from(err)),
@@ -201,7 +208,7 @@ pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
     let transport = open_ledger_transport()?;
 
     // Serialize the derivative path
-    let derivative_path_bytes = serialize_bip32(DERIVATIVE_PATH);
+    let derivative_path_bytes = SERIALIZED_BIP32.clone();
 
     // Send the derivative path over as first message
     let sign_start = transport.exchange(&APDUCommand {
@@ -213,7 +220,7 @@ pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
     });
 
     if let Err(err) = sign_start {
-        return Err(AptosLedgerError::UnexpectedError(err.to_string()));
+        return Err(AptosLedgerError::UnexpectedError(err.to_string(), None));
     }
 
     let chunks = raw_txn.chunks(MAX_APDU_LEN);
@@ -245,7 +252,10 @@ pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
                         .unwrap_or_else(|retcode| {
                             format!("Unknown Ledger APDU retcode: {:x}", retcode)
                         });
-                    return Err(AptosLedgerError::UnexpectedError(error_string));
+                    return Err(AptosLedgerError::UnexpectedError(
+                        error_string,
+                        Option::from(response.retcode()),
+                    ));
                 }
             },
             Err(err) => return Err(AptosLedgerError::from(err)),
@@ -253,6 +263,7 @@ pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
     }
     Err(AptosLedgerError::UnexpectedError(
         "Unable to process request".to_string(),
+        None,
     ))
 }
 

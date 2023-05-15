@@ -1,6 +1,6 @@
 [package]
 name = "aptos-ledger"
-description = "library for integration with Aptos app on Ledger"
+description = "Library for integration with the Aptos app on Ledger"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -16,4 +16,5 @@ rust-version = { workspace = true }
 hex = "0.4.3"
 ledger-apdu = "0.10.0"
 ledger-transport-hid = "0.10.0"
+once_cell = "1.10.0"
 thiserror = "1.0.37"
