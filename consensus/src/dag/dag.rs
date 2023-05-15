@@ -30,7 +30,12 @@ use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
-use crate::dag::types::{AbsentInfo, DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, MissingDagNodeStatus, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerNodeMap, PendingInfo, WeakLinksCreator};
+use crate::dag::types::{AbsentInfo, MissingDagNodeStatus, PendingInfo};
+use crate::dag::types::dag_in_mem::{DagInMem, DagInMem_Key};
+use crate::dag::types::dag_round_list::{DagRoundList, DagRoundListItem};
+use crate::dag::types::missing_node_status_map::{MissingNodeStatusMap, MissingNodeStatusMapEntry, MissingNodeStatusMapEntry_Key};
+use crate::dag::types::peer_node_map::{PeerNodeMap, PeerNodeMapEntry};
+use crate::dag::types::week_link_creator::WeakLinksCreator;
 
 #[allow(dead_code)]
 pub(crate) struct Dag {
@@ -179,7 +184,7 @@ impl Dag {
 
         let round = self.in_mem.get_dag_mut().get_mut(round).unwrap();
         round.insert(certified_node.node().source(), certified_node.clone());
-        let entry = PeerIdToCertifiedNodeMapEntry {
+        let entry = PeerNodeMapEntry {
             map_id: round.id,
             key: certified_node.node().source(),
             value_id: certified_node.digest(),
@@ -253,7 +258,7 @@ impl Dag {
             match self.in_mem.get_missing_nodes_mut().entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
                     entry.get_mut().add_peer_to_request(source);
-                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry{
+                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
                         map_id,
                         key: entry.key().clone(),
                         value: entry.get().clone(),
@@ -283,7 +288,7 @@ impl Dag {
         self.in_mem.get_missing_nodes_mut()
             .insert(pending_digest, new_status.clone());
         let map_id = self.in_mem.get_missing_nodes().id;
-        storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry {
+        storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
             map_id,
             key: pending_digest,
             value: new_status,
@@ -300,7 +305,7 @@ impl Dag {
 
             status.add_dependency(pending_digest);
             status.add_peer_to_request(pending_peer_id);
-            storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry{
+            storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
                 map_id,
                 key: missing_parent_node_digest,
                 value: status.clone(),
@@ -433,13 +438,13 @@ impl Dag {
                     .update_to_pending(certified_node, missing_parents);
                 if entry.get_mut().ready_to_be_added() {
                     maybe_node_status = Some(entry.remove());
-                    let entry_db_key = MissingNodeIdToStatusMap_Entry_Key {
+                    let entry_db_key = MissingNodeStatusMapEntry_Key {
                         map_id,
                         key: Some(node_digest),
                     };
                     storage_diff.del_missing_node_id_to_status_map_entry(&entry_db_key).unwrap();
                 } else {
-                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeIdToStatusMap_Entry {
+                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
                         map_id,
                         key: entry.key().clone(),
                         value: entry.get().clone(),

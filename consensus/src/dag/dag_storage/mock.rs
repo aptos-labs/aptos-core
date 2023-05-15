@@ -4,7 +4,13 @@ use std::any::Any;
 use aptos_consensus_types::node::CertifiedNode;
 use aptos_crypto::HashValue;
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerNodeMap, PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator};
+use crate::dag::types::week_link_creator::WeakLinksCreator;
+use crate::dag::types::dag_in_mem::{DagInMem, DagInMem_Key};
+use crate::dag::types::dag_round_list::{DagRoundList, DagRoundListItem, DagRoundListItem_Key};
+use crate::dag::types::missing_node_status_map::{MissingNodeStatusMap, MissingNodeStatusMapEntry, MissingNodeStatusMapEntry_Key};
+use crate::dag::types::peer_index_map::PeerIndexMap;
+use crate::dag::types::peer_node_map::{PeerNodeMap, PeerNodeMapEntry, PeerNodeMapEntry_Key};
+use crate::dag::types::peer_status_list::{PeerStatusList, PeerStatusListItem, PeerStatusListItem_Key};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -15,7 +21,7 @@ impl MockDagStoreWriteBatch {
 }
 
 impl DagStoreWriteBatch for MockDagStoreWriteBatch {
-    fn del_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+    fn del_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeStatusMapEntry_Key) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -51,7 +57,7 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
+    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeStatusMapEntry) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -59,7 +65,7 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
-    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> anyhow::Result<()> {
+    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerNodeMapEntry) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -113,7 +119,7 @@ impl DagStorage for MockDagStore {
         todo!()
     }
 
-    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<Option<MissingNodeIdToStatusMap_Entry>> {
+    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeStatusMapEntry_Key) -> anyhow::Result<Option<MissingNodeStatusMapEntry>> {
         todo!()
     }
 
@@ -121,7 +127,7 @@ impl DagStorage for MockDagStore {
         todo!()
     }
 
-    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
+    fn load_peer_to_node_map_entry(&self, key: &PeerNodeMapEntry_Key) -> anyhow::Result<Option<PeerNodeMapEntry>> {
         todo!()
     }
 

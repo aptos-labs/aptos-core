@@ -13,7 +13,13 @@ use aptos_schemadb::schema::{KeyCodec, ValueCodec};
 use aptos_types::PeerId;
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
 use crate::dag::types;
-use crate::dag::types::{DagInMem, DagInMem_Key, DagInMem_Metadata, DagRoundList, DagRoundList_Metadata, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap_Entry, MissingNodeIdToStatusMap_Entry_Key, MissingNodeStatusMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerNodeMap, PeerNodeMapMetadata, PeerStatusList, PeerStatusList_Metadata, PeerStatusListItem, PeerStatusListItem_Key, WeakLinksCreator, WeakLinksCreatorMetadata};
+use crate::dag::types::dag_in_mem::{DagInMem, DagInMem_Key, DagInMem_Metadata};
+use crate::dag::types::dag_round_list::{DagRoundList, DagRoundList_Metadata, DagRoundListItem, DagRoundListItem_Key};
+use crate::dag::types::missing_node_status_map::{MissingNodeStatusMap, MissingNodeStatusMapEntry, MissingNodeStatusMapEntry_Key};
+use crate::dag::types::peer_index_map::PeerIndexMap;
+use crate::dag::types::peer_node_map::{PeerNodeMap, PeerNodeMapEntry, PeerNodeMapEntry_Key, PeerNodeMapMetadata};
+use crate::dag::types::peer_status_list::{PeerStatusList, PeerStatusList_Metadata, PeerStatusListItem, PeerStatusListItem_Key};
+use crate::dag::types::week_link_creator::{WeakLinksCreator, WeakLinksCreatorMetadata};
 
 pub struct NaiveDagStoreWriteBatch {
     inner: SchemaBatch,
@@ -32,7 +38,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self
     }
 
-    fn del_missing_node_id_to_status_map_entry(&mut self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<()> {
+    fn del_missing_node_id_to_status_map_entry(&mut self, key: &MissingNodeStatusMapEntry_Key) -> anyhow::Result<()> {
         self.inner.delete::<MissingNodeIdToStatusMapEntrySchema>(key)
     }
 
@@ -77,7 +83,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         self.inner.put::<MissingNodeIdToStatusMapSchema>(&obj.id, obj)
     }
 
-    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeIdToStatusMap_Entry) -> anyhow::Result<()> {
+    fn put_missing_node_id_to_status_map_entry(&mut self, obj: &MissingNodeStatusMapEntry) -> anyhow::Result<()> {
         self.inner.put::<MissingNodeIdToStatusMapEntrySchema>(&obj.key(), obj)
     }
 
@@ -105,7 +111,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         // The entries.
         for (peer, node) in obj.iter() {
             self.put_certified_node(node)?;
-            self.put_peer_to_node_map_entry__deep(&PeerIdToCertifiedNodeMapEntry{
+            self.put_peer_to_node_map_entry__deep(&PeerNodeMapEntry {
                 map_id: obj.id,
                 key: *peer,
                 value_id: node.digest(),
@@ -114,7 +120,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
 
         // The end of the entries.
         self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(
-            &PeerIdToCertifiedNodeMapEntry_Key{ map_id: obj.id, key: None },
+            &PeerNodeMapEntry_Key { map_id: obj.id, key: None },
             &None
         )?;
 
@@ -123,7 +129,7 @@ impl DagStoreWriteBatch for NaiveDagStoreWriteBatch {
         Ok(())
     }
 
-    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> anyhow::Result<()> {
+    fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerNodeMapEntry) -> anyhow::Result<()> {
         self.inner.put::<PeerIdToCertifiedNodeMapEntrySchema>(&obj.key(), &Some(obj.clone()))
     }
 
@@ -236,7 +242,7 @@ impl DagStorage for NaiveDagStore {
         }
     }
 
-    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeIdToStatusMap_Entry_Key) -> anyhow::Result<Option<MissingNodeIdToStatusMap_Entry>> {
+    fn load_missing_node_id_to_status_map_entry(&self, key: &MissingNodeStatusMapEntry_Key) -> anyhow::Result<Option<MissingNodeStatusMapEntry>> {
         Ok(self.db.get::<MissingNodeIdToStatusMapEntrySchema>(key)?)
     }
 
@@ -270,7 +276,7 @@ impl DagStorage for NaiveDagStore {
     fn load_peer_to_node_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerNodeMap>> {
         if let Some(metadata) = self.db.get::<PeerIdToCertifiedNodeMapSchema>(key)? {
             let mut iter = self.db.iter::<PeerIdToCertifiedNodeMapEntrySchema>(ReadOptions::default())?;
-            iter.seek(&PeerIdToCertifiedNodeMapEntry_Key{
+            iter.seek(&PeerNodeMapEntry_Key {
                 map_id: metadata.id,
                 key: Some(PeerId::ZERO),
             })?;
@@ -290,7 +296,7 @@ impl DagStorage for NaiveDagStore {
         }
     }
 
-    fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
+    fn load_peer_to_node_map_entry(&self, key: &PeerNodeMapEntry_Key) -> anyhow::Result<Option<PeerNodeMapEntry>> {
         Ok(self.db.get::<PeerIdToCertifiedNodeMapEntrySchema>(&key)?.unwrap())
     }
 
@@ -338,10 +344,10 @@ fn read_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> anyhow::Result<Vec<u8>> {
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeStatusMap, "MissingNodeIdToStatusMap");
 
-define_schema!(MissingNodeIdToStatusMapEntrySchema, MissingNodeIdToStatusMap_Entry_Key, MissingNodeIdToStatusMap_Entry, "MissingNodeIdToStatusMapEntry");
+define_schema!(MissingNodeIdToStatusMapEntrySchema, MissingNodeStatusMapEntry_Key, MissingNodeStatusMapEntry, "MissingNodeIdToStatusMapEntry");
 
 
-impl KeyCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry_Key {
+impl KeyCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeStatusMapEntry_Key {
     fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
         let mut buf = vec![];
         buf.write(self.map_id.as_slice())?;
@@ -368,14 +374,14 @@ impl KeyCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_
             0xff => None,
             _ => unreachable!(),
         };
-        Ok(MissingNodeIdToStatusMap_Entry_Key{
+        Ok(MissingNodeStatusMapEntry_Key {
             map_id,
             key,
         })
     }
 }
 
-impl ValueCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeIdToStatusMap_Entry {
+impl ValueCodec<MissingNodeIdToStatusMapEntrySchema> for MissingNodeStatusMapEntry {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         Ok(bcs::to_bytes(self)?)
     }
@@ -466,7 +472,7 @@ impl ValueCodec<DagInMemSchema> for DagInMem_Metadata {
 }
 
 
-define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerIdToCertifiedNodeMapEntry_Key, Option<PeerIdToCertifiedNodeMapEntry>, "PeerIdToCertifiedNodeMapEntry");
+define_schema!(PeerIdToCertifiedNodeMapEntrySchema, PeerNodeMapEntry_Key, Option<PeerNodeMapEntry>, "PeerIdToCertifiedNodeMapEntry");
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -491,7 +497,7 @@ impl ValueCodec<MissingNodeIdToStatusMapSchema> for PeerNodeMap {
 }
 
 
-impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for Option<PeerIdToCertifiedNodeMapEntry> {
+impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for Option<PeerNodeMapEntry> {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         Ok(bcs::to_bytes(self)?)
     }
@@ -502,7 +508,7 @@ impl ValueCodec<PeerIdToCertifiedNodeMapEntrySchema> for Option<PeerIdToCertifie
 }
 
 
-impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerIdToCertifiedNodeMapEntry_Key {
+impl KeyCodec<PeerIdToCertifiedNodeMapEntrySchema> for PeerNodeMapEntry_Key {
     /// Key format: map_id (16 bytes) + [0x00] + key (32 bytes).
     /// In a `*MapEntry` column family, for a map with ID `map_id`, a key `map_id + [0xff]` always exist to help seek.
     fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
