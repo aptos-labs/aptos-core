@@ -33,12 +33,8 @@ impl OnChainExecutionConfig {
 
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainExecutionConfig {
-    // fn default() -> Self {
-    //     OnChainExecutionConfig::V1(ExecutionConfigV1::default())
-    // }
     fn default() -> Self {
-        // Just for testing
-        OnChainExecutionConfig::V2(ExecutionConfigV2::default())
+        OnChainExecutionConfig::V1(ExecutionConfigV1::default())
     }
 }
 
@@ -83,9 +79,7 @@ impl Default for ExecutionConfigV2 {
     fn default() -> Self {
         Self {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
-            // block_gas_limit: None,
-            // Just for testing
-            block_gas_limit: Some(1000000),
+            block_gas_limit: None,
         }
     }
 }
