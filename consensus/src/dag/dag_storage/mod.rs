@@ -10,7 +10,7 @@ use anyhow::Result;
 use aptos_schemadb::{DB, Options, SchemaBatch};
 use aptos_schemadb::schema::Schema;
 use aptos_types::PeerId;
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, WeakLinksCreator};
 
 pub type ItemId = [u8; 16];
 
@@ -31,6 +31,8 @@ pub(crate) trait DagStorage: Sync + Send {
     fn load_missing_node_id_to_status_map(&self, key: &ItemId) -> Result<Option<MissingNodeIdToStatusMap>>;
     fn load_peer_to_node_map(&self, key: &ItemId) -> Result<Option<PeerIdToCertifiedNodeMap>>;
     fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> Result<Option<PeerIdToCertifiedNodeMapEntry>>;
+    fn load_peer_status_list(&self, key: &ItemId) -> Result<Option<PeerStatusList>>;
+    fn load_peer_index_map(&self, key: &ItemId) -> Result<Option<PeerIndexMap>>;
     fn new_write_batch(&self) -> Box<dyn DagStoreWriteBatch>;
     fn commit_write_batch(&self, batch: Box<dyn DagStoreWriteBatch>) -> Result<()>;
 }
@@ -44,6 +46,8 @@ pub(crate) trait DagStoreWriteBatch: Sync + Send {
     fn put_missing_node_id_to_status_map(&mut self, obj: &MissingNodeIdToStatusMap) -> Result<()>;
     fn put_peer_to_node_map__deep(&mut self, obj: &PeerIdToCertifiedNodeMap) -> Result<()>;
     fn put_peer_to_node_map_entry__deep(&mut self, obj: &PeerIdToCertifiedNodeMapEntry) -> Result<()>;
+    fn put_peer_status_list(&mut self, obj: &PeerStatusList) -> Result<()>;
+    fn put_peer_index_map(&mut self, obj: &PeerIndexMap) -> Result<()>;
     fn as_any(&self) -> &dyn Any;
 }
 

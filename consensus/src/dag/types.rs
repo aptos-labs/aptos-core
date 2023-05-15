@@ -303,14 +303,110 @@ impl ValueCodec<DagRoundListItemSchema> for DagRoundListItem {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerStatusList {
+    pub(crate) id: ItemId,
+    inner: Vec<Option<PeerStatus>>,
+}
+
+impl PeerStatusList {
+    pub(crate) fn new(list: Vec<Option<PeerStatus>>) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner: list
+        }
+    }
+
+    pub(crate) fn iter_mut(&mut self) -> std::slice::IterMut<Option<PeerStatus>>{
+        self.inner.iter_mut()
+    }
+
+    pub(crate) fn get(&self, i: usize) -> Option<&Option<PeerStatus>> {
+        self.inner.get(i)
+    }
+
+    pub(crate) fn get_mut(&mut self, i: usize) -> Option<&mut Option<PeerStatus>> {
+        self.inner.get_mut(i)
+    }
+}
+
+impl KeyCodec<PeerStatusListSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+
+impl ValueCodec<PeerStatusListSchema> for PeerStatusList {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct PeerIndexMap {
+    pub(crate) id: ItemId,
+    inner: HashMap<PeerId, usize>,
+}
+
+impl PeerIndexMap {
+    pub(crate) fn new(inner: HashMap<PeerId, usize>) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().into_bytes(),
+            inner,
+        }
+    }
+
+    pub(crate) fn get(&self, k: &PeerId) -> Option<&usize> {
+        self.inner.get(k)
+    }
+}
+
+impl KeyCodec<PeerIndexMapSchema> for ItemId {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(self.to_vec())
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(ItemId::try_from(data)?)
+    }
+}
+
+impl ValueCodec<PeerIndexMapSchema> for PeerIndexMap {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub(crate) struct WeakLinksCreatorMetadata {
+    pub(crate) id: ItemId,
+    pub(crate) my_id: PeerId,
+    pub(crate) latest_nodes_metadata: ItemId,
+    pub(crate) address_to_validator_index: ItemId,
+}
 ///keeps track of weak links. None indicates that a (strong or weak) link was already added.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct WeakLinksCreator {
-    id: ItemId,
-    my_id: PeerId,
-    latest_nodes_metadata: Vec<Option<PeerStatus>>,
-    address_to_validator_index: HashMap<PeerId, usize>,
+    pub(crate) id: ItemId,
+    pub(crate) my_id: PeerId,
+    pub(crate) latest_nodes_metadata: PeerStatusList,
+    pub(crate) address_to_validator_index: PeerIndexMap,
 }
 
 impl WeakLinksCreator {
@@ -318,12 +414,21 @@ impl WeakLinksCreator {
         Self {
             id: uuid::Uuid::new_v4().into_bytes(),
             my_id,
-            latest_nodes_metadata: verifier
+            latest_nodes_metadata: PeerStatusList::new(verifier
                 .address_to_validator_index()
                 .iter()
                 .map(|_| None)
-                .collect(),
-            address_to_validator_index: verifier.address_to_validator_index().clone(),
+                .collect()),
+            address_to_validator_index: PeerIndexMap::new(verifier.address_to_validator_index().clone()),
+        }
+    }
+
+    pub fn metadata(&self) -> WeakLinksCreatorMetadata {
+        WeakLinksCreatorMetadata {
+            id: self.id,
+            my_id: self.my_id,
+            latest_nodes_metadata: self.latest_nodes_metadata.id,
+            address_to_validator_index: self.address_to_validator_index.id,
         }
     }
 
@@ -345,7 +450,7 @@ impl WeakLinksCreator {
             .get(&node_meta_data.source())
             .expect("invalid peer_id node metadata");
 
-        let need_to_update = match &self.latest_nodes_metadata[*peer_index] {
+        let need_to_update = match &self.latest_nodes_metadata.get(*peer_index).unwrap() {
             Some(status) => status.round() < node_meta_data.round(),
             None => true,
         };
@@ -356,7 +461,7 @@ impl WeakLinksCreator {
                 node_meta_data.round(),
                 *peer_index
             );
-            self.latest_nodes_metadata[*peer_index] = Some(PeerStatus::NotLinked(node_meta_data));
+            *self.latest_nodes_metadata.get_mut(*peer_index).unwrap() = Some(PeerStatus::NotLinked(node_meta_data));
         } else {
             info!("DAG: not updating peer latest node: my_id {},", self.my_id);
         }
@@ -365,13 +470,14 @@ impl WeakLinksCreator {
     pub fn update_with_strong_links(&mut self, round: Round, strong_links: Vec<PeerId>) {
         for peer_id in strong_links {
             let index = self.address_to_validator_index.get(&peer_id).unwrap();
-            debug_assert!(self.latest_nodes_metadata[*index].as_ref().unwrap().round() >= round);
-            if self.latest_nodes_metadata[*index].as_ref().unwrap().round() == round {
-                debug_assert!(self.latest_nodes_metadata[*index]
+            debug_assert!(self.latest_nodes_metadata.get(*index).unwrap().as_ref().unwrap().round() >= round);
+            if self.latest_nodes_metadata.get(*index).unwrap().as_ref().unwrap().round() == round {
+                debug_assert!(self.latest_nodes_metadata.get(*index).unwrap()
                     .as_ref()
                     .unwrap()
                     .not_linked());
-                self.latest_nodes_metadata[*index]
+                self.latest_nodes_metadata.get_mut(*index)
+                    .unwrap()
                     .as_mut()
                     .unwrap()
                     .mark_linked();
@@ -399,7 +505,7 @@ impl KeyCodec<WeakLinksCreatorSchema> for ItemId {
     }
 }
 
-impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreator {
+impl ValueCodec<WeakLinksCreatorSchema> for WeakLinksCreatorMetadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         let buf = bcs::to_bytes(self)?;
         Ok(buf)
@@ -818,8 +924,8 @@ pub(crate) struct DagInMem {
 }
 
 impl DagInMem {
-    pub(crate) fn partial(&self) -> DagInMem_Partial {
-        DagInMem_Partial {
+    pub(crate) fn partial(&self) -> DagInMemMetadata {
+        DagInMemMetadata {
             my_id: self.my_id,
             epoch: self.epoch,
             current_round: self.current_round,
@@ -856,7 +962,7 @@ impl DagInMem {
 
 /// The part of the DAG data that should be persisted.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct DagInMem_Partial {
+pub(crate) struct DagInMemMetadata {
     pub(crate) my_id: PeerId,
     pub(crate) epoch: u64,
     pub(crate) current_round: u64,
@@ -887,7 +993,7 @@ impl KeyCodec<DagInMemSchema> for DagInMem_Key {
     }
 }
 
-impl ValueCodec<DagInMemSchema> for DagInMem_Partial {
+impl ValueCodec<DagInMemSchema> for DagInMemMetadata {
     fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
         let mut buf = vec![];
         Write::write(&mut buf, self.my_id.as_slice())?;
@@ -928,7 +1034,7 @@ fn read_bytes(cursor: &mut Cursor<&[u8]>, n: usize) -> anyhow::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-define_schema!(WeakLinksCreatorSchema, ItemId, WeakLinksCreator, "WeakLinksCreator");
+define_schema!(WeakLinksCreatorSchema, ItemId, WeakLinksCreatorMetadata, "WeakLinksCreator");
 
 define_schema!(DagRoundListSchema, ItemId, DagRoundList_Metadata, "DagRoundList");
 
@@ -936,4 +1042,8 @@ define_schema!(DagRoundListItemSchema, DagRoundListItem_Key, DagRoundListItem, "
 
 define_schema!(MissingNodeIdToStatusMapSchema, ItemId, MissingNodeIdToStatusMap, "MissingNodeIdToStatusMap");
 
-define_schema!(DagInMemSchema, DagInMem_Key, DagInMem_Partial, "DagInMem");
+define_schema!(DagInMemSchema, DagInMem_Key, DagInMemMetadata, "DagInMem");
+
+define_schema!(PeerStatusListSchema, ItemId, PeerStatusList, "PeerStatusList");
+
+define_schema!(PeerIndexMapSchema, ItemId, PeerIndexMap, "PeerIndexMap");

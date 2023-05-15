@@ -3,7 +3,7 @@
 use std::any::Any;
 use crate::dag::dag::{};
 use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
-use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, WeakLinksCreator};
+use crate::dag::types::{DagInMem, DagInMem_Key, DagRoundList, DagRoundListItem, DagRoundListItem_Key, MissingNodeIdToStatusMap, PeerIdToCertifiedNodeMap, PeerIdToCertifiedNodeMapEntry, PeerIdToCertifiedNodeMapEntry_Key, PeerIndexMap, PeerStatusList, WeakLinksCreator};
 
 pub struct MockDagStoreWriteBatch {}
 
@@ -46,6 +46,14 @@ impl DagStoreWriteBatch for MockDagStoreWriteBatch {
         todo!()
     }
 
+    fn put_peer_status_list(&mut self, obj: &PeerStatusList) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn put_peer_index_map(&mut self, obj: &PeerIndexMap) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -85,6 +93,14 @@ impl DagStorage for MockDagStore {
     }
 
     fn load_peer_to_node_map_entry(&self, key: &PeerIdToCertifiedNodeMapEntry_Key) -> anyhow::Result<Option<PeerIdToCertifiedNodeMapEntry>> {
+        todo!()
+    }
+
+    fn load_peer_status_list(&self, key: &ItemId) -> anyhow::Result<Option<PeerStatusList>> {
+        todo!()
+    }
+
+    fn load_peer_index_map(&self, key: &ItemId) -> anyhow::Result<Option<PeerIndexMap>> {
         todo!()
     }
 
