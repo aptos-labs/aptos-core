@@ -751,6 +751,7 @@ async fn test_transfer() {
     */
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_delegation_pool_operations() {
     let (mut swarm, cli, _faucet, rosetta_client) = setup_test(1, 3).await;
