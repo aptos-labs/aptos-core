@@ -22,7 +22,7 @@ EXPECTED_TPS = {
     ("coin-transfer", True, 1): (22000.0, True),
     ("account-generation", False, 1): (11000.0, True),
     ("account-generation", True, 1): (17600.0, True),
-    ("create-new-account-resource", False, 1): (12600.0, True),
+    ("account-resource-small", False, 1): (12600.0, True),
     ("modify-global-resource", False, 1): (3900.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
     ("publish-package", False, 1): (150.0, True),

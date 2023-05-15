@@ -3,8 +3,8 @@
 
 use crate::NetworkLoadTest;
 use aptos_forge::{
-    EmitJobMode, EmitJobRequest, EntryPoints, NetworkContext, NetworkTest, Result, Test,
-    TransactionType, TxnStats,
+    args::TransactionTypeArg, EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result,
+    Test, TxnStats,
 };
 use aptos_logger::info;
 use rand::SeedableRng;
@@ -23,7 +23,7 @@ pub struct SingleRunStats {
 
 pub enum Workloads {
     TPS(&'static [usize]),
-    TRANSACTIONS(&'static [TransactinWorkload]),
+    TRANSACTIONS(&'static [TransactionWorkload]),
 }
 
 impl Workloads {
@@ -50,112 +50,34 @@ impl Workloads {
 }
 
 #[derive(Debug)]
-pub enum TransactinWorkload {
-    NoOp,
-    NoOpUnique,
-    LargeModuleWorkingSet,
-    WriteResourceSmall,
-    WriteResourceBig,
-    PublishPackages,
-    CoinTransfer,
-    CoinTransferUnique,
-    NftMint,
-    TokenV1,
+pub struct TransactionWorkload {
+    pub transaction_type: TransactionTypeArg,
+    pub num_modules: usize,
+    pub unique_senders: bool,
 }
 
-impl TransactinWorkload {
+impl TransactionWorkload {
     fn configure(&self, request: EmitJobRequest) -> EmitJobRequest {
-        let account_creation_type = TransactionType::AccountGeneration {
-            add_created_accounts_to_pool: true,
-            max_account_working_set: 10_000_000,
-            creation_balance: 200_000_000,
-        };
+        let account_creation_type =
+            TransactionTypeArg::AccountGenerationLargePool.materialize(1, false);
 
-        match self {
-            Self::NoOp => request.transaction_type(TransactionType::CallCustomModules {
-                entry_point: EntryPoints::Nop,
-                num_modules: 1,
-                use_account_pool: false,
-            }),
-            Self::LargeModuleWorkingSet => {
-                request.transaction_type(TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::Nop,
-                    num_modules: 1000,
-                    use_account_pool: false,
-                })
-            },
-            Self::WriteResourceSmall | Self::WriteResourceBig => {
-                let write_type = TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::BytesMakeOrChange {
-                        data_length: Some(
-                            if let Self::WriteResourceBig = self {
-                                1024
-                            } else {
-                                32
-                            },
-                        ),
-                    },
-                    num_modules: 1,
-                    use_account_pool: true,
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::PublishPackages => {
-                let write_type = TransactionType::PublishPackage {
-                    use_account_pool: true,
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::CoinTransfer => {
-                request.transaction_type(TransactionType::default_coin_transfer())
-            },
-            Self::NoOpUnique | Self::CoinTransferUnique => {
-                let write_type = if let Self::CoinTransferUnique = self {
-                    TransactionType::CoinTransfer {
-                        invalid_transaction_ratio: 0,
-                        sender_use_account_pool: true,
-                    }
-                } else {
-                    TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::Nop,
-                        num_modules: 1,
-                        use_account_pool: true,
-                    }
-                };
-                request.transaction_mix_per_phase(vec![
-                    // warmup
-                    vec![(account_creation_type, 1)],
-                    vec![(account_creation_type, 1)],
-                    vec![(write_type, 1)],
-                    // cooldown
-                    vec![(write_type, 1)],
-                ])
-            },
-            Self::NftMint => request.transaction_type(TransactionType::NftMintAndTransfer),
-            Self::TokenV1 => request.transaction_type(TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV1MintAndTransferNFTParallel,
-                num_modules: 1,
-                use_account_pool: false,
-            }),
+        if self.unique_senders {
+            request.transaction_type(self.transaction_type.materialize(self.num_modules, false))
+        } else {
+            let write_type = self.transaction_type.materialize(self.num_modules, true);
+            request.transaction_mix_per_phase(vec![
+                // warmup
+                vec![(account_creation_type, 1)],
+                vec![(account_creation_type, 1)],
+                vec![(write_type, 1)],
+                // cooldown
+                vec![(write_type, 1)],
+            ])
         }
     }
 }
 
-impl Display for TransactinWorkload {
+impl Display for TransactionWorkload {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Debug::fmt(self, f)
     }
