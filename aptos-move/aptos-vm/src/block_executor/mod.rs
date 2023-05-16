@@ -5,7 +5,7 @@
 pub(crate) mod vm_wrapper;
 
 use crate::{
-    adapter_common::{preprocess_transaction, PreprocessedTransaction},
+    aptos_vm::PreprocessedTransaction,
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
@@ -146,7 +146,7 @@ impl BlockAptosVM {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
+                    .map(preprocess_transaction)
                     .collect()
             });
         drop(signature_verification_timer);
@@ -190,7 +190,7 @@ impl BlockAptosVM {
                     .clone()
                     .into_par_iter()
                     .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
+                    .map(preprocess_transaction)
                     .collect()
             });
 
@@ -207,5 +207,26 @@ impl BlockAptosVM {
                     .map(|output| output.take_output())
                     .collect()
             })
+    }
+}
+
+/// Check the signature (if any) of a transaction. If the signature is OK, the result
+/// is a PreprocessedTransaction, where a user transaction is translated to a
+/// SignatureCheckedTransaction and also categorized into either a UserTransaction
+/// or a WriteSet transaction.
+fn preprocess_transaction(txn: Transaction) -> PreprocessedTransaction {
+    match txn {
+        Transaction::BlockMetadata(b) => PreprocessedTransaction::BlockMetadata(b),
+        Transaction::GenesisTransaction(ws) => PreprocessedTransaction::WaypointWriteSet(ws),
+        Transaction::UserTransaction(txn) => {
+            let checked_txn = match AptosVM::check_signature(txn) {
+                Ok(checked_txn) => checked_txn,
+                _ => {
+                    return PreprocessedTransaction::InvalidSignature;
+                },
+            };
+            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
+        },
+        Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }
 }

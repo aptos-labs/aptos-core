@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common::{PreprocessedTransaction, VMAdapter},
-    aptos_vm::AptosVM,
+    aptos_vm::{AptosVM, PreprocessedTransaction},
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
 };

@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common::{
-        discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
-    },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::BlockAptosVM,
     counters::*,
@@ -99,6 +96,18 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
 pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
+}
+
+/// Transactions after signature checking:
+/// Waypoints and BlockPrologues are not signed and are unaffected by signature checking,
+/// but a user transaction or writeset transaction is transformed to a SignatureCheckedTransaction.
+#[derive(Debug)]
+pub enum PreprocessedTransaction {
+    UserTransaction(Box<SignatureCheckedTransaction>),
+    WaypointWriteSet(WriteSetPayload),
+    BlockMetadata(BlockMetadata),
+    InvalidSignature,
+    StateCheckpoint,
 }
 
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -1436,6 +1445,147 @@ impl AptosVM {
             },
         }
     }
+
+    pub(crate) fn new_session<'r>(
+        &self,
+        resolver: &'r impl MoveResolverExt,
+        session_id: SessionId,
+    ) -> SessionExt<'r, '_> {
+        self.0.new_session(resolver, session_id)
+    }
+
+    pub(crate) fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+        txn.check_signature()
+    }
+
+    pub(crate) fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
+        if txn.contains_duplicate_signers() {
+            return Err(VMStatus::Error(
+                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
+                None,
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn run_prologue(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl MoveResolverExt,
+        transaction: &SignatureCheckedTransaction,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let txn_data = TransactionMetadata::new(transaction);
+        self.run_prologue_with_payload(
+            session,
+            resolver,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+            false,
+        )
+    }
+
+    pub(crate) fn should_restart_execution(vm_output: &TransactionOutput) -> bool {
+        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
+        vm_output
+            .events()
+            .iter()
+            .any(|event| *event.key() == new_epoch_event_key)
+    }
+
+    pub(crate) fn execute_single_transaction(
+        &self,
+        txn: &PreprocessedTransaction,
+        resolver: &impl MoveResolverExt,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
+        Ok(match txn {
+            PreprocessedTransaction::BlockMetadata(block_metadata) => {
+                fail_point!("aptos_vm::execution::block_metadata");
+                let (vm_status, output) =
+                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
+                (vm_status, output, Some("block_prologue".to_string()))
+            },
+            PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
+                let (vm_status, output) = self.process_waypoint_change_set(
+                    resolver,
+                    write_set_payload.clone(),
+                    log_context,
+                )?;
+                (vm_status, output, Some("waypoint_write_set".to_string()))
+            },
+            PreprocessedTransaction::UserTransaction(txn) => {
+                fail_point!("aptos_vm::execution::user_transaction");
+                let sender = txn.sender().to_string();
+                let _timer = TXN_TOTAL_SECONDS.start_timer();
+                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
+
+                if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
+                    vm_status.clone().keep_or_discard()
+                {
+                    error!(
+                        *log_context,
+                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                        bcs::to_bytes::<SignedTransaction>(&**txn),
+                        vm_status,
+                    );
+                    TRANSACTIONS_INVARIANT_VIOLATION.inc();
+                }
+
+                // Increment the counter for user transactions executed.
+                let counter_label = match output.txn_output().status() {
+                    TransactionStatus::Keep(_) => Some("success"),
+                    TransactionStatus::Discard(_) => Some("discarded"),
+                    TransactionStatus::Retry => None,
+                };
+                if let Some(label) = counter_label {
+                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
+                }
+                (vm_status, output, Some(sender))
+            },
+            PreprocessedTransaction::InvalidSignature => {
+                let (vm_status, output) =
+                    discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
+                (vm_status, output, None)
+            },
+            PreprocessedTransaction::StateCheckpoint => {
+                let output = TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                );
+                (
+                    VMStatus::Executed,
+                    TransactionOutputExt::from(output),
+                    Some("state_checkpoint".into()),
+                )
+            },
+        })
+    }
+
+    pub(crate) fn validate_signature_checked_transaction(
+        &self,
+        session: &mut SessionExt,
+        storage: &impl MoveResolverExt,
+        transaction: &SignatureCheckedTransaction,
+        allow_too_new: bool,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        self.check_transaction_format(transaction)?;
+
+        let prologue_status = self.run_prologue(session, storage, transaction, log_context);
+        match prologue_status {
+            Err(err)
+                if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
+            {
+                Err(err)
+            },
+            _ => Ok(()),
+        }
+    }
 }
 
 // Executor external API
@@ -1532,128 +1682,6 @@ impl VMValidator for AptosVM {
             .inc();
 
         result
-    }
-}
-
-impl VMAdapter for AptosVM {
-    fn new_session<'r>(
-        &self,
-        resolver: &'r impl MoveResolverExt,
-        session_id: SessionId,
-    ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id)
-    }
-
-    fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
-        txn.check_signature()
-    }
-
-    fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.contains_duplicate_signers() {
-            return Err(VMStatus::Error(
-                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
-                None,
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn run_prologue(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl MoveResolverExt,
-        transaction: &SignatureCheckedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let txn_data = TransactionMetadata::new(transaction);
-        self.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            &txn_data,
-            log_context,
-            false,
-        )
-    }
-
-    fn should_restart_execution(vm_output: &TransactionOutput) -> bool {
-        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
-        vm_output
-            .events()
-            .iter()
-            .any(|event| *event.key() == new_epoch_event_key)
-    }
-
-    fn execute_single_transaction(
-        &self,
-        txn: &PreprocessedTransaction,
-        resolver: &impl MoveResolverExt,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
-        Ok(match txn {
-            PreprocessedTransaction::BlockMetadata(block_metadata) => {
-                fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
-                (vm_status, output, Some("block_prologue".to_string()))
-            },
-            PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
-                let (vm_status, output) = self.process_waypoint_change_set(
-                    resolver,
-                    write_set_payload.clone(),
-                    log_context,
-                )?;
-                (vm_status, output, Some("waypoint_write_set".to_string()))
-            },
-            PreprocessedTransaction::UserTransaction(txn) => {
-                fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_string();
-                let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
-
-                if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
-                    vm_status.clone().keep_or_discard()
-                {
-                    error!(
-                        *log_context,
-                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                        bcs::to_bytes::<SignedTransaction>(&**txn),
-                        vm_status,
-                    );
-                    TRANSACTIONS_INVARIANT_VIOLATION.inc();
-                }
-
-                // Increment the counter for user transactions executed.
-                let counter_label = match output.txn_output().status() {
-                    TransactionStatus::Keep(_) => Some("success"),
-                    TransactionStatus::Discard(_) => Some("discarded"),
-                    TransactionStatus::Retry => None,
-                };
-                if let Some(label) = counter_label {
-                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
-                }
-                (vm_status, output, Some(sender))
-            },
-            PreprocessedTransaction::InvalidSignature => {
-                let (vm_status, output) =
-                    discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE, None));
-                (vm_status, output, None)
-            },
-            PreprocessedTransaction::StateCheckpoint => {
-                let output = TransactionOutput::new(
-                    WriteSet::default(),
-                    Vec::new(),
-                    0,
-                    TransactionStatus::Keep(ExecutionStatus::Success),
-                );
-                (
-                    VMStatus::Executed,
-                    TransactionOutputExt::from(output),
-                    Some("state_checkpoint".into()),
-                )
-            },
-        })
     }
 }
 
@@ -1831,4 +1859,26 @@ impl AptosSimulationVM {
             },
         }
     }
+}
+
+fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
+    let vm_status = err.clone();
+    let error_code = match err.keep_or_discard() {
+        Ok(_) => {
+            debug_assert!(false, "discarding non-discardable error: {:?}", vm_status);
+            vm_status.status_code()
+        },
+        Err(code) => code,
+    };
+    (vm_status, discard_error_output(error_code))
+}
+
+fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
+    // Since this transaction will be discarded, no writeset will be included.
+    TransactionOutputExt::from(TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Discard(err),
+    ))
 }
