@@ -43,6 +43,8 @@ use std::{
     mem::{discriminant, Discriminant},
     time::Duration,
 };
+use std::sync::mpsc::Receiver;
+use aptos_network::protocols::network::{IncomingMessage, NetworkEvents2};
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
@@ -422,6 +424,18 @@ impl NetworkTask {
         let (rpc_tx, rpc_rx) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::RPC_CHANNEL_MSGS));
 
+        let mut all_directs = Vec::new();//Vec::<Receiver<IncomingMessage>>::new();
+        let mut all_rpcrequests = Vec::new();
+        for (network_id, ne2) in network_service_events.network_and_events.into_iter() {
+            // let directs = ne2.direct_streams;
+            for (_, dr) in ne2.direct_streams.into_iter() {
+                all_directs.push(ReceiverStream::new(dr));
+            }
+            for (_, rr) in ne2.rpc_streams.into_iter() {
+                all_rpcrequests.push(ReceiverStream::new(rr));
+            }
+        }
+        let direct_selector = select_all(all_directs).fuse();
         // Verify the network events have been constructed correctly
         // let network_and_events = network_service_events.into_network_and_events(); // TODO: reimplement
         // if (network_and_events.values().len() != 1)
@@ -469,44 +483,82 @@ impl NetworkTask {
         }
     }
 
+    pub async fn handle_message(&mut self, peer_id: AccountAddress, msg: ConsensusMsg) {
+        counters::CONSENSUS_RECEIVED_MSGS
+            .with_label_values(&[msg.name()])
+            .inc();
+        match msg {
+            ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
+                warn!("unexpected rpc msg");
+            },
+            quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+            | ConsensusMsg::BatchMsg(_)
+            | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                Self::push_msg(
+                    peer_id,
+                    quorum_store_msg,
+                    &self.quorum_store_messages_tx,
+                );
+            },
+            buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+            | ConsensusMsg::CommitDecisionMsg(_)) => {
+                Self::push_msg(
+                    peer_id,
+                    buffer_manager_msg,
+                    &self.buffer_manager_messages_tx,
+                );
+            },
+            consensus_msg => {
+                if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                    observe_block(
+                        proposal.proposal().timestamp_usecs(),
+                        BlockStage::NETWORK_RECEIVED,
+                    );
+                }
+                Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+            },
+        }
+    }
+
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
-                    counters::CONSENSUS_RECEIVED_MSGS
-                        .with_label_values(&[msg.name()])
-                        .inc();
-                    match msg {
-                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
-                            warn!("unexpected rpc msg");
-                        },
-                        quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
-                        | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
-                            Self::push_msg(
-                                peer_id,
-                                quorum_store_msg,
-                                &self.quorum_store_messages_tx,
-                            );
-                        },
-                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
-                        | ConsensusMsg::CommitDecisionMsg(_)) => {
-                            Self::push_msg(
-                                peer_id,
-                                buffer_manager_msg,
-                                &self.buffer_manager_messages_tx,
-                            );
-                        },
-                        consensus_msg => {
-                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
-                                observe_block(
-                                    proposal.proposal().timestamp_usecs(),
-                                    BlockStage::NETWORK_RECEIVED,
-                                );
-                            }
-                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
-                        },
-                    }
+                    // counters::CONSENSUS_RECEIVED_MSGS
+                    //     .with_label_values(&[msg.name()])
+                    //     .inc();
+                    // match msg {
+                    //     ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
+                    //         warn!("unexpected rpc msg");
+                    //     },
+                    //     quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+                    //     | ConsensusMsg::BatchMsg(_)
+                    //     | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                    //         Self::push_msg(
+                    //             peer_id,
+                    //             quorum_store_msg,
+                    //             &self.quorum_store_messages_tx,
+                    //         );
+                    //     },
+                    //     buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
+                    //     | ConsensusMsg::CommitDecisionMsg(_)) => {
+                    //         Self::push_msg(
+                    //             peer_id,
+                    //             buffer_manager_msg,
+                    //             &self.buffer_manager_messages_tx,
+                    //         );
+                    //     },
+                    //     consensus_msg => {
+                    //         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
+                    //             observe_block(
+                    //                 proposal.proposal().timestamp_usecs(),
+                    //                 BlockStage::NETWORK_RECEIVED,
+                    //             );
+                    //         }
+                    //         Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                    //     },
+                    // }
+                    self.handle_message(peer_id, msg);
                 },
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {

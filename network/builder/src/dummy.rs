@@ -113,7 +113,7 @@ pub fn setup_network() -> DummyNetwork {
     let listener_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
         vec![TEST_RPC_PROTOCOL],
-        // hashmap! {network_id => listener_sender},
+        hashmap! {network_id => listener_sender},
         peers_and_metadata,
     );
 
@@ -146,7 +146,7 @@ pub fn setup_network() -> DummyNetwork {
     let dialer_network_client = NetworkClient::new(
         vec![TEST_DIRECT_SEND_PROTOCOL],
         vec![TEST_RPC_PROTOCOL],
-        //hashmap! {network_id => dialer_sender},
+        hashmap! {network_id => dialer_sender},
         peers_and_metadata,
     );
 

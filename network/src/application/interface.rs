@@ -19,10 +19,12 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use bytes::Bytes;
+use futures::executor::block_on;
 use futures_util::future::FusedFuture;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use crate::protocols::network::NetworkEvents2;
+use crate::protocols::rpc::error::RpcError;
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -82,7 +84,7 @@ pub trait NetworkClientInterface: Clone + Send + Sync {
 pub struct NetworkClient {
     direct_send_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
     rpc_protocols_and_preferences: Vec<ProtocolId>, // Protocols are sorted by preference (highest to lowest)
-    // network_senders: HashMap<NetworkId, NetworkSender>,
+    network_senders: HashMap<NetworkId, NetworkSender>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -90,13 +92,13 @@ impl NetworkClient {
     pub fn new(
         direct_send_protocols_and_preferences: Vec<ProtocolId>,
         rpc_protocols_and_preferences: Vec<ProtocolId>,
-        // network_senders: HashMap<NetworkId, NetworkSender>,
+        network_senders: HashMap<NetworkId, NetworkSender>,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             direct_send_protocols_and_preferences,
             rpc_protocols_and_preferences,
-            // network_senders,
+            network_senders,
             peers_and_metadata,
         }
     }
@@ -146,32 +148,18 @@ impl NetworkClient {
         // TODO: put on per-peer-per-network outbound queue for a per-peer send thread
         // TODO: manage maximum number of pending messages and maximum total pending bytes on a peer outbound queue
         // TODO? (optionally, for some queues) when the queue is full push a new message and drop the _oldest_ message. The old message may be obsolete already, only send the newest data.
-        Err(Error::UnexpectedError(format!("TODO: implement network client send_bytes_to_peer")))
+        let network_id = peer.network_id();
+        let ns = self.network_senders.get(&network_id).ok_or_else(|| RpcError::NotConnected(peer.peer_id()))?;
+        return ns.send_to(peer.peer_id(), protocol_id, message).map_err(|e| Error::NetworkError(e.to_string()))
     }
 
-    fn send_rpc_to_peer(&self, protocol_id: ProtocolId, message: Bytes, rpc_timeout: Duration, peer: &PeerNetworkId) -> RpcResult {
+    async fn send_rpc_to_peer(&self, protocol_id: ProtocolId, message: Bytes, rpc_timeout: Duration, peer: &PeerNetworkId) -> Result<Bytes, RpcError> {
         // TODO: outbound RPC could get complicated. timeout could happen to something in the queue and not even sent yet.
         // A timer task needs to keep a priority queue ordered by next timeout.
         // Lookup by rpc_id and lookup by timeout both need to be cleared when either is invoked.
-        RpcResult{}
-    }
-}
-
-pub struct RpcResult {
-    // TODO: stuff?
-}
-
-impl Future for RpcResult {
-    type Output = Bytes;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Pending // TODO: implement RpcResult FusedFuture
-    }
-}
-
-impl FusedFuture for RpcResult {
-    fn is_terminated(&self) -> bool {
-        true // TODO: implement RpcResult FusedFuture
+        let network_id = peer.network_id();
+        let ns = self.network_senders.get(&network_id).ok_or_else(|| RpcError::NotConnected(peer.peer_id()))?;
+        ns.send_rpc(peer.peer_id(),protocol_id,message,rpc_timeout).await
     }
 }
 
@@ -284,7 +272,7 @@ impl NetworkClientInterface for NetworkClient {
         // let result = network_sender
         //     .send_rpc(peer.peer_id(), protocol_id, blob.into(), rpc_timeout)
         //     .await?;
-        let result = self.send_rpc_to_peer(protocol_id, blob.into(), rpc_timeout, &peer).await;
+        let result = self.send_rpc_to_peer(protocol_id, blob.into(), rpc_timeout, &peer).await.map_err(|e| Error::RpcError(e.to_string()))?;
         protocol_id.from_bytes(result.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))
     }
 }
@@ -292,13 +280,17 @@ impl NetworkClientInterface for NetworkClient {
 /// A network component that can be used by server applications (e.g., consensus,
 /// state sync and mempool, etc.) to respond to network events and network clients.
 pub struct NetworkServiceEvents {
-    network_and_events: HashMap<NetworkId, NetworkEvents2>,
+    pub network_and_events: HashMap<NetworkId, NetworkEvents2>,
 }
 
 impl NetworkServiceEvents {
     pub fn new(network_and_events: HashMap<NetworkId, NetworkEvents2>) -> Self {
         Self { network_and_events }
     }
+
+    // pub fn get_direct_streams(self) -> Vec<(&NetworkId, &NetworkEvents2)> {
+    //     self.network_and_events.iter().map(|x| (x.0, x.1.direct_streams)).collect()
+    // }
     //
     // /// Consumes and returns the network and events map
     // pub fn into_network_and_events(self) -> HashMap<NetworkId, NetworkEvents<_>> {

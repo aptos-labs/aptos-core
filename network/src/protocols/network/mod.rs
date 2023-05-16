@@ -165,9 +165,10 @@ pub struct IncomingRpcRequest {
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
-pub struct NetworkEvents2 { // TODO: implement
-    pub direct_streams: Vec<(ProtocolId, Receiver<IncomingMessage>)>,
-    pub rpc_streams: Vec<(ProtocolId, Receiver<IncomingRpcRequest>)>,
+/// NetworkEvents2 is a temporary container for sets of streams from where they are set up to where they are consumed
+pub struct NetworkEvents2 {
+    pub direct_streams: Vec<(ProtocolId, tokio::sync::mpsc::Receiver<IncomingMessage>)>,
+    pub rpc_streams: Vec<(ProtocolId, tokio::sync::mpsc::Receiver<IncomingRpcRequest>)>,
 }
 
 impl NetworkEvents2 {
