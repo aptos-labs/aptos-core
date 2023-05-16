@@ -29,8 +29,10 @@ SUBCOMMANDS:
     init          Tool to initialize current directory for the aptos tool
     key           Tool for generating, inspecting, and interacting with keys
     move          Tool for Move related operations
+    multisig      Tool for interacting with multisig accounts
     node          Tool for operations related to nodes
-    stake         Tool for manipulating stake
+    stake         Tool for manipulating stake and stake pools
+    update        Update the CLI itself
 ```
 
 ### Command-specific help

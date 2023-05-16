@@ -14,10 +14,10 @@ use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
-            load_account_arg, CliConfig, CliError, CliTypedResult, ConfigSearchMode,
-            EntryFunctionArguments, MoveManifestAccountWrapper, MovePackageDir, ProfileOptions,
-            PromptOptions, RestOptions, ScriptFunctionArguments, TransactionOptions,
-            TransactionSummary,
+            load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
+            ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
+            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
+            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -38,6 +38,9 @@ use aptos_framework::{
     prover::ProverOptions, BuildOptions, BuiltPackage,
 };
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters};
+use aptos_rest_client::aptos_api_types::{
+    self, EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
+};
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -57,6 +60,7 @@ use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     collections::BTreeMap,
     fmt::{Display, Formatter},
@@ -625,6 +629,9 @@ pub struct PublishPackage {
     pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+    /// JSON output file to write publication transaction to instead of publishing on-chain
+    #[clap(long, parse(from_os_str))]
+    pub(crate) json_output_file: Option<PathBuf>,
 }
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
@@ -717,6 +724,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             txn_options,
             override_size_check,
             included_artifacts_args,
+            json_output_file,
         } = self;
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts_args.included_artifacts.build_options(
@@ -728,10 +736,11 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let compiled_units = package.extract_code();
 
         // Send the compiled module and metadata using the code::publish_package_txn.
-        let metadata = package.extract_metadata()?;
+        let metadata_serialized =
+            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS");
         let payload = aptos_cached_packages::aptos_stdlib::code_publish_package_txn(
-            bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
-            compiled_units,
+            metadata_serialized.clone(),
+            compiled_units.clone(),
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
@@ -743,7 +752,68 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        profile_or_submit(payload, &txn_options).await
+        // If JSON output file specified, store entry function JSON file on disk.
+        if let Some(output_file) = json_output_file {
+            // Extract entry function data from publication payload.
+            let entry_function = payload.into_entry_function();
+            let entry_function_id = EntryFunctionId {
+                module: MoveModuleId::from(entry_function.module().clone()),
+                name: IdentifierWrapper::from(entry_function.function()),
+            };
+            let package_metadata_hex = HexEncodedBytes(metadata_serialized).to_string();
+            let package_code_hex_vec: Vec<String> = compiled_units
+                .clone()
+                .into_iter()
+                .map(|element| HexEncodedBytes(element).to_string())
+                .collect();
+            // Construct entry function JSON file representation from entry function data.
+            let json = EntryFunctionArgumentsJSON {
+                function_id: entry_function_id.to_string(),
+                type_args: vec![],
+                args: vec![
+                    ArgWithTypeJSON {
+                        arg_type: "hex".to_string(),
+                        arg_value: serde_json::Value::String(package_metadata_hex),
+                    },
+                    ArgWithTypeJSON {
+                        arg_type: "hex".to_string(),
+                        arg_value: json!(package_code_hex_vec),
+                    },
+                ],
+            };
+            // Create save file options for checking and saving file to disk.
+            let save_file = SaveFile {
+                output_file,
+                prompt_options: txn_options.prompt_options,
+            };
+            save_file.check_file()?;
+            save_file.save_to_file(
+                "Publication entry function JSON file",
+                serde_json::to_string_pretty(&json)
+                    .map_err(|err| CliError::UnexpectedError(format!("{}", err)))?
+                    .as_bytes(),
+            )?;
+            Ok(TransactionSummary {
+                // Pass bogus hash for required struct field.
+                transaction_hash: aptos_api_types::HashValue::from(HashValue::zero()),
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sender: None,
+                sequence_number: None,
+                success: None,
+                timestamp_us: None,
+                version: None,
+                // Pass feedback message in available String field.
+                vm_status: Some(format!(
+                    "Publication entry function JSON file saved to {}",
+                    save_file.output_file.display()
+                )),
+            })
+        // If no JSON output file specified, publish on-chain.
+        } else {
+            profile_or_submit(payload, &txn_options).await
+        }
     }
 }
 
@@ -1205,7 +1275,9 @@ impl FunctionArgType {
             )
             .map_err(|err| CliError::BCS("arg", err)),
             FunctionArgType::Hex => bcs::to_bytes(
-                &hex::decode(arg).map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
+                HexEncodedBytes::from_str(arg)
+                    .map_err(|err| CliError::UnableToParse("hex", err.to_string()))?
+                    .inner(),
             )
             .map_err(|err| CliError::BCS("arg", err)),
             FunctionArgType::String => bcs::to_bytes(arg).map_err(|err| CliError::BCS("arg", err)),
@@ -1238,9 +1310,10 @@ impl FunctionArgType {
                     .map_err(|err| CliError::UnableToParse("u256", err.to_string()))?,
             )
             .map_err(|err| CliError::BCS("arg", err)),
-            FunctionArgType::Raw => {
-                hex::decode(arg).map_err(|err| CliError::UnableToParse("raw", err.to_string()))
-            },
+            FunctionArgType::Raw => Ok(HexEncodedBytes::from_str(arg)
+                .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?
+                .inner()
+                .to_vec()),
         }
     }
 

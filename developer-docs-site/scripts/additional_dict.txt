@@ -96,6 +96,7 @@ EWITHDRAW
 EWRONG
 EZERO
 Eg
+Enqueue
 EntryFunction
 EntryFunctionPayload
 Enums
@@ -332,6 +333,7 @@ doesnt
 dr
 eg
 endian
+enqueue
 entrancy
 enum
 enums

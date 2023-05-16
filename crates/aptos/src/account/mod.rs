@@ -49,6 +49,7 @@ impl AccountTool {
 pub enum MultisigAccountTool {
     Approve(multisig_account::Approve),
     Create(multisig_account::Create),
+    CheckTransaction(multisig_account::CheckTransaction),
     CreateTransaction(multisig_account::CreateTransaction),
     Execute(multisig_account::Execute),
     ExecuteReject(multisig_account::ExecuteReject),
@@ -60,6 +61,7 @@ impl MultisigAccountTool {
         match self {
             MultisigAccountTool::Approve(tool) => tool.execute_serialized().await,
             MultisigAccountTool::Create(tool) => tool.execute_serialized().await,
+            MultisigAccountTool::CheckTransaction(tool) => tool.execute_serialized().await,
             MultisigAccountTool::CreateTransaction(tool) => tool.execute_serialized().await,
             MultisigAccountTool::Execute(tool) => tool.execute_serialized().await,
             MultisigAccountTool::ExecuteReject(tool) => tool.execute_serialized().await,

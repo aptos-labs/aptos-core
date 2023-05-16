@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    CliCommand, CliTypedResult, EntryFunctionArguments, MultisigAccount, TransactionOptions,
-    TransactionSummary,
+use crate::common::{
+    types::{
+        CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
+        TransactionOptions, TransactionSummary,
+    },
+    utils::get_view_json_option_vec_ref,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_rest_client::{
-    aptos_api_types::{WriteResource, WriteSetChange},
+    aptos_api_types::{HexEncodedBytes, ViewRequest, WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_types::{
@@ -18,6 +21,9 @@ use async_trait::async_trait;
 use bcs::to_bytes;
 use clap::Parser;
 use serde::Serialize;
+use serde_json::json;
+use sha2::Digest;
+use sha3::Sha3_256;
 
 /// Create a new multisig account (v2) on-chain.
 ///
@@ -107,6 +113,9 @@ pub struct CreateTransaction {
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) entry_function_args: EntryFunctionArguments,
+    /// Pass this flag if only storing transaction hash on-chain. Else full payload is stored
+    #[clap(long)]
+    pub(crate) hash_only: bool,
 }
 
 #[async_trait]
@@ -116,15 +125,97 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload =
-            MultisigTransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
-        self.txn_options
-            .submit_transaction(aptos_stdlib::multisig_account_create_transaction(
+        let multisig_transaction_payload_bytes =
+            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+        let transaction_payload = if self.hash_only {
+            aptos_stdlib::multisig_account_create_transaction_with_hash(
                 self.multisig_account.multisig_address,
-                to_bytes(&payload)?,
-            ))
+                Sha3_256::digest(&multisig_transaction_payload_bytes).to_vec(),
+            )
+        } else {
+            aptos_stdlib::multisig_account_create_transaction(
+                self.multisig_account.multisig_address,
+                multisig_transaction_payload_bytes,
+            )
+        };
+        self.txn_options
+            .submit_transaction(transaction_payload)
             .await
             .map(|inner| inner.into())
+    }
+}
+
+/// Check entry function against on-chain transaction proposal payload.
+#[derive(Debug, Parser)]
+pub struct CheckTransaction {
+    #[clap(flatten)]
+    pub(crate) multisig_account: MultisigAccount,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
+    /// Sequence number of multisig transaction to check
+    #[clap(long)]
+    pub(crate) sequence_number: u64,
+}
+
+#[async_trait]
+impl CliCommand<serde_json::Value> for CheckTransaction {
+    fn command_name(&self) -> &'static str {
+        "CheckTransactionMultisig"
+    }
+
+    async fn execute(self) -> CliTypedResult<serde_json::Value> {
+        // Get multisig transaction via view function.
+        let multisig_transaction = &self
+            .txn_options
+            .view(ViewRequest {
+                function: "0x1::multisig_account::get_transaction".parse()?,
+                type_arguments: vec![],
+                arguments: vec![
+                    serde_json::Value::String(String::from(
+                        &self.multisig_account.multisig_address,
+                    )),
+                    serde_json::Value::String(self.sequence_number.to_string()),
+                ],
+            })
+            .await?[0];
+        // Get reference to inner payload option from multisig transaction.
+        let multisig_payload_option_ref =
+            get_view_json_option_vec_ref(&multisig_transaction["payload"]);
+        // Get expected multisig transaction payload bytes from provided entry function.
+        let expected_multisig_transaction_payload_bytes =
+            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+        // If full payload stored on-chain, get expected bytes and reference to actual hex option:
+        let (expected_bytes, actual_value_hex_option_ref) =
+            if !multisig_payload_option_ref.is_empty() {
+                (
+                    expected_multisig_transaction_payload_bytes,
+                    multisig_payload_option_ref,
+                )
+            // If only payload hash on-chain, get different compare values:
+            } else {
+                (
+                    Sha3_256::digest(&expected_multisig_transaction_payload_bytes).to_vec(),
+                    get_view_json_option_vec_ref(&multisig_transaction["payload_hash"]),
+                )
+            };
+        // If expected bytes matches actual hex from view function:
+        if expected_bytes.eq(&actual_value_hex_option_ref[0]
+            .as_str()
+            .unwrap()
+            .parse::<HexEncodedBytes>()?
+            .inner())
+        {
+            // Return success message.
+            Ok(json!({
+                "Status": "Transaction match",
+                "Multisig transaction": multisig_transaction
+            }))
+        } else {
+            // If a mismatch between expected bytes and actual hex, error out.
+            Err(CliError::UnexpectedError("Payload mismatch".to_string()))
+        }
     }
 }
 
@@ -206,6 +297,8 @@ pub struct Execute {
     pub(crate) multisig_account: MultisigAccount,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) entry_function_args: EntryFunctionArguments,
 }
 
 #[async_trait]
@@ -215,13 +308,11 @@ impl CliCommand<TransactionSummary> for Execute {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload = TransactionPayload::Multisig(Multisig {
-            multisig_address: self.multisig_account.multisig_address,
-            // TODO: Support passing an explicit payload
-            transaction_payload: None,
-        });
         self.txn_options
-            .submit_transaction(payload)
+            .submit_transaction(TransactionPayload::Multisig(Multisig {
+                multisig_address: self.multisig_account.multisig_address,
+                transaction_payload: self.entry_function_args.try_into()?,
+            }))
             .await
             .map(|inner| inner.into())
     }
