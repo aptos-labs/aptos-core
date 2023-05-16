@@ -28,7 +28,8 @@ use crate::{
         },
         v2_token_utils::{
             AptosCollection, BurnEvent, FixedSupply, ObjectCore, PropertyMap,
-            TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned, UnlimitedSupply,
+            TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned, TransferEvent,
+            UnlimitedSupply,
         },
     },
     schema,
@@ -980,13 +981,6 @@ fn parse_v2_token(
             // Get burn events for token v2 by object
             let mut tokens_burned: TokenV2Burned = HashSet::new();
 
-            // Pass through events to get the burn events and token activities v2
-            for (_, event) in user_txn.events.iter().enumerate() {
-                if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
-                    tokens_burned.insert(burn_event.get_token_address());
-                }
-            }
-
             // Need to do a first pass to get all the objects
             for (_, wsc) in user_txn.info.changes.iter().enumerate() {
                 if let WriteSetChange::WriteResource(wr) = wsc {
@@ -1001,8 +995,30 @@ fn parse_v2_token(
                                 object: object_core,
                                 unlimited_supply: None,
                                 property_map: None,
+                                transfer_event: None,
                             },
                         );
+                    }
+                }
+            }
+
+            // Pass through events to get the burn events and token activities v2
+            for (index, event) in user_txn.events.iter().enumerate() {
+                if let Some(burn_event) = BurnEvent::from_event(event, txn_version).unwrap() {
+                    tokens_burned.insert(burn_event.get_token_address());
+                }
+                if let Some(transfer_event) = TransferEvent::from_event(event, txn_version).unwrap()
+                {
+                    if let Some(aggregated_data) =
+                        token_v2_metadata.get_mut(&transfer_event.get_object_address())
+                    {
+                        // we don't want index to be 0 otherwise we might have collision with write set change index
+                        let index = if index == 0 {
+                            user_txn.events.len()
+                        } else {
+                            index
+                        };
+                        aggregated_data.transfer_event = Some((index as i64, transfer_event));
                     }
                 }
             }
@@ -1165,18 +1181,23 @@ fn parse_v2_token(
                             .unwrap()
                         {
                             // Add NFT ownership
-                            let (nft_ownership, current_nft_ownership) =
-                                TokenOwnershipV2::get_nft_v2_from_token_data(
-                                    &token_data,
-                                    &token_v2_metadata,
-                                )
-                                .unwrap();
+                            let (
+                                nft_ownership,
+                                current_nft_ownership,
+                                from_nft_ownership,
+                                from_current_nft_ownership,
+                            ) = TokenOwnershipV2::get_nft_v2_from_token_data(
+                                &token_data,
+                                &token_v2_metadata,
+                            )
+                            .unwrap();
                             token_datas_v2.push(token_data);
                             current_token_datas_v2.insert(
                                 current_token_data.token_data_id.clone(),
                                 current_token_data,
                             );
                             token_ownerships_v2.push(nft_ownership);
+                            // this is used to persist latest owner for burn event handling
                             prior_nft_ownership.insert(
                                 current_nft_ownership.token_data_id.clone(),
                                 NFTOwnershipV2 {
@@ -1194,6 +1215,21 @@ fn parse_v2_token(
                                 ),
                                 current_nft_ownership,
                             );
+                            // Add the previous owner of the token transfer
+                            if let Some(from_nft_ownership) = from_nft_ownership {
+                                let from_current_nft_ownership =
+                                    from_current_nft_ownership.unwrap();
+                                token_ownerships_v2.push(from_nft_ownership);
+                                current_token_ownerships_v2.insert(
+                                    (
+                                        from_current_nft_ownership.token_data_id.clone(),
+                                        from_current_nft_ownership.property_version_v1.clone(),
+                                        from_current_nft_ownership.owner_address.clone(),
+                                        from_current_nft_ownership.storage_id.clone(),
+                                    ),
+                                    from_current_nft_ownership,
+                                );
+                            }
 
                             // Add burned NFT handling
                             if let Some((nft_ownership, current_nft_ownership)) =

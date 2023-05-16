@@ -24,6 +24,8 @@ use std::{
 pub type TokenV2AggregatedDataMapping = HashMap<CurrentObjectPK, TokenV2AggregatedData>;
 /// Tracks all token related data in a hashmap for quick access (keyed on address of the object core)
 pub type TokenV2Burned = HashSet<CurrentObjectPK>;
+/// Index of the event so that we can write its inverse to the db as primary key (to avoid collisiona)
+pub type EventIndex = i64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TokenV2AggregatedData {
@@ -32,6 +34,7 @@ pub struct TokenV2AggregatedData {
     pub object: ObjectCore,
     pub unlimited_supply: Option<UnlimitedSupply>,
     pub property_map: Option<PropertyMap>,
+    pub transfer_event: Option<(EventIndex, TransferEvent)>,
 }
 
 /// Tracks which token standard a token / collection is built upon
@@ -270,6 +273,38 @@ impl BurnEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TransferEvent {
+    from: String,
+    to: String,
+    object: String,
+}
+
+impl TransferEvent {
+    pub fn from_event(event: &Event, txn_version: i64) -> anyhow::Result<Option<Self>> {
+        let event_type = event.typ.to_string();
+        if let Some(V2TokenEvent::TransferEvent(inner)) =
+            V2TokenEvent::from_event(event_type.as_str(), &event.data, txn_version).unwrap()
+        {
+            Ok(Some(inner))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_from_address(&self) -> String {
+        standardize_address(&self.from)
+    }
+
+    pub fn get_to_address(&self) -> String {
+        standardize_address(&self.to)
+    }
+
+    pub fn get_object_address(&self) -> String {
+        standardize_address(&self.object)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyMap {
     #[serde(deserialize_with = "deserialize_token_object_property_map_from_bcs_hexstring")]
     pub inner: serde_json::Value,
@@ -374,6 +409,7 @@ impl V2TokenResource {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum V2TokenEvent {
     BurnEvent(BurnEvent),
+    TransferEvent(TransferEvent),
 }
 
 impl V2TokenEvent {
@@ -385,6 +421,9 @@ impl V2TokenEvent {
         match data_type {
             "0x4::collection::BurnEvent" => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::BurnEvent(inner)))
+            },
+            "0x1::object::TransferEvent" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(Self::TransferEvent(inner)))
             },
             _ => Ok(None),
         }

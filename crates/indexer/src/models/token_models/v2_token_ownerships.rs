@@ -101,7 +101,12 @@ impl TokenOwnershipV2 {
     pub fn get_nft_v2_from_token_data(
         token_data: &TokenDataV2,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
-    ) -> anyhow::Result<(Self, CurrentTokenOwnershipV2)> {
+    ) -> anyhow::Result<(
+        Self,
+        CurrentTokenOwnershipV2,
+        Option<Self>, // If token was transferred, the previous ownership record
+        Option<CurrentTokenOwnershipV2>, // If token was transferred, the previous ownership record
+    )> {
         let metadata = token_v2_metadata
             .get(&token_data.token_data_id)
             .context("If token data exists objectcore must exist")?;
@@ -111,37 +116,79 @@ impl TokenOwnershipV2 {
         let storage_id = token_data_id.clone();
         let is_soulbound = !object_core.allow_ungated_transfer;
 
-        Ok((
-            Self {
-                transaction_version: token_data.transaction_version,
-                write_set_change_index: token_data.write_set_change_index,
-                token_data_id: token_data_id.clone(),
-                property_version_v1: BigDecimal::zero(),
-                owner_address: Some(owner_address.clone()),
-                storage_id: storage_id.clone(),
-                amount: BigDecimal::one(),
-                table_type_v1: None,
-                token_properties_mutated_v1: None,
-                is_soulbound_v2: Some(is_soulbound),
-                token_standard: TokenStandard::V2.to_string(),
-                is_fungible_v2: token_data.is_fungible_v2,
-                transaction_timestamp: token_data.transaction_timestamp,
-            },
-            CurrentTokenOwnershipV2 {
-                token_data_id,
-                property_version_v1: BigDecimal::zero(),
-                owner_address,
-                storage_id,
-                amount: BigDecimal::one(),
-                table_type_v1: None,
-                token_properties_mutated_v1: None,
-                is_soulbound_v2: Some(is_soulbound),
-                token_standard: TokenStandard::V2.to_string(),
-                is_fungible_v2: token_data.is_fungible_v2,
-                last_transaction_version: token_data.transaction_version,
-                last_transaction_timestamp: token_data.transaction_timestamp,
-            },
-        ))
+        let ownership = Self {
+            transaction_version: token_data.transaction_version,
+            write_set_change_index: token_data.write_set_change_index,
+            token_data_id: token_data_id.clone(),
+            property_version_v1: BigDecimal::zero(),
+            owner_address: Some(owner_address.clone()),
+            storage_id: storage_id.clone(),
+            amount: BigDecimal::one(),
+            table_type_v1: None,
+            token_properties_mutated_v1: None,
+            is_soulbound_v2: Some(is_soulbound),
+            token_standard: TokenStandard::V2.to_string(),
+            is_fungible_v2: token_data.is_fungible_v2,
+            transaction_timestamp: token_data.transaction_timestamp,
+        };
+        let current_ownership = CurrentTokenOwnershipV2 {
+            token_data_id: token_data_id.clone(),
+            property_version_v1: BigDecimal::zero(),
+            owner_address,
+            storage_id: storage_id.clone(),
+            amount: BigDecimal::one(),
+            table_type_v1: None,
+            token_properties_mutated_v1: None,
+            is_soulbound_v2: Some(is_soulbound),
+            token_standard: TokenStandard::V2.to_string(),
+            is_fungible_v2: token_data.is_fungible_v2,
+            last_transaction_version: token_data.transaction_version,
+            last_transaction_timestamp: token_data.transaction_timestamp,
+        };
+
+        // check if token was transferred
+        if let Some((event_index, transfer_event)) = &metadata.transfer_event {
+            Ok((
+                ownership,
+                current_ownership,
+                Some(Self {
+                    transaction_version: token_data.transaction_version,
+                    // set to negative of event index to avoid collison with write set index
+                    write_set_change_index: -1 * event_index,
+                    token_data_id: token_data_id.clone(),
+                    property_version_v1: BigDecimal::zero(),
+                    // previous owner
+                    owner_address: Some(transfer_event.get_from_address()),
+                    storage_id: storage_id.clone(),
+                    // soft delete
+                    amount: BigDecimal::zero(),
+                    table_type_v1: None,
+                    token_properties_mutated_v1: None,
+                    is_soulbound_v2: Some(is_soulbound),
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: token_data.is_fungible_v2,
+                    transaction_timestamp: token_data.transaction_timestamp,
+                }),
+                Some(CurrentTokenOwnershipV2 {
+                    token_data_id,
+                    property_version_v1: BigDecimal::zero(),
+                    // previous owner
+                    owner_address: transfer_event.get_from_address(),
+                    storage_id,
+                    // soft delete
+                    amount: BigDecimal::zero(),
+                    table_type_v1: None,
+                    token_properties_mutated_v1: None,
+                    is_soulbound_v2: Some(is_soulbound),
+                    token_standard: TokenStandard::V2.to_string(),
+                    is_fungible_v2: token_data.is_fungible_v2,
+                    last_transaction_version: token_data.transaction_version,
+                    last_transaction_timestamp: token_data.transaction_timestamp,
+                }),
+            ))
+        } else {
+            Ok((ownership, current_ownership, None, None))
+        }
     }
 
     /// This handles the case where token is burned but objectCore is still there
