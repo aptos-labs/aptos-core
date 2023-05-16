@@ -70,7 +70,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    cmp::min,
+    cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
     marker::Sync,
@@ -148,7 +148,7 @@ impl AptosVM {
     }
 
     pub fn set_num_shards_once(mut num_shards: usize) {
-        num_shards = min(num_shards, 1);
+        num_shards = max(num_shards, 1);
         // Only the first call succeeds, due to OnceCell semantics.
         NUM_EXECUTION_SHARD.set(num_shards).ok();
     }
