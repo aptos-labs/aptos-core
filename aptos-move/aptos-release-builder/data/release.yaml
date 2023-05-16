@@ -25,29 +25,28 @@ proposals:
         enabled:
           - cryptography_algebra_natives
           - bls12381_structures
-        disabled: []
   - name: enable_quorum_store
-      metadata:
-        title: "Enable Quorum Store"
-        description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
-        source_code_url: "TBD"
-        discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
-      execution_mode: MultiStep
-      update_sequence:
-      - Consensus:
-          V2:
-            decoupled_execution: true
-            back_pressure_limit: 10
-            exclude_round: 40
-            proposer_election_type:
-              leader_reputation:
-                proposer_and_voter_v2:
-                  active_weight: 1000
-                  inactive_weight: 10
-                  failed_weight: 1
-                  failure_threshold_percent: 10
-                  proposer_window_num_validators_multiplier: 10
-                  voter_window_num_validators_multiplier: 1
-                  weight_by_voting_power: true
-                  use_history_from_previous_epoch_max_count: 5
-            max_failed_authors_to_store: 10
+    metadata:
+      title: "Enable Quorum Store"
+      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
+      source_code_url: "TBD"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
+    execution_mode: MultiStep
+    update_sequence:
+    - Consensus:
+        V2:
+          decoupled_execution: true
+          back_pressure_limit: 10
+          exclude_round: 40
+          proposer_election_type:
+            leader_reputation:
+              proposer_and_voter_v2:
+                active_weight: 1000
+                inactive_weight: 10
+                failed_weight: 1
+                failure_threshold_percent: 10
+                proposer_window_num_validators_multiplier: 10
+                voter_window_num_validators_multiplier: 1
+                weight_by_voting_power: true
+                use_history_from_previous_epoch_max_count: 5
+          max_failed_authors_to_store: 10
