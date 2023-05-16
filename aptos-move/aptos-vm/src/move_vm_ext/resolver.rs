@@ -10,6 +10,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, resolver::MoveResolver,
 };
 use move_table_extension::TableResolver;
+use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
     MoveResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
@@ -25,6 +26,12 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, VMError>;
+
+    fn release_resource_group_cache(
+        &self,
+        address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>>;
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {

@@ -14,8 +14,8 @@ use crate::{
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     verify_module_identifier, Address, AptosErrorCode, AsConverter, IdentifierWrapper,
-    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawTableItemRequest,
-    TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
+    MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
+    RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
@@ -213,6 +213,44 @@ impl StateApi {
             table_item_request.0,
             ledger_version.0,
         )
+    }
+
+    /// Get raw state value.
+    ///
+    /// Get a state value at a specific ledger version, identified by the key provided
+    /// in the request body.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window.
+    /// If the requested ledger version has been pruned, the server responds with a 410.
+    #[oai(
+        path = "/experimental/state_values/raw",
+        method = "post",
+        operation_id = "get_raw_state_value",
+        tag = "ApiTags::Experimental",
+        hidden
+    )]
+    async fn get_raw_state_value(
+        &self,
+        accept_type: AcceptType,
+        /// Request that carries the state key.
+        request: Json<RawStateValueRequest>,
+        /// Ledger version at which the value is got.
+        ///
+        /// If not provided, it will be the latest version
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<MoveValue> {
+        fail_point_poem("endpoint_get_raw_state_value")?;
+
+        if AcceptType::Json == accept_type {
+            return Err(api_forbidden(
+                "Get raw state value",
+                "Only BCS is supported as an AcceptType.",
+            ));
+        }
+        self.context
+            .check_api_output_enabled("Get raw state value", &accept_type)?;
+
+        self.raw_value(&accept_type, request.0, ledger_version.0)
     }
 }
 
@@ -466,6 +504,75 @@ impl StateApi {
             AcceptType::Json => Err(api_forbidden(
                 "Get raw table item",
                 "Please use get table item instead.",
+            )),
+            AcceptType::Bcs => {
+                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
+            },
+        }
+    }
+
+    /// Retrieve state value for a specific ledger version
+    pub fn raw_value(
+        &self,
+        accept_type: &AcceptType,
+        request: RawStateValueRequest,
+        ledger_version: Option<U64>,
+    ) -> BasicResultWith404<MoveValue> {
+        // Retrieve local state
+        let (ledger_info, ledger_version, state_view) = self
+            .context
+            .state_view(ledger_version.map(|inner| inner.0))?;
+
+        let state_key = bcs::from_bytes(&request.key.0)
+            .context(format!(
+                "Failed deserializing state value. key: {}",
+                request.key
+            ))
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?;
+        let state_value = state_view
+            .get_state_value(&state_key)
+            .context(format!("Failed fetching state value. key: {}", request.key,))
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?
+            .ok_or_else(|| {
+                build_not_found(
+                    "Raw State Value",
+                    format!(
+                        "StateKey({}) and Ledger version({})",
+                        request.key, ledger_version
+                    ),
+                    AptosErrorCode::TableItemNotFound,
+                    &ledger_info,
+                )
+            })?;
+        let bytes = bcs::to_bytes(&state_value)
+            .context(format!(
+                "Failed serializing state value. key: {}",
+                request.key
+            ))
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            })?;
+
+        match accept_type {
+            AcceptType::Json => Err(api_forbidden(
+                "Get raw state value",
+                "This serves only bytes. Use other APIs for Json.",
             )),
             AcceptType::Bcs => {
                 BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))

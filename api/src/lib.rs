@@ -38,6 +38,9 @@ pub enum ApiTags {
     /// Access to events
     Events,
 
+    /// Experimental APIs, no guarantees
+    Experimental,
+
     /// General information
     General,
 
