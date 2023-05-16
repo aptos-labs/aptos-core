@@ -34,7 +34,6 @@ use std::{
     sync::{
         mpsc,
         mpsc::{Receiver, Sender},
-        Arc,
     },
 };
 
@@ -44,15 +43,15 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockExecutor<T, E, S> {
+pub struct BlockExecutor<'a, T, E, S> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
-    executor_thread_pool: Arc<ThreadPool>,
+    executor_thread_pool: &'a ThreadPool,
     phantom: PhantomData<(T, E, S)>,
 }
 
-impl<T, E, S> BlockExecutor<T, E, S>
+impl<'a, T, E, S> BlockExecutor<'a, T, E, S>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
@@ -60,7 +59,7 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize, executor_thread_pool: Arc<ThreadPool>) -> Self {
+    pub fn new(concurrency_level: usize, executor_thread_pool: &'a ThreadPool) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",

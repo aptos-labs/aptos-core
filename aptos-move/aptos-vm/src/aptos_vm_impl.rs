@@ -3,18 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache,
     data_cache::StorageAdapter,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
-    AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    Gas, NativeGasParameters, StorageGasParameters,
+    AbstractValueSizeGasParameters, AptosGasParameters, FromOnChainGasSchedule, Gas,
+    NativeGasParameters, StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
@@ -25,7 +23,7 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
         GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, Multisig},
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -40,10 +38,10 @@ use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
 
-pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
+const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
 /// A wrapper to make VMRuntime standalone
-pub struct AptosVMImpl {
+pub(crate) struct AptosVMImpl {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Option<AptosGasParameters>,
@@ -53,7 +51,7 @@ pub struct AptosVMImpl {
     features: Features,
 }
 
-pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>, u64) {
+pub(crate) fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>, u64) {
     match GasScheduleV2::fetch_config(storage) {
         Some(gas_schedule) => {
             let feature_version = gas_schedule.feature_version;
@@ -75,7 +73,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new(state: &impl StateView) -> Self {
+    pub(crate) fn new(state: &impl StateView) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
@@ -171,12 +169,7 @@ impl AptosVMImpl {
         self.move_vm.mark_loader_cache_as_invalid();
     }
 
-    /// Provides access to some internal APIs of the VM.
-    pub fn internals(&self) -> AptosVMInternals {
-        AptosVMInternals(self)
-    }
-
-    pub(crate) fn transaction_validation(&self) -> &TransactionValidation {
+    fn transaction_validation(&self) -> &TransactionValidation {
         self.transaction_validation
             .as_ref()
             .unwrap_or(&APTOS_TRANSACTION_VALIDATION)
@@ -195,7 +188,7 @@ impl AptosVMImpl {
         }
     }
 
-    pub fn get_gas_parameters(
+    pub(crate) fn get_gas_parameters(
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
@@ -208,7 +201,7 @@ impl AptosVMImpl {
         })
     }
 
-    pub fn get_storage_gas_parameters(
+    pub(crate) fn get_storage_gas_parameters(
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
@@ -221,22 +214,22 @@ impl AptosVMImpl {
         })
     }
 
-    pub fn get_gas_feature_version(&self) -> u64 {
+    pub(crate) fn get_gas_feature_version(&self) -> u64 {
         self.gas_feature_version
     }
 
-    pub fn get_version(&self) -> Result<Version, VMStatus> {
+    pub(crate) fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
             alert!("VM Startup Failed. Version Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE, None)
         })
     }
 
-    pub fn get_features(&self) -> &Features {
+    pub(crate) fn get_features(&self) -> &Features {
         &self.features
     }
 
-    pub fn check_gas(
+    pub(crate) fn check_gas(
         &self,
         resolver: &impl MoveResolverExt,
         txn_data: &TransactionMetadata,
@@ -609,7 +602,7 @@ impl AptosVMImpl {
         }
     }
 
-    pub fn new_session<'r>(
+    pub(crate) fn new_session<'r>(
         &self,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
@@ -617,79 +610,11 @@ impl AptosVMImpl {
         self.move_vm.new_session(resolver, session_id)
     }
 
-    pub fn load_module<'r>(
+    pub(crate) fn load_module<'r>(
         &self,
         module_id: &ModuleId,
         resolver: &'r impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, resolver)
     }
-}
-
-/// Internal APIs for the VM, primarily used for testing.
-#[derive(Clone, Copy)]
-pub struct AptosVMInternals<'a>(&'a AptosVMImpl);
-
-impl<'a> AptosVMInternals<'a> {
-    pub fn new(internal: &'a AptosVMImpl) -> Self {
-        Self(internal)
-    }
-
-    /// Returns the internal Move VM instance.
-    pub fn move_vm(self) -> &'a MoveVmExt {
-        &self.0.move_vm
-    }
-
-    /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(
-        self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&'a AptosGasParameters, VMStatus> {
-        self.0.get_gas_parameters(log_context)
-    }
-
-    /// Returns the version of Move Runtime.
-    pub fn version(self) -> Result<Version, VMStatus> {
-        self.0.get_version()
-    }
-}
-
-pub(crate) fn get_transaction_output<A: AccessPathCache>(
-    ap_cache: &mut A,
-    session: SessionExt,
-    gas_left: Gas,
-    txn_data: &TransactionMetadata,
-    status: ExecutionStatus,
-    change_set_configs: &ChangeSetConfigs,
-) -> Result<TransactionOutputExt, VMStatus> {
-    let gas_used = txn_data
-        .max_gas_amount()
-        .checked_sub(gas_left)
-        .expect("Balance should always be less than or equal to max gas amount");
-
-    let change_set_ext = session.finish(ap_cache, change_set_configs)?;
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
-    let (write_set, events) = change_set.into_inner();
-
-    let txn_output = TransactionOutput::new(
-        write_set,
-        events,
-        gas_used.into(),
-        TransactionStatus::Keep(status),
-    );
-
-    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
-}
-
-#[test]
-fn vm_thread_safe() {
-    fn assert_send<T: Send>() {}
-    fn assert_sync<T: Sync>() {}
-
-    use crate::AptosVM;
-
-    assert_send::<AptosVM>();
-    assert_sync::<AptosVM>();
-    assert_send::<MoveVmExt>();
-    assert_sync::<MoveVmExt>();
 }

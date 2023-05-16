@@ -33,7 +33,6 @@ use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -130,7 +129,7 @@ pub struct BlockAptosVM();
 
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
-        executor_thread_pool: Arc<ThreadPool>,
+        executor_thread_pool: &ThreadPool,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
@@ -176,7 +175,7 @@ impl BlockAptosVM {
     }
 
     pub fn execute_block_benchmark<S: StateView + Sync>(
-        executor_thread_pool: Arc<ThreadPool>,
+        executor_thread_pool: &ThreadPool,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,

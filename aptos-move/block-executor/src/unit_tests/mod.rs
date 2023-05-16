@@ -30,16 +30,14 @@ where
         phantom: PhantomData,
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    let executor_thread_pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_cpus::get())
+        .build()
+        .unwrap();
 
     let output = BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(
         num_cpus::get(),
-        executor_thread_pool,
+        &executor_thread_pool,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
 

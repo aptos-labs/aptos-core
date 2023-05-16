@@ -15,7 +15,7 @@ fn initial_aptos_version() {
     let vm = AptosVM::new(executor.get_state_view());
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
-    assert_eq!(vm.internals().version().unwrap(), version,);
+    assert_eq!(vm.version().unwrap(), version,);
 
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)
@@ -27,7 +27,7 @@ fn initial_aptos_version() {
     executor.execute_and_apply(txn);
 
     let new_vm = AptosVM::new(executor.get_state_view());
-    assert_eq!(new_vm.internals().version().unwrap(), Version {
+    assert_eq!(new_vm.version().unwrap(), Version {
         major: version.major + 1
     });
 }
@@ -38,7 +38,7 @@ fn drop_txn_after_reconfiguration() {
     let vm = AptosVM::new(executor.get_state_view());
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
-    assert_eq!(vm.internals().version().unwrap(), version);
+    assert_eq!(vm.version().unwrap(), version);
 
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)

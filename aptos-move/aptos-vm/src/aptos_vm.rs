@@ -2,8 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+use crate::move_vm_ext::MoveVmExt;
 use crate::{
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    access_path_cache::AccessPathCache,
+    aptos_vm_impl::AptosVMImpl,
     block_executor::BlockAptosVM,
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
@@ -31,7 +34,7 @@ use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
-    on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
+    on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride, Version},
     transaction::{
         ChangeSet, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -66,6 +69,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
+    borrow::Borrow,
     cmp::min,
     collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
@@ -82,14 +86,12 @@ static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .thread_name(|index| format!("par_exec_{}", index))
-            .build()
-            .unwrap(),
-    )
+static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(num_cpus::get())
+        .thread_name(|index| format!("par_exec_{}", index))
+        .build()
+        .unwrap()
 });
 
 /// Remove this once the bundle is removed from the code.
@@ -110,7 +112,7 @@ pub enum PreprocessedTransaction {
     StateCheckpoint,
 }
 
-pub struct AptosVM(pub(crate) AptosVMImpl);
+pub struct AptosVM(AptosVMImpl);
 
 struct AptosSimulationVM(AptosVM);
 
@@ -208,8 +210,8 @@ impl AptosVM {
         }
     }
 
-    pub fn internals(&self) -> AptosVMInternals {
-        AptosVMInternals::new(&self.0)
+    pub fn version(&self) -> Result<Version, VMStatus> {
+        self.0.get_version()
     }
 
     /// Load a module into its internal MoveVM's code cache.
@@ -1615,7 +1617,7 @@ impl VMExecutor for AptosVM {
 
         let count = transactions.len();
         let ret = BlockAptosVM::execute_block(
-            Arc::clone(&RAYON_EXEC_POOL),
+            RAYON_EXEC_POOL.borrow(),
             transactions,
             state_view,
             Self::get_concurrency_level(),
@@ -1881,4 +1883,44 @@ fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
         0,
         TransactionStatus::Discard(err),
     ))
+}
+
+fn get_transaction_output<A: AccessPathCache>(
+    ap_cache: &mut A,
+    session: SessionExt,
+    gas_left: Gas,
+    txn_data: &TransactionMetadata,
+    status: ExecutionStatus,
+    change_set_configs: &ChangeSetConfigs,
+) -> Result<TransactionOutputExt, VMStatus> {
+    let gas_used = txn_data
+        .max_gas_amount()
+        .checked_sub(gas_left)
+        .expect("Balance should always be less than or equal to max gas amount");
+
+    let change_set_ext = session.finish(ap_cache, change_set_configs)?;
+    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (write_set, events) = change_set.into_inner();
+
+    let txn_output = TransactionOutput::new(
+        write_set,
+        events,
+        gas_used.into(),
+        TransactionStatus::Keep(status),
+    );
+
+    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
+}
+
+#[test]
+fn vm_thread_safe() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    use crate::AptosVM;
+
+    assert_send::<AptosVM>();
+    assert_sync::<AptosVM>();
+    assert_send::<MoveVmExt>();
+    assert_sync::<MoveVmExt>();
 }

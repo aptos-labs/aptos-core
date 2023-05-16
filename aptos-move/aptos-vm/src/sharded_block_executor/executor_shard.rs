@@ -16,7 +16,7 @@ use std::sync::{
 /// Currently it runs in the local machine and it will be further extended to run in a remote machine.
 pub struct ExecutorShard<S: StateView + Sync> {
     shard_id: usize,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_thread_pool: rayon::ThreadPool,
     num_executor_threads: usize,
     command_rx: Receiver<ExecutorShardCommand>,
     result_tx: Sender<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
@@ -31,12 +31,10 @@ impl<S: StateView + Sync> ExecutorShard<S> {
         command_rx: Receiver<ExecutorShardCommand>,
         result_tx: Sender<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
     ) -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(concurrency_level)
-                .build()
-                .unwrap(),
-        );
+        let executor_thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(concurrency_level)
+            .build()
+            .unwrap();
         Self {
             shard_id,
             executor_thread_pool,
@@ -58,7 +56,7 @@ impl<S: StateView + Sync> ExecutorShard<S> {
                         transactions.len()
                     );
                     let ret = BlockAptosVM::execute_block_benchmark(
-                        self.executor_thread_pool.clone(),
+                        &self.executor_thread_pool,
                         transactions,
                         self.state_view.as_ref(),
                         self.num_executor_threads,
