@@ -1333,9 +1333,16 @@ def test(
 
     if forge_cluster_name == "multiregion":
         log.info("Using multiregion cluster")
-        forge_cluster = ForgeCluster(name=forge_cluster_name, cloud = Cloud.GCP, region = "multiregion", kubeconf=context.filesystem.mkstemp())
+        forge_cluster = ForgeCluster(
+            name=forge_cluster_name,
+            cloud=Cloud.GCP,
+            region="multiregion",
+            kubeconf=context.filesystem.mkstemp(),
+        )
     else:
-        log.info(f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}")
+        log.info(
+            f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}"
+        )
         forge_cluster = find_forge_cluster(
             context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
         )
