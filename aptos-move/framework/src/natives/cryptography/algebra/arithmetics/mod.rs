@@ -19,7 +19,7 @@ macro_rules! ark_binary_op_internal {
         safe_borrow_element!($context, handle_2, $ark_typ, element_2_ptr, element_2);
         $context.charge($gas)?;
         let new_element = element_1.$ark_func(element_2);
-        let new_handle = store_element!($context, new_element);
+        let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -31,7 +31,7 @@ macro_rules! ark_unary_op_internal {
         safe_borrow_element!($context, handle, $ark_typ, element_ptr, element);
         $context.charge($gas)?;
         let new_element = element.$ark_func();
-        let new_handle = store_element!($context, new_element);
+        let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
