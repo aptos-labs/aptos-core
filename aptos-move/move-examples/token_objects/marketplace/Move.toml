@@ -7,4 +7,5 @@ marketplace_contract = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosToken = { local = "../../../framework/aptos-token" }
 AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

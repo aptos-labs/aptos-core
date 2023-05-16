@@ -21,12 +21,15 @@ module marketplace_contract::marketplace {
     use aptos_framework::object::{Self, Object, DeleteRef, ExtendRef, new_event_handle, ObjectCore};
     use aptos_framework::timestamp;
     use aptos_std::math64;
+    use aptos_token::token as token_v1;
     use aptos_token_objects::royalty;
-    use aptos_token_objects::token;
+    use aptos_token_objects::token as token_objects;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
     use std::vector;
+
+    // -- Errors --
 
     /// Listing not found
     const ELISTING_NOT_FOUND: u64 = 1;
@@ -57,9 +60,15 @@ module marketplace_contract::marketplace {
     /// Listing not on Marketplace
     const ELISTING_NOT_ON_MARKETPLACE: u64 = 14;
 
+    // -- Constants --
+
     const FIVE_MINUTES_SECS: u64 = 300;
 
-    const TOKEN: vector<u8> = b"Token";
+    // These delineate supported object types for listing
+    const TOKEN_V1: vector<u8> = b"TokenV1";
+    const TOKEN_V2: vector<u8> = b"TokenV2";
+
+    // -- Structs --
 
     /// A listing for a single Token object on the market place
     ///
@@ -87,6 +96,37 @@ module marketplace_contract::marketplace {
         listing_refs: ListingRefs,
         /// Events on changes to the listing state
         events: EventHandle<ListingEvent>,
+    }
+
+    /// A wrapper for Token V1 to support a marketplace for both types of tokens together
+    struct TokenV1Wrapper has key {
+        /// The original token
+        token: token_v1::Token,
+        /// Delete reference to delete the holding object
+        delete_ref: DeleteRef,
+    }
+
+    /// Unpacks a Token V1 from a listing wrapper to an account.
+    /// This is used after the wrapper has been bought by a buyer.
+    entry fun unpack_token_v1(owner: &signer, token_wrapper: Object<TokenV1Wrapper>) acquires TokenV1Wrapper {
+        let token = extract_token_v1(owner, token_wrapper);
+
+        token_v1::deposit_token(owner, token);
+    }
+
+    /// Destroys a TokenV1 wrapper
+    fun extract_token_v1(
+        owner: &signer,
+        token_wrapper: Object<TokenV1Wrapper>
+    ): token_v1::Token acquires TokenV1Wrapper {
+        assert!(object::is_owner(token_wrapper, signer::address_of(owner)), ENOT_OWNER);
+        let TokenV1Wrapper {
+            token,
+            delete_ref,
+        } = move_from<TokenV1Wrapper>(object::object_address(&token_wrapper));
+        object::delete(delete_ref);
+
+        token
     }
 
     /// Combined events for an individual listing
@@ -310,10 +350,106 @@ module marketplace_contract::marketplace {
     /// Internal helper function to allow tests to know what the address of the listings are
     ///
     /// Normally, this would be handled with an indexer
+    fun list_token_v1_inner<CoinType>(
+        seller: &signer,
+        marketplace_address: address,
+        creator: address,
+        collection: String,
+        name: String,
+        amount: u64,
+        min_bid: u64,
+        price: u64,
+        duration_seconds: u64
+    ): address acquires Marketplace {
+        let token_data_id = token_v1::create_token_data_id(creator, collection, name);
+        let property_version = token_v1::get_tokendata_largest_property_version(creator, token_data_id);
+        let token_id = token_v1::create_token_id(token_data_id, property_version);
+        let token = token_v1::withdraw_token(seller, token_id, amount);
+
+        // Wrap the token for sale
+        let marketplace = borrow_marketplace<CoinType>(marketplace_address);
+        let (token_address, token_signer, token_delete_ref) = create_object_with_delete_ref(marketplace);
+        let wrapped_token = TokenV1Wrapper {
+            token,
+            delete_ref: token_delete_ref
+        };
+        move_to(&token_signer, wrapped_token);
+
+        // Convert to a shared form
+        let item = object::address_to_object<ObjectCore>(token_address);
+
+        list_object<CoinType>(
+            seller,
+            marketplace_address,
+            item,
+            string::utf8(TOKEN_V1),
+            min_bid,
+            price,
+            duration_seconds
+        )
+    }
+
+    inline fun create_object<CoinType>(
+        marketplace: &Marketplace<CoinType>,
+    ): (address, signer, ExtendRef, DeleteRef) {
+        let marketplace_signer = object::generate_signer_for_extending(&marketplace.extend_ref);
+
+        let constructor_ref = object::create_object_from_object(&marketplace_signer);
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+        let delete_ref = object::generate_delete_ref(&constructor_ref);
+        let address = object::address_from_constructor_ref(&constructor_ref);
+        let signer = object::generate_signer(&constructor_ref);
+        (address, signer, extend_ref, delete_ref)
+    }
+
+    inline fun create_object_with_delete_ref<CoinType>(
+        marketplace: &Marketplace<CoinType>,
+    ): (address, signer, DeleteRef) {
+        let marketplace_signer = object::generate_signer_for_extending(&marketplace.extend_ref);
+
+        let constructor_ref = object::create_object_from_object(&marketplace_signer);
+        let delete_ref = object::generate_delete_ref(&constructor_ref);
+        let address = object::address_from_constructor_ref(&constructor_ref);
+        let signer = object::generate_signer(&constructor_ref);
+        (address, signer, delete_ref)
+    }
+
+    /// Internal helper function to allow tests to know what the address of the listings are
+    ///
+    /// Normally, this would be handled with an indexer
     fun list_token_object_inner<ObjectType: key, CoinType>(
         seller: &signer,
         marketplace_address: address,
         item: Object<ObjectType>,
+        min_bid: u64,
+        price: u64,
+        duration_seconds: u64
+    ): address acquires Marketplace {
+        // Ensure this is in fact a token object
+        // TODO: provide better error messaging
+        let _ = object::convert<ObjectType, token_objects::Token>(item);
+        // Convert to a shared form
+        let item = object::convert<ObjectType, ObjectCore>(item);
+
+        list_object<CoinType>(
+            seller,
+            marketplace_address,
+            item,
+            string::utf8(TOKEN_V2),
+            min_bid,
+            price,
+            duration_seconds
+        )
+    }
+
+    /// Internal helper function to allow tests to know what the address of the listings are
+    ///
+    /// Normally, this would be handled with an indexer
+    fun list_object<CoinType>(
+        seller: &signer,
+        marketplace_address: address,
+        item: Object<ObjectCore>,
+        type: String,
         min_bid: u64,
         price: u64,
         duration_seconds: u64
@@ -324,27 +460,15 @@ module marketplace_contract::marketplace {
 
         assert!(duration_seconds > FIVE_MINUTES_SECS, ETOO_SHORT_DURATION);
 
-        // Ensure this is in fact a token object
-        // TODO: provide better error messaging
-        let _ = object::convert<ObjectType, token::Token>(item);
-
-        // Convert to a shared form
-        let item = object::convert<ObjectType, ObjectCore>(item);
-        let type = string::utf8(TOKEN);
-
         // Determine listing end time
         let start_time_seconds = timestamp::now_seconds();
         let expiration_time_seconds = start_time_seconds + duration_seconds;
 
         // Build the Listing object and derive it from the marketplace
         let marketplace = borrow_marketplace<CoinType>(marketplace_address);
-        let marketplace_signer = object::generate_signer_for_extending(&marketplace.extend_ref);
-
-        let listing_object_constructor_ref = object::create_object_from_object(&marketplace_signer);
-        let listing_extend_ref = object::generate_extend_ref(&listing_object_constructor_ref);
-        let listing_delete_ref = object::generate_delete_ref(&listing_object_constructor_ref);
-        let listing_address = object::address_from_constructor_ref(&listing_object_constructor_ref);
-        let listing_signer = object::generate_signer(&listing_object_constructor_ref);
+        let (listing_address, listing_signer, listing_extend_ref, listing_delete_ref) = create_object<CoinType>(
+            marketplace
+        );
 
         let listing = Listing<CoinType> {
             item,
@@ -593,8 +717,8 @@ module marketplace_contract::marketplace {
         return_bid<CoinType>(listing);
 
         // Transfer the royalties before commission, creators deserve to be paid first
-        let royalty_resource = if (listing.type == string::utf8(TOKEN)) {
-            token::royalty(listing.item)
+        let royalty_resource = if (listing.type == string::utf8(TOKEN_V2)) {
+            token_objects::royalty(listing.item)
         } else {
             // For non-tokens, just get the royalty from the object only
             royalty::get(listing.item)
