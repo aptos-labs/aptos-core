@@ -1105,7 +1105,11 @@ async fn test_gas_estimation_ten_empty_blocks() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_cache() {
     let mut node_config = NodeConfig::default();
-    node_config.api.gas_estimation_max_block_history = 10;
+    // Sets max cache size to 10
+    let max_block_history = 10;
+    node_config.api.gas_estimation.low_block_history = max_block_history;
+    node_config.api.gas_estimation.market_block_history = max_block_history;
+    node_config.api.gas_estimation.aggressive_block_history = max_block_history;
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;
@@ -1121,22 +1125,34 @@ async fn test_gas_estimation_cache() {
         ctx.commit_block(&[]).await;
     }
     ctx.get("/estimate_gas_price").await;
-    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
     // Wait for cache to expire
     std::thread::sleep(Duration::from_secs(1));
     ctx.get("/estimate_gas_price").await;
-    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
 
     // Expect max of 10 entries
     for _i in 0..8 {
         ctx.commit_block(&[]).await;
     }
     ctx.get("/estimate_gas_price").await;
-    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
     // Wait for cache to expire
     std::thread::sleep(Duration::from_secs(1));
     ctx.get("/estimate_gas_price").await;
-    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
 }
 
 fn gen_string(len: u64) -> String {

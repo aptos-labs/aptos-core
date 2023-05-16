@@ -52,7 +52,7 @@ use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
     collections::{BTreeMap, HashMap},
     ops::Bound::Included,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock, RwLockWriteGuard},
     time::Instant,
 };
 
@@ -832,8 +832,10 @@ impl Context {
         if let Some(epoch) = cache.last_updated_epoch {
             if let Some(time) = cache.last_updated_time {
                 if let Some(estimation) = cache.estimation {
-                    // TODO: config for updated time
-                    if epoch == current_epoch && time.elapsed().as_millis() < 500 {
+                    if epoch == current_epoch
+                        && (time.elapsed().as_millis() as u64)
+                            < self.node_config.api.gas_estimation.cache_expiration_ms
+                    {
                         return Some(estimation);
                     }
                 }
@@ -842,10 +844,22 @@ impl Context {
         None
     }
 
+    fn update_cached_gas_estimation(
+        &self,
+        cache: &mut RwLockWriteGuard<GasEstimationCache>,
+        epoch: u64,
+        estimation: GasEstimation,
+    ) {
+        cache.last_updated_epoch = Some(epoch);
+        cache.estimation = Some(estimation);
+        cache.last_updated_time = Some(Instant::now());
+    }
+
     pub fn estimate_gas_price<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
+        let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
         let epoch = ledger_info.epoch.0;
 
@@ -855,7 +869,7 @@ impl Context {
         }
 
         let mut cache = self.gas_estimation_cache.write().unwrap();
-        let max_block_history = self.node_config.api.gas_estimation_max_block_history;
+        let max_block_history = config.aggressive_block_history;
         // 1. Get the block metadata txns
         let mut lookup_version = ledger_info.ledger_version.0;
         let mut blocks = vec![];
@@ -892,16 +906,13 @@ impl Context {
         }
         if blocks.is_empty() && !cached_blocks_hit {
             let estimation = self.default_gas_estimation(min_gas_unit_price);
-            cache.estimation = Some(estimation);
-            cache.last_updated_epoch = Some(epoch);
-            cache.last_updated_time = Some(Instant::now());
+            self.update_cached_gas_estimation(&mut cache, epoch, estimation);
             return Ok(estimation);
         }
         let remaining = max_block_history - blocks.len();
 
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
-        let full_block_txns = self.node_config.api.gas_estimation_full_block_txns;
         // TODO: if multiple calls to db is a perf issue, combine into a single call and then split
         for (first, last) in blocks {
             let min_inclusion_price =
@@ -910,7 +921,7 @@ impl Context {
                     .get_gas_prices(first, last - first, ledger_info.ledger_version.0)
                 {
                     Ok(prices) => {
-                        if prices.len() < full_block_txns {
+                        if prices.len() < config.full_block_txns {
                             min_gas_unit_price
                         } else {
                             prices.iter().min().unwrap() + 1
@@ -936,13 +947,21 @@ impl Context {
 
         // 3. Get values
         // (1) low
-        let low_price = match min_inclusion_prices.iter().take(10).min() {
+        let low_price = match min_inclusion_prices
+            .iter()
+            .take(config.low_block_history)
+            .min()
+        {
             Some(price) => *price,
             None => min_gas_unit_price,
         };
 
         // (2) market
-        let mut latest_prices: Vec<_> = min_inclusion_prices.iter().take(30).cloned().collect();
+        let mut latest_prices: Vec<_> = min_inclusion_prices
+            .iter()
+            .take(config.market_block_history)
+            .cloned()
+            .collect();
         latest_prices.sort();
         let market_price = latest_prices[latest_prices.len() / 2];
 
@@ -964,9 +983,7 @@ impl Context {
                 cache.min_inclusion_prices.pop_first();
             }
         }
-        cache.estimation = Some(estimation);
-        cache.last_updated_epoch = Some(epoch);
-        cache.last_updated_time = Some(Instant::now());
+        self.update_cached_gas_estimation(&mut cache, epoch, estimation);
         Ok(estimation)
     }
 
