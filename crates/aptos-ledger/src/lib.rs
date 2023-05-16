@@ -46,8 +46,8 @@ pub enum AptosLedgerError {
     #[error("Device not found")]
     DeviceNotFound,
 
-    /// Unexpected error
-    #[error("Unexpected Error: {0}")]
+    /// Unexpected error, the Option<u16> is the retcode received from ledger transport
+    #[error("Unexpected Error: {0} (Retcode {1:?})")]
     UnexpectedError(String, Option<u16>),
 }
 
