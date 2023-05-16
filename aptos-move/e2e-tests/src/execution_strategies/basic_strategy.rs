@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BasicStrategy;
 
 impl PartitionStrategy for BasicStrategy {
@@ -21,7 +21,6 @@ impl PartitionStrategy for BasicStrategy {
     }
 }
 
-#[derive(Debug)]
 pub struct BasicExecutor {
     executor: FakeExecutor,
     strategy: BasicStrategy,

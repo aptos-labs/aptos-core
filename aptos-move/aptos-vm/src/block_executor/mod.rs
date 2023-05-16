@@ -174,38 +174,4 @@ impl BlockAptosVM {
             Err(Error::UserError(err)) => Err(err),
         }
     }
-
-    pub fn execute_block_benchmark<S: StateView + Sync>(
-        executor_thread_pool: Arc<ThreadPool>,
-        transactions: Vec<Transaction>,
-        state_view: &S,
-        concurrency_level: usize,
-    ) -> Result<Vec<TransactionOutput>, Error<VMStatus>> {
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            executor_thread_pool.install(|| {
-                transactions
-                    .clone()
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
-
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
-            concurrency_level,
-            executor_thread_pool,
-        );
-        executor
-            .execute_block(state_view, signature_verified_block, state_view)
-            .map(|outputs| {
-                outputs
-                    .into_iter()
-                    .map(|output| output.take_output())
-                    .collect()
-            })
-    }
 }

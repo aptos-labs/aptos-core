@@ -336,7 +336,7 @@ impl Generator {
                 emit!(ctx.writer, "let $arg{} := ", idx);
                 match arg {
                     MoveValue::Address(addr) => {
-                        emitln!(ctx.writer, "{}", addr.to_hex_literal());
+                        emitln!(ctx.writer, "0x{}", addr.short_str_lossless());
                     },
                     _ => unreachable!(
                         "only address literals are allowed as test arguments currently"
@@ -398,7 +398,7 @@ impl Generator {
             if let Some(storage) = &self.storage_type {
                 // The creator function must return a value of the storage type.
                 let storage_ty = storage.to_type();
-                if creator.get_return_count() != 1 || creator.get_return_type(0) != storage_ty {
+                if creator.get_return_count() != 1 || creator.get_result_type_at(0) != storage_ty {
                     ctx.env.error(
                         &creator.get_loc(),
                         &format!("creator function for contract with #[storage] must return value of type `{}`", storage_ty.display(&ctx.env.get_type_display_ctx()))

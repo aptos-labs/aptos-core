@@ -556,8 +556,19 @@ impl Swarm for LocalSwarm {
             .unwrap()
             .rest_api_endpoint()
             .to_string();
+        let inspection_service_url = self
+            .validators()
+            .next()
+            .unwrap()
+            .inspection_service_endpoint()
+            .to_string();
 
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 
     fn logs_location(&mut self) -> String {
@@ -610,8 +621,18 @@ impl Swarm for LocalSwarm {
             .unwrap()
             .rest_api_endpoint()
             .to_string();
-
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        let inspection_service_url = self
+            .validators()
+            .nth(idx)
+            .unwrap()
+            .inspection_service_endpoint()
+            .to_string();
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 }
 
