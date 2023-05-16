@@ -8,13 +8,13 @@ use crate::algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasScalingFactor, GasUnit,
     NumSlots,
 };
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
-};
+use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
+use aptos_vm_types::op::Op;
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes,
     ToUnitFractionalWithParams, ToUnitWithParams,
 };
+use move_vm_types::types::Store;
 
 mod storage;
 
@@ -187,22 +187,29 @@ impl TransactionGasParameters {
     }
 
     /// New formula to charge storage fee for a write, measured in APT.
-    pub fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
-        use WriteOp::*;
-
-        let excess_fee = |key: &StateKey, data: &[u8]| -> Fee {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
-            match size.checked_sub(self.free_write_bytes_quota) {
-                Some(excess) => excess * self.storage_fee_per_excess_state_byte,
-                None => 0.into(),
-            }
-        };
+    pub fn storage_fee_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> Fee {
+        use aptos_vm_types::op::Op::*;
 
         match op {
             Creation(data) | CreationWithMetadata { data, .. } => {
-                self.storage_fee_per_state_slot_create * NumSlots::new(1) + excess_fee(key, data)
+                // TODO: Closure doesn't work with impl Store, let's refactor this so there
+                // is no duplication.
+                let size =
+                    NumBytes::new(key.size() as u64) + NumBytes::new(data.num_bytes() as u64);
+                let excess_fee = match size.checked_sub(self.free_write_bytes_quota) {
+                    Some(excess) => excess * self.storage_fee_per_excess_state_byte,
+                    None => 0.into(),
+                };
+                self.storage_fee_per_state_slot_create * NumSlots::new(1) + excess_fee
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => excess_fee(key, data),
+            Modification(data) | ModificationWithMetadata { data, .. } => {
+                let size =
+                    NumBytes::new(key.size() as u64) + NumBytes::new(data.num_bytes() as u64);
+                match size.checked_sub(self.free_write_bytes_quota) {
+                    Some(excess) => excess * self.storage_fee_per_excess_state_byte,
+                    None => 0.into(),
+                }
+            },
             Deletion | DeletionWithMetadata { .. } => 0.into(),
         }
     }

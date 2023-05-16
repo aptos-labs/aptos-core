@@ -22,9 +22,8 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
     transaction::SignatureCheckedTransaction,
-    write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
+use aptos_vm_types::{change_set::AptosChangeSet, op::Op, write_change_set::WriteChangeSet};
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -410,9 +409,9 @@ impl<'r> WriteOpConverter<'r> {
         state_key: &StateKey,
         move_storage_op: MoveStorageOp<Vec<u8>>,
         legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
+    ) -> Result<Op<Vec<u8>>, VMStatus> {
         use MoveStorageOp::*;
-        use WriteOp::*;
+        use Op::*;
 
         let existing_value_opt = self.remote.get_state_value(state_key).map_err(|_| {
             VMStatus::Error(
@@ -471,7 +470,7 @@ impl<'r> WriteOpConverter<'r> {
         &self,
         state_key: &StateKey,
         value: u128,
-    ) -> Result<WriteOp, VMStatus> {
+    ) -> Result<Op<Vec<u8>>, VMStatus> {
         let existing_value_opt = self
             .remote
             .get_state_value(state_key)
@@ -482,16 +481,16 @@ impl<'r> WriteOpConverter<'r> {
             None => {
                 match &self.new_slot_metadata {
                     // n.b. Aggregator writes historically did not distinguish Create vs Modify.
-                    None => WriteOp::Modification(data),
-                    Some(metadata) => WriteOp::CreationWithMetadata {
+                    None => Op::Modification(data),
+                    Some(metadata) => Op::CreationWithMetadata {
                         data,
                         metadata: metadata.clone(),
                     },
                 }
             },
             Some(existing_value) => match existing_value.into_metadata() {
-                None => WriteOp::Modification(data),
-                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
+                None => Op::Modification(data),
+                Some(metadata) => Op::ModificationWithMetadata { data, metadata },
             },
         };
 

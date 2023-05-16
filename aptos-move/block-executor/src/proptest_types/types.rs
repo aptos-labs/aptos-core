@@ -17,8 +17,9 @@ use aptos_types::{
     account_address::AccountAddress,
     executable::ModulePath,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
+use aptos_vm_types::op::Op;
 use claims::{assert_none, assert_ok};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -470,7 +471,7 @@ pub struct Output<K, V>(
     Vec<(K, V)>,
     Vec<(K, DeltaOp)>,
     Vec<Option<Vec<u8>>>,
-    pub(crate) OnceCell<Vec<(K, WriteOp)>>,
+    pub(crate) OnceCell<Vec<(K, Op<Vec<u8>>)>>,
 );
 
 impl<K, V> Output<K, V>
@@ -478,7 +479,7 @@ where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
-    pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
+    pub(crate) fn delta_writes(&self) -> Vec<(K, Op<Vec<u8>>)> {
         self.3.get().cloned().expect("Delta writes must be set")
     }
 }
@@ -510,7 +511,7 @@ where
         Self(vec![], vec![], vec![], OnceCell::new())
     }
 
-    fn incorporate_materialized_deltas(&self, delta_writes: Vec<(K, WriteOp)>) {
+    fn incorporate_materialized_deltas(&self, delta_writes: Vec<(K, Op<Vec<u8>>)>) {
         assert_ok!(self.3.set(delta_writes));
     }
 }
@@ -531,7 +532,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
     pub fn generate_baseline<K: Hash + Clone + Eq>(
         txns: &[Transaction<K, V>],
-        resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
+        resolved_deltas: Option<Vec<Vec<(K, Op<Vec<u8>>)>>>,
     ) -> Self {
         let mut current_world = HashMap::new();
         // Delta world stores the latest u128 value of delta aggregator. When empty, the
@@ -545,7 +546,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                 delta_writes[idx]
                     .iter()
                     .cloned()
-                    .collect::<HashMap<K, WriteOp>>()
+                    .collect::<HashMap<K, Op<Vec<u8>>>>()
             });
 
             match txn {

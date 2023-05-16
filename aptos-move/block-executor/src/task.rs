@@ -5,10 +5,8 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::{
-    executable::ModulePath,
-    write_set::{TransactionWrite, WriteOp},
-};
+use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
+use aptos_vm_types::op::Op;
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -104,6 +102,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// materialized and incorporated during execution).
     fn incorporate_materialized_deltas(
         &self,
-        materialized_deltas: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        materialized_deltas: Vec<(<Self::Txn as Transaction>::Key, Op<Vec<u8>>)>,
     );
 }

@@ -27,10 +27,9 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::vm_output::VMOutput;
+use aptos_vm_types::{op::Op, vm_output::VMOutput};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -38,7 +37,7 @@ use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
-    type Value = WriteOp;
+    type Value = Op<Vec<u8>>;
 }
 
 // Wrapper to avoid orphan rule
@@ -79,7 +78,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_materialized_deltas, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn get_resource_writes(&self) -> Vec<(StateKey, WriteOp)> {
+    fn get_resource_writes(&self) -> Vec<(StateKey, Op<Vec<u8>>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -90,7 +89,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    fn get_module_writes(&self) -> Vec<(StateKey, WriteOp)> {
+    fn get_module_writes(&self) -> Vec<(StateKey, Op<Vec<u8>>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -101,7 +100,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    fn get_aggregator_writes(&self) -> Vec<(StateKey, WriteOp)> {
+    fn get_aggregator_writes(&self) -> Vec<(StateKey, Op<Vec<u8>>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -127,7 +126,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Can be called (at most) once after transaction is committed to internally
     /// include the materialized delta outputs with the transaction outputs.
-    fn incorporate_materialized_deltas(&self, materialized_deltas: Vec<(StateKey, WriteOp)>) {
+    fn incorporate_materialized_deltas(&self, materialized_deltas: Vec<(StateKey, Op<Vec<u8>>)>) {
         assert!(
             self.committed_output
                 .set(

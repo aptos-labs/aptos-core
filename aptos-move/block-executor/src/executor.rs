@@ -21,11 +21,9 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{
-    executable::ExecutableTestType, // TODO: fix up with the proper generics.
-    write_set::WriteOp,
-};
+use aptos_types::executable::ExecutableTestType;
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use aptos_vm_types::op::Op;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -252,10 +250,7 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            materialized_deltas.push((
-                k.clone(),
-                WriteOp::Modification(serialize(&committed_delta)),
-            ));
+            materialized_deltas.push((k.clone(), Op::Modification(serialize(&committed_delta))));
         }
         last_input_output.record_materialized_deltas(txn_idx, materialized_deltas);
     }

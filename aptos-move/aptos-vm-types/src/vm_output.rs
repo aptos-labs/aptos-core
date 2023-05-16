@@ -3,6 +3,7 @@
 
 use crate::{
     change_set::{into_write_set, AptosChangeSet},
+    op::Op,
     write_change_set::WriteChangeSet,
 };
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
@@ -11,15 +12,14 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 
 #[derive(Debug)]
 pub struct VMOutput {
-    resource_writes: WriteChangeSet,
-    module_writes: WriteChangeSet,
-    aggregator_writes: WriteChangeSet,
+    resource_writes: WriteChangeSet<Vec<u8>>,
+    module_writes: WriteChangeSet<Vec<u8>>,
+    aggregator_writes: WriteChangeSet<Vec<u8>>,
     deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
     gas_used: u64,
@@ -28,9 +28,9 @@ pub struct VMOutput {
 
 impl VMOutput {
     pub fn new(
-        resource_writes: WriteChangeSet,
-        module_writes: WriteChangeSet,
-        aggregator_writes: WriteChangeSet,
+        resource_writes: WriteChangeSet<Vec<u8>>,
+        module_writes: WriteChangeSet<Vec<u8>>,
+        aggregator_writes: WriteChangeSet<Vec<u8>>,
         deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
         gas_used: u64,
@@ -80,9 +80,9 @@ impl VMOutput {
     pub fn into(
         self,
     ) -> (
-        WriteChangeSet,
-        WriteChangeSet,
-        WriteChangeSet,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
         DeltaChangeSet,
         Vec<ContractEvent>,
     ) {
@@ -98,9 +98,9 @@ impl VMOutput {
     pub fn unpack(
         self,
     ) -> (
-        WriteChangeSet,
-        WriteChangeSet,
-        WriteChangeSet,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
         DeltaChangeSet,
         Vec<ContractEvent>,
         u64,
@@ -117,15 +117,15 @@ impl VMOutput {
         )
     }
 
-    pub fn resource_writes(&self) -> &WriteChangeSet {
+    pub fn resource_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.resource_writes
     }
 
-    pub fn module_writes(&self) -> &WriteChangeSet {
+    pub fn module_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.module_writes
     }
 
-    pub fn aggregator_writes(&self) -> &WriteChangeSet {
+    pub fn aggregator_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.aggregator_writes
     }
 
@@ -149,7 +149,7 @@ impl VMOutput {
     /// understand. Extends writes with values from materialized deltas.
     pub fn output_with_materialized_deltas(
         self,
-        materialized_deltas: Vec<(StateKey, WriteOp)>,
+        materialized_deltas: Vec<(StateKey, Op<Vec<u8>>)>,
     ) -> TransactionOutput {
         // We should have a materialized delta for every delta in the output.
         let (

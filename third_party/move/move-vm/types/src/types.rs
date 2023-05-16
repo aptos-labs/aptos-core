@@ -10,14 +10,35 @@ pub trait Store {
     /// Consumes the stored type and returns its serialized version.
     fn into_bytes(self) -> Option<Vec<u8>>;
 
+    /// Returns the serialized version of the type.
+    fn as_bytes(&self) -> Option<Vec<u8>>;
+
     /// Returns the number of bytes the stored type occupies in serialized
     /// format.
     fn num_bytes(&self) -> usize;
 }
 
+impl<T: Clone + Store + AsRef<T>> Store for &T {
+    fn into_bytes(self) -> Option<Vec<u8>> {
+        self.as_ref().clone().into_bytes()
+    }
+
+    fn as_bytes(&self) -> Option<Vec<u8>> {
+        (**self).as_bytes()
+    }
+
+    fn num_bytes(&self) -> usize {
+        (**self).num_bytes()
+    }
+}
+
 impl Store for Vec<u8> {
     fn into_bytes(self) -> Option<Vec<u8>> {
         Some(self)
+    }
+
+    fn as_bytes(&self) -> Option<Vec<u8>> {
+        Some(self.clone())
     }
 
     fn num_bytes(&self) -> usize {
@@ -52,6 +73,13 @@ impl Store for Resource {
         match self {
             Self::Serialized(bytes) => Some(bytes),
             Self::Cached(value, layout, _) => value.simple_serialize(&layout),
+        }
+    }
+
+    fn as_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            Self::Serialized(bytes) => Some(bytes.clone()),
+            Self::Cached(value, layout, _) => value.simple_serialize(layout),
         }
     }
 

@@ -7,13 +7,13 @@ use aptos_types::{
     on_chain_config::StorageGasSchedule,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, CheckChangeSet},
-    write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::SizeChecker, write_change_set::WriteChangeSet};
+use aptos_vm_types::{change_set::SizeChecker, op::Op, write_change_set::WriteChangeSet};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_types::types::Store;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
@@ -50,9 +50,8 @@ impl StoragePricingV1 {
             }
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
-
+    fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas {
+        use aptos_vm_types::op::Op::*;
         let mut cost = self.write_data_per_op * NumArgs::new(1);
 
         if self.write_data_per_byte_in_key > 0.into() {
@@ -67,10 +66,10 @@ impl StoragePricingV1 {
         match op {
             Creation(data) | CreationWithMetadata { data, .. } => {
                 cost += self.write_data_per_new_item * NumArgs::new(1)
-                    + self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+                    + self.write_data_per_byte_in_val * NumBytes::new(data.num_bytes() as u64);
             },
             Modification(data) | ModificationWithMetadata { data, .. } => {
-                cost += self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+                cost += self.write_data_per_byte_in_val * NumBytes::new(data.num_bytes() as u64);
             },
             Deletion | DeletionWithMetadata { .. } => (),
         }
@@ -129,9 +128,7 @@ impl StoragePricingV2 {
         }
     }
 
-    fn write_op_size(&self, key: &StateKey, value: &[u8]) -> NumBytes {
-        let value_size = NumBytes::new(value.len() as u64);
-
+    fn write_op_size(&self, key: &StateKey, value_size: NumBytes) -> NumBytes {
         if self.feature_version >= 3 {
             let key_size = NumBytes::new(key.size() as u64);
             (key_size + value_size)
@@ -155,17 +152,19 @@ impl StoragePricingV2 {
             }
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas {
+        use aptos_vm_types::op::Op::*;
 
         match &op {
             Creation(data) | CreationWithMetadata { data, .. } => {
                 self.per_item_create * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_create
+                    + self.write_op_size(key, NumBytes::new(data.num_bytes() as u64))
+                        * self.per_byte_create
             },
             Modification(data) | ModificationWithMetadata { data, .. } => {
                 self.per_item_write * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_write
+                    + self.write_op_size(key, NumBytes::new(data.num_bytes() as u64))
+                        * self.per_byte_write
             },
             Deletion | DeletionWithMetadata { .. } => 0.into(),
         }
@@ -188,7 +187,7 @@ impl StoragePricing {
         }
     }
 
-    pub fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
+    pub fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas {
         use StoragePricing::*;
 
         match self {
@@ -272,19 +271,19 @@ fn size_error() -> VMStatus {
     VMStatus::Error(StatusCode::STORAGE_ERROR, None)
 }
 
-impl SizeChecker for ChangeSetConfigs {
+impl<T: Store> SizeChecker<T> for ChangeSetConfigs {
     fn check_writes(
         &self,
-        resource_writes: &WriteChangeSet,
-        module_writes: &WriteChangeSet,
+        resource_writes: &WriteChangeSet<T>,
+        module_writes: &WriteChangeSet<T>,
     ) -> Result<(), VMStatus> {
         let mut write_set_size = 0;
 
         macro_rules! write_set_size {
             ($writes:ident) => {
                 for (key, op) in $writes.iter() {
-                    if let Some(bytes) = op.bytes() {
-                        let write_op_size = (bytes.len() + key.size()) as u64;
+                    if let Some(data) = op.ok() {
+                        let write_op_size = (data.num_bytes() + key.size()) as u64;
                         if write_op_size > self.max_bytes_per_write_op {
                             return Err(size_error());
                         }

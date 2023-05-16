@@ -14,8 +14,9 @@ use crate::{
 use aptos_logger::error;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
-    state_store::state_key::StateKey, write_set::WriteOp,
+    state_store::state_key::StateKey,
 };
+use aptos_vm_types::op::Op;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -28,6 +29,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{GasMeter as MoveGasMeter, SimpleInstruction},
+    types::Store,
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
@@ -254,7 +256,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 
     /// Calculates the IO gas cost required to perform a write operation.
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+    fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas;
 
     /// Charges IO gas for all items in the specified write set.
     ///
@@ -264,7 +266,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// unless you are doing something special, such as injecting additional logging logic.
     fn charge_io_gas_for_writes<'a>(
         &mut self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
     ) -> VMResult<()> {
         for (key, op) in ops {
             self.charge_io(self.io_gas_per_write(key, op))
@@ -274,7 +276,7 @@ pub trait AptosGasMeter: MoveGasMeter {
     }
 
     /// Calculates the storage fee for a write operation.
-    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+    fn storage_fee_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> Fee;
 
     /// Calculates the storage fee for an event.
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -294,8 +296,8 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// unless you are doing something special, such as injecting additional logging logic.
     fn charge_storage_fee_for_all<'a>(
         &mut self,
-        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
+        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
@@ -1009,11 +1011,11 @@ impl AptosGasMeter for StandardGasMeter {
         Ok(())
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
+    fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas {
         self.storage_gas_params.pricing.io_gas_per_write(key, op)
     }
 
-    fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee {
+    fn storage_fee_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> Fee {
         self.gas_params.txn.storage_fee_per_write(key, op)
     }
 

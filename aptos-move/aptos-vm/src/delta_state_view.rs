@@ -10,19 +10,20 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::write_change_set::WriteChangeSet;
+use move_vm_types::types::Store;
 
-pub struct DeltaStateView<'a, 'b, S> {
+pub struct DeltaStateView<'a, 'b, S, T: Store> {
     base: &'a S,
-    writes: &'b WriteChangeSet,
+    writes: &'b WriteChangeSet<T>,
 }
 
-impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, writes: &'b WriteChangeSet) -> Self {
+impl<'a, 'b, S, T: Store> DeltaStateView<'a, 'b, S, T> {
+    pub fn new(base: &'a S, writes: &'b WriteChangeSet<T>) -> Self {
         Self { base, writes }
     }
 }
 
-impl<'a, 'b, S> TStateView for DeltaStateView<'a, 'b, S>
+impl<'a, 'b, S, T: Store> TStateView for DeltaStateView<'a, 'b, S, T>
 where
     S: TStateView<Key = StateKey>,
 {

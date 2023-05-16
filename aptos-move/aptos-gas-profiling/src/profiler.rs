@@ -6,9 +6,8 @@ use crate::log::{
     WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas::{AptosGasMeter, Fee, Gas, GasScalingFactor};
-use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
-};
+use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
+use aptos_vm_types::op::Op;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -22,6 +21,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
+    types::Store,
     views::{TypeView, ValueView},
 };
 
@@ -445,8 +445,8 @@ where
     }
 }
 
-fn write_op_type(op: &WriteOp) -> WriteOpType {
-    use WriteOp as O;
+fn write_op_type(op: &Op<impl Store>) -> WriteOpType {
+    use Op as O;
     use WriteOpType as T;
 
     match op {
@@ -467,9 +467,9 @@ where
 
         fn gas_unit_scaling_factor(&self) -> GasScalingFactor;
 
-        fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas;
+        fn io_gas_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> InternalGas;
 
-        fn storage_fee_per_write(&self, key: &StateKey, op: &WriteOp) -> Fee;
+        fn storage_fee_per_write(&self, key: &StateKey, op: &Op<impl Store>) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 
@@ -492,7 +492,7 @@ where
 
     fn charge_io_gas_for_writes<'a>(
         &mut self,
-        ops: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        ops: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
     ) -> VMResult<()> {
         for (key, op) in ops {
             let cost = self.io_gas_per_write(key, op);
@@ -509,8 +509,8 @@ where
 
     fn charge_storage_fee_for_all<'a>(
         &mut self,
-        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
-        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a WriteOp)>,
+        resource_writes: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
+        module_writes: impl IntoIterator<Item = (&'a StateKey, &'a Op<impl Store + 'a>)>,
         events: impl IntoIterator<Item = &'a ContractEvent>,
         txn_size: NumBytes,
         gas_unit_price: aptos_gas::FeePerGasUnit,

@@ -302,12 +302,15 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        // TODO: Make DeltaStateView take different write sets and deltas when
+        // a new View trait is added.
         let storage_with_changes =
             DeltaStateView::new(resolver, user_txn_change_set.aggregator_writes());
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, user_txn_change_set.module_writes());
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, user_txn_change_set.resource_writes());
+
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use
@@ -666,6 +669,8 @@ impl AptosVM {
             txn_data.gas_unit_price,
         ));
 
+        // TODO: Make DeltaStateView take different write sets and deltas when
+        // a new View trait is added.
         let storage_with_changes = DeltaStateView::new(resolver, change_set.aggregator_writes());
         let storage_with_changes =
             DeltaStateView::new(&storage_with_changes, change_set.module_writes());
@@ -1228,7 +1233,7 @@ impl AptosVM {
     fn read_writeset(
         &self,
         state_view: &impl StateView,
-        writes: &WriteChangeSet,
+        writes: &WriteChangeSet<Vec<u8>>,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.

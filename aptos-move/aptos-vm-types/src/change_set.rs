@@ -1,15 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::write_change_set::WriteChangeSet;
+use crate::{op::Op, write_change_set::WriteChangeSet};
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaChangeSet};
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteSet, WriteSetMut},
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_vm_types::types::Store;
 use std::collections::{
     btree_map::{
         Entry,
@@ -98,32 +99,32 @@ impl<T> IntoIterator for ChangeSet<T> {
     }
 }
 
-pub trait SizeChecker {
+pub trait SizeChecker<T: Store> {
     fn check_writes(
         &self,
-        resource_writes: &WriteChangeSet,
-        module_writes: &WriteChangeSet,
+        resource_writes: &WriteChangeSet<T>,
+        module_writes: &WriteChangeSet<T>,
     ) -> Result<(), VMStatus>;
     fn check_events(&self, events: &[ContractEvent]) -> Result<(), VMStatus>;
 }
 
 #[derive(Debug)]
 pub struct AptosChangeSet {
-    resource_writes: WriteChangeSet,
-    module_writes: WriteChangeSet,
-    aggregator_writes: WriteChangeSet,
+    resource_writes: WriteChangeSet<Vec<u8>>,
+    module_writes: WriteChangeSet<Vec<u8>>,
+    aggregator_writes: WriteChangeSet<Vec<u8>>,
     deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
 }
 
 impl AptosChangeSet {
     pub fn new(
-        resource_writes: WriteChangeSet,
-        module_writes: WriteChangeSet,
-        aggregator_writes: WriteChangeSet,
+        resource_writes: WriteChangeSet<Vec<u8>>,
+        module_writes: WriteChangeSet<Vec<u8>>,
+        aggregator_writes: WriteChangeSet<Vec<u8>>,
         deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
-        checker: &dyn SizeChecker,
+        checker: &dyn SizeChecker<Vec<u8>>,
     ) -> anyhow::Result<Self, VMStatus> {
         // TODO: Check aggregator writes?
         checker.check_writes(&resource_writes, &module_writes)?;
@@ -146,12 +147,12 @@ impl AptosChangeSet {
         for (state_key, write_op) in write_set {
             if let StateKeyInner::AccessPath(ap) = state_key.inner() {
                 if ap.is_code() {
-                    module_writes.insert((state_key, write_op));
+                    module_writes.insert((state_key, Op::from_write_op(write_op)));
                     continue;
                 }
             }
             // Aggregator writes should never be included ina change set!
-            resource_writes.insert((state_key, write_op));
+            resource_writes.insert((state_key, Op::from_write_op(write_op)));
         }
         Self {
             resource_writes,
@@ -162,15 +163,15 @@ impl AptosChangeSet {
         }
     }
 
-    pub fn resource_writes(&self) -> &WriteChangeSet {
+    pub fn resource_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.resource_writes
     }
 
-    pub fn module_writes(&self) -> &WriteChangeSet {
+    pub fn module_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.module_writes
     }
 
-    pub fn aggregator_writes(&self) -> &WriteChangeSet {
+    pub fn aggregator_writes(&self) -> &WriteChangeSet<Vec<u8>> {
         &self.aggregator_writes
     }
 
@@ -185,9 +186,9 @@ impl AptosChangeSet {
     pub fn into_inner(
         self,
     ) -> (
-        WriteChangeSet,
-        WriteChangeSet,
-        WriteChangeSet,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
+        WriteChangeSet<Vec<u8>>,
         DeltaChangeSet,
         Vec<ContractEvent>,
     ) {
@@ -210,18 +211,17 @@ impl AptosChangeSet {
     }
 
     fn squash_delta_change_set(&mut self, deltas: DeltaChangeSet) -> anyhow::Result<()> {
-        use WriteOp::*;
         for (key, mut op) in deltas.into_iter() {
             if let Some(r) = self.aggregator_writes.get_mut(&key) {
                 match r {
-                    Creation(data)
-                    | Modification(data)
-                    | CreationWithMetadata { data, .. }
-                    | ModificationWithMetadata { data, .. } => {
+                    Op::Creation(data)
+                    | Op::Modification(data)
+                    | Op::CreationWithMetadata { data, .. }
+                    | Op::ModificationWithMetadata { data, .. } => {
                         let val: u128 = deserialize(data);
                         *data = serialize(&op.apply_to(val)?);
                     },
-                    Deletion | DeletionWithMetadata { .. } => {
+                    Op::Deletion | Op::DeletionWithMetadata { .. } => {
                         anyhow::bail!("Failed to apply Aggregator delta -- value already deleted");
                     },
                 }
@@ -245,12 +245,12 @@ impl AptosChangeSet {
 
     fn squash_module_write_change_set(
         &mut self,
-        module_writes: WriteChangeSet,
+        module_writes: WriteChangeSet<Vec<u8>>,
     ) -> anyhow::Result<()> {
         for (key, write) in module_writes.into_iter() {
             match self.module_writes.entry(key) {
                 Occupied(mut entry) => {
-                    if !WriteOp::squash(entry.get_mut(), write)? {
+                    if !Op::squash(entry.get_mut(), write)? {
                         entry.remove();
                     }
                 },
@@ -264,12 +264,12 @@ impl AptosChangeSet {
 
     fn squash_resource_write_change_set(
         &mut self,
-        resource_writes: WriteChangeSet,
+        resource_writes: WriteChangeSet<Vec<u8>>,
     ) -> anyhow::Result<()> {
         for (key, write) in resource_writes.into_iter() {
             match self.resource_writes.entry(key) {
                 Occupied(mut entry) => {
-                    if !WriteOp::squash(entry.get_mut(), write)? {
+                    if !Op::squash(entry.get_mut(), write)? {
                         entry.remove();
                     }
                 },
@@ -283,12 +283,12 @@ impl AptosChangeSet {
 
     fn squash_aggregator_write_change_set(
         &mut self,
-        aggregator_writes: WriteChangeSet,
+        aggregator_writes: WriteChangeSet<Vec<u8>>,
     ) -> anyhow::Result<()> {
         for (key, write) in aggregator_writes.into_iter() {
             match self.aggregator_writes.entry(key) {
                 Occupied(mut entry) => {
-                    if !WriteOp::squash(entry.get_mut(), write)? {
+                    if !Op::squash(entry.get_mut(), write)? {
                         entry.remove();
                     }
                 },
@@ -324,9 +324,9 @@ impl AptosChangeSet {
 
 /// Utility to merge writes into a single storage-friendly write set.
 pub(crate) fn into_write_set(
-    resource_writes: WriteChangeSet,
-    module_writes: WriteChangeSet,
-    aggregator_writes: WriteChangeSet,
+    resource_writes: WriteChangeSet<Vec<u8>>,
+    module_writes: WriteChangeSet<Vec<u8>>,
+    aggregator_writes: WriteChangeSet<Vec<u8>>,
 ) -> anyhow::Result<WriteSet, VMStatus> {
     // Convert to write sets.
     let resource_write_set = resource_writes.into_write_set()?;

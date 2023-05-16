@@ -6,7 +6,8 @@ use crate::{
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_types::{access_path::AccessPath, executable::ModulePath};
+use aptos_vm_types::op::Op;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -261,7 +262,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn record_materialized_deltas(
         &self,
         txn_idx: TxnIndex,
-        materialized_deltas: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
+        materialized_deltas: Vec<(
+            <<T as TransactionOutput>::Txn as Transaction>::Key,
+            Op<Vec<u8>>,
+        )>,
     ) {
         match &self.outputs[txn_idx as usize]
             .load_full()
