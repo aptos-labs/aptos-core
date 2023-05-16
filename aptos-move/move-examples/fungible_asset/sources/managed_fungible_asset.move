@@ -1,6 +1,10 @@
-/// By deploying this module, the deployer provide an extension layer upon fungible asset that helps manage
-/// the refs for the deployer, who is set to be the initial admin that can mint/burn/freeze/unfreeze accounts.
-/// The admin can transfer the asset via object::transfer() at any point to set a new admin.
+/// This module provides a managed fungible asset that allows the owner of the metadata object to
+/// mint, transfer and burn fungible assets.
+///
+/// The functionalities offered by this module are:
+/// 1. Mint fungible assets as the owner of metadata object.
+/// 2. Transfer fungible assets as the owner of metadata object ignoring `frozen` field.
+/// 3. Burn fungible assets as the owner of metadata object.
 module fungible_asset_extension::managed_fungible_asset {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, FungibleAsset, Metadata};
     use aptos_framework::object::{Self, Object, ConstructorRef};
@@ -24,26 +28,24 @@ module fungible_asset_extension::managed_fungible_asset {
     /// Initialize metadata object and store the refs.
     public fun initialize(
         constructor_ref: &ConstructorRef,
-        monitoring_supply: bool,
         maximum_supply: u128,
         name: String,
         symbol: String,
-        decimals: u8
+        decimals: u8,
+        icon_uri: String,
     ) {
+        let supply = if (maximum_supply != 0) {
+            option::some(maximum_supply)
+        } else {
+            option::none()
+        };
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            if (monitoring_supply) {
-                option::some(if (maximum_supply != 0) {
-                    option::some(maximum_supply)
-                } else {
-                    option::none()
-                })
-            } else {
-                option::none()
-            },
+            supply,
             name,
             symbol,
             decimals,
+            icon_uri,
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -108,27 +110,35 @@ module fungible_asset_extension::managed_fungible_asset {
     }
 
     /// Unfreeze an account so it can transfer or receive fungible assets.
-    public entry fun unfreeze_account(admin: &signer,
-                                      metadata: Object<Metadata>,
-                                      account: address) acquires ManagedFungibleAsset {
+    public entry fun unfreeze_account(
+        admin: &signer,
+        metadata: Object<Metadata>,
+        account: address,
+    ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
         let wallet = primary_fungible_store::ensure_primary_store_exists(account, metadata);
         fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
     /// Withdraw as the owner of metadata object ignoring `frozen` field.
-    public fun withdraw(admin: &signer,
-                        metadata: Object<Metadata>,
-                        amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
+    public fun withdraw(
+        admin: &signer,
+        metadata: Object<Metadata>,
+        amount: u64,
+        from: address,
+    ): FungibleAsset acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
         let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, metadata);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
     /// Deposit as the owner of metadata object ignoring `frozen` field.
-    public fun deposit(admin: &signer,
-                       metadata: Object<Metadata>,
-                       to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
+    public fun deposit(
+        admin: &signer,
+        metadata: Object<Metadata>,
+        to: address,
+        fa: FungibleAsset,
+    ) acquires ManagedFungibleAsset {
         let transfer_ref = &authorized_borrow_refs(admin, metadata).transfer_ref;
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, metadata);
         fungible_asset::deposit_with_ref(transfer_ref, to_wallet, fa);
@@ -154,11 +164,11 @@ module fungible_asset_extension::managed_fungible_asset {
         let constructor_ref = &object::create_named_object(creator, b"APT");
         initialize(
             constructor_ref,
-            true,
             0,
             utf8(b"Aptos Token"), /* name */
             utf8(b"APT"), /* symbol */
             8, /* decimals */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
         );
         object_from_constructor_ref<Metadata>(constructor_ref)
     }

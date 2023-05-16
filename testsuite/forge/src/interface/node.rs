@@ -149,7 +149,7 @@ pub trait NodeExt: Node {
 
     /// Return an InspectionClient for this Node
     fn inspection_client(&self) -> InspectionClient {
-        InspectionClient::from_url(self.inspection_service_endpoint())
+        InspectionClient::new(self.inspection_service_endpoint())
     }
 
     /// Restarts this Node by calling Node::Stop followed by Node::Start

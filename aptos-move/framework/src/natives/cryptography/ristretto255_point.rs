@@ -10,7 +10,7 @@ use crate::{
             pop_64_byte_slice, pop_scalar_from_bytes, scalar_from_struct, GasParameters,
             COMPRESSED_POINT_NUM_BYTES,
         },
-        helpers::{log2_floor, SafeNativeContext, SafeNativeResult},
+        helpers::{log2_floor, SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
     safely_assert_eq, safely_pop_arg, safely_pop_type_arg,
 };
@@ -60,6 +60,12 @@ pub struct NativeRistrettoPointContext {
 //
 // Private Data Structures and Constants
 //
+
+/// This limit ensures that no more than 1.6MB will be allocated for Ristretto points (160 bytes for each) per VM session.
+const NUM_POINTS_LIMIT: usize = 10000;
+
+/// Equivalent to `std::error::resource_exhausted(4)` in Move.
+const E_TOO_MANY_POINTS_CREATED: u64 = 0x09_0004;
 
 /// A structure representing mutable data of the NativeRistrettoPointContext. This is in a RefCell
 /// of the overall context so we can mutate while still accessing the overall context.
@@ -128,12 +134,18 @@ impl PointStore {
         }
     }
 
-    /// Adds the point to the store and returns its RistrettoPointHandle ID
-    pub fn add_point(&mut self, point: RistrettoPoint) -> u64 {
+    /// Adds the point to the store and returns its RistrettoPointHandle ID.
+    /// Aborts if the number of points has exceeded a limit.
+    fn safe_add_point(&mut self, point: RistrettoPoint) -> SafeNativeResult<u64> {
         let id = self.points.len();
-        self.points.push(point);
-
-        id as u64
+        if id >= NUM_POINTS_LIMIT {
+            Err(SafeNativeError::Abort {
+                abort_code: E_TOO_MANY_POINTS_CREATED,
+            })
+        } else {
+            self.points.push(point);
+            Ok(id as u64)
+        }
     }
 }
 
@@ -175,7 +187,8 @@ pub(crate) fn native_point_identity(
     context.charge(gas_params.point_identity * NumArgs::one())?;
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
-    let result_handle = point_data.add_point(RistrettoPoint::identity());
+    let point = RistrettoPoint::identity();
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -221,7 +234,7 @@ pub(crate) fn native_point_decompress(
     // Take the # of points produced so far, which creates a unique and deterministic global ID
     // within the temporary scope of this current transaction. Then, store the RistrettoPoint in
     // a vector using this global ID as an index.
-    let id = point_data.add_point(point);
+    let id = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(id), Value::bool(true)])
 }
@@ -268,7 +281,7 @@ pub(crate) fn native_point_mul(
     let result_handle = match in_place {
         false => {
             let point = point_data.get_point(&point_handle).mul(scalar);
-            point_data.add_point(point)
+            point_data.safe_add_point(point)?
         },
         true => {
             point_data.get_point_mut(&point_handle).mul_assign(scalar);
@@ -324,7 +337,7 @@ pub(crate) fn native_point_neg(
     let result_handle = match in_place {
         false => {
             let point = point_data.get_point(&point_handle).neg();
-            point_data.add_point(point)
+            point_data.safe_add_point(point)?
         },
         true => {
             let neg = point_data.get_point_mut(&point_handle).neg();
@@ -361,7 +374,7 @@ pub(crate) fn native_point_add(
             let b = point_data.get_point(&b_handle);
 
             let point = a.add(b);
-            point_data.add_point(point)
+            point_data.safe_add_point(point)?
         },
         true => {
             // NOTE: When calling Move's add_assign, Move's linear types ensure that we will never
@@ -404,7 +417,7 @@ pub(crate) fn native_point_sub(
             let b = point_data.get_point(&b_handle);
 
             let point = a.sub(b);
-            point_data.add_point(point)
+            point_data.safe_add_point(point)?
         },
         true => {
             // NOTE: When calling Move's sub_assign, Move's linear types ensure that we will never
@@ -439,7 +452,7 @@ pub(crate) fn native_basepoint_mul(
 
     let basepoint = RISTRETTO_BASEPOINT_TABLE;
     let result = basepoint.mul(&a);
-    let result_handle = point_data.add_point(result);
+    let result_handle = point_data.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -466,7 +479,7 @@ pub(crate) fn native_basepoint_double_mul(
     // Compute result = a * A + b * BASEPOINT and return a RistrettoPointHandle
     let A_ref = point_data.get_point(&A_handle);
     let result = RistrettoPoint::vartime_double_scalar_mul_basepoint(&a, A_ref, &b);
-    let result_handle = point_data.add_point(result);
+    let result_handle = point_data.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -490,8 +503,8 @@ pub(crate) fn native_new_point_from_sha512(
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
-
-    let result_handle = point_data.add_point(RistrettoPoint::hash_from_bytes::<Sha512>(&bytes));
+    let point = RistrettoPoint::hash_from_bytes::<Sha512>(&bytes);
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -511,7 +524,9 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     let mut point_data = point_context.point_data.borrow_mut();
 
     let slice = pop_64_byte_slice(&mut args)?;
-    let result_handle = point_data.add_point(RistrettoPoint::from_uniform_bytes(&slice));
+
+    let point = RistrettoPoint::from_uniform_bytes(&slice);
+    let result_handle = point_data.safe_add_point(point)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -589,7 +604,7 @@ pub(crate) fn native_multi_scalar_mul(
         .point_data
         .borrow_mut();
 
-    let result_handle = point_data_mut.add_point(result);
+    let result_handle = point_data_mut.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }
@@ -665,7 +680,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
         .point_data
         .borrow_mut();
 
-    let result_handle = point_data_mut.add_point(result);
+    let result_handle = point_data_mut.safe_add_point(result)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }

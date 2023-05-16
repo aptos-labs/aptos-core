@@ -41,7 +41,7 @@ struct VersionedValue<V: TransactionWrite, X: Executable> {
     executables: HashMap<HashValue, Arc<X>>,
 }
 
-/// Maps each key (access path) to an interal VersionedValue.
+/// Maps each key (access path) to an internal VersionedValue.
 pub struct VersionedCode<K, V: TransactionWrite, X: Executable> {
     values: DashMap<K, VersionedValue<V, X>>,
 }
