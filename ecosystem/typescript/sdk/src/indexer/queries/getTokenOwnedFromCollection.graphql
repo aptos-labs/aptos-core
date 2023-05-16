@@ -1,4 +1,4 @@
-query getAccountCollectionTokens($collection_id: String!, $owner_address: String!, $offset: Int, $limit: Int) {
+query getTokenOwnedFromCollection($collection_id: String!, $owner_address: String!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
     where: {
       owner_address: { _eq: $owner_address }

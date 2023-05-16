@@ -19,6 +19,7 @@ const faucetClient = new FaucetClient(
 const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
 const collectionName = "AliceCollection";
+const collectionNameV2 = "AliceCollection2";
 const tokenName = "Alice Token";
 const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
 
@@ -67,7 +68,7 @@ describe("Indexer", () => {
     );
 
     await provider.waitForTransaction(
-      await aptosToken.createCollection(alice, "Alice's simple collection", collectionName, "https://aptos.dev", 5, {
+      await aptosToken.createCollection(alice, "Alice's simple collection", collectionNameV2, "https://aptos.dev", 5, {
         royaltyNumerator: 10,
         royaltyDenominator: 10,
       }),
@@ -77,7 +78,7 @@ describe("Indexer", () => {
     await provider.waitForTransactionWithResult(
       await aptosToken.mint(
         alice,
-        collectionName,
+        collectionNameV2,
         "Alice's simple token",
         tokenName,
         "https://aptos.dev/img/nyan.jpeg",
@@ -233,18 +234,26 @@ describe("Indexer", () => {
 
     it("gets the collection data", async () => {
       const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
-      expect(collectionData.current_collections_v2).toHaveLength(2);
+      expect(collectionData.current_collections_v2).toHaveLength(1);
+      expect(collectionData.current_collections_v2[0].collection_name).toEqual(collectionName);
+    });
+
+    it("gets the currect collection address", async () => {
+      const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionNameV2);
+      const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionNameV2);
+      expect(collectionData.current_collections_v2[0].collection_id).toEqual(collectionAddress);
     });
 
     it(
-      "gets account current tokens of a specific collection by the collection address",
+      "gets account current tokens of a specific collection by the collection address with token standard specified",
       async () => {
-        const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionName, {
-          tokenStandard: "v2",
-        });
-        const tokens = await indexerClient.getAccountCollectionTokensByCollectionAddress(
+        const tokens = await indexerClient.getTokenOwnedFromCollectionNameAndCreatorAddress(
           alice.address().hex(),
-          collectionAddress,
+          collectionNameV2,
+          alice.address().hex(),
+          {
+            tokenStandard: "v2",
+          },
         );
         expect(tokens.current_token_ownerships_v2).toHaveLength(1);
         expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v2");
@@ -253,17 +262,23 @@ describe("Indexer", () => {
     );
 
     it(
-      "gets account current tokens of a specific collection by the collection address",
+      "returns same result for getTokenOwnedFromCollectionNameAndCreatorAddress and getTokenOwnedFromCollectionAddress",
       async () => {
-        const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionName, {
-          tokenStandard: "v1",
-        });
-        const tokens = await indexerClient.getAccountCollectionTokensByCollectionAddress(
+        console.log(alice.address().hex());
+        const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionNameV2);
+        const tokensFromCollectionAddress = await indexerClient.getTokenOwnedFromCollectionAddress(
           alice.address().hex(),
           collectionAddress,
         );
-        expect(tokens.current_token_ownerships_v2).toHaveLength(1);
-        expect(tokens.current_token_ownerships_v2[0].token_standard).toEqual("v1");
+        const tokensFromNameAndCreatorAddress = await indexerClient.getTokenOwnedFromCollectionNameAndCreatorAddress(
+          alice.address().hex(),
+          collectionNameV2,
+          alice.address().hex(),
+        );
+
+        expect(tokensFromCollectionAddress.current_token_ownerships_v2).toEqual(
+          tokensFromNameAndCreatorAddress.current_token_ownerships_v2,
+        );
       },
       longTestTimeout,
     );
