@@ -212,7 +212,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
-    /// (A more detailed description can be found in TODO: implement.)
+    /// (A more detailed description can be found in `unveil_sigma_protocol_verify`.)
     struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint,
@@ -818,11 +818,10 @@ module veiled_coin::veiled_coin {
         })
     }
 
-    // TODO: Fix comment
-    /// Deserializes and returns a `SigmaProof` given its byte representation (see protocol description in
-    /// `sigma_protocol_verify`)
+    /// Deserializes and returns a `ElGamalToPedSigmaProof` given its byte representation (see protocol description in
+    /// `unveil_sigma_protocol_verify`)
     ///
-    /// Elements at the end of the `SigmaProof` struct are expected to be at the start  of the byte vector, and
+    /// Elements at the end of the `ElGamalToPedSigmaProof` struct are expected to be at the start of the byte vector, and
     /// serialized using the serialization formats in the `ristretto255` module.
     fun deserialize_unveil_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<ElGamalToPedSigmaProof<CoinType>> {
         if (vector::length<u8>(&proof_bytes) != 160) {
@@ -990,7 +989,9 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
-    // TODO: Describe in comment
+    /// Computes the challenge value as `rho = H(g, h, y, c_1, c_2, c, X_1, X_2, X_3)
+    /// for the $\Sigma$-protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
+    /// used above is from the Zether [BAZB20] paper.
     fun unveil_sigma_protocol_fiat_shamir<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
@@ -1080,7 +1081,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// TODO: explain the challenge derivation as a function of the parameters
-    /// Computes the challenge value as `c = H(g, y, \bar{y}, h, C, D, \bar{C}, c_1, c_2, c, \bar{c}, {X_i}_{i=1}^7)`
+    /// Computes the challenge value as `rho = H(g, y, \bar{y}, h, C, D, \bar{C}, c_1, c_2, c, \bar{c}, {X_i}_{i=1}^7)`
     /// for the $\Sigma$-protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
     /// used above is from the Zether [BAZB20] paper.
     fun sigma_protocol_fiat_shamir<CoinType>(
@@ -1292,9 +1293,8 @@ module veiled_coin::veiled_coin {
     }
 
     #[test_only]
-    // TODO: Fix this comment
-    /// Proves the $\Sigma$-protocol used for veiled coin transfers.
-    /// See `sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
+    /// Proves the $\Sigma$-protocol used for veiled-to-unveiled coin transfers.
+    /// See `unveil_sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
     public fun unveil_sigma_protocol_prove<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
@@ -1377,10 +1377,9 @@ module veiled_coin::veiled_coin {
         bytes
     }
 
-    // TODO: Fix comment
     #[test_only]
-    /// Given a $\Sigma$-protocol proof, serializes it into byte form.
-    /// Elements at the end of the `SigmaProof` struct are placed into the vector first,
+    /// Given a $\Sigma$-protocol proof for veiled-to-unveiled transfers, serializes it into byte form.
+    /// Elements at the end of the `ElGamalToPedSigmaProof` struct are placed into the vector first,
     /// using the serialization formats in the `ristretto255` module.
     public fun serialize_unveil_sigma_proof<CoinType>(proof: &ElGamalToPedSigmaProof<CoinType>): vector<u8> {
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
@@ -1694,7 +1693,6 @@ module veiled_coin::veiled_coin {
         let sender_new_balance = ristretto255::new_scalar_from_u32(100);
         let zero_randomness = ristretto255::scalar_zero();
 
-        // TODO: Will need a different wrapper function that creates the `UnveiledWithdrawalProof`
         let (new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(
             &sender_new_balance,
             &zero_randomness,
