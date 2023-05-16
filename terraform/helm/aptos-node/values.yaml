@@ -14,6 +14,7 @@ numValidators: 1
 # -- Total number of fullnode groups to deploy
 numFullnodeGroups: 1
 
+# -- Options for multicluster mode. This is *experimental only*.
 multicluster:
   enabled: false 
   targetClusters: ["cluster1", "cluster2", "cluster3"]
