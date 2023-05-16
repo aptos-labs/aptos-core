@@ -156,7 +156,7 @@ impl AggregatorChangeSet {
 mod test {
     use super::*;
     use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
-    use claims::assert_matches;
+    use claims::{assert_matches, assert_ok};
     use move_table_extension::TableHandle;
 
     struct EmptyStorage;
@@ -174,18 +174,18 @@ mod test {
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
     //
-    //     +-------+---------------+----------+-----+---------+
-    //     |  key  | storage value |  create  | get | remove  |
-    //     +-------+---------------+----------+-----+---------+
-    //     |  100  |               |   yes    | yes |   yes   |
-    //     |  200  |               |   yes    | yes |         |
-    //     |  300  |               |   yes    |     |   yes   |
-    //     |  400  |               |   yes    |     |         |
-    //     |  500  |               |          | yes |   yes   |
-    //     |  600  |               |          | yes |         |
-    //     |  700  |               |          | yes |         |
-    //     |  800  |               |          |     |   yes   |
-    //     +-------+---------------+----------+-----+---------+
+    //     +-------+---------------+-----------------------------------+-----+---------+
+    //     |  key  | storage value |  create                           | get | remove  |
+    //     +-------+---------------+-----------------------------------+-----+---------+
+    //     |  100  |               |   yes                              | yes |   yes   |
+    //     |  200  |               |   yes                              | yes |         |
+    //     |  300  |               |   yes                              |     |   yes   |
+    //     |  400  |               |   yes                              |     |         |
+    //     |  500  |               |   Yes if !aggregagtor_enabled      | yes |   yes   |
+    //     |  600  |               |   Yes if !aggregagtor_enabled      | yes |         |
+    //     |  700  |               |   Yes if !aggregagtor_enabled      | yes |         |
+    //     |  800  |               |                                    |     |   yes   |
+    //     +-------+---------------+------------------------------------+-----+---------+
     fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
@@ -193,25 +193,30 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
+        if !aggregator_enabled {
+            aggregator_data.create_new_aggregator(aggregator_id_for_test(500), 500);
+            aggregator_data.create_new_aggregator(aggregator_id_for_test(600), 600);
+            aggregator_data.create_new_aggregator(aggregator_id_for_test(700), 700);
+        }
 
-        aggregator_data.get_aggregator(
+        assert_ok!(aggregator_data.get_aggregator(
             aggregator_id_for_test(100),
             100,
             context.resolver,
             aggregator_enabled,
-        );
-        aggregator_data.get_aggregator(
+        ));
+        assert_ok!(aggregator_data.get_aggregator(
             aggregator_id_for_test(200),
             200,
             context.resolver,
             aggregator_enabled,
-        );
-        aggregator_data.get_aggregator(
+        ));
+        assert_ok!(aggregator_data.get_aggregator(
             aggregator_id_for_test(500),
             500,
             context.resolver,
             aggregator_enabled,
-        );
+        ));
         aggregator_data
             .get_aggregator(
                 aggregator_id_for_test(600),
@@ -219,6 +224,7 @@ mod test {
                 context.resolver,
                 aggregator_enabled,
             )
+            .unwrap()
             .add(100)
             .unwrap();
         aggregator_data
@@ -228,6 +234,7 @@ mod test {
                 context.resolver,
                 aggregator_enabled,
             )
+            .unwrap()
             .add(200)
             .unwrap();
 
@@ -240,7 +247,6 @@ mod test {
     #[test]
     fn test_into_change_set() {
         let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, true);
-        use AggregatorChange::*;
 
         test_set_up(&context, true);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -269,13 +275,15 @@ mod test {
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)
         );
-        assert_matches!(changes.get(&aggregator_id_for_test(800)).unwrap(), Delete);
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(800)).unwrap(),
+            AggregatorChange::Delete
+        );
     }
 
     #[test]
     fn test_into_change_set_aggregator_disabled() {
         let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, false);
-        use AggregatorChange::*;
 
         test_set_up(&context, false);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -290,7 +298,10 @@ mod test {
             changes.get(&aggregator_id_for_test(400)).unwrap(),
             AggregatorChange::Write(0)
         );
-        assert_matches!(changes.get(&aggregator_id_for_test(500)).unwrap(), Delete);
+        assert_matches!(
+            changes.get(&aggregator_id_for_test(500)).unwrap(),
+            AggregatorChange::Delete
+        );
         assert_matches!(
             changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Write(100)

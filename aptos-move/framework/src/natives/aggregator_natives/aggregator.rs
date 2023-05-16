@@ -55,7 +55,7 @@ fn native_add(
         limit,
         aggregator_context.resolver,
         aggregator_context.aggregator_enabled,
-    );
+    )?;
 
     aggregator.add(value)?;
 
@@ -94,7 +94,7 @@ fn native_read(
         limit,
         aggregator_context.resolver,
         aggregator_context.aggregator_enabled,
-    );
+    )?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
@@ -134,7 +134,7 @@ fn native_sub(
         limit,
         aggregator_context.resolver,
         aggregator_context.aggregator_enabled,
-    );
+    )?;
 
     aggregator.sub(value)?;
 
