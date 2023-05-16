@@ -25,7 +25,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use std::{collections::BTreeMap, ops::Deref};
+use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
@@ -39,42 +39,59 @@ pub(crate) fn get_resource_group_from_metadata(
         .find_map(|attr| attr.get_resource_group_member())
 }
 
-fn get_any_resource(
-    move_resolver: &impl MoveResolverExt,
-    address: &AccountAddress,
-    struct_tag: &StructTag,
-    metadata: &[Metadata],
-) -> Result<Option<Vec<u8>>, VMError> {
-    let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
-    if let Some(resource_group) = resource_group {
-        let group_data = move_resolver.get_resource_group_data(address, &resource_group)?;
-        if let Some(group_data) = group_data {
-            let mut group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .finish(Location::Undefined)
-                })?;
-            Ok(group_data.remove(struct_tag))
-        } else {
-            Ok(None)
-        }
-    } else {
-        move_resolver.get_standard_resource(address, struct_tag)
-    }
-}
-
 /// Adapter to convert a `StateView` into a `MoveResolverExt`.
-pub struct StorageAdapter<'a, S>(&'a S);
+pub struct StorageAdapter<'a, S> {
+    state_store: &'a S,
+    resource_group_cache:
+        RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
+}
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
-        Self(state_store)
+        Self {
+            state_store,
+            resource_group_cache: RefCell::new(BTreeMap::new()),
+        }
     }
 
     pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
-        self.0
+        self.state_store
             .get_state_value_bytes(&StateKey::access_path(access_path))
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
+    }
+
+    fn get_any_resource(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>, VMError> {
+        let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
+        if let Some(resource_group) = resource_group {
+            let mut cache = self.resource_group_cache.borrow_mut();
+            let cache = cache.entry(*address).or_insert_with(BTreeMap::new);
+            if let Some(group_data) = cache.get_mut(&resource_group) {
+                // This resource group is already cached for this address. So just return the
+                // cached value.
+                return Ok(group_data.get(struct_tag).cloned());
+            }
+            let group_data = self.get_resource_group_data(address, &resource_group)?;
+            if let Some(group_data) = group_data {
+                let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .finish(Location::Undefined)
+                    })?;
+                let res = group_data.get(struct_tag).cloned();
+                cache.insert(resource_group, group_data);
+                Ok(res)
+            } else {
+                cache.insert(resource_group, BTreeMap::new());
+                Ok(None)
+            }
+        } else {
+            self.get_standard_resource(address, struct_tag)
+        }
     }
 }
 
@@ -98,6 +115,17 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
         })?;
         self.get(ap).map_err(|e| e.finish(Location::Undefined))
     }
+
+    fn release_resource_group_cache(
+        &self,
+        address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
+        self.resource_group_cache
+            .borrow_mut()
+            .get_mut(address)?
+            .remove(resource_group)
+    }
 }
 
 impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
@@ -107,7 +135,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         struct_tag: &StructTag,
         metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(get_any_resource(self, address, struct_tag, metadata)?)
+        Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
 
@@ -164,7 +192,7 @@ impl<'a, S> Deref for StorageAdapter<'a, S> {
     type Target = S;
 
     fn deref(&self) -> &Self::Target {
-        self.0
+        self.state_store
     }
 }
 
