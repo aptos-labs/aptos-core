@@ -37,6 +37,7 @@ module aptos_framework::primary_fungible_store {
         symbol: String,
         decimals: u8,
         icon_uri: String,
+        project_uri: String,
     ) {
         fungible_asset::add_fungibility(
             constructor_ref,
@@ -45,6 +46,7 @@ module aptos_framework::primary_fungible_store {
             symbol,
             decimals,
             icon_uri,
+            project_uri,
         );
         let metadata_obj = &object::generate_signer(constructor_ref);
         move_to(metadata_obj, DeriveRefPod {
@@ -163,6 +165,7 @@ module aptos_framework::primary_fungible_store {
             string::utf8(b"@T"),
             0,
             string::utf8(b"http://example.com/icon"),
+            string::utf8(b"http://example.com"),
         );
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);
