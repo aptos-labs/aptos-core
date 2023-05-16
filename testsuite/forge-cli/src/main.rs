@@ -402,7 +402,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
+        "land_blocking" => Ok(land_blocking_three_region_test_suite(duration)),
         "land_blocking_three_region" => Ok(land_blocking_three_region_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
@@ -1235,6 +1235,7 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
         )
 }
 
+#[allow(dead_code)]
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
@@ -1274,7 +1275,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
 fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_fullnode_count(20)
         .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
@@ -1298,6 +1299,9 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
                     max_round_gap: 4,
                 }),
         )
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 40000,
+        }))
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
