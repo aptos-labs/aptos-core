@@ -6,11 +6,12 @@
 
 // TODO(tengzhang): helpers specifically for bv types need to be refactored
 
-use crate::options::BoogieOptions;
+use crate::{options::BoogieOptions, COMPILED_MODULE_AVAILABLE};
 use itertools::Itertools;
 use move_binary_format::file_format::TypeParameterIndex;
+use move_core_types::account_address::AccountAddress;
 use move_model::{
-    ast::{MemoryLabel, TempIndex, Value},
+    ast::{Address, MemoryLabel, TempIndex, Value},
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, ModuleEnv, QualifiedInstId, SpecFunId, StructEnv,
         StructId, SCRIPT_MODULE_NAME,
@@ -33,9 +34,13 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
     if mod_sym.as_str() == SCRIPT_MODULE_NAME {
         // <SELF> is not accepted by boogie as a symbol
         "#SELF#".to_string()
-    } else {
+    } else if let Address::Numerical(a) = mod_name.addr() {
         // qualify module by address.
-        format!("{}_{}", mod_name.addr().to_str_radix(16), mod_sym)
+        format!("{}_{}", a.short_str_lossless(), mod_sym)
+    } else {
+        env.env
+            .error(&env.get_loc(), "unsupported symbolic address");
+        format!("ERROR_{}", mod_sym)
     }
 }
 
@@ -496,8 +501,8 @@ pub fn boogie_byte_blob(_options: &BoogieOptions, val: &[u8], bv_flag: bool) -> 
     }
 }
 
-pub fn boogie_address_blob(_options: &BoogieOptions, val: &[BigUint]) -> String {
-    let args = val.iter().map(|v| format!("{}", *v)).collect_vec();
+pub fn boogie_address_blob(env: &GlobalEnv, _options: &BoogieOptions, val: &[Address]) -> String {
+    let args = val.iter().map(|v| boogie_address(env, v)).collect_vec();
     if args.is_empty() {
         "$EmptyVec'address'()".to_string()
     } else {
@@ -507,10 +512,10 @@ pub fn boogie_address_blob(_options: &BoogieOptions, val: &[BigUint]) -> String 
 
 /// Generate vectors for constant values
 /// TODO(tengzhang): add support for bv types
-pub fn boogie_constant_blob(_options: &BoogieOptions, val: &[Constant]) -> String {
+pub fn boogie_constant_blob(env: &GlobalEnv, _options: &BoogieOptions, val: &[Constant]) -> String {
     let args = val
         .iter()
-        .map(|v| boogie_constant(_options, v))
+        .map(|v| boogie_constant(env, _options, v))
         .collect_vec();
     if args.is_empty() {
         "EmptyVec()".to_string()
@@ -519,7 +524,7 @@ pub fn boogie_constant_blob(_options: &BoogieOptions, val: &[Constant]) -> Strin
     }
 }
 
-pub fn boogie_constant(_options: &BoogieOptions, val: &Constant) -> String {
+pub fn boogie_constant(env: &GlobalEnv, _options: &BoogieOptions, val: &Constant) -> String {
     match val {
         Constant::Bool(true) => "true".to_string(),
         Constant::Bool(false) => "false".to_string(),
@@ -527,12 +532,12 @@ pub fn boogie_constant(_options: &BoogieOptions, val: &Constant) -> String {
         Constant::U64(num) => num.to_string(),
         Constant::U128(num) => num.to_string(),
         Constant::U256(num) => num.to_string(),
-        Constant::Address(v) => v.to_string(),
+        Constant::Address(v) => boogie_address(env, v),
         Constant::ByteArray(v) => boogie_byte_blob(_options, v, false),
-        Constant::AddressArray(v) => boogie_address_blob(_options, v),
+        Constant::AddressArray(v) => boogie_address_blob(env, _options, v),
         Constant::Vector(vec) => boogie_make_vec_from_strings(
             &vec.iter()
-                .map(|v| boogie_constant(_options, v))
+                .map(|v| boogie_constant(env, _options, v))
                 .collect_vec(),
         ),
         Constant::U16(num) => num.to_string(),
@@ -540,8 +545,15 @@ pub fn boogie_constant(_options: &BoogieOptions, val: &Constant) -> String {
     }
 }
 
-pub fn boogie_value_blob(_options: &BoogieOptions, val: &[Value]) -> String {
-    let args = val.iter().map(|v| boogie_value(_options, v)).collect_vec();
+pub fn boogie_address(_env: &GlobalEnv, addr: &Address) -> String {
+    BigUint::from_bytes_be(&addr.expect_numerical().into_bytes()).to_string()
+}
+
+pub fn boogie_value_blob(env: &GlobalEnv, _options: &BoogieOptions, val: &[Value]) -> String {
+    let args = val
+        .iter()
+        .map(|v| boogie_value(env, _options, v))
+        .collect_vec();
     if args.is_empty() {
         "EmptyVec()".to_string()
     } else {
@@ -549,16 +561,18 @@ pub fn boogie_value_blob(_options: &BoogieOptions, val: &[Value]) -> String {
     }
 }
 
-pub fn boogie_value(_options: &BoogieOptions, val: &Value) -> String {
+pub fn boogie_value(env: &GlobalEnv, _options: &BoogieOptions, val: &Value) -> String {
     match val {
         Value::Bool(true) => "true".to_string(),
         Value::Bool(false) => "false".to_string(),
         Value::Number(num) => num.to_string(),
-        Value::Address(v) => v.to_string(),
+        Value::Address(v) => BigUint::from_bytes_be(&v.expect_numerical().into_bytes()).to_string(),
         Value::ByteArray(v) => boogie_byte_blob(_options, v, false),
-        Value::AddressArray(v) => boogie_address_blob(_options, v),
+        Value::AddressArray(v) => boogie_address_blob(env, _options, v),
         Value::Vector(vec) => boogie_make_vec_from_strings(
-            &vec.iter().map(|v| boogie_value(_options, v)).collect_vec(),
+            &vec.iter()
+                .map(|v| boogie_value(env, _options, v))
+                .collect_vec(),
         ),
     }
 }
@@ -582,7 +596,10 @@ fn boogie_debug_track(
     ty: &Type,
     bv_flag: bool,
 ) -> String {
-    let fun_def_idx = fun_target.func_env.get_def_idx();
+    let fun_def_idx = fun_target
+        .func_env
+        .get_def_idx()
+        .expect(COMPILED_MODULE_AVAILABLE);
     let value = format!("$t{}", idx);
     if ty.is_reference() {
         let temp_name = boogie_temp(fun_target.global_env(), ty.skip_reference(), 0, bv_flag);
@@ -615,7 +632,10 @@ fn boogie_debug_track(
 
 /// Construct a statement to debug track an abort.
 pub fn boogie_debug_track_abort(fun_target: &FunctionTarget<'_>, abort_code: &str) -> String {
-    let fun_def_idx = fun_target.func_env.get_def_idx();
+    let fun_def_idx = fun_target
+        .func_env
+        .get_def_idx()
+        .expect(COMPILED_MODULE_AVAILABLE);
     format!(
         "assume {{:print \"$track_abort({},{}):\", {}}} {} == {};",
         fun_target.func_env.module_env.get_id().to_usize(),
@@ -727,8 +747,8 @@ pub struct AddressFormatter {
 }
 
 impl AddressFormatter {
-    pub fn format(&self, addr: &BigUint) -> String {
-        let result = addr.to_str_radix(16);
+    pub fn format(&self, addr: &AccountAddress) -> String {
+        let result = addr.to_big_uint().to_str_radix(16);
         // into correct length
         let result = if self.full_length {
             format!("{:0>32}", result)
@@ -776,7 +796,7 @@ fn type_name_to_ident_tokens(
             let struct_env = module_env.get_struct(*sid);
             let type_name = format!(
                 "{}::{}::{}",
-                formatter.format(module_env.get_name().addr()),
+                formatter.format(&module_env.get_name().addr().expect_numerical()),
                 module_env
                     .get_name()
                     .name()
@@ -845,17 +865,21 @@ pub fn boogie_reflection_type_name(env: &GlobalEnv, ty: &Type, stdlib: bool) -> 
     if stdlib {
         format!(
             "${}_type_name_TypeName(${}_ascii_String({}))",
-            env.get_stdlib_address(),
-            env.get_stdlib_address(),
+            env.get_stdlib_address().expect_numerical().to_big_uint(),
+            env.get_stdlib_address().expect_numerical().to_big_uint(),
             bytes
         )
     } else {
-        format!("${}_string_String({})", env.get_stdlib_address(), bytes)
+        format!(
+            "${}_string_String({})",
+            env.get_stdlib_address().expect_numerical().to_big_uint(),
+            bytes
+        )
     }
 }
 
 enum TypeInfoPack {
-    Struct(BigUint, String, String),
+    Struct(Address, String, String),
     Symbolic(TypeParameterIndex),
 }
 
@@ -924,13 +948,13 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
         format!("s#$TypeParamStruct(#{}_info)", idx)
     }
 
-    let extlib_address = env.get_extlib_address();
+    let extlib_address = env.get_extlib_address().expect_numerical();
     match type_name_to_info_pack(env, ty) {
         None => (
             "false".to_string(),
             format!(
                 "${}_type_info_TypeInfo(0, EmptyVec(), EmptyVec())",
-                extlib_address
+                extlib_address.to_big_uint()
             ),
         ),
         Some(TypeInfoPack::Struct(addr, module_name, struct_name)) => {
@@ -940,7 +964,10 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
                 "true".to_string(),
                 format!(
                     "${}_type_info_TypeInfo({}, {}, {})",
-                    extlib_address, addr, module_repr, struct_repr
+                    extlib_address.to_big_uint(),
+                    addr.expect_numerical().to_big_uint(),
+                    module_repr,
+                    struct_repr
                 ),
             )
         },
@@ -948,7 +975,7 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
             get_symbol_is_struct(idx),
             format!(
                 "${}_type_info_TypeInfo({}, {}, {})",
-                extlib_address,
+                extlib_address.to_big_uint(),
                 get_symbol_account_address(idx),
                 get_symbol_module_name(idx),
                 get_symbol_struct_name(idx)

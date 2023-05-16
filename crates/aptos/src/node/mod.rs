@@ -1055,6 +1055,13 @@ pub struct RunLocalTestnet {
     #[clap(long, parse(from_os_str))]
     test_dir: Option<PathBuf>,
 
+    /// Path to node configuration file override for local test mode.
+    ///
+    /// If provided, the default node config will be overridden by the config in the given file.
+    /// Cannot be used with --config-path
+    #[clap(long, parse(from_os_str), conflicts_with("config-path"))]
+    test_config_override: Option<PathBuf>,
+
     /// Random seed for key generation in test mode
     ///
     /// This allows you to have deterministic keys for testing
@@ -1127,6 +1134,7 @@ impl CliCommand<()> for RunLocalTestnet {
         let node_thread_handle = thread::spawn(move || {
             let result = aptos_node::setup_test_environment_and_start_node(
                 config_path,
+                self.test_config_override,
                 Some(test_dir_copy),
                 false,
                 false,

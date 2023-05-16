@@ -13,6 +13,7 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_model::{
+    ast::Address,
     code_writer::CodeWriter,
     emit, emitln,
     model::{GlobalEnv, QualifiedId, StructId},
@@ -29,10 +30,12 @@ use move_model::{
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::mono_analysis;
-use num::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use tera::{Context, Tera};
+
+/// An error message used for cases where a compiled module is expected to be attached
+pub(crate) const COMPILED_MODULE_AVAILABLE: &str = "compiled module missing";
 
 const PRELUDE_TEMPLATE: &[u8] = include_bytes!("prelude/prelude.bpl");
 const NATIVE_TEMPLATE: &[u8] = include_bytes!("prelude/native.bpl");
@@ -275,8 +278,8 @@ pub fn add_prelude(
 
     // TODO: we have defined {{std}} for adaptable resolution of stdlib addresses but
     //   not used it yet in the templates.
-    let std_addr = format!("${}", env.get_stdlib_address());
-    let ext_addr = format!("${}", env.get_extlib_address());
+    let std_addr = format!("${}", env.get_stdlib_address().expect_numerical());
+    let ext_addr = format!("${}", env.get_extlib_address().expect_numerical());
     context.insert("std", &std_addr);
     context.insert("Ext", &ext_addr);
 
@@ -345,74 +348,99 @@ impl MapImpl {
         );
 
         let decl = env
-            .intrinsics
+            .get_intrinsics()
             .get_decl_for_struct(&struct_qid)
             .expect("intrinsic decl");
 
         MapImpl {
             struct_name,
             insts,
-            fun_new: Self::triple_opt_to_name(decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW)),
+            fun_new: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_NEW)),
             fun_destroy_empty: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_DESTROY_EMPTY),
             ),
-            fun_len: Self::triple_opt_to_name(decl.get_fun_triple(env, INTRINSIC_FUN_MAP_LEN)),
+            fun_len: Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_LEN)),
             fun_is_empty: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_IS_EMPTY),
             ),
             fun_has_key: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_HAS_KEY),
             ),
             fun_add_no_override: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE),
             ),
             fun_add_override_if_exists: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS),
             ),
             fun_del_must_exist: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_DEL_MUST_EXIST),
             ),
             fun_del_return_key: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_DEL_RETURN_KEY),
             ),
             fun_borrow: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW),
             ),
             fun_borrow_mut: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_MUT),
             ),
             fun_borrow_mut_with_default: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT),
             ),
             fun_spec_new: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_NEW),
             ),
             fun_spec_get: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_GET),
             ),
             fun_spec_set: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_SET),
             ),
             fun_spec_del: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_DEL),
             ),
             fun_spec_len: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_LEN),
             ),
             fun_spec_is_empty: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_IS_EMPTY),
             ),
             fun_spec_has_key: Self::triple_opt_to_name(
+                env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
             ),
         }
     }
 
-    fn triple_opt_to_name(triple_opt: Option<(BigUint, String, String)>) -> String {
+    fn triple_opt_to_name(
+        _env: &GlobalEnv,
+        triple_opt: Option<(Address, String, String)>,
+    ) -> String {
         match triple_opt {
             None => String::new(),
             Some((addr, mod_name, fun_name)) => {
-                format!("${}_{}_{}", addr.to_str_radix(16), mod_name, fun_name)
+                format!(
+                    "${}_{}_{}",
+                    addr.expect_numerical().short_str_lossless(),
+                    mod_name,
+                    fun_name
+                )
             },
         }
     }

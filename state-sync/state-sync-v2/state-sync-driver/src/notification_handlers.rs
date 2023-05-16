@@ -28,9 +28,6 @@ use std::{
     task::{Context, Poll},
 };
 
-// TODO(joshlind): make these configurable!
-const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
-
 /// A notification for new data that has been committed to storage
 #[derive(Clone, Debug)]
 pub enum CommitNotification {
@@ -392,12 +389,14 @@ impl FusedStream for ErrorNotificationListener {
 /// A simple handler for sending notifications to mempool
 #[derive(Clone)]
 pub struct MempoolNotificationHandler<M> {
+    mempool_commit_ack_timeout_ms: u64,
     mempool_notification_sender: M,
 }
 
 impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
-    pub fn new(mempool_notification_sender: M) -> Self {
+    pub fn new(mempool_notification_sender: M, mempool_commit_ack_timeout_ms: u64) -> Self {
         Self {
+            mempool_commit_ack_timeout_ms,
             mempool_notification_sender,
         }
     }
@@ -413,7 +412,7 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             .notify_new_commit(
                 committed_transactions,
                 block_timestamp_usecs,
-                MEMPOOL_COMMIT_ACK_TIMEOUT_MS,
+                self.mempool_commit_ack_timeout_ms,
             )
             .await;
 
