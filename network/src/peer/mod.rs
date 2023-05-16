@@ -52,11 +52,9 @@ use std::sync::mpsc::{Receiver, sync_channel, SyncSender, TryRecvError};
 use std::task::{Context, Poll};
 use anyhow::anyhow;
 use tokio::io::WriteHalf;
-//use tokio::io::{AsyncWrite, WriteHalf};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
-//use crate::error::NetworkErrorKind::PeerManagerError;
 use crate::protocols::wire::messaging::v1::network_message_frame_codec;
 
 #[cfg(test)]
@@ -125,10 +123,7 @@ pub struct Peer<TSocket> {
     connection: Option<TSocket>,
     /// Channel to notify PeerManager that we've disconnected.
     connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
-    // Channel to receive requests from PeerManager to send messages and rpcs.
-    // peer_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>,//aptos_channel::Receiver<ProtocolId, PeerRequest>,
-    /// Channel to notifty PeerManager of new inbound messages and rpcs.
-    //peer_notifs_tx: aptos_channel::Sender<ProtocolId, PeerNotification>, // TODO: how can this and a channel of NetworkMessage be the same thing? If we just _don't_ make the RPC response object at this time, we can do it later and keep channel the same
+    /// Messages received from the socket
     peer_notifs_tx: tokio::sync::mpsc::Sender<NetworkMessage>,
     /// Inbound rpc request queue for handling requests from remote peer.
     inbound_rpcs: InboundRpcs, // TODO: this maybe goes away?
@@ -155,9 +150,7 @@ where
         time_service: TimeService,
         connection: Connection<TSocket>,
         connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
-        //peer_reqs_rx: aptos_channel::Receiver<ProtocolId, PeerRequest>,
-        // peer_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>, // towards network peer
-        peer_notifs_tx: tokio::sync::mpsc::Sender<NetworkMessage>,//aptos_channel::Sender<ProtocolId, PeerNotification>, // from network peer
+        peer_notifs_tx: tokio::sync::mpsc::Sender<NetworkMessage>,
         inbound_rpc_timeout: Duration,
         max_concurrent_inbound_rpcs: u32,
         max_concurrent_outbound_rpcs: u32,
@@ -177,7 +170,6 @@ where
             connection_metadata,
             connection: Some(socket),
             connection_notifs_tx,
-            // peer_reqs_rx,
             peer_notifs_tx,
             inbound_rpcs: InboundRpcs::new(
                 network_context,
@@ -205,7 +197,7 @@ where
 
     pub async fn start(
         mut self,
-        peer_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>, // towards network peer
+        peer_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>, // outbound messages towards network peer
     ) {
         let remote_peer_id = self.remote_peer_id();
         trace!(
@@ -224,23 +216,17 @@ where
             MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
         let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
-        //let (mut write_reqs_tx, mut write_reqs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(1024); // TODO: channel too deep?
-        //let mut write_reqs_rx = OrderedCompoundStream::new(vec![&mut write_reqs_rx]);
-        //let write_reqs_rx = RefCell::new(write_reqs_rx);
-        //let write_reqs_rx = vec![write_reqs_rx];
-
         // Start writer "process" as a separate task. We receive two handles to
         // communicate with the task:
         //   1. `write_reqs_tx`: Queue of pending NetworkMessages to write.
         //   2. `close_tx`: Handle to close the task and underlying connection.
-        //let (mut write_reqs_tx, writer_close_tx) = Self::start_writer_task(
         let writer_close_tx = Self::start_writer_task(
             &self.executor,
             self.time_service.clone(),
             self.connection_metadata.clone(),
             self.network_context,
             writer,
-            peer_reqs_rx,//write_reqs_rx,
+            peer_reqs_rx,
             self.max_frame_size,
             self.max_message_size,
         );
@@ -252,16 +238,7 @@ where
             }
 
             futures::select! {
-                // Handle a new outbound request from the PeerManager.
-/*                maybe_request = self.peer_reqs_rx.next() => {
-                    match maybe_request {
-                        Some(request) => self.handle_outbound_request(request, &mut write_reqs_tx).await,
-                        // The PeerManager is requesting this connection to close
-                        // by dropping the corresponding peer_reqs_tx handle.
-                        None => self.shutdown(DisconnectReason::Requested),
-                    }
-                },
-*/                // Handle a new inbound MultiplexMessage that we've just read off
+                // Handle a new inbound MultiplexMessage that we've just read off
                 // the wire from the remote peer.
                 maybe_message = reader.next() => {
                     match maybe_message {
@@ -282,17 +259,6 @@ where
                         None => self.shutdown(DisconnectReason::ConnectionLost),
                     }
                 },
-                // // Drive the queue of pending inbound rpcs. When one is fulfilled
-                // // by an upstream protocol, send the response to the remote peer.
-                // maybe_response = self.inbound_rpcs.next_completed_response() => {
-                //     if let Err(err) = self.inbound_rpcs.send_outbound_response(&mut write_reqs_tx, maybe_response).await {
-                //         warn!(
-                //             NetworkSchema::new(&self.network_context).connection_metadata(&self.connection_metadata),
-                //             error = %err,
-                //             "{} Error in handling inbound rpc request, error: {}", self.network_context, err,
-                //         );
-                //     }
-                // },
                 // Poll the queue of pending outbound rpc tasks for the next
                 // successfully or unsuccessfully completed request.
                 (request_id, maybe_completed_request) = self.outbound_rpcs.next_completed_request() => {
@@ -319,14 +285,11 @@ where
         connection_metadata: ConnectionMetadata,
         network_context: NetworkContext,
         mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
-        //write_reqs_rx: Vec<&mut tokio::sync::mpsc::Receiver<NetworkMessage>>,
-        write_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>,
+        write_reqs_rx: Vec<RefCell<tokio::sync::mpsc::Receiver<NetworkMessage>>>,  //
         max_frame_size: usize,
         max_message_size: usize,
-//    ) -> (tokio::sync::mpsc::Sender<NetworkMessage>, oneshot::Sender<()>) {
         ) -> oneshot::Sender<()> {
         let remote_peer_id = connection_metadata.remote_peer_id;
-        //let (write_reqs_tx, mut write_reqs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(1024);
         let mut write_reqs_rx = OrderedCompoundStream{
             streams: write_reqs_rx,
             done: false,
@@ -397,20 +360,11 @@ where
             }
         };
         let multiplex_task = async move {
-            // let mut write_reqs_rx = write_reqs_rx;
-            // let mut write_reqs_rx = OrderedCompoundStream::new(write_reqs_rx);
             let mut outbound_stream =
                 OutboundStream::new(max_frame_size, max_message_size, stream_msg_tx);
             loop {
-                // let wat = write_reqs_rx.next().await;
-                // let message = match wat {
-                //     None => break,
-                //     Some(v) => v,
-                // };
-                // futures::select! {
                 match write_reqs_rx.next().await {
                     Some(message) => {
-//                    message = write_reqs_rx.select_next_some() {
                         // A large message becomes a series of chunks in the chunk channel backlog.
                         // writer_task above pulls round robin from the large-message-chunk-stream and the small-message-stream.
                         // either channel full would block the other one
@@ -429,16 +383,12 @@ where
                         }
                     },
                     None => break,
-                //     _ = close_rx => {
-                //         break;
-                //     }
                  }
             }
         };
 
         executor.spawn(writer_task);
         executor.spawn(multiplex_task);
-        //(write_reqs_tx, close_tx)
         close_tx
     }
 
@@ -447,7 +397,7 @@ where
         message: NetworkMessage,
     ) -> Result<(), PeerManagerError> {
         // just dump out to tokio mpsc channel of NetworkMessage at this point
-        // TODO: handle RPC replies to requests sent to this node
+        // TODO? handle RPC replies to requests sent to this node
         return match self.peer_notifs_tx.try_send(message) {
             Ok(_) => Ok({}),
             Err(tse) => match tse {
@@ -461,39 +411,6 @@ where
                 }
             }
         };
-/*        match message {
-            NetworkMessage::DirectSendMsg(message) => //self.handle_inbound_direct_send(message),
-            NetworkMessage::Error(error_msg) => {
-                warn!(
-                    NetworkSchema::new(&self.network_context)
-                        .connection_metadata(&self.connection_metadata),
-                    error_msg = ?error_msg,
-                    "{} Peer {} sent an error message: {:?}",
-                    self.network_context,
-                    self.remote_peer_id().short_str(),
-                    error_msg,
-                );
-            },
-            NetworkMessage::RpcRequest(request) => {
-                if let Err(err) = self
-                    .inbound_rpcs
-                    .handle_inbound_request(&mut self.peer_notifs_tx, request)
-                {
-                    warn!(
-                        NetworkSchema::new(&self.network_context)
-                            .connection_metadata(&self.connection_metadata),
-                        error = %err,
-                        "{} Error handling inbound rpc request: {}",
-                        self.network_context,
-                        err
-                    );
-                }
-            },
-            NetworkMessage::RpcResponse(response) => {
-                self.outbound_rpcs.handle_inbound_response(response)
-            },
-        };
-        Ok(())*/
     }
 
     async fn handle_inbound_stream_message(
@@ -557,115 +474,6 @@ where
         }
     }
 
-    /// Handle an inbound DirectSendMsg from the remote peer. There's not much to
-    /// do here other than bump some counters and forward the message up to the
-    /// PeerManager.
-/*    fn handle_inbound_direct_send(&mut self, message: DirectSendMsg) {
-        let peer_id = self.remote_peer_id();
-        let protocol_id = message.protocol_id;
-        let data = message.raw_msg;
-
-        trace!(
-            NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-            protocol_id = protocol_id,
-            "{} DirectSend: Received inbound message from peer {} for protocol {:?}",
-            self.network_context,
-            peer_id.short_str(),
-            protocol_id
-        );
-        let data_len = data.len() as u64;
-        counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
-        counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL).inc_by(data_len);
-        network_application_inbound_traffic(self.network_context, message.protocol_id, data_len);
-
-        let notif = PeerNotification::RecvMessage(Message {
-            protocol_id,
-            mdata: Bytes::from(data),
-        });
-
-        if let Err(err) = self.peer_notifs_tx.push(protocol_id, notif) {
-            warn!(
-                NetworkSchema::new(&self.network_context),
-                error = ?err,
-                "{} Failed to notify PeerManager about inbound DirectSend message. Error: {:?}",
-                self.network_context,
-                err
-            );
-        }
-    }
-*/
-    async fn handle_outbound_request(
-        &mut self,
-        request: PeerRequest,
-        write_reqs_tx: &mut tokio::sync::mpsc::Sender<NetworkMessage>,
-    ) {
-        trace!(
-            "Peer {} PeerRequest::{:?}",
-            self.remote_peer_id().short_str(),
-            request
-        );
-        match request {
-            // To send an outbound DirectSendMsg, we just bump some counters and
-            // push it onto our outbound writer queue.
-            PeerRequest::SendDirectSend(message) => {
-                let message_len = message.mdata.len();
-                let protocol_id = message.protocol_id;
-                network_application_outbound_traffic(
-                    self.network_context,
-                    protocol_id,
-                    message_len as u64,
-                );
-                let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
-                    protocol_id,
-                    priority: Priority::default(),
-                    raw_msg: Vec::from(message.mdata.as_ref()),
-                });
-
-                match write_reqs_tx.send(message).await {
-                    Ok(_) => {
-                        counters::direct_send_messages(&self.network_context, SENT_LABEL).inc();
-                        counters::direct_send_bytes(&self.network_context, SENT_LABEL)
-                            .inc_by(message_len as u64);
-                    },
-                    Err(e) => {
-                        warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .connection_metadata(&self.connection_metadata),
-                            error = ?e,
-                            "Failed to send direct send message for protocol {} to peer: {}. Error: {:?}",
-                            protocol_id,
-                            self.remote_peer_id().short_str(),
-                            e,
-                        );
-                    },
-                }
-            },
-            PeerRequest::SendRpc(request) => {
-                let protocol_id = request.protocol_id;
-                network_application_outbound_traffic(
-                    self.network_context,
-                    protocol_id,
-                    request.data.len() as u64,
-                );
-                if let Err(e) = self
-                    .outbound_rpcs
-                    .handle_outbound_request(request, write_reqs_tx)
-                    .await
-                {
-                    warn!(
-                        NetworkSchema::new(&self.network_context)
-                            .connection_metadata(&self.connection_metadata),
-                        error = %e,
-                        "Failed to send outbound rpc request for protocol {} to peer: {}. Error: {}",
-                        protocol_id,
-                        self.remote_peer_id().short_str(),
-                        e,
-                    );
-                }
-            },
-        }
-    }
-
     fn shutdown(&mut self, reason: DisconnectReason) {
         // Set the state of the actor to `State::ShuttingDown` to true ensures that the peer actor
         // will terminate and close the connection.
@@ -720,20 +528,11 @@ where
 }
 
 struct OrderedCompoundStream<T> {
-    //streams: Vec<&'a mut Receiver<T>>,
-    //streams: Vec<tokio::sync::mpsc::Receiver<T>>,
     streams: Vec<RefCell<tokio::sync::mpsc::Receiver<T>>>,
     done: bool,
 }
 
 impl<T> OrderedCompoundStream<T> {
-    // pub fn new(streams: Vec<&'a mut Receiver<T>>) -> Self {
-    // pub fn new(streams: Vec<Box<Pin<tokio::sync::mpsc::Receiver<T>>>>) -> Self {
-    //     Self{
-    //         streams,
-    //         done:false,
-    //     }
-    // }
 }
 
 impl<T> Unpin for OrderedCompoundStream<T> {}
@@ -745,12 +544,9 @@ impl<T> Stream for OrderedCompoundStream<T> {
         if self.done {
             return Poll::Ready(None);
         }
-        //loop {
             let mut any = false;
-        // let wat = self.into_inner();
         let wat = Pin::<&mut OrderedCompoundStream<T>>::into_inner(self);
             for source in wat.streams.iter_mut() {
-                //let res = source.poll_recv(cx);
                 match source.get_mut().poll_recv(cx) {
                     Poll::Ready(vo) => match vo {
                         None => {}
@@ -763,27 +559,6 @@ impl<T> Stream for OrderedCompoundStream<T> {
                         any = true;
                     }
                 }
-                // FusedStream
-                // if source.is_terminated() {continue;}
-                // any = true;
-                // let res= source.poll_next(cx);
-                // match res {
-                //     Poll::Ready(_) => return res,
-                //     Poll::Pending => continue,
-                // }
-                //
-                // std::sync::mpsc::Receiver
-                // let res = source.try_recv();
-                // match res {
-                //     Ok(v) => return Poll::Ready(v),
-                //     Err(e) => match e {
-                //         TryRecvError::Empty => {
-                //             any = true;
-                //         }
-                //         // TODO: mark skip? remove from vec?
-                //         TryRecvError::Disconnected => {}
-                //     }
-                // }
             }
             if !any {
                 wat.done = true;
@@ -791,7 +566,6 @@ impl<T> Stream for OrderedCompoundStream<T> {
             }
             //cx.waker().wake_by_ref();
             return Poll::Pending
-        //}
     }
 }
 
