@@ -76,8 +76,8 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     if [[ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
         fullnode_host="fullnode${i}.${DOMAIN}:6182"
     elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-        index=$(($i % ${#MULTICLUSTER_SUFFIXES[@]}))
-        cluster=${MULTICLUSTER_SUFFIXES[${index}]}
+        index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
+        cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
         fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6182"
     else 
         fullnode_host="${username}-${FULLNODE_INTERNAL_HOST_SUFFIX}:6182"
@@ -86,8 +86,8 @@ for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
     if [[ "${VALIDATOR_ENABLE_ONCHAIN_DISCOVERY}" = "true" ]]; then
         validator_host="val${i}.${DOMAIN}:6180"
     elif [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" = "true" ]]; then
-        index=$(($i % ${#MULTICLUSTER_SUFFIXES[@]}))
-        cluster=${MULTICLUSTER_SUFFIXES[${index}]}
+        index=$(($i % ${#MULTICLUSTER_DOMAIN_SUFFIXES[@]}))
+        cluster=${MULTICLUSTER_DOMAIN_SUFFIXES[${index}]}
         validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}.${NAMESPACE}.svc.${cluster}:6180"
     else
         validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
