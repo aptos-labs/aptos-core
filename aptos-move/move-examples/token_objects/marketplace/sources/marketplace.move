@@ -6,18 +6,18 @@
 /// * Royalties
 /// * Events on listings
 /// * Token V1 in an object wrapper
+/// * Collection bids
 ///
 /// The main philosophy behind this marketplace is that everything is an object,
 /// all tracking of listings would be done with an indexer.  Tokens are owned
 /// by the listings.  Listings are owned by the marketplace and the marketplace
 /// is owned by its creator.
 ///
-/// TODO: Collection offers
 /// TODO: Fungible asset support
 module marketplace_contract::marketplace {
 
     use aptos_framework::aptos_account;
-    use aptos_framework::coin;
+    use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{Self, EventHandle, emit_event};
     use aptos_framework::object::{Self, Object, DeleteRef, ExtendRef, new_event_handle, ObjectCore};
     use aptos_framework::timestamp;
@@ -25,6 +25,7 @@ module marketplace_contract::marketplace {
     use aptos_token::token as token_v1;
     use aptos_token_objects::royalty;
     use aptos_token_objects::token as token_objects;
+    use aptos_token_objects::collection as token_objects_collection;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
@@ -60,6 +61,8 @@ module marketplace_contract::marketplace {
     const EAUCTION_NOT_OVER: u64 = 13;
     /// Listing not on Marketplace
     const ELISTING_NOT_ON_MARKETPLACE: u64 = 14;
+    /// Collection bid amount cannot be zero
+    const ECOLLECTION_BID_AMOUNT_ZERO: u64 = 15;
 
     // -- Constants --
 
@@ -127,6 +130,7 @@ module marketplace_contract::marketplace {
 
     /// Administrative object references to keep the listing working
     struct ListingRefs has store, drop {
+        /// An extend ref to transfer the underlying asset and future allow modifying listings
         extend_ref: ExtendRef,
         delete_ref: Option<DeleteRef>,
     }
@@ -137,6 +141,25 @@ module marketplace_contract::marketplace {
         bidder: address,
         /// Stored coins from the bid
         coins: coin::Coin<CoinType>
+    }
+
+    /// A representation of a timed bid for use in uses like collection bids
+    struct TokenObjectCollectionOffer<phantom CoinType> has key {
+        bid: Bid<CoinType>,
+        /// Collection to purchase from
+        collection: Object<token_objects_collection::Collection>,
+        /// Price for each item
+        price: u64,
+        /// Total number of items remaining to be purchased
+        amount: u64,
+        /// timestamp in secs for the listing starting time
+        start_time_seconds: u64,
+        /// timestamp in secs for the listing expiration time, after this time the auction can be completed
+        expiration_time_seconds: u64,
+        /// An extend ref for future functionality to modify bids after they are already published
+        extend_ref: ExtendRef,
+        delete_ref: Option<DeleteRef>,
+        events: event::EventHandle<TokenObjectCollectionOfferEvent>,
     }
 
     /// A wrapper for Token V1 to support a marketplace for both types of tokens together
@@ -155,6 +178,15 @@ module marketplace_contract::marketplace {
         type: String,
         start: Option<StartEvent>,
         bid: Option<BidEvent>,
+        sale: Option<SaleEvent>,
+        end: Option<EndEvent>
+    }
+
+    /// Combined events for an individual listing
+    struct TokenObjectCollectionOfferEvent has drop, store {
+        collection: Object<token_objects_collection::Collection>,
+        amount: u64,
+        start: Option<StartEvent>,
         sale: Option<SaleEvent>,
         end: Option<EndEvent>
     }
@@ -390,9 +422,8 @@ module marketplace_contract::marketplace {
         let token_id = token_v1::create_token_id(token_data_id, property_version);
         let token = token_v1::withdraw_token(seller, token_id, amount);
 
-        // Wrap the token for sale
-        let marketplace = borrow_marketplace<CoinType>(marketplace_address);
-        let (token_address, token_signer, token_delete_ref) = create_object_with_delete_ref(marketplace);
+        // Wrap the token for sale with the user as the owner
+        let (token_address, token_signer, token_delete_ref) = create_object_from_account(seller);
         let wrapped_token = TokenV1Wrapper {
             token,
             delete_ref: token_delete_ref
@@ -435,7 +466,7 @@ module marketplace_contract::marketplace {
 
         // Build the Listing object and derive it from the marketplace
         let marketplace = borrow_marketplace<CoinType>(marketplace_address);
-        let (listing_address, listing_signer, listing_extend_ref, listing_delete_ref) = create_object<CoinType>(
+        let (listing_address, listing_signer, listing_extend_ref, listing_delete_ref) = create_object_from_marketplace<CoinType>(
             marketplace
         );
 
@@ -496,13 +527,7 @@ module marketplace_contract::marketplace {
         assert!(seller_address == listing.seller, ENOT_SELLER);
 
         // Return bid if it exists
-        if (option::is_some(&listing.highest_bid)) {
-            let Bid {
-                bidder,
-                coins
-            } = option::extract(&mut listing.highest_bid);
-            aptos_account::deposit_coins<CoinType>(bidder, coins);
-        };
+        return_bid(listing);
 
         emit_event(&mut listing.events, ListingEvent {
             item: listing.item,
@@ -626,6 +651,172 @@ module marketplace_contract::marketplace {
             });
     }
 
+    /// Make a bid on a token object collection
+    entry fun collection_offer<CoinType>(
+        buyer: &signer,
+        marketplace_address: address,
+        collection: Object<token_objects_collection::Collection>,
+        price: u64,
+        amount: u64,
+        duration_secs: u64
+    ) acquires Marketplace {
+        collection_offer_inner<CoinType>(buyer, marketplace_address, collection, price, amount, duration_secs);
+    }
+
+    fun collection_offer_inner<CoinType>(
+        buyer: &signer,
+        marketplace_address: address,
+        collection: Object<token_objects_collection::Collection>,
+        price: u64,
+        amount: u64,
+        duration_seconds: u64
+    ): address acquires Marketplace {
+        let buyer_address = signer::address_of(buyer);
+        assert!(duration_seconds > FIVE_MINUTES_SECS, ETOO_SHORT_DURATION);
+        assert!(amount > 0, ECOLLECTION_BID_AMOUNT_ZERO);
+
+        let start_time_seconds = timestamp::now_seconds();
+        let expiration_time_seconds = start_time_seconds + duration_seconds;
+
+        let marketplace = borrow_marketplace<CoinType>(marketplace_address);
+        let (offer_address, offer_signer, extend_ref, delete_ref) = create_object_from_marketplace(marketplace);
+
+        let coins = coin::withdraw<CoinType>(buyer, price * amount);
+        let collection_offer = TokenObjectCollectionOffer<CoinType> {
+            bid: Bid {
+                bidder: buyer_address,
+                coins
+            },
+            price,
+            collection,
+            amount,
+            start_time_seconds,
+            expiration_time_seconds,
+            extend_ref,
+            delete_ref: option::some(delete_ref),
+            events: new_event_handle<TokenObjectCollectionOfferEvent>(&offer_signer)
+        };
+        emit_event(&mut collection_offer.events, TokenObjectCollectionOfferEvent {
+            collection,
+            amount,
+            start: option::some(StartEvent {
+                price,
+                start_time_secs: start_time_seconds,
+                end_time_secs: expiration_time_seconds,
+            }),
+            sale: option::none(),
+            end: option::none(),
+        });
+
+        move_to(&offer_signer, collection_offer);
+
+        // Remove the listing fee if there is one
+        // TODO: Possibly make a different fee
+        if (marketplace.fee_schedule.listing_fee > 0) {
+            aptos_account::transfer_coins<CoinType>(
+                buyer,
+                marketplace.fee_schedule.fee_address,
+                marketplace.fee_schedule.listing_fee
+            );
+        };
+
+        offer_address
+    }
+
+    /// Closes a collection offer at its current state, and returns remaining funds
+    entry fun close_collection_offer<CoinType>(
+        buyer: &signer,
+        marketplace_address: address,
+        collection_bid: Object<TokenObjectCollectionOffer<CoinType>>,
+    ) acquires TokenObjectCollectionOffer {
+        // Check ownership of object
+        let buyer_address = signer::address_of(buyer);
+
+        // Check ownership of bid
+        assert!(object::is_owner(collection_bid, marketplace_address), ELISTING_NOT_ON_MARKETPLACE);
+
+        let bid_address = object::object_address(&collection_bid);
+        let offer = borrow_global_mut<TokenObjectCollectionOffer<CoinType>>(bid_address);
+
+        // Return coins to bidder
+        let coins = coin::extract_all(&mut offer.bid.coins);
+        coin::deposit(buyer_address, coins);
+
+        // Delete bid
+        emit_event(&mut offer.events, TokenObjectCollectionOfferEvent {
+            collection: offer.collection,
+            amount: offer.amount,
+            start: option::none(),
+            sale: option::none(),
+            end: option::some(EndEvent {}),
+        });
+        let delete_ref = option::extract(&mut offer.delete_ref);
+        object::delete(delete_ref);
+    }
+
+    /// Offers a token for a collection bid, closing out the bid if it's fully settled
+    entry fun offer_for_collection_bid<CoinType>(
+        seller: &signer,
+        marketplace_address: address,
+        collection_bid: Object<TokenObjectCollectionOffer<CoinType>>,
+        token: Object<token_objects::Token>
+    ) acquires Marketplace, TokenObjectCollectionOffer {
+        // Check ownership of object
+        let seller_address = signer::address_of(seller);
+        assert!(object::is_owner(token, seller_address), ENOT_OWNER);
+
+        // Check ownership of bid
+        assert!(object::is_owner(collection_bid, marketplace_address), ELISTING_NOT_ON_MARKETPLACE);
+
+        // Check and reduce collection bid by 1
+        let bid_address = object::object_address(&collection_bid);
+        let offer = borrow_global_mut<TokenObjectCollectionOffer<CoinType>>(bid_address);
+        assert!(offer.amount > 0, ECOLLECTION_BID_AMOUNT_ZERO);
+        offer.amount = offer.amount - 1;
+
+        // Remove price coins from collection bid
+        let coins = coin::extract(&mut offer.bid.coins, offer.price);
+        let marketplace = borrow_marketplace<CoinType>(marketplace_address);
+
+        // Transfer funds
+        let (price, royalties, commission) = settle_sale_funds(
+            marketplace,
+            seller_address,
+            string::utf8(TOKEN_V2),
+            token,
+            coins
+        );
+
+        emit_event(&mut offer.events, TokenObjectCollectionOfferEvent {
+            collection: offer.collection,
+            amount: offer.amount,
+            start: option::none(),
+            sale: option::some(SaleEvent {
+                price,
+                buyer: seller_address,
+                commission,
+                royalties,
+            }),
+            end: option::none(),
+        });
+
+        // Transfer object
+        object::transfer(seller, token, offer.bid.bidder);
+
+        // If amount is 0, drop the collection bid
+        if (offer.amount == 0) {
+            emit_event(&mut offer.events, TokenObjectCollectionOfferEvent {
+                collection: offer.collection,
+                amount: offer.amount,
+                start: option::none(),
+                sale: option::none(),
+                end: option::some(EndEvent {}),
+            });
+            let delete_ref = option::extract(&mut offer.delete_ref);
+            object::delete(delete_ref);
+        }
+    }
+
     /// Buys multiple tokens at once at the buy now price
     entry fun buy_multiple_tokens<CoinType>(
         buyer: &signer,
@@ -727,7 +918,17 @@ module marketplace_contract::marketplace {
 
     // -- Helper functions --
 
-    inline fun create_object<CoinType>(
+    inline fun create_object_from_account(
+        account: &signer
+    ): (address, signer, DeleteRef) {
+        let constructor_ref = object::create_object_from_account(account);
+        let delete_ref = object::generate_delete_ref(&constructor_ref);
+        let address = object::address_from_constructor_ref(&constructor_ref);
+        let signer = object::generate_signer(&constructor_ref);
+        (address, signer, delete_ref)
+    }
+
+    inline fun create_object_from_marketplace<CoinType>(
         marketplace: &Marketplace<CoinType>,
     ): (address, signer, ExtendRef, DeleteRef) {
         let marketplace_signer = object::generate_signer_for_extending(&marketplace.extend_ref);
@@ -780,18 +981,52 @@ module marketplace_contract::marketplace {
         buyer_address: address,
         coins: coin::Coin<CoinType>
     ) {
-        let price = coin::value(&coins);
         let listing = borrow_listing_mut<CoinType>(listing_address);
 
         // Return any outstanding bids
         return_bid<CoinType>(listing);
 
+        let (price, royalties, commission) = settle_sale_funds(
+            marketplace,
+            listing.seller,
+            listing.type,
+            listing.item,
+            coins
+        );
+
+        emit_event(&mut listing.events, ListingEvent {
+            item: listing.item,
+            type: listing.type,
+            start: option::none(),
+            bid: option::none(),
+            sale: option::some(SaleEvent {
+                price,
+                buyer: buyer_address,
+                commission,
+                royalties,
+            }),
+            end: option::none()
+        });
+
+        // Transfer the token to the buyer
+        transfer_and_drop_listing<CoinType, ObjectCore>(listing_address, listing.item, buyer_address);
+    }
+
+    inline fun settle_sale_funds<T: key, CoinType>(
+        marketplace: &Marketplace<CoinType>,
+        seller_address: address,
+        type: String,
+        item: Object<T>,
+        coins: Coin<CoinType>,
+    ): (u64, u64, u64) {
+        let price = coin::value(&coins);
+
         // Transfer the royalties before commission, creators deserve to be paid first
-        let royalty_resource = if (listing.type == string::utf8(TOKEN_V2)) {
-            token_objects::royalty(listing.item)
+        let royalty_resource = if (type == string::utf8(TOKEN_V2)) {
+            token_objects::royalty(item)
         } else {
             // For non-tokens, just get the royalty from the object only
-            royalty::get(listing.item)
+            royalty::get(item)
         };
 
         let royalties = if (option::is_some(&royalty_resource)) {
@@ -821,23 +1056,9 @@ module marketplace_contract::marketplace {
         };
 
         // Transfer the remaining to the seller
-        aptos_account::deposit_coins(listing.seller, coins);
-        emit_event(&mut listing.events, ListingEvent {
-            item: listing.item,
-            type: listing.type,
-            start: option::none(),
-            bid: option::none(),
-            sale: option::some(SaleEvent {
-                price,
-                buyer: buyer_address,
-                commission,
-                royalties,
-            }),
-            end: option::none()
-        });
+        aptos_account::deposit_coins(seller_address, coins);
 
-        // Transfer the token to the buyer
-        transfer_and_drop_listing<CoinType, ObjectCore>(listing_address, listing.item, buyer_address);
+        (price, royalties, commission)
     }
 
     /// Returns the current highest bid to the original owner
