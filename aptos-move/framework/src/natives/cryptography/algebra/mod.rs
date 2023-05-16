@@ -150,7 +150,7 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
 }
 
 /// This limit ensures that no more than 1MB will be allocated for elements per VM session.
-const MEMORY_CONSUMPTION_LIMIT_IN_BYTES: usize = 1 << 20;
+const MEMORY_LIMIT_IN_BYTES: usize = 1 << 20;
 
 /// Equivalent to `std::error::resource_exhausted(3)` in Move.
 const E_TOO_MUCH_MEMORY_USED: u64 = 0x09_0003;
@@ -194,7 +194,7 @@ macro_rules! store_element {
     ($context:expr, $obj:expr) => {{
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
-        if new_size > MEMORY_CONSUMPTION_LIMIT_IN_BYTES {
+        if new_size > MEMORY_LIMIT_IN_BYTES {
             Err(SafeNativeError::Abort {
                 abort_code: E_TOO_MUCH_MEMORY_USED,
             })

@@ -4,7 +4,7 @@
 use crate::{
     natives::cryptography::algebra::{
         AlgebraContext, Structure, BLS12381_GT_GENERATOR, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_CONSUMPTION_LIMIT_IN_BYTES,
+        MEMORY_LIMIT_IN_BYTES,
     },
     structure_from_ty_arg,
 };
@@ -28,7 +28,7 @@ macro_rules! store_element {
     ($context:expr, $obj:expr) => {{
         let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
         let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
-        if new_size > MEMORY_CONSUMPTION_LIMIT_IN_BYTES {
+        if new_size > MEMORY_LIMIT_IN_BYTES {
             Err(E_TOO_MUCH_MEMORY_USED)
         } else {
             let target_vec = &mut context.objs;

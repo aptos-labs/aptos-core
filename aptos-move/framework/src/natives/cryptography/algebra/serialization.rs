@@ -6,7 +6,7 @@ use crate::{
         cryptography::algebra::{
             abort_invariant_violated, gas::GasParameters, AlgebraContext, SerializationFormat,
             Structure, BLS12381_R_SCALAR, E_TOO_MUCH_MEMORY_USED,
-            MEMORY_CONSUMPTION_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
