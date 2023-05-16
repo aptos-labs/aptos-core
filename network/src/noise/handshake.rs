@@ -13,6 +13,7 @@
 
 use crate::{
     application::storage::PeersAndMetadata,
+    logging::NetworkSchema,
     noise::{error::NoiseHandshakeError, stream::NoiseStream},
 };
 use aptos_config::{
@@ -21,8 +22,7 @@ use aptos_config::{
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::{duration_since_epoch, RwLock};
-use aptos_logger::trace;
-use aptos_netcore::transport::ConnectionOrigin;
+use aptos_logger::{error, trace};
 use aptos_short_hex_str::{AsShortHexStr, ShortHexStr};
 use aptos_types::PeerId;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -116,6 +116,11 @@ impl HandshakeAuthMode {
         HandshakeAuthMode::maybe_mutual(peers_and_metadata)
     }
 
+    #[cfg(test)]
+    pub fn server_only_with_metadata(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
+        HandshakeAuthMode::maybe_mutual(peers_and_metadata)
+    }
+
     fn anti_replay_timestamps(&self) -> Option<&RwLock<AntiReplayTimestamps>> {
         match &self {
             HandshakeAuthMode::Mutual {
@@ -169,42 +174,6 @@ impl NoiseUpgrader {
         }
     }
 
-    /// Perform a protocol upgrade on an underlying connection. In addition perform the noise IK
-    /// handshake to establish a noise stream and exchange static public keys. Upon success,
-    /// returns the static public key of the remote as well as a NoiseStream.
-    // TODO(philiphayes): rework socket-bench-server so we can remove this function
-    #[allow(dead_code)]
-    pub async fn upgrade_with_noise<TSocket>(
-        &self,
-        socket: TSocket,
-        origin: ConnectionOrigin,
-        remote_public_key: Option<x25519::PublicKey>,
-    ) -> Result<(x25519::PublicKey, NoiseStream<TSocket>), NoiseHandshakeError>
-    where
-        TSocket: AsyncRead + AsyncWrite + Debug + Unpin,
-    {
-        // perform the noise handshake
-        let socket = match origin {
-            ConnectionOrigin::Outbound => {
-                let remote_public_key = match remote_public_key {
-                    Some(key) => key,
-                    None if cfg!(any(test, feature = "fuzzing")) => unreachable!(),
-                    None => return Err(NoiseHandshakeError::MissingServerPublicKey),
-                };
-                self.upgrade_outbound(socket, remote_public_key, AntiReplayTimestamps::now)
-                    .await?
-            },
-            ConnectionOrigin::Inbound => {
-                let (socket, _peer_id, _) = self.upgrade_inbound(socket).await?;
-                socket
-            },
-        };
-
-        // return remote public key with a socket including the noise stream
-        let remote_public_key = socket.get_remote_static();
-        Ok((remote_public_key, socket))
-    }
-
     /// Perform an outbound protocol upgrade on this connection.
     ///
     /// This runs the "client" side of the Noise IK handshake to establish a
@@ -215,9 +184,10 @@ impl NoiseUpgrader {
     pub async fn upgrade_outbound<TSocket, F>(
         &self,
         mut socket: TSocket,
+        remote_peer_id: PeerId,
         remote_public_key: x25519::PublicKey,
         time_provider: F,
-    ) -> Result<NoiseStream<TSocket>, NoiseHandshakeError>
+    ) -> Result<(NoiseStream<TSocket>, PeerRole), NoiseHandshakeError>
     where
         TSocket: AsyncRead + AsyncWrite + Debug + Unpin,
         F: Fn() -> [u8; AntiReplayTimestamps::TIMESTAMP_SIZE],
@@ -287,7 +257,50 @@ impl NoiseUpgrader {
             .map_err(NoiseHandshakeError::ClientFinalizeFailed)?;
 
         // finalize the connection
-        Ok(NoiseStream::new(socket, session))
+        let noise_stream = NoiseStream::new(socket, session);
+        let peer_role = self.extract_peer_role_from_trusted_peers(remote_peer_id);
+
+        Ok((noise_stream, peer_role))
+    }
+
+    /// Returns the peer role for the remote peer based on the trusted peer set.
+    /// If the trusted peers is not found, or the trusted peers doesn't contain
+    /// the remote peer, an error is logged and we return an unknown peer role.
+    fn extract_peer_role_from_trusted_peers(&self, remote_peer_id: PeerId) -> PeerRole {
+        // Get the peers and metadata struct
+        let peers_and_metadata = match &self.auth_mode {
+            HandshakeAuthMode::Mutual {
+                peers_and_metadata, ..
+            } => peers_and_metadata.clone(),
+            HandshakeAuthMode::MaybeMutual(peers_and_metadata) => peers_and_metadata.clone(),
+        };
+
+        // Determine the peer role
+        match peers_and_metadata.get_trusted_peers(&self.network_context.network_id()) {
+            Ok(trusted_peers) => {
+                match trusted_peers.read().get(&remote_peer_id) {
+                    Some(trusted_peer) => {
+                        return trusted_peer.role; // We've found the peer!
+                    },
+                    None => {
+                        error!(NetworkSchema::new(&self.network_context).message(format!(
+                            "{} Outbound connection made with unknown peer (not in the trusted peers set)! Missing peer: {:?}",
+                            self.network_context, remote_peer_id
+
+                        )));
+                    },
+                }
+            },
+            Err(error) => {
+                error!(NetworkSchema::new(&self.network_context).message(format!(
+                    "Failed to get trusted peers for network context: {:?}, error: {:?}",
+                    self.network_context, error
+                )));
+            },
+        };
+
+        // If we couldn't determine the peer role, return an unknown peer role
+        PeerRole::Unknown
     }
 
     /// Perform an inbound protocol upgrade on this connection.
@@ -466,7 +479,9 @@ impl NoiseUpgrader {
             self.network_context,
             remote_peer_short,
         );
-        Ok((NoiseStream::new(socket, session), remote_peer_id, peer_role))
+
+        let noise_stream = NoiseStream::new(socket, session);
+        Ok((noise_stream, remote_peer_id, peer_role))
     }
 
     fn authenticate_inbound(
@@ -556,12 +571,10 @@ mod test {
                         Some(server_public_key),
                         peers_and_metadata,
                     );
-                let network_ids: Vec<NetworkId> =
-                    peers_and_metadata.get_registered_networks().collect();
 
                 (
-                    HandshakeAuthMode::server_only(&network_ids),
-                    HandshakeAuthMode::server_only(&network_ids),
+                    HandshakeAuthMode::server_only_with_metadata(peers_and_metadata.clone()),
+                    HandshakeAuthMode::server_only_with_metadata(peers_and_metadata),
                     client_network_context,
                     server_network_context,
                 )
@@ -586,7 +599,7 @@ mod test {
         server: &NoiseUpgrader,
         server_public_key: x25519::PublicKey,
     ) -> (
-        Result<NoiseStream<MemorySocket>, NoiseHandshakeError>,
+        Result<(NoiseStream<MemorySocket>, PeerRole), NoiseHandshakeError>,
         Result<(NoiseStream<MemorySocket>, PeerId, PeerRole), NoiseHandshakeError>,
     ) {
         // create an in-memory socket for testing
@@ -594,7 +607,12 @@ mod test {
 
         // perform the handshake
         block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now),
+            client.upgrade_outbound(
+                dialer_socket,
+                server.network_context.peer_id(),
+                server_public_key,
+                AntiReplayTimestamps::now,
+            ),
             server.upgrade_inbound(listener_socket),
         ))
     }
@@ -608,11 +626,17 @@ mod test {
     fn test_timestamp_replay() {
         // 1. generate peers
         let ((client, _), (server, server_public_key)) = build_peers(true, None);
+        let server_peer_id = server.network_context.peer_id();
 
         // 2. perform the handshake with some timestamp, it should work
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, bad_timestamp(1)),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                bad_timestamp(1),
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
@@ -622,7 +646,12 @@ mod test {
         // 3. perform the handshake again with timestamp in the past, it should fail
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, bad_timestamp(0)),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                bad_timestamp(0),
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
@@ -632,7 +661,12 @@ mod test {
         // 4. perform the handshake again with the same timestamp, it should fail
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, bad_timestamp(1)),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                bad_timestamp(1),
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
@@ -642,7 +676,12 @@ mod test {
         // 5. perform the handshake again with a valid timestamp in the future, it should work
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, bad_timestamp(2)),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                bad_timestamp(2),
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
@@ -656,7 +695,7 @@ mod test {
             build_peers(is_mutual_auth, None);
 
         let (client_res, server_res) = perform_handshake(&client, &server, server_public_key);
-        let client_stream = client_res.unwrap();
+        let (client_stream, _) = client_res.unwrap();
         let (server_stream, _, _) = server_res.unwrap();
 
         assert_eq!(client_stream.get_remote_static(), server_public_key);
@@ -750,10 +789,16 @@ mod test {
 
         // get peers
         let ((client, _client_public_key), (server, server_public_key)) = build_peers(false, None);
+        let server_peer_id = server.network_context.peer_id();
 
         // perform the handshake
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                AntiReplayTimestamps::now,
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
@@ -762,48 +807,17 @@ mod test {
     }
 
     #[test]
-    fn test_handshake_peer_roles_validator_dials_validator() {
-        // Initialize the logger
-        ::aptos_logger::Logger::init_for_testing();
-
-        // Create a client and server with mutual auth enabled
-        let ((client, _), (server, server_public_key)) = build_peers(true, None);
-
-        // Create an in-memory socket for testing
-        let (dialer_socket, listener_socket) = MemorySocket::new_pair();
-
-        // Create the client connection task
-        let client_peer_id = client.network_context.peer_id();
-        let client_connection_task = async move {
-            client
-                .upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now)
-                .await
-                .unwrap();
-        };
-
-        // Create the server connection task
-        let server_connection_task = async move {
-            let (_, peer_id, peer_role) = server.upgrade_inbound(listener_socket).await.unwrap();
-            assert_eq!(peer_id, client_peer_id);
-            assert_eq!(peer_role, PeerRole::Validator);
-        };
-
-        // Perform the handshake
-        block_on(join(client_connection_task, server_connection_task));
-    }
-
-    #[test]
     fn test_handshake_peer_roles_pfn_dials_vfn() {
         // Initialize the logger
         ::aptos_logger::Logger::init_for_testing();
 
-        // Create a peers and metadata struct with no trusted peers
+        // Create a peers and metadata struct
         let network_ids = vec![NetworkId::Vfn, NetworkId::Public];
         let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
         // Create a client and server with mutual auth disabled
         let ((mut client, _), (mut server, server_public_key)) =
-            build_peers(false, Some(peers_and_metadata));
+            build_peers(false, Some(peers_and_metadata.clone()));
 
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
@@ -817,15 +831,34 @@ mod test {
             NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id);
         server.network_context = server_network_context;
 
+        // Add the VFN to the trusted peers set
+        let trusted_peers = peers_and_metadata
+            .get_trusted_peers(&NetworkId::Public)
+            .unwrap();
+        trusted_peers.write().insert(
+            server_peer_id,
+            Peer::new(
+                vec![],
+                [server_public_key].into_iter().collect(),
+                PeerRole::ValidatorFullNode,
+            ),
+        );
+
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
 
         // Create the client connection task
         let client_connection_task = async move {
-            client
-                .upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now)
+            let (_, peer_role) = client
+                .upgrade_outbound(
+                    dialer_socket,
+                    server_peer_id,
+                    server_public_key,
+                    AntiReplayTimestamps::now,
+                )
                 .await
                 .unwrap();
+            assert_eq!(peer_role, PeerRole::ValidatorFullNode);
         };
 
         // Create the server connection task
@@ -833,6 +866,44 @@ mod test {
             let (_, peer_id, peer_role) = server.upgrade_inbound(listener_socket).await.unwrap();
             assert_eq!(peer_id, client_peer_id);
             assert_eq!(peer_role, PeerRole::Unknown);
+        };
+
+        // Perform the handshake
+        block_on(join(client_connection_task, server_connection_task));
+    }
+
+    #[test]
+    fn test_handshake_peer_roles_validator_dials_validator() {
+        // Initialize the logger
+        ::aptos_logger::Logger::init_for_testing();
+
+        // Create a client and server with mutual auth enabled
+        let ((client, _), (server, server_public_key)) = build_peers(true, None);
+        let server_peer_id = server.network_context.peer_id();
+
+        // Create an in-memory socket for testing
+        let (dialer_socket, listener_socket) = MemorySocket::new_pair();
+
+        // Create the client connection task
+        let client_peer_id = client.network_context.peer_id();
+        let client_connection_task = async move {
+            let (_, peer_role) = client
+                .upgrade_outbound(
+                    dialer_socket,
+                    server_peer_id,
+                    server_public_key,
+                    AntiReplayTimestamps::now,
+                )
+                .await
+                .unwrap();
+            assert_eq!(peer_role, PeerRole::Validator);
+        };
+
+        // Create the server connection task
+        let server_connection_task = async move {
+            let (_, peer_id, peer_role) = server.upgrade_inbound(listener_socket).await.unwrap();
+            assert_eq!(peer_id, client_peer_id);
+            assert_eq!(peer_role, PeerRole::Validator);
         };
 
         // Perform the handshake
@@ -850,7 +921,7 @@ mod test {
 
         // Create a client and server with mutual auth disabled
         let ((mut client, _), (mut server, server_public_key)) =
-            build_peers(false, Some(peers_and_metadata));
+            build_peers(false, Some(peers_and_metadata.clone()));
 
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
@@ -864,15 +935,34 @@ mod test {
             NetworkContext::new(RoleType::Validator, NetworkId::Vfn, server_peer_id);
         server.network_context = server_network_context;
 
+        // Add the validator to the trusted peers set
+        let trusted_peers = peers_and_metadata
+            .get_trusted_peers(&NetworkId::Vfn)
+            .unwrap();
+        trusted_peers.write().insert(
+            server_peer_id,
+            Peer::new(
+                vec![],
+                [server_public_key].into_iter().collect(),
+                PeerRole::Validator,
+            ),
+        );
+
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
 
         // Create the client connection task
         let client_connection_task = async move {
-            client
-                .upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now)
+            let (_, peer_role) = client
+                .upgrade_outbound(
+                    dialer_socket,
+                    server_peer_id,
+                    server_public_key,
+                    AntiReplayTimestamps::now,
+                )
                 .await
                 .unwrap();
+            assert_eq!(peer_role, PeerRole::Validator);
         };
 
         // Create the server connection task
@@ -896,8 +986,8 @@ mod test {
         let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
         // Create a client and server with mutual auth disabled
-        let ((mut client, _), (mut server, server_public_key)) =
-            build_peers(false, Some(peers_and_metadata));
+        let ((mut client, client_public_key), (mut server, server_public_key)) =
+            build_peers(false, Some(peers_and_metadata.clone()));
 
         // Update the client network context
         let client_peer_id = client.network_context.peer_id();
@@ -911,22 +1001,49 @@ mod test {
             NetworkContext::new(RoleType::FullNode, NetworkId::Public, server_peer_id);
         server.network_context = server_network_context;
 
+        // Add the client VFN and server VFN to the trusted peers set
+        let trusted_peers = peers_and_metadata
+            .get_trusted_peers(&NetworkId::Public)
+            .unwrap();
+        trusted_peers.write().insert(
+            client_peer_id,
+            Peer::new(
+                vec![],
+                [client_public_key].into_iter().collect(),
+                PeerRole::ValidatorFullNode,
+            ),
+        );
+        trusted_peers.write().insert(
+            server_peer_id,
+            Peer::new(
+                vec![],
+                [server_public_key].into_iter().collect(),
+                PeerRole::ValidatorFullNode,
+            ),
+        );
+
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
 
         // Create the client connection task
         let client_connection_task = async move {
-            client
-                .upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now)
+            let (_, peer_role) = client
+                .upgrade_outbound(
+                    dialer_socket,
+                    server_peer_id,
+                    server_public_key,
+                    AntiReplayTimestamps::now,
+                )
                 .await
                 .unwrap();
+            assert_eq!(peer_role, PeerRole::ValidatorFullNode);
         };
 
         // Create the server connection task
         let server_connection_task = async move {
             let (_, peer_id, peer_role) = server.upgrade_inbound(listener_socket).await.unwrap();
             assert_eq!(peer_id, client_peer_id);
-            assert_eq!(peer_role, PeerRole::Unknown);
+            assert_eq!(peer_role, PeerRole::ValidatorFullNode);
         };
 
         // Perform the handshake
