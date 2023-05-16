@@ -1268,11 +1268,14 @@ fn validators_join_and_leave(forge_config: ForgeConfig<'static>) -> ForgeConfig<
 fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_fullnode_count(20)
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["fullnode"]["config"]["mempool"]["default_failovers"] = 19.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(
@@ -1301,6 +1304,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
+#[allow(dead_code)]
 fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
