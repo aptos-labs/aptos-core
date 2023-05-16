@@ -61,6 +61,8 @@ We do not use the fourth **`won't`** level in this specification.
   - [ ] **1.1.10** bool.
   - [ ] **1.1.11** Object<T> encodings as an address.
 - [ ] **1.2** The encoding & decoding details **should** be hidden from the end user and done by the SDK.
+  - [ ] **1.2.1** The SDK **must** encode each piece in order.
+  - [ ] **1.2.2** The SDK **should** encode based on a given struct.
 
 ### 2. API servers
 
@@ -83,7 +85,7 @@ We do not use the fourth **`won't`** level in this specification.
 - [ ] **3.3** The SDK **must** support key management for Ed25519 keys.
   - [ ] **3.3.1** The SDK **must** support Key generation
   - [ ] **3.3.2** The SDK **must** support Key loading from a file
-  - [ ] **3.3.3** The SDK **must** support Key loading from an input
+  - [ ] **3.3.3** The SDK **must** support Key loading from a byte array
   - [ ] **3.3.4** The SDK **should** support Key rotation
   - [ ] **3.3.5** The SDK **could** Key management via local storage
   - [ ] **3.3.6** The SDK **could** Key management via hardware wallet (e.g. Ledger, Keystone, etc.)
@@ -103,8 +105,9 @@ We do not use the fourth **`won't`** level in this specification.
 - [ ] **4.1** The SDK **must** support entry function payload transaction submission.
 - [ ] **4.2** The SDK **must** support script payload transaction submission.
 - [ ] **4.3** The SDK **must** support simulation of transactions.
-- [ ] **4.4** The SDK **should** use the gas estimation API to determine the gas price when building transaction payloads.
-  - [ ] **4.4.1** The SDK **must** cache the response from the gas estimation API for a set period of time (e.g. 1 minute).
+- [ ] **4.4** The SDK **must** support view function payload.
+- [ ] **4.5** The SDK **should** use the gas estimation API to determine the gas price when building transaction payloads.
+  - [ ] **4.5.1** The SDK **must** cache the response from the gas estimation API for a set period of time (e.g. 1 minute).
 
 ### 5. Coin Management
 
