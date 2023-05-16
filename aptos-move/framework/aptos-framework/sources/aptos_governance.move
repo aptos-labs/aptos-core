@@ -9,8 +9,6 @@
 /// track proposal creation and proposal ids.
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
 /// on a proposal multiple times as long as the total voting power of these votes don't exceed its total voting power.
-///
-///
 module aptos_framework::aptos_governance {
     use std::error;
     use std::option;
@@ -252,14 +250,15 @@ module aptos_framework::aptos_governance {
 
     #[view]
     /// Return remaining voting power of a stake pool on a proposal.
-    /// Note: a stake pool's voting power on a proposal could increase overtime(e.g. rewards/new stake).
+    /// Note: a stake pool's voting power on a proposal could increase over time(e.g. rewards/new stake).
     public fun get_remaining_voting_power(stake_pool: address, proposal_id: u64): u64 acquires VotingRecords, VotingRecordsV2 {
         assert_voting_initialization();
 
-        // The voter's stake needs to be locked up at least as long as the proposal's expiration.
         let proposal_expiration = voting::get_proposal_expiration_secs<GovernanceProposal>(@aptos_framework, proposal_id);
         let lockup_until = stake::get_lockup_secs(stake_pool);
-        if (proposal_expiration > lockup_until) {
+        // The voter's stake needs to be locked up at least as long as the proposal's expiration.
+        // Also no one can vote on a expired proposal.
+        if (proposal_expiration > lockup_until || timestamp::now_seconds() > proposal_expiration) {
             return 0
         };
 
@@ -945,7 +944,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
-    public entry fun test_no_remaining_voting_power_when_lockup_ends_before_proposal_expiration(
+    public entry fun test_no_remaining_voting_power_about_proposal_expiration_time(
         aptos_framework: signer,
         proposer: signer,
         voter_1: signer,
@@ -963,12 +962,19 @@ module aptos_framework::aptos_governance {
         assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 0, 2);
 
-        // 500 seconds later, lockup period of voter_1 and voter_2 is reset .
+        // 500 seconds later, lockup period of voter_1 and voter_2 is reset.
         timestamp::fast_forward_seconds(440);
         stake::end_epoch();
         assert!(get_remaining_voting_power(proposer_addr, 0) == 100, 0);
         assert!(get_remaining_voting_power(voter_1_addr, 0) == 20, 1);
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
+
+        // 501 seconds later, the proposal expires.
+        timestamp::fast_forward_seconds(441);
+        stake::end_epoch();
+        assert!(get_remaining_voting_power(proposer_addr, 0) == 0, 0);
+        assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
+        assert!(get_remaining_voting_power(voter_2_addr, 0) == 0, 2);
     }
 
     #[test_only]
