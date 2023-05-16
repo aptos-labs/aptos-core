@@ -77,8 +77,13 @@ impl DriverFactory {
         let consensus_notification_handler = ConsensusNotificationHandler::new(consensus_listener);
         let (error_notification_sender, error_notification_listener) =
             ErrorNotificationListener::new();
-        let mempool_notification_handler =
-            MempoolNotificationHandler::new(mempool_notification_sender);
+        let mempool_notification_handler = MempoolNotificationHandler::new(
+            mempool_notification_sender,
+            node_config
+                .state_sync
+                .state_sync_driver
+                .mempool_commit_ack_timeout_ms,
+        );
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {
