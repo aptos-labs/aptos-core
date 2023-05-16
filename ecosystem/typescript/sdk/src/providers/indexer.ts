@@ -393,7 +393,8 @@ export class IndexerClient {
     },
   ): Promise<GetTokenOwnedFromCollectionQuery> {
     const collectionAddress = await this.getCollectionAddress(creatorAddress, collectionName, extraArgs);
-    return await this.getTokenOwnedFromCollectionAddress(ownerAddress, collectionAddress, extraArgs);
+    const tokens = await this.getTokenOwnedFromCollectionAddress(ownerAddress, collectionAddress, extraArgs);
+    return tokens;
   }
 
   /**
