@@ -214,7 +214,11 @@ module veiled_coin::veiled_coin {
     /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
     /// (A more detailed description can be found in TODO: implement.)
     struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
-        // TODO: implement
+        x1: RistrettoPoint,
+        x2: RistrettoPoint,
+        x3: RistrettoPoint,
+        alpha1: Scalar,
+        alpha2: Scalar,
     }
 
     /// Event emitted when some amount of veiled coins were deposited into an account.
@@ -299,14 +303,23 @@ module veiled_coin::veiled_coin {
         sender: &signer,
         recipient: address,
         amount: u32,
-        range_proof_new_balance: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
+        range_proof_new_balance: vector<u8>,
+        unveil_sigma_proof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-        let range_proof_new_balance = bulletproofs::range_proof_from_bytes(range_proof_new_balance);
+        let new_balance_proof = bulletproofs::range_proof_from_bytes(range_proof_new_balance);
+        let sigma_proof = deserialize_unveil_sigma_proof<CoinType>(unveil_sigma_proof);
+        assert!(std::option::is_some(&sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        let sigma_proof = std::option::extract(&mut sigma_proof);
+
+        let withdrawal_proof = UnveiledWithdrawalProof {
+           sigma_proof, 
+           new_balance_proof,
+        };
 
         let c = unveiled_withdraw<CoinType>(
             sender,
             amount,
-            &range_proof_new_balance);
+            &withdrawal_proof);
 
         coin::deposit<CoinType>(recipient, c);
     }
@@ -315,9 +328,10 @@ module veiled_coin::veiled_coin {
     public entry fun unveil<CoinType>(
         sender: &signer,
         amount: u32,
-        range_proof_new_balance: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
+        range_proof_new_balance: vector<u8>,
+        unveil_sigma_proof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-        unveil_to<CoinType>(sender, signer::address_of(sender), amount, range_proof_new_balance)
+        unveil_to<CoinType>(sender, signer::address_of(sender), amount, range_proof_new_balance, unveil_sigma_proof)
     }
 
     /// Sends a *veiled* `amount` from `sender` to `recipient`. After this call, the balance of the `sender`
@@ -511,7 +525,7 @@ module veiled_coin::veiled_coin {
     public fun unveiled_withdraw<CoinType>(
         sender: &signer,
         amount: u32,
-        new_balance_proof: &RangeProof): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter
+        unveil_proof: &UnveiledWithdrawalProof<CoinType>): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter
     {
         let addr = signer::address_of(sender);
 
@@ -526,7 +540,7 @@ module veiled_coin::veiled_coin {
         elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
 
         // Since `veiled_amount` was created from a `u32` public `amount`, no ZK range proof is needed for it.
-        veiled_withdraw(veiled_amount, coin_store, &veiled_balance, new_balance_proof, &std::option::none());
+        veiled_withdraw(veiled_amount, coin_store, &veiled_balance, &unveil_proof.new_balance_proof, &std::option::none());
 
         // Note: If the above `withdraw` aborts, the whole TXN aborts, so there are no atomicity issues.
         coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount))
@@ -804,6 +818,57 @@ module veiled_coin::veiled_coin {
         })
     }
 
+    // TODO: Fix comment
+    /// Deserializes and returns a `SigmaProof` given its byte representation (see protocol description in
+    /// `sigma_protocol_verify`)
+    ///
+    /// Elements at the end of the `SigmaProof` struct are expected to be at the start  of the byte vector, and
+    /// serialized using the serialization formats in the `ristretto255` module.
+    fun deserialize_unveil_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<ElGamalToPedSigmaProof<CoinType>> {
+        if (vector::length<u8>(&proof_bytes) != 160) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+
+        let x1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x1 = ristretto255::new_point_from_bytes(x1_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x1)) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+        let x1 = std::option::extract<RistrettoPoint>(&mut x1);
+
+        let x2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x2 = ristretto255::new_point_from_bytes(x2_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x2)) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+        let x2 = std::option::extract<RistrettoPoint>(&mut x2);
+
+        let x3_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let x3 = ristretto255::new_point_from_bytes(x3_bytes);
+        if (!std::option::is_some<RistrettoPoint>(&x3)) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+        let x3 = std::option::extract<RistrettoPoint>(&mut x3);
+
+        let alpha1_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha1 = ristretto255::new_scalar_from_bytes(alpha1_bytes);
+        if (!std::option::is_some(&alpha1)) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+        let alpha1 = std::option::extract(&mut alpha1);
+
+        let alpha2_bytes = cut_vector<u8>(&mut proof_bytes, 32);
+        let alpha2 = ristretto255::new_scalar_from_bytes(alpha2_bytes);
+        if (!std::option::is_some(&alpha2)) {
+            return std::option::none<ElGamalToPedSigmaProof<CoinType>>()
+        };
+        let alpha2 = std::option::extract(&mut alpha2);
+
+        std::option::some(ElGamalToPedSigmaProof {
+            x1, x2, x3, alpha1, alpha2 
+        })
+    }
+
     // TODO: Update comment
     /// Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled transfer.
     /// Specifically, this proof proves that `withdraw_ct` and `deposit_ct` encrypt the same amount $v$ using the same
@@ -923,7 +988,96 @@ module veiled_coin::veiled_coin {
         let h_alpha2 = ristretto255::point_mul(&h, &proof.alpha2);
         ristretto255::point_add_assign(&mut h_alpha2, &g_alpha1);
         assert!(ristretto255::point_equals(&bar_c_acc, &h_alpha2), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
-        }
+    }
+
+    // TODO: Describe in comment
+    fun unveil_sigma_protocol_fiat_shamir<CoinType>(
+        sender_pk: &elgamal::CompressedPubkey,
+        sender_updated_balance_ct: &elgamal::Ciphertext,
+        sender_updated_balance_comm: &pedersen::Commitment,
+        x1: &RistrettoPoint,
+        x2: &RistrettoPoint,
+        x3: &RistrettoPoint): Scalar
+    {
+        let (c1, c2) = elgamal::ciphertext_as_points(sender_updated_balance_ct);
+        let c = pedersen::commitment_as_point(sender_updated_balance_comm);
+
+        let hash_input = vector::empty<u8>();
+
+        let basepoint_bytes = ristretto255::point_to_bytes(&ristretto255::basepoint_compressed());
+        vector::append<u8>(&mut hash_input, basepoint_bytes);
+
+        let h_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&pedersen::randomness_base_for_bulletproof()));
+        vector::append<u8>(&mut hash_input, h_bytes);
+
+        let y = elgamal::pubkey_to_compressed_point(sender_pk);
+        let y_bytes = ristretto255::point_to_bytes(&y);
+        vector::append<u8>(&mut hash_input, y_bytes);
+
+        let c1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c1));
+        vector::append<u8>(&mut hash_input, c1_bytes);
+
+        let c2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c2));
+        vector::append<u8>(&mut hash_input, c2_bytes);
+
+        let c_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(c));
+        vector::append<u8>(&mut hash_input, c_bytes);
+
+        let x_1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x1));
+        vector::append<u8>(&mut hash_input, x_1_bytes);
+
+        let x_2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x2));
+        vector::append<u8>(&mut hash_input, x_2_bytes);
+
+        let x_3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(x3));
+        vector::append<u8>(&mut hash_input, x_3_bytes);
+
+        vector::append<u8>(&mut hash_input, FIAT_SHAMIR_SIGMA_DST);
+
+        ristretto255::new_scalar_from_sha2_512(hash_input)
+    }
+
+    // TODO: Describe in comment
+    fun unveil_sigma_protocol_verify<CoinType>(
+        sender_pk: &elgamal::CompressedPubkey,
+        sender_updated_balance_ct: &elgamal::Ciphertext,
+        sender_updated_balance_comm: &pedersen::Commitment,
+        proof: &ElGamalToPedSigmaProof<CoinType>)
+    { 
+        let (c1, c2) = elgamal::ciphertext_as_points(sender_updated_balance_ct);
+        let c = pedersen::commitment_as_point(sender_updated_balance_comm);
+        let h = pedersen::randomness_base_for_bulletproof();
+        let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
+
+        let rho = unveil_sigma_protocol_fiat_shamir<CoinType>(
+            sender_pk,
+            sender_updated_balance_ct,
+            sender_updated_balance_comm,
+            &proof.x1,
+            &proof.x2,
+            &proof.x3);
+
+        let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
+        // \rho * c_1 + X_1 =? \alpha_1 * g
+        let c1_acc = ristretto255::point_mul(c1, &rho);
+        ristretto255::point_add_assign(&mut c1_acc, &proof.x1);
+        assert!(ristretto255::point_equals(&c1_acc, &g_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+
+        let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
+        // \rho * c_2 + X_2 =? \alpha_2 * g + \alpha_1 * y
+        let c2_acc = ristretto255::point_mul(c2, &rho);
+        ristretto255::point_add_assign(&mut c2_acc, &proof.x2);
+        let y_alpha1 = ristretto255::point_mul(&sender_pk_point, &proof.alpha1);
+        ristretto255::point_add_assign(&mut y_alpha1, &g_alpha2);
+        assert!(ristretto255::point_equals(&c2_acc, &y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+
+        // \rho * c + X_3 =? \alpha_2 * g + \alpha_1 * h
+        let c_acc = ristretto255::point_mul(c, &rho); 
+        ristretto255::point_add_assign(&mut c_acc, &proof.x3);
+        let h_alpha1 = ristretto255::point_mul(&h, &proof.alpha1);
+        ristretto255::point_add_assign(&mut h_alpha1, &g_alpha2);
+        assert!(ristretto255::point_equals(&c_acc, &h_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+    }
 
     /// TODO: explain the challenge derivation as a function of the parameters
     /// Computes the challenge value as `c = H(g, y, \bar{y}, h, C, D, \bar{C}, c_1, c_2, c, \bar{c}, {X_i}_{i=1}^7)`
@@ -1110,15 +1264,15 @@ module veiled_coin::veiled_coin {
         let alpha1 = ristretto255::scalar_mul(&rho, amount_val);
         ristretto255::scalar_add_assign(&mut alpha1, &x1);
 
-        // alpha_2 <- x2 + \rho * r
+        // alpha_2 <- x2 + rho * r
         let alpha2 = ristretto255::scalar_mul(&rho, amount_rand);
         ristretto255::scalar_add_assign(&mut alpha2, &x2);
 
-        // alpha_3 <- x3 + \rho * b
+        // alpha_3 <- x3 + rho * b
         let alpha3 = ristretto255::scalar_mul(&rho, updated_balance_val);
         ristretto255::scalar_add_assign(&mut alpha3, &x3);
 
-        // alpha_4 <- x4 + \rho * r_b
+        // alpha_4 <- x4 + rho * r_b
         let alpha4 = ristretto255::scalar_mul(&rho, updated_balance_rand);
         ristretto255::scalar_add_assign(&mut alpha4, &x4);
 
@@ -1134,6 +1288,59 @@ module veiled_coin::veiled_coin {
             alpha2,
             alpha3,
             alpha4,
+        }
+    }
+
+    #[test_only]
+    // TODO: Fix this comment
+    /// Proves the $\Sigma$-protocol used for veiled coin transfers.
+    /// See `sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
+    public fun unveil_sigma_protocol_prove<CoinType>(
+        sender_pk: &elgamal::CompressedPubkey,
+        sender_updated_balance_ct: &elgamal::Ciphertext,
+        sender_updated_balance_comm: &pedersen::Commitment,
+        updated_balance_rand: &Scalar,
+        updated_balance_val: &Scalar): ElGamalToPedSigmaProof<CoinType>
+    {
+        let x1 = ristretto255::random_scalar();
+        let x2 = ristretto255::random_scalar();
+        let source_pk_point = elgamal::pubkey_to_point(sender_pk);
+        let h = pedersen::randomness_base_for_bulletproof();
+
+        // X1 <- x1 * g
+        let big_x1 = ristretto255::basepoint_mul(&x1); 
+
+        let g_x2 = ristretto255::basepoint_mul(&x2);
+        // X2 <- x2 * g + x1 * y
+        let big_x2 = ristretto255::point_mul(&source_pk_point, &x1);
+        ristretto255::point_add_assign(&mut big_x2, &g_x2);
+
+        // X3 <- x2 * g + x1 * h
+        let big_x3 = ristretto255::point_mul(&h, &x1);
+        ristretto255::point_add_assign(&mut big_x3, &g_x2);
+
+        let rho = unveil_sigma_protocol_fiat_shamir<CoinType>(
+            sender_pk,
+            sender_updated_balance_ct,
+            sender_updated_balance_comm,
+            &big_x1,
+            &big_x2,
+            &big_x3);
+
+        // alpha_1 <- x1 + rho * r
+        let alpha1 = ristretto255::scalar_mul(&rho, updated_balance_rand);
+        ristretto255::scalar_add_assign(&mut alpha1, &x1);
+
+        // alpha2 <- x2 + rho * b
+        let alpha2 = ristretto255::scalar_mul(&rho, updated_balance_val);
+        ristretto255::scalar_add_assign(&mut alpha2, &x2);
+
+        ElGamalToPedSigmaProof {
+            x1: big_x1,
+            x2: big_x2,
+            x3: big_x3,
+            alpha1,
+            alpha2,
         }
     }
 
@@ -1163,6 +1370,28 @@ module veiled_coin::veiled_coin {
         vector::append<u8>(&mut bytes, x6_bytes);
         vector::append<u8>(&mut bytes, x5_bytes);
         vector::append<u8>(&mut bytes, x4_bytes);
+        vector::append<u8>(&mut bytes, x3_bytes);
+        vector::append<u8>(&mut bytes, x2_bytes);
+        vector::append<u8>(&mut bytes, x1_bytes);
+
+        bytes
+    }
+
+    // TODO: Fix comment
+    #[test_only]
+    /// Given a $\Sigma$-protocol proof, serializes it into byte form.
+    /// Elements at the end of the `SigmaProof` struct are placed into the vector first,
+    /// using the serialization formats in the `ristretto255` module.
+    public fun serialize_unveil_sigma_proof<CoinType>(proof: &ElGamalToPedSigmaProof<CoinType>): vector<u8> {
+        let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
+        let x2_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x2));
+        let x3_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x3));
+        let alpha1_bytes = ristretto255::scalar_to_bytes(&proof.alpha1);
+        let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
+
+        let bytes = vector::empty<u8>();
+        vector::append<u8>(&mut bytes, alpha2_bytes);
+        vector::append<u8>(&mut bytes, alpha1_bytes);
         vector::append<u8>(&mut bytes, x3_bytes);
         vector::append<u8>(&mut bytes, x2_bytes);
         vector::append<u8>(&mut bytes, x1_bytes);
@@ -1406,9 +1635,17 @@ module veiled_coin::veiled_coin {
             MAX_BITS_IN_VALUE, VEILED_COIN_DST);
         let new_balance_range_proof_bytes = bulletproofs::range_proof_to_bytes(&new_balance_range_proof);
 
+        let new_balance_ct = elgamal::new_ciphertext_with_basepoint(&recipient_new_balance, &ristretto255::scalar_zero(), &recipient_pk);
+        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&recipient_new_balance, &ristretto255::scalar_zero());
+
+        // Compute a sigma proof which shows that the recipient's new balance ciphertext and commitment both encode
+        // the same value. The commitment is necessary to ensure the value is binding
+        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&recipient_pk, &new_balance_ct, &new_balance_comm, &ristretto255::scalar_zero(), &recipient_new_balance);
+        let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
+
         // Transfer `50` veiled coins from the `recipient` to the `sender`'s public balance
         unveil_to<coin::FakeMoney>(
-            &recipient, signer::address_of(&sender), 50u32, new_balance_range_proof_bytes);
+            &recipient, signer::address_of(&sender), 50u32, new_balance_range_proof_bytes, sigma_proof_bytes);
 
         // Check that the sender now has 350 + 50 = 400 public coins
         let sender_public_balance = coin::balance<coin::FakeMoney>(signer::address_of(&sender));
@@ -1464,11 +1701,18 @@ module veiled_coin::veiled_coin {
             &sender_pk,
             MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
+        let new_balance_ct = elgamal::new_ciphertext_with_basepoint(&sender_new_balance, &zero_randomness, &sender_pk);
+        let new_balance_comm = pedersen::new_commitment_for_bulletproof(&sender_new_balance, &zero_randomness);
+
+        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&sender_pk, &new_balance_ct, &new_balance_comm, &zero_randomness, &sender_new_balance);
+        let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
+
         // Move 50 veiled coins into the public balance of the sender
         unveil<coin::FakeMoney>(
             &sender,
             50,
-            bulletproofs::range_proof_to_bytes(&new_balance_range_proof));
+            bulletproofs::range_proof_to_bytes(&new_balance_range_proof),
+            sigma_proof_bytes);
 
         println(b"Remaining veiled coins, after `unveil` call:");
         print(&total_veiled_coins<coin::FakeMoney>());
@@ -1573,9 +1817,16 @@ module veiled_coin::veiled_coin {
         let (new_new_balance_range_proof, _) = bulletproofs::prove_range_elgamal(
             &new_new_balance_val, &new_balance_rand, &sender_pk, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
+        // Compute a pedersen commitment over the same values the range proof is done over to gurantee a binding commitment
+        // to the sender's new balance. A sigma proof demonstrates the commitment and ciphertexts contain the same value and randomness
+        let new_new_balance_ct = elgamal::new_ciphertext_with_basepoint(&new_new_balance_val, &new_balance_rand, &sender_pk);
+        let new_new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_new_balance_val, &new_balance_rand);
+        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&sender_pk, &new_new_balance_ct, &new_new_balance_comm, &new_balance_rand, &new_new_balance_val);
+        let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
+
         // Unveil all coins of the `sender`
         unveil<coin::FakeMoney>(
-            &sender, 100, bulletproofs::range_proof_to_bytes(&new_new_balance_range_proof));
+            &sender, 100, bulletproofs::range_proof_to_bytes(&new_new_balance_range_proof), sigma_proof_bytes);
         println(b"Unveiled all 100 coins from the `sender`'s veiled balance");
 
         let total_veiled_coins = cast_u32_to_u64_amount(50);
