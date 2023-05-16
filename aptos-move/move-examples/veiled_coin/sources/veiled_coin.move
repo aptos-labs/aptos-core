@@ -868,10 +868,14 @@ module veiled_coin::veiled_coin {
         })
     }
 
-    // TODO: Update comment
     /// Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled transfer.
-    /// Specifically, this proof proves that `withdraw_ct` and `deposit_ct` encrypt the same amount $v$ using the same
-    /// randomness $r$, with `sender_pk` and `recipient_pk` respectively.
+    /// Specifically, this proof proves that ElGamal ciphertexts `withdraw_ct` and `deposit_ct` encrypt the same amount $v$ using the same
+    /// randomness $r$, with `sender_pk` and `recipient_pk` respectively. In addition, it proves that ElGamal ciphertext
+    /// `sender_updated_balance_ct` and Pedersen commitment `sender_updated_balance_comm` encode the same value $b$
+    /// with the same randomness $r$, where the former uses `sender_pk`. It also proves that Pedersen commitment
+    /// `transfer_value` encodes the same value $v$ as `withdraw_ct` and `deposit_ct`, with the same randomness `r`. 
+    /// These Pedersen commitments are needed to ensure that the range proofs done elsewhere on the left part of the 
+    /// ElGamal ciphertexts cannot be forged by a user with their secret key, by providing binding for $v$ and $b$. 
     ///
     /// # Cryptographic details
     ///
@@ -880,36 +884,45 @@ module veiled_coin::veiled_coin {
     ///
     /// The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
     ///  - $v$, the amount being transferred
-    ///  - $r$, ElGamal encryption randomness
+    ///  - $r$, the ElGamal encryption randomness used to encrypt $v$
+    ///  - $b$, the sender's new balance after the transfer occurs
+    ///  - $r_b$, the ElGamal encryption randomness used to encrypt $b$
     ///
     /// (Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
     ///
     /// The public statement $x$ in this relation consists of:
     ///  - $G$, the basepoint of a given elliptic curve
+    ///  = $H$, the basepoint used for randomness in the Pedersen commitments
     ///  - $Y$, the sender's PK
     ///  - $Y'$, the recipient's PK
-    ///  - $(C, D)$, the ElGamal encryption of $v$ under the sender's PK
-    ///  - $(C', D)$, the ElGamal encryption of $v$ under the recipient's PK
+    ///  - $(C, D)$, the ElGamal encryption of $v$ using randomness $r$ under the sender's PK
+    ///  - $(C', D)$, the ElGamal encryption of $v$ using randomness $r$ under the recipient's PK
+    ///  - $c$, the Pedersen commitment to $v$ using randomness $r$
+    ///  - $(c1, c2)$, the ElGamal encryption of $b$ using randomness $r_b$
+    ///  - $c'$, the Pedersen commitment to $b$ using randomness $r_b$
     ///
-    ///
-    /// The relation, at a high level, and created two ciphertexts $(C, D)$ and $(C', D)$
-    /// encrypting $v$ under the sender's PK and recipient's PK, respectively.:
     ///
     /// ```
     /// R(
-    ///     x = [ Y, Y', (C, C', D), G]
-    ///     w = [ v, r ]
+    ///     x = [ Y, Y', (C, C', D), c, (c1, c2), c', G, H]
+    ///     w = [ v, r, b, r_b ]
     /// ) = {
     ///     C = v * G + r * Y
     ///     C' = v * G + r * Y'
     ///     D = r * G
+    ///     c1 = b * G + r_b * Y
+    ///     c2 = r_b * G
+    ///     c = b * G + r_b * H
+    ///     c' = v * G + r * H
     /// }
     /// ```
     ///
     /// A relation similar to this is also described on page 14 of the Zether paper [BAZB20] (just replace  $G$ -> $g$,
-    /// $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$).
+    /// $C'$ -> $\bar{C}$, $Y$ -> $y$, $Y'$ -> $\bar{y}$, $v$ -> $b^*$). Note their relation does not include the
+    /// Pedersen commitments as they guarantee the binding property by integrating their Bulletproofs range proofs
+    /// into their $\Sigma$ protocol.
     ///
-    /// Note the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
+    /// Note also that the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
     /// programmatically by this smart contract and so are not needed in our $\Sigma$-protocol.
     fun sigma_protocol_verify<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
@@ -1038,7 +1051,41 @@ module veiled_coin::veiled_coin {
         ristretto255::new_scalar_from_sha2_512(hash_input)
     }
 
-    // TODO: Describe in comment
+    /// Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
+    /// Specifically, this proof proves that `sender_updated_balance_ct` and `sender_updated_balance_comm` encode the same amount $v$ using the same
+    /// randomness $r$, with `sender_pk` being used in `sender_updated_balance_ct`. This is necessary to prevent
+    /// the forgery of range proofs, as computing a range proof over the left half of an ElGamal ciphertext allows
+    /// a user with their secret key to create range proofs over false values.
+    ///
+    /// # Cryptographic details
+    ///
+    /// The proof argues knowledge of a witness $w$ such that a specific relation $R(x; w)$ is satisfied, for a public
+    /// statement $x$ known to the verifier (i.e., known to the validators). We describe this relation below.
+    ///
+    /// The secret witness $w$ in this relation, known only to the sender of the TXN, consists of:
+    ///  - $b$, the new veiled balance of the sender after their transaction goes through
+    ///  - $r$, ElGamal encryption randomness of the sender's new balance
+    ///
+    /// (Note that the $\Sigma$-protocol's zero-knowledge property ensures the witness is not revealed.)
+    ///
+    /// The public statement $x$ in this relation consists of:
+    ///  - $G$, the basepoint of a given elliptic curve
+    ///  - $Y$, the sender's PK
+    ///  - $(c1, c2)$, the ElGamal ecnryption of the sender's updated balance $b$ with updated randomness $r$ after their transaction is sent
+    ///  - $c$, the Pedersen commitment to $b$ with randomness $r$, using fixed randomness base $H$
+    ///
+    /// The previse relation being proved is as follows: 
+    ///
+    /// ```
+    /// R(
+    ///     x = [ Y, (c1, c2), c, G, H]
+    ///     w = [ b, r ]
+    /// ) = {
+    ///     c1 = r * G
+    ///     c2 = b * g + r * y
+    ///     c = b * g + r * h
+    /// }
+    /// ```
     fun unveil_sigma_protocol_verify<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
