@@ -100,7 +100,7 @@ pub struct CounterState {
 }
 
 #[async_trait]
-pub trait TransactionExecutor: Sync + Send {
+pub trait ReliableTransactionSubmitter: Sync + Send {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64>;
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64>;
@@ -171,7 +171,7 @@ pub async fn create_txn_generator_creator(
     transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
     source_accounts: &mut [LocalAccount],
     initial_burner_accounts: Vec<LocalAccount>,
-    txn_executor: &dyn TransactionExecutor,
+    txn_executor: &dyn ReliableTransactionSubmitter,
     txn_factory: &TransactionFactory,
     init_txn_factory: &TransactionFactory,
     cur_phase: Arc<AtomicUsize>,
