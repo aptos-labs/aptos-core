@@ -55,7 +55,6 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
-use num_cpus;
 use serde::Serialize;
 use std::{
     env,
@@ -83,7 +82,6 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
-#[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,
     executor_thread_pool: Arc<rayon::ThreadPool>,
