@@ -1533,7 +1533,7 @@ fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> For
 }
 
 fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
-    ForgeConfig::default()
+    config
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1544,7 +1544,7 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
         }))
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["multicluster"]["enabled"] = true.into();
-            // Create headless services for validators and fullnodes. 
+            // Create headless services for validators and fullnodes.
             // Note: chaos-mesh will not work with clusterIP services.
             helm_values["service"]["validator"]["internal"]["type"] = "ClusterIP".into();
             helm_values["service"]["validator"]["internal"]["headless"] = true.into();
@@ -1555,24 +1555,22 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
             helm_values["pyroscope"]["enabled"] = false.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(
-                4500
-            )
-            .add_no_restarts()
-            .add_wait_for_catchup_s(
-                // Give at least 60s for catchup, give 10% of the run for longer durations.
-                180,
-            )
-            .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                // Check that we don't use more than 12 CPU cores for 30% of the time.
-                MetricsThreshold::new(12, 30),
-                // Check that we don't use more than 10 GB of memory for 30% of the time.
-                MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
-            ))
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
+            SuccessCriteria::new(4500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup, give 10% of the run for longer durations.
+                    180,
+                )
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
         )
 }
 
