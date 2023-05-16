@@ -20,8 +20,10 @@ use crate::{
 };
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
-    AdvertisedData, AptosDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
-    ResponsePayload,
+    global_summary::{AdvertisedData, GlobalDataSummary},
+    interface::{
+        AptosDataClientInterface, Response, ResponseContext, ResponseError, ResponsePayload,
+    },
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
@@ -103,7 +105,7 @@ pub struct DataStream<T> {
     send_failure: bool,
 }
 
-impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
+impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     pub fn new(
         data_client_config: AptosDataClientConfig,
         data_stream_config: DataStreamingServiceConfig,
@@ -416,7 +418,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                         // we need to notify the stream engine and not retry the request.
                         if matches!(
                             error,
-                            aptos_data_client::Error::TimeoutWaitingForResponse(_)
+                            aptos_data_client::error::Error::TimeoutWaitingForResponse(_)
                         ) && is_subscription_request(client_request)
                         {
                             self.stream_engine
@@ -473,7 +475,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     fn handle_data_client_error(
         &mut self,
         data_client_request: &DataClientRequest,
-        data_client_error: &aptos_data_client::Error,
+        data_client_error: &aptos_data_client::error::Error,
     ) -> Result<(), Error> {
         warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
             .stream_id(self.data_stream_id)
@@ -795,7 +797,7 @@ fn extract_response_error(
     }
 }
 
-fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
+fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
     data_client_request: DataClientRequest,
     aptos_data_client: T,
     pending_response: PendingClientResponse,
@@ -881,11 +883,11 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     })
 }
 
-async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: StateValuesWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_state_values_with_proof(
         request.version,
         request.start_index,
@@ -897,11 +899,11 @@ async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'stati
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_epoch_ending_ledger_infos<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: EpochEndingLedgerInfosRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_epoch_ending_ledger_infos(
         request.start_epoch,
         request.end_epoch,
@@ -912,11 +914,13 @@ async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'stat
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_new_transaction_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
     aptos_data_client: T,
     request: NewTransactionOutputsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_new_transaction_outputs_with_proof(
         request.known_version,
         request.known_epoch,
@@ -927,11 +931,11 @@ async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clon
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_new_transactions_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NewTransactionsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_new_transactions_with_proof(
         request.known_version,
         request.known_epoch,
@@ -943,11 +947,13 @@ async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'st
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_new_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_new_transactions_or_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
     aptos_data_client: T,
     request: NewTransactionsOrOutputsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_new_transactions_or_outputs_with_proof(
         request.known_version,
         request.known_epoch,
@@ -958,11 +964,11 @@ async fn get_new_transactions_or_outputs_with_proof<T: AptosDataClient + Send + 
     Ok(Response::new(context, ResponsePayload::try_from(payload)?))
 }
 
-async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_number_of_states<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NumberOfStatesRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response =
         aptos_data_client.get_number_of_states(request.version, request_timeout_ms);
     client_response
@@ -970,11 +976,13 @@ async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_transaction_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
     aptos_data_client: T,
     request: TransactionOutputsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_transaction_outputs_with_proof(
         request.proof_version,
         request.start_version,
@@ -986,11 +994,11 @@ async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_transactions_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_transactions_with_proof(
         request.proof_version,
         request.start_version,
@@ -1003,11 +1011,13 @@ async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_transactions_or_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+async fn get_transactions_or_outputs_with_proof<
+    T: AptosDataClientInterface + Send + Clone + 'static,
+>(
     aptos_data_client: T,
     request: TransactionsOrOutputsWithProofRequest,
     request_timeout_ms: u64,
-) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+) -> Result<Response<ResponsePayload>, aptos_data_client::error::Error> {
     let client_response = aptos_data_client.get_transactions_or_outputs_with_proof(
         request.proof_version,
         request.start_version,

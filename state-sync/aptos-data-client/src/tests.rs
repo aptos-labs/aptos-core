@@ -1,8 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
-use crate::aptosnet::{poll_peer, state::calculate_optimal_chunk_sizes};
+use crate::{
+    client::AptosDataClient,
+    error::Error,
+    interface::AptosDataClientInterface,
+    peer_states::calculate_optimal_chunk_sizes,
+    poller::{poll_peer, DataSummaryPoller},
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig, RoleType},
@@ -84,7 +89,7 @@ impl MockNetwork {
         base_config: Option<BaseConfig>,
         data_client_config: Option<AptosDataClientConfig>,
         networks: Option<Vec<NetworkId>>,
-    ) -> (Self, MockTimeService, AptosNetDataClient, DataSummaryPoller) {
+    ) -> (Self, MockTimeService, AptosDataClient, DataSummaryPoller) {
         // Setup the request managers
         let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
         let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
@@ -114,7 +119,7 @@ impl MockNetwork {
         let mock_time = TimeService::mock();
         let base_config = base_config.unwrap_or_default();
         let data_client_config = data_client_config.unwrap_or_default();
-        let (client, poller) = AptosNetDataClient::new(
+        let (client, poller) = AptosDataClient::new(
             data_client_config,
             base_config,
             mock_time.clone(),
@@ -226,7 +231,7 @@ async fn request_works_only_when_data_available() {
     tokio::spawn(poller.start_poller());
 
     // This request should fail because no peers are currently connected
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     let error = client
         .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
@@ -1022,7 +1027,7 @@ async fn bad_peer_is_eventually_banned_internal() {
     let mut seen_data_unavailable_err = false;
 
     // Sending a bunch of requests to the bad peer's upper range will fail.
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     for _ in 0..20 {
         let result = client
             .get_transactions_with_proof(200, 200, 200, false, request_timeout)
@@ -1087,7 +1092,7 @@ async fn bad_peer_is_eventually_banned_callback() {
     let mut seen_data_unavailable_err = false;
 
     // Sending a bunch of requests to the bad peer (that we later decide are bad).
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     for _ in 0..20 {
         let result = client
             .get_transactions_with_proof(200, 200, 200, false, request_timeout)
@@ -1099,10 +1104,9 @@ async fn bad_peer_is_eventually_banned_callback() {
         if !seen_data_unavailable_err {
             match result {
                 Ok(response) => {
-                    response
-                        .context
-                        .response_callback
-                        .notify_bad_response(crate::ResponseError::ProofVerificationError);
+                    response.context.response_callback.notify_bad_response(
+                        crate::interface::ResponseError::ProofVerificationError,
+                    );
                 },
                 Err(Error::DataIsUnavailable(_)) => {
                     seen_data_unavailable_err = true;
@@ -1171,7 +1175,7 @@ async fn compression_mismatch_disabled() {
     });
 
     // The client should receive a compressed response and return an error
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     let response = client
         .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
@@ -1223,7 +1227,7 @@ async fn compression_mismatch_enabled() {
     });
 
     // The client should receive a compressed response and return an error
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     let response = client
         .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
@@ -1296,7 +1300,7 @@ async fn disable_compression() {
 
     // The client's request should succeed since a peer finally has advertised
     // data for this range.
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     let response = client
         .get_transactions_with_proof(100, 50, 100, false, request_timeout)
         .await
@@ -1410,7 +1414,7 @@ async fn bad_peer_is_eventually_added_back() {
 
     // Keep decreasing this peer's score by considering its responses bad.
     // Eventually its score drops below IGNORE_PEER_THRESHOLD.
-    let request_timeout = client.data_client_config.response_timeout_ms;
+    let request_timeout = client.get_response_timeout_ms();
     for _ in 0..20 {
         let result = client
             .get_transactions_with_proof(200, 0, 200, false, request_timeout)
@@ -1420,7 +1424,7 @@ async fn bad_peer_is_eventually_added_back() {
             response
                 .context
                 .response_callback
-                .notify_bad_response(crate::ResponseError::ProofVerificationError);
+                .notify_bad_response(crate::interface::ResponseError::ProofVerificationError);
         }
     }
 
@@ -1506,7 +1510,7 @@ async fn optimal_chunk_size_calculations() {
 
 /// A helper method that fetches peers to poll depending on the peer priority
 fn fetch_peer_to_poll(
-    client: AptosNetDataClient,
+    client: AptosDataClient,
     is_priority_peer: bool,
 ) -> Result<Option<PeerNetworkId>, Error> {
     // Fetch the next peer to poll
@@ -1525,11 +1529,11 @@ fn fetch_peer_to_poll(
 }
 
 /// Fetches the number of in flight requests for peers depending on priority
-fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -> u64 {
+fn get_num_in_flight_polls(client: AptosDataClient, is_priority_peer: bool) -> u64 {
     if is_priority_peer {
-        client.peer_states.read().num_in_flight_priority_polls()
+        client.get_peer_states().num_in_flight_priority_polls()
     } else {
-        client.peer_states.read().num_in_flight_regular_polls()
+        client.get_peer_states().num_in_flight_regular_polls()
     }
 }
 
@@ -1537,7 +1541,7 @@ fn get_num_in_flight_polls(client: AptosNetDataClient, is_priority_peer: bool) -
 /// and returns storage server summaries for each.
 async fn poll_peers(
     mock_network: &mut MockNetwork,
-    client: &AptosNetDataClient,
+    client: &AptosDataClient,
     all_peers: Vec<PeerNetworkId>,
 ) {
     for peer in all_peers {
@@ -1557,8 +1561,8 @@ async fn poll_peers(
 }
 
 /// Verifies the exclusive existence of peer states for all the specified peers
-fn verify_peer_states(client: &AptosNetDataClient, all_peers: Vec<PeerNetworkId>) {
-    let peer_to_states = client.peer_states.read().get_peer_to_states();
+fn verify_peer_states(client: &AptosDataClient, all_peers: Vec<PeerNetworkId>) {
+    let peer_to_states = client.get_peer_states().get_peer_to_states();
     for peer in &all_peers {
         assert!(peer_to_states.contains_key(peer));
     }
