@@ -14,34 +14,39 @@ from tabulate import tabulate
 # numbers are based on the machine spec used by github action
 # Local machine numbers will be higher.
 EXPECTED_TPS = {
-    ("no-op", False): (18200.0, True),
-    ("coin-transfer", False): (11800.0, True),
-    ("coin-transfer", True): (20000.0, True),
-    ("account-generation", False): (9900.0, True),
-    ("account-generation", True): (16300.0, True),
-    ("create-new-account-resource", False): (11700.0, True),
-    ("modify-global-resource", False): (4000.0, True),
-    ("modify-ten-global-resources", False): (10500.0, True),
-    ("large-module-working-set-no-op", False): (2550.0, True),
-    ("publish-package", False): (130.0, True),
-    ("batch100-transfer", False): (300, True),
-    ("batch100-transfer", True): (500, True),
+    ("no-op", False, 1): (18800.0, True),
+    ("no-op", False, 1000): (2980.0, True),
+    ("coin-transfer", False, 1): (12200.0, True),
+    ("coin-transfer", True, 1): (22000.0, True),
+    ("account-generation", False, 1): (11000.0, True),
+    ("account-generation", True, 1): (17600.0, True),
+    ("create-new-account-resource", False, 1): (12600.0, True),
+    ("modify-global-resource", False, 1): (3900.0, True),
+    ("modify-global-resource", False, 10): (10800.0, True),
+    ("publish-package", False, 1): (150.0, True),
+    ("batch100-transfer", False, 1): (330, True),
+    ("batch100-transfer", True, 1): (550, True),
+    ("token-v1ft-mint-and-transfer", False, 1): (1700.0, True),
+    ("token-v1ft-mint-and-transfer", False, 20): (7000.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5200.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 1): (1380.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5300.0, True),
     # ("token-v1ft-mint-and-store", False): 1000.0,
-    ("token-v1ft-mint-and-transfer", False): (1700.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False): (1100.0, True),
-    ("token-v1ft-mint-and-transfer20-collections", False): (6400.0, False),
-    ("token-v1nft-mint-and-transfer-sequential20-collections", False): (4400.0, False),
-    ("token-v1nft-mint-and-transfer-parallel", False): (1000.0, False),
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
-    ("no-op2-signers", False): (18200.0, False),
-    ("no-op5-signers", False): (18200.0, False),
+    ("no-op2-signers", False, 1): (18600.0, True),
+    ("no-op5-signers", False, 1): (18600.0, True),
+    ("token-v2-ambassador-mint", False, 1): (1750.0, True),
+    ("token-v2-ambassador-mint", False, 20): (5380.0, True),
 }
 
 NOISE_LOWER_LIMIT = 0.8
-# temporarily increasing upper threshold for perf improvements in #8002,
-# TODO will reduce back after calibration
-NOISE_UPPER_LIMIT = 1.3
+NOISE_LOWER_LIMIT_WARN = 0.9
+# If you want to calibrate the upper limit for perf improvement, you can
+# increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
+NOISE_UPPER_LIMIT = 1.1
+NOISE_UPPER_LIMIT_WARN = 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
@@ -96,7 +101,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     rows = []
     gas_rows = []
 
-    for (transaction_type, use_native_executor), (
+    for (transaction_type, use_native_executor, module_working_set_size), (
         expected_tps,
         check_active,
     ) in EXPECTED_TPS.items():
@@ -108,18 +113,20 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         use_native_executor_row_str = "native" if use_native_executor else "VM"
         row = [
             transaction_type,
+            module_working_set_size,
             use_native_executor_row_str,
             cur_block_size,
             expected_tps,
         ]
         gas_row = [
             transaction_type,
+            module_working_set_size,
             use_native_executor_row_str,
             cur_block_size,
         ]
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --use-state-kv-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --use-state-kv-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
         for concurrency_level in EXECUTION_ONLY_CONCURRENCY_LEVELS:
             test_db_command = f"cargo run {BUILD_FLAG} -- --concurrency-level {concurrency_level}  --skip-commit {common_command_suffix} --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
@@ -150,6 +157,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 {
                     "grep": "grep_json_single_node_perf",
                     "transaction_type": transaction_type,
+                    "module_working_set_size": module_working_set_size,
                     "executor_type": use_native_executor_row_str,
                     "block_size": cur_block_size,
                     "expected_tps": expected_tps,
@@ -171,6 +179,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 rows,
                 headers=[
                     "transaction_type",
+                    "module_working_set",
                     "executor",
                     "block_size",
                     "expected t/s",
@@ -201,17 +210,25 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 errors.append(text)
             else:
                 warnings.append(text)
+        elif tps < expected_tps * NOISE_LOWER_LIMIT_WARN:
+            text = f"potential (but within normal noise) regression detected {tps} < {expected_tps * NOISE_LOWER_LIMIT_WARN} = {expected_tps} * {NOISE_LOWER_LIMIT_WARN}, {transaction_type} with {use_native_executor_row_str} executor didn't meet TPS requirements"
+            warnings.append(text)
         elif tps > expected_tps * NOISE_UPPER_LIMIT:
             text = f"perf improvement detected {tps} > {expected_tps * NOISE_UPPER_LIMIT} = {expected_tps} * {NOISE_UPPER_LIMIT}, {transaction_type} with {use_native_executor_row_str} executor exceeded TPS requirements, increase TPS requirements to match new baseline"
             if check_active:
                 errors.append(text)
             else:
                 warnings.append(text)
+        elif tps > expected_tps * NOISE_UPPER_LIMIT_WARN:
+            text = f"potential (but within normal noise) perf improvement detected {tps} > {expected_tps * NOISE_UPPER_LIMIT_WARN} = {expected_tps} * {NOISE_UPPER_LIMIT_WARN}, {transaction_type} with {use_native_executor_row_str} executor exceeded TPS requirements, increase TPS requirements to match new baseline"
+            warnings.append(text)
 
 if warnings:
+    print("Warnings: ")
     print("\n".join(warnings))
 
 if errors:
+    print("Errors: ")
     print("\n".join(errors))
     exit(1)
 

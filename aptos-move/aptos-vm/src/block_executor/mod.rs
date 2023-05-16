@@ -16,7 +16,7 @@ use crate::{
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_block_executor::{
     errors::Error,
-    executor::{BlockExecutor, RAYON_EXEC_POOL},
+    executor::BlockExecutor,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
@@ -32,8 +32,8 @@ use aptos_types::{
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
-use rayon::prelude::*;
-use std::time::Instant;
+use rayon::{prelude::*, ThreadPool};
+use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -130,6 +130,7 @@ pub struct BlockAptosVM();
 
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
+        executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
@@ -141,7 +142,7 @@ impl BlockAptosVM {
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
-            RAYON_EXEC_POOL.install(|| {
+            executor_thread_pool.install(|| {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
@@ -155,6 +156,7 @@ impl BlockAptosVM {
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
+            executor_thread_pool,
         );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
@@ -173,19 +175,17 @@ impl BlockAptosVM {
         }
     }
 
-    fn execute_block_benchmark_parallel<S: StateView + Sync>(
+    pub fn execute_block_benchmark<S: StateView + Sync>(
+        executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-    ) -> (
-        usize,
-        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
-    ) {
+    ) -> Result<Vec<TransactionOutput>, Error<VMStatus>> {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         let signature_verified_block: Vec<PreprocessedTransaction> =
-            RAYON_EXEC_POOL.install(|| {
+            executor_thread_pool.install(|| {
                 transactions
                     .clone()
                     .into_par_iter()
@@ -193,114 +193,19 @@ impl BlockAptosVM {
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
-        let block_size = signature_verified_block.len();
-
-        init_speculative_logs(signature_verified_block.len());
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
+            executor_thread_pool,
         );
-        println!("Parallel execution starts...");
-        let timer = Instant::now();
-        let par_ret = executor
+        executor
             .execute_block(state_view, signature_verified_block, state_view)
             .map(|outputs| {
                 outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect()
-            });
-
-        let exec_t = timer.elapsed();
-        println!(
-            "Parallel execution finishes, TPS = {}",
-            block_size * 1000 / exec_t.as_millis() as usize
-        );
-
-        flush_speculative_logs();
-
-        (
-            block_size * 1000 / exec_t.as_millis() as usize,
-            Some(par_ret),
-        )
-    }
-
-    fn execute_block_benchmark_sequential<S: StateView + Sync>(
-        transactions: Vec<Transaction>,
-        state_view: &S,
-    ) -> (
-        usize,
-        Option<Result<Vec<TransactionOutput>, Error<VMStatus>>>,
-    ) {
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            RAYON_EXEC_POOL.install(|| {
-                transactions
-                    .clone()
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
-        let block_size = signature_verified_block.len();
-
-        // sequentially execute the block and check if the results match
-        let seq_executor =
-            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
-        println!("Sequential execution starts...");
-        let seq_timer = Instant::now();
-        let seq_ret = seq_executor
-            .execute_block(state_view, signature_verified_block, state_view)
-            .map(|outputs| {
-                outputs
-                    .into_iter()
-                    .map(|output| output.take_output())
-                    .collect()
-            });
-        let seq_exec_t = seq_timer.elapsed();
-        println!(
-            "Sequential execution finishes, TPS = {}",
-            block_size * 1000 / seq_exec_t.as_millis() as usize
-        );
-
-        (
-            block_size * 1000 / seq_exec_t.as_millis() as usize,
-            Some(seq_ret),
-        )
-    }
-
-    pub fn execute_block_benchmark<S: StateView + Sync>(
-        transactions: Vec<Transaction>,
-        state_view: &S,
-        concurrency_level: usize,
-        run_par: bool,
-        run_seq: bool,
-    ) -> (usize, usize) {
-        let (par_tps, par_ret) = if run_par {
-            BlockAptosVM::execute_block_benchmark_parallel(
-                transactions.clone(),
-                state_view,
-                concurrency_level,
-            )
-        } else {
-            (0, None)
-        };
-        let (seq_tps, seq_ret) = if run_seq {
-            BlockAptosVM::execute_block_benchmark_sequential(transactions, state_view)
-        } else {
-            (0, None)
-        };
-
-        if let (Some(par), Some(seq)) = (par_ret.as_ref(), seq_ret.as_ref()) {
-            assert_eq!(par, seq);
-        }
-
-        drop(par_ret);
-        drop(seq_ret);
-
-        (par_tps, seq_tps)
+            })
     }
 }

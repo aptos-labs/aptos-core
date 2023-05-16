@@ -49,6 +49,7 @@ members = [
     "crates/aptos-faucet/metrics-server",
     "crates/aptos-faucet/service",
     "crates/aptos-genesis",
+    "crates/aptos-github-client",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
@@ -111,7 +112,6 @@ members = [
     "sdk",
     "secure/net",
     "secure/storage",
-    "secure/storage/github",
     "secure/storage/vault",
     "state-sync/aptos-data-client",
     "state-sync/inter-component/consensus-notifications",
@@ -282,7 +282,7 @@ aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-genesis = { path = "crates/aptos-genesis" }
-aptos-github-client = { path = "secure/storage/github" }
+aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
@@ -487,7 +487,8 @@ pbjson = "0.4.0"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
 poem = { version = "=1.3.55", features = ["anyhow", "rustls"] }
-poem-openapi = { version = "2.0.10", features = ["swagger-ui", "url"] }
+poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
+poem-openapi-derive = "=2.0.11"
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
@@ -524,6 +525,7 @@ serde = { version = "1.0.137", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 serde_repr = "0.1"
+serde_merge = "0.1.3"
 serde-name = "0.1.1"
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }

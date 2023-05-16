@@ -35,7 +35,7 @@ tokio-stream = { workspace = true }
 
 [dev-dependencies]
 aptos-storage-service-types = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }

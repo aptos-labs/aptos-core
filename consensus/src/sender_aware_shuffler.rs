@@ -40,6 +40,11 @@ impl TransactionShuffler for SenderAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         let _timer = TXN_SHUFFLE_SECONDS.start_timer();
 
+        // handle the corner case of conflict window being 0, in which case we don't do any shuffling
+        if self.conflict_window_size == 0 {
+            return txns;
+        }
+
         // maintains the intermediate state of the shuffled transactions
         let mut sliding_window = SlidingWindowState::new(self.conflict_window_size, txns.len());
         let mut pending_txns = PendingTransactions::new();
@@ -461,5 +466,26 @@ mod tests {
         for orig_txn in orig_txns {
             assert!(optimized_txn_set.contains(&orig_txn.into_raw_transaction()));
         }
+    }
+
+    #[test]
+    fn test_shuffling_zero_conflict_window() {
+        let mut rng = OsRng;
+        let max_senders = 50;
+        let max_txn_per_sender = 100;
+        let num_senders = rng.gen_range(1, max_senders);
+        let mut orig_txns = Vec::new();
+        let mut senders = Vec::new();
+        for _ in 0..num_senders {
+            let mut sender_txns = create_signed_transaction(rng.gen_range(1, max_txn_per_sender));
+            senders.push(sender_txns.get(0).unwrap().sender());
+            orig_txns.append(&mut sender_txns);
+        }
+
+        let txn_shuffler = SenderAwareShuffler::new(0);
+        let optimized_txns = txn_shuffler.shuffle(orig_txns.clone());
+        assert_eq!(orig_txns.len(), optimized_txns.len());
+        // Assert that the ordering is unchanged in case of unique senders txns.
+        assert_eq!(orig_txns, optimized_txns);
     }
 }

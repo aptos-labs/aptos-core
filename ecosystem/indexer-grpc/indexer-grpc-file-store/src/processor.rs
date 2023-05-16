@@ -5,9 +5,9 @@ use crate::metrics::{LATEST_PROCESSED_VERSION, PROCESSED_VERSIONS_COUNT};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
-    config::IndexerGrpcConfig,
+    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
     constants::BLOB_STORAGE_SIZE,
-    file_store_operator::FileStoreOperator,
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
@@ -19,7 +19,7 @@ const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
     cache_operator: Option<CacheOperator<redis::aio::Connection>>,
-    file_store_processor: Option<FileStoreOperator>,
+    file_store_processor: Option<Box<dyn FileStoreOperator>>,
     cache_chain_id: Option<u64>,
     config: IndexerGrpcConfig,
 }
@@ -49,8 +49,14 @@ impl Processor {
             .await
             .expect("Get chain id failed.");
 
-        let file_store_operator =
-            FileStoreOperator::new(self.config.file_store_bucket_name.clone());
+        let file_store_operator: Box<dyn FileStoreOperator> = match &self.config.file_store {
+            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
+            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
+            ),
+        };
         file_store_operator.verify_storage_bucket_existence().await;
 
         self.cache_operator = Some(cache_operator);
