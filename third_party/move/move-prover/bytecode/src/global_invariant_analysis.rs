@@ -119,10 +119,7 @@ impl FunctionTargetProcessor for GlobalInvariantAnalysisProcessor {
         targets: &FunctionTargetsHolder,
     ) -> fmt::Result {
         // utils
-        let type_display_ctxt = TypeDisplayContext::WithEnv {
-            env,
-            type_param_names: None,
-        };
+        let type_display_ctxt = TypeDisplayContext::new(env);
 
         let display_type_slice = |tys: &[Type]| -> String {
             let content = tys
@@ -494,7 +491,7 @@ impl PerFunctionRelevance {
                                             let ghost_idx = fun_type_params_arity
                                                 + *fun_type_params_ghost_count;
                                             *fun_type_params_ghost_count += 1;
-                                            Type::TypeParameter(ghost_idx as u16)
+                                            Type::new_param(ghost_idx)
                                         } else {
                                             t
                                         }

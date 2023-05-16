@@ -32,6 +32,10 @@
       "description": "Access to events"
     },
     {
+      "name": "Experimental",
+      "description": "Experimental APIs, no guarantees"
+    },
+    {
       "name": "General",
       "description": "General information"
     },
@@ -12013,6 +12017,7 @@
           "transaction_not_found",
           "table_item_not_found",
           "block_not_found",
+          "state_value_not_found",
           "version_pruned",
           "block_pruned",
           "invalid_input",

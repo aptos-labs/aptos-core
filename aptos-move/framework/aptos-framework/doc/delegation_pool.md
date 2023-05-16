@@ -716,7 +716,7 @@ On each <code>add_stake</code> operation any resulted fee is used to buy active 
 First synchronization after this epoch ends will distribute accumulated fees to the rest of the pool as refunds.
 
 
-<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>: <b>address</b> = 0;
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>: <b>address</b> = 0x0;
 </code></pre>
 
 

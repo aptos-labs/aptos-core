@@ -18,7 +18,8 @@ use aptos_types::{
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
+use std::sync::Arc;
 
 fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
     // setup fake db
@@ -57,6 +58,14 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
 }
 
 impl VMExecutor for FakeVM {
+    fn execute_block_sharded<S: StateView + Send + Sync>(
+        _sharded_block_executor: &ShardedBlockExecutor<S>,
+        _transactions: Vec<Transaction>,
+        _state_view: Arc<S>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Ok(Vec::new())
+    }
+
     fn execute_block(
         _transactions: Vec<Transaction>,
         _state_view: &impl StateView,

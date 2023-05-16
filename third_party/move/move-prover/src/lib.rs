@@ -6,10 +6,7 @@
 
 use crate::cli::Options;
 use anyhow::anyhow;
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::termcolor::{Buffer, ColorChoice, StandardStream, WriteColor},
-};
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_abigen::Abigen;
@@ -24,14 +21,10 @@ use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
 };
 use move_stackless_bytecode::{
-    escape_analysis::EscapeAnalysisProcessor,
-    function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder},
-    number_operation::GlobalNumberOperationState,
+    function_target_pipeline::FunctionTargetsHolder, number_operation::GlobalNumberOperationState,
     pipeline_factory,
-    read_write_set_analysis::{self, ReadWriteSetProcessor},
 };
 use std::{
-    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     time::Instant,
@@ -78,7 +71,9 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             global_state.create_initial_struct_oper_state(&struct_env);
         }
         for fun_env in module_env.get_functions() {
-            global_state.create_initial_func_oper_state(&fun_env);
+            if !fun_env.is_inline() {
+                global_state.create_initial_func_oper_state(&fun_env);
+            }
         }
     }
     //global_state.create_initial_exp_oper_state(env);
@@ -124,28 +119,9 @@ pub fn run_move_prover_with_model<W: WriteColor>(
             Ok(())
         };
     }
-    // Same for read/write set analysis
-    if options.run_read_write_set {
-        return {
-            run_read_write_set(env, &options, now);
-            Ok(())
-        };
-    }
-    // Same for escape analysis
-    if options.run_escape {
-        return {
-            run_escape(env, &options, now);
-            Ok(())
-        };
-    }
 
     // Check correct backend versions.
     options.backend.check_tool_versions()?;
-
-    // Print functions that are reachable from the script function if the flag is set
-    if options.script_reach {
-        print_script_reach(env);
-    }
 
     // Create and process bytecode
     let now = Instant::now();
@@ -260,8 +236,10 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             info!("preparing module {}", module_env.get_full_name_str());
         }
         if options.prover.dump_bytecode {
-            let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
-            fs::write(dump_file, module_env.disassemble()).expect("dumping disassembled module");
+            if let Some(out) = module_env.disassemble() {
+                let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
+                fs::write(dump_file, out).expect("dumping disassembled module");
+            }
         }
         for func_env in module_env.get_functions() {
             targets.add_target(&func_env)
@@ -294,34 +272,6 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
 
 // TODO: make those tools independent. Need to first address the todo to
 // move the model builder into the move-model crate.
-
-// Print functions that are reachable from script functions available in the `GlobalEnv`
-fn print_script_reach(env: &GlobalEnv) {
-    let target_modules = env.get_target_modules();
-    let mut func_ids = BTreeSet::new();
-
-    for m in &target_modules {
-        for f in m.get_functions() {
-            if f.is_entry() {
-                let qualified_id = f.get_qualified_id();
-                func_ids.insert(qualified_id);
-                let trans_funcs = f.get_transitive_closure_of_called_functions();
-                for trans_func in trans_funcs {
-                    func_ids.insert(trans_func);
-                }
-            }
-        }
-    }
-
-    if func_ids.is_empty() {
-        println!("no function is reached from the script functions in the target module");
-    } else {
-        for func_id in func_ids {
-            let func_env = env.get_function(func_id);
-            println!("{}", func_env.get_full_name_str());
-        }
-    }
-}
 
 fn run_docgen<W: WriteColor>(
     env: &GlobalEnv,
@@ -382,63 +332,4 @@ fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
         checking_elapsed.as_secs_f64(),
         (generating_elapsed - checking_elapsed).as_secs_f64()
     );
-}
-
-fn run_read_write_set(env: &GlobalEnv, options: &Options, now: Instant) {
-    let mut targets = FunctionTargetsHolder::default();
-
-    for module_env in env.get_modules() {
-        for func_env in module_env.get_functions() {
-            targets.add_target(&func_env)
-        }
-    }
-    let mut pipeline = FunctionTargetPipeline::default();
-    pipeline.add_processor(ReadWriteSetProcessor::new());
-
-    let start = now.elapsed();
-    info!("generating read/write set");
-    pipeline.run(env, &mut targets);
-    read_write_set_analysis::get_read_write_set(env, &targets);
-    println!("generated for {:?}", options.move_sources);
-
-    let end = now.elapsed();
-    info!("{:.3}s analyzing", (end - start).as_secs_f64());
-}
-
-fn run_escape(env: &GlobalEnv, options: &Options, now: Instant) {
-    let mut targets = FunctionTargetsHolder::default();
-    for module_env in env.get_modules() {
-        for func_env in module_env.get_functions() {
-            targets.add_target(&func_env)
-        }
-    }
-    println!(
-        "Analyzing {} modules, {} declared functions, {} declared structs, {} total bytecodes",
-        env.get_module_count(),
-        env.get_declared_function_count(),
-        env.get_declared_struct_count(),
-        env.get_move_bytecode_instruction_count(),
-    );
-    let mut pipeline = FunctionTargetPipeline::default();
-    pipeline.add_processor(EscapeAnalysisProcessor::new());
-
-    let start = now.elapsed();
-    pipeline.run(env, &mut targets);
-    let end = now.elapsed();
-
-    // print escaped internal refs flagged by analysis. do not report errors in dependencies
-    let mut error_writer = Buffer::no_color();
-    env.report_diag_with_filter(&mut error_writer, |d| {
-        let fname = env.get_file(d.labels[0].file_id).to_str().unwrap();
-        options.move_sources.iter().any(|d| {
-            let p = Path::new(d);
-            if p.is_file() {
-                d == fname
-            } else {
-                Path::new(fname).parent().unwrap() == p
-            }
-        }) && d.severity >= Severity::Error
-    });
-    println!("{}", String::from_utf8_lossy(&error_writer.into_inner()));
-    info!("in ms, analysis took {:.3}", (end - start).as_millis())
 }

@@ -23,6 +23,7 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `add`](#0x1_simple_map_add)
 -  [Function `upsert`](#0x1_simple_map_upsert)
 -  [Function `to_vec_pair`](#0x1_simple_map_to_vec_pair)
+-  [Function `destroy`](#0x1_simple_map_destroy)
 -  [Function `remove`](#0x1_simple_map_remove)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
@@ -391,8 +392,40 @@ Primarily used to destroy a map
     <b>let</b> keys: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Key&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> values: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Value&gt; = <a href="../../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     <b>let</b> <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a> { data } = map;
-    vector::for_each(data, |e| { <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value } = e; <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, key); <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> values, value); });
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(data, |e| { <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value } = e; <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, key); <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> values, value); });
     (keys, values)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_destroy"></a>
+
+## Function `destroy`
+
+For maps that cannot be dropped this is a utility to destroy them
+using lambdas to destroy the individual keys and values.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_destroy">destroy</a>&lt;Key: store, Value: store&gt;(map: <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, dk: |Key|(), dv: |Value|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="simple_map.md#0x1_simple_map_destroy">destroy</a>&lt;Key: store, Value: store&gt;(
+    map: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
+    dk: |Key|,
+    dv: |Value|
+) {
+    <b>let</b> (keys, values) = <a href="simple_map.md#0x1_simple_map_to_vec_pair">to_vec_pair</a>(map);
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy">vector::destroy</a>(keys, |_k| dk(_k));
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy">vector::destroy</a>(values, |_v| dv(_v));
 }
 </code></pre>
 
