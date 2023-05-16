@@ -74,7 +74,7 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for AptosVM {
         transactions: Vec<BenchmarkTransaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        AptosVM::execute_transaction_block(
+        ChunkOutput::by_transaction_execution_sharded::<AptosVM>(
             transactions
                 .into_iter()
                 .map(|txn| txn.transaction)

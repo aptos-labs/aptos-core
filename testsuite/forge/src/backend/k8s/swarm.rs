@@ -121,6 +121,15 @@ impl K8sSwarm {
             .to_string()
     }
 
+    fn get_inspection_service_url(&self, idx: usize) -> String {
+        self.validators
+            .values()
+            .nth(idx)
+            .unwrap()
+            .inspection_service_endpoint()
+            .to_string()
+    }
+
     #[allow(dead_code)]
     fn get_kube_client(&self) -> K8sClient {
         self.kube_client.clone()
@@ -250,7 +259,13 @@ impl Swarm for K8sSwarm {
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url(0);
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        let inspection_service_url = self.get_inspection_service_url(0);
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 
     // returns a kubectl logs command to retrieve the logs manually
@@ -351,7 +366,13 @@ impl Swarm for K8sSwarm {
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url(idx);
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        let inspection_service_url = self.get_inspection_service_url(idx);
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 }
 

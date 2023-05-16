@@ -8,6 +8,7 @@ metadata:
   name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
   labels:
     {{- include "aptos-validator.labels" $ | nindent 4 }}
+    {{- include "aptos-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }}  
 spec:
   selector:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
@@ -15,6 +16,9 @@ spec:
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
   type: {{ $.Values.service.fullnode.internal.type }}
+  {{- if $.Values.service.fullnode.internal.headless }}
+  clusterIP: None
+  {{- end }}
   ports:
   - name: aptosnet
     port: 6182
@@ -34,6 +38,7 @@ metadata:
     app.kubernetes.io/name: fullnode
     app.kubernetes.io/instance: fullnode-{{$i}}
     group: {{ .name }}
+    {{- include "aptos-validator.multiclusterLabels" (tuple $ $i) | nindent 4 }}  
 spec:
   serviceName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}
   replicas: {{ .replicas }}
