@@ -53,15 +53,22 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution_sharded::<FakeVM>(transactions, state_view)
     }
 }
 
 impl VMExecutor for FakeVM {
-    fn execute_block<S: StateView + Send + Sync>(
+    fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
         _transactions: Vec<Transaction>,
         _state_view: Arc<S>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Ok(Vec::new())
+    }
+
+    fn execute_block(
+        _transactions: Vec<Transaction>,
+        _state_view: &impl StateView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

@@ -35,7 +35,7 @@ pub struct Argument {
 async fn main() -> Result<()> {
     aptos_logger::Logger::new().init();
     let args = Argument::parse();
-    AptosVM::set_concurrency_per_shard_once(args.concurrency_level);
+    AptosVM::set_concurrency_level_once(args.concurrency_level);
 
     let debugger = match args.target {
         Target::Rest { endpoint } => {

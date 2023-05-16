@@ -47,12 +47,27 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
-        let state_view_arc = Arc::new(state_view);
-        let transaction_outputs =
-            Self::execute_block::<V>(transactions.clone(), state_view_arc.clone())?;
+        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+
+        Ok(Self {
+            transactions,
+            transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+        })
+    }
+
+    pub fn by_transaction_execution_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<Self> {
+        let state_view_arc = Arc::new(state_view);
+        let transaction_outputs =
+            Self::execute_block_sharded::<V>(transactions.clone(), state_view_arc.clone())?;
 
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
 
@@ -127,18 +142,25 @@ impl ChunkOutput {
         }
     }
 
+    fn execute_block_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: Arc<CachedStateView>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block_sharded(
+            SHARDED_BLOCK_EXECUTOR.lock().deref(),
+            transactions,
+            state_view,
+        )?)
+    }
+
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
-        state_view: Arc<CachedStateView>,
+        state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(
-            SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            transactions,
-            state_view,
-        )?)
+        Ok(V::execute_block(transactions, &state_view)?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -148,18 +170,14 @@ impl ChunkOutput {
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
-        state_view: Arc<CachedStateView>,
+        state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => V::execute_block(
-                SHARDED_BLOCK_EXECUTOR.lock().deref(),
-                transactions,
-                state_view,
-            )?,
+            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
             _ => transactions
                 .iter()
                 .map(|_| {

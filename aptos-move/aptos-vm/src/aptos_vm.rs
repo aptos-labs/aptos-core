@@ -7,6 +7,7 @@ use crate::{
         discard_error_output, discard_error_vm_status, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    block_executor::BlockAptosVM,
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     delta_state_view::DeltaStateView,
@@ -79,7 +80,7 @@ use std::{
     },
 };
 
-static CONCURRENCY_PER_SHARD: OnceCell<usize> = OnceCell::new();
+static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
@@ -129,18 +130,18 @@ impl AptosVM {
     }
 
     /// Sets execution concurrency level when invoked the first time.
-    pub fn set_concurrency_per_shard_once(mut concurrency_level: usize) {
+    pub fn set_concurrency_level_once(mut concurrency_level: usize) {
         concurrency_level = min(concurrency_level, num_cpus::get());
         // Only the first call succeeds, due to OnceCell semantics.
-        CONCURRENCY_PER_SHARD.set(concurrency_level).ok();
+        EXECUTION_CONCURRENCY_LEVEL.set(concurrency_level).ok();
     }
 
     /// Get the concurrency level if already set, otherwise return default 1
     /// (sequential execution).
     ///
     /// The concurrency level is fixed to 1 if gas profiling is enabled.
-    pub fn get_concurrency_per_shard() -> usize {
-        match CONCURRENCY_PER_SHARD.get() {
+    pub fn get_concurrency_level() -> usize {
+        match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
         }
@@ -1459,10 +1460,9 @@ impl VMExecutor for AptosVM {
     /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior
     /// mutability. Writes to be applied to the data view are encoded in the write set part of a
     /// transaction output.
-    fn execute_block<S: StateView + Sync + Send + 'static>(
-        sharded_block_executor: &ShardedBlockExecutor<S>,
+    fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: Arc<S>,
+        state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1470,7 +1470,32 @@ impl VMExecutor for AptosVM {
                 None,
             ))
         });
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
 
+        let count = transactions.len();
+        let ret = BlockAptosVM::execute_block(
+            Arc::clone(&RAYON_EXEC_POOL),
+            transactions,
+            state_view,
+            Self::get_concurrency_level(),
+        );
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
+    }
+
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
+        sharded_block_executor: &ShardedBlockExecutor<S>,
+        transactions: Vec<Transaction>,
+        state_view: Arc<S>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
             log_context,
@@ -1482,7 +1507,7 @@ impl VMExecutor for AptosVM {
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
-            AptosVM::get_concurrency_per_shard(),
+            AptosVM::get_concurrency_level(),
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

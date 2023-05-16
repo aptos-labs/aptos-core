@@ -4,11 +4,10 @@
 use anyhow::Result;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{transaction::Transaction, write_set::WriteSet};
-use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
+use aptos_vm::{AptosVM, VMExecutor};
 use std::{
     collections::HashMap,
     io::{self, Read},
-    sync::Arc,
 };
 
 fn main() -> Result<()> {
@@ -45,9 +44,7 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let sharded_block_executor = ShardedBlockExecutor::new(1, Some(1));
-
-    let res = AptosVM::execute_block(&sharded_block_executor, txns, Arc::new(state_store))?;
+    let res = AptosVM::execute_block(txns, &state_store)?;
     for i in 0..NUM_TXNS {
         assert!(res[i as usize].status().status().unwrap().is_success());
     }

@@ -295,7 +295,7 @@ fn main() {
         .thread_name(|index| format!("rayon-global-{}", index))
         .build_global()
         .expect("Failed to build rayon global thread pool.");
-    AptosVM::set_concurrency_per_shard_once(opt.concurrency_level());
+    AptosVM::set_concurrency_level_once(opt.concurrency_level());
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
     if opt.use_native_executor {

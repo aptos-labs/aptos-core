@@ -151,7 +151,13 @@ pub trait VMExecutor: Send + Sync {
     // sorted out before that's possible.
 
     /// Executes a block of transactions and returns output for each one of them.
-    fn execute_block<S: StateView + Sync + Send + 'static>(
+    fn execute_block(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+
+    /// Executes a block of transactions using a sharded block executor and returns the results.
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
         transactions: Vec<Transaction>,
         state_view: Arc<S>,
