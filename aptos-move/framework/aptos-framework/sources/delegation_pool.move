@@ -856,6 +856,7 @@ module aptos_framework::delegation_pool {
 
         let vote_delegation_table = &mut governance_records.vote_delegation;
         // By default, a delegator's delegated voter is itself.
+        // TODO: recycle storage when VoteDelegation equals to default value.
         if (!smart_table::contains(vote_delegation_table, delegator)) {
             return smart_table::borrow_mut_with_default(vote_delegation_table, delegator, VoteDelegation {
                 voter: delegator,
@@ -884,6 +885,7 @@ module aptos_framework::delegation_pool {
 
         let delegated_votes_per_voter = &mut governance_records.delegated_votes;
         // By default, a delegator's voter is itself.
+        // TODO: recycle storage when DelegatedVotes equals to default value.
         if (!smart_table::contains(delegated_votes_per_voter, voter)) {
             let active_shares = get_delegator_active_shares(pool, voter);
             let inactive_shares = get_delegator_pending_inactive_shares(pool, voter);
@@ -1130,6 +1132,7 @@ module aptos_framework::delegation_pool {
     }
 
     fun withdraw_internal(pool: &mut DelegationPool, delegator_address: address, amount: u64) acquires GovernanceRecords {
+        // TODO: recycle storage when a delegator fully exits the delegation pool.
         // short-circuit if amount to withdraw is 0 so no event is emitted
         if (amount == 0) { return };
 
