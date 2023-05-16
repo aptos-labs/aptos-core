@@ -1536,6 +1536,11 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
     config
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_network_tests(vec![&PerformanceBenchmark])
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 })
+                .txn_expiration_time_secs(5 * 60),
+        )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -1553,6 +1558,25 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
 
             // Disable pyroscope. Need to ensure secrets are created/propogated before enabling.
             helm_values["pyroscope"]["enabled"] = false.into();
+
+            // Consensus-only config
+            helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
+            helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
+                (3_u64 * 1024 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["mempool"]["capacity_per_user"] = 100_000.into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_timeout_secs"] =
+                (5 * 60 * 60).into();
+            helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
+                (5 * 60 * 60_000).into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
+                30000.into();
+            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
+                (3 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
+            helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
+                ["continuous_syncing_mode"] = "ExecuteTransactions".into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)
