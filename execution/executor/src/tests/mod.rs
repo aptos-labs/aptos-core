@@ -594,7 +594,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
 
     for txn in transactions {
-        let out = ChunkOutput::by_transaction_execution_sharded::<MockVM>(
+        let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
                 .verified_state_view(

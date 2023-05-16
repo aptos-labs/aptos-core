@@ -53,7 +53,7 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_sharded::<FakeVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
     }
 }
 

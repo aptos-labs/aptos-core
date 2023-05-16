@@ -62,7 +62,7 @@ impl TransactionBlockExecutor<Transaction> for MockVM {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_sharded::<MockVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
     }
 }
 
