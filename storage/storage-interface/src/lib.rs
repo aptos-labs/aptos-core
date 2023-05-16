@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::cached_state_view::ShardedStateCache;
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -43,10 +44,8 @@ mod executed_trees;
 mod metrics;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
-pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;
-pub mod sync_proof_fetcher;
 
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
@@ -381,7 +380,7 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Gets an account state by account address.
+    /// Gets the state value by state key at version.
     /// See [AptosDB::get_state_value_by_version].
     ///
     /// [AptosDB::get_state_value_by_version]:
@@ -391,6 +390,20 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
+        unimplemented!()
+    }
+
+    /// Get the latest state value and its corresponding version when it's of the given key up
+    /// to the given version.
+    /// See [AptosDB::get_state_value_with_version_by_version].
+    ///
+    /// [AptosDB::get_state_value_with_version_by_version]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_state_value_with_version_by_version
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
         unimplemented!()
     }
 
@@ -625,6 +638,25 @@ pub trait DbWriter: Send + Sync {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Persist transactions for block.
+    /// See [`AptosDB::save_transaction_block`].
+    ///
+    /// [`AptosDB::save_transaction_block`]:
+    /// ../aptosdb/struct.AptosDB.html#method.save_transaction_block
+    fn save_transaction_block(
+        &self,
+        txns_to_commit: &[Arc<TransactionToCommit>],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        latest_in_memory_state: StateDelta,
+        block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         unimplemented!()
     }

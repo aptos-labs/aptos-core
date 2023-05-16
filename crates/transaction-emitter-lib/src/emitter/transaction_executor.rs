@@ -4,7 +4,7 @@
 use super::RETRY_POLICY;
 use anyhow::{Context, Result};
 use aptos_logger::{debug, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{aptos_api_types::TransactionInfo, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
 };
@@ -116,15 +116,74 @@ impl RestApiTransactionExecutor {
         }
 
         // if submission timeouts, it might still get committed:
-        self.random_rest_client()
+        let onchain_info = self
+            .random_rest_client()
             .wait_for_signed_transaction_bcs(txn)
-            .await?;
+            .await?
+            .into_inner()
+            .info;
+        if !onchain_info.status().is_success() {
+            anyhow::bail!(
+                "Transaction failed execution with {:?}",
+                onchain_info.status()
+            );
+        }
 
         counters
             .successes
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
+}
+
+async fn warn_detailed_error(
+    call_name: &str,
+    rest_client: &RestClient,
+    txn: &SignedTransaction,
+    err: Result<&TransactionInfo, &RestError>,
+) {
+    let sender = txn.sender();
+    let (last_transactions, seq_num) =
+        if let Ok(account) = rest_client.get_account_bcs(sender).await {
+            let inner = account.into_inner();
+            (
+                rest_client
+                    .get_account_transactions_bcs(
+                        sender,
+                        Some(inner.sequence_number().saturating_sub(1)),
+                        Some(5),
+                    )
+                    .await
+                    .ok()
+                    .map(|r| {
+                        r.into_inner()
+                            .into_iter()
+                            .map(|t| t.info)
+                            .collect::<Vec<_>>()
+                    }),
+                Some(inner.sequence_number()),
+            )
+        } else {
+            (None, None)
+        };
+    let balance = rest_client
+        .get_account_balance(sender)
+        .await
+        .map_or(-1, |v| v.into_inner().get() as i64);
+
+    warn!(
+        "[{:?}] Failed {} transaction: {:?}, seq num: {}, gas: unit {} and max {}, for account {}, last seq_num {:?}, balance of {} and last transaction for account: {:?}",
+        rest_client.path_prefix_string(),
+        call_name,
+        err,
+        txn.sequence_number(),
+        txn.gas_unit_price(),
+        txn.max_gas_amount(),
+        sender,
+        seq_num,
+        balance,
+        last_transactions,
+    );
 }
 
 async fn submit_and_check(
@@ -138,16 +197,12 @@ async fn submit_and_check(
     if let Err(err) = rest_client.submit_bcs(txn).await {
         sample!(
             SampleRate::Duration(Duration::from_secs(60)),
-            warn!(
-                "[{}] Failed submitting transaction: {}",
-                rest_client.path_prefix_string(),
-                err,
-            )
+            warn_detailed_error("submitting", rest_client, txn, Err(&err)).await
         );
         *failed_submit = true;
         // even if txn fails submitting, it might get committed, so wait to see if that is the case.
     }
-    if let Err(err) = rest_client
+    match rest_client
         .wait_for_transaction_by_hash(
             txn.clone().committed_hash(),
             txn.expiration_timestamp_secs(),
@@ -156,17 +211,30 @@ async fn submit_and_check(
         )
         .await
     {
-        sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
-            warn!(
-                "[{}] Failed waiting on a transaction: {}",
-                rest_client.path_prefix_string(),
-                err,
-            )
-        );
-        *failed_wait = true;
-        Err(err)?;
+        Err(err) => {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                warn_detailed_error("waiting on a", rest_client, txn, Err(&err)).await
+            );
+            *failed_wait = true;
+            Err(err)?;
+        },
+        Ok(result) => {
+            let transaction_info = result.inner().transaction_info().unwrap();
+            if !transaction_info.success {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(60)),
+                    warn_detailed_error("waiting on a", rest_client, txn, Ok(transaction_info))
+                        .await
+                );
+                anyhow::bail!(
+                    "Transaction failed execution with VM status {}",
+                    transaction_info.vm_status
+                );
+            }
+        },
     }
+
     Ok(())
 }
 

@@ -20,7 +20,7 @@ use move_bytecode_source_map::{
     source_map::{FunctionSourceMap, SourceName},
 };
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use move_ir_types::location::Loc;
 use std::collections::HashMap;
@@ -1275,7 +1275,7 @@ impl<'a> Disassembler<'a> {
                         .source_map
                         .get_function_source_map(FunctionDefinitionIndex(0_u16))?,
                     None,
-                    IdentStr::new("main")?,
+                    ident_str!("main"),
                     &script.type_parameters,
                     script.parameters,
                     Some(&script.code),

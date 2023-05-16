@@ -81,8 +81,8 @@ use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
+    DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -118,6 +118,7 @@ use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
@@ -807,9 +808,10 @@ impl AptosDB {
 
     fn save_transactions_impl(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<(SchemaBatch, ShardedStateKvSchemaBatch, HashValue)> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_impl"])
@@ -829,13 +831,14 @@ impl AptosDB {
 
                 let state_updates_vec = txns_to_commit
                     .iter()
-                    .map(|txn_to_commit| txn_to_commit.state_updates())
+                    .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
                     .collect::<Vec<_>>();
 
                 self.state_store.put_value_sets(
                     state_updates_vec,
                     first_version,
                     expected_state_db_usage,
+                    sharded_state_cache,
                     &ledger_batch,
                     &sharded_state_kv_batches,
                 )
@@ -848,8 +851,11 @@ impl AptosDB {
                     .start_timer();
                 zip_eq(first_version..=last_version, txns_to_commit)
                     .map(|(ver, txn_to_commit)| {
-                        self.event_store
-                            .put_events(ver, txn_to_commit.events(), &ledger_batch)
+                        self.event_store.put_events(
+                            ver,
+                            txn_to_commit.borrow().events(),
+                            &ledger_batch,
+                        )
                     })
                     .collect::<Result<Vec<_>>>()
             });
@@ -863,12 +869,12 @@ impl AptosDB {
                         // Transaction updates. Gather transaction hashes.
                         self.transaction_store.put_transaction(
                             ver,
-                            txn_to_commit.transaction(),
+                            txn_to_commit.borrow().transaction(),
                             &ledger_batch,
                         )?;
                         self.transaction_store.put_write_set(
                             ver,
-                            txn_to_commit.write_set(),
+                            txn_to_commit.borrow().write_set(),
                             &ledger_batch,
                         )
                     },
@@ -876,7 +882,7 @@ impl AptosDB {
                 // Transaction accumulator updates. Get result root hash.
                 let txn_infos: Vec<_> = txns_to_commit
                     .iter()
-                    .map(|t| t.transaction_info())
+                    .map(|t| t.borrow().transaction_info())
                     .cloned()
                     .collect();
                 self.ledger_store
@@ -900,7 +906,7 @@ impl AptosDB {
 
     fn save_transactions_validation(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -1060,7 +1066,7 @@ impl AptosDB {
 
     fn post_commit(
         &self,
-        txns_to_commit: &[TransactionToCommit],
+        txns_to_commit: &[impl Borrow<TransactionToCommit>],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -1087,7 +1093,10 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["indexer_index"])
                 .start_timer();
-            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
+            let write_sets: Vec<_> = txns_to_commit
+                .iter()
+                .map(|txn| txn.borrow().write_set())
+                .collect();
             indexer.index(self.state_store.clone(), first_version, &write_sets)?;
         }
 
@@ -1583,6 +1592,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        gauged_api("get_state_value_with_version_by_version", || {
+            self.error_if_state_kv_pruned("StateValue", version)?;
+
+            self.state_store
+                .get_state_value_with_version_by_version(state_key, version)
+        })
+    }
+
     /// Returns the proof of the given state key and version.
     fn get_state_proof_by_version_ext(
         &self,
@@ -1896,6 +1918,7 @@ impl DbWriter for AptosDB {
                     txns_to_commit,
                     first_version,
                     latest_in_memory_state.current.usage(),
+                    None,
                 )?;
 
             {
@@ -1916,6 +1939,73 @@ impl DbWriter for AptosDB {
                     latest_in_memory_state,
                     sync_commit,
                 )?;
+            }
+
+            self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)
+        })
+    }
+
+    /// Same as save_transactions, but only for a whole block.
+    fn save_transaction_block(
+        &self,
+        txns_to_commit: &[Arc<TransactionToCommit>],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
+        // TODO(grao): Consider remove this.
+        latest_in_memory_state: StateDelta,
+        block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        sharded_state_cache: &ShardedStateCache,
+    ) -> Result<()> {
+        gauged_api("save_transaction_block", || {
+            // Executing and committing from more than one threads not allowed -- consensus and
+            // state sync must hand over to each other after all pending execution and committing
+            // complete.
+            let _lock = self
+                .ledger_commit_lock
+                .try_lock()
+                .expect("Concurrent committing detected.");
+
+            // For reconfig suffix.
+            if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
+                return Ok(());
+            }
+
+            self.save_transactions_validation(
+                txns_to_commit,
+                first_version,
+                base_state_version,
+                ledger_info_with_sigs,
+                &latest_in_memory_state,
+            )?;
+
+            let (ledger_batch, sharded_state_kv_batches, new_root_hash) = self
+                .save_transactions_impl(
+                    txns_to_commit,
+                    first_version,
+                    latest_in_memory_state.current.usage(),
+                    Some(sharded_state_cache),
+                )?;
+
+            {
+                let mut buffered_state = self.state_store.buffered_state().lock();
+                let last_version = first_version + txns_to_commit.len() as u64 - 1;
+                self.commit_ledger_and_state_kv_db(
+                    last_version,
+                    ledger_batch,
+                    sharded_state_kv_batches,
+                    new_root_hash,
+                    ledger_info_with_sigs,
+                )?;
+
+                if !txns_to_commit.is_empty() {
+                    buffered_state.update(
+                        Some(block_state_updates),
+                        latest_in_memory_state,
+                        sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
+                    )?;
+                }
             }
 
             self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)

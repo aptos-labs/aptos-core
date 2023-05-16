@@ -4,7 +4,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::{MoveResolverWithVMMetadata, StorageAdapter},
+    data_cache::StorageAdapter,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
@@ -34,7 +34,6 @@ use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     language_storage::ModuleId,
     move_resource::MoveStructType,
-    resolver::ResourceResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::logging::expect_no_verification_errors;
@@ -43,10 +42,9 @@ use std::sync::Arc;
 
 pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
-#[derive(Clone)]
-/// A wrapper to make VMRuntime standalone and thread safe.
+/// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
-    move_vm: Arc<MoveVmExt>,
+    move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Option<AptosGasParameters>,
     storage_gas_params: Option<StorageGasParameters>,
@@ -55,30 +53,34 @@ pub struct AptosVMImpl {
     features: Features,
 }
 
+pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>, u64) {
+    match GasScheduleV2::fetch_config(storage) {
+        Some(gas_schedule) => {
+            let feature_version = gas_schedule.feature_version;
+            let map = gas_schedule.to_btree_map();
+            (
+                AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
+                feature_version,
+            )
+        },
+        None => match GasSchedule::fetch_config(storage) {
+            Some(gas_schedule) => {
+                let map = gas_schedule.to_btree_map();
+                (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
+            },
+            None => (None, 0),
+        },
+    }
+}
+
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new<S: StateView>(state: &S) -> Self {
+    pub fn new(state: &impl StateView) -> Self {
         let storage = StorageAdapter::new(state);
 
         // Get the gas parameters
         let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
-            match GasScheduleV2::fetch_config(&storage) {
-                Some(gas_schedule) => {
-                    let feature_version = gas_schedule.feature_version;
-                    let map = gas_schedule.to_btree_map();
-                    (
-                        AptosGasParameters::from_on_chain_gas_schedule(&map, feature_version),
-                        feature_version,
-                    )
-                },
-                None => match GasSchedule::fetch_config(&storage) {
-                    Some(gas_schedule) => {
-                        let map = gas_schedule.to_btree_map();
-                        (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
-                    },
-                    None => (None, 0),
-                },
-            };
+            gas_config(&storage);
 
         let storage_gas_schedule = match gas_feature_version {
             0 => None,
@@ -152,7 +154,7 @@ impl AptosVMImpl {
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
         let mut vm = Self {
-            move_vm: Arc::new(inner),
+            move_vm: inner,
             gas_feature_version,
             gas_params,
             storage_gas_params,
@@ -181,10 +183,10 @@ impl AptosVMImpl {
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework
-    fn get_transaction_validation<S: ResourceResolver>(
-        remote_cache: &S,
+    fn get_transaction_validation(
+        resolver: &impl MoveResolverExt,
     ) -> Option<TransactionValidation> {
-        match remote_cache
+        match resolver
             .get_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
@@ -234,9 +236,9 @@ impl AptosVMImpl {
         &self.features
     }
 
-    pub fn check_gas<S: MoveResolverExt>(
+    pub fn check_gas(
         &self,
-        storage: &S,
+        resolver: &impl MoveResolverExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -245,7 +247,7 @@ impl AptosVMImpl {
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
             let data =
-                storage.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+                resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
             let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
@@ -366,9 +368,9 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into either `SCRIPT_PROLOGUE_NAME` function
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_script_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_script_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -430,9 +432,9 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into `MODULE_PROLOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_module_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_module_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -472,9 +474,9 @@ impl AptosVMImpl {
     /// 2. It has received enough approvals to meet the signature threshold of the multisig account
     /// 3. If only the payload hash was stored on chain, the provided payload in execution should
     /// match that hash.
-    pub(crate) fn run_multisig_prologue<S: MoveResolverExt>(
+    pub(crate) fn run_multisig_prologue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         payload: &Multisig,
         log_context: &AdapterLogSchema,
@@ -507,9 +509,9 @@ impl AptosVMImpl {
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
+    pub(crate) fn run_success_epilogue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -547,9 +549,9 @@ impl AptosVMImpl {
 
     /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
     /// stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_failure_epilogue<S: MoveResolverExt>(
+    pub(crate) fn run_failure_epilogue(
         &self,
-        session: &mut SessionExt<S>,
+        session: &mut SessionExt,
         gas_remaining: Gas,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -601,33 +603,26 @@ impl AptosVMImpl {
         module: &ModuleId,
     ) -> Option<RuntimeModuleMetadataV1> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-            aptos_framework::get_vm_metadata(&self.move_vm, module.clone())
+            aptos_framework::get_vm_metadata(&self.move_vm, module)
         } else {
-            aptos_framework::get_vm_metadata_v0(&self.move_vm, module.clone())
+            aptos_framework::get_vm_metadata_v0(&self.move_vm, module)
         }
     }
 
-    pub fn new_move_resolver<'r, R: MoveResolverExt>(
+    pub fn new_session<'r>(
         &self,
-        r: &'r R,
-    ) -> MoveResolverWithVMMetadata<'r, '_, R> {
-        MoveResolverWithVMMetadata::new(r, &self.move_vm)
-    }
-
-    pub fn new_session<'r, R: MoveResolverExt>(
-        &self,
-        r: &'r R,
+        resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_, R> {
-        self.move_vm.new_session(r, session_id)
+    ) -> SessionExt<'r, '_> {
+        self.move_vm.new_session(resolver, session_id)
     }
 
-    pub fn load_module<'r, R: MoveResolverExt>(
+    pub fn load_module<'r>(
         &self,
         module_id: &ModuleId,
-        remote: &'r R,
+        resolver: &'r impl MoveResolverExt,
     ) -> VMResult<Arc<CompiledModule>> {
-        self.move_vm.load_module(module_id, remote)
+        self.move_vm.load_module(module_id, resolver)
     }
 }
 
@@ -659,9 +654,9 @@ impl<'a> AptosVMInternals<'a> {
     }
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
+pub(crate) fn get_transaction_output<A: AccessPathCache>(
     ap_cache: &mut A,
-    session: SessionExt<S>,
+    session: SessionExt,
     gas_left: Gas,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
@@ -672,9 +667,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
         .checked_sub(gas_left)
         .expect("Balance should always be less than or equal to max gas amount");
 
-    let change_set_ext = session
-        .finish(ap_cache, change_set_configs)
-        .map_err(|e| e.into_vm_status())?;
+    let change_set_ext = session.finish(ap_cache, change_set_configs)?;
     let (delta_change_set, change_set) = change_set_ext.into_inner();
     let (write_set, events) = change_set.into_inner();
 

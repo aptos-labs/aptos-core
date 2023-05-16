@@ -343,6 +343,16 @@ The number of scalars does not match the number of points.
 
 
 
+<a name="0x1_ristretto255_E_TOO_MANY_POINTS_CREATED"></a>
+
+Too many points have been created in the current transaction execution.
+
+
+<pre><code><b>const</b> <a href="ristretto255.md#0x1_ristretto255_E_TOO_MANY_POINTS_CREATED">E_TOO_MANY_POINTS_CREATED</a>: u64 = 4;
+</code></pre>
+
+
+
 <a name="0x1_ristretto255_E_ZERO_POINTS"></a>
 
 Expected more than zero points as input.

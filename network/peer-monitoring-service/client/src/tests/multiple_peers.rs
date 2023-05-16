@@ -22,7 +22,7 @@ use crate::{
     PeerState,
 };
 use aptos_config::{
-    config::{NodeConfig, PeerRole},
+    config::{NodeConfig, PeerMonitoringServiceConfig, PeerRole},
     network_id::NetworkId,
 };
 use aptos_infallible::RwLock;
@@ -145,8 +145,14 @@ async fn test_initial_states() {
     let (peer_monitoring_client, mut mock_monitoring_server, peer_monitor_state, time_service) =
         MockMonitoringServer::new(all_network_ids.clone());
 
-    // Spawn the peer monitoring client
-    let node_config = NodeConfig::default();
+    // Spawn the peer monitoring client with a very low monitoring interval
+    let node_config = NodeConfig {
+        peer_monitoring_service: PeerMonitoringServiceConfig {
+            peer_monitor_interval_usec: 100,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     start_peer_monitor(
         peer_monitoring_client,
         &peer_monitor_state,

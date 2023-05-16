@@ -16,8 +16,8 @@ use move_model::{
     ast,
     ast::{Condition, ConditionKind, ExpData},
     model::{
-        FunId, GlobalEnv, ModuleId, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructEnv,
-        StructId,
+        FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId,
+        StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
@@ -85,10 +85,7 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
         let info = env
             .get_extension::<MonoInfo>()
             .expect("monomorphization analysis not run");
-        let tctx = TypeDisplayContext::WithEnv {
-            env,
-            type_param_names: None,
-        };
+        let tctx = TypeDisplayContext::new(env);
         let display_inst = |tys: &[Type]| {
             tys.iter()
                 .map(|ty| ty.display(&tctx).to_string())
@@ -196,6 +193,9 @@ impl<'a> Analyzer<'a> {
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
         for module in self.env.get_modules() {
             for fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 for (variant, target) in self.targets.get_targets(&fun) {
                     if !variant.is_verified() {
                         continue;
@@ -452,7 +452,7 @@ impl<'a> Analyzer<'a> {
     fn analyze_spec_fun(&mut self, fun: QualifiedId<SpecFunId>) {
         let module_env = self.env.get_module(fun.module_id);
         let decl = module_env.get_spec_fun(fun.id);
-        for (_, ty) in &decl.params {
+        for Parameter(_, ty) in &decl.params {
             self.add_type_root(ty)
         }
         self.add_type_root(&decl.result_type);
@@ -553,7 +553,7 @@ impl<'a> Analyzer<'a> {
                 .entry(struct_.get_qualified_id())
                 .or_default()
                 .insert((targs[0].clone(), targs[1].clone()));
-        } else if struct_.is_native_or_intrinsic() && !targs.is_empty() {
+        } else if struct_.is_intrinsic() && !targs.is_empty() {
             self.info
                 .native_inst
                 .entry(struct_.module_env.get_id())

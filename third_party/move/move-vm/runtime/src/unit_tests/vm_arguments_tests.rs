@@ -15,8 +15,10 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
     value::{serialize_values, MoveValue},
@@ -248,16 +250,21 @@ impl RemoteStore {
 }
 
 impl ModuleResolver for RemoteStore {
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
+
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
 impl ResourceResolver for RemoteStore {
-    fn get_resource(
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
+        _metadata: &[Metadata],
     ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(None)
     }
@@ -791,8 +798,8 @@ fn check_script_function() {
 fn call_missing_item() {
     let module = empty_module();
     let id = &module.self_id();
-    let function_name = IdentStr::new("foo").unwrap();
-    // mising module
+    let function_name = ident_str!("foo");
+    // missing module
     let move_vm = MoveVM::new(vec![]).unwrap();
     let mut remote_view = RemoteStore::new();
     let mut session = move_vm.new_session(&remote_view);

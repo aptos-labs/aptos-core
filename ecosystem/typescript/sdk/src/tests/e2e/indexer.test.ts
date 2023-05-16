@@ -187,7 +187,16 @@ describe("Indexer", () => {
       longTestTimeout,
     );
 
-    test("gets indexer ledger info", async () => {
+    it(
+      "gets number of delegators",
+      async () => {
+        const numberOfDelegators = await indexerClient.getNumberOfDelegators(alice.address().hex());
+        expect(numberOfDelegators.num_active_delegator_per_pool).toHaveLength(0);
+      },
+      longTestTimeout,
+    );
+
+    it("gets indexer ledger info", async () => {
       const ledgerInfo = await indexerClient.getIndexerLedgerInfo();
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });

@@ -64,7 +64,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         .into_inner()
                         .to_vec(),
                 ))),
-                Path::Resource(tag) | Path::ResourceGroup(tag) => Ok(self
+                Path::Resource(tag) => Ok(self
                     .0
                     .get_account_resource_at_version_bytes(
                         path.address,
@@ -74,6 +74,17 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                     .await
                     .ok()
                     .map(|inner| StateValue::new_legacy(inner.into_inner()))),
+
+                Path::ResourceGroup(_) => Ok(self
+                    .0
+                    .get_account_resources_at_version_bcs(path.address, version)
+                    .await
+                    .ok()
+                    .and_then(|inner| {
+                        Some(StateValue::new_legacy(
+                            bcs::to_bytes(&inner.into_inner()).ok()?,
+                        ))
+                    })),
             },
             StateKeyInner::TableItem { handle, key } => Ok(Some(StateValue::new_legacy(
                 self.0

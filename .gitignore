@@ -118,3 +118,7 @@ metadata-cache
 /local/
 run_*
 tmp_log
+
+# test files for indexer GRPC
+test_indexer_grpc_*.yaml
+test_indexer_grpc/*

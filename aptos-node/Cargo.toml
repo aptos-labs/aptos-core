@@ -68,6 +68,8 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_merge = { workspace = true }
+serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 url = { workspace = true }
@@ -82,4 +84,5 @@ consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-me
 default = []
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
 indexer = ["aptos-indexer"]
+network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console"]

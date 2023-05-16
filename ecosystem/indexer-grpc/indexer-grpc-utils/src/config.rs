@@ -3,7 +3,33 @@
 
 use serde::{Deserialize, Serialize};
 /// Common configuration for Indexer GRPC Store.
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{env, fs::File, io::Read, path::PathBuf};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GcsFileStore {
+    pub gcs_file_store_bucket_name: String,
+    // TODO: consider adding credentials_path, rather than relying on default location
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LocalFileStore {
+    pub local_file_store_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "file_store_type")]
+pub enum IndexerGrpcFileStoreConfig {
+    GcsFileStore(GcsFileStore),
+    LocalFileStore(LocalFileStore),
+}
+
+impl Default for IndexerGrpcFileStoreConfig {
+    fn default() -> Self {
+        IndexerGrpcFileStoreConfig::LocalFileStore(LocalFileStore {
+            local_file_store_path: env::current_dir().unwrap(),
+        })
+    }
+}
 
 /// Indexer GRPC configuration. This is to configure the Indexer GRPC server.
 /// This configuration is intende to share between Indexer GRPC(cache, file store, etc.).
@@ -16,8 +42,8 @@ pub struct IndexerGrpcConfig {
     pub data_service_grpc_listen_address: Option<String>,
     /// Redis address, e.g. "127.0.0.1:6379".
     pub redis_address: String,
-    /// File store bucket name, e.g., "indexer-grpc-file-store".
-    pub file_store_bucket_name: String,
+    /// File store config
+    pub file_store: IndexerGrpcFileStoreConfig,
     /// Health check port.
     pub health_check_port: u16,
     /// Whitelisted auth tokens, e.g., "token1,token2". Only used by Data Service.

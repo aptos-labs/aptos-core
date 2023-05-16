@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics::TIMER, proof_fetcher::ProofFetcher, DbReader};
+use crate::{metrics::TIMER, DbReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate};
@@ -52,6 +52,34 @@ impl AsyncProofFetcher {
             data_receiver,
             num_proofs_to_read: AtomicUsize::new(0),
         }
+    }
+
+    pub fn fetch_state_value_with_version_and_schedule_proof_read(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+        root_hash: Option<HashValue>,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let _timer = TIMER
+            .with_label_values(&["async_proof_fetcher_fetch"])
+            .start_timer();
+        let version_and_value_opt = self
+            .reader
+            .get_state_value_with_version_by_version(state_key, version)?;
+        self.schedule_proof_read(
+            state_key.clone(),
+            version,
+            root_hash,
+            version_and_value_opt.as_ref().map(|v| {
+                let state_value = &v.1;
+                state_value.hash()
+            }),
+        );
+        Ok(version_and_value_opt)
+    }
+
+    pub fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
+        self.wait()
     }
 
     // Waits scheduled proof read to finish, and returns all read proofs.
@@ -124,31 +152,6 @@ impl AsyncProofFetcher {
     }
 }
 
-impl ProofFetcher for AsyncProofFetcher {
-    fn fetch_state_value_and_proof(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-        root_hash: Option<HashValue>,
-    ) -> Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
-        let _timer = TIMER
-            .with_label_values(&["async_proof_fetcher_fetch"])
-            .start_timer();
-        let value = self.reader.get_state_value_by_version(state_key, version)?;
-        self.schedule_proof_read(
-            state_key.clone(),
-            version,
-            root_hash,
-            value.as_ref().map(|v| v.hash()),
-        );
-        Ok((value, None))
-    }
-
-    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
-        self.wait()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,14 +167,13 @@ mod tests {
             let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).into_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
-                .fetch_state_value_and_proof(&state_key, 0, None)
+                .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, None)
                 .expect("Should not fail.");
             let expected_value = StateValue::from(match state_key.into_inner() {
                 StateKeyInner::Raw(key) => key,
                 _ => unreachable!(),
             });
-            assert_eq!(result.0, Some(expected_value));
-            assert!(result.1.is_none());
+            assert_eq!(result, Some((0, expected_value)));
         }
 
         let proofs = fetcher.get_proof_cache();

@@ -32,7 +32,7 @@ use std::{
 /// reduce the number of proofs a client must get.
 ///
 /// Second, the structure contains a `consensus_data_hash` value. This is the hash of an internal
-/// data structure that represents a block that is voted on in HotStuff. If 2f+1 signatures are
+/// data structure that represents a block that is voted on in Consensus. If 2f+1 signatures are
 /// gathered on the same ledger info that represents a Quorum Certificate (QC) on the consensus
 /// data.
 ///

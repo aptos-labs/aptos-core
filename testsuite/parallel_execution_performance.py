@@ -5,33 +5,34 @@
 
 import subprocess
 import re
+import platform
 
 # Set the tps and speedup ratio threshold for block size 1k, 10k and 50k
 THRESHOLDS = {
-    "1k_8": 15000,
-    "1k_16": 19000,
-    "1k_32": 20000,
-    "10k_8": 27000,
-    "10k_16": 46000,
-    "10k_32": 63000,
-    "50k_8": 29000,
-    "50k_16": 53000,
-    "50k_32": 82000,
+    "1k_8": 11000,
+    "1k_16": 13000,
+    "1k_32": 13000,
+    "10k_8": 22000,
+    "10k_16": 32000,
+    "10k_32": 43000,
+    "50k_8": 49000,
+    "50k_16": 64000,
+    "50k_32": 86000,
 }
 
 SPEEDUPS = {
     "1k_8": 3,
     "1k_16": 4,
-    "1k_32": 5,
-    "10k_8": 6,
-    "10k_16": 10,
-    "10k_32": 13,
-    "50k_8": 6,
-    "50k_16": 11,
-    "50k_32": 17,
+    "1k_32": 4,
+    "10k_8": 5,
+    "10k_16": 8,
+    "10k_32": 10,
+    "50k_8": 5,
+    "50k_16": 9,
+    "50k_32": 10,
 }
 
-THRESHOLDS_NOISE = 0.15
+THRESHOLDS_NOISE = 0.20
 SPEEDUPS_NOISE_BELOW = 1
 SPEEDUPS_NOISE_ABOVE = 2
 
@@ -44,7 +45,13 @@ speedups_set = {}
 
 fail = False
 for threads in THREADS:
-    command = f"taskset -c 0-{threads-1} cargo run --profile performance main true true"
+    operating_system = platform.system()
+    if operating_system == "Linux":
+        command = (
+            f"taskset -c 0-{threads-1} cargo run --profile performance param-sweep"
+        )
+    else:
+        command = f"cargo run --profile performance param-sweep"
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )

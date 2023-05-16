@@ -74,7 +74,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Build and Push Rust images
-        run: docker/experimental/docker-bake-rust-all.sh
+        run: docker/builder/docker-bake-rust-all.sh
         env:
           PROFILE: ${{ env.PROFILE }}
           FEATURES: ${{ env.FEATURES }}

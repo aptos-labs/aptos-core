@@ -26,7 +26,7 @@ on:
         description: The Forge k8s cluster to be used for test
       FORGE_RUNNER_DURATION_SECS:
         required: false
-        type: string
+        type: number
         default: 480
         description: Duration of the forge test run
       FORGE_TEST_SUITE:
@@ -142,9 +142,7 @@ jobs:
 
       - name: "Setup GCloud project"
         shell: bash
-        run: |
-          gcloud container clusters get-credentials aptos-forge-0 --zone us-central1-c --project aptos-forge-gcp-0
-          gcloud config set project aptos-forge-gcp-0
+        run: gcloud config set project aptos-forge-gcp-0
 
       - name: Run pre-Forge checks
         shell: bash

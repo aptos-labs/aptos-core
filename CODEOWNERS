@@ -25,11 +25,11 @@
 /aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
 /aptos-move/vm-genesis/ @davidiw @movekevin
 
-# Owner for aptos node (just to prevent things from becoming out of hand, again :D)
+# Owner for aptos node (to prevent things from becoming out of hand :D)
 /aptos-node/ @joshlind
 
-# Owner for logger config
-/config/src/config/logger_config.rs @joshlind @gregnazario
+# Owner for the node configs (to prevent things from becoming out of hand :D)
+/config/ @joshlind @gregnazario
 
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
@@ -65,14 +65,17 @@
 /crates/aptos-telemetry @ibalajiarun @geekflyer
 /crates/aptos-telemetry-service @ibalajiarun @geekflyer
 
+# Owners for the inspection-service crate
+/crates/inspection-service/ @joshlind @brianolson
+
 # Owners for the `/dashboards` directory and all its subdirectories.
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @clay-aptos @gregnazario @saharct
+/developer-docs-site/ @davidiw @gregnazario @saharct
 
 # Auto-reviewers for all Markdown changes including READMEs
-*.md @clay-aptos @saharct
+*.md @saharct
 
 # Owner for docs tutorials for the token_standard and related tutorials.
 /developer-docs-site/docs/tutorials @areshand @gregnazario
@@ -91,7 +94,7 @@
 /mempool/ @bchocho
 
 # Owners for the network and all its subdirectories.
-/network/ @gregnazario @joshlind
+/network/ @gregnazario @joshlind @brianolson
 
 # Owners for the `/state-sync` directory and all its subdirectories.
 /state-sync/ @joshlind

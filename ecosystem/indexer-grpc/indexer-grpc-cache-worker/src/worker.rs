@@ -7,9 +7,11 @@ use crate::metrics::{
 };
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
-    config::IndexerGrpcConfig,
+    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
     create_grpc_client,
-    file_store_operator::{FileStoreMetadata, FileStoreOperator},
+    file_store_operator::{
+        FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
+    },
     time_diff_since_pb_timestamp_in_secs,
 };
 use aptos_logger::{error, info};
@@ -31,8 +33,8 @@ pub struct Worker {
     redis_client: redis::Client,
     /// Fullnode grpc address.
     fullnode_grpc_address: String,
-    /// File store bucket name.
-    pub file_store_bucket_name: String,
+    /// File store config
+    file_store: IndexerGrpcFileStoreConfig,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -64,7 +66,7 @@ impl Worker {
             redis_client,
             // The fullnode grpc address is required.
             fullnode_grpc_address: format!("http://{}", config.fullnode_grpc_address.unwrap()),
-            file_store_bucket_name: config.file_store_bucket_name,
+            file_store: config.file_store,
         }
     }
 
@@ -88,7 +90,15 @@ impl Worker {
             let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
 
             // 1. Fetch metadata.
-            let file_store_operator = FileStoreOperator::new(self.file_store_bucket_name.clone());
+            let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store {
+                IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                    GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
+                ),
+                IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                    LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
+                ),
+            };
+
             file_store_operator.verify_storage_bucket_existence().await;
             let mut starting_version = 0;
             let file_store_metadata = file_store_operator.get_file_store_metadata().await;

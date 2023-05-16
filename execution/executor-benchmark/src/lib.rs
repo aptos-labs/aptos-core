@@ -120,6 +120,7 @@ pub fn run_benchmark<V>(
             db.clone(),
             &source_dir,
             // Initialization pipeline is temporary, so needs to be fully committed.
+            // No discards/aborts allowed during initialization, even if they are allowed later.
             PipelineConfig {
                 delay_execution_start: false,
                 split_stages: false,
@@ -384,7 +385,7 @@ mod tests {
         println!("db_generator::create_db_with_accounts");
 
         crate::db_generator::create_db_with_accounts::<E>(
-            40, /* num_accounts */
+            100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
             5,           /* block_size */
@@ -407,7 +408,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize()),
+            transaction_type.map(|t| t.materialize(2)),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */
@@ -434,7 +435,10 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::CreateNewAccountResource), true);
+        test_generic_benchmark::<AptosVM>(
+            Some(TransactionTypeArg::TokenV1NFTMintAndTransferSequential),
+            true,
+        );
     }
 
     #[test]

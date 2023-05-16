@@ -10,7 +10,8 @@ use move_binary_format::file_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    ident_str,
+    identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
@@ -122,7 +123,7 @@ fn instantiation_err() {
 
     let err = session.execute_entry_function(
         &cm.self_id(),
-        IdentStr::new("f").unwrap(),
+        ident_str!("f"),
         vec![ty_arg],
         Vec::<Vec<u8>>::new(),
         &mut GasStatus::new_unmetered(),

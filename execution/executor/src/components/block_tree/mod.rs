@@ -11,7 +11,7 @@ use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{Error, ExecutedChunk};
+use aptos_executor_types::{Error, ExecutedBlock};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::DbReader;
@@ -23,7 +23,7 @@ use std::{
 
 pub struct Block {
     pub id: HashValue,
-    pub output: ExecutedChunk,
+    pub output: ExecutedBlock,
     children: Mutex<Vec<Arc<Block>>>,
     block_lookup: Arc<BlockLookup>,
 }
@@ -88,7 +88,7 @@ impl BlockLookupInner {
     fn fetch_or_add_block(
         &mut self,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
         parent_id: Option<HashValue>,
         block_lookup: &Arc<BlockLookup>,
     ) -> Result<(Arc<Block>, bool, Option<Arc<Block>>)> {
@@ -147,7 +147,7 @@ impl BlockLookup {
     fn fetch_or_add_block(
         self: &Arc<Self>,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
         parent_id: Option<HashValue>,
     ) -> Result<Arc<Block>> {
         let (block, existing, parent_block) = self
@@ -223,7 +223,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(ledger_view), None)
+        block_lookup.fetch_or_add_block(id, ExecutedBlock::new_empty(ledger_view), None)
     }
 
     pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<()> {
@@ -240,7 +240,7 @@ impl BlockTree {
             );
             self.block_lookup.fetch_or_add_block(
                 epoch_genesis_id,
-                ExecutedChunk::new_empty(last_committed_block.output.result_view.clone()),
+                ExecutedBlock::new_empty(last_committed_block.output.result_view.clone()),
                 None,
             )?
         } else {
@@ -258,7 +258,7 @@ impl BlockTree {
         &self,
         parent_block_id: HashValue,
         id: HashValue,
-        output: ExecutedChunk,
+        output: ExecutedBlock,
     ) -> Result<Arc<Block>> {
         self.block_lookup
             .fetch_or_add_block(id, output, Some(parent_block_id))

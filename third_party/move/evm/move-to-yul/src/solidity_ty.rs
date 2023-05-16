@@ -681,7 +681,7 @@ impl SoliditySignature {
             ));
         }
         let mut ret_type_lst = vec![];
-        for move_ty in fun.get_return_types() {
+        for move_ty in fun.get_result_type().flatten() {
             let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false);
             ret_type_lst.push((solidity_ty, SignatureDataLocation::Memory));
         }
@@ -765,7 +765,9 @@ impl SoliditySignature {
                 para_names.remove(0);
             }
             // Skip storage reference parameter.
-            if !para_names.is_empty() && ctx.is_storage_ref(storage_type, &fun.get_local_type(0)) {
+            if !para_names.is_empty()
+                && ctx.is_storage_ref(storage_type, &fun.get_local_type(0).unwrap())
+            {
                 para_names.remove(0);
             }
             let ret_names = vec!["".to_string(); fun.get_return_count()];
@@ -864,7 +866,7 @@ impl SoliditySignature {
         // Check return type list, but only if fun is not a creator.
         if !attributes::is_create_fun(fun) {
             let sig_ret_vec = self.ret_types.iter().map(|(ty, _)| ty).collect::<Vec<_>>();
-            let ret_types = fun.get_return_types();
+            let ret_types = fun.get_result_type().flatten();
             if ret_types.len() != sig_ret_vec.len() {
                 return false;
             }

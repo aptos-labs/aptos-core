@@ -11,8 +11,7 @@ use move_binary_format::file_format::{
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, TypeSignature,
     Visibility,
 };
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use std::str::FromStr;
+use move_core_types::{account_address::AccountAddress, ident_str};
 
 fuzz_target!(|code_unit: CodeUnit| {
     let mut module = empty_module();
@@ -46,11 +45,11 @@ fuzz_target!(|code_unit: CodeUnit| {
 
     module.identifiers.extend(
         vec![
-            Identifier::from_str("zf_hello_world").unwrap(),
-            Identifier::from_str("awldFnU18mlDKQfh6qNfBGx8X").unwrap(),
-            Identifier::from_str("aQPwJNHyAHpvJ").unwrap(),
-            Identifier::from_str("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").unwrap(),
-            Identifier::from_str("arYpsFa2fvrpPJ").unwrap(),
+            ident_str!("zf_hello_world").into(),
+            ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
+            ident_str!("aQPwJNHyAHpvJ").into(),
+            ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
+            ident_str!("arYpsFa2fvrpPJ").into(),
         ]
         .into_iter(),
     );

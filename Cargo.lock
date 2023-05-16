@@ -546,6 +546,7 @@ dependencies = [
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "byteorder",
  "cfg-if",
+ "cfg_block",
  "get_if_addrs",
  "mirai-annotations",
  "poem-openapi",
@@ -1668,6 +1669,7 @@ dependencies = [
  "aptos-inspection-service",
  "aptos-logger",
  "aptos-protos",
+ "async-trait",
  "backoff",
  "base64 0.13.0",
  "cloud-storage",
@@ -1701,6 +1703,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-network",
  "aptos-runtimes",
  "aptos-telemetry",
  "assert_approx_eq",
@@ -1781,6 +1784,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
+ "rayon",
  "serde 1.0.149",
 ]
 
@@ -2156,6 +2160,8 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "serde_json",
+ "serde_merge",
+ "serde_yaml 0.8.26",
  "tokio",
  "tokio-stream",
  "url",
@@ -2289,6 +2295,7 @@ dependencies = [
  "once_cell",
  "rand 0.7.3",
  "serde 1.0.149",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -2314,6 +2321,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "bytes",
+ "cfg_block",
  "claims",
  "futures",
  "maplit",
@@ -2332,6 +2340,7 @@ dependencies = [
  "aptos-config",
  "aptos-types",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
+ "cfg_block",
  "serde 1.0.149",
  "thiserror",
 ]
@@ -2653,10 +2662,8 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-github-client",
  "aptos-infallible",
  "aptos-logger",
- "aptos-schemadb",
  "aptos-temppath",
  "aptos-time-service",
  "aptos-vault-client",
@@ -2771,6 +2778,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "arr_macro",
  "assert_unordered",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "crossbeam-channel",
@@ -2986,8 +2994,12 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-language-e2e-tests",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-push-metrics",
  "aptos-types",
  "aptos-vm",
+ "clap 3.2.23",
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
@@ -3134,6 +3146,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-utils"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-validator-interface"
 version = "0.1.0"
 dependencies = [
@@ -3146,6 +3162,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-trait",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "itertools",
  "lru 0.7.8",
  "move-binary-format",
@@ -3188,6 +3205,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-state-view",
  "aptos-types",
+ "aptos-utils",
  "aptos-vm-logging",
  "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=d31fab9d81748e2594be5cd5cdf845786a30562d)",
  "dashmap",
@@ -3205,7 +3223,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "rayon",
- "read-write-set-dynamic",
  "serde 1.0.149",
  "serde_json",
  "smallvec",
@@ -4327,6 +4344,12 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "cfg_block"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18758054972164c3264f7c8386f5fc6da6114cb46b619fd365d4e3b2dc3ae487"
 
 [[package]]
 name = "chrono"
@@ -7887,8 +7910,6 @@ dependencies = [
  "move-vm-test-utils",
  "move-vm-types",
  "once_cell",
- "read-write-set",
- "read-write-set-dynamic",
  "reqwest",
  "serde 1.0.149",
  "serde_json",
@@ -8022,6 +8043,7 @@ dependencies = [
  "itertools",
  "log",
  "move-compiler",
+ "move-core-types",
  "move-model",
  "move-prover",
  "move-prover-test-utils",
@@ -8286,16 +8308,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-read-write-set-types"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-core-types",
- "serde 1.0.149",
-]
-
-[[package]]
 name = "move-resource-viewer"
 version = "0.1.0"
 dependencies = [
@@ -8330,7 +8342,6 @@ dependencies = [
  "move-ir-to-bytecode",
  "move-model",
  "move-prover-test-utils",
- "move-read-write-set-types",
  "move-stdlib",
  "num",
  "once_cell",
@@ -9406,6 +9417,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "poem-derive",
+ "quick-xml 0.26.0",
  "regex",
  "rfc7239",
  "rustls-pemfile 1.0.1",
@@ -9437,9 +9449,9 @@ dependencies = [
 
 [[package]]
 name = "poem-openapi"
-version = "2.0.10"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d4d9252b377035ab2ef8d88020d0484f80892ec6325028af9e4c5839a0656b7"
+checksum = "e69c569eb0671cc85e65cfb6bd960d0168d24732ff58825227b4d2a10167ba91"
 dependencies = [
  "base64 0.13.0",
  "bytes",
@@ -9449,6 +9461,7 @@ dependencies = [
  "num-traits 0.2.15",
  "poem",
  "poem-openapi-derive",
+ "quick-xml 0.23.1",
  "regex",
  "serde 1.0.149",
  "serde_json",
@@ -9461,9 +9474,9 @@ dependencies = [
 
 [[package]]
 name = "poem-openapi-derive"
-version = "2.0.10"
+version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5a965be0296fa454602ca8f7a5422e91f5b24d42bfadc1117b17e132892cd7f"
+checksum = "274cf13f710999977a3c1e396c2a5000d104075a7127ce6470fbdae4706be621"
 dependencies = [
  "darling",
  "http",
@@ -9881,11 +9894,22 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11bafc859c6815fbaffbbbf4229ecb767ac913fecb27f9ad4343662e9ef099ea"
+dependencies = [
+ "memchr",
+ "serde 1.0.149",
+]
+
+[[package]]
+name = "quick-xml"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f50b1c63b38611e7d4d7f68b82d3ad0cc71a2ad2e7f61fc10f1328d917c93cd"
 dependencies = [
  "memchr",
+ "serde 1.0.149",
 ]
 
 [[package]]
@@ -10065,31 +10089,6 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
  "num_cpus",
-]
-
-[[package]]
-name = "read-write-set"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-model",
- "move-read-write-set-types",
- "move-stackless-bytecode",
- "read-write-set-dynamic",
-]
-
-[[package]]
-name = "read-write-set-dynamic"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-read-write-set-types",
 ]
 
 [[package]]
@@ -10792,6 +10791,17 @@ dependencies = [
  "itoa",
  "ryu",
  "serde 1.0.149",
+]
+
+[[package]]
+name = "serde_merge"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "606e91878516232ac3b16c12e063d4468d762f16d77e7aef14a1f2326c5f409b"
+dependencies = [
+ "serde 1.0.149",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
