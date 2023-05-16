@@ -110,7 +110,6 @@ pub mod data_cache;
 pub mod foreign_contracts;
 
 pub mod aptos_vm;
-mod aptos_vm_impl;
 pub mod block_executor;
 mod delta_state_view;
 mod errors;
