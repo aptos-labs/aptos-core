@@ -211,12 +211,16 @@ mod test {
             context.resolver,
             aggregator_enabled,
         ));
-        assert_ok!(aggregator_data.get_aggregator(
-            aggregator_id_for_test(500),
-            500,
-            context.resolver,
-            aggregator_enabled,
-        ));
+        aggregator_data
+            .get_aggregator(
+                aggregator_id_for_test(500),
+                500,
+                context.resolver,
+                aggregator_enabled,
+            )
+            .unwrap()
+            .add(150)
+            .unwrap();
         aggregator_data
             .get_aggregator(
                 aggregator_id_for_test(600),
