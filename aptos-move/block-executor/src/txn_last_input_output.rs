@@ -131,7 +131,7 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
 
     module_read_write_intersection: AtomicBool,
 
-    commit_locks: Vec<Mutex<bool>>, // Shared locks to prevent race during commit
+    commit_locks: Vec<Mutex<()>>, // Shared locks to prevent race during commit
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
@@ -146,7 +146,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
             module_read_write_intersection: AtomicBool::new(false),
-            commit_locks: (0..num_txns).map(|_| Mutex::new(false)).collect(),
+            commit_locks: (0..num_txns).map(|_| Mutex::new(())).collect(),
         }
     }
 
@@ -234,7 +234,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
-        let lock = self.commit_locks[txn_idx as usize].lock();
+        let _lock = self.commit_locks[txn_idx as usize].lock();
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
@@ -242,7 +242,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         } else {
             unreachable!();
         }
-        drop(lock);
     }
 
     // Extracts a set of paths written or updated during execution from transaction
@@ -269,7 +268,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         usize,
         Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
     ) {
-        let lock = self.commit_locks[txn_idx as usize].lock();
+        let _lock = self.commit_locks[txn_idx as usize].lock();
         let ret: (
             usize,
             Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
@@ -289,7 +288,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                 ),
             },
         );
-        drop(lock);
         ret
     }
 
@@ -300,7 +298,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
         delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
-        let lock = self.commit_locks[txn_idx as usize].lock();
+        let _lock = self.commit_locks[txn_idx as usize].lock();
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
@@ -311,7 +309,6 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             },
             ExecutionStatus::Abort(_) => {},
         };
-        drop(lock);
     }
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if

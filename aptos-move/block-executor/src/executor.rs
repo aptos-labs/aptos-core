@@ -40,7 +40,7 @@ use std::{
 
 #[derive(Debug)]
 enum CommitRole {
-    Coordinator(Vec<Sender<TxnIndex>>, usize),
+    Coordinator(Vec<Sender<TxnIndex>>),
     Worker(Receiver<TxnIndex>),
 }
 
@@ -224,17 +224,17 @@ where
         maybe_gas_limit: Option<u64>,
         scheduler: &Scheduler,
         post_commit_txs: &Vec<Sender<u32>>,
-        commit_idx: &mut usize,
+        worker_idx: &mut usize,
         accumulated_gas: &mut u64,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            post_commit_txs[*commit_idx]
+            post_commit_txs[*worker_idx]
                 .send(txn_idx)
                 .expect("Worker must be available");
             // Iterate round robin over workers to do commit_hook.
-            *commit_idx = (*commit_idx + 1) % post_commit_txs.len();
+            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
@@ -342,20 +342,21 @@ where
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
-        let committing = matches!(role, CommitRole::Coordinator(_, _));
+        let committing = matches!(role, CommitRole::Coordinator(_));
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
         let mut accumulated_gas = 0;
+        let mut worker_idx = 0;
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
-                CommitRole::Coordinator(post_commit_txs, mut idx) => {
+                CommitRole::Coordinator(post_commit_txs) => {
                     self.coordinator_commit_hook(
                         self.maybe_gas_limit,
                         scheduler,
                         post_commit_txs,
-                        &mut idx,
+                        &mut worker_idx,
                         &mut accumulated_gas,
                         &mut scheduler_task,
                         last_input_output,
@@ -443,7 +444,7 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let mut roles: Vec<CommitRole> = vec![];
-        let mut senders = Vec::with_capacity(self.concurrency_level - 1);
+        let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
         for _ in 0..(self.concurrency_level - 1) {
             let (tx, rx) = mpsc::channel();
             roles.push(CommitRole::Worker(rx));
@@ -454,7 +455,7 @@ where
         // Note: It is important that the Coordinator is the first thread that
         // picks up a role will be a coordinator. Hence, if multiple parallel
         // executors are running concurrently, they will all have active coordinator.
-        roles.push(CommitRole::Coordinator(senders, 0));
+        roles.push(CommitRole::Coordinator(senders));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
