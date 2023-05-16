@@ -483,38 +483,10 @@ To pass vectors (including nested vectors) as arguments from the command line, u
 
 The function ID, type arguments, and arguments can alternatively be specified in a JSON file:
 
-```json title="entry_function_arguments.json"
-{
-    "function_id": "<test_account>::cli_args::set_vals",
-    "type_args": [
-        "0x1::account::Account",
-        "0x1::chain_id::ChainId"
-    ],
-    "args": [
-        {
-            "arg_type": "u8",
-            "arg_value": 123
-        },
-        {
-            "arg_type": "bool",
-            "arg_value": [false, true, false, false]
-        },
-        {
-            "arg_type": "address",
-            "arg_value": [
-                [
-                    "0xace",
-                    "0xbee"
-                ],
-                [
-                    "0xcad"
-                ],
-                []
-            ]
-        }
-    ]
-}
-```
+import CodeBlock from '@theme/CodeBlock';
+import entry_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/entry_function_arguments.json';
+
+<CodeBlock language="json" title="entry_function_arguments.json">{entry_json_file}</CodeBlock>
 
 Here, the call to `aptos move run` looks like:
 
@@ -523,6 +495,10 @@ aptos move run \
     --private-key-file <test_account.key> \
     --json-file entry_function_arguments.json
 ```
+
+:::tip
+If you are trying to run the example yourself don't forget to substitute `<test_account>` with an appropriate address in the JSON file from the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args)!
+:::
 
 ### View functions
 
@@ -547,21 +523,9 @@ aptos move view \
 aptos move view --json-file view_function_arguments.json
 ```
 
-```json title="view_function_arguments.json"
-{
-    "function_id": "<test_account>::cli_args::reveal",
-    "type_args": [
-        "0x1::account::Account",
-        "0x1::account::Account"
-    ],
-    "args": [
-        {
-            "arg_type": "address",
-            "arg_value": "<test_account>"
-        }
-    ]
-}
-```
+import view_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/view_function_arguments.json';
+
+<CodeBlock language="json" title="view_function_arguments.json">{view_json_file}</CodeBlock>
 
 ```zsh title="Output"
 {
@@ -627,28 +591,9 @@ aptos move run-script \
     --json-file script_function_arguments.json
 ```
 
-```json title="script_function_arguments.json"
-{
-    "type_args": [
-        "0x1::account::Account",
-        "0x1::chain_id::ChainId"
-    ],
-    "args": [
-        {
-            "arg_type": "u8",
-            "arg_value": 123
-        },
-        {
-            "arg_type": "u8",
-            "arg_value": [122, 123, 124, 125]
-        },
-        {
-            "arg_type": "address",
-            "arg_value": "0xace"
-        }
-    ]
-}
-```
+import script_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/script_function_arguments.json';
+
+<CodeBlock language="json" title="script_function_arguments.json">{script_json_file}</CodeBlock>
 
 Both such script function invocations result in the following `reveal()` view function output:
 

@@ -41,6 +41,7 @@ CPU
 CPUs
 ChainID
 Clippy
+CodeBlock
 CoinStore
 CoinType
 CollectionData
