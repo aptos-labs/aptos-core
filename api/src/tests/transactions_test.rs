@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
+use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -25,7 +27,7 @@ use move_core_types::{
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_deserialize_genesis_transaction() {
@@ -1098,6 +1100,43 @@ async fn test_gas_estimation_ten_empty_blocks() {
         assert_eq!(resp, cached);
     }
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_cache() {
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation_max_block_history = 10;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let ctx = &mut context;
+    // First block is ignored in gas estimate, so expect 4 entries
+    for _i in 0..5 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 4);
+
+    // Expect max of 10 entries
+    for _i in 0..8 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    // Wait for cache to expire
+    std::thread::sleep(Duration::from_secs(1));
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+
+    // Expect max of 10 entries
+    for _i in 0..8 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
+    // Wait for cache to expire
+    std::thread::sleep(Duration::from_secs(1));
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 10);
 }
 
 fn gen_string(len: u64) -> String {

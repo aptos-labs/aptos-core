@@ -846,7 +846,6 @@ impl Context {
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<GasEstimation, E> {
-        let max_block_history = 120;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
         let epoch = ledger_info.epoch.0;
 
@@ -856,6 +855,7 @@ impl Context {
         }
 
         let mut cache = self.gas_estimation_cache.write().unwrap();
+        let max_block_history = self.node_config.api.gas_estimation_max_block_history;
         // 1. Get the block metadata txns
         let mut lookup_version = ledger_info.ledger_version.0;
         let mut blocks = vec![];
@@ -1071,6 +1071,14 @@ impl Context {
 
     pub fn last_updated_gas_schedule(&self) -> Option<u64> {
         self.gas_schedule_cache.read().unwrap().last_updated_epoch
+    }
+
+    pub fn last_updated_gas_estimation_cache_size(&self) -> usize {
+        self.gas_estimation_cache
+            .read()
+            .unwrap()
+            .min_inclusion_prices
+            .len()
     }
 }
 

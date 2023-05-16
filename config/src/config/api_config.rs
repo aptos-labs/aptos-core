@@ -69,6 +69,7 @@ pub struct ApiConfig {
     pub runtime_worker_multiplier: usize,
     /// The number of transactions for blocks to be classified as full for gas estimation
     pub gas_estimation_full_block_txns: usize,
+    pub gas_estimation_max_block_history: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -113,6 +114,7 @@ impl Default for ApiConfig {
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
             gas_estimation_full_block_txns: 250,
+            gas_estimation_max_block_history: 120,
         }
     }
 }
