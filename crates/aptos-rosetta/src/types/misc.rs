@@ -110,6 +110,7 @@ pub enum OperationType {
 }
 
 impl OperationType {
+    const ADD_DELEGATED_STAKE: &'static str = "add_delegated_stake";
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
@@ -119,10 +120,9 @@ impl OperationType {
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
     const STAKING_REWARD: &'static str = "staking_reward";
+    const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
     const WITHDRAW: &'static str = "withdraw";
-    const ADD_DELEGATED_STAKE: &'static str = "add_delegated_stake";
-    const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
 
     pub fn all() -> Vec<OperationType> {
         use OperationType::*;
