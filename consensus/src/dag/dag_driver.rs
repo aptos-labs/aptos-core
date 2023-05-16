@@ -5,7 +5,7 @@
 
 use crate::{
     dag::{
-        anchor_election::RoundRobinAnchorElection,
+        anchor_election::{LeaderReputationElection, RoundRobinAnchorElection},
         bullshark::Bullshark,
         dag::Dag,
         reliable_broadcast::{ReliableBroadcast, ReliableBroadcastCommand},
@@ -78,7 +78,9 @@ impl DagDriver {
             validator_signer,
         );
 
-        let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
+        let proposer_election = Arc::new(LeaderReputationElection::new(&verifier));
+        let enable_pipeline = true;
+
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
             epoch,
             author,
@@ -86,6 +88,7 @@ impl DagDriver {
             proposer_election.clone(),
             verifier.clone(),
             genesis_block_id,
+            enable_pipeline,
         )));
 
         let (rb_close_tx, close_rx) = oneshot::channel();
