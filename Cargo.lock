@@ -619,6 +619,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-metrics",
+ "tokio-stream",
 ]
 
 [[package]]

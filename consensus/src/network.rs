@@ -45,6 +45,7 @@ use std::{
 };
 use std::sync::mpsc::Receiver;
 use aptos_network::protocols::network::{IncomingMessage, NetworkEvents2};
+use tokio_stream::wrappers::ReceiverStream;
 
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response

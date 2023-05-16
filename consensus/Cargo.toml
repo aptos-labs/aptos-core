@@ -66,6 +66,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
 aptos-config = { workspace = true, features = ["fuzzing"] }
