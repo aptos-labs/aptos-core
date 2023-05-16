@@ -115,6 +115,7 @@ module aptos_framework::delegation_pool {
 
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
+    use aptos_std::smart_table::{Self, SmartTable};
 
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
@@ -172,20 +173,14 @@ module aptos_framework::delegation_pool {
     /// Partial governance voting hasn't been enabled on this delegation pool.
     const EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED: u64 = 14;
 
-    /// A delegator is using voting power more than it has.
-    const EVOTING_POWER_OVERUSE: u64 = 15;
-
     /// The voter does not have sufficient stake to create a proposal.
-    const EINSUFFICIENT_PROPOSER_STAKE: u64 = 16;
+    const EINSUFFICIENT_PROPOSER_STAKE: u64 = 15;
 
     /// The voter does not have any voting power on this proposal.
-    const ENO_VOTING_POWER: u64 = 17;
-
-    /// The specified account is not part of this delegation pool
-    const EDELEGATOR_NOT_EXISTS: u64 = 18;
+    const ENO_VOTING_POWER: u64 = 16;
 
     /// The stake pool has already voted on the proposal before enabling partial governance voting on this delegation pool.
-    const EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING: u64 = 19;
+    const EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING: u64 = 17;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -253,41 +248,45 @@ module aptos_framework::delegation_pool {
 
     /// Track delgated voter of each delegator.
     struct VoteDelegation has copy, drop, store {
-        // The current voter address of this delegator.
+        // The account who can vote on behalf of this delegator.
         voter: address,
-        // The change of voter address won't take effects until the current lockup period ends. Record the new voter
-        // address and update `voter` to `pending_voter` when that lockup period has already ended.
+        // The account that will become the voter in the next lockup period. Changing voter address needs 1 lockup
+        // period to take effects.
         pending_voter: address,
-        // locked_until_secs of the stake pool when last time this struct is updated.
+        // Tracks the last known lockup cycle end when the voter was updated. This will be used to determine when
+        // the new voter becomes effective.
         // If <locked_until_secs of the stake pool> != last_locked_until_secs, it means that a lockup period has passed.
         // This is slightly different from ObservedLockupCycle because ObservedLockupCycle cannot detect if a lockup
-        // period is passed when there is no unlocking during the lockup period .
+        // period is passed when there is no unlocking during the lockup period.
         last_locked_until_secs: u64,
     }
 
     /// Track total voteing power of each voter.
     struct DelegatedVotes has copy, drop, store {
-        // Equals to the sum of active shares of delegators who delegate to this voter.
+        // The total number of active shares delegated to this voter by all delegators.
         active_shares: u128,
-        // Equals to the sum of pending inactive shares of delegators who delegate to this voter.
+        // The total number of pending active shares delegated to this voter by all delegators
         pending_inactive_shares: u128,
         // Total active shares delegated to this voter in the next lockup cycle.
         // `active_shares_next_lockup` might be different `active_shares` when some delegators change their voter.
         active_shares_next_lockup: u128,
-        // locked_until_secs of the stake pool when last time this struct is updated.
+        // Tracks the last known lockup cycle end when the voter was updated. This will be used to determine when
+        // the new voter becomes effective.
         // If <locked_until_secs of the stake pool> != last_locked_until_secs, it means that a lockup period has passed.
         // This is slightly different from ObservedLockupCycle because ObservedLockupCycle cannot detect if a lockup
-        // period is passed when there is no unlocking during the lockup period .
+        // period is passed when there is no unlocking during the lockup period.
         last_locked_until_secs: u64,
     }
 
+    /// Track governance information of a delegation(e.g. voter delegation/voting power calculation).
+    /// This struct should be stored in the delegation pool resource account.
     struct GovernanceRecords has key {
         // `votes` tracks voting power usage of each voter on each proposal.
-        votes: smart_table::SmartTable<VotingRecordKey, u64>,
+        votes: SmartTable<VotingRecordKey, u64>,
         // `votes_per_proposal` tracks voting power usage of this stake pool on each proposal. Key is proposal_id.
-        votes_per_proposal: smart_table::SmartTable<u64, u64>,
-        vote_delegation: smart_table::SmartTable<address, VoteDelegation>,
-        delegated_votes: smart_table::SmartTable<address, DelegatedVotes>,
+        votes_per_proposal: SmartTable<u64, u64>,
+        vote_delegation: SmartTable<address, VoteDelegation>,
+        delegated_votes: SmartTable<address, DelegatedVotes>,
         vote_events: EventHandle<VoteEvent>,
         create_proposal_events: EventHandle<CreateProposalEvent>,
         // Note: a DelegateVotingPowerEvent event only means that the delegator tries to change its voter. The change
@@ -533,22 +532,21 @@ module aptos_framework::delegation_pool {
     /// Return the total voting power of a delegator in a delegation pool. This function syncs DelegationPool to the
     /// latest state.
     public fun calculate_and_update_voter_total_voting_power(pool_address: address, voter: address): u64 acquires DelegationPool, GovernanceRecords {
-        // This function is meaningful only when the pool has already enabled partial governance voting.
         assert_partial_governance_voting_enabled(pool_address);
-        // This function is meaningful only when delegation pool is synced.
+        // Delegation pool need to be synced to explain rewards(which could change the coin amount) and
+        // commission(which could cause share transfer).
         synchronize_delegation_pool(pool_address);
         let pool = borrow_global<DelegationPool>(pool_address);
-        let governance_records = borrow_global<GovernanceRecords>(pool_address);
-        let (latest_vote_delegation, _, _) = get_latest_vote_delegation(pool, governance_records, voter);
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let latest_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, voter);
         let delegation_pool = borrow_global<DelegationPool>(pool_address);
-        calculate_total_voting_power(delegation_pool, &latest_vote_delegation)
+        calculate_total_voting_power(delegation_pool, latest_delegated_votes)
     }
 
     #[view]
     /// Return the remaining voting power of a delegator in a delegation pool on a proposal. This function syncs DelegationPool to the
     /// latest state.
     public fun calculate_and_update_remaining_voting_power(pool_address: address, voter_address: address, proposal_id: u64): u64 acquires DelegationPool, GovernanceRecords {
-        // This function is meaningful only when the pool has already enabled partial governance voting.
         assert_partial_governance_voting_enabled(pool_address);
         // If the whole stake pool has no voting power(e.g. it has already voted before partial
         // governance voting flag is enabled), the delegator also has no voting power.
@@ -565,7 +563,6 @@ module aptos_framework::delegation_pool {
     /// Return the latest delegated voter of a delegator in a delegation pool. This function syncs DelegationPool to the
     /// latest state.
     public fun calculate_and_update_delegator_voter(pool_address: address, delegator_address: address): address acquires DelegationPool, GovernanceRecords {
-        // This function is meaningful only when the pool has already enabled partial governance voting.
         assert_partial_governance_voting_enabled(pool_address);
         calculate_and_update_delegator_voter_internal(
             borrow_global<DelegationPool>(pool_address),
@@ -640,10 +637,13 @@ module aptos_framework::delegation_pool {
     ) acquires DelegationPool, GovernanceRecords {
         assert!(features::delegation_pool_partial_governance_voting_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         assert_delegation_pool_exists(pool_address);
+        // synchronize delegation and stake pools before any user operation.
+        synchronize_delegation_pool(pool_address);
+
         let delegation_pool = borrow_global<DelegationPool>(pool_address);
         let stake_pool_signer = retrieve_stake_pool_owner(delegation_pool);
-        synchronize_delegation_pool(pool_address);
-        // delegated_voter is managed by the stake pool itself.
+        // delegated_voter is managed by the stake pool itself, which signer capability is managed by DelegationPool.
+        // So voting power of this stake pool can only be used through this module.
         stake::set_delegated_voter(&stake_pool_signer, signer::address_of(&stake_pool_signer));
 
         move_to(&stake_pool_signer, GovernanceRecords {
@@ -657,10 +657,14 @@ module aptos_framework::delegation_pool {
         });
     }
 
+    /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
+    /// 1. The voting period of the proposal hasn't ended.
+    /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
+    /// 3. The voter still has spare voting power on this proposal.
+    /// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
     public entry fun vote(voter: &signer, pool_address: address, proposal_id: u64, voting_power: u64, should_pass: bool) acquires DelegationPool, GovernanceRecords {
         assert_partial_governance_voting_enabled(pool_address);
-
-        // synchronize delegation and stake pools before any user operation
+        // synchronize delegation and stake pools before any user operation.
         synchronize_delegation_pool(pool_address);
 
         let voter_address = signer::address_of(voter);
@@ -671,16 +675,8 @@ module aptos_framework::delegation_pool {
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-        let stake_pool_remaining_voting_power = aptos_governance::get_remaining_voting_power(pool_address, proposal_id);
-        let stake_pool_used_voting_power = aptos_governance::get_voting_power(pool_address) - stake_pool_remaining_voting_power;
-        let proposal_used_voting_power = smart_table::borrow_mut_with_default(&mut governance_records.votes_per_proposal, proposal_id, 0);
-        // A edge case: Before enabling partial governance voting on a delegation pool, the delegation pool has
-        // a voter which can vote with all voting power of this delegation pool. If the voter votes on a proposal after
-        // partial governance voting flag is enabled, the delegation pool doesn't have enough voting power on this
-        // proposal for all the delegators. To be fair, no one can vote on this proposal through this delegation pool.
-        // To detect this case, check if the stake pool had used voting power not through delegation_pool module.
-        assert!(stake_pool_used_voting_power == *proposal_used_voting_power, error::invalid_argument(EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING));
-        *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
+        // Check a edge case during the transient period of enabling partial governance voting.
+        assert_and_update_proposal_used_voting_power(governance_records, pool_address, proposal_id, voting_power);
         let used_voting_power = borrow_mut_used_voting_power(governance_records, voter_address, proposal_id);
         *used_voting_power = *used_voting_power + voting_power;
 
@@ -699,6 +695,9 @@ module aptos_framework::delegation_pool {
         );
     }
 
+    /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
+    /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
+    /// `aptos_governance.move`.
     public entry fun create_proposal(
         voter: &signer,
         pool_address: address,
@@ -715,7 +714,7 @@ module aptos_framework::delegation_pool {
         let voter_addr = signer::address_of(voter);
         let pool = borrow_global<DelegationPool>(pool_address);
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-        let total_voting_power = calculate_and_update_vote_delegation(pool, governance_records, voter_addr);
+        let total_voting_power = calculate_and_update_delegated_votes(pool, governance_records, voter_addr);
         assert!(
             total_voting_power >= aptos_governance::get_required_proposer_stake(),
             error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE));
@@ -846,100 +845,64 @@ module aptos_framework::delegation_pool {
         smart_table::borrow_mut_with_default(votes, key, 0)
     }
 
-    /// Get the latest VoteDelegation of a delegator.
-    /// The 2nd bool return value is true when VoteDelegation has already been created before calling this function.
-    /// The 3rd bool return value is true when the latest VoteDelegation is different from the existing VoteDelegation.
-    fun get_latest_delegator_vote_delegation(pool: &DelegationPool, governance_records: &GovernanceRecords, delegator: address): (VoteDelegation, bool, bool) {
-        let pool_address = get_pool_address(pool);
-        let locked_until_secs = stake::get_lockup_secs(pool_address);
-        let vote_delegation = &governance_records.vote_delegation;
-        // By default, a delegator's delegated voter is itself.
-        if (!smart_table::contains(vote_delegation, delegator)) {
-            return (VoteDelegation {
-                voter: delegator,
-                last_locked_until_secs: locked_until_secs,
-                pending_voter: delegator,
-            }, false, false)
-        };
-        let vote_delegation = *smart_table::borrow(vote_delegation, delegator);
-        let needs_update = false;
-        if (vote_delegation.last_locked_until_secs < locked_until_secs &&
-            vote_delegation.voter != vote_delegation.pending_voter) {
-            vote_delegation.voter = vote_delegation.pending_voter;
-            needs_update = true;
-        };
-        (vote_delegation, true, needs_update)
-    }
-
     /// Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
     fun update_and_borrow_mut_delegator_vote_delegation(
         pool: &DelegationPool,
         governance_records :&mut GovernanceRecords,
         delegator: address
     ): &mut VoteDelegation {
-        let (latest_vote_delegation, is_existed, needs_update) =
-            get_latest_delegator_vote_delegation(pool, governance_records, delegator);
+        let pool_address = get_pool_address(pool);
+        let locked_until_secs = stake::get_lockup_secs(pool_address);
+
         let vote_delegation_table = &mut governance_records.vote_delegation;
-        if (!is_existed) {
-            smart_table::add(vote_delegation_table, delegator, latest_vote_delegation);
+        // By default, a delegator's delegated voter is itself.
+        if (!smart_table::contains(vote_delegation_table, delegator)) {
+            return smart_table::borrow_mut_with_default(vote_delegation_table, delegator, VoteDelegation {
+                voter: delegator,
+                last_locked_until_secs: locked_until_secs,
+                pending_voter: delegator,
+            })
         };
+
         let vote_delegation = smart_table::borrow_mut(vote_delegation_table, delegator);
-        if (needs_update) {
-            *vote_delegation = latest_vote_delegation;
+        // A lockup period has passed since last time `vote_delegation` was updated. Pending voter takes effect.
+        if (vote_delegation.last_locked_until_secs < locked_until_secs &&
+            vote_delegation.voter != vote_delegation.pending_voter) {
+            vote_delegation.voter = vote_delegation.pending_voter;
         };
         vote_delegation
     }
 
-    /// Get the latest VoteDelegation of a voter.
-    /// The 2nd bool return value is true when VoteDelegation has already been created before calling this function.
-    /// The 3rd bool return value is true when the latest VoteDelegation is different from the existing VoteDelegation.
-    fun get_latest_vote_delegation(
-        pool: &DelegationPool,
-        governance_records: &GovernanceRecords,
-        voter: address
-    ): (DelegatedVotes, bool, bool) {
-        let pool_address = get_pool_address(pool);
-        let locked_until_secs = stake::get_lockup_secs(pool_address);
-        let voting_power_per_voter = &governance_records.delegated_votes;
-        // By default, a delegator's voter is itself.
-        if (!smart_table::contains(voting_power_per_voter, voter)) {
-            let active_shares = get_delegator_active_shares(pool, voter);
-            let inactive_shares = get_delegator_pending_inactive_shares(pool, voter);
-            return (DelegatedVotes {
-                active_shares,
-                pending_inactive_shares: inactive_shares,
-                active_shares_next_lockup: active_shares,
-                last_locked_until_secs: locked_until_secs,
-            }, false, false)
-        };
-        let latest_vote_delegation = *smart_table::borrow(voting_power_per_voter, voter);
-        let needs_updated = false;
-        if (latest_vote_delegation.last_locked_until_secs < locked_until_secs) {
-            latest_vote_delegation.active_shares = latest_vote_delegation.active_shares_next_lockup;
-            latest_vote_delegation.pending_inactive_shares = 0;
-            latest_vote_delegation.active_shares_next_lockup = latest_vote_delegation.active_shares;
-            latest_vote_delegation.last_locked_until_secs = locked_until_secs;
-            needs_updated = true;
-        };
-        (latest_vote_delegation, true, needs_updated)
-    }
-
-    /// Update VoterVotingPower of a voter to up-to-date then borrow_mut it.
-    fun update_and_borrow_mut_vote_delegation(
+    /// Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
+    fun update_and_borrow_mut_delegated_votes(
         pool: &DelegationPool,
         governance_records :&mut GovernanceRecords,
         voter: address
     ): &mut DelegatedVotes {
-        let (latest_vote_delegation, is_existed, is_updated) = get_latest_vote_delegation(pool, governance_records, voter);
-        let voting_power_per_voter = &mut governance_records.delegated_votes;
-        if (!is_existed) {
-            smart_table::add(voting_power_per_voter, voter, latest_vote_delegation);
+        let pool_address = get_pool_address(pool);
+        let locked_until_secs = stake::get_lockup_secs(pool_address);
+
+        let delegated_votes_per_voter = &mut governance_records.delegated_votes;
+        // By default, a delegator's voter is itself.
+        if (!smart_table::contains(delegated_votes_per_voter, voter)) {
+            let active_shares = get_delegator_active_shares(pool, voter);
+            let inactive_shares = get_delegator_pending_inactive_shares(pool, voter);
+            return smart_table::borrow_mut_with_default(delegated_votes_per_voter, voter, DelegatedVotes {
+                active_shares,
+                pending_inactive_shares: inactive_shares,
+                active_shares_next_lockup: active_shares,
+                last_locked_until_secs: locked_until_secs,
+            })
         };
-        let vote_delegation = smart_table::borrow_mut(voting_power_per_voter, voter);
-        if (is_updated) {
-            *vote_delegation = latest_vote_delegation;
+
+        let delegated_votes = smart_table::borrow_mut(delegated_votes_per_voter, voter);
+        // A lockup period has passed since last time `delegated_votes` was updated. Pending voter takes effect.
+        if (delegated_votes.last_locked_until_secs < locked_until_secs) {
+            delegated_votes.active_shares = delegated_votes.active_shares_next_lockup;
+            delegated_votes.pending_inactive_shares = 0;
+            delegated_votes.last_locked_until_secs = locked_until_secs;
         };
-        vote_delegation
+        delegated_votes
     }
 
     fun olc_with_index(index: u64): ObservedLockupCycle {
@@ -948,13 +911,13 @@ module aptos_framework::delegation_pool {
 
     /// Given the amounts of shares in `active_shares` pool and `inactive_shares` pool, calculate the total voting
     /// power, which equals to the sum of the coin amounts.
-    fun calculate_total_voting_power(delegation_pool: &DelegationPool, latest_vote_delegation: &DelegatedVotes): u64 {
+    fun calculate_total_voting_power(delegation_pool: &DelegationPool, latest_delegated_votes: &DelegatedVotes): u64 {
         let active_amount = pool_u64::shares_to_amount(
             &delegation_pool.active_shares,
-            latest_vote_delegation.active_shares);
+            latest_delegated_votes.active_shares);
         let pending_inactive_amount = pool_u64::shares_to_amount(
             pending_inactive_shares_pool(delegation_pool),
-            latest_vote_delegation.pending_inactive_shares);
+            latest_delegated_votes.pending_inactive_shares);
         active_amount + pending_inactive_amount
     }
 
@@ -964,10 +927,10 @@ module aptos_framework::delegation_pool {
         vote_delegation.voter
     }
 
-    /// Update VoterVotingPower of a voter to up-to-date then return the total voting power of this voter.
-    fun calculate_and_update_vote_delegation(pool: &DelegationPool, governance_records: &mut GovernanceRecords, voter: address): u64 {
-        let vote_delegation = update_and_borrow_mut_vote_delegation(pool, governance_records, voter);
-        calculate_total_voting_power(pool, vote_delegation)
+    /// Update DelegatedVotes of a voter to up-to-date then return the total voting power of this voter.
+    fun calculate_and_update_delegated_votes(pool: &DelegationPool, governance_records: &mut GovernanceRecords, voter: address): u64 {
+        let delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, voter);
+        calculate_total_voting_power(pool, delegated_votes)
     }
 
     /// Allows an owner to change the operator of the underlying stake pool.
@@ -988,7 +951,7 @@ module aptos_framework::delegation_pool {
         new_voter: address
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords {
         // No one can change delegated_voter once the partial governance voting feature is enabled.
-        assert!(!features::delegation_pool_partial_governance_voting_enabled(), error::invalid_argument(EDEPRECATED_FUNCTION));
+        assert!(!features::delegation_pool_partial_governance_voting_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
         let pool_address = get_owned_pool_address(signer::address_of(owner));
         // synchronize delegation and stake pools before any user operation
         synchronize_delegation_pool(pool_address);
@@ -1008,9 +971,6 @@ module aptos_framework::delegation_pool {
         synchronize_delegation_pool(pool_address);
 
         let delegator_address = signer::address_of(delegator);
-        let (active, inactive, pending_inactive) = get_stake(pool_address, delegator_address);
-        assert!(active + inactive + pending_inactive > 0, error::invalid_argument(EDELEGATOR_NOT_EXISTS));
-
         let delegation_pool = borrow_global<DelegationPool>(pool_address);
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let delegator_vote_delegation = update_and_borrow_mut_delegator_vote_delegation(
@@ -1023,26 +983,24 @@ module aptos_framework::delegation_pool {
         // No need to update if the voter doesn't really change.
         if (pending_voter != new_voter) {
             delegator_vote_delegation.pending_voter = new_voter;
-
             let active_shares = get_delegator_active_shares(delegation_pool, delegator_address);
-
             // <active shares> of <pending voter of shareholder> -= <active_shares>
             // <active shares> of <new voter of shareholder> += <active_shares>
-            let pending_vote_delegation = update_and_borrow_mut_vote_delegation(
+            let pending_delegated_votes = update_and_borrow_mut_delegated_votes(
                 delegation_pool,
                 governance_records,
                 pending_voter
             );
-            pending_vote_delegation.active_shares_next_lockup =
-                pending_vote_delegation.active_shares_next_lockup - active_shares;
+            pending_delegated_votes.active_shares_next_lockup =
+                pending_delegated_votes.active_shares_next_lockup - active_shares;
 
-            let new_vote_delegation = update_and_borrow_mut_vote_delegation(
+            let new_delegated_votes = update_and_borrow_mut_delegated_votes(
                 delegation_pool,
                 governance_records,
                 new_voter
             );
-            new_vote_delegation.active_shares_next_lockup =
-                new_vote_delegation.active_shares_next_lockup + active_shares;
+            new_delegated_votes.active_shares_next_lockup =
+                new_delegated_votes.active_shares_next_lockup + active_shares;
         };
 
         event::emit_event(&mut governance_records.delegate_voting_power_events, DelegateVotingPowerEvent {
@@ -1275,26 +1233,8 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
-        // <active shares> of <shareholder> += <new_shares> ---->
-        // <active shares> of <current voter of shareholder> += <new_shares>
-        // <active shares> of <next voter of shareholder> += <new_shares>
         if (partial_governance_voting_enabled(pool_address)) {
-            let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-            let vote_delegation = update_and_borrow_mut_delegator_vote_delegation(pool, governance_records, shareholder);
-            let current_voter = vote_delegation.voter;
-            let pending_voter = vote_delegation.pending_voter;
-            let current_vote_delegation =
-                update_and_borrow_mut_vote_delegation(pool, governance_records, current_voter);
-            current_vote_delegation.active_shares = current_vote_delegation.active_shares + new_shares;
-            if (pending_voter == current_voter) {
-                current_vote_delegation.active_shares_next_lockup =
-                    current_vote_delegation.active_shares_next_lockup + new_shares;
-            } else {
-                let pending_vote_delegation =
-                    update_and_borrow_mut_vote_delegation(pool, governance_records, pending_voter);
-                pending_vote_delegation.active_shares_next_lockup =
-                    pending_vote_delegation.active_shares_next_lockup + new_shares;
-            };
+            update_governance_records_for_buy_in_active_shares(pool, pool_address, new_shares, shareholder);
         };
 
         pool_u64::buy_in(&mut pool.active_shares, shareholder, coins_amount);
@@ -1310,20 +1250,14 @@ module aptos_framework::delegation_pool {
         shareholder: address,
         coins_amount: u64,
     ): u128 acquires GovernanceRecords {
-        let new_shares = pool_u64::amount_to_shares(pending_inactive_shares_pool_mut(pool), coins_amount);
+        let new_shares = pool_u64::amount_to_shares(pending_inactive_shares_pool(pool), coins_amount);
         // never create a new pending withdrawal unless delegator owns some pending_inactive shares
         if (new_shares == 0) { return 0 };
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
-        // <pending inactive shares> of <shareholder> += <new_shares>   ---->
-        // <pending inactive shares> of <current voter of shareholder> += <new_shares>
-        // no impact on <pending inactive shares> of <next voter of shareholder>
         if (partial_governance_voting_enabled(pool_address)) {
-            let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-            let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
-            let current_vote_delegation = update_and_borrow_mut_vote_delegation(pool, governance_records, current_voter);
-            current_vote_delegation.pending_inactive_shares = current_vote_delegation.pending_inactive_shares + new_shares;
+            update_governance_records_for_buy_in_pending_inactive_shares(pool, pool_address, new_shares, shareholder);
         };
 
         // cannot buy inactive shares, only pending_inactive at current lockup cycle
@@ -1341,7 +1275,6 @@ module aptos_framework::delegation_pool {
         ) == observed_lockup_cycle,
             error::invalid_state(EPENDING_WITHDRAWAL_EXISTS)
         );
-
 
         new_shares
     }
@@ -1376,29 +1309,8 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
-        // <active shares> of <shareholder> -= <shares_to_redeem> ---->
-        // <active shares> of <current voter of shareholder> -= <shares_to_redeem>
-        // <active shares> of <next voter of shareholder> -= <shares_to_redeem>
         if (partial_governance_voting_enabled(pool_address)) {
-            let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-            let vote_delegation = update_and_borrow_mut_delegator_vote_delegation(
-                pool,
-                governance_records,
-                shareholder
-            );
-            let current_voter = vote_delegation.voter;
-            let pending_voter = vote_delegation.pending_voter;
-            let current_vote_delegation = update_and_borrow_mut_vote_delegation(pool, governance_records, current_voter);
-            current_vote_delegation.active_shares = current_vote_delegation.active_shares - shares_to_redeem;
-            if (current_voter == pending_voter) {
-                current_vote_delegation.active_shares_next_lockup =
-                    current_vote_delegation.active_shares_next_lockup - shares_to_redeem;
-            } else {
-                let pending_vote_delegation =
-                    update_and_borrow_mut_vote_delegation(pool, governance_records, pending_voter);
-                pending_vote_delegation.active_shares_next_lockup =
-                    pending_vote_delegation.active_shares_next_lockup - shares_to_redeem;
-            };
+            update_governanace_records_for_redeem_active_shares(pool, pool_address, shares_to_redeem, shareholder);
         };
 
         pool_u64::redeem_shares(&mut pool.active_shares, shareholder, shares_to_redeem)
@@ -1425,14 +1337,9 @@ module aptos_framework::delegation_pool {
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
-        // <pending inactive shares> of <shareholder> -= <shares_to_redeem>  ---->
-        // <pending inactive shares> of <current voter of shareholder> -= <shares_to_redeem>
-        // no impact on <pending inactive shares> of <next voter of shareholder>
-        if (partial_governance_voting_enabled(pool_address)) {
-            let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
-            let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
-            let current_vote_delegation = update_and_borrow_mut_vote_delegation(pool, governance_records, current_voter);
-            current_vote_delegation.pending_inactive_shares = current_vote_delegation.pending_inactive_shares - shares_to_redeem;
+        // Only redeem shares from the pending_inactive pool at `lockup_cycle` == current OLC.
+        if (partial_governance_voting_enabled(pool_address) && lockup_cycle.index == pool.observed_lockup_cycle.index) {
+            update_governanace_records_for_redeem_pending_inactive_shares(pool, pool_address, shares_to_redeem, shareholder);
         };
 
         let inactive_shares = table::borrow_mut(&mut pool.inactive_shares, lockup_cycle);
@@ -1574,6 +1481,96 @@ module aptos_framework::delegation_pool {
         }
     }
 
+    inline fun assert_and_update_proposal_used_voting_power(
+        governance_records: &mut GovernanceRecords, pool_address : address, proposal_id : u64, voting_power: u64
+    ) {
+        let stake_pool_remaining_voting_power = aptos_governance::get_remaining_voting_power(pool_address, proposal_id);
+        let stake_pool_used_voting_power = aptos_governance::get_voting_power(pool_address) - stake_pool_remaining_voting_power;
+        let proposal_used_voting_power = smart_table::borrow_mut_with_default(&mut governance_records.votes_per_proposal, proposal_id, 0);
+        // A edge case: Before enabling partial governance voting on a delegation pool, the delegation pool has
+        // a voter which can vote with all voting power of this delegation pool. If the voter votes on a proposal after
+        // partial governance voting flag is enabled, the delegation pool doesn't have enough voting power on this
+        // proposal for all the delegators. To be fair, no one can vote on this proposal through this delegation pool.
+        // To detect this case, check if the stake pool had used voting power not through delegation_pool module.
+        assert!(stake_pool_used_voting_power == *proposal_used_voting_power, error::invalid_argument(EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING));
+        *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
+    }
+
+    fun update_governance_records_for_buy_in_active_shares(
+        pool: &DelegationPool, pool_address: address, new_shares: u128, shareholder: address
+    ) acquires GovernanceRecords{
+        // <active shares> of <shareholder> += <new_shares> ---->
+        // <active shares> of <current voter of shareholder> += <new_shares>
+        // <active shares> of <next voter of shareholder> += <new_shares>
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let vote_delegation = update_and_borrow_mut_delegator_vote_delegation(pool, governance_records, shareholder);
+        let current_voter = vote_delegation.voter;
+        let pending_voter = vote_delegation.pending_voter;
+        let current_delegated_votes =
+            update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
+        current_delegated_votes.active_shares = current_delegated_votes.active_shares + new_shares;
+        if (pending_voter == current_voter) {
+            current_delegated_votes.active_shares_next_lockup =
+                current_delegated_votes.active_shares_next_lockup + new_shares;
+        } else {
+            let pending_delegated_votes =
+                update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
+            pending_delegated_votes.active_shares_next_lockup =
+                pending_delegated_votes.active_shares_next_lockup + new_shares;
+        };
+    }
+
+    fun update_governance_records_for_buy_in_pending_inactive_shares(
+        pool: &DelegationPool, pool_address: address, new_shares: u128, shareholder: address
+    ) acquires GovernanceRecords {
+        // <pending inactive shares> of <shareholder> += <new_shares>   ---->
+        // <pending inactive shares> of <current voter of shareholder> += <new_shares>
+        // no impact on <pending inactive shares> of <next voter of shareholder>
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
+        let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
+        current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares + new_shares;
+    }
+
+    fun update_governanace_records_for_redeem_active_shares(
+        pool: &DelegationPool, pool_address: address, shares_to_redeem: u128, shareholder: address
+    ) acquires GovernanceRecords {
+        // <active shares> of <shareholder> -= <shares_to_redeem> ---->
+        // <active shares> of <current voter of shareholder> -= <shares_to_redeem>
+        // <active shares> of <next voter of shareholder> -= <shares_to_redeem>
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let vote_delegation = update_and_borrow_mut_delegator_vote_delegation(
+            pool,
+            governance_records,
+            shareholder
+        );
+        let current_voter = vote_delegation.voter;
+        let pending_voter = vote_delegation.pending_voter;
+        let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
+        current_delegated_votes.active_shares = current_delegated_votes.active_shares - shares_to_redeem;
+        if (current_voter == pending_voter) {
+            current_delegated_votes.active_shares_next_lockup =
+                current_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+        } else {
+            let pending_delegated_votes =
+                update_and_borrow_mut_delegated_votes(pool, governance_records, pending_voter);
+            pending_delegated_votes.active_shares_next_lockup =
+                pending_delegated_votes.active_shares_next_lockup - shares_to_redeem;
+        };
+    }
+
+    fun update_governanace_records_for_redeem_pending_inactive_shares(
+        pool: &DelegationPool, pool_address: address, shares_to_redeem: u128, shareholder: address
+    ) acquires GovernanceRecords {
+        // <pending inactive shares> of <shareholder> -= <shares_to_redeem>  ---->
+        // <pending inactive shares> of <current voter of shareholder> -= <shares_to_redeem>
+        // no impact on <pending inactive shares> of <next voter of shareholder>
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let current_voter = calculate_and_update_delegator_voter_internal(pool, governance_records, shareholder);
+        let current_delegated_votes = update_and_borrow_mut_delegated_votes(pool, governance_records, current_voter);
+        current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares - shares_to_redeem;
+    }
+
     public fun multiply_then_divide(x: u64, y: u64, z: u64): u64 {
         let result = (to_u128(x) * to_u128(y)) / to_u128(z);
         (result as u64)
@@ -1589,7 +1586,6 @@ module aptos_framework::delegation_pool {
     use aptos_std::fixed_point64;
     #[test_only]
     use aptos_framework::timestamp::fast_forward_seconds;
-    use aptos_std::smart_table;
 
     #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";
@@ -3305,7 +3301,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010)]
-    #[expected_failure(abort_code = 0x10010, location = Self)]
+    #[expected_failure(abort_code = 0x1000f, location = Self)]
     public entry fun test_create_proposal_abort_if_inefficient_stake(
         aptos_framework: &signer,
         validator: &signer,
@@ -3532,6 +3528,8 @@ module aptos_framework::delegation_pool {
         // One cycle passed. The voter change takes effects.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_aptos_epoch();
+        // Withdrawl inactive shares will not change voting power.
+        withdraw(delegator1, pool_address, 45 * ONE_APT);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 0, 1);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 100 * ONE_APT, 1);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, delegator1_address) == 0, 1);
@@ -3778,7 +3776,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, voter1 = @0x030)]
-    #[expected_failure(abort_code=0x10011, location = Self)]
+    #[expected_failure(abort_code=0x10010, location = Self)]
     public entry fun test_vote_should_failed_if_already_voted_before_enable_partial_voting_flag(
         aptos_framework: &signer,
         validator: &signer,
@@ -3814,7 +3812,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, voter1 = @0x030)]
-    #[expected_failure(abort_code=0x10013, location = Self)]
+    #[expected_failure(abort_code=0x10011, location = Self)]
     public entry fun test_vote_should_failed_if_already_voted_before_enable_partial_voting_on_pool(
         aptos_framework: &signer,
         validator: &signer,
@@ -3853,7 +3851,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010)]
-    #[expected_failure(abort_code=0x10011, location = Self)]
+    #[expected_failure(abort_code=0x10010, location = Self)]
     public entry fun test_vote_should_failed_if_no_stake(
         aptos_framework: &signer,
         validator: &signer,
@@ -3872,8 +3870,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator1 = @0x010, voter1 = @0x030)]
-    #[expected_failure(abort_code=0x10012, location = Self)]
-    public entry fun test_delegate_voting_power_should_fail_if_no_stake(
+    public entry fun test_delegate_voting_power_should_pass_even_if_no_stake(
         aptos_framework: &signer,
         validator: &signer,
         delegator1: &signer,

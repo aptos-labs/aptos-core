@@ -16,7 +16,6 @@ track proposal creation and proposal ids.
 on a proposal multiple times as long as the total voting power of these votes don't exceed its total voting power.
 
 
-
 -  [Resource `GovernanceResponsbility`](#0x1_aptos_governance_GovernanceResponsbility)
 -  [Resource `GovernanceConfig`](#0x1_aptos_governance_GovernanceConfig)
 -  [Struct `RecordKey`](#0x1_aptos_governance_RecordKey)
@@ -930,7 +929,7 @@ Return true if a stake pool has already voted on a proposal before partial gover
 ## Function `get_remaining_voting_power`
 
 Return remaining voting power of a stake pool on a proposal.
-Note: a stake pool's voting power on a proposal could increase overtime(e.g. rewards/new stake).
+Note: a stake pool's voting power on a proposal could increase over time(e.g. rewards/new stake).
 
 
 <pre><code>#[view]
@@ -946,10 +945,11 @@ Note: a stake pool's voting power on a proposal could increase overtime(e.g. rew
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">get_remaining_voting_power</a>(stake_pool: <b>address</b>, proposal_id: u64): u64 <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingRecords">VotingRecords</a>, <a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a> {
     <a href="aptos_governance.md#0x1_aptos_governance_assert_voting_initialization">assert_voting_initialization</a>();
 
-    // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     <b>let</b> proposal_expiration = <a href="voting.md#0x1_voting_get_proposal_expiration_secs">voting::get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
     <b>let</b> lockup_until = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool);
-    <b>if</b> (proposal_expiration &gt; lockup_until) {
+    // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
+    // Also no one can vote on a expired proposal.
+    <b>if</b> (proposal_expiration &gt; lockup_until || <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration) {
         <b>return</b> 0
     };
 

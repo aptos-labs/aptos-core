@@ -257,6 +257,9 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
+    /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
+    /// `aptos_governance.move`.
     DelegationPoolCreateProposal {
         pool_address: AccountAddress,
         execution_hash: Vec<u8>,
@@ -316,6 +319,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
+    /// 1. The voting period of the proposal hasn't ended.
+    /// 2. The delegation pool's lockup period ends after the voting period of the proposal.
+    /// 3. The voter still has spare voting power on this proposal.
+    /// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
     DelegationPoolVote {
         pool_address: AccountAddress,
         proposal_id: u64,
@@ -1952,6 +1960,9 @@ pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> T
     ))
 }
 
+/// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
+/// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
+/// `aptos_governance.move`.
 pub fn delegation_pool_create_proposal(
     pool_address: AccountAddress,
     execution_hash: Vec<u8>,
@@ -2139,6 +2150,11 @@ pub fn delegation_pool_unlock(pool_address: AccountAddress, amount: u64) -> Tran
     ))
 }
 
+/// Vote on a proposal with a voter's voting power. To successfully vote, the following conditions must be met:
+/// 1. The voting period of the proposal hasn't ended.
+/// 2. The delegation pool's lockup period ends after the voting period of the proposal.
+/// 3. The voter still has spare voting power on this proposal.
+/// 4. The delegation pool never votes on the proposal before enabling partial governance voting.
 pub fn delegation_pool_vote(
     pool_address: AccountAddress,
     proposal_id: u64,
