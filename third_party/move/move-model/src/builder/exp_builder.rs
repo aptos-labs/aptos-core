@@ -3,12 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Value},
+    ast::{
+        Address, Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Value,
+    },
     builder::{
         model_builder::{ConstEntry, LocalVarEntry, SpecFunEntry},
         module_builder::ModuleBuilder,
     },
-    model::{FieldId, Loc, ModuleId, NodeId, QualifiedId, QualifiedInstId, SpecFunId, StructId},
+    model::{
+        FieldId, Loc, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
+        StructId, TypeParameter, TypeParameterKind,
+    },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Substitution, Type, TypeDisplayContext, Variance, BOOL_TYPE},
 };
@@ -20,9 +25,9 @@ use move_compiler::{
     parser::ast as PA,
     shared::{Identifier, Name},
 };
-use move_core_types::value::MoveValue;
+use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_ir_types::location::{sp, Spanned};
-use num::{BigInt, BigUint, FromPrimitive, Zero};
+use num::{BigInt, FromPrimitive};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, LinkedList},
@@ -131,18 +136,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         vars
     }
 
-    // Get type parameters from this translator.
-    #[allow(unused)]
-    pub fn get_type_params(&self) -> Vec<Type> {
-        self.type_params
-            .iter()
-            .map(|(_, t)| t.clone())
-            .collect_vec()
-    }
-
-    // Get type parameters with names from this translator.
+    /// Get type parameters with names from this translator (old style)
     pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type)> {
         self.type_params.clone()
+    }
+
+    /// Get type parameters declared so far.
+    pub fn get_type_params(&self) -> Vec<TypeParameter> {
+        self.type_params
+            .iter()
+            .map(|(n, _)| TypeParameter::new_named(n))
+            .collect()
     }
 
     /// Shortcut for accessing symbol pool.
@@ -295,7 +299,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let vars = ty.get_vars();
         // Assign a type parameter to each free variable and add it to substitution.
         for var in vars {
-            let type_param = Type::TypeParameter(generated_params.len() as u16);
+            let type_param = Type::new_param(generated_params.len());
             generated_params.push(type_param.clone());
             self.subs.bind(var, type_param);
         }
@@ -305,9 +309,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Constructs a type display context used to visualize types in error messages.
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
-        TypeDisplayContext::WithoutEnv {
-            symbol_pool: self.symbol_pool(),
-            reverse_struct_table: &self.parent.parent.reverse_struct_table,
+        TypeDisplayContext {
+            env: self.parent.parent.env,
+            type_param_names: Some(self.type_params.iter().map(|(s, _)| *s).collect()),
+            builder_struct_table: Some(&self.parent.parent.reverse_struct_table),
         }
     }
 
@@ -362,10 +367,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.type_params.push((name, ty));
         } else {
             let param_name = name.display(self.symbol_pool());
-            let context = TypeDisplayContext::WithEnv {
-                env: self.parent.parent.env,
-                type_param_names: None,
-            };
+            let context = TypeDisplayContext::new(self.parent.parent.env);
             self.parent.parent.error(
                 loc,
                 &format!(
@@ -374,6 +376,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     ty.display(&context)
                 ),
             );
+        }
+    }
+
+    /// Defines a vector of formal type parameters.
+    pub fn define_type_params(&mut self, loc: &Loc, params: &[TypeParameter]) {
+        for (pos, TypeParameter(name, _)) in params.iter().enumerate() {
+            self.define_type_param(loc, *name, Type::new_param(pos))
         }
     }
 
@@ -450,18 +459,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Analyzes the sequence of type parameters as they are provided via the source AST and enters
     /// them into the environment. Returns a vector for representing them in the target AST.
-    pub fn analyze_and_add_type_params<'a, I>(&mut self, type_params: I) -> Vec<(Symbol, Type)>
+    pub fn analyze_and_add_type_params<'a, I>(&mut self, type_params: I) -> Vec<TypeParameter>
     where
-        I: IntoIterator<Item = &'a Name>,
+        I: IntoIterator<Item = (&'a Name, &'a EA::AbilitySet)>,
     {
         type_params
             .into_iter()
             .enumerate()
-            .map(|(i, n)| {
-                let ty = Type::TypeParameter(i as u16);
+            .map(|(i, (n, a))| {
+                let ty = Type::new_param(i);
                 let sym = self.symbol_pool().make(n.value.as_str());
-                self.define_type_param(&self.to_loc(&n.loc), sym, ty.clone());
-                (sym, ty)
+                let abilities = self.parent.translate_abilities(a);
+                self.define_type_param(&self.to_loc(&n.loc), sym, ty);
+                TypeParameter(sym, TypeParameterKind::new(abilities))
             })
             .collect_vec()
     }
@@ -472,7 +482,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
-    ) -> Vec<(Symbol, Type)> {
+    ) -> Vec<Parameter> {
         params
             .iter()
             .enumerate()
@@ -489,7 +499,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     // a `LocalVar`.
                     if for_move_fun { Some(idx) } else { None },
                 );
-                (sym, ty)
+                Parameter(sym, ty)
             })
             .collect_vec()
     }
@@ -505,7 +515,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         module_name: m.clone(),
                         symbol: name,
                     }
-                    .display(self.symbol_pool())
+                    .display(self.parent.parent.env)
                 );
             }
         }
@@ -525,9 +535,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             "{}({}): {}",
             target,
             entry
-                .arg_types
+                .params
                 .iter()
-                .map(|ty| ty.display(&type_display_context))
+                .map(|p| p.1.display(&type_display_context))
                 .join(", "),
             entry.result_type.display(&type_display_context)
         )
@@ -967,8 +977,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let loc = self.to_loc(&v.loc);
         match &v.value {
             EA::Value_::Address(addr) => {
-                let addr_bytes = self.parent.parent.resolve_address(&loc, addr);
-                let value = Value::Address(BigUint::from_bytes_be(&addr_bytes.into_bytes()));
+                // TODO: revisit resolution of symbolic addresses now that we support them in
+                // the model AST. For now, this just always resolves to a numeric address.
+                let account_addr = self.parent.parent.resolve_address(&loc, addr).into_inner();
+                let value = Value::Address(Address::Numerical(account_addr));
                 Some((value, Type::new_prim(PrimitiveType::Address)))
             },
             EA::Value_::U8(x) => Some((
@@ -1101,7 +1113,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     "in return type on lambda-lifted spec function call",
                 ) == Type::Error;
 
-                if full_arg_types.len() != spec_fun_entry.arg_types.len() {
+                if full_arg_types.len() != spec_fun_entry.params.len() {
                     self.error(
                         loc,
                         &format!(
@@ -1113,7 +1125,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
                 let param_type_error = full_arg_types
                     .iter()
-                    .zip(spec_fun_entry.arg_types.iter())
+                    .zip(spec_fun_entry.params.iter().map(|p| &p.1))
                     .any(|(actual_ty, expected_ty)| {
                         self.check_type(
                             loc,
@@ -1356,7 +1368,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let ghost_mem_ty = Type::Struct(module_id, ghost_mem_id, instantiation.clone());
             let zero_addr = ExpData::Value(
                 self.new_node_id_with_type_loc(&Type::Primitive(PrimitiveType::Address), loc),
-                Value::Address(BigUint::zero()),
+                Value::Address(Address::Numerical(AccountAddress::ZERO)),
             );
             let global_id = self.new_node_id_with_type_loc(&ghost_mem_ty, loc);
             self.set_node_instantiation(global_id, vec![ghost_mem_ty]);
@@ -1380,7 +1392,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             loc,
             &format!(
                 "undeclared `{}`",
-                global_var_sym.display(self.symbol_pool())
+                global_var_sym.display(self.parent.parent.env)
             ),
         );
         self.new_error_exp()
@@ -1594,7 +1606,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &format!(
                             "field `{}` not declared in struct `{}`",
                             field_name.display(self.symbol_pool()),
-                            struct_name.display(self.symbol_pool())
+                            struct_name.display(self.parent.parent.env)
                         ),
                     );
                     None
@@ -1604,7 +1616,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     loc,
                     &format!(
                         "struct `{}` is native and does not support field selection",
-                        struct_name.display(self.symbol_pool())
+                        struct_name.display(self.parent.parent.env)
                     ),
                 );
                 None
@@ -1667,12 +1679,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let mut outruled = vec![];
         let mut matching = vec![];
         for cand in &cands {
-            if cand.arg_types.len() != translated_args.len() {
+            if cand.params.len() != translated_args.len() {
                 outruled.push((
                     cand,
                     format!(
                         "argument count mismatch (expected {} but found {})",
-                        cand.arg_types.len(),
+                        cand.params.len(),
                         translated_args.len()
                     ),
                 ));
@@ -1688,7 +1700,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let mut subs = self.subs.clone();
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
-                let instantiated = cand.arg_types[i].instantiate(&instantiation);
+                let instantiated = cand.params[i].1.instantiate(&instantiation);
                 if let Err(err) = subs.unify(Variance::Allow, arg_ty, &instantiated) {
                     outruled.push((
                         cand,
@@ -1968,7 +1980,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             if let Some(field_decls) = &entry.fields {
                 let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
-                fields_not_covered.extend(field_decls.keys());
+                // Exclude from the covered fields the dummy_field added by legacy compiler
+                fields_not_covered.extend(
+                    field_decls
+                        .keys()
+                        .filter(|s| *s != &self.parent.dummy_field_name()),
+                );
                 let mut args = BTreeMap::new();
                 for (name_loc, name_, (_, value)) in fields.iter() {
                     let field_name = self.symbol_pool().make(name_);
@@ -1985,7 +2002,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             &format!(
                                 "field `{}` not declared in struct `{}`",
                                 field_name.display(self.symbol_pool()),
-                                struct_name.display(self.symbol_pool())
+                                struct_name.display(self.parent.parent.env)
                             ),
                         );
                     }
@@ -2018,7 +2035,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &struct_name_loc,
                     &format!(
                         "native struct `{}` cannot be packed or unpacked",
-                        struct_name.display(self.symbol_pool())
+                        struct_name.display(self.parent.parent.env)
                     ),
                 );
                 None
@@ -2028,7 +2045,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &struct_name_loc,
                 &format!(
                     "undeclared struct `{}`",
-                    struct_name.display(self.symbol_pool())
+                    struct_name.display(self.parent.parent.env)
                 ),
             );
             None
@@ -2183,8 +2200,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             (_, MoveValue::U128(n)) => Value::Number(BigInt::from_u128(*n).unwrap()),
             (_, MoveValue::U256(n)) => Value::Number(BigInt::from(n)),
             (_, MoveValue::Bool(b)) => Value::Bool(*b),
-            (_, MoveValue::Address(a)) => Value::Address(crate::addr_to_big_uint(a)),
-            (_, MoveValue::Signer(a)) => Value::Address(crate::addr_to_big_uint(a)),
+            (_, MoveValue::Address(a)) => Value::Address(Address::Numerical(*a)),
+            (_, MoveValue::Signer(a)) => Value::Address(Address::Numerical(*a)),
             (Type::Vector(inner), MoveValue::Vector(vs)) => match **inner {
                 Type::Primitive(PrimitiveType::U8) => {
                     let b = vs
@@ -2203,7 +2220,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let b = vs
                         .iter()
                         .filter_map(|v| match v {
-                            MoveValue::Address(a) => Some(crate::addr_to_big_uint(a)),
+                            MoveValue::Address(a) => Some(Address::Numerical(*a)),
                             _ => {
                                 self.error(
                                     loc,
@@ -2212,7 +2229,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 None
                             },
                         })
-                        .collect::<Vec<BigUint>>();
+                        .collect::<Vec<Address>>();
                     Value::AddressArray(b)
                 },
                 _ => {

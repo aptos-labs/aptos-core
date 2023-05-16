@@ -50,8 +50,6 @@ move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
 move-vm-types = { path = "../../move-vm/types" }
-read-write-set = { path = "../read-write-set" }
-read-write-set-dynamic = { path = "../read-write-set/dynamic" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

@@ -195,9 +195,6 @@ members = [
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
-    "third_party/move/tools/read-write-set",
-    "third_party/move/tools/read-write-set/dynamic",
-    "third_party/move/tools/read-write-set/types",
     "types",
     "vm-validator",
 ]
@@ -608,8 +605,6 @@ move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
-read-write-set = { path = "third_party/move/tools/read-write-set" }
-read-write-set-dynamic = { path = "third_party/move/tools/read-write-set/dynamic" }
 
 [profile.release]
 debug = true

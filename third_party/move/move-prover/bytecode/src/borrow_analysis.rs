@@ -319,7 +319,9 @@ impl BorrowInfo {
                 }
             } else {
                 assert!(
-                    !callee_env.get_return_type(ret_idx).is_mutable_reference(),
+                    !callee_env
+                        .get_result_type_at(ret_idx)
+                        .is_mutable_reference(),
                     "inconsistent borrow information: undefined output: {}",
                     callee_env.get_full_name_str()
                 )
@@ -439,6 +441,9 @@ impl FunctionTargetProcessor for BorrowAnalysisProcessor {
         writeln!(f, "\n\n==== borrow analysis summaries ====\n")?;
         for ref module in env.get_modules() {
             for ref fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 for (_, ref target) in targets.get_targets(fun) {
                     if let Some(an) = target.get_annotations().get::<BorrowAnnotation>() {
                         if !an.summary.is_empty() {
