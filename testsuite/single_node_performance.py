@@ -72,10 +72,10 @@ if os.environ.get("DETAILED"):
 else:
     EXECUTION_ONLY_CONCURRENCY_LEVELS = []
 
-if os.environ.get("RELEASE_BUILD"):
-    BUILD_FLAG = "--release"
-else:
-    BUILD_FLAG = "--profile performance"
+# if os.environ.get("RELEASE_BUILD"):
+BUILD_FLAG = "--release"
+# else:
+# BUILD_FLAG = "--profile performance"
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
