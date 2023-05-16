@@ -27,10 +27,6 @@ impl PeerNodeMap {
         }
     }
 
-    pub(crate) fn metadata(&self) -> PeerNodeMapMetadata {
-        PeerNodeMapMetadata { id: self.id }
-    }
-
     pub fn get(&self, k: &PeerId) -> Option<&CertifiedNode> {
         self.inner.get(k)
     }
@@ -52,21 +48,21 @@ impl PeerNodeMap {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerNodeMapEntry {
     pub(crate) map_id: ItemId,
-    pub(crate) key: PeerId,
-    pub(crate) value_id: HashValue,
+    pub(crate) key: Option<PeerId>,
+    pub(crate) value_id: Option<HashValue>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerNodeMapEntry_Key {
     pub(crate) map_id: ItemId,
-    pub(crate) key: Option<PeerId>,
+    pub(crate) maybe_peer_id: Option<PeerId>,
 }
 
 impl PeerNodeMapEntry {
     pub(crate) fn key(&self) -> PeerNodeMapEntry_Key {
         PeerNodeMapEntry_Key {
             map_id: self.map_id,
-            key: Some(self.key),
+            maybe_peer_id: self.key,
         }
     }
 }

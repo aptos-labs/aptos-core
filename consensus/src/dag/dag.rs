@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 use aptos_network::peer::Peer;
 use aptos_schemadb::{ColumnFamilyName, define_schema, SchemaBatch};
 use aptos_schemadb::schema::{KeyCodec, Schema, ValueCodec};
-use crate::dag::dag_storage::{DagStorage, DagStoreWriteBatch, ItemId};
+use crate::dag::dag_storage::{DagStorage, DagStorageItem, DagStoreWriteBatch, ItemId};
 use serde::{Deserialize, Serialize};
 use crate::dag::dag_storage::naive::NaiveDagStoreWriteBatch;
 use crate::dag::types::{AbsentInfo, MissingDagNodeStatus, PendingInfo};
@@ -57,10 +57,10 @@ impl Dag {
         verifier: ValidatorVerifier,
         proposer_election: Arc<dyn AnchorElection>,
         payload_manager: Arc<PayloadManager>,
-        mut storage: Arc<dyn DagStorage>,
+        storage: Arc<dyn DagStorage>,
     ) -> Self {
         let key = DagInMem_Key { my_id, epoch };
-        let in_mem = match storage.load_dag_in_mem(&key).expect("235922") {
+        let in_mem = match DagInMem::load(storage.clone(), &key).unwrap() {
             Some(in_mem) => in_mem,
             None => {
                 let mut round_list = DagRoundList::new();
@@ -73,9 +73,9 @@ impl Dag {
                     dag: round_list,
                     missing_nodes: MissingNodeStatusMap::new(),
                 };
-                let mut batch = storage.new_write_batch();
-                batch.put_dag_in_mem__deep(&in_mem).unwrap();
-                storage.commit_write_batch(batch).unwrap();
+                let mut storage_diff = storage.new_write_batch();
+                in_mem.deep_save(&mut storage_diff).unwrap();
+                storage.commit_write_batch(storage_diff).unwrap();
                 in_mem
             }
         };
@@ -172,24 +172,27 @@ impl Dag {
 
         if self.in_mem.get_dag().len() <= round {
             let dag_round = PeerNodeMap::new();
-            storage_diff.put_peer_to_node_map__deep(&dag_round).unwrap();
-            storage_diff.put_dag_round_list_item(&DagRoundListItem{
+            let dag_round_id = dag_round.id;
+            dag_round.deep_save(storage_diff).unwrap();
+            self.in_mem.get_dag_mut().push(dag_round);
+
+            let list_item = DagRoundListItem{
                 list_id: self.in_mem.get_dag().id,
                 index: self.in_mem.get_dag().len() as u64,
-                content_id: dag_round.id,
-            }).unwrap();
-            self.in_mem.get_dag_mut().push(dag_round);
-            storage_diff.put_dag_round_list__shallow(self.in_mem.get_dag()).unwrap();
+                content_id: dag_round_id,
+            };
+            list_item.deep_save(storage_diff).unwrap();
+            self.in_mem.get_dag().shallow_save(storage_diff).unwrap();
         }
 
         let round = self.in_mem.get_dag_mut().get_mut(round).unwrap();
         round.insert(certified_node.node().source(), certified_node.clone());
         let entry = PeerNodeMapEntry {
             map_id: round.id,
-            key: certified_node.node().source(),
-            value_id: certified_node.digest(),
+            key: Some(certified_node.node().source()),
+            value_id: Some(certified_node.digest()),
         };
-        storage_diff.put_peer_to_node_map_entry__deep(&entry).unwrap();
+        entry.deep_save(storage_diff).unwrap();
 
         self.in_mem.get_front_mut()
             .update_peer_latest_node(certified_node.node().metadata().clone(), storage_diff);
@@ -258,11 +261,12 @@ impl Dag {
             match self.in_mem.get_missing_nodes_mut().entry(parent_digest) {
                 Entry::Occupied(mut entry) => {
                     entry.get_mut().add_peer_to_request(source);
-                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
+                    let x = MissingNodeStatusMapEntry {
                         map_id,
-                        key: entry.key().clone(),
-                        value: entry.get().clone(),
-                    }).unwrap(); //TODO: only write the diff.
+                        key: Some(entry.key().clone()),
+                        value: Some(entry.get().clone()),
+                    };
+                    x.deep_save(storage_diff).unwrap(); //TODO: only write the diff.
                     self.add_peers_recursively(parent_digest, source, storage_diff);
                 },
                 Entry::Vacant(_) => unreachable!("node should exist in missing nodes"),
@@ -288,11 +292,12 @@ impl Dag {
         self.in_mem.get_missing_nodes_mut()
             .insert(pending_digest, new_status.clone());
         let map_id = self.in_mem.get_missing_nodes().id;
-        storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
+        let map_entry = MissingNodeStatusMapEntry {
             map_id,
-            key: pending_digest,
-            value: new_status,
-        }).unwrap();
+            key: Some(pending_digest),
+            value: Some(new_status),
+        };
+        map_entry.deep_save(storage_diff).unwrap();
 
         for node_meta_data in missing_parents {
             let missing_parent_node_digest = node_meta_data.digest();
@@ -305,11 +310,12 @@ impl Dag {
 
             status.add_dependency(pending_digest);
             status.add_peer_to_request(pending_peer_id);
-            storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
+            let map_entry = MissingNodeStatusMapEntry {
                 map_id,
-                key: missing_parent_node_digest,
-                value: status.clone(),
-            }).unwrap(); //TODO: only write the diff.
+                key: Some(missing_parent_node_digest),
+                value: Some(status.clone()),
+            };
+            map_entry.deep_save(storage_diff).unwrap(); //TODO: only write the diff.
 
             //TODO: can a missing/pending node be visited in this DFS traversal? Do we need to deduplicate?
             self.add_peers_recursively(missing_parent_node_digest, pending_peer_id, storage_diff); // Recursively update source_peers.
@@ -375,18 +381,21 @@ impl Dag {
             .update_with_strong_links(current_round, strong_links_peers, &mut storage_diff);
 
         self.in_mem.current_round += 1;
-        storage_diff.put_dag_in_mem__shallow(&self.in_mem).unwrap();
+        self.in_mem.shallow_save(&mut storage_diff).unwrap();
 
         if self.in_mem.get_dag().get(self.in_mem.current_round as usize).is_none() {
             let new_node_map = PeerNodeMap::new();
-            storage_diff.put_peer_to_node_map__deep(&new_node_map).unwrap();
+            let new_node_map_id = new_node_map.id;
+            new_node_map.deep_save(&mut storage_diff).unwrap();
 
-            storage_diff.put_dag_round_list_item(&DagRoundListItem{
+            self.in_mem.get_dag_mut().push(new_node_map);
+            let new_list_item = DagRoundListItem{
                 list_id: self.in_mem.get_dag().id,
                 index: self.in_mem.get_dag().len() as u64,
-                content_id: new_node_map.id,
-            }).unwrap();
-            self.in_mem.get_dag_mut().push(new_node_map);
+                content_id: new_node_map_id,
+            };
+            new_list_item.deep_save(&mut storage_diff).unwrap();
+            self.in_mem.get_dag().shallow_save(&mut storage_diff).unwrap();
         }
 
         self.storage.commit_write_batch(storage_diff).unwrap();
@@ -442,13 +451,14 @@ impl Dag {
                         map_id,
                         key: Some(node_digest),
                     };
-                    storage_diff.del_missing_node_id_to_status_map_entry(&entry_db_key).unwrap();
+                    MissingNodeStatusMapEntry::shallow_delete(&entry_db_key, storage_diff).unwrap();
                 } else {
-                    storage_diff.put_missing_node_id_to_status_map_entry(&MissingNodeStatusMapEntry {
+                    let entry = MissingNodeStatusMapEntry {
                         map_id,
-                        key: entry.key().clone(),
-                        value: entry.get().clone(),
-                    }).unwrap(); //TODO: only write the diff.
+                        key: Some(entry.key().clone()),
+                        value: Some(entry.get().clone()),
+                    };
+                    entry.deep_save(storage_diff).unwrap(); //TODO: only write the diff.
                 }
             },
         }

@@ -18,13 +18,6 @@ impl DagRoundList {
         }
     }
 
-    pub(crate) fn metadata(&self) -> DagRoundList_Metadata {
-        DagRoundList_Metadata {
-            id: self.id,
-            len: self.inner.len() as u64,
-        }
-    }
-
     pub(crate) fn get(&self, index: usize) -> Option<&PeerNodeMap> {
         self.inner.get(index)
     }
@@ -47,15 +40,8 @@ impl DagRoundList {
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct DagRoundList_Metadata {
-    pub(crate) id: ItemId,
-    pub(crate) len: u64,
-}
-
-
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct DagRoundListItem_Key {
-    pub(crate) id: ItemId,
+    pub(crate) list_id: ItemId,
     pub(crate) index: u64,
 }
 
@@ -70,7 +56,7 @@ pub(crate) struct DagRoundListItem {
 impl DagRoundListItem {
     pub(crate) fn key(&self) -> DagRoundListItem_Key {
         DagRoundListItem_Key {
-            id: self.list_id,
+            list_id: self.list_id,
             index: self.index,
         }
     }

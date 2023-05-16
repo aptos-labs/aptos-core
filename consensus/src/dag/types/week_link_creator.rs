@@ -5,7 +5,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use move_core_types::account_address::AccountAddress as PeerId;
 use std::collections::HashSet;
 use aptos_consensus_types::node::NodeMetaData;
-use crate::dag::dag_storage::{DagStoreWriteBatch, ItemId};
+use crate::dag::dag_storage::{DagStorageItem, DagStoreWriteBatch, ItemId};
 use crate::dag::types::peer_index_map::PeerIndexMap;
 use crate::dag::types::peer_status_list::{PeerStatusList, PeerStatusListItem};
 use crate::dag::types::PeerStatus;
@@ -13,8 +13,7 @@ use serde::{Deserialize, Serialize};
 use aptos_logger::info;
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct WeakLinksCreatorMetadata {
-    pub(crate) id: ItemId,
+pub(crate) struct WeakLinksCreator_Brief {
     pub(crate) my_id: PeerId,
     pub(crate) latest_nodes_metadata: ItemId,
     pub(crate) address_to_validator_index: ItemId,
@@ -40,15 +39,6 @@ impl WeakLinksCreator {
                 .map(|_| None)
                 .collect()),
             address_to_validator_index: PeerIndexMap::new(verifier.address_to_validator_index().clone()),
-        }
-    }
-
-    pub fn metadata(&self) -> WeakLinksCreatorMetadata {
-        WeakLinksCreatorMetadata {
-            id: self.id,
-            my_id: self.my_id,
-            latest_nodes_metadata: self.latest_nodes_metadata.id,
-            address_to_validator_index: self.address_to_validator_index.id,
         }
     }
 
@@ -81,15 +71,14 @@ impl WeakLinksCreator {
                 node_meta_data.round(),
                 *peer_index
             );
-            let new_val = Some(PeerStatus::NotLinked(node_meta_data));
-            *self.latest_nodes_metadata.get_mut(*peer_index).unwrap() = new_val.clone();
+            let new_status = Some(PeerStatus::NotLinked(node_meta_data));
+            *self.latest_nodes_metadata.get_mut(*peer_index).unwrap() = new_status.clone();
             let list_item = PeerStatusListItem {
                 list_id: self.latest_nodes_metadata.id,
                 index: *peer_index,
-                content: new_val.clone(),
+                content: new_status.clone(),
             };
-            storage_diff.put_peer_status_list_item(&list_item).unwrap();
-            // storage_diff.put_peer_status_list(&self.latest_nodes_metadata).unwrap(); //TODO: only write the diff.
+            list_item.deep_save(storage_diff).unwrap();
         } else {
             info!("DAG: not updating peer latest node: my_id {},", self.my_id);
         }
@@ -109,11 +98,12 @@ impl WeakLinksCreator {
                     .as_mut()
                     .unwrap()
                     .mark_linked();
-                storage_diff.put_peer_status_list_item(&PeerStatusListItem{
+                let list_item = PeerStatusListItem{
                     list_id: self.latest_nodes_metadata.id,
                     index: *index,
                     content: self.latest_nodes_metadata.get(*index).unwrap().clone(),
-                }).unwrap();
+                };
+                list_item.deep_save(storage_diff).unwrap();
             }
         }
     }

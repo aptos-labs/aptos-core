@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct MissingNodeStatusMap {
     pub(crate) id: ItemId,
-    inner: HashMap<HashValue, MissingDagNodeStatus>,
+    pub(crate) inner: HashMap<HashValue, MissingDagNodeStatus>,
 }
 
 impl MissingNodeStatusMap {
@@ -47,15 +47,15 @@ pub(crate) struct MissingNodeStatusMapEntry_Key {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct MissingNodeStatusMapEntry {
     pub(crate) map_id: ItemId,
-    pub(crate) key: HashValue,
-    pub(crate) value: MissingDagNodeStatus,
+    pub(crate) key: Option<HashValue>,
+    pub(crate) value: Option<MissingDagNodeStatus>,
 }
 
 impl MissingNodeStatusMapEntry {
     pub(crate) fn key(&self) -> MissingNodeStatusMapEntry_Key {
         MissingNodeStatusMapEntry_Key {
             map_id: self.map_id,
-            key: Some(self.key),
+            key: self.key,
         }
     }
 }

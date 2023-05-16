@@ -27,24 +27,6 @@ pub(crate) struct DagInMem {
 }
 
 impl DagInMem {
-    pub(crate) fn metadata(&self) -> DagInMem_Metadata {
-        DagInMem_Metadata {
-            my_id: self.my_id,
-            epoch: self.epoch,
-            current_round: self.current_round,
-            front: self.front.id,
-            dag: self.dag.id,
-            missing_nodes: self.missing_nodes.id,
-        }
-    }
-
-    pub(crate) fn key(&self) -> DagInMem_Key {
-        DagInMem_Key {
-            my_id: self.my_id,
-            epoch: self.epoch,
-        }
-    }
-
     pub(crate) fn get_dag(&self) -> &DagRoundList {
         &self.dag
     }
@@ -72,9 +54,7 @@ impl DagInMem {
 
 /// The part of the DAG data that should be persisted.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub(crate) struct DagInMem_Metadata {
-    pub(crate) my_id: PeerId,
-    pub(crate) epoch: u64,
+pub(crate) struct DagInMem_Brief {
     pub(crate) current_round: u64,
     pub(crate) front: ItemId,
     pub(crate) dag: ItemId,

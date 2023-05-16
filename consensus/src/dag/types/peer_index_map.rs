@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub(crate) struct PeerIndexMap {
     pub(crate) id: ItemId,
-    inner: HashMap<PeerId, usize>,
+    pub(crate) inner: HashMap<PeerId, usize>,
 }
 
 impl PeerIndexMap {

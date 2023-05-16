@@ -47,13 +47,6 @@ impl PeerStatusList {
         }
     }
 
-    pub(crate) fn metadata(&self) -> PeerStatusList_Metadata {
-        PeerStatusList_Metadata {
-            id: self.id,
-            len: self.inner.len() as u64,
-        }
-    }
-
     pub(crate) fn iter(&self) -> std::slice::Iter<Option<PeerStatus>>{
         self.inner.iter()
     }
