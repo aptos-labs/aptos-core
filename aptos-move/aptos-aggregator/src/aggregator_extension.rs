@@ -1,11 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{addition, deserialize, subtraction};
-use aptos_types::vm_status::StatusCode;
+use crate::{
+    delta_change_set::{addition, deserialize, subtraction},
+    resolver::AggregatorResolver,
+};
+use aptos_types::{state_store::table::TableHandle, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
-use move_table_extension::{TableHandle, TableResolver};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.
@@ -215,7 +217,7 @@ impl Aggregator {
     /// `Data`).
     pub fn read_and_materialize(
         &mut self,
-        resolver: &dyn TableResolver,
+        resolver: &dyn AggregatorResolver,
         id: &AggregatorID,
     ) -> PartialVMResult<u128> {
         // If aggregator has already been read, return immediately.
@@ -229,7 +231,7 @@ impl Aggregator {
         // extension.
         let key_bytes = id.key.0.to_vec();
         resolver
-            .resolve_table_entry(&id.handle, &key_bytes)
+            .resolve_aggregator_value(&id.handle, &key_bytes)
             .map_err(|_| extension_error("could not find the value of the aggregator"))?
             .map_or(
                 Err(extension_error(
@@ -373,12 +375,27 @@ pub fn extension_error(message: impl ToString) -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_err, assert_ok};
     use once_cell::sync::Lazy;
 
+    // We cannot reuse FakeDataStore due to cyclic dependencies.
+    #[derive(Debug, Default)]
+    struct AggregatorDataStore(BTreeMap<StateKey, Vec<u8>>);
+
+    impl AggregatorResolver for AggregatorDataStore {
+        fn resolve_aggregator_value(
+            &self,
+            handle: &TableHandle,
+            key: &[u8],
+        ) -> anyhow::Result<Option<Vec<u8>>> {
+            let state_key = StateKey::table_item(*handle, key.to_vec());
+            Ok(self.0.get(&state_key).cloned())
+        }
+    }
+
     #[allow(clippy::redundant_closure)]
-    static TEST_RESOLVER: Lazy<FakeDataStore> = Lazy::new(|| FakeDataStore::default());
+    static TEST_RESOLVER: Lazy<AggregatorDataStore> = Lazy::new(|| AggregatorDataStore::default());
 
     #[test]
     fn test_materialize_not_in_storage() {

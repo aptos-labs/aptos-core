@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::on_chain_config::ConfigStorage;
@@ -11,7 +12,12 @@ use move_table_extension::TableResolver;
 use move_vm_types::resolver::MoveRefResolver;
 
 pub trait MoveResolverExt:
-    MoveRefResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
+    MoveRefResolver
+    + TableResolver
+    + AggregatorResolver
+    + StateStorageUsageResolver
+    + ConfigStorage
+    + StateView
 {
     fn get_resource_group_data(
         &self,

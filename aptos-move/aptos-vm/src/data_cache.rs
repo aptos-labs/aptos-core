@@ -9,12 +9,16 @@ use crate::{
 };
 #[allow(unused_imports)]
 use anyhow::Error;
+use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_framework::natives::state_storage::StateStorageUsageResolver;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
-    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage,
+        table::TableHandle as AptosTableHandle,
+    },
 };
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
@@ -157,6 +161,16 @@ impl<'a, S: StateView> TableResolver for StorageAdapter<'a, S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value_bytes(&StateKey::table_item((*handle).into(), key.to_vec()))
+    }
+}
+
+impl<'a, S: StateView> AggregatorResolver for StorageAdapter<'a, S> {
+    fn resolve_aggregator_value(
+        &self,
+        handle: &AptosTableHandle,
+        key: &[u8],
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        self.get_state_value_bytes(&StateKey::table_item(*handle, key.to_vec()))
     }
 }
 

@@ -4,11 +4,11 @@
 use aptos_aggregator::{
     aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
+    resolver::AggregatorResolver,
 };
 use aptos_types::vm_status::VMStatus;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
-use move_table_extension::TableResolver;
 use std::{
     cell::RefCell,
     collections::{btree_map, BTreeMap},
@@ -38,14 +38,14 @@ pub struct AggregatorChangeSet {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
-    pub(crate) resolver: &'a dyn TableResolver,
+    pub(crate) resolver: &'a dyn AggregatorResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn AggregatorResolver) -> Self {
         Self {
             txn_hash,
             resolver,
@@ -146,13 +146,13 @@ impl AggregatorChangeSet {
 mod test {
     use super::*;
     use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
+    use aptos_types::state_store::table::TableHandle;
     use claims::assert_matches;
-    use move_table_extension::TableHandle;
 
     struct EmptyStorage;
 
-    impl TableResolver for EmptyStorage {
-        fn resolve_table_entry(
+    impl AggregatorResolver for EmptyStorage {
+        fn resolve_aggregator_value(
             &self,
             _handle: &TableHandle,
             _key: &[u8],
