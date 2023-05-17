@@ -356,9 +356,9 @@ impl DeltaChangeSet {
                     })
             },
             Err(vm_status) => {
-                // Error  from failed delta application.
-                // Right now we do not support this case (and do not have to because deltas are
-                // used for total supply only).
+                // Error from failed delta application. Right now we do not support
+                // this case (and do not have to because deltas are used for total
+                // supply only).
                 if let VMStatus::MoveAbort(AbortLocation::Module(id), code) = &vm_status {
                     if id == &*AGGREGATOR_MODULE
                         && (*code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW)
