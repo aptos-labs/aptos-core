@@ -21,12 +21,12 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
+use tracing::error;
 
 pub const NAME: &str = "token_processor";
 pub struct TokenTransactionProcessor {
@@ -36,7 +36,7 @@ pub struct TokenTransactionProcessor {
 
 impl TokenTransactionProcessor {
     pub fn new(connection_pool: PgDbPool, ans_contract_address: Option<String>) -> Self {
-        aptos_logger::info!(
+        tracing::info!(
             ans_contract_address = ans_contract_address,
             "init TokenTransactionProcessor"
         );
@@ -106,7 +106,7 @@ fn insert_to_db(
     current_token_claims: Vec<CurrentTokenPendingClaim>,
     current_ans_lookups: Vec<CurrentAnsLookup>,
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,

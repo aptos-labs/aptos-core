@@ -26,7 +26,7 @@ impl GcsFileStoreOperator {
 impl FileStoreOperator for GcsFileStoreOperator {
     /// Bootstraps the file store operator. This is required before any other operations.
     async fn verify_storage_bucket_existence(&self) {
-        aptos_logger::info!(
+        tracing::info!(
             bucket_name = self.bucket_name,
             "Before file store operator starts, verify the bucket exists."
         );

@@ -53,7 +53,7 @@ impl MoveVmExt {
 
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-        let type_size_limit = timed_features.is_enabled(TimedFeatureFlag::EntryTypeSizeLimit);
+        let type_size_limit = true;
 
         let verifier_config = verifier_config(&features, &timed_features);
         let features = Arc::new(features);
@@ -132,30 +132,7 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(features: &Features, timed_features: &TimedFeatures) -> VerifierConfig {
-    let mut max_back_edges_per_function = None;
-    let mut max_back_edges_per_module = None;
-    let mut max_basic_blocks_in_script = None;
-
-    let mut max_per_fun_meter_units = None;
-    let mut max_per_mod_meter_units = None;
-
-    let legacy_limit_back_edges =
-        timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges);
-    let metering = timed_features.is_enabled(TimedFeatureFlag::VerifierMetering);
-
-    if legacy_limit_back_edges && !metering {
-        // Turn on limit on back edges, as long as metering is not active
-        max_back_edges_per_function = Some(20);
-        max_back_edges_per_module = Some(400);
-        max_basic_blocks_in_script = Some(1024);
-    }
-
-    if metering {
-        max_per_fun_meter_units = Some(1000 * 80000);
-        max_per_mod_meter_units = Some(1000 * 80000);
-    }
-
+pub fn verifier_config(features: &Features, _timed_features: &TimedFeatures) -> VerifierConfig {
     VerifierConfig {
         max_loop_depth: Some(5),
         max_generic_instantiation_length: Some(32),
@@ -168,11 +145,11 @@ pub fn verifier_config(features: &Features, timed_features: &TimedFeatures) -> V
         max_struct_definitions: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
-        max_back_edges_per_function,
-        max_back_edges_per_module,
-        max_basic_blocks_in_script,
-        max_per_fun_meter_units,
-        max_per_mod_meter_units,
+        max_back_edges_per_function: None,
+        max_back_edges_per_module: None,
+        max_basic_blocks_in_script: None,
+        max_per_fun_meter_units: Some(1000 * 80000),
+        max_per_mod_meter_units: Some(1000 * 80000),
         use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
     }
 }

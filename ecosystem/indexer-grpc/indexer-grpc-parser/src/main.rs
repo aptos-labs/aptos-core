@@ -1,46 +1,49 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::{Ok, Result};
 use aptos_indexer_grpc_parser::worker::Worker;
-use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
+use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use clap::Parser;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use serde::{Deserialize, Serialize};
 
-#[derive(Parser)]
-pub struct Args {
-    #[clap(short, long)]
-    pub config_path: String,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexerGrpcProcessorConfig {
+    pub server_name: String,
+    pub processor_name: String,
+    pub postgres_connection_string: String,
+    pub indexer_grpc_data_service_addresss: String,
+    pub auth_token: String,
+    pub starting_version: Option<u64>,
+    pub number_concurrent_processing_tasks: Option<usize>,
+    pub ans_address: Option<String>,
 }
 
-fn main() {
-    aptos_logger::Logger::new().init();
-    aptos_crash_handler::setup_panic_handler();
-
-    // Load config.
-    let args = Args::parse();
-    let config = aptos_indexer_grpc_utils::config::IndexerGrpcProcessorConfig::load(
-        std::path::PathBuf::from(args.config_path),
-    )
-    .unwrap();
-
-    let runtime = aptos_runtimes::spawn_named_runtime("indexerproc".to_string(), None);
-
-    let health_port = config.health_check_port;
-    runtime.spawn(async move {
-        let worker = Worker::new(config).await;
+#[async_trait::async_trait]
+impl RunnableConfig for IndexerGrpcProcessorConfig {
+    async fn run(&self) -> Result<()> {
+        let worker = Worker::new(
+            self.processor_name.clone(),
+            self.postgres_connection_string.clone(),
+            self.indexer_grpc_data_service_addresss.clone(),
+            self.auth_token.clone(),
+            self.starting_version,
+            self.number_concurrent_processing_tasks,
+            self.ans_address.clone(),
+        )
+        .await;
         worker.run().await;
-    });
-
-    // Start liveness and readiness probes.
-    runtime.spawn(async move {
-        register_probes_and_metrics_handler(health_port).await;
-    });
-
-    let term = Arc::new(AtomicBool::new(false));
-    while !term.load(Ordering::Acquire) {
-        std::thread::park();
+        Ok(())
     }
+
+    fn get_server_name(&self) -> String {
+        self.server_name.clone()
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = ServerArgs::parse();
+    args.run::<IndexerGrpcProcessorConfig>().await
 }

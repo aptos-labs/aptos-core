@@ -77,6 +77,7 @@ pub trait StateComputer: Send + Sync {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
+        block_gas_limit: Option<u64>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

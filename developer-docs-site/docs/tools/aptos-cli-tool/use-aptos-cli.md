@@ -86,9 +86,9 @@ OPTIONS:
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
 
-            Example: alice=0x1234, bob=0x5678
+            Example: alice=0x1234,bob=0x5678
 
-            Note: This will fail if there are duplicates in the Move.toml file remove those first.
+            Note: This will fail if there are duplicates in the Move.toml file remove those first. Also make sure there's no space in between named addresses if more than one is provided.
 
             [default: ]
 

@@ -51,6 +51,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `withdraw_with_ref`](#0x1_fungible_asset_withdraw_with_ref)
 -  [Function `deposit_with_ref`](#0x1_fungible_asset_deposit_with_ref)
 -  [Function `transfer_with_ref`](#0x1_fungible_asset_transfer_with_ref)
+-  [Function `zero`](#0x1_fungible_asset_zero)
 -  [Function `extract`](#0x1_fungible_asset_extract)
 -  [Function `merge`](#0x1_fungible_asset_merge)
 -  [Function `destroy_zero`](#0x1_fungible_asset_destroy_zero)
@@ -1283,9 +1284,8 @@ Applications can use this to create multiple stores for isolating fungible asset
     metadata: Object&lt;T&gt;,
 ): Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt; {
     <b>let</b> store_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
-    <b>let</b> metadata = <a href="object.md#0x1_object_convert">object::convert</a>&lt;T, <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata);
     <b>move_to</b>(store_obj, <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-        metadata,
+        metadata: <a href="object.md#0x1_object_convert">object::convert</a>(metadata),
         balance: 0,
         frozen: <b>false</b>,
     });
@@ -1653,6 +1653,35 @@ Transfer <code>amount</code> of the fungible asset with <code><a href="fungible_
 
 </details>
 
+<a name="0x1_fungible_asset_zero"></a>
+
+## Function `zero`
+
+Create a fungible asset with zero amount.
+This can be useful when starting a series of computations where the initial value is 0.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_zero">zero</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_zero">zero</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> {
+        metadata: <a href="object.md#0x1_object_convert">object::convert</a>(metadata),
+        amount: 0,
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_fungible_asset_extract"></a>
 
 ## Function `extract`
@@ -1754,6 +1783,8 @@ Destroy an empty fungible asset.
 
 <pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a> {
     <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount } = fa;
+    <b>if</b> (amount == 0) <b>return</b>;
+
     <b>let</b> store_metadata = <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store);
     <b>assert</b>!(metadata == store_metadata, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_ASSET_AND_STORE_MISMATCH">EFUNGIBLE_ASSET_AND_STORE_MISMATCH</a>));
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);

@@ -13,6 +13,7 @@ use crate::{
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
+    sharded_block_executor::ShardedBlockExecutor,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -69,7 +70,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    cmp::min,
+    cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
     marker::Sync,
@@ -80,6 +81,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
@@ -141,6 +143,19 @@ impl AptosVM {
     pub fn get_concurrency_level() -> usize {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
+            None => 1,
+        }
+    }
+
+    pub fn set_num_shards_once(mut num_shards: usize) {
+        num_shards = max(num_shards, 1);
+        // Only the first call succeeds, due to OnceCell semantics.
+        NUM_EXECUTION_SHARD.set(num_shards).ok();
+    }
+
+    pub fn get_num_shards() -> usize {
+        match NUM_EXECUTION_SHARD.get() {
+            Some(num_shards) => *num_shards,
             None => 1,
         }
     }
@@ -1455,6 +1470,39 @@ impl VMExecutor for AptosVM {
                 None,
             ))
         });
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret = BlockAptosVM::execute_block(
+            Arc::clone(&RAYON_EXEC_POOL),
+            transactions,
+            state_view,
+            Self::get_concurrency_level(),
+            None,
+        );
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
+    }
+
+    fn execute_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+        maybe_gas_limit: Option<u64>,
+    ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
+        fail_point!("move_adapter::execute_block", |_| {
+            Err(VMStatus::Error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
@@ -1469,6 +1517,32 @@ impl VMExecutor for AptosVM {
             transactions,
             state_view,
             Self::get_concurrency_level(),
+            maybe_gas_limit,
+        );
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
+    }
+
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
+        sharded_block_executor: &ShardedBlockExecutor<S>,
+        transactions: Vec<Transaction>,
+        state_view: Arc<S>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret = sharded_block_executor.execute_block(
+            state_view,
+            transactions,
+            AptosVM::get_concurrency_level(),
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

@@ -84,10 +84,13 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let li = db.reader.get_latest_ledger_info().unwrap();
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
-    let target_version = version + txns.len() as u64;
+    let target_version = version + txns.len() as u64 + 1; // Due to StateCheckpoint txn
     let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
-        .execute_block((block_id, txns), executor.committed_block_id())
+        .execute_block(
+            (block_id, block(txns, executor.get_block_gas_limit())),
+            executor.committed_block_id(),
+        )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
     let ledger_info_with_sigs =
@@ -207,7 +210,7 @@ fn test_new_genesis() {
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
     let txn3 = get_aptos_coin_mint_transaction(genesis_key, 2, &account1, 200_000_000);
     let txn4 = get_aptos_coin_mint_transaction(genesis_key, 3, &account2, 200_000_000);
-    execute_and_commit(block(vec![txn1, txn2, txn3, txn4]), &db, &signer);
+    execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 200_000_000);
     assert_eq!(get_balance(&account2, &db), 200_000_000);
 
@@ -297,7 +300,7 @@ fn test_new_genesis() {
     println!("FINAL TRANSFER");
     // Transfer some money.
     let txn = get_aptos_coin_transfer_transaction(account1, 0, &account1_key, account2, 50_000_000);
-    execute_and_commit(block(vec![txn]), &db, &signer);
+    execute_and_commit(vec![txn], &db, &signer);
 
     // And verify.
     assert_eq!(get_balance(&account2, &db), 250_000_000);

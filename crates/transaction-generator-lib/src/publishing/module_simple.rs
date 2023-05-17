@@ -143,6 +143,9 @@ pub enum EntryPoints {
     BytesMakeOrChange {
         data_length: Option<usize>,
     },
+    EmitEvents {
+        count: u64,
+    },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
 
@@ -179,6 +182,7 @@ impl EntryPoints {
             | EntryPoints::Minimize
             | EntryPoints::MakeOrChange { .. }
             | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
             | EntryPoints::StepDst => "simple",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -211,6 +215,7 @@ impl EntryPoints {
             | EntryPoints::Minimize
             | EntryPoints::MakeOrChange { .. }
             | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
             | EntryPoints::StepDst => "simple",
             EntryPoints::TokenV1InitializeCollection
             | EntryPoints::TokenV1MintAndStoreNFTParallel
@@ -281,6 +286,11 @@ impl EntryPoints {
                 let rng = rng.expect("Must provide RNG");
                 let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
                 bytes_make_or_change(rng, module_id, data_len)
+            },
+            EntryPoints::EmitEvents { count } => {
+                get_payload(module_id, ident_str!("emit_events").to_owned(), vec![
+                    bcs::to_bytes(count).unwrap(),
+                ])
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
