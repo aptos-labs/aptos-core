@@ -1260,6 +1260,8 @@ dependencies = [
  "aptos-testcases",
  "async-trait",
  "jemallocator",
+ "rand 0.7.3",
+ "random_word",
  "serde_yaml 0.8.26",
  "structopt",
  "tokio",
@@ -10189,6 +10191,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = [
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "random_word"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97b2bb830d03b36582fd6723a57d2451b9db74574d21c34db9d7122c96b24fa0"
+dependencies = [
+ "rand 0.8.5",
 ]
 
 [[package]]
