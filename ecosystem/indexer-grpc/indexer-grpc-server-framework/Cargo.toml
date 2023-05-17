@@ -1,6 +1,6 @@
 [package]
-name = "aptos-indexer-grpc-file-store"
-description = "Indexer gRPC file store to save transactions to Google Cloud Storage."
+name = "aptos-indexer-grpc-server-framework"
+description = "Indexer gRPC server framework."
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -14,18 +14,18 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-grpc-utils = { workspace = true }
-aptos-metrics-core  =   { workspace = true }
-aptos-moving-average = { workspace = true }
+aptos-metrics-core = { workspace = true }
 aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
+backtrace = { workspace = true }
 clap = { workspace = true }
-cloud-storage = { workspace = true }
-futures-util = { workspace = true }
-once_cell = { workspace = true }
-redis = { workspace = true }
+futures = { workspace = true }
+prometheus = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
+toml = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+warp = { workspace = true }

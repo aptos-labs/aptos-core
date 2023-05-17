@@ -14,13 +14,13 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crash-handler = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
-aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
+async-trait = { workspace = true }
 base64 = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
@@ -34,4 +34,5 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
+tracing = { workspace = true }
 uuid = { workspace = true }

@@ -8,12 +8,11 @@ use crate::metrics::{
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
-    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
+    config::IndexerGrpcFileStoreConfig,
     constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
-use aptos_logger::{error, info, warn};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
@@ -29,10 +28,11 @@ use tokio::sync::{
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::{error, info, warn, Instrument};
 use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct RequestMetadata {
     pub request_id: String,
     pub request_remote_addr: String,
@@ -57,17 +57,17 @@ const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
-    pub server_config: IndexerGrpcConfig,
+    pub file_store_config: IndexerGrpcFileStoreConfig,
 }
 
 impl RawDataServerWrapper {
-    pub fn new(config: IndexerGrpcConfig) -> Self {
+    pub fn new(redis_address: String, file_store_config: IndexerGrpcFileStoreConfig) -> Self {
         Self {
             redis_client: Arc::new(
-                redis::Client::open(format!("redis://{}", config.redis_address))
+                redis::Client::open(format!("redis://{}", redis_address))
                     .expect("Create redis client failed."),
             ),
-            server_config: config,
+            file_store_config,
         }
     }
 }
@@ -116,7 +116,7 @@ impl RawData for RawDataServerWrapper {
         // This is to monitor the latest processed version.
         let (watch_sender, mut watch_receiver) = watch_channel(current_version);
 
-        let file_store_operator: Box<dyn FileStoreOperator> = match &self.server_config.file_store {
+        let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
                 GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
             ),
@@ -125,203 +125,212 @@ impl RawData for RawDataServerWrapper {
             ),
         };
 
+        // Adds tracing context for the request.
+        let serving_span = tracing::span!(
+            tracing::Level::INFO,
+            "Data Serving",
+            request_id = request_metadata.request_id.as_str(),
+            request_remote_addr = request_metadata.request_remote_addr.as_str(),
+            request_token = request_metadata.request_token.as_str(),
+            request_name = request_metadata.request_name.as_str(),
+            request_source = request_metadata.request_source.as_str(),
+        );
+
         let redis_client = self.redis_client.clone();
         let request_metadata_clone = request_metadata.clone();
-        tokio::spawn(async move {
-            let request_metadata = request_metadata_clone;
-            let conn = match redis_client.get_async_connection().await {
-                Ok(conn) => conn,
-                Err(e) => {
-                    ERROR_COUNT
-                        .with_label_values(&["redis_connection_failed"])
-                        .inc();
-                    tx.send(Err(Status::unavailable(
-                        "[Indexer Data] Cannot connect to Redis; please retry.",
-                    )))
-                    .await
-                    .unwrap();
-                    error!(
-                        request_metadata = request_metadata,
-                        error = e.to_string(),
-                        "[Indexer Data] Failed to get redis connection."
-                    );
-                    return;
-                },
-            };
-            let mut cache_operator = CacheOperator::new(conn);
-            file_store_operator.verify_storage_bucket_existence().await;
-
-            let chain_id = match cache_operator.get_chain_id().await {
-                Ok(chain_id) => chain_id,
-                Err(e) => {
-                    ERROR_COUNT
-                        .with_label_values(&["redis_get_chain_id_failed"])
-                        .inc();
-                    tx.send(Err(Status::unavailable(
-                        "[Indexer Data] Cannot get the chain id; please retry.",
-                    )))
-                    .await
-                    .unwrap();
-                    error!(
-                        request_metadata = request_metadata,
-                        error = e.to_string(),
-                        "[Indexer Data] Failed to get chain id."
-                    );
-                    return;
-                },
-            };
-            // Data service metrics.
-            let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
-
-            info!(
-                chain_id = chain_id,
-                current_version = current_version,
-                request_metadata = request_metadata,
-                "[Indexer Data] New request received."
-            );
-            loop {
-                // 1. Fetch data from cache and file store.
-                let transaction_data = match data_fetch(
-                    current_version,
-                    &mut cache_operator,
-                    file_store_operator.as_ref(),
-                )
-                .await
-                {
-                    Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-                    Ok(TransactionsDataStatus::AheadOfCache) => {
-                        ahead_of_cache_data_handling().await;
-                        // Retry after a short sleep.
-                        continue;
-                    },
-                    Ok(TransactionsDataStatus::DataGap) => {
-                        data_gap_handling(current_version, &request_metadata);
-                        // End the data stream.
-                        break;
-                    },
+        tokio::spawn(
+            async move {
+                let request_metadata = request_metadata_clone;
+                let conn = match redis_client.get_async_connection().await {
+                    Ok(conn) => conn,
                     Err(e) => {
-                        ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
-                        data_fetch_error_handling(e, current_version, chain_id, &request_metadata)
-                            .await;
-                        // Retry after a short sleep.
-                        continue;
+                        ERROR_COUNT
+                            .with_label_values(&["redis_connection_failed"])
+                            .inc();
+                        tx.send(Err(Status::unavailable(
+                            "[Indexer Data] Cannot connect to Redis; please retry.",
+                        )))
+                        .await
+                        .unwrap();
+                        error!(
+                            error = e.to_string(),
+                            "[Indexer Data] Failed to get redis connection."
+                        );
+                        return;
                     },
                 };
+                let mut cache_operator = CacheOperator::new(conn);
+                file_store_operator.verify_storage_bucket_existence().await;
 
-                // 2. Push the data to the response channel, i.e. stream the data to the client.
-                let resp_item =
-                    get_transactions_response_builder(transaction_data, chain_id as u32);
-                let current_batch_size = resp_item.transactions.as_slice().len();
-                let end_of_batch_version =
-                    resp_item.transactions.as_slice().last().unwrap().version;
-                let data_latency_in_secs = resp_item
-                    .transactions
-                    .first()
-                    .unwrap()
-                    .timestamp
-                    .as_ref()
-                    .map(time_diff_since_pb_timestamp_in_secs);
-                match tx.try_send(Result::<TransactionsResponse, Status>::Ok(resp_item)) {
-                    Ok(_) => {
-                        PROCESSED_BATCH_SIZE
-                            .with_label_values(&[
-                                request_metadata.request_token.as_str(),
-                                request_metadata.request_name.as_str(),
-                            ])
-                            .set(current_batch_size as i64);
-                        LATEST_PROCESSED_VERSION
-                            .with_label_values(&[
-                                request_metadata.request_token.as_str(),
-                                request_metadata.request_name.as_str(),
-                            ])
-                            .set(end_of_batch_version as i64);
-                        PROCESSED_VERSIONS_COUNT
-                            .with_label_values(&[
-                                request_metadata.request_token.as_str(),
-                                request_metadata.request_name.as_str(),
-                            ])
-                            .inc_by(current_batch_size as u64);
-                        if let Some(data_latency_in_secs) = data_latency_in_secs {
-                            PROCESSED_LATENCY_IN_SECS
+                let chain_id = match cache_operator.get_chain_id().await {
+                    Ok(chain_id) => chain_id,
+                    Err(e) => {
+                        ERROR_COUNT
+                            .with_label_values(&["redis_get_chain_id_failed"])
+                            .inc();
+                        tx.send(Err(Status::unavailable(
+                            "[Indexer Data] Cannot get the chain id; please retry.",
+                        )))
+                        .await
+                        .unwrap();
+                        error!(
+                            error = e.to_string(),
+                            "[Indexer Data] Failed to get chain id."
+                        );
+                        return;
+                    },
+                };
+                // Data service metrics.
+                let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
+
+                info!(
+                    chain_id = chain_id,
+                    current_version = current_version,
+                    "[Indexer Data] New request received."
+                );
+
+                loop {
+                    // 1. Fetch data from cache and file store.
+                    let transaction_data = match data_fetch(
+                        current_version,
+                        &mut cache_operator,
+                        file_store_operator.as_ref(),
+                    )
+                    .await
+                    {
+                        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
+                        Ok(TransactionsDataStatus::AheadOfCache) => {
+                            ahead_of_cache_data_handling().await;
+                            // Retry after a short sleep.
+                            continue;
+                        },
+                        Ok(TransactionsDataStatus::DataGap) => {
+                            data_gap_handling(current_version);
+                            // End the data stream.
+                            break;
+                        },
+                        Err(e) => {
+                            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
+                            data_fetch_error_handling(e, current_version, chain_id).await;
+                            // Retry after a short sleep.
+                            continue;
+                        },
+                    };
+                    // 2. Push the data to the response channel, i.e. stream the data to the client.
+                    let resp_item =
+                        get_transactions_response_builder(transaction_data, chain_id as u32);
+                    let current_batch_size = resp_item.transactions.as_slice().len();
+                    let end_of_batch_version =
+                        resp_item.transactions.as_slice().last().unwrap().version;
+                    let data_latency_in_secs = resp_item
+                        .transactions
+                        .first()
+                        .unwrap()
+                        .timestamp
+                        .as_ref()
+                        .map(time_diff_since_pb_timestamp_in_secs);
+                    match tx.try_send(Result::<TransactionsResponse, Status>::Ok(resp_item)) {
+                        Ok(_) => {
+                            PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
                                     request_metadata.request_token.as_str(),
                                     request_metadata.request_name.as_str(),
                                 ])
-                                .set(data_latency_in_secs);
-                            PROCESSED_LATENCY_IN_SECS_ALL
-                                .with_label_values(&[request_metadata.request_source.as_str()])
-                                .observe(data_latency_in_secs);
-                        }
-                    },
-                    Err(TrySendError::Full(_)) => {
-                        warn!(
-                            request_metadata = request_metadata,
-                            "[Indexer Data] Receiver is full; retrying."
-                        );
-                        tokio::time::sleep(Duration::from_millis(
-                            RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS,
-                        ))
-                        .await;
-                        continue;
-                    },
-                    Err(TrySendError::Closed(_)) => {
-                        ERROR_COUNT
-                            .with_label_values(&["response_channel_closed"])
-                            .inc();
-                        warn!(
-                            request_metadata = request_metadata,
-                            "[Indexer Data] Receiver is closed; exiting."
-                        );
-                        break;
-                    },
-                }
-                // 3. Update the current version and record current tps.
-                tps_calculator.tick_now(current_batch_size as u64);
-                current_version = end_of_batch_version + 1;
-                if watch_sender.send(current_version).is_err() {
-                    error!(
-                        request_metadata = request_metadata,
+                                .set(current_batch_size as i64);
+                            LATEST_PROCESSED_VERSION
+                                .with_label_values(&[
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_name.as_str(),
+                                ])
+                                .set(end_of_batch_version as i64);
+                            PROCESSED_VERSIONS_COUNT
+                                .with_label_values(&[
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_name.as_str(),
+                                ])
+                                .inc_by(current_batch_size as u64);
+                            if let Some(data_latency_in_secs) = data_latency_in_secs {
+                                PROCESSED_LATENCY_IN_SECS
+                                    .with_label_values(&[
+                                        request_metadata.request_token.as_str(),
+                                        request_metadata.request_name.as_str(),
+                                    ])
+                                    .set(data_latency_in_secs);
+                                PROCESSED_LATENCY_IN_SECS_ALL
+                                    .with_label_values(&[request_metadata.request_source.as_str()])
+                                    .observe(data_latency_in_secs);
+                            }
+                        },
+                        Err(TrySendError::Full(_)) => {
+                            warn!("[Indexer Data] Receiver is full; retrying.");
+                            tokio::time::sleep(Duration::from_millis(
+                                RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS,
+                            ))
+                            .await;
+                            continue;
+                        },
+                        Err(TrySendError::Closed(_)) => {
+                            ERROR_COUNT
+                                .with_label_values(&["response_channel_closed"])
+                                .inc();
+                            warn!("[Indexer Data] Receiver is closed; exiting.");
+                            break;
+                        },
+                    }
+                    // 3. Update the current version and record current tps.
+                    tps_calculator.tick_now(current_batch_size as u64);
+                    current_version = end_of_batch_version + 1;
+                    if watch_sender.send(current_version).is_err() {
+                        error!(
                         "[Indexer Data] Failed to send the current version to the watch channel."
                     );
-                    break;
-                }
-                info!(
-                    request_metadata = request_metadata,
-                    current_version = current_version,
-                    end_version = end_of_batch_version,
-                    batch_size = current_batch_size,
-                    tps = (tps_calculator.avg() * 1000.0) as u64,
-                    "[Indexer Data] Sending batch."
-                );
-            }
-            info!(
-                request_metadata = request_metadata,
-                "[Indexer Data] Client disconnected."
-            );
-        });
-
-        tokio::spawn(async move {
-            let request_token = request_metadata.request_token.as_str();
-            let request_name = request_metadata.request_name.as_str();
-            loop {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                match watch_receiver.changed().await.is_ok() {
-                    true => {
-                        let current_processed_version = *watch_receiver.borrow();
-                        OBSERVED_LATEST_PROCESSED_VERSION
-                            .with_label_values(&[request_token, request_name])
-                            .set(current_processed_version as i64);
-                    },
-                    false => {
-                        info!(
-                            request_metadata = request_metadata,
-                            "[Indexer Data] Version watch receiver is closed; exiting."
-                        );
                         break;
-                    },
+                    }
+                    info!(
+                        current_version = current_version,
+                        end_version = end_of_batch_version,
+                        batch_size = current_batch_size,
+                        tps = (tps_calculator.avg() * 1000.0) as u64,
+                        "[Indexer Data] Sending batch."
+                    );
+                }
+                info!("[Indexer Data] Client disconnected.");
+            }
+            .instrument(serving_span),
+        );
+
+        let monitoring_span = tracing::span!(
+            tracing::Level::INFO,
+            "Data Monitoring",
+            request_id = request_metadata.request_id.as_str(),
+            request_remote_addr = request_metadata.request_remote_addr.as_str(),
+            request_token = request_metadata.request_token.as_str(),
+            request_name = request_metadata.request_name.as_str(),
+            request_source = request_metadata.request_source.as_str(),
+        );
+
+        tokio::spawn(
+            async move {
+                let request_token = request_metadata.request_token.as_str();
+                let request_name = request_metadata.request_name.as_str();
+                loop {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    match watch_receiver.changed().await.is_ok() {
+                        true => {
+                            let current_processed_version = *watch_receiver.borrow();
+                            OBSERVED_LATEST_PROCESSED_VERSION
+                                .with_label_values(&[request_token, request_name])
+                                .set(current_processed_version as i64);
+                        },
+                        false => {
+                            info!("[Indexer Data] Version watch receiver is closed; exiting.");
+                            break;
+                        },
+                    }
                 }
             }
-        });
+            .instrument(monitoring_span),
+        );
         let output_stream = ReceiverStream::new(rx);
         Ok(Response::new(
             Box::pin(output_stream) as Self::GetTransactionsStream
@@ -395,25 +404,18 @@ async fn ahead_of_cache_data_handling() {
 }
 
 /// Handles data gap errors, i.e., the data is not present in the cache or file store.
-fn data_gap_handling(version: u64, request_metadata: &RequestMetadata) {
+fn data_gap_handling(version: u64) {
     // TODO(larry): add metrics/alerts to track the gap.
     // Do not crash the server when gap detected since other clients may still be able to get data.
     error!(
-        request_metadata = request_metadata,
         current_version = version,
         "[Indexer Data] Data gap detected. Please check the logs for more details."
     );
 }
 
 /// Handles data fetch errors, including cache and file store related errors.
-async fn data_fetch_error_handling(
-    err: anyhow::Error,
-    current_version: u64,
-    chain_id: u64,
-    request_metadata: &RequestMetadata,
-) {
+async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, chain_id: u64) {
     error!(
-        request_metadata = request_metadata,
         chain_id = chain_id,
         current_version = current_version,
         "[Indexer Data] Failed to fetch data from cache and file store. {:?}",
