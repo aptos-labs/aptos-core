@@ -27,16 +27,12 @@ use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::gas_algebra::InternalGas;
 use move_core_types::gas_algebra::{InternalGasPerArg, NumArgs, NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::{
-    loaded_data::runtime_types::Type, values::Value,
-};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 #[cfg(feature = "testing")]
-use move_vm_types::{
-    natives::function::NativeResult, pop_arg
-};
+use move_vm_types::{natives::function::NativeResult, pop_arg};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
@@ -200,10 +196,13 @@ fn native_generate_keys(
         .collect();
     let group_sk = multi_ed25519::MultiEd25519PrivateKey::new(private_keys, threshold).unwrap();
     let group_pk = multi_ed25519::MultiEd25519PublicKey::new(public_keys, threshold).unwrap();
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(group_sk.to_bytes()),
-        Value::vector_u8(group_pk.to_bytes()),
-    ]))
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![
+            Value::vector_u8(group_sk.to_bytes()),
+            Value::vector_u8(group_pk.to_bytes()),
+        ],
+    ))
 }
 
 #[cfg(feature = "testing")]
@@ -216,9 +215,10 @@ fn native_sign(
     let sk_bytes = pop_arg!(arguments, Vec<u8>);
     let group_sk = multi_ed25519::MultiEd25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
     let sig = group_sk.sign_arbitrary_message(message.as_slice());
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
-        Value::vector_u8(sig.to_bytes()),
-    ]))
+    Ok(NativeResult::ok(
+        InternalGas::zero(),
+        smallvec![Value::vector_u8(sig.to_bytes()),],
+    ))
 }
 /***************************************************************************************************
  * module
