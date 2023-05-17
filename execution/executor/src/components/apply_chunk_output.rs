@@ -24,7 +24,7 @@ use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     proof::accumulator::InMemoryAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{
         ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
         TransactionToCommit,
@@ -341,7 +341,7 @@ impl ApplyChunkOutput {
 
     fn assemble_ledger_diff_for_block(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        state_updates_vec: Vec<HashMap<StateKey, Option<StateValue>>>,
+        state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (
         Vec<Arc<TransactionToCommit>>,
