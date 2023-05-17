@@ -5,7 +5,7 @@ use crate::{
     natives::{
         cryptography::algebra::{
             feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -21,7 +21,7 @@ macro_rules! from_u64_internal {
         let value = safely_pop_arg!($args, u64);
         $context.charge($gas)?;
         let element = <$typ>::from(value as u64);
-        let handle = store_element!($context, element);
+        let handle = store_element!($context, element)?;
         Ok(smallvec![Value::u64(handle as u64)])
     }};
 }

@@ -41,6 +41,7 @@ module aptos_std::crypto_algebra {
 
     const E_NOT_IMPLEMENTED: u64 = 1;
     const E_NON_EQUAL_LENGTHS: u64 = 2;
+    const E_TOO_MUCH_MEMORY_USED: u64 = 3;
 
     /// This struct represents an element of a structure `S`.
     struct Element<phantom S> has copy, drop {
