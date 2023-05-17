@@ -130,7 +130,7 @@ impl PeerState {
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    pub(crate) fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+    pub fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
         } else {

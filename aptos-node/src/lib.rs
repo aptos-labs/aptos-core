@@ -428,7 +428,6 @@ where
     node_config
         .mempool
         .shared_mempool_max_concurrent_inbound_syncs = 1;
-    node_config.mempool.default_failovers = 1;
     node_config.mempool.max_broadcasts_per_peer = 1;
 
     node_config

@@ -6,12 +6,15 @@ use crate::{
     core_mempool::CoreMempool,
     network::MempoolSyncMsg,
     shared_mempool::{
+        broadcast_peers_selector::{
+            AllPeersSelector, BroadcastPeersSelector, FreshPeersSelector, PrioritizedPeersSelector,
+        },
         coordinator::{coordinator, gc_coordinator, snapshot_job},
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
     QuorumStoreRequest,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{BroadcastPeersSelectorConfig, NodeConfig};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
@@ -32,6 +35,7 @@ use tokio::runtime::{Handle, Runtime};
 ///   - outbound_sync_task (task that periodically broadcasts transactions to peers).
 ///   - inbound_network_task (task that handles inbound mempool messages and network events).
 ///   - gc_task (task that performs GC of all expired transactions by SystemTTL).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     executor: &Handle,
     config: &NodeConfig,
@@ -46,6 +50,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
     ConfigProvider: OnChainConfigProvider,
@@ -71,6 +76,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
         mempool_reconfig_events,
         config.mempool.shared_mempool_peer_update_interval_ms,
         peers_and_metadata,
+        broadcast_peers_selector,
     ));
 
     executor.spawn(gc_coordinator(
@@ -98,7 +104,25 @@ pub fn bootstrap(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
+
+    let broadcast_peers_selector = {
+        let inner_selector: Box<dyn BroadcastPeersSelector> =
+            match config.mempool.broadcast_peers_selector {
+                BroadcastPeersSelectorConfig::AllPeers => Box::new(AllPeersSelector::new()),
+                BroadcastPeersSelectorConfig::FreshPeers(max_selected_peers) => {
+                    Box::new(FreshPeersSelector::new(max_selected_peers))
+                },
+                BroadcastPeersSelectorConfig::PrioritizedPeers(max_selected_peers) => {
+                    Box::new(PrioritizedPeersSelector::new(max_selected_peers))
+                },
+            };
+        Arc::new(RwLock::new(inner_selector))
+    };
+
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        config,
+        broadcast_peers_selector.clone(),
+    )));
     let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
     start_shared_mempool(
         runtime.handle(),
@@ -114,6 +138,7 @@ pub fn bootstrap(
         vm_validator,
         vec![],
         peers_and_metadata,
+        broadcast_peers_selector,
     );
     runtime
 }

@@ -10,6 +10,7 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     network::MempoolSyncMsg,
     shared_mempool::{
+        broadcast_peers_selector::BroadcastPeersSelector,
         tasks,
         tasks::process_committed_transactions,
         types::{notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification},
@@ -20,7 +21,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
 use aptos_network::{
@@ -55,6 +56,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
     mut mempool_reconfig_events: ReconfigNotificationListener<ConfigProvider>,
     peer_update_interval_ms: u64,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
@@ -114,7 +116,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
                 handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
             },
             _ = update_peers_interval.tick().fuse() => {
-                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
+                handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, broadcast_peers_selector.clone(), executor.clone()).await;
             },
             complete => break,
         }
@@ -345,16 +347,23 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
     peers_and_metadata: Arc<PeersAndMetadata>,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     scheduled_broadcasts: &mut FuturesUnordered<ScheduledBroadcast>,
+    broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
     executor: Handle,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
+        broadcast_peers_selector
+            .write()
+            .update_peers(&connected_peers);
         let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
         if !newly_added_upstream.is_empty() || !disabled.is_empty() {
             counters::shared_mempool_event_inc("peer_update");
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
+        }
+        if !newly_added_upstream.is_empty() {
+            smp.mempool.lock().redirect_no_peers();
         }
         for peer in &newly_added_upstream {
             debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
@@ -363,6 +372,9 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
         }
         for peer in &disabled {
             debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
+            // TODO: Also need to redirect the out of date ones, based on some threshold
+            // TODO: of out-of-date versions
+            smp.mempool.lock().redirect(*peer);
         }
     }
 }

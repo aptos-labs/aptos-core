@@ -4,7 +4,11 @@
 
 use crate::{
     core_mempool::CoreMempool,
-    shared_mempool::{start_shared_mempool, types::MultiBatchId},
+    shared_mempool::{
+        broadcast_peers_selector::{AllPeersSelector, BroadcastPeersSelector},
+        start_shared_mempool,
+        types::MultiBatchId,
+    },
     tests::{common, common::TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
 };
@@ -586,7 +590,12 @@ fn setup_mempool(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(AllPeersSelector::new());
+    let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        &config,
+        broadcast_peers_selector.clone(),
+    )));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let db_ro = Arc::new(MockDbReaderWriter);
 
@@ -618,6 +627,7 @@ fn setup_mempool(
         vm_validator,
         vec![sender],
         peers_and_metadata,
+        broadcast_peers_selector,
     );
 
     (
