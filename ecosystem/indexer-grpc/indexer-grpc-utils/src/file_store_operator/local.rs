@@ -23,7 +23,7 @@ impl LocalFileStoreOperator {
 #[async_trait::async_trait]
 impl FileStoreOperator for LocalFileStoreOperator {
     async fn verify_storage_bucket_existence(&self) {
-        aptos_logger::info!(
+        tracing::info!(
             bucket_name = self.path.to_str().unwrap(),
             "Before file store operator starts, verify the bucket exists."
         );
@@ -152,7 +152,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
         // create files directory
         let files_dir = self.path.join(FILE_FOLDER_NAME);
         if !files_dir.exists() {
-            aptos_logger::info!("Creating files directory {:?}", files_dir.clone());
+            tracing::info!("Creating files directory {:?}", files_dir.clone());
             tokio::fs::create_dir(files_dir.clone()).await?;
         }
 
@@ -164,7 +164,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
                 .path
                 .join(generate_blob_name(transactions_file.starting_version).as_str());
 
-            aptos_logger::info!(
+            tracing::info!(
                 "Uploading transactions to {:?}",
                 txns_path.to_str().unwrap()
             );
@@ -185,7 +185,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
         // If any uploading fails, retry.
         for result in &results {
             if result.is_err() {
-                aptos_logger::error!("Error happens when uploading transactions. {:?}", result);
+                tracing::error!("Error happens when uploading transactions. {:?}", result);
             }
         }
         if any(results, |x| x.is_err()) {

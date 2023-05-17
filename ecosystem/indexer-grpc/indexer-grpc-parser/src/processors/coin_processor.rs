@@ -15,12 +15,12 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
+use tracing::error;
 
 pub const NAME: &str = "coin_processor";
 const APTOS_COIN_TYPE_STR: &str = "0x1::aptos_coin::AptosCoin";
@@ -72,7 +72,7 @@ fn insert_to_db(
     current_coin_balances: Vec<CurrentCoinBalance>,
     coin_supply: Vec<CoinSupply>,
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,

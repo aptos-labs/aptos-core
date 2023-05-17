@@ -1,51 +1,42 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::{Ok, Result};
 use aptos_indexer_grpc_cache_worker::worker::Worker;
-use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
+use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
+use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use clap::Parser;
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread,
-};
+use serde::{Deserialize, Serialize};
 
-#[derive(Parser)]
-pub struct Args {
-    #[clap(short, long)]
-    pub config_path: String,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexerGrpcCacheWorkerConfig {
+    pub server_name: String,
+    pub fullnode_grpc_address: String,
+    pub file_store_config: IndexerGrpcFileStoreConfig,
+    pub redis_main_instance_address: String,
 }
 
-fn main() {
-    aptos_logger::Logger::new().init();
-    aptos_crash_handler::setup_panic_handler();
-
-    // Load config.
-    let args = Args::parse();
-    let config = aptos_indexer_grpc_utils::config::IndexerGrpcConfig::load(
-        std::path::PathBuf::from(args.config_path),
-    )
-    .unwrap();
-
-    let health_port = config.health_check_port;
-
-    let runtime = aptos_runtimes::spawn_named_runtime("indexercache".to_string(), None);
-
-    // Start processing.
-    runtime.spawn(async move {
-        let mut worker = Worker::new(config).await;
+#[async_trait::async_trait]
+impl RunnableConfig for IndexerGrpcCacheWorkerConfig {
+    async fn run(&self) -> Result<()> {
+        let mut worker = Worker::new(
+            self.fullnode_grpc_address.clone(),
+            self.redis_main_instance_address.clone(),
+            self.file_store_config.clone(),
+        )
+        .await;
         worker.run().await;
-    });
-
-    // Start liveness and readiness probes.
-    runtime.spawn(async move {
-        register_probes_and_metrics_handler(health_port).await;
-    });
-
-    let term = Arc::new(AtomicBool::new(false));
-    while !term.load(Ordering::Acquire) {
-        thread::park();
+        Ok(())
     }
+
+    fn get_server_name(&self) -> String {
+        self.server_name.clone()
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = ServerArgs::parse();
+    args.run::<IndexerGrpcCacheWorkerConfig>().await
 }
