@@ -76,12 +76,12 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
     };
 }
 
-/// Flushes the currently stored logs, and swaps the speculative log / event storage with None.
+/// Flushes the first num_to_flush logs in the currently stored logs, and swaps the speculative log / event storage with None.
 /// Must be called after block execution is complete (removes the storage from Arc).
-pub fn flush_speculative_logs() {
+pub fn flush_speculative_logs(num_to_flush: usize) {
     if let Some(log_events_ptr) = BUFFERED_LOG_EVENTS.swap(None) {
         match Arc::try_unwrap(log_events_ptr) {
-            Ok(log_events) => log_events.flush(),
+            Ok(log_events) => log_events.flush(num_to_flush),
             Err(_) => {
                 alert!("Speculative log storage must be uniquely owned to flush");
             },

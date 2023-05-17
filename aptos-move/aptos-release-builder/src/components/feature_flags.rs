@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
+    #[serde(default)]
     pub enabled: Vec<FeatureFlag>,
+    #[serde(default)]
     pub disabled: Vec<FeatureFlag>,
 }
 

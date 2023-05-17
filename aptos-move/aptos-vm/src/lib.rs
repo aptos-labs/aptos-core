@@ -155,6 +155,14 @@ pub trait VMExecutor: Send + Sync {
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
+    /// Executes a block of transactions with per_block_gas_limit
+    /// and returns output for each one of them.
+    fn execute_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
