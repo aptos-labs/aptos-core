@@ -5,7 +5,10 @@ use crate::{
     dag::{anchor_election::AnchorElection, bullshark::Bullshark},
     payload_manager::PayloadManager,
 };
-use aptos_consensus_types::{node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData}, block::Block};
+use aptos_consensus_types::{
+    block::Block,
+    node::{CertifiedNode, CertifiedNodeRequest, NodeMetaData},
+};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier, PeerId};
@@ -643,6 +646,9 @@ impl Dag {
             return;
         }
 
+        let pending_peer_id = certified_node.node().source();
+        let pending_digest = certified_node.node().digest();
+
         let missing_parents: HashSet<NodeMetaData> = certified_node
             .parents()
             .iter()
@@ -652,13 +658,15 @@ impl Dag {
 
         let mut maybe_node_status = None;
 
+        let mut add_to_pending = false;
+
         match self.missing_nodes.entry(certified_node.digest()) {
             // Node not in the system
             Entry::Vacant(_) => {
                 if missing_parents.is_empty() {
                     self.add_to_dag(certified_node).await;
                 } else {
-                    self.add_to_pending(certified_node, missing_parents);
+                    self.add_to_pending(certified_node, missing_parents.clone());
                 }
             },
 
@@ -666,11 +674,30 @@ impl Dag {
             Entry::Occupied(mut entry) => {
                 entry
                     .get_mut()
-                    .update_to_pending(certified_node, missing_parents);
+                    .update_to_pending(certified_node, missing_parents.clone());
+                add_to_pending = true;
                 if entry.get_mut().ready_to_be_added() {
                     maybe_node_status = Some(entry.remove());
                 }
             },
+        }
+
+        if add_to_pending {
+            // TODO: Persist
+            for node_meta_data in missing_parents {
+                let digest = node_meta_data.digest();
+                let status =
+                    self.missing_nodes
+                        .entry(digest)
+                        .or_insert(MissingDagNodeStatus::Absent(AbsentInfo::new(
+                            node_meta_data,
+                        )));
+
+                status.add_dependency(pending_digest);
+                status.add_peer_to_request(pending_peer_id);
+
+                self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
+            }
         }
 
         if let Some(node_status) = maybe_node_status {
