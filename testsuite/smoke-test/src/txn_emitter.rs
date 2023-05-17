@@ -81,7 +81,7 @@ async fn test_txn_emmitter() {
                 // (TransactionType::default_call_different_modules(), 20),
                 (
                     TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::EmitEvents { count: 60 },
+                        entry_point: EntryPoints::MakeOrChangeTable { count: 60 },
                         num_modules: 1,
                         use_account_pool: false,
                     },
