@@ -73,6 +73,7 @@ where
                     self.num_transactions,
                     1,
                     AccountPickStyle::Unlimited,
+                    None,
                 )
             },
             |state| state.execute_sequential(),
@@ -91,6 +92,7 @@ where
                     self.num_transactions,
                     1,
                     AccountPickStyle::Unlimited,
+                    None,
                 )
             },
             |state| state.execute_parallel(),
@@ -111,6 +113,7 @@ where
         num_executor_shards: usize,
         concurrency_level_per_shard: usize,
         no_conflict_txn: bool,
+        maybe_gas_limit: Option<u64>,
     ) -> (Vec<usize>, Vec<usize>) {
         let mut par_tps = Vec::new();
         let mut seq_tps = Vec::new();
@@ -135,6 +138,7 @@ where
             num_txn,
             num_executor_shards,
             account_pick_style,
+            maybe_gas_limit,
         );
 
         for i in 0..total_runs {
@@ -184,12 +188,14 @@ where
         num_transactions: usize,
         num_executor_shards: usize,
         account_pick_style: AccountPickStyle,
+        maybe_gas_limit: Option<u64>,
     ) -> Self {
         Self::with_universe(
             strategy,
             universe_strategy(num_accounts, num_transactions, account_pick_style),
             num_transactions,
             num_executor_shards,
+            maybe_gas_limit,
         )
     }
 
@@ -200,6 +206,7 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
+        maybe_gas_limit: Option<u64>,
     ) -> Self {
         let mut runner = TestRunner::default();
         let universe_gen = universe_strategy
@@ -214,9 +221,13 @@ where
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
         let state_view = Arc::new(executor.get_state_view().clone());
-        let parallel_block_executor =
-            Arc::new(ShardedBlockExecutor::new(num_executor_shards, None));
-        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1)));
+        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
+            num_executor_shards,
+            None,
+            maybe_gas_limit,
+        ));
+        let sequential_block_executor =
+            Arc::new(ShardedBlockExecutor::new(1, Some(1), maybe_gas_limit));
 
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()

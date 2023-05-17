@@ -818,6 +818,14 @@ impl TransactionStatus {
         }
     }
 
+    pub fn is_retry(&self) -> bool {
+        match self {
+            TransactionStatus::Discard(_) => false,
+            TransactionStatus::Keep(_) => false,
+            TransactionStatus::Retry => true,
+        }
+    }
+
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
             TransactionStatus::Keep(s) => Ok(s.clone()),
