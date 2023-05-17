@@ -72,7 +72,6 @@ where
                     self.num_accounts,
                     self.num_transactions,
                     1,
-                    num_cpus::get(),
                     AccountPickStyle::Unlimited,
                     None,
                 )
@@ -92,7 +91,6 @@ where
                     self.num_accounts,
                     self.num_transactions,
                     1,
-                    num_cpus::get(),
                     AccountPickStyle::Unlimited,
                     None,
                 )
@@ -139,7 +137,6 @@ where
             num_accounts,
             num_txn,
             num_executor_shards,
-            concurrency_level_per_shard,
             account_pick_style,
             maybe_gas_limit,
         );
@@ -147,9 +144,19 @@ where
         for i in 0..total_runs {
             if i < num_warmups {
                 println!("WARMUP - ignore results");
-                state.execute_blockstm_benchmark(run_par, run_seq, no_conflict_txn);
+                state.execute_blockstm_benchmark(
+                    run_par,
+                    run_seq,
+                    no_conflict_txn,
+                    concurrency_level_per_shard,
+                );
             } else {
-                let tps = state.execute_blockstm_benchmark(run_par, run_seq, no_conflict_txn);
+                let tps = state.execute_blockstm_benchmark(
+                    run_par,
+                    run_seq,
+                    no_conflict_txn,
+                    concurrency_level_per_shard,
+                );
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);
             }
@@ -166,6 +173,7 @@ struct TransactionBenchState<S> {
     parallel_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     sequential_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     validator_set: ValidatorSet,
+    state_view: Arc<FakeDataStore>,
 }
 
 impl<S> TransactionBenchState<S>
@@ -179,7 +187,6 @@ where
         num_accounts: usize,
         num_transactions: usize,
         num_executor_shards: usize,
-        concurrency_level_per_shard: usize,
         account_pick_style: AccountPickStyle,
         maybe_gas_limit: Option<u64>,
     ) -> Self {
@@ -188,7 +195,6 @@ where
             universe_strategy(num_accounts, num_transactions, account_pick_style),
             num_transactions,
             num_executor_shards,
-            concurrency_level_per_shard,
             maybe_gas_limit,
         )
     }
@@ -200,7 +206,6 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
-        concurrency_level_per_shard: usize,
         maybe_gas_limit: Option<u64>,
     ) -> Self {
         let mut runner = TestRunner::default();
@@ -218,16 +223,11 @@ where
         let state_view = Arc::new(executor.get_state_view().clone());
         let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
             num_executor_shards,
-            Some(concurrency_level_per_shard),
-            state_view.clone(),
+            None,
             maybe_gas_limit,
         ));
-        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(
-            1,
-            Some(1),
-            state_view,
-            maybe_gas_limit,
-        ));
+        let sequential_block_executor =
+            Arc::new(ShardedBlockExecutor::new(1, Some(1), maybe_gas_limit));
 
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()
@@ -243,6 +243,7 @@ where
             parallel_block_executor,
             sequential_block_executor,
             validator_set,
+            state_view,
         }
     }
 
@@ -291,7 +292,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.sequential_block_executor;
         executor
-            .execute_block(txns)
+            .execute_block(self.state_view.clone(), txns, 1)
             .expect("VM should not fail to start");
     }
 
@@ -302,7 +303,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.parallel_block_executor.clone();
         executor
-            .execute_block(txns)
+            .execute_block(self.state_view.clone(), txns, num_cpus::get())
             .expect("VM should not fail to start");
     }
 
@@ -310,11 +311,16 @@ where
         &self,
         transactions: Vec<Transaction>,
         block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
+        concurrency_level_per_shard: usize,
     ) -> usize {
         let block_size = transactions.len();
         let timer = Instant::now();
         block_executor
-            .execute_block(transactions)
+            .execute_block(
+                self.state_view.clone(),
+                transactions,
+                concurrency_level_per_shard,
+            )
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
@@ -326,12 +332,16 @@ where
         run_par: bool,
         run_seq: bool,
         no_conflict_txns: bool,
+        conurrency_level_per_shard: usize,
     ) -> (usize, usize) {
         let transactions = self.gen_transaction(no_conflict_txns);
         let par_tps = if run_par {
             println!("Parallel execution starts...");
-            let tps =
-                self.execute_benchmark(transactions.clone(), self.parallel_block_executor.clone());
+            let tps = self.execute_benchmark(
+                transactions.clone(),
+                self.parallel_block_executor.clone(),
+                conurrency_level_per_shard,
+            );
             println!("Parallel execution finishes, TPS = {}", tps);
             tps
         } else {
@@ -339,7 +349,8 @@ where
         };
         let seq_tps = if run_seq {
             println!("Sequential execution starts...");
-            let tps = self.execute_benchmark(transactions, self.sequential_block_executor.clone());
+            let tps =
+                self.execute_benchmark(transactions, self.sequential_block_executor.clone(), 1);
             println!("Sequential execution finishes, TPS = {}", tps);
             tps
         } else {

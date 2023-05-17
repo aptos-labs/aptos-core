@@ -25,6 +25,12 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Function `destroy_some`](#0x1_option_destroy_some)
 -  [Function `destroy_none`](#0x1_option_destroy_none)
 -  [Function `to_vec`](#0x1_option_to_vec)
+-  [Function `for_each`](#0x1_option_for_each)
+-  [Function `for_each_ref`](#0x1_option_for_each_ref)
+-  [Function `for_each_mut`](#0x1_option_for_each_mut)
+-  [Function `fold`](#0x1_option_fold)
+-  [Function `map`](#0x1_option_map)
+-  [Function `filter`](#0x1_option_filter)
 -  [Module Specification](#@Module_Specification_1)
     -  [Helper Schema](#@Helper_Schema_2)
 
@@ -841,6 +847,182 @@ and an empty vector otherwise
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == t.vec;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_for_each"></a>
+
+## Function `for_each`
+
+Apply the function to the optional element, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_for_each">for_each</a>&lt;Element&gt;(o: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, f: |Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_for_each">for_each</a>&lt;Element&gt;(o: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, f: |Element|) {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(&o)) {
+        f(<a href="option.md#0x1_option_destroy_some">destroy_some</a>(o))
+    } <b>else</b> {
+        <a href="option.md#0x1_option_destroy_none">destroy_none</a>(o)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to the optional element reference.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_for_each_ref">for_each_ref</a>&lt;Element&gt;(o: &<a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, f: |&Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_for_each_ref">for_each_ref</a>&lt;Element&gt;(o: &<a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, f: |&Element|) {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(o)) {
+        f(<a href="option.md#0x1_option_borrow">borrow</a>(o))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to the optional element reference.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_for_each_mut">for_each_mut</a>&lt;Element&gt;(o: &<b>mut</b> <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, f: |&<b>mut</b> Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_for_each_mut">for_each_mut</a>&lt;Element&gt;(o: &<b>mut</b> <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, f: |&<b>mut</b> Element|) {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(o)) {
+        f(<a href="option.md#0x1_option_borrow_mut">borrow_mut</a>(o))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_fold"></a>
+
+## Function `fold`
+
+Folds the function over the optional element.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_fold">fold</a>&lt;Accumulator, Element&gt;(o: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, init: Accumulator, f: |(Accumulator, Element)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_fold">fold</a>&lt;Accumulator, Element&gt;(
+    o: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;,
+    init: Accumulator,
+    f: |Accumulator,Element|Accumulator
+): Accumulator {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(&o)) {
+        f(init, <a href="option.md#0x1_option_destroy_some">destroy_some</a>(o))
+    } <b>else</b> {
+        <a href="option.md#0x1_option_destroy_none">destroy_none</a>(o);
+        init
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_map"></a>
+
+## Function `map`
+
+Maps the content of an option
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_map">map</a>&lt;Element, OtherElement&gt;(o: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, f: |Element|OtherElement): <a href="option.md#0x1_option_Option">option::Option</a>&lt;OtherElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_map">map</a>&lt;Element, OtherElement&gt;(o: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, f: |Element|OtherElement): <a href="option.md#0x1_option_Option">Option</a>&lt;OtherElement&gt; {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(&o)) {
+        <a href="option.md#0x1_option_some">some</a>(f(<a href="option.md#0x1_option_destroy_some">destroy_some</a>(o)))
+    } <b>else</b> {
+        <a href="option.md#0x1_option_destroy_none">destroy_none</a>(o);
+        <a href="option.md#0x1_option_none">none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_option_filter"></a>
+
+## Function `filter`
+
+Filters the content of an option
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_filter">filter</a>&lt;Element: drop&gt;(o: <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;, f: |&Element|bool): <a href="option.md#0x1_option_Option">option::Option</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="option.md#0x1_option_filter">filter</a>&lt;Element:drop&gt;(o: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, f: |&Element|bool): <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt; {
+    <b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(&o) && f(<a href="option.md#0x1_option_borrow">borrow</a>(&o))) {
+        o
+    } <b>else</b> {
+        <a href="option.md#0x1_option_none">none</a>()
+    }
+}
 </code></pre>
 
 

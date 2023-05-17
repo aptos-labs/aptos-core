@@ -1331,11 +1331,23 @@ def test(
     else:
         cloud_enum = Cloud.GCP
 
-    log.info(f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}")
-    forge_cluster = find_forge_cluster(
-        context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
-    )
-    log.info(f"Found cluster: {forge_cluster}")
+    if forge_cluster_name == "multiregion":
+        log.info("Using multiregion cluster")
+        forge_cluster = ForgeCluster(
+            name=forge_cluster_name,
+            cloud=Cloud.GCP,
+            region="multiregion",
+            kubeconf=context.filesystem.mkstemp(),
+        )
+    else:
+        log.info(
+            f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}"
+        )
+        forge_cluster = find_forge_cluster(
+            context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
+        )
+        log.info(f"Found cluster: {forge_cluster}")
+
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
