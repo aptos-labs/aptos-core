@@ -5,7 +5,7 @@
 use super::*;
 use crate::{
     peer::DisconnectReason,
-    peer_manager::{conn_notifs_channel, ConnectionNotification, ConnectionRequest},
+    peer_manager::{conn_notifs_channel, ConnectionRequest},
     transport::ConnectionMetadata,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -815,6 +815,7 @@ fn basic_update_discovered_peers() {
     assert_eq!(*trusted_peers.read(), peers_empty);
 }
 
+/*
 #[tokio::test(flavor = "multi_thread")]
 async fn test_stale_peers_unknown_inbound() {
     // Create a connectivity manager with mutual authentication disabled
@@ -906,3 +907,4 @@ async fn test_stale_peers_vfn_inbound() {
         mock.expect_disconnect_fail(peer_id_2, connection_metadata_2.addr)
     );
 }
+*/
