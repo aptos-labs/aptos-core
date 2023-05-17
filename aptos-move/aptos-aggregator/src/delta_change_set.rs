@@ -13,6 +13,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
+use move_core_types::vm_status::AbortLocation;
 use std::collections::BTreeMap;
 
 /// When `Addition` operation overflows the `limit`.
@@ -174,28 +175,32 @@ impl DeltaOp {
         state_view: &impl StateView,
         state_key: &StateKey,
     ) -> anyhow::Result<WriteOp, VMStatus> {
-        state_view
+        // In case storage fails to fetch the value, return immediately.
+        let maybe_value = state_view
             .get_state_value_bytes(state_key)
-            .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))
-            .and_then(|maybe_bytes| {
-                match maybe_bytes {
-                    Some(bytes) => {
-                        let base = deserialize(&bytes);
-                        self.apply_to(base)
-                            .map_err(|partial_error| {
-                                // If delta application fails, transform partial VM
-                                // error into an appropriate VM status.
-                                partial_error
-                                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                                    .into_vm_status()
-                            })
-                            .map(|result| WriteOp::Modification(serialize(&result)))
-                    },
-                    // Something is wrong, the value to which we apply delta should
-                    // always exist. Guard anyway.
-                    None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-                }
-            })
+            .map_err(|e| VMStatus::Error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?;
+
+        // Otherwise we have to apply delta to the storage value.
+        match maybe_value {
+            Some(bytes) => {
+                let base = deserialize(&bytes);
+                self.apply_to(base)
+                    .map_err(|partial_error| {
+                        // If delta application fails, transform partial VM
+                        // error into an appropriate VM status.
+                        partial_error
+                            .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+                            .into_vm_status()
+                    })
+                    .map(|result| WriteOp::Modification(serialize(&result)))
+            },
+            // Something is wrong, the value to which we apply delta should
+            // always exist. Guard anyway.
+            None => Err(VMStatus::Error(
+                StatusCode::STORAGE_ERROR,
+                Some("Aggregator value does not exist in storage.".to_string()),
+            )),
+        }
     }
 }
 
@@ -223,7 +228,7 @@ pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
     }
 }
 
-/// Returns partial VM error on abort. Can be used by delta partial functions
+/// Error for delta application. Can be used by delta partial functions
 /// to return descriptive error messages and an appropriate error code.
 fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::ABORTED)
@@ -338,13 +343,35 @@ impl DeltaChangeSet {
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
-        let materialized_write_set = self
-            .take(state_view)
-            .expect("something terrible happened when applying aggregator deltas");
+        match self.take(state_view) {
+            Ok(materialized_write_set) => {
+                // Materialization successful, we can construct a write set.
+                WriteSetMut::new(materialized_write_set)
+                    .freeze()
+                    .map_err(|_err| {
+                        VMStatus::Error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            Some("Error when freezing materialized deltas.".to_string()),
+                        )
+                    })
+            },
+            Err(vm_status) => {
+                // Error  from failed delta application.
+                // Right now we do not support this case (and do not have to because deltas are
+                // used for total supply only).
+                if let VMStatus::MoveAbort(AbortLocation::Module(id), code) = &vm_status {
+                    if id == &*AGGREGATOR_MODULE
+                        && (*code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW)
+                    {
+                        unimplemented!("Applying aggregator deltas failed but is not supported.")
+                    }
+                }
 
-        WriteSetMut::new(materialized_write_set)
-            .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
+                // Otherwise just propagate the error.
+                debug_assert!(vm_status.status_code() == StatusCode::STORAGE_ERROR);
+                Err(vm_status)
+            },
+        }
     }
 }
 
@@ -370,6 +397,10 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 mod test {
     use super::*;
     use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_state_view::TStateView;
+    use aptos_types::state_store::{
+        state_storage_usage::StateStorageUsage, state_value::StateValue,
+    };
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
 
@@ -551,17 +582,75 @@ mod test {
     static KEY: Lazy<StateKey> = Lazy::new(|| StateKey::raw(String::from("test-key").into_bytes()));
 
     #[test]
-    fn test_failed_delta_application() {
+    fn test_failed_write_op_conversion_because_of_empty_storage() {
         let state_view = FakeDataStore::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
             delta_op.try_into_write_op(&state_view, &KEY),
-            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None))
+            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
         );
     }
 
     #[test]
-    fn test_successful_delta_application() {
+    fn test_empty_storage_error_propagated() {
+        let state_view = FakeDataStore::default();
+        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
+        let delta_change_set = DeltaChangeSet::new(deltas);
+        assert_err!(delta_change_set.try_into_write_set(&state_view));
+    }
+
+    struct BadStorage;
+
+    impl TStateView for BadStorage {
+        type Key = StateKey;
+
+        fn get_state_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+            Err(anyhow::Error::new(VMStatus::Error(
+                StatusCode::STORAGE_ERROR,
+                Some("Error message from BadStorage.".to_string()),
+            )))
+        }
+
+        fn is_genesis(&self) -> bool {
+            unreachable!()
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn test_failed_write_op_conversion_because_of_storage_error() {
+        let state_view = BadStorage;
+        let delta_op = delta_add(10, 1000);
+        assert_matches!(
+            delta_op.try_into_write_op(&state_view, &KEY),
+            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
+        );
+    }
+
+    #[test]
+    fn test_storage_error_propagated() {
+        let state_view = BadStorage;
+        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
+        let delta_change_set = DeltaChangeSet::new(deltas);
+        assert_err!(delta_change_set.try_into_write_set(&state_view));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_delta_materialization_failure_unsupported() {
+        let mut state_view = FakeDataStore::default();
+        state_view.set_legacy(KEY.clone(), serialize(&99));
+
+        let deltas = vec![(KEY.clone(), delta_add(10, 100))];
+        let delta_change_set = DeltaChangeSet::new(deltas);
+        delta_change_set.try_into_write_set(&state_view).unwrap();
+    }
+
+    #[test]
+    fn test_successful_write_op_conversion() {
         let mut state_view = FakeDataStore::default();
         state_view.set_legacy(KEY.clone(), serialize(&100));
 
@@ -577,7 +666,7 @@ mod test {
     }
 
     #[test]
-    fn test_unsuccessful_delta_application() {
+    fn test_unsuccessful_write_op_conversion() {
         let mut state_view = FakeDataStore::default();
         state_view.set_legacy(KEY.clone(), serialize(&100));
 
