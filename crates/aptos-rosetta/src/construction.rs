@@ -561,6 +561,14 @@ async fn construction_parse(
                     STAKING_CONTRACT_MODULE,
                     DISTRIBUTE_STAKING_REWARDS_FUNCTION,
                 ) => parse_distribute_staking_rewards_operation(sender, &type_args, &args)?,
+                (
+                    AccountAddress::ONE,
+                    DELEGATION_POOL_MODULE,
+                    DELEGATION_POOL_ADD_STAKE_FUNCTION,
+                ) => parse_delegation_pool_add_stake_operation(sender, &type_args, &args)?,
+                (AccountAddress::ONE, DELEGATION_POOL_MODULE, DELEGATION_POOL_UNLOCK_FUNCTTON) => {
+                    parse_delegation_pool_unlock_operation(sender, &type_args, &args)?
+                },
                 _ => {
                     return Err(ApiError::TransactionParseError(Some(format!(
                         "Unsupported entry function type {:x}::{}::{}",
@@ -885,6 +893,54 @@ pub fn parse_distribute_staking_rewards_operation(
     )])
 }
 
+pub fn parse_delegation_pool_add_stake_operation(
+    delegator: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "add_delegated_stake should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let pool_address: AccountAddress = parse_function_arg("add_delegated_stake", args, 0)?;
+    let amount: u64 = parse_function_arg("add_delegated_stake", args, 1)?;
+
+    Ok(vec![Operation::add_delegated_stake(
+        0,
+        None,
+        delegator,
+        AccountIdentifier::base_account(pool_address),
+        Some(amount),
+    )])
+}
+
+pub fn parse_delegation_pool_unlock_operation(
+    delegator: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(format!(
+            "Unlock delegated stake should not have type arguments: {:?}",
+            type_args
+        ))));
+    }
+
+    let pool_address: AccountAddress = parse_function_arg("unlock_delegated_stake", args, 0)?;
+    let amount: u64 = parse_function_arg("unlock_delegated_stake", args, 1)?;
+
+    Ok(vec![Operation::unlock_delegated_stake(
+        0,
+        None,
+        delegator,
+        AccountIdentifier::base_account(pool_address),
+        Some(amount),
+    )])
+}
+
 /// Construction payloads command (OFFLINE)
 ///
 /// Constructs payloads for given known operations
@@ -1014,6 +1070,44 @@ async fn construction_payloads(
             } else {
                 return Err(ApiError::InvalidInput(Some(format!(
                     "Distribute staking rewards operation doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::AddDelegatedStake(inner) => {
+            if let InternalOperation::AddDelegatedStake(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.delegator != metadata_op.delegator
+                    || inner.pool_address != metadata_op.pool_address
+                {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "AddDelegatedStake internal operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "InternalOperation::AddDelegatedStake doesn't match metadata {:?} vs {:?}",
+                    inner, metadata.internal_operation
+                ))));
+            }
+        },
+        InternalOperation::UnlockDelegatedStake(inner) => {
+            if let InternalOperation::UnlockDelegatedStake(ref metadata_op) =
+                metadata.internal_operation
+            {
+                if inner.delegator != metadata_op.delegator
+                    || inner.pool_address != metadata_op.pool_address
+                {
+                    return Err(ApiError::InvalidInput(Some(format!(
+                        "Unlock delegated stake operation doesn't match metadata {:?} vs {:?}",
+                        inner, metadata.internal_operation
+                    ))));
+                }
+            } else {
+                return Err(ApiError::InvalidInput(Some(format!(
+                    "Unlock delegated stake operation doesn't match metadata {:?} vs {:?}",
                     inner, metadata.internal_operation
                 ))));
             }
