@@ -2,9 +2,6 @@ spec aptos_framework::voting {
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
-
-        global ghost_state: u64;
-        global ghost_time: u64;
     }
 
     spec register<ProposalType: store>(account: &signer) {
@@ -120,25 +117,20 @@ spec aptos_framework::voting {
         
         use aptos_framework::chain_status;
         
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating(); 
+        requires chain_status::is_operating(); // Ensures existence of Timestamp
         include AbortsIfNotContainProposalID<ProposalType>;
-        
-        // Use ghost var to get state
-        aborts_if ghost_state != PROPOSAL_STATE_SUCCEEDED;
+        // If the proposal is not resolvable, this function aborts.
+        aborts_if spec_get_proposal_state<ProposalType>(voting_forum_address, proposal_id) != PROPOSAL_STATE_SUCCEEDED;
 
         let voting_forum =  global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
 
         aborts_if proposal.is_resolved;
-
-        // Check all assert statemtn
         aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);
         aborts_if !simple_map::spec_contains_key(proposal.metadata, std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY));
         aborts_if !from_bcs::deserializable<u64>(simple_map::spec_get(proposal.metadata, std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY)));
-        aborts_if timestamp::spec_now_seconds() <= ghost_time;
-        aborts_if transaction_context::spec_get_script_hash() != proposal.execution_hash;
-            
+        aborts_if timestamp::spec_now_seconds() <= from_bcs::deserialize<u64>(simple_map::spec_get(proposal.metadata, std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY)));
+        aborts_if transaction_context::spec_get_script_hash() != proposal.execution_hash;     
     }
 
     spec resolve<ProposalType: store>(
@@ -181,23 +173,25 @@ spec aptos_framework::voting {
         aborts_if false;
     }
 
-    // spec fun spec_get_proposal_state<ProposalType>(
-    //     voting_forum_address: address,
-    //     proposal_id: u64,
-    // ): u64;
+    spec fun spec_get_proposal_state<ProposalType>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64;
 
     spec get_proposal_state<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 {
+        
         use aptos_framework::chain_status;
+        pragma opaque;
         requires chain_status::is_operating(); // Ensures existence of Timestamp
         // Addition of yes_votes and no_votes might overflow.
         pragma addition_overflow_unchecked;
         
         include AbortsIfNotContainProposalID<ProposalType>;
         // Any way to specify the result?
-        // ensures [abstract] result == spec_get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
+        ensures [abstract] result == spec_get_proposal_state<ProposalType>(voting_forum_address, proposal_id);
     }
 
     spec get_proposal_creation_secs<ProposalType: store>(
