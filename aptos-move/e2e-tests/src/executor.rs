@@ -43,7 +43,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     block_executor::BlockAptosVM,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
@@ -618,8 +618,8 @@ impl FakeExecutor {
                 timed_features,
             )
             .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let resolver = self.data_store.as_move_resolver();
+            let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -668,8 +668,8 @@ impl FakeExecutor {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let resolver = self.data_store.as_move_resolver();
+        let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

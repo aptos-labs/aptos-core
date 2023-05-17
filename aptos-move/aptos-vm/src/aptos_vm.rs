@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::BlockAptosVM,
     counters::*,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::AsMoveResolver,
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
@@ -1166,7 +1166,7 @@ impl AptosVM {
         // TODO(Gas): revisit this.
         init_speculative_logs(1);
 
-        let resolver = StorageAdapter::new(state_view);
+        let resolver = state_view.as_move_resolver();
         let vm = AptosVM::new(&resolver);
 
         // TODO(Gas): avoid creating txn metadata twice.

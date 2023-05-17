@@ -6,7 +6,7 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::AsMoveResolver,
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -41,9 +41,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
+        let resolver = argument.as_move_resolver();
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &StorageAdapter::new(argument),
+            &resolver,
         );
 
         Self {

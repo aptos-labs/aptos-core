@@ -4,7 +4,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
@@ -76,15 +76,15 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new(state: &impl StateView) -> Self {
-        let storage = StorageAdapter::new(state);
+        let resolver = state.as_move_resolver();
 
         // Get the gas parameters
         let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
-            gas_config(&storage);
+            gas_config(&resolver);
 
         let storage_gas_schedule = match gas_feature_version {
             0 => None,
-            _ => StorageGasSchedule::fetch_config(&storage),
+            _ => StorageGasSchedule::fetch_config(&resolver),
         };
 
         if let (Some(gas_params), Some(storage_gas_schedule)) =
@@ -129,12 +129,12 @@ impl AptosVMImpl {
             ),
         };
 
-        let features = Features::fetch_config(&storage).unwrap_or_default();
+        let features = Features::fetch_config(&resolver).unwrap_or_default();
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
-        let chain_id = ChainId::fetch_config(&storage).unwrap_or_else(ChainId::test);
+        let chain_id = ChainId::fetch_config(&resolver).unwrap_or_else(ChainId::test);
 
-        let timestamp = ConfigurationResource::fetch_config(&storage)
+        let timestamp = ConfigurationResource::fetch_config(&resolver)
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
@@ -162,8 +162,8 @@ impl AptosVMImpl {
             transaction_validation: None,
             features,
         };
-        vm.version = Version::fetch_config(&storage);
-        vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
+        vm.version = Version::fetch_config(&resolver);
+        vm.transaction_validation = Self::get_transaction_validation(&resolver);
         vm
     }
 

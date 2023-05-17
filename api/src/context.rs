@@ -43,10 +43,7 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::{
-    data_cache::{AsMoveResolver, StorageAdapter},
-    move_vm_ext::MoveResolverExt,
-};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
@@ -866,16 +863,16 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StorageAdapter::new(&state_view);
+            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&storage_adapter)
+                    None => GasSchedule::fetch_config(&resolver)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0)
