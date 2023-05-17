@@ -428,7 +428,7 @@ module 0xABCD::simple {
         while (count > 0) {
             count = count - 1;
             let table_entry = table::borrow_mut_with_default(table_entries, count, 0);
-            *table_entry = *table_entry + 1; 
+            *table_entry = *table_entry + 1;
         }
     }
 
