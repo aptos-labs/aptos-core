@@ -23,7 +23,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{pin::Pin, sync::Arc, time::Duration};
 use tokio::sync::{
-    mpsc::{channel, error::TrySendError},
+    mpsc::{channel, error::SendTimeoutError},
     watch::channel as watch_channel,
 };
 use tokio_stream::wrappers::ReceiverStream;
@@ -48,12 +48,13 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
-// TODO(larry): replace this with a exponential backoff.
-// The server will not fetch more data from the cache and file store until the channel is not full.
-const RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS: u64 = 1000;
 // Up to MAX_RESPONSE_CHANNEL_SIZE response can be buffered in the channel. If the channel is full,
 // the server will not fetch more data from the cache and file store until the channel is not full.
 const MAX_RESPONSE_CHANNEL_SIZE: usize = 40;
+
+// The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
+// This is to prevent the server from being occupied by a slow client.
+const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -104,11 +105,14 @@ impl RawData for RawDataServerWrapper {
             Ok(request_metadata) => request_metadata,
             _ => return Result::Err(Status::aborted("Invalid request token")),
         };
+        let request = req.into_inner();
+
+        let transactions_count = request.transactions_count;
 
         // Response channel to stream the data to the client.
         let (tx, rx) = channel(MAX_RESPONSE_CHANNEL_SIZE);
-        let mut current_version = match req.into_inner().starting_version {
-            Some(version) => version,
+        let mut current_version = match &request.starting_version {
+            Some(version) => *version,
             None => {
                 return Result::Err(Status::aborted("Starting version is not set"));
             },
@@ -140,6 +144,7 @@ impl RawData for RawDataServerWrapper {
         let request_metadata_clone = request_metadata.clone();
         tokio::spawn(
             async move {
+                let mut transactions_count = transactions_count;
                 let request_metadata = request_metadata_clone;
                 let conn = match redis_client.get_async_connection().await {
                     Ok(conn) => conn,
@@ -147,11 +152,8 @@ impl RawData for RawDataServerWrapper {
                         ERROR_COUNT
                             .with_label_values(&["redis_connection_failed"])
                             .inc();
-                        tx.send(Err(Status::unavailable(
-                            "[Indexer Data] Cannot connect to Redis; please retry.",
-                        )))
-                        .await
-                        .unwrap();
+                        // Connection will be dropped anyway, so we ignore the error here.
+                        let _result = tx.send_timeout(Err(Status::unavailable("[Indexer Data] Cannot connect to Redis; please retry.")), RESPONSE_CHANNEL_SEND_TIMEOUT).await;
                         error!(
                             error = e.to_string(),
                             "[Indexer Data] Failed to get redis connection."
@@ -168,11 +170,8 @@ impl RawData for RawDataServerWrapper {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
                             .inc();
-                        tx.send(Err(Status::unavailable(
-                            "[Indexer Data] Cannot get the chain id; please retry.",
-                        )))
-                        .await
-                        .unwrap();
+                        // Connection will be dropped anyway, so we ignore the error here.
+                        let _result = tx.send_timeout(Err(Status::unavailable("[Indexer Data] Cannot get the chain id; please retry.")), RESPONSE_CHANNEL_SEND_TIMEOUT).await;
                         error!(
                             error = e.to_string(),
                             "[Indexer Data] Failed to get chain id."
@@ -191,7 +190,7 @@ impl RawData for RawDataServerWrapper {
 
                 loop {
                     // 1. Fetch data from cache and file store.
-                    let transaction_data = match data_fetch(
+                    let mut transaction_data = match data_fetch(
                         current_version,
                         &mut cache_operator,
                         file_store_operator.as_ref(),
@@ -216,6 +215,18 @@ impl RawData for RawDataServerWrapper {
                             continue;
                         },
                     };
+                    if let Some(count) = transactions_count {
+                        if count == 0 {
+                            // End the data stream.
+                            break;
+                        } else if (count as usize) < transaction_data.len() {
+                            // Trim the data to the requested size.
+                            transaction_data.truncate(count as usize);
+                            transactions_count = Some(0);
+                        } else {
+                            transactions_count = Some(count - transaction_data.len() as u64);
+                        }
+                    };
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let resp_item =
                         get_transactions_response_builder(transaction_data, chain_id as u32);
@@ -229,7 +240,7 @@ impl RawData for RawDataServerWrapper {
                         .timestamp
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
-                    match tx.try_send(Result::<TransactionsResponse, Status>::Ok(resp_item)) {
+                    match tx.send_timeout(Result::<TransactionsResponse, Status>::Ok(resp_item), RESPONSE_CHANNEL_SEND_TIMEOUT).await {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
@@ -261,18 +272,11 @@ impl RawData for RawDataServerWrapper {
                                     .observe(data_latency_in_secs);
                             }
                         },
-                        Err(TrySendError::Full(_)) => {
-                            warn!("[Indexer Data] Receiver is full; retrying.");
-                            tokio::time::sleep(Duration::from_millis(
-                                RESPONSE_CHANNEL_FULL_BACKOFF_DURATION_MS,
-                            ))
-                            .await;
-                            continue;
+                        Err(SendTimeoutError::Timeout(_)) => {
+                            warn!("[Indexer Data] Receiver is full; exiting.");
+                            break;
                         },
-                        Err(TrySendError::Closed(_)) => {
-                            ERROR_COUNT
-                                .with_label_values(&["response_channel_closed"])
-                                .inc();
+                        Err(SendTimeoutError::Closed(_)) => {
                             warn!("[Indexer Data] Receiver is closed; exiting.");
                             break;
                         },
@@ -282,8 +286,8 @@ impl RawData for RawDataServerWrapper {
                     current_version = end_of_batch_version + 1;
                     if watch_sender.send(current_version).is_err() {
                         error!(
-                        "[Indexer Data] Failed to send the current version to the watch channel."
-                    );
+                            "[Indexer Data] Failed to send the current version to the watch channel."
+                        );
                         break;
                     }
                     info!(
