@@ -1538,7 +1538,9 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog: 300000 })
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 600000,
+                })
                 .txn_expiration_time_secs(5 * 60),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -1568,17 +1570,44 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
                 (5 * 60 * 60).into();
             helm_values["validator"]["config"]["mempool"]["system_transaction_gc_interval_ms"] =
                 (5 * 60 * 60_000).into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_txns"] = 5000.into();
-            helm_values["validator"]["config"]["consensus"]["max_receiving_block_txns"] =
-                30000.into();
-            helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
-                (3 * 1024 * 1024).into();
-            helm_values["validator"]["config"]["consensus"]["dag_config"]
-                ["max_node_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_txns_quorum_store_override"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_txns_quorum_store_override"] = 30000.into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_bytes_quorum_store_override"] = (20 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]
+                ["max_receiving_block_bytes_quorum_store_override"] = (21 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["dag_config"]["max_node_txns"] =
+                5000.into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
                 ["continuous_syncing_mode"] = "ExecuteTransactions".into();
+
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_txns"] = 500.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_batch_bytes"] = (5 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_num_batches"] = 100.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_total_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["sender_max_total_bytes"] = (10 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_txns"] = 500.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_batch_bytes"] = (5 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_num_batches"] = 100.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_total_txns"] = 5000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]
+                ["receiver_max_total_bytes"] = (10 * 1024 * 1024).into();
+
+            helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"]
+                ["max_sending_block_bytes_override"] = (10 * 1024 * 1024).into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)

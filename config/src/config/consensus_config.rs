@@ -136,13 +136,13 @@ impl Default for ConsensusConfig {
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1000,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1500,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                 },
                 PipelineBackpressureValues {
@@ -154,7 +154,7 @@ impl Default for ConsensusConfig {
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2500,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
@@ -165,7 +165,7 @@ impl Default for ConsensusConfig {
                     // instead rely on max gas per block to limit latency
                     max_sending_block_txns_override: 500,
                     // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
             ],
@@ -174,26 +174,26 @@ impl Default for ConsensusConfig {
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 80,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 150,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
                     max_sending_block_txns_override: 1000,
                     // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
                     max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
@@ -203,7 +203,7 @@ impl Default for ConsensusConfig {
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
                     max_sending_block_txns_override: 250,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
             ],
