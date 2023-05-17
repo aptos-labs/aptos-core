@@ -20,12 +20,12 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::Transaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, result::Error, ExpressionMethods, PgConnection};
 use field_count::FieldCount;
 use std::{collections::HashMap, fmt::Debug};
+use tracing::error;
 
 pub const NAME: &str = "default_processor";
 pub struct DefaultTransactionProcessor {
@@ -105,7 +105,7 @@ fn insert_to_db(
         Vec<TableMetadata>,
     ),
 ) -> Result<(), diesel::result::Error> {
-    aptos_logger::trace!(
+    tracing::trace!(
         name = name,
         start_version = start_version,
         end_version = end_version,
