@@ -779,7 +779,7 @@ module aptos_std::bls12381_algebra {
         enable_cryptography_algebra_natives(&fx);
         let remaining = G1_NUM_MAX;
         while (remaining > 0) {
-            rand_insecure<G1>();
+            zero<G1>();
             remaining = remaining - 1;
         }
     }
@@ -790,7 +790,7 @@ module aptos_std::bls12381_algebra {
         enable_cryptography_algebra_natives(&fx);
         let remaining = G1_NUM_MAX + 1;
         while (remaining > 0) {
-            rand_insecure<G1>();
+            zero<G1>();
             remaining = remaining - 1;
         }
     }
