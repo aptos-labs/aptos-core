@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::network_id::NetworkId;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
 };
-use aptos_network::ProtocolId;
 use once_cell::sync::Lazy;
 
 /// Counter for pending network events to the monitoring service (server-side)
@@ -22,7 +22,7 @@ pub static PEER_MONITORING_ERRORS_ENCOUNTERED: Lazy<IntCounterVec> = Lazy::new(|
     register_int_counter_vec!(
         "aptos_peer_monitoring_service_server_errors",
         "Counters related to the peer monitoring server errors encountered",
-        &["protocol", "error_type"]
+        &["network_id", "error_type"]
     )
     .unwrap()
 });
@@ -32,7 +32,7 @@ pub static PEER_MONITORING_REQUESTS_RECEIVED: Lazy<IntCounterVec> = Lazy::new(||
     register_int_counter_vec!(
         "aptos_peer_monitoring_service_server_requests_received",
         "Counters related to the peer monitoring server requests received",
-        &["protocol", "request_type"]
+        &["network_id", "request_type"]
     )
     .unwrap()
 });
@@ -42,7 +42,7 @@ pub static PEER_MONITORING_RESPONSES_SENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_peer_monitoring_service_server_responses_sent",
         "Counters related to the peer monitoring server responses sent",
-        &["protocol", "response_type"]
+        &["network_id", "response_type"]
     )
     .unwrap()
 });
@@ -52,23 +52,25 @@ pub static PEER_MONITORING_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy
     register_histogram_vec!(
         "aptos_peer_monitoring_service_server_request_latency",
         "Time it takes to process a peer monitoring service request",
-        &["protocol", "request_type"]
+        &["network_id", "request_type"]
     )
     .unwrap()
 });
 
 /// Increments the given counter with the provided label values.
-pub fn increment_counter(counter: &Lazy<IntCounterVec>, protocol: ProtocolId, label: &str) {
-    counter.with_label_values(&[protocol.as_str(), label]).inc();
+pub fn increment_counter(counter: &Lazy<IntCounterVec>, network_id: NetworkId, label: &str) {
+    counter
+        .with_label_values(&[network_id.as_str(), label])
+        .inc();
 }
 
 /// Starts the timer for the provided histogram and label values.
 pub fn start_timer(
     histogram: &Lazy<HistogramVec>,
-    protocol: ProtocolId,
+    network_id: NetworkId,
     label: &str,
 ) -> HistogramTimer {
     histogram
-        .with_label_values(&[protocol.as_str(), label])
+        .with_label_values(&[network_id.as_str(), label])
         .start_timer()
 }

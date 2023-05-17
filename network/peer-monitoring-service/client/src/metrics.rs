@@ -16,7 +16,7 @@ pub static SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "peer_monitoring_client_sent_requests",
         "Counters related to sent requests",
-        &["request_types", "network"]
+        &["request_types", "network_id"]
     )
     .unwrap()
 });
@@ -26,7 +26,7 @@ pub static SUCCESS_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "peer_monitoring_client_success_responses",
         "Counters related to success responses",
-        &["response_type", "network"]
+        &["response_type", "network_id"]
     )
     .unwrap()
 });
@@ -36,7 +36,7 @@ pub static ERROR_RESPONSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "peer_monitoring_client_error_responses",
         "Counters related to error responses",
-        &["response_type", "network"]
+        &["response_type", "network_id"]
     )
     .unwrap()
 });
@@ -46,7 +46,7 @@ pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "peer_monitoring_client_request_latencies",
         "Counters related to request latencies",
-        &["request_type", "network"]
+        &["request_type", "network_id"]
     )
     .unwrap()
 });
@@ -72,10 +72,12 @@ pub fn increment_request_counter(
     label: &str,
     peer_network_id: &PeerNetworkId,
 ) {
-    let network = peer_network_id.network_id();
-    counter.with_label_values(&[label, network.as_str()]).inc();
+    let network_id = peer_network_id.network_id();
     counter
-        .with_label_values(&[TOTAL_COUNT_LABEL, network.as_str()])
+        .with_label_values(&[label, network_id.as_str()])
+        .inc();
+    counter
+        .with_label_values(&[TOTAL_COUNT_LABEL, network_id.as_str()])
         .inc();
 }
 
@@ -91,8 +93,8 @@ pub fn observe_value(
     peer_network_id: &PeerNetworkId,
     value: f64,
 ) {
-    let network = peer_network_id.network_id();
+    let network_id = peer_network_id.network_id();
     histogram
-        .with_label_values(&[request_label, network.as_str()])
+        .with_label_values(&[request_label, network_id.as_str()])
         .observe(value)
 }
