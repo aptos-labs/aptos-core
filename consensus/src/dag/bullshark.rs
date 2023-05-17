@@ -3,7 +3,7 @@
 
 use crate::{
     dag::anchor_election::AnchorElection,
-    experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer,
+    experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer, block_storage::update_counters_for_committed_blocks,
 };
 use aptos_consensus_types::{
     block::Block,
@@ -259,7 +259,9 @@ impl Bullshark {
                     LedgerInfo::new(block_info, HashValue::zero()),
                     AggregateSignature::empty(),
                 ),
-                Box::new(|_, _| {}),
+                Box::new(|blocks_to_commit, ledger_info| {
+                    update_counters_for_committed_blocks(blocks_to_commit);
+                }),
             )
             .await
             .unwrap();

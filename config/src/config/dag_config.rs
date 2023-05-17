@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct DagConfig {
     pub channel_size: usize,
     pub max_node_txns: u64,

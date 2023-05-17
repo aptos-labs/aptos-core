@@ -1538,12 +1538,12 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog: 30000 })
+                .mode(EmitJobMode::MaxLoad { mempool_backlog: 300000 })
                 .txn_expiration_time_secs(5 * 60),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["epoch_duration_secs"] = 3600.into();
 
             helm_values["genesis"]["multicluster"]["enabled"] = true.into();
         }))
@@ -1573,6 +1573,8 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
                 30000.into();
             helm_values["validator"]["config"]["consensus"]["max_sending_block_bytes"] =
                 (3 * 1024 * 1024).into();
+            helm_values["validator"]["config"]["consensus"]["dag_config"]
+                ["max_node_txns"] = 5000.into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]
                 ["bootstrapping_mode"] = "ExecuteTransactionsFromGenesis".into();
             helm_values["validator"]["config"]["state_sync"]["state_sync_driver"]

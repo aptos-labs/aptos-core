@@ -295,6 +295,8 @@ impl ProofQueue {
             iters.push(batches.iter().rev());
         }
 
+        // let mut iters = vec![self.author_to_batches.get(&self.my_peer_id).unwrap().iter().rev()];
+
         while !iters.is_empty() {
             iters.shuffle(&mut thread_rng());
             iters.retain_mut(|iter| {
