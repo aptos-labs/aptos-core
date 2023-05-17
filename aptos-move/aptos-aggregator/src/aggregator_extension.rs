@@ -392,10 +392,7 @@ mod test {
     use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_err, assert_ok};
     use once_cell::sync::Lazy;
-
-    pub fn serialize(value: &u128) -> Vec<u8> {
-        bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
-    }
+    use crate::delta_change_set::serialize;
 
     #[allow(clippy::redundant_closure)]
     static TEST_RESOLVER: Lazy<FakeDataStore> = Lazy::new(|| FakeDataStore::default());
