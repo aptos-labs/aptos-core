@@ -53,6 +53,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
 
 [dev-dependencies]
 aptos-bitvec = { workspace = true, features = ["fuzzing"] }

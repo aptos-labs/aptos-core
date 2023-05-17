@@ -64,8 +64,8 @@ pub struct NetworkBuilder {
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
     peers_and_metadata: Arc<PeersAndMetadata>,
-    direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
-    rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
+    // direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
+    // rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
 }
 
 impl NetworkBuilder {
@@ -115,8 +115,8 @@ impl NetworkBuilder {
             health_checker_builder: None,
             peer_manager_builder,
             peers_and_metadata,
-            direct_map: HashMap::new(),
-            rpc_map: HashMap::new(),
+            // direct_map: HashMap::new(),
+            // rpc_map: HashMap::new(),
         }
     }
 
@@ -460,24 +460,22 @@ impl NetworkBuilder {
     /// interface for handling network requests.
     // TODO(philiphayes): return new NetworkService (name TBD) interface?
     fn add_service(&mut self, config: &NetworkServiceConfig) -> NetworkEvents2 { // TODO: reimplement
-        // let mut direct_map : HashMap<ProtocolId, Sender<IncomingMessage>> = HashMap::new(); // TODO: not HashMap but LUT
-        // let mut rpc_map : HashMap<ProtocolId, Sender<IncomingRpcRequest>> = HashMap::new(); // TODO: not HashMap but LUT
-        //let mut recv_ends : Vec<(ProtocolId, Receiver<IncomingMessage>)> = Vec::new();
-        //let mut rpc_ends : Vec<(ProtocolId, Receiver<IncomingRpcRequest>)> = Vec::new();
         let mut recv_ends = Vec::new();
         let mut rpc_ends = Vec::new();
         for protocol_id in config.direct_send_protocols_and_preferences.iter() {
             // let (send, recv) = std::sync::mpsc::sync_channel(config.inbound_queue_config.max_capacity);
             let (send, recv) = tokio::sync::mpsc::channel(config.inbound_queue_config.max_capacity);
-            let prev = self.direct_map.insert(*protocol_id, send);
-            assert!(prev.is_none(), "collision installing handler for protocol_id={}", protocol_id);
+            let ok = self.peer_manager_builder.add_service_direct_part(config, *protocol_id, send);
+            // let prev = self.direct_map.insert(*protocol_id, send);
+            assert!(ok, "collision installing direct handler for protocol_id={}", protocol_id);
             recv_ends.push((*protocol_id, recv));
         }
         for protocol_id in config.rpc_protocols_and_preferences.iter() {
             // let (send, recv) = std::sync::mpsc::sync_channel(config.inbound_queue_config.max_capacity);
             let (send, recv) = tokio::sync::mpsc::channel(config.inbound_queue_config.max_capacity);
-            let prev = self.rpc_map.insert(*protocol_id, send);
-            assert!(prev.is_none(), "collision installing handler for protocol_id={}", protocol_id);
+            // let prev = self.rpc_map.insert(*protocol_id, send);
+            let ok = self.peer_manager_builder.add_service_rpc_part(config, *protocol_id, send);
+            assert!(ok, "collision installing rpc handler for protocol_id={}", protocol_id);
             rpc_ends.push((*protocol_id, recv));
         }
         NetworkEvents2{

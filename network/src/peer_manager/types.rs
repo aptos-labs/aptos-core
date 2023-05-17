@@ -15,6 +15,7 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::channel::oneshot;
 use serde::Serialize;
 use std::fmt;
+use crate::protocols::wire::messaging::v1::RequestId;
 
 /// Request received by PeerManager from upstream actors.
 #[derive(Debug, Serialize)]
@@ -23,6 +24,8 @@ pub enum PeerManagerRequest {
     SendRpc(PeerId, #[serde(skip)] OutboundRpcRequest),
     /// Fire-and-forget style message send to a remote peer.
     SendDirectSend(PeerId, #[serde(skip)] Message),
+    /// Fire-and-forget reply
+    SendRpcReply(PeerId, RequestId, #[serde(skip)] Message),
 }
 
 /// Notifications sent by PeerManager to upstream actors.

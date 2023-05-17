@@ -25,6 +25,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use crate::protocols::network::NetworkEvents2;
 use crate::protocols::rpc::error::RpcError;
+use crate::protocols::wire::messaging::v1::RequestId;
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -76,6 +77,8 @@ pub trait NetworkClientInterface: Clone + Send + Sync {
         _rpc_timeout: Duration,
         _peer: PeerNetworkId,
     ) -> Result<O, Error>;
+
+    fn reply_to_peer_rpc<T: Serialize + Sync>(&self, protocol_id: ProtocolId, _message: &T, _peer: PeerNetworkId, request_id: RequestId) -> Result<(), Error>;
 }
 
 /// A network component that can be used by client applications (e.g., consensus,
@@ -160,6 +163,15 @@ impl NetworkClient {
         let network_id = peer.network_id();
         let ns = self.network_senders.get(&network_id).ok_or_else(|| RpcError::NotConnected(peer.peer_id()))?;
         ns.send_rpc(peer.peer_id(),protocol_id,message,rpc_timeout).await
+    }
+
+    fn send_rpc_reply_bytes_to_peer(&self, protocol_id: ProtocolId, request_id: RequestId, message: Bytes, peer: &PeerNetworkId) -> Result<(), Error> {
+        // TODO: put on per-peer-per-network outbound queue for a per-peer send thread
+        // TODO: manage maximum number of pending messages and maximum total pending bytes on a peer outbound queue
+        // TODO? (optionally, for some queues) when the queue is full push a new message and drop the _oldest_ message. The old message may be obsolete already, only send the newest data.
+        let network_id = peer.network_id();
+        let ns = self.network_senders.get(&network_id).ok_or_else(|| RpcError::NotConnected(peer.peer_id()))?;
+        return ns.reply_to(peer.peer_id(), protocol_id, request_id, message).map_err(|e| Error::NetworkError(e.to_string()))
     }
 }
 
@@ -274,6 +286,11 @@ impl NetworkClientInterface for NetworkClient {
         //     .await?;
         let result = self.send_rpc_to_peer(protocol_id, blob.into(), rpc_timeout, &peer).await.map_err(|e| Error::RpcError(e.to_string()))?;
         protocol_id.from_bytes(result.as_ref()).map_err(|e| Error::NetworkError(format!("decode err: {}", e)))
+    }
+
+    fn reply_to_peer_rpc<T: Serialize + Sync>(&self, protocol_id: ProtocolId, message: &T, peer: PeerNetworkId, request_id: RequestId) -> Result<(), Error> {
+        let blob = protocol_id.to_bytes(message).map_err(|e| Error::UnexpectedError(format!("encode err: {}", e)))?;
+        self.send_rpc_reply_bytes_to_peer(protocol_id, request_id,blob.into(), &peer)
     }
 }
 

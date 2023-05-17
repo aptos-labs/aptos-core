@@ -162,7 +162,12 @@ impl IncomingMessage {
 pub struct IncomingRpcRequest {
     pub core: IncomingMessage,
     pub request_id: RequestId, // rpc field
-    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    //pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+pub trait ResponseSender {
+     fn send_bytes(data: Bytes);
+     fn send_error(err: RpcError);
 }
 
 /// NetworkEvents2 is a temporary container for sets of streams from where they are set up to where they are consumed
@@ -391,6 +396,17 @@ impl NetworkSender {
             .send_rpc(recipient, protocol, req_msg, timeout)
             .await?;
         Ok(res_data)
+    }
+
+    pub fn reply_to(
+        &self,
+        recipient: PeerId,
+        protocol: ProtocolId,
+        request_id: RequestId,
+        message: Bytes,
+    ) -> Result<(), NetworkError> {
+        self.peer_mgr_reqs_tx.reply_to(recipient, protocol, request_id, message)?;
+        Ok(())
     }
 }
 

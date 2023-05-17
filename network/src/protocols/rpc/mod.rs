@@ -359,6 +359,8 @@ pub struct OutboundRpcs {
     max_concurrent_outbound_rpcs: u32,
 }
 
+unsafe impl Send for OutboundRpcs {}
+
 impl OutboundRpcs {
     pub fn new(
         network_context: NetworkContext,

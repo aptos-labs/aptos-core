@@ -11,7 +11,7 @@ use crate::{
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
-        network::{NetworkClientConfig, NetworkServiceConfig},
+        network::{NetworkClientConfig, NetworkServiceConfig, IncomingMessage, IncomingRpcRequest},
         wire::handshake::v1::ProtocolIdSet,
     },
     transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
@@ -69,8 +69,10 @@ struct PeerManagerContext {
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
     peers_and_metadata: Arc<PeersAndMetadata>,
-    upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    // upstream_handlers:
+    //     HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
+    rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
     max_concurrent_network_reqs: usize,
@@ -90,10 +92,12 @@ impl PeerManagerContext {
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
         peers_and_metadata: Arc<PeersAndMetadata>,
-        upstream_handlers: HashMap<
-            ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-        >,
+        // upstream_handlers: HashMap<
+        //     ProtocolId,
+        //     aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        // >,
+        direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
+        rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
         max_concurrent_network_reqs: usize,
@@ -110,7 +114,9 @@ impl PeerManagerContext {
             connection_reqs_rx,
 
             peers_and_metadata,
-            upstream_handlers,
+            //upstream_handlers,
+            direct_map,
+            rpc_map,
             connection_event_handlers,
 
             max_concurrent_network_reqs,
@@ -122,14 +128,14 @@ impl PeerManagerContext {
         }
     }
 
-    fn add_upstream_handler(
-        &mut self,
-        protocol_id: ProtocolId,
-        channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-    ) -> &mut Self {
-        self.upstream_handlers.insert(protocol_id, channel);
-        self
-    }
+    // fn add_upstream_handler(
+    //     &mut self,
+    //     protocol_id: ProtocolId,
+    //     channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    // ) -> &mut Self {
+    //     self.upstream_handlers.insert(protocol_id, channel);
+    //     self
+    // }
 
     pub fn add_connection_event_listener(&mut self) -> conn_notifs_channel::Receiver {
         let (tx, rx) = conn_notifs_channel::new();
@@ -204,6 +210,7 @@ impl PeerManagerBuilder {
                 connection_reqs_tx,
                 connection_reqs_rx,
                 peers_and_metadata,
+                HashMap::new(),
                 HashMap::new(),
                 Vec::new(),
                 max_concurrent_network_reqs,
@@ -339,7 +346,8 @@ impl PeerManagerBuilder {
             pm_context.peers_and_metadata,
             pm_context.pm_reqs_rx,
             pm_context.connection_reqs_rx,
-            pm_context.upstream_handlers,
+            pm_context.direct_map,
+            pm_context.rpc_map,
             pm_context.connection_event_handlers,
             pm_context.channel_size,
             pm_context.max_concurrent_network_reqs,
@@ -414,7 +422,7 @@ impl PeerManagerBuilder {
     }
 
     /// Register a service for handling some protocols.
-    pub fn add_service(
+    /*pub fn add_service(
         &mut self,
         config: &NetworkServiceConfig,
     ) -> (
@@ -440,5 +448,21 @@ impl PeerManagerBuilder {
         let connection_notifs_rx = pm_context.add_connection_event_listener();
 
         (network_notifs_rx, connection_notifs_rx)
+    }*/
+
+    pub fn add_service_direct_part(&mut self, config: &NetworkServiceConfig, protocol_id: ProtocolId, network_notifs_tx: tokio::sync::mpsc::Sender<IncomingMessage>) -> bool {
+        // Register the direct send and rpc protocols
+        let protocols = vec![protocol_id];
+        self.transport_context().add_protocols(&protocols); // TODO: make a singular add_protocol() ?
+        let prev = self.peer_manager_context().direct_map.insert(protocol_id, network_notifs_tx);
+        return prev.is_some()
+    }
+
+    pub fn add_service_rpc_part(&mut self, config: &NetworkServiceConfig, protocol_id: ProtocolId, network_notifs_tx: tokio::sync::mpsc::Sender<IncomingRpcRequest>) -> bool {
+        // Register the direct send and rpc protocols
+        let protocols = vec![protocol_id];
+        self.transport_context().add_protocols(&protocols); // TODO: make a singular add_protocol() ?
+        let prev = self.peer_manager_context().rpc_map.insert(protocol_id, network_notifs_tx);
+        return prev.is_some()
     }
 }

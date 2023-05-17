@@ -44,6 +44,7 @@ use std::{
 use std::cell::RefCell;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::Sender;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub mod builder;
 pub mod conn_notifs_channel;
@@ -64,7 +65,39 @@ use aptos_config::config::PeerRole;
 use aptos_types::account_address::AccountAddress;
 pub use senders::*;
 pub use types::*;
-use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
+use crate::protocols::network::{IncomingMessage, IncomingRpcRequest};
+use crate::protocols::rpc::OutboundRpcs;
+use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest, RpcResponse};
+
+/// PmPeer is the state that the PeerManager holds about a peer.
+/// This is different than the Peer object which is used by threads active in servicing the peer.
+struct PmPeer {
+    conn_metadata: ConnectionMetadata,
+    sender: Sender<NetworkMessage>,
+    outbound_rpcs: OutboundRpcs,
+}
+
+impl PmPeer {
+    fn new(
+        conn_metadata: ConnectionMetadata,
+        sender: Sender<NetworkMessage>,
+        network_context: NetworkContext,
+        time_service: TimeService,
+        max_concurrent_outbound_rpcs: u32,
+    ) -> Self {
+        let remote_peer_id = conn_metadata.remote_peer_id;
+        Self {
+            conn_metadata,
+            sender,
+            outbound_rpcs: OutboundRpcs::new(
+                network_context,
+                time_service,
+                remote_peer_id,
+                max_concurrent_outbound_rpcs,
+            ),
+        }
+    }
+}
 
 /// Responsible for handling and maintaining connections to other Peers
 pub struct PeerManager<TTransport, TSocket>
@@ -82,22 +115,18 @@ where
     /// Connection Listener, listening on `listen_addr`
     transport_handler: Option<TransportHandler<TTransport, TSocket>>,
     /// Map from PeerId to corresponding Peer object.
-    active_peers: HashMap<
-        PeerId,
-        (
-            ConnectionMetadata,
-            //aptos_channel::Sender<ProtocolId, PeerRequest>,
-            Sender<NetworkMessage>,
-        ),
-    >,
+    /// TODO: make the value side a struct PmPeer{ConnectionMetadata,Sender<NetworkMessage>,OutboundRpcs} and remove OutboundRpcs from Peer
+    active_peers: HashMap<PeerId, PmPeer>,
     /// Shared metadata storage about trusted peers and metadata
     peers_and_metadata: Arc<PeersAndMetadata>,
     /// Channel to receive requests from other actors.
     requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
-    upstream_handlers:
-        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    // upstream_handlers:
+    //     HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
+    rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
@@ -141,10 +170,12 @@ where
         peers_and_metadata: Arc<PeersAndMetadata>,
         requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
-        upstream_handlers: HashMap<
-            ProtocolId,
-            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-        >,
+        // upstream_handlers: HashMap<
+        //     ProtocolId,
+        //     aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        // >,
+        direct_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingMessage>>, // TODO: not HashMap but LUT
+        rpc_map : HashMap<ProtocolId, tokio::sync::mpsc::Sender<IncomingRpcRequest>>, // TODO: not HashMap but LUT
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
         max_concurrent_network_reqs: usize,
@@ -186,7 +217,9 @@ where
             transport_notifs_rx,
             outstanding_disconnect_requests: HashMap::new(),
             phantom_transport: PhantomData,
-            upstream_handlers,
+            //upstream_handlers,
+            direct_map,
+            rpc_map,
             connection_event_handlers,
             max_concurrent_network_reqs,
             channel_size,
@@ -201,7 +234,7 @@ where
         let inbound = self
             .active_peers
             .iter()
-            .filter(|(_, (metadata, _))| metadata.origin == ConnectionOrigin::Inbound)
+            .filter(|(_,pmp)| pmp.conn_metadata.origin == ConnectionOrigin::Inbound)
             .count();
         let outbound = total.saturating_sub(inbound);
 
@@ -216,11 +249,11 @@ where
             let peers: Vec<_> = self
                 .active_peers
                 .values()
-                .map(|(connection, _)| {
+                .map(|x| {
                     (
-                        connection.remote_peer_id,
-                        connection.addr.clone(),
-                        connection.origin,
+                        x.conn_metadata.remote_peer_id,
+                        x.conn_metadata.addr.clone(),
+                        x.conn_metadata.origin,
                     )
                 })
                 .collect();
@@ -296,8 +329,8 @@ where
                 let peer_id = lost_conn_metadata.remote_peer_id;
                 // If the active connection with the peer is lost, remove it from `active_peers`.
                 if let Entry::Occupied(entry) = self.active_peers.entry(peer_id) {
-                    let (conn_metadata, _) = entry.get();
-                    let connection_id = conn_metadata.connection_id;
+                    let pmp = entry.get();
+                    let connection_id = pmp.conn_metadata.connection_id;
                     if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
@@ -388,8 +421,8 @@ where
                     let unknown_inbound_conns = self
                         .active_peers
                         .iter()
-                        .filter(|(peer_id, (metadata, _))| {
-                            metadata.origin == ConnectionOrigin::Inbound
+                        .filter(|(peer_id, pmp)| {
+                            pmp.conn_metadata.origin == ConnectionOrigin::Inbound
                                 && trusted_peers
                                     .read()
                                     .get(peer_id)
@@ -463,19 +496,19 @@ where
         match request {
             ConnectionRequest::DialPeer(requested_peer_id, addr, response_tx) => {
                 // Only dial peers which we aren't already connected with
-                if let Some((curr_connection, _)) = self.active_peers.get(&requested_peer_id) {
-                    let error = PeerManagerError::AlreadyConnected(curr_connection.addr.clone());
-                    debug!(
+                    if let Some(pmp) = self.active_peers.get(&requested_peer_id) {
+                            let error = PeerManagerError::AlreadyConnected(pmp.conn_metadata.addr.clone());
+                            debug!(
                         NetworkSchema::new(&self.network_context)
-                            .connection_metadata_with_address(curr_connection),
+                            .connection_metadata_with_address(&pmp.conn_metadata),
                         "{} Already connected to Peer {} with connection {:?}. Not dialing address {}",
                         self.network_context,
                         requested_peer_id.short_str(),
-                        curr_connection,
+                        pmp.conn_metadata,
                         addr
                     );
-                    if let Err(send_err) = response_tx.send(Err(error)) {
-                        info!(
+                            if let Err(send_err) = response_tx.send(Err(error)) {
+                                info!(
                             NetworkSchema::new(&self.network_context)
                                 .remote_peer(&requested_peer_id),
                             "{} Failed to notify that peer is already connected for Peer {}: {:?}",
@@ -483,21 +516,23 @@ where
                             requested_peer_id.short_str(),
                             send_err
                         );
-                    }
-                } else {
-                    let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
-                    self.transport_reqs_tx.send(request).await.unwrap();
-                };
+                            }
+                        return;
+                        }
+                            let request = TransportRequest::DialPeer(requested_peer_id, addr, response_tx);
+                            self.transport_reqs_tx.send(request).await.unwrap();
+                        //}
+
             },
             ConnectionRequest::DisconnectPeer(peer_id, resp_tx) => {
                 // Send a CloseConnection request to Peer and drop the send end of the
                 // PeerRequest channel.
-                if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
-                    let connection_id = conn_metadata.connection_id;
-                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
+                if let Some(pmp) = self.active_peers.remove(&peer_id) {
+                    let connection_id = pmp.conn_metadata.connection_id;
+                    self.remove_peer_from_metadata(pmp.conn_metadata.remote_peer_id, connection_id);
 
                     // This triggers a disconnect.
-                    drop(sender);
+                    drop(pmp.sender);
                     // Add to outstanding disconnect requests.
                     self.outstanding_disconnect_requests
                         .insert(connection_id, resp_tx);
@@ -539,22 +574,36 @@ where
                     protocol_id: msg.protocol_id(),
                     priority: 0,
                     raw_msg: msg.mdata.to_vec(),
-                }))//PeerRequest::SendDirectSend(msg))
+                }))
             },
             PeerManagerRequest::SendRpc(peer_id, req) => {
-                (peer_id, req.protocol_id(), NetworkMessage::RpcRequest(RpcRequest{
-                    protocol_id: req.protocol_id(),
-                    request_id: 0, // TODO: set request_id?
-                    priority: 0,
-                    raw_request: req.data.to_vec(),
-                }))//PeerRequest::SendRpc(req))
+                // TODO: peer.outbound_rpcs.handle_outbound_request(req, sender)
+                if let Some(pmp) = self.active_peers.get_mut(&peer_id) {
+                    pmp.outbound_rpcs.handle_outbound_request(req, &mut pmp.sender);
+                } else {
+                    // TODO: err log, count
+                }
+                return;
+                // (peer_id, req.protocol_id(), NetworkMessage::RpcRequest(RpcRequest{
+                //     protocol_id: req.protocol_id(),
+                //     request_id: 0, // TODO: set request_id?
+                //     priority: 0,
+                //     raw_request: req.data.to_vec(),
+                // }))
             },
+            PeerManagerRequest::SendRpcReply(peer_id, request_id, msg) => {
+                (peer_id, msg.protocol_id(), NetworkMessage::RpcResponse(RpcResponse{
+                    request_id,
+                    priority: 0,
+                    raw_response: msg.mdata.to_vec(),
+                }))
+            }
         };
 
-        if let Some((conn_metadata, sender)) = self.active_peers.get_mut(&peer_id) {
-            if let Err(err) = sender.try_send(peer_request) {//sender.push(protocol_id, peer_request) {
+        if let Some(pmp) = self.active_peers.get_mut(&peer_id) {
+            if let Err(err) = pmp.sender.try_send(peer_request) {
                 info!(
-                    NetworkSchema::new(&self.network_context).connection_metadata(conn_metadata),
+                    NetworkSchema::new(&self.network_context).connection_metadata(&pmp.conn_metadata),
                     protocol_id = %protocol_id,
                     error = ?err,
                     "{} Failed to forward outbound message to downstream actor. Error: {:?}",
@@ -650,16 +699,16 @@ where
 
         // Check for and handle simultaneous dialing
         if let Entry::Occupied(active_entry) = self.active_peers.entry(peer_id) {
-            let (curr_conn_metadata, _) = active_entry.get();
+            let pmp = active_entry.get();
             if Self::simultaneous_dial_tie_breaking(
                 self.network_context.peer_id(),
                 peer_id,
-                curr_conn_metadata.origin,
+                pmp.conn_metadata.origin,
                 conn_meta.origin,
             ) {
-                let (_, peer_handle) = active_entry.remove();
+                let pmp = active_entry.remove();
                 // Drop the existing connection and replace it with the new connection
-                drop(peer_handle);
+                drop(pmp.sender);
                 info!(
                     NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                     "{} Closing existing connection with Peer {} to mitigate simultaneous dial",
@@ -682,23 +731,11 @@ where
 
         // TODO: Add label for peer.
         // messages towards network peer
-        // TODO: one per "Network" quality-of-service level (Validator, everyone-else)
         let (peer_reqs_tx, peer_reqs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(self.channel_size);
         let peer_reqs_rx = vec![RefCell::new(peer_reqs_rx)];
-        // let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
-        //     QueueStyle::FIFO,
-        //     self.channel_size,
-        //     Some(&counters::PENDING_NETWORK_REQUESTS),
-        // );
         // TODO: Add label for peer.
-        // TODO: make this be tokio mpsc channel of NetworkMessage
         // messages from network peer
         let (peer_notifs_tx, peer_notifs_rx) = tokio::sync::mpsc::channel::<NetworkMessage>(self.channel_size);
-        // let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
-        //     QueueStyle::FIFO,
-        //     self.channel_size,
-        //     Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
-        // );
 
         // Initialize a new Peer actor for this connection.
         let peer = Peer::new(
@@ -707,7 +744,6 @@ where
             self.time_service.clone(),
             connection,
             self.transport_notifs_tx.clone(),
-            // peer_reqs_rx,
             peer_notifs_tx,
             Duration::from_millis(constants::INBOUND_RPC_TIMEOUT_MS),
             constants::MAX_CONCURRENT_INBOUND_RPCS,
@@ -719,10 +755,10 @@ where
 
         // Start background task to handle events (RPCs and DirectSend messages) received from
         // peer.
-        // self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
+        self.spawn_peer_network_events_handler(peer_id, peer_notifs_rx);
         // Save PeerRequest sender to `active_peers`.
         self.active_peers
-            .insert(peer_id, (conn_meta.clone(), peer_reqs_tx));
+            .insert(peer_id, PmPeer::new(conn_meta.clone(), peer_reqs_tx, self.network_context, self.time_service.clone(), constants::MAX_CONCURRENT_OUTBOUND_RPCS));
         self.peers_and_metadata.insert_connection_metadata(
             PeerNetworkId::new(self.network_context.network_id(), peer_id),
             conn_meta.clone(),
@@ -758,18 +794,23 @@ where
     fn spawn_peer_network_events_handler(
         &self,
         peer_id: PeerId,
-        network_events: aptos_channel::Receiver<ProtocolId, PeerNotification>,
+        network_events: tokio::sync::mpsc::Receiver<NetworkMessage>,
     ) {
-        let mut upstream_handlers = self.upstream_handlers.clone();
+        //let mut upstream_handlers = self.upstream_handlers.clone();
+        let mut direct_map = self.direct_map.clone();
+        let mut rpc_map = self.rpc_map.clone();
         let network_context = self.network_context;
-        self.executor.spawn(network_events.for_each_concurrent(
+        let ne_stream = ReceiverStream::new(network_events);
+        self.executor.spawn(ne_stream.for_each_concurrent(
             self.max_concurrent_network_reqs,
             move |inbound_event| {
                 handle_inbound_request(
                     network_context,
                     inbound_event,
                     peer_id,
-                    &mut upstream_handlers,
+                    //&mut upstream_handlers,
+                    &mut direct_map,
+                    &mut rpc_map,
                 );
                 futures::future::ready(())
             },
@@ -777,46 +818,92 @@ where
     }
 }
 
+
+
 /// A task for consuming inbound network messages
 fn handle_inbound_request(
     network_context: NetworkContext,
-    inbound_event: PeerNotification,
+    inbound_event: NetworkMessage,
     peer_id: PeerId,
-    upstream_handlers: &mut HashMap<
-        ProtocolId,
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-    >,
+    // upstream_handlers: &mut HashMap<
+    //     ProtocolId,
+    //     aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    // >,
+    direct_map: &mut HashMap<ProtocolId, Sender<IncomingMessage>>,
+    rpc_map: &mut HashMap<ProtocolId, Sender<IncomingRpcRequest>>,
 ) {
-    let (protocol_id, notification) = match inbound_event {
-        PeerNotification::RecvMessage(msg) => (
-            msg.protocol_id(),
-            PeerManagerNotification::RecvMessage(peer_id, msg),
-        ),
-        PeerNotification::RecvRpc(req) => (
-            req.protocol_id(),
-            PeerManagerNotification::RecvRpc(peer_id, req),
-        ),
-    };
-
-    if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
-        // Send over aptos channel for fairness.
-        if let Err(err) = handler.push((peer_id, protocol_id), notification) {
-            warn!(
-                NetworkSchema::new(&network_context),
-                error = ?err,
-                protocol_id = protocol_id,
-                "{} Upstream handler unable to handle message for protocol: {}. Error: {:?}",
-                network_context, protocol_id, err
-            );
+    match inbound_event {
+        NetworkMessage::DirectSendMsg(msg) => {
+            if let Some(handler) = direct_map.get_mut(&msg.protocol_id) {
+                let im = IncomingMessage {
+                    sender: PeerNetworkId::new(network_context.network_id(), peer_id),
+                    protocol_id: msg.protocol_id,
+                    priority: msg.priority,
+                    message: msg.raw_msg.into(),
+                };
+                if let Err(e) = handler.try_send(im) {
+                    // TODO: log, counter
+                }
+            } else {
+                // TODO: debug msg, counter
+            }
         }
-    } else {
-        debug!(
-            NetworkSchema::new(&network_context),
-            protocol_id = protocol_id,
-            message = format!("{:?}", notification),
-            "{} Received network message for unregistered protocol: {:?}",
-            network_context,
-            notification,
-        );
-    }
+        NetworkMessage::RpcRequest(msg) => {
+            let handler = match rpc_map.get_mut(&msg.protocol_id) {
+                Some(x) => x,
+                None => {
+                    // TODO: log, counter
+                    return;
+                }
+            };
+            let im = IncomingRpcRequest {
+                core: IncomingMessage {
+                    sender: PeerNetworkId::new(network_context.network_id(), peer_id),
+                    protocol_id: msg.protocol_id,
+                    priority: msg.priority,
+                    message: msg.raw_request.into(),
+                },
+                request_id: msg.request_id,
+            };
+            if let Err(e) = handler.try_send(im) {
+                // TODO: log, counter
+            }
+        }
+        NetworkMessage::RpcResponse(res) => { // TODO: reconnect with peer.outbound_rpcs.handle_inbound_response(res)
+        }
+        NetworkMessage::Error(_) => {return} // don't care, drop. TODO: counter? log?
+    };
+    // let (protocol_id, notification) = match inbound_event {
+        // PeerNotification::RecvMessage(msg) => (
+        //     msg.protocol_id(),
+        //     PeerManagerNotification::RecvMessage(peer_id, msg),
+        // ),
+        // PeerNotification::RecvRpc(req) => (
+        //     req.protocol_id(),
+        //     PeerManagerNotification::RecvRpc(peer_id, req),
+        // ),
+    // };
+
+    // if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
+    //     let notification = PeerManagerNotification::RecvMessage(peer_id, Message {});
+    //     // Send over aptos channel for fairness.
+    //     if let Err(err) = handler.push((peer_id, protocol_id), notification) {
+    //         warn!(
+    //             NetworkSchema::new(&network_context),
+    //             error = ?err,
+    //             protocol_id = protocol_id,
+    //             "{} Upstream handler unable to handle message for protocol: {}. Error: {:?}",
+    //             network_context, protocol_id, err
+    //         );
+    //     }
+    // } else {
+    //     debug!(
+    //         NetworkSchema::new(&network_context),
+    //         protocol_id = protocol_id,
+    //         message = format!("{:?}", notification),
+    //         "{} Received network message for unregistered protocol: {:?}",
+    //         network_context,
+    //         notification,
+    //     );
+    // }
 }

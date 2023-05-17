@@ -15,6 +15,7 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::channel::oneshot;
 use std::time::Duration;
+use crate::protocols::wire::messaging::v1::RequestId;
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.
@@ -47,6 +48,7 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
+        // TODO: eliminate this queue, cut through directly to peer outbound queue
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendDirectSend(peer_id, Message { protocol_id, mdata }),
@@ -77,6 +79,7 @@ impl PeerManagerRequestSender {
             // only fail if the queue is unexpectedly shutdown (i.e., receiver
             // dropped early), we know that we can't make further progress if
             // this send fails.
+            // TODO: eliminate this queue, cut through directly to peer outbound queue
             self.inner.push(
                 (recipient, protocol_id),
                 PeerManagerRequest::SendDirectSend(recipient, msg.clone()),
@@ -100,11 +103,27 @@ impl PeerManagerRequestSender {
             res_tx,
             timeout,
         };
+        // TODO: eliminate this queue, cut through directly to peer outbound queue
         self.inner.push(
             (peer_id, protocol_id),
             PeerManagerRequest::SendRpc(peer_id, request),
         )?;
         res_rx.await?
+    }
+
+    pub fn reply_to(
+        &self,
+        peer_id: PeerId,
+        protocol_id: ProtocolId,
+        request_id: RequestId,
+        mdata: Bytes,
+    ) -> Result<(), PeerManagerError> {
+        // TODO: eliminate this queue, cut through directly to peer outbound queue
+        self.inner.push(
+            (peer_id, protocol_id),
+            PeerManagerRequest::SendRpcReply(peer_id, request_id, Message { protocol_id, mdata }),
+        )?;
+        Ok(())
     }
 }
 
