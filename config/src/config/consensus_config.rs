@@ -132,31 +132,31 @@ impl Default for ConsensusConfig {
             vote_back_pressure_limit: 30,
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1000,
+                    back_pressure_pipeline_latency_limit_ms: 2000,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
+                    back_pressure_pipeline_latency_limit_ms: 2500,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
+                    back_pressure_pipeline_latency_limit_ms: 3000,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
+                    back_pressure_pipeline_latency_limit_ms: 3500,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4000,
+                    back_pressure_pipeline_latency_limit_ms: 4500,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
                     // meaning that most aggressively we limit to ~1000 TPS
                     // For transactions that are more expensive than that, we should
