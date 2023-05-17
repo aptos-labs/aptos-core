@@ -156,36 +156,61 @@ impl AggregatorChangeSet {
 mod test {
     use super::*;
     use aptos_aggregator::aggregator_extension::aggregator_id_for_test;
+    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_types::state_store::state_key::StateKey;
     use claims::{assert_matches, assert_ok};
-    use move_table_extension::TableHandle;
 
-    struct EmptyStorage;
+    pub fn serialize(value: &u128) -> Vec<u8> {
+        bcs::to_bytes(value).expect("unexpected serialization error in aggregator")
+    }
 
-    impl TableResolver for EmptyStorage {
-        fn resolve_table_entry(
-            &self,
-            _handle: &TableHandle,
-            _key: &[u8],
-        ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-            Ok(None)
-        }
+    fn get_test_resolver() -> FakeDataStore {
+        #[allow(clippy::redundant_closure)]
+        let mut state_view = FakeDataStore::default();
+
+        let AggregatorID {
+            handle: handle_500,
+            key: key_500,
+        } = aggregator_id_for_test(500);
+        let AggregatorID {
+            handle: handle_600,
+            key: key_600,
+        } = aggregator_id_for_test(600);
+        let AggregatorID {
+            handle: handle_700,
+            key: key_700,
+        } = aggregator_id_for_test(700);
+
+        state_view.set_legacy(
+            StateKey::table_item(handle_500.into(), key_500.0.to_vec()),
+            serialize(&150),
+        );
+        state_view.set_legacy(
+            StateKey::table_item(handle_600.into(), key_600.0.to_vec()),
+            serialize(&100),
+        );
+        state_view.set_legacy(
+            StateKey::table_item(handle_700.into(), key_700.0.to_vec()),
+            serialize(&200),
+        );
+        state_view
     }
 
     // All aggregators are initialized deterministically based on their ID,
     // with the following spec.
     //
-    //     +-------+---------------+-----------------------------------+-----+---------+
-    //     |  key  | storage value |  create                           | get | remove  |
-    //     +-------+---------------+-----------------------------------+-----+---------+
-    //     |  100  |               |   yes                              | yes |   yes   |
-    //     |  200  |               |   yes                              | yes |         |
-    //     |  300  |               |   yes                              |     |   yes   |
-    //     |  400  |               |   yes                              |     |         |
-    //     |  500  |               |   Yes if !aggregagtor_enabled      | yes |   yes   |
-    //     |  600  |               |   Yes if !aggregagtor_enabled      | yes |         |
-    //     |  700  |               |   Yes if !aggregagtor_enabled      | yes |         |
-    //     |  800  |               |                                    |     |   yes   |
-    //     +-------+---------------+------------------------------------+-----+---------+
+    //     +-------+---------------+-----------+-----+---------+
+    //     |  key  | storage value |  create   | get | remove  |
+    //     +-------+---------------+-----------+-----+---------+
+    //     |  100  |               |   yes     | yes |   yes   |
+    //     |  200  |               |   yes     | yes |         |
+    //     |  300  |               |   yes     |     |   yes   |
+    //     |  400  |               |   yes     |     |         |
+    //     |  500  |               |   Yes     | yes |   yes   |
+    //     |  600  |               |   Yes     | yes |         |
+    //     |  700  |               |   Yes     | yes |         |
+    //     |  800  |               |           |     |   yes   |
+    //     +-------+---------------+-----------+-----+---------+
     fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {
         let mut aggregator_data = context.aggregator_data.borrow_mut();
 
@@ -193,11 +218,6 @@ mod test {
         aggregator_data.create_new_aggregator(aggregator_id_for_test(200), 200);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(300), 300);
         aggregator_data.create_new_aggregator(aggregator_id_for_test(400), 400);
-        if !aggregator_enabled {
-            aggregator_data.create_new_aggregator(aggregator_id_for_test(500), 500);
-            aggregator_data.create_new_aggregator(aggregator_id_for_test(600), 600);
-            aggregator_data.create_new_aggregator(aggregator_id_for_test(700), 700);
-        }
 
         assert_ok!(aggregator_data.get_aggregator(
             aggregator_id_for_test(100),
@@ -250,7 +270,8 @@ mod test {
 
     #[test]
     fn test_into_change_set() {
-        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, true);
+        let resolver = get_test_resolver();
+        let context = NativeAggregatorContext::new([0; 32], &resolver, true);
 
         test_set_up(&context, true);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -287,7 +308,8 @@ mod test {
 
     #[test]
     fn test_into_change_set_aggregator_disabled() {
-        let context = NativeAggregatorContext::new([0; 32], &EmptyStorage, false);
+        let resolver = get_test_resolver();
+        let context = NativeAggregatorContext::new([0; 32], &resolver, false);
 
         test_set_up(&context, false);
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -308,11 +330,11 @@ mod test {
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(600)).unwrap(),
-            AggregatorChange::Write(100)
+            AggregatorChange::Write(200)
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(700)).unwrap(),
-            AggregatorChange::Write(200)
+            AggregatorChange::Write(400)
         );
         assert_matches!(
             changes.get(&aggregator_id_for_test(800)).unwrap(),

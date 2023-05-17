@@ -503,7 +503,6 @@ mod test {
         let aggregator = aggregator_data
             .get_aggregator(aggregator_id_for_test(200), 600, &*TEST_RESOLVER, false)
             .expect("Get aggregator failed");
-        println!("::{}", aggregator.value);
         assert_err!(aggregator.sub(400));
     }
 
