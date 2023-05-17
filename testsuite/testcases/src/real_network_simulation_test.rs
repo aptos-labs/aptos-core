@@ -24,7 +24,7 @@ macro_rules! FOUR_REGION_LINK_STATS_CSV {
 /// A test to simulate a real (e.g. mainnet, previewnet) network with multiple regions
 /// in different clouds and varying CPU performance. It currently supports only 4
 /// regions, due to ChaosMesh limitations.
-pub struct RealNetworkSimulationTest {}
+pub struct RealNetworkSimulationTest;
 
 impl Test for RealNetworkSimulationTest {
     fn name(&self) -> &'static str {

@@ -1234,6 +1234,8 @@ def test(
 ) -> None:
     """Run a forge test"""
 
+    forge_cluster_name = "aptos-forge-0"
+
     if verbose:
         log.setLevel(logging.DEBUG)
 

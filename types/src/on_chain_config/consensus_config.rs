@@ -52,7 +52,7 @@ impl OnChainConsensusConfig {
 
     pub fn quorum_store_enabled(&self) -> bool {
         match &self {
-            OnChainConsensusConfig::V1(_config) => true,
+            OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_config) => true,
         }
     }
@@ -61,7 +61,7 @@ impl OnChainConsensusConfig {
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        OnChainConsensusConfig::V1(ConsensusConfigV1::default())
     }
 }
 
