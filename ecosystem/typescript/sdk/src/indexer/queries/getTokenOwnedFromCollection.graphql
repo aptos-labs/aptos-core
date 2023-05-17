@@ -11,7 +11,6 @@ query getTokenOwnedFromCollection($collection_id: String!, $owner_address: Strin
     token_standard
     is_fungible_v2
     is_soulbound_v2
-    is_soulbound_v2
     property_version_v1
     table_type_v1
     token_properties_mutated_v1

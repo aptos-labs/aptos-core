@@ -228,7 +228,7 @@ describe("Indexer", () => {
     });
 
     it("gets account current tokens", async () => {
-      const tokens = await indexerClient.getAccountTokens(alice.address().hex());
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex());
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
     });
 

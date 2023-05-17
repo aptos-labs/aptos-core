@@ -17,7 +17,7 @@ import {
   GetTokenOwnersDataQuery,
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
-  GetAccountTokensQuery,
+  GetOwnedTokensQuery,
   GetTokenOwnedFromCollectionQuery,
   GetCollectionDataQuery,
 } from "../indexer/generated/operations";
@@ -36,7 +36,7 @@ import {
   GetTokenOwnersData,
   GetTopUserTransactions,
   GetUserTransactions,
-  GetAccountTokens,
+  GetOwnedTokens,
   GetTokenOwnedFromCollection,
   GetCollectionData,
 } from "../indexer/generated/queries";
@@ -320,22 +320,22 @@ export class IndexerClient {
   }
 
   /**
-   * Queries account's current tokens.
+   * Queries account's current owned tokens.
    * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
    *
    * @param ownerAddress The token owner address we want to get the tokens for
-   * @returns GetAccountTokensQuery response type
+   * @returns GetOwnedTokensQuery response type
    */
-  async getAccountTokens(
+  async getOwnedTokens(
     ownerAddress: MaybeHexString,
     extraArgs?: {
       options?: PaginationArgs;
     },
-  ): Promise<GetAccountTokensQuery> {
+  ): Promise<GetOwnedTokensQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
     const graphqlQuery = {
-      query: GetAccountTokens,
+      query: GetOwnedTokens,
       variables: { address, offset: extraArgs?.options?.offset, limit: extraArgs?.options?.limit },
     };
     return this.queryIndexer(graphqlQuery);

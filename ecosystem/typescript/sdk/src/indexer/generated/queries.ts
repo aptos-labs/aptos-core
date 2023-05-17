@@ -62,52 +62,6 @@ export const GetAccountCurrentTokens = `
 }
     ${TokenDataFieldsFragmentDoc}
 ${CollectionDataFieldsFragmentDoc}`;
-export const GetAccountTokens = `
-    query getAccountTokens($address: String!, $offset: Int, $limit: Int) {
-  current_token_ownerships_v2(
-    where: {owner_address: {_eq: $address}, amount: {_gt: 0}}
-    offset: $offset
-    limit: $limit
-  ) {
-    token_standard
-    is_fungible_v2
-    is_soulbound_v2
-    is_soulbound_v2
-    property_version_v1
-    table_type_v1
-    token_properties_mutated_v1
-    amount
-    last_transaction_timestamp
-    last_transaction_version
-    storage_id
-    owner_address
-    current_token_data {
-      token_name
-      token_data_id
-      token_uri
-      token_properties
-      supply
-      maximum
-      last_transaction_version
-      last_transaction_timestamp
-      largest_property_version_v1
-      current_collection {
-        collection_name
-        creator_address
-        description
-        uri
-        collection_id
-        last_transaction_version
-        current_supply
-        mutable_description
-        total_minted_v2
-        table_handle_v1
-        mutable_uri
-      }
-    }
-  }
-}
-    `;
 export const GetAccountTokensCount = `
     query getAccountTokensCount($owner_address: String) {
   current_token_ownerships_aggregate(
@@ -188,6 +142,51 @@ export const GetNumberOfDelegators = `
   }
 }
     `;
+export const GetOwnedTokens = `
+    query getOwnedTokens($address: String!, $offset: Int, $limit: Int) {
+  current_token_ownerships_v2(
+    where: {owner_address: {_eq: $address}, amount: {_gt: 0}}
+    offset: $offset
+    limit: $limit
+  ) {
+    token_standard
+    is_fungible_v2
+    is_soulbound_v2
+    property_version_v1
+    table_type_v1
+    token_properties_mutated_v1
+    amount
+    last_transaction_timestamp
+    last_transaction_version
+    storage_id
+    owner_address
+    current_token_data {
+      token_name
+      token_data_id
+      token_uri
+      token_properties
+      supply
+      maximum
+      last_transaction_version
+      last_transaction_timestamp
+      largest_property_version_v1
+      current_collection {
+        collection_name
+        creator_address
+        description
+        uri
+        collection_id
+        last_transaction_version
+        current_supply
+        mutable_description
+        total_minted_v2
+        table_handle_v1
+        mutable_uri
+      }
+    }
+  }
+}
+    `;
 export const GetTokenActivities = `
     query getTokenActivities($idHash: String!, $offset: Int, $limit: Int) {
   token_activities(
@@ -248,7 +247,6 @@ export const GetTokenOwnedFromCollection = `
   ) {
     token_standard
     is_fungible_v2
-    is_soulbound_v2
     is_soulbound_v2
     property_version_v1
     table_type_v1
@@ -327,9 +325,6 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     getAccountCurrentTokens(variables: Types.GetAccountCurrentTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountCurrentTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountCurrentTokensQuery>(GetAccountCurrentTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountCurrentTokens', 'query');
     },
-    getAccountTokens(variables: Types.GetAccountTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTokensQuery> {
-      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTokensQuery>(GetAccountTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTokens', 'query');
-    },
     getAccountTokensCount(variables?: Types.GetAccountTokensCountQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetAccountTokensCountQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetAccountTokensCountQuery>(GetAccountTokensCount, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getAccountTokensCount', 'query');
     },
@@ -350,6 +345,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getNumberOfDelegators(variables?: Types.GetNumberOfDelegatorsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetNumberOfDelegatorsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetNumberOfDelegatorsQuery>(GetNumberOfDelegators, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getNumberOfDelegators', 'query');
+    },
+    getOwnedTokens(variables: Types.GetOwnedTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetOwnedTokensQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetOwnedTokensQuery>(GetOwnedTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getOwnedTokens', 'query');
     },
     getTokenActivities(variables: Types.GetTokenActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetTokenActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetTokenActivitiesQuery>(GetTokenActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getTokenActivities', 'query');

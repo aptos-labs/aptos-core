@@ -1,4 +1,4 @@
-query getAccountTokens($address: String!, $offset: Int, $limit: Int) {
+query getOwnedTokens($address: String!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
     where: { owner_address: { _eq: $address }, amount: { _gt: 0 } }
     offset: $offset
@@ -6,7 +6,6 @@ query getAccountTokens($address: String!, $offset: Int, $limit: Int) {
   ) {
     token_standard
     is_fungible_v2
-    is_soulbound_v2
     is_soulbound_v2
     property_version_v1
     table_type_v1
