@@ -103,11 +103,14 @@ pub enum OperationType {
     ResetLockup,
     UnlockStake,
     DistributeStakingRewards,
+    AddDelegatedStake,
+    UnlockDelegatedStake,
     // Fee must always be last for ordering
     Fee,
 }
 
 impl OperationType {
+    const ADD_DELEGATED_STAKE: &'static str = "add_delegated_stake";
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const DISTRIBUTE_STAKING_REWARDS: &'static str = "distribute_staking_rewards";
@@ -117,6 +120,7 @@ impl OperationType {
     const SET_OPERATOR: &'static str = "set_operator";
     const SET_VOTER: &'static str = "set_voter";
     const STAKING_REWARD: &'static str = "staking_reward";
+    const UNLOCK_DELEGATED_STAKE: &'static str = "unlock_delegated_stake";
     const UNLOCK_STAKE: &'static str = "unlock_stake";
     const WITHDRAW: &'static str = "withdraw";
 
@@ -134,6 +138,8 @@ impl OperationType {
             ResetLockup,
             UnlockStake,
             DistributeStakingRewards,
+            AddDelegatedStake,
+            UnlockDelegatedStake,
         ]
     }
 }
@@ -154,6 +160,8 @@ impl FromStr for OperationType {
             Self::RESET_LOCKUP => Ok(OperationType::ResetLockup),
             Self::UNLOCK_STAKE => Ok(OperationType::UnlockStake),
             Self::DISTRIBUTE_STAKING_REWARDS => Ok(OperationType::DistributeStakingRewards),
+            Self::ADD_DELEGATED_STAKE => Ok(OperationType::AddDelegatedStake),
+            Self::UNLOCK_DELEGATED_STAKE => Ok(OperationType::UnlockDelegatedStake),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -176,6 +184,8 @@ impl Display for OperationType {
             ResetLockup => Self::RESET_LOCKUP,
             UnlockStake => Self::UNLOCK_STAKE,
             DistributeStakingRewards => Self::DISTRIBUTE_STAKING_REWARDS,
+            AddDelegatedStake => Self::ADD_DELEGATED_STAKE,
+            UnlockDelegatedStake => Self::UNLOCK_DELEGATED_STAKE,
             Fee => Self::FEE,
         })
     }
