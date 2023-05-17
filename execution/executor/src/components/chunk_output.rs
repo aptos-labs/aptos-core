@@ -234,6 +234,16 @@ impl ChunkOutput {
         };
         Ok(transaction_outputs)
     }
+
+    /// In consensus-only mode, we do not care about gas limits.
+    #[cfg(feature = "consensus-only-perf-test")]
+    fn execute_block_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Self::execute_block::<V>(transactions, state_view)
+    }
 }
 
 pub fn update_counters_for_processed_chunk(
