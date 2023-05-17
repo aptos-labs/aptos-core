@@ -507,8 +507,7 @@ impl AptosDataClient {
     }
 
     /// Returns a copy of the peer states for testing
-    #[cfg(test)]
-    pub(crate) fn get_peer_states(&self) -> PeerStates {
+    pub fn get_peer_states(&self) -> PeerStates {
         self.peer_states.read().clone()
     }
 }

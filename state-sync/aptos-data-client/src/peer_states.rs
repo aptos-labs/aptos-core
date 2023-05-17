@@ -81,7 +81,7 @@ impl PeerState {
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    fn storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+    pub fn storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
         } else {
@@ -107,7 +107,7 @@ impl PeerState {
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
 /// advertisements and data-client internal metadata for scoring.
 #[derive(Clone, Debug)]
-pub(crate) struct PeerStates {
+pub struct PeerStates {
     base_config: BaseConfig,
     data_client_config: AptosDataClientConfig,
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
@@ -174,7 +174,7 @@ impl PeerStates {
     }
 
     /// Updates the score of the peer according to an error
-    pub fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
+    pub(crate) fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
         let old_score = self.peer_to_state.entry(peer).or_default().score;
         self.peer_to_state
             .entry(peer)
@@ -374,6 +374,14 @@ impl PeerStates {
     /// Returns a copy of the peer to states map for test purposes
     pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {
         self.peer_to_state.clone()
+    }
+
+    pub fn is_vfn(&self) -> bool {
+        !self.base_config.role.is_validator()
+            && self
+                .peers_and_metadata
+                .get_registered_networks()
+                .contains(&NetworkId::Vfn)
     }
 }
 
