@@ -12,7 +12,7 @@ on:
         type: string
         required: true
       BRANCH:
-        description: "The aptos-core branch to switch to before running the fullnode."
+        description: "The aptos-core branch (or ref) to switch to before running the fullnode."
         type: string
         required: true
       NETWORK:
@@ -32,17 +32,39 @@ on:
         type: number
         required: false
         default: 300 # Run for at most 5 hours
+  workflow_dispatch:
+    inputs:
+      TEST_NAME:
+        description: "The unique name of the fullnode test."
+        type: string
+        required: true
+      BRANCH:
+        description: "The aptos-core branch (or ref) to switch to before running the fullnode."
+        type: string
+        required: true
+      NETWORK:
+        description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
+        type: string
+        required: true
+      BOOTSTRAPPING_MODE:
+        description: "The state sync bootstrapping mode for the fullnode."
+        type: string
+        required: true
+      CONTINUOUS_SYNCING_MODE:
+        description: "The state sync continuous syncing mode for the fullnode."
+        type: string
+        required: true
 
 jobs:
   fullnode-sync:
     runs-on: medium-perf-docker-with-local-ssd
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }}
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
       - uses: ./.github/actions/fullnode-sync
         with:
-          TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
+          TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES || 300 }}
           BRANCH: ${{ inputs.BRANCH }}
           NETWORK: ${{ inputs.NETWORK }}
           BOOTSTRAPPING_MODE: ${{ inputs.BOOTSTRAPPING_MODE }}
