@@ -205,8 +205,14 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(8 * 6 * 60);
     let suite_name: &str = args.suite.as_ref();
+
+    let suite_name = if suite_name == "land_blocking" {
+        "load_vs_perf_benchmark"
+    } else {
+        panic!();
+    };
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -730,11 +736,14 @@ fn load_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
     config
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
-        .with_network_tests(vec![&LoadVsPerfBenchmark {
-            test: &PerformanceBenchmark,
-            workloads: Workloads::TPS(&[
-                200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
-            ]),
+        .with_network_tests(vec![&CompositeNetworkTest {
+            wrapper: &RealNetworkSimulationTest,
+            test: &LoadVsPerfBenchmark {
+                test: &PerformanceBenchmark,
+                workloads: Workloads::TPS(&[
+                    1, 10, 100, 500, 1000, 2000, 3000, 4000,
+                ]),
+            }
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1515,7 +1524,7 @@ fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> For
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&RealNetworkSimulationTest {}])
+        .with_network_tests(vec![&RealNetworkSimulationTest])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
