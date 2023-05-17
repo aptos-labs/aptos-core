@@ -5,12 +5,14 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     network::MempoolSyncMsg,
+    shared_mempool::broadcast_peers_selector::AllPeersSelector,
 };
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_infallible::RwLock;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -20,12 +22,12 @@ use aptos_types::{
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = vec![0];
-    (CoreMempool::new(&config), ConsensusMock::new())
+    (mempool_with_config(&config), ConsensusMock::new())
 }
 
 pub(crate) fn setup_mempool_with_broadcast_buckets(
@@ -33,7 +35,14 @@ pub(crate) fn setup_mempool_with_broadcast_buckets(
 ) -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = buckets;
-    (CoreMempool::new(&config), ConsensusMock::new())
+    (mempool_with_config(&config), ConsensusMock::new())
+}
+
+pub(crate) fn mempool_with_config(config: &NodeConfig) -> CoreMempool {
+    CoreMempool::new(
+        config,
+        Arc::new(RwLock::new(Box::new(AllPeersSelector::new()))),
+    )
 }
 
 static ACCOUNTS: Lazy<Vec<AccountAddress>> = Lazy::new(|| {

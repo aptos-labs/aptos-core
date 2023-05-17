@@ -362,7 +362,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                             transaction.clone(),
                             ranking_score,
                             sequence_info,
-                            timeline_state,
+                            timeline_state.clone(),
                             client_submitted,
                         );
                         statuses.push((transaction, (mempool_status, None)));

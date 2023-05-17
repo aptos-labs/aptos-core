@@ -5,15 +5,21 @@
 use crate::{
     smoke_test_environment::SwarmBuilder,
     test_utils::{
-        assert_balance, create_and_fund_account, transfer_coins, MAX_CATCH_UP_WAIT_SECS,
-        MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+        assert_balance, create_and_fund_account, transfer_coins, transfer_coins_non_blocking,
+        MAX_CATCH_UP_WAIT_SECS, MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
 use aptos_config::{
-    config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
+    config::{
+        BroadcastPeersSelectorConfig, DiscoveryMethod, NodeConfig, OverrideNodeConfig, Peer,
+        PeerRole, HANDSHAKE_VERSION,
+    },
     network_id::NetworkId,
 };
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
+use aptos_logger::info;
+use aptos_rest_client::Client;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::network_address::{NetworkAddress, Protocol};
 use std::{
     collections::HashSet,
@@ -23,7 +29,7 @@ use std::{
 
 #[tokio::test]
 async fn test_full_node_basic_flow() {
-    let mut swarm = local_swarm_with_fullnodes(1, 1).await;
+    let mut swarm = local_swarm_with_fullnodes(4, 4).await;
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
     let version = swarm.versions().max().unwrap();
@@ -113,11 +119,148 @@ async fn test_full_node_basic_flow() {
     assert_balance(&pfn_client, &account_1, 13).await;
 }
 
+// TODO:
+#[tokio::test]
+async fn test_pfn_route_updates() {
+    // VFN will not forward to other VFN
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    vfn_config.mempool.broadcast_peers_selector = BroadcastPeersSelectorConfig::PrioritizedPeers(1);
+    let mut swarm = SwarmBuilder::new_local(2)
+        .with_num_fullnodes(2)
+        .with_aptos()
+        .with_vfn_config(vfn_config)
+        .build()
+        .await;
+    let vfn_peer_ids = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let version = swarm.versions().max().unwrap();
+    // The PFN only forwards to a single VFN at a time. Route updates allow the txns to succeed.
+    let mut pfn_config = NodeConfig::get_default_pfn_config();
+    pfn_config.mempool.broadcast_peers_selector = BroadcastPeersSelectorConfig::FreshPeers(1);
+    pfn_config
+        .peer_monitoring_service
+        .node_monitoring
+        .node_info_request_interval_ms = 1_000;
+    pfn_config
+        .peer_monitoring_service
+        .node_monitoring
+        .node_info_request_timeout_ms = 500;
+    let pfn_peer_id = swarm
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(pfn_config),
+        )
+        .await
+        .unwrap();
+    for fullnode in swarm.full_nodes_mut() {
+        fullnode
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
+            .await
+            .unwrap();
+    }
+    let transaction_factory = swarm.chain_info().transaction_factory();
+
+    // create client for pfn
+    let pfn_client = swarm.full_node(pfn_peer_id).unwrap().rest_client();
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 10).await;
+    let mut account_1 = create_and_fund_account(&mut swarm, 10).await;
+
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
+        .await
+        .unwrap();
+
+    // Send txn to PFN
+    info!("Send txn to PFN, all nodes up");
+    send_and_receive_coin(
+        &transaction_factory,
+        &pfn_client,
+        &mut account_0,
+        &mut account_1,
+        10,
+    )
+    .await;
+    info!("Send txn to PFN, all nodes up, succeeded");
+
+    // Turn off a VFN, send txn to PFN
+    let vfn_0 = swarm.full_node_mut(vfn_peer_ids[0]).unwrap();
+    vfn_0.stop().await.unwrap();
+    info!("Send txn to PFN, VFN 0 ({}) is down", vfn_0.peer_id());
+    send_and_receive_coin(
+        &transaction_factory,
+        &pfn_client,
+        &mut account_0,
+        &mut account_1,
+        10,
+    )
+    .await;
+    info!("Send txn to PFN, VFN 0 is down, succeeded",);
+
+    // Turn the VFN back on
+    vfn_0.start().await.unwrap();
+    vfn_0
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
+        .await
+        .unwrap();
+    vfn_0
+        .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))
+        .await
+        .unwrap();
+
+    // Turn off the other VFN, send txn to PFN
+    let vfn_1 = swarm.full_node_mut(vfn_peer_ids[1]).unwrap();
+    vfn_1.stop().await.unwrap();
+    info!("Send txn to PFN, VFN 1 ({}) is down", vfn_1.peer_id());
+    send_and_receive_coin(
+        &transaction_factory,
+        &pfn_client,
+        &mut account_0,
+        &mut account_1,
+        10,
+    )
+    .await;
+    info!("Send txn to PFN, VFN 1 is down, succeeded",);
+
+    let vfn_0 = swarm.full_node_mut(vfn_peer_ids[0]).unwrap();
+    vfn_0.stop().await.unwrap();
+    info!("Send txn to PFN, all VFNs down");
+    let txn = transfer_coins_non_blocking(
+        &pfn_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        1,
+    )
+    .await;
+    let vfn_1 = swarm.full_node_mut(vfn_peer_ids[1]).unwrap();
+    info!("Bringing VFN 1 ({}) back up", vfn_1.peer_id());
+    vfn_1.start().await.unwrap();
+    pfn_client.wait_for_signed_transaction(&txn).await.unwrap();
+    assert_balance(&pfn_client, &account_0, 9).await;
+    assert_balance(&pfn_client, &account_1, 11).await;
+    info!("Send txn to PFN, all VFNs down then VFN 1 back up, succeeded",);
+}
+
+async fn send_and_receive_coin(
+    transaction_factory: &TransactionFactory,
+    pfn_client: &Client,
+    account_0: &mut LocalAccount,
+    account_1: &mut LocalAccount,
+    balance: u64,
+) {
+    let _txn = transfer_coins(pfn_client, transaction_factory, account_0, account_1, 1).await;
+    assert_balance(pfn_client, account_0, balance - 1).await;
+    assert_balance(pfn_client, account_1, balance + 1).await;
+    let _txn = transfer_coins(pfn_client, transaction_factory, account_1, account_0, 1).await;
+    assert_balance(pfn_client, account_1, balance).await;
+    assert_balance(pfn_client, account_0, balance).await;
+}
+
 #[tokio::test]
 async fn test_vfn_failover() {
     // VFN failover happens when validator is down even for default_failovers = 0
     let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config.mempool.default_failovers = 0;
+    vfn_config.mempool.broadcast_peers_selector = BroadcastPeersSelectorConfig::PrioritizedPeers(1);
     let mut swarm = SwarmBuilder::new_local(4)
         .with_num_fullnodes(4)
         .with_aptos()

@@ -4,7 +4,10 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    shared_mempool::start_shared_mempool,
+    shared_mempool::{
+        broadcast_peers_selector::{AllPeersSelector, BroadcastPeersSelector},
+        start_shared_mempool,
+    },
     MempoolClientSender, QuorumStoreRequest,
 };
 use anyhow::{format_err, Result};
@@ -105,7 +108,12 @@ impl MockSharedMempool {
         let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
-        let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+        let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(AllPeersSelector::new());
+        let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
+        let mempool = Arc::new(Mutex::new(CoreMempool::new(
+            &config,
+            broadcast_peers_selector.clone(),
+        )));
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -157,6 +165,7 @@ impl MockSharedMempool {
             Arc::new(RwLock::new(validator)),
             vec![],
             peers_and_metadata,
+            broadcast_peers_selector,
         );
 
         (ac_client, mempool, quorum_store_sender, mempool_notifier)

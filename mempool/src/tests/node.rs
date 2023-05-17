@@ -5,7 +5,11 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::MempoolSyncMsg,
-    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
+    shared_mempool::{
+        broadcast_peers_selector::{AllPeersSelector, BroadcastPeersSelector},
+        start_shared_mempool,
+        types::SharedMempoolNotification,
+    },
     tests::common::TestTransaction,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -599,7 +603,12 @@ fn start_node_mempool(
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(AllPeersSelector::new());
+    let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        &config,
+        broadcast_peers_selector.clone(),
+    )));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
@@ -634,6 +643,7 @@ fn start_node_mempool(
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
         peers_and_metadata,
+        broadcast_peers_selector,
     );
 
     (mempool, runtime, subscriber)

@@ -20,8 +20,6 @@ pub struct MempoolConfig {
     pub capacity_bytes: usize,
     /// Maximum number of transactions allowed in the Mempool per user
     pub capacity_per_user: usize,
-    /// Number of failover peers to broadcast to when the primary network is alive
-    pub default_failovers: usize,
     /// The maximum number of broadcasts sent to a single peer that are pending a response ACK at any point.
     pub max_broadcasts_per_peer: usize,
     /// Maximum number of inbound network messages to the Mempool application
@@ -53,6 +51,8 @@ pub struct MempoolConfig {
     pub broadcast_buckets: Vec<u64>,
     pub eager_expire_threshold_ms: Option<u64>,
     pub eager_expire_time_ms: u64,
+    pub peer_update_interval_ms: u64,
+    pub broadcast_peers_selector: BroadcastPeersSelectorConfig,
 }
 
 impl Default for MempoolConfig {
@@ -70,13 +70,14 @@ impl Default for MempoolConfig {
             capacity: 2_000_000,
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
-            default_failovers: 1,
             shared_mempool_peer_update_interval_ms: 1_000,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
             eager_expire_threshold_ms: Some(10_000),
             eager_expire_time_ms: 3_000,
+            peer_update_interval_ms: 1_000,
+            broadcast_peers_selector: BroadcastPeersSelectorConfig::AllPeers,
         }
     }
 }
@@ -116,15 +117,15 @@ impl ConfigOptimizer for MempoolConfig {
             }
         }
         if node_type.is_validator_fullnode() {
+            // Set broadcast peers to prioritized, with a max of 1
+            // TODO: as a workaround for smoke tests, always apply even if there is an override
+            mempool_config.broadcast_peers_selector =
+                BroadcastPeersSelectorConfig::PrioritizedPeers(1);
+            modified_config = true;
+
             // Set the shared_mempool_max_concurrent_inbound_syncs to 16 (default is 4)
             if local_mempool_config_yaml["shared_mempool_max_concurrent_inbound_syncs"].is_null() {
                 mempool_config.shared_mempool_max_concurrent_inbound_syncs = 16;
-                modified_config = true;
-            }
-
-            // Set the default_failovers to 0 (default is 1)
-            if local_mempool_config_yaml["default_failovers"].is_null() {
-                mempool_config.default_failovers = 0;
                 modified_config = true;
             }
 
@@ -133,10 +134,26 @@ impl ConfigOptimizer for MempoolConfig {
                 mempool_config.shared_mempool_tick_interval_ms = 10;
                 modified_config = true;
             }
+        } else if node_type.is_validator() {
+            // None for now
+        } else {
+            // The node is a PFN
+            // Set broadcast peers to fresh, with a max of 2
+            // TODO: as a workaround for smoke tests, always apply even if there is an override
+            mempool_config.broadcast_peers_selector = BroadcastPeersSelectorConfig::FreshPeers(2);
+            modified_config = true;
         }
 
         Ok(modified_config)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BroadcastPeersSelectorConfig {
+    AllPeers,
+    FreshPeers(usize),
+    PrioritizedPeers(usize),
 }
 
 #[cfg(test)]
@@ -165,8 +182,11 @@ mod tests {
             16
         );
         assert_eq!(mempool_config.max_broadcasts_per_peer, 20);
-        assert_eq!(mempool_config.default_failovers, 0);
         assert_eq!(mempool_config.shared_mempool_batch_size, 300);
+        assert_eq!(
+            mempool_config.broadcast_peers_selector,
+            BroadcastPeersSelectorConfig::PrioritizedPeers(1)
+        );
         assert_eq!(mempool_config.shared_mempool_tick_interval_ms, 10);
     }
 
@@ -194,8 +214,8 @@ mod tests {
         );
         assert_eq!(mempool_config.max_broadcasts_per_peer, 2);
         assert_eq!(
-            mempool_config.default_failovers,
-            default_mempool_config.default_failovers
+            mempool_config.broadcast_peers_selector,
+            default_mempool_config.broadcast_peers_selector
         );
         assert_eq!(mempool_config.shared_mempool_batch_size, 200);
         assert_eq!(
@@ -247,6 +267,10 @@ mod tests {
         assert_eq!(
             mempool_config.max_broadcasts_per_peer,
             local_max_broadcasts_per_peer
+        );
+        assert_ne!(
+            mempool_config.broadcast_peers_selector,
+            default_mempool_config.broadcast_peers_selector
         );
         assert_ne!(
             mempool_config.shared_mempool_tick_interval_ms,
