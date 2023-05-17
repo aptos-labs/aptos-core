@@ -15,7 +15,7 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos SDK
 
-Aptos SDK Release v1.8.5 check out the changelog [here.](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/CHANGELOG.md#185-2023-04-29)
+Aptos SDK Release v1.8.5 check out the change-log [here.](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/CHANGELOG.md#185-2023-04-29)
 
 ## Aptos CLI
 
