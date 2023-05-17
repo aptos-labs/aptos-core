@@ -9,6 +9,7 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use move_table_extension::TableResolver;
 use move_vm_types::resolver::MoveRefResolver;
+use std::collections::BTreeMap;
 
 pub trait MoveResolverExt:
     MoveRefResolver + TableResolver + StateStorageUsageResolver + ConfigStorage + StateView
@@ -24,6 +25,12 @@ pub trait MoveResolverExt:
         address: &AccountAddress,
         struct_tag: &StructTag,
     ) -> VMResult<Option<Vec<u8>>>;
+
+    fn release_resource_group_cache(
+        &self,
+        address: &AccountAddress,
+        resource_group: &StructTag,
+    ) -> Option<BTreeMap<StructTag, Vec<u8>>>;
 
     // Move to API does not belong here
     fn is_resource_group(&self, struct_tag: &StructTag) -> bool {

@@ -9,6 +9,7 @@ use crate::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     stackless_bytecode::{Bytecode, Operation},
+    COMPILED_MODULE_AVAILABLE,
 };
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::language_storage::{StructTag, TypeTag};
@@ -33,7 +34,10 @@ pub fn get_packed_types(
 ) -> BTreeSet<StructTag> {
     let mut packed_types = BTreeSet::new();
     for module_env in env.get_modules() {
-        let module_name = module_env.get_identifier().to_string();
+        let module_name = module_env
+            .get_identifier()
+            .expect(COMPILED_MODULE_AVAILABLE)
+            .to_string();
         let is_script = module_env.is_script_module();
         if is_script || module_name == "Genesis" {
             for func_env in module_env.get_functions() {

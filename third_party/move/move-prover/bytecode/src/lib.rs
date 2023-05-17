@@ -8,8 +8,6 @@ use crate::function_target_pipeline::FunctionTargetsHolder;
 use move_model::model::GlobalEnv;
 use std::fmt::Write;
 
-pub mod access_path;
-pub mod access_path_trie;
 pub mod annotations;
 pub mod borrow_analysis;
 pub mod clean_and_optimize;
@@ -19,7 +17,6 @@ pub mod dataflow_analysis;
 pub mod dataflow_domains;
 pub mod debug_instrumentation;
 pub mod eliminate_imm_refs;
-pub mod escape_analysis;
 pub mod function_data_builder;
 pub mod function_target;
 pub mod function_target_pipeline;
@@ -40,7 +37,6 @@ pub mod options;
 pub mod packed_types_analysis;
 pub mod pipeline_factory;
 pub mod reaching_def_analysis;
-pub mod read_write_set_analysis;
 pub mod spec_instrumentation;
 pub mod stackless_bytecode;
 pub mod stackless_bytecode_generator;
@@ -49,6 +45,9 @@ pub mod usage_analysis;
 pub mod verification_analysis;
 pub mod verification_analysis_v2;
 pub mod well_formed_instrumentation;
+
+/// An error message used for cases where a compiled module is expected to be attached
+pub(crate) const COMPILED_MODULE_AVAILABLE: &str = "compiled module missing";
 
 /// Print function targets for testing and debugging.
 pub fn print_targets_for_test(
@@ -60,6 +59,9 @@ pub fn print_targets_for_test(
     writeln!(&mut text, "============ {} ================", header).unwrap();
     for module_env in env.get_modules() {
         for func_env in module_env.get_functions() {
+            if func_env.is_inline() {
+                continue;
+            }
             for (variant, target) in targets.get_targets(&func_env) {
                 if !target.data.code.is_empty() || target.func_env.is_native_or_intrinsic() {
                     target.register_annotation_formatters_for_test();

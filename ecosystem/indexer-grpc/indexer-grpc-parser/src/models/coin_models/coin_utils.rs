@@ -9,10 +9,10 @@ use crate::{
     utils::util::{deserialize_from_string, hash_str, standardize_address, truncate_str},
 };
 use anyhow::{Context, Result};
-use aptos_logger::error;
 use aptos_protos::transaction::testing1::v1::{move_type::Content, MoveType, WriteResource};
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 const COIN_ADDR: &str = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const COIN_TYPE_HASH_LENGTH: usize = 5000;

@@ -5,7 +5,7 @@
 use crate::{
     executor::BlockExecutor,
     proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
-    scheduler::{Scheduler, SchedulerTask},
+    scheduler::{DependencyResult, Scheduler, SchedulerTask},
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
@@ -40,10 +40,11 @@ where
     let output = BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(
         num_cpus::get(),
         executor_thread_pool,
+        None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
 
-    let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
     baseline.assert_output(&output);
 }
 
@@ -425,11 +426,16 @@ fn scheduler_dependency() {
         s.next_task(false),
         SchedulerTask::ValidationTask((0, 0), 0)
     ));
-
     // Current status of 0 is executed - hence, no dependency added.
-    assert!(s.wait_for_dependency(3, 0).is_none());
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Resolved
+    ));
     // Dependency added for transaction 4 on transaction 2.
-    assert!(s.wait_for_dependency(4, 2).is_some());
+    assert!(matches!(
+        s.wait_for_dependency(4, 2),
+        DependencyResult::Dependency(_)
+    ));
 
     assert!(matches!(
         s.finish_execution(2, 0, false),
@@ -468,7 +474,6 @@ fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
             SchedulerTask::ExecutionTask((j, 1), None) if i == j
         ));
     }
-
     s
 }
 
@@ -477,8 +482,14 @@ fn scheduler_incarnation() {
     let s = incarnation_one_scheduler(5);
 
     // execution/validation index = 5, wave = 0.
-    assert!(s.wait_for_dependency(1, 0).is_some());
-    assert!(s.wait_for_dependency(3, 0).is_some());
+    assert!(matches!(
+        s.wait_for_dependency(1, 0),
+        DependencyResult::Dependency(_)
+    ));
+    assert!(matches!(
+        s.wait_for_dependency(3, 0),
+        DependencyResult::Dependency(_)
+    ));
 
     // Because validation index is higher, return validation task to caller (even with
     // revalidate_suffix = true) - because now we always decrease validation idx to txn_idx + 1

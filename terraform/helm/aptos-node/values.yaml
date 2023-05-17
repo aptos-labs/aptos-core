@@ -14,6 +14,11 @@ numValidators: 1
 # -- Total number of fullnode groups to deploy
 numFullnodeGroups: 1
 
+# -- Options for multicluster mode. This is *experimental only*.
+multicluster:
+  enabled: false 
+  targetClusters: ["cluster1", "cluster2", "cluster3"]
+
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.
 overrideNodeConfig: false
 
@@ -127,12 +132,6 @@ fullnode:
       # The first item in the array `full_node_networks` must always refer to the public fullnode network
       - network_id: "public"
         seeds: {}
-    mempool:
-      shared_mempool_max_concurrent_inbound_syncs: 16 # default 4
-      max_broadcasts_per_peer: 4 # default 1
-      default_failovers: 0 # default 1
-      shared_mempool_batch_size: 200 # default 100
-      shared_mempool_tick_interval_ms: 10 # default 50
 
 service:
   # -- If set, the base domain name to use for External DNS
@@ -144,6 +143,7 @@ service:
     internal:
       # -- The Kubernetes ServiceType to use for validator
       type: ClusterIP
+      headless: false
     # -- The externalTrafficPolicy for the validator service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
@@ -159,6 +159,7 @@ service:
     internal:
       # -- The Kubernetes ServiceType to use for fullnodes
       type: ClusterIP
+      headless: false
     # -- The externalTrafficPolicy for the fullnode service
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs
