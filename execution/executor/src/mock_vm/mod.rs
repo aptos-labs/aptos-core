@@ -8,7 +8,6 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -31,6 +30,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::VMExecutor;
+use aptos_vm_types::vm_view::AptosVMView;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -69,28 +69,29 @@ impl TransactionBlockExecutor<Transaction> for MockVM {
 impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &impl StateView,
+        vm_view: &impl AptosVMView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        if state_view.is_genesis() {
-            assert_eq!(
-                transactions.len(),
-                1,
-                "Genesis block should have only one transaction."
-            );
-            let output = TransactionOutput::new(
-                gen_genesis_writeset(),
-                // mock the validator set event
-                vec![ContractEvent::new(
-                    new_epoch_event_key(),
-                    0,
-                    TypeTag::Bool,
-                    bcs::to_bytes(&0).unwrap(),
-                )],
-                0,
-                KEEP_STATUS.clone(),
-            );
-            return Ok(vec![output]);
-        }
+        // TODO: Do we need this here?
+        // if vm_view.is_genesis() {
+        //     assert_eq!(
+        //         transactions.len(),
+        //         1,
+        //         "Genesis block should have only one transaction."
+        //     );
+        //     let output = TransactionOutput::new(
+        //         gen_genesis_writeset(),
+        //         // mock the validator set event
+        //         vec![ContractEvent::new(
+        //             new_epoch_event_key(),
+        //             0,
+        //             TypeTag::Bool,
+        //             bcs::to_bytes(&0).unwrap(),
+        //         )],
+        //         0,
+        //         KEEP_STATUS.clone(),
+        //     );
+        //     return Ok(vec![output]);
+        // }
 
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
@@ -109,13 +110,13 @@ impl VMExecutor for MockVM {
             }
 
             if matches!(txn, Transaction::GenesisTransaction(_)) {
-                read_state_value_from_storage(
-                    state_view,
+                read_resource_bytes_from_storage(
+                    vm_view,
                     &access_path_for_config(ValidatorSet::CONFIG_ID)
                         .map_err(|_| VMStatus::Error(StatusCode::TOO_MANY_TYPE_NODES, None))?,
                 );
-                read_state_value_from_storage(
-                    state_view,
+                read_resource_bytes_from_storage(
+                    vm_view,
                     &AccessPath::new(CORE_CODE_ADDRESS, ConfigurationResource::resource_path()),
                 );
                 outputs.push(TransactionOutput::new(
@@ -136,9 +137,9 @@ impl VMExecutor for MockVM {
 
             match decode_transaction(txn.try_as_signed_user_txn().unwrap()) {
                 MockVMTransaction::Mint { sender, amount } => {
-                    let old_balance = read_balance(&output_cache, state_view, sender);
+                    let old_balance = read_balance(&output_cache, vm_view, sender);
                     let new_balance = old_balance + amount;
-                    let old_seqnum = read_seqnum(&output_cache, state_view, sender);
+                    let old_seqnum = read_seqnum(&output_cache, vm_view, sender);
                     let new_seqnum = old_seqnum + 1;
 
                     output_cache.insert(balance_ap(sender), new_balance);
@@ -158,8 +159,8 @@ impl VMExecutor for MockVM {
                     recipient,
                     amount,
                 } => {
-                    let sender_old_balance = read_balance(&output_cache, state_view, sender);
-                    let recipient_old_balance = read_balance(&output_cache, state_view, recipient);
+                    let sender_old_balance = read_balance(&output_cache, vm_view, sender);
+                    let recipient_old_balance = read_balance(&output_cache, vm_view, recipient);
                     if sender_old_balance < amount {
                         outputs.push(TransactionOutput::new(
                             WriteSet::default(),
@@ -170,7 +171,7 @@ impl VMExecutor for MockVM {
                         continue;
                     }
 
-                    let sender_old_seqnum = read_seqnum(&output_cache, state_view, sender);
+                    let sender_old_seqnum = read_seqnum(&output_cache, vm_view, sender);
                     let sender_new_seqnum = sender_old_seqnum + 1;
                     let sender_new_balance = sender_old_balance - amount;
                     let recipient_new_balance = recipient_old_balance + amount;
@@ -203,49 +204,49 @@ impl VMExecutor for MockVM {
 
 fn read_balance(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &impl StateView,
+    vm_view: &impl AptosVMView,
     account: AccountAddress,
 ) -> u64 {
     let balance_access_path = balance_ap(account);
     match output_cache.get(&balance_access_path) {
         Some(balance) => *balance,
-        None => read_balance_from_storage(state_view, &balance_access_path),
+        None => read_balance_from_storage(vm_view, &balance_access_path),
     }
 }
 
 fn read_seqnum(
     output_cache: &HashMap<AccessPath, u64>,
-    state_view: &impl StateView,
+    vm_view: &impl AptosVMView,
     account: AccountAddress,
 ) -> u64 {
     let seqnum_access_path = seqnum_ap(account);
     match output_cache.get(&seqnum_access_path) {
         Some(seqnum) => *seqnum,
-        None => read_seqnum_from_storage(state_view, &seqnum_access_path),
+        None => read_seqnum_from_storage(vm_view, &seqnum_access_path),
     }
 }
 
-fn read_balance_from_storage(state_view: &impl StateView, balance_access_path: &AccessPath) -> u64 {
-    read_u64_from_storage(state_view, balance_access_path)
+fn read_balance_from_storage(vm_view: &impl AptosVMView, balance_access_path: &AccessPath) -> u64 {
+    read_u64_from_storage(vm_view, balance_access_path)
 }
 
-fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &AccessPath) -> u64 {
-    read_u64_from_storage(state_view, seqnum_access_path)
+fn read_seqnum_from_storage(vm_view: &impl AptosVMView, seqnum_access_path: &AccessPath) -> u64 {
+    read_u64_from_storage(vm_view, seqnum_access_path)
 }
 
-fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
-    state_view
-        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
+fn read_u64_from_storage(vm_view: &impl AptosVMView, access_path: &AccessPath) -> u64 {
+    vm_view
+        .get_move_resource(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
 
-fn read_state_value_from_storage(
-    state_view: &impl StateView,
+fn read_resource_bytes_from_storage(
+    vm_view: &impl AptosVMView,
     access_path: &AccessPath,
 ) -> Option<Vec<u8>> {
-    state_view
-        .get_state_value_bytes(&StateKey::access_path(access_path.clone()))
+    vm_view
+        .get_move_resource(&StateKey::access_path(access_path.clone()))
         .expect("Failed to query storage.")
 }
 

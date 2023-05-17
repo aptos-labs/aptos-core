@@ -21,7 +21,6 @@ use aptos_gas::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -48,6 +47,7 @@ use aptos_vm::{
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
+use aptos_vm_types::vm_view::VMView;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -310,10 +310,12 @@ impl FakeExecutor {
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap =
             AccessPath::resource_access_path(*addr, T::struct_tag()).expect("access path in test");
-        let data_blob =
-            TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
-                .expect("account must exist in data store")
-                .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
+        let data_blob = self
+            .data_store
+            .as_move_resolver()
+            .get_move_resource(&StateKey::access_path(ap))
+            .expect("account must exist in data store")
+            .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
@@ -341,7 +343,7 @@ impl FakeExecutor {
                 Some(aggregator) => {
                     let state_key = aggregator.state_key();
                     let value_bytes = self
-                        .read_state_value_bytes(&state_key)
+                        .read_resource_bytes(&state_key)
                         .expect("aggregator value must exist in data store");
                     bcs::from_bytes(&value_bytes).unwrap()
                 },
@@ -490,13 +492,18 @@ impl FakeExecutor {
         seq
     }
 
-    pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
-        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+    pub fn read_state_value(&self, _state_key: &StateKey) -> Option<StateValue> {
+        // TODO: THIS IS WRONG
+        None
+        // TStateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Get the blob for the associated AccessPath
-    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
-        TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
+    pub fn read_resource_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        self.data_store
+            .as_move_resolver()
+            .get_move_resource(state_key)
+            .unwrap()
     }
 
     /// Set the blob for the associated AccessPath

@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
@@ -19,6 +18,7 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::VMExecutor;
+use aptos_vm_types::vm_view::AptosVMView;
 
 fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
     // setup fake db
@@ -59,7 +59,7 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: Vec<Transaction>,
-        _state_view: &impl StateView,
+        _vm_view: &impl AptosVMView,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

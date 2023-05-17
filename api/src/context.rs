@@ -43,7 +43,10 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
+use aptos_vm::{
+    data_cache::{AsMoveResolver, StorageAdapter},
+    move_vm_ext::MoveResolverExt,
+};
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
@@ -330,7 +333,9 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                if state_view.as_move_resolver().is_resource_group(&key) {
+                let adapter = StorageAdapter::new(&state_view);
+                let resolver = adapter.as_move_resolver();
+                if resolver.is_resource_group(&key) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| {
@@ -553,7 +558,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -584,7 +590,8 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.db.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -863,7 +870,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
+            let adapter = StorageAdapter::new(&state_view);
+            let resolver = adapter.as_move_resolver();
 
             let gas_schedule_params =
                 match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {

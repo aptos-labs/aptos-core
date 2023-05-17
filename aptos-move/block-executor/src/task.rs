@@ -4,9 +4,8 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
-use aptos_vm_types::op::Op;
+use aptos_vm_types::{op::Op, vm_view::VMView};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -57,7 +56,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &impl VMView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,

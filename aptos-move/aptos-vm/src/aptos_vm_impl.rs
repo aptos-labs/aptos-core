@@ -16,7 +16,6 @@ use aptos_gas::{
     Gas, NativeGasParameters, StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -28,7 +27,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::vm_output::VMOutput;
+use aptos_vm_types::{vm_output::VMOutput, vm_view::AptosVMView};
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -75,7 +74,7 @@ pub fn gas_config(storage: &impl MoveResolverExt) -> (Option<AptosGasParameters>
 
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
-    pub fn new(state: &impl StateView) -> Self {
+    pub fn new(state: &impl AptosVMView) -> Self {
         let resolver = state.as_move_resolver();
 
         // Get the gas parameters

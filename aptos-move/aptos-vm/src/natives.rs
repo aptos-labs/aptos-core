@@ -2,19 +2,21 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
 use aptos_aggregator::resolver::AggregatorResolver;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::cryptography::algebra::AlgebraContext;
 use aptos_gas::{AbstractValueSizeGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-#[cfg(feature = "testing")]
-use aptos_types::chain_id::ChainId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
-    state_store::table::TableHandle,
 };
+#[cfg(feature = "testing")]
+use aptos_types::{chain_id::ChainId, state_store::table::TableHandle};
 use move_vm_runtime::native_functions::NativeFunctionTable;
-use std::{ops::Deref, sync::Arc};
+#[cfg(feature = "testing")]
+use std::ops::Deref;
+use std::sync::Arc;
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -28,8 +30,10 @@ use {
 };
 
 // We need this adapter so that we can implement Aptos resolver traits.
+#[cfg(feature = "testing")]
 struct BlankStorageAdapter(BlankStorage);
 
+#[cfg(feature = "testing")]
 impl BlankStorageAdapter {
     pub fn new() -> Self {
         Self(BlankStorage)
@@ -37,6 +41,7 @@ impl BlankStorageAdapter {
 }
 
 // Implement Deref so that all Move resolver traits still apply.
+#[cfg(feature = "testing")]
 impl Deref for BlankStorageAdapter {
     type Target = BlankStorage;
 
@@ -46,6 +51,7 @@ impl Deref for BlankStorageAdapter {
 }
 
 // Needed for unit testing aggregator.
+#[cfg(feature = "testing")]
 impl AggregatorResolver for BlankStorageAdapter {
     fn resolve_aggregator_value(
         &self,

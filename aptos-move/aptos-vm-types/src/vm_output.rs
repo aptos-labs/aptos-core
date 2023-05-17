@@ -4,10 +4,10 @@
 use crate::{
     change_set::{into_write_set, AptosChangeSet},
     op::Op,
+    vm_view::AptosVMView,
     write_change_set::WriteChangeSet,
 };
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
-use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
@@ -175,7 +175,7 @@ impl VMOutput {
 
     /// Tries to materialize deltas and merges them with the set of writes produced
     /// by this VM output.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(self, vm_view: &impl AptosVMView) -> anyhow::Result<Self, VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
@@ -192,7 +192,7 @@ impl VMOutput {
             gas_used,
             status,
         ) = self.unpack();
-        let materialized_deltas = WriteChangeSet::from_deltas(deltas, state_view)?;
+        let materialized_deltas = WriteChangeSet::from_deltas(deltas, vm_view)?;
         aggregator_writes
             .extend_with_writes(materialized_deltas)
             .expect("Extending with materialized deltas should always succeed");

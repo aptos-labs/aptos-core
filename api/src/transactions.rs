@@ -38,7 +38,10 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{
+    data_cache::{AsMoveResolver, StorageAdapter},
+    AptosVM,
+};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -716,7 +719,8 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
+                let adapter = StorageAdapter::new(&state_view);
+                let resolver = adapter.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
@@ -895,20 +899,22 @@ impl TransactionsApi {
 
                 Ok(signed_transaction)
             },
-            SubmitTransactionPost::Json(data) => self
-                .context
-                .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
-                .as_converter(self.context.db.clone())
-                .try_into_signed_transaction_poem(data.0, self.context.chain_id())
-                .context("Failed to create SignedTransaction from SubmitTransactionRequest")
-                .map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    )
-                }),
+            SubmitTransactionPost::Json(data) => {
+                let state_view = self.context.latest_state_view_poem(ledger_info)?;
+                let adapter = StorageAdapter::new(&state_view);
+                adapter
+                    .as_move_resolver()
+                    .as_converter(self.context.db.clone())
+                    .try_into_signed_transaction_poem(data.0, self.context.chain_id())
+                    .context("Failed to create SignedTransaction from SubmitTransactionRequest")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })
+            },
         }
     }
 
@@ -976,8 +982,10 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
+                    let state_view = self.context
+                        .latest_state_view_poem(ledger_info)?;
+                    let adapter = StorageAdapter::new(&state_view);
+                    adapter.as_move_resolver()
                         .as_converter(self.context.db.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
@@ -1066,7 +1074,8 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
+                    let adapter = StorageAdapter::new(&state_view);
+                    let resolver = adapter.as_move_resolver();
 
                     // We provide the pending transaction so that users have the hash associated
                     let pending_txn = resolver
@@ -1176,11 +1185,11 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let move_resolver = state_view.as_move_resolver();
-        let (_, vm_output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let vm_view = StorageAdapter::new(&state_view);
+        let (_, vm_output) = AptosVM::simulate_signed_transaction(&txn, &vm_view);
         let version = ledger_info.version();
 
-        let output = match vm_output.try_materialize(&move_resolver) {
+        let output = match vm_output.try_materialize(&vm_view) {
             Ok(vm_output) => vm_output.output_with_materialized_deltas(vec![]),
             Err(_) => {
                 return Err(SubmitTransactionError::internal_with_code(
@@ -1268,7 +1277,8 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let raw_txn: RawTransaction = resolver
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())

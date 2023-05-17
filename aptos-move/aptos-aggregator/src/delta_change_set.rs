@@ -169,6 +169,7 @@ impl DeltaOp {
     /// Consumes a single delta and tries to materialize it with a given state
     /// key. If materialization succeeds, a write op is produced. Otherwise, an
     /// error VM status is returned.
+    // TODO: Move this to vm-types
     pub fn try_into_write_op(
         self,
         state_view: &impl StateView,
@@ -325,20 +326,6 @@ impl DeltaChangeSet {
 
     pub fn as_inner_mut(&mut self) -> &mut BTreeMap<StateKey, DeltaOp> {
         &mut self.delta_change_set
-    }
-
-    pub fn take(
-        self,
-        state_view: &impl StateView,
-    ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
-        let mut ret = Vec::with_capacity(self.delta_change_set.len());
-
-        for (state_key, delta_op) in self.delta_change_set {
-            let write_op = delta_op.try_into_write_op(state_view, &state_key)?;
-            ret.push((state_key, write_op));
-        }
-
-        Ok(ret)
     }
 }
 

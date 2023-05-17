@@ -15,7 +15,7 @@ use aptos_protos::{
     },
     transaction::testing1::v1::Transaction as TransactionPB,
 };
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -222,7 +222,8 @@ impl IndexerStreamCoordinator {
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
-        let resolver = state_view.as_move_resolver();
+        let vm_view = StorageAdapter::new(&state_view);
+        let resolver = vm_view.as_move_resolver();
         let converter = resolver.as_converter(context.db.clone());
 
         // Enrich data with block metadata

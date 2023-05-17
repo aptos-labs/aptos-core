@@ -23,13 +23,12 @@ use aptos_block_executor::{
     },
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::{op::Op, vm_output::VMOutput};
+use aptos_vm_types::{op::Op, vm_output::VMOutput, vm_view::AptosVMView};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -145,7 +144,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    pub fn execute_block<S: StateView + Sync>(
+    pub fn execute_block<S: AptosVMView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,
@@ -191,7 +190,7 @@ impl BlockAptosVM {
         }
     }
 
-    pub fn execute_block_benchmark<S: StateView + Sync>(
+    pub fn execute_block_benchmark<S: AptosVMView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,

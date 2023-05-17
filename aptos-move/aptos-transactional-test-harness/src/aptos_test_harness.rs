@@ -11,7 +11,6 @@ use aptos_crypto::{
 };
 use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
@@ -27,6 +26,7 @@ use aptos_types::{
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
+use aptos_vm_types::vm_view::VMView;
 use clap::StructOpt;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_command_line_common::{
@@ -367,7 +367,7 @@ impl<'a> AptosTestAdapter<'a> {
                 .expect("access path in test");
         let account_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(account_access_path))
+            .get_move_resource(&StateKey::access_path(account_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -388,7 +388,7 @@ impl<'a> AptosTestAdapter<'a> {
 
         let balance_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(coin_access_path))
+            .get_move_resource(&StateKey::access_path(coin_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -901,7 +901,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
                 let bytes = self
                     .storage
-                    .get_state_value_bytes(&state_key)
+                    .get_move_resource(&state_key)
                     .unwrap()
                     .ok_or_else(|| format_err!("Failed to fetch table item.",))?;
 

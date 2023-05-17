@@ -6,13 +6,13 @@ use aptos_gas::{
     AptosGasParameters, StandardGasMeter, StorageGasParameters, LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
-use aptos_state_view::TStateView;
 use aptos_types::{
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use aptos_vm_types::vm_view::VMView;
 use move_core_types::vm_status::StatusCode::TYPE_MISMATCH;
 
 #[test]

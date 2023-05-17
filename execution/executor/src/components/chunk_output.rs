@@ -16,7 +16,10 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{
+    data_cache::{AsMoveResolver, StorageAdapter},
+    AptosVM, VMExecutor,
+};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::time::Duration;
@@ -118,7 +121,9 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(transactions, &state_view)?)
+        let adapter = StorageAdapter::new(state_view);
+        let resolver = adapter.as_move_resolver();
+        Ok(V::execute_block(transactions, &resolver)?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -133,9 +138,10 @@ impl ChunkOutput {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
+        let storage = StorageAdapter::new(state_view);
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            StateViewId::Miscellaneous => V::execute_block(transactions, &storage)?,
             _ => transactions
                 .iter()
                 .map(|_| {

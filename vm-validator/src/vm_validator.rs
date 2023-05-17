@@ -15,7 +15,10 @@ use aptos_types::{
     on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{
+    data_cache::{AsMoveResolver, StorageAdapter},
+    AptosVM,
+};
 use fail::fail_point;
 use std::sync::Arc;
 
@@ -54,7 +57,8 @@ impl VMValidator {
             .latest_state_checkpoint_view()
             .expect("Get db view cannot fail");
 
-        let vm = AptosVM::new_for_validation(&db_state_view);
+        let adapter = StorageAdapter::new(&db_state_view);
+        let vm = AptosVM::new_for_validation(&adapter);
         VMValidator {
             db_reader,
             state_view: db_state_view.into(),
@@ -74,13 +78,15 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.state_view))
+        let adapter = StorageAdapter::new(&self.state_view);
+        Ok(self.vm.validate_transaction(txn, &adapter))
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = AptosVM::new_for_validation(&self.state_view);
+        let adapter = StorageAdapter::new(&self.state_view);
+        self.vm = AptosVM::new_for_validation(&adapter.as_move_resolver());
         Ok(())
     }
 

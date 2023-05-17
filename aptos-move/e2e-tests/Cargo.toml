@@ -25,6 +25,7 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }

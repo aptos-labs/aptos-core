@@ -24,7 +24,7 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    data_cache::AsMoveResolver,
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMExecutor,
 };
@@ -58,7 +58,8 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(txns, &state_view)
+        let adapter = StorageAdapter::new(&state_view);
+        AptosVM::execute_block(txns, &adapter)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
@@ -68,6 +69,8 @@ impl AptosDebugger {
         txn: SignedTransaction,
     ) -> Result<(VMStatus, VMOutput, TransactionGasLog)> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let adapter = StorageAdapter::new(&state_view);
+
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let txn = txn
             .check_signature()
@@ -75,7 +78,7 @@ impl AptosDebugger {
 
         let (status, output, gas_profiler) =
             AptosVM::execute_user_transaction_with_custom_gas_meter(
-                &state_view,
+                &adapter,
                 &txn,
                 &log_context,
                 |gas_feature_version, gas_params, storage_gas_params, balance| {
@@ -175,7 +178,8 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&resolver);
         Ok(
             match self
@@ -195,7 +199,8 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&resolver);
 
         let mut result = vec![];
@@ -224,7 +229,8 @@ impl AptosDebugger {
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let features = Features::fetch_config(&resolver).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),

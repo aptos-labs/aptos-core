@@ -4,15 +4,13 @@
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-    },
+    state_store::{state_key::StateKey, state_storage_usage::StateStorageUsage},
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
+use aptos_vm_types::vm_view::VMView;
 use std::collections::BTreeMap;
 
 fn gen_address(index: u8) -> AccountAddress {
@@ -21,18 +19,22 @@ fn gen_address(index: u8) -> AccountAddress {
 
 struct MockStateView;
 
-impl TStateView for MockStateView {
+impl VMView for MockStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_move_module(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 
-    fn is_genesis(&self) -> bool {
-        false
+    fn get_move_resource(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        Ok(None)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_aggregator_value(&self, _state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+
+    fn get_storage_usage_at_epoch_end(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
     }
 }

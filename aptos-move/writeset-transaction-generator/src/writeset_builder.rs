@@ -16,7 +16,7 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::AsMoveResolver,
+    data_cache::{AsMoveResolver, StorageAdapter},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
@@ -120,7 +120,8 @@ where
         TimedFeatures::enable_all(),
     )
     .unwrap();
-    let resolver = state_view.as_move_resolver();
+    let vm_view = StorageAdapter::new(&state_view);
+    let resolver = vm_view.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

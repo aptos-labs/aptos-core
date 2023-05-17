@@ -8,8 +8,8 @@ use crate::sharded_block_executor::{
 };
 use aptos_block_executor::errors::Error;
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_vm_types::vm_view::AptosVMView;
 use move_core_types::vm_status::VMStatus;
 use std::{
     marker::PhantomData,
@@ -24,7 +24,7 @@ mod block_partitioner;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
-pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
+pub struct ShardedBlockExecutor<S: AptosVMView + Sync + Send + 'static> {
     num_executor_shards: usize,
     partitioner: Arc<dyn BlockPartitioner>,
     command_txs: Vec<Sender<ExecutorShardCommand>>,
@@ -38,7 +38,7 @@ pub enum ExecutorShardCommand {
     Stop,
 }
 
-impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
+impl<S: AptosVMView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn new(
         num_executor_shards: usize,
         num_threads_per_executor: Option<usize>,
@@ -97,7 +97,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     }
 }
 
-impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
+impl<S: AptosVMView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
     fn drop(&mut self) {
         // send stop command to all executor shards
         for command_tx in self.command_txs.iter() {
@@ -111,7 +111,7 @@ impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
     }
 }
 
-fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
+fn spawn_executor_shard<S: AptosVMView + Sync + Send + 'static>(
     shard_id: usize,
     concurrency_level: usize,
     state_view: Arc<S>,

@@ -20,6 +20,7 @@ use aptos_vm_genesis::{
     generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
     GenesisOptions,
 };
+use aptos_vm_types::vm_view::VMView;
 use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -112,7 +113,8 @@ impl FakeDataStore {
     }
 }
 
-// This is used by the `execute_block` API.
+// This ensure aggregator delta op tests are working. Once deltas move to
+// vm-types crate, we should remove this implementation!
 impl TStateView for FakeDataStore {
     type Key = StateKey;
 
@@ -125,6 +127,43 @@ impl TStateView for FakeDataStore {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
+        let mut usage = StateStorageUsage::new_untracked();
+        for (k, v) in self.state_data.iter() {
+            usage.add_item(k.size() + v.size())
+        }
+        Ok(usage)
+    }
+}
+
+// This is used by the `execute_block` API.
+impl VMView for FakeDataStore {
+    type Key = StateKey;
+
+    fn get_move_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(|b| b.into_bytes()))
+    }
+
+    fn get_move_resource(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(|b| b.into_bytes()))
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        Ok(self
+            .state_data
+            .get(state_key)
+            .cloned()
+            .map(|b| b.into_bytes()))
+    }
+
+    fn get_storage_usage_at_epoch_end(&self) -> Result<StateStorageUsage> {
         let mut usage = StateStorageUsage::new_untracked();
         for (k, v) in self.state_data.iter() {
             usage.add_item(k.size() + v.size())

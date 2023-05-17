@@ -22,7 +22,7 @@ use aptos_types::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
 };
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
 use move_core_types::language_storage::{ModuleId, StructTag};
 use move_vm_types::resolver::MoveRefResolver;
 use poem_openapi::{
@@ -235,7 +235,8 @@ impl StateApi {
 
         let (ledger_info, ledger_version, state_view) = self.context.state_view(ledger_version)?;
 
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let bytes = resolver
             .get_resource_bytes(&address.into(), &resource_type)
             .context(format!(
@@ -255,8 +256,9 @@ impl StateApi {
 
         match accept_type {
             AcceptType::Json => {
-                let resource = state_view
-                    .as_move_resolver()
+                let adapter = StorageAdapter::new(&state_view);
+                let resolver = adapter.as_move_resolver();
+                let resource = resolver
                     .as_converter(self.context.db.clone())
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
@@ -358,7 +360,8 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let resolver = state_view.as_move_resolver();
+        let adapter = StorageAdapter::new(&state_view);
+        let resolver = adapter.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
 
         // Convert key to lookup version for DB

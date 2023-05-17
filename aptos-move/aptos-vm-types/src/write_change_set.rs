@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::ChangeSet, op::Op};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
-use aptos_state_view::StateView;
+use crate::{change_set::ChangeSet, op::Op, vm_view::AptosVMView};
+use aptos_aggregator::{
+    delta_change_set::{deserialize, serialize, DeltaChangeSet, DeltaOp},
+    module::AGGREGATOR_MODULE,
+};
 use aptos_types::{
     state_store::state_key::StateKey,
     write_set::{WriteSet, WriteSetMut},
 };
+use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use move_vm_types::types::Store;
 use std::{
@@ -92,18 +95,52 @@ impl<T: Store> WriteChangeSet<T> {
     }
 }
 
+// TODO: This is almost 1-to-1 copy of DeltaOp::try_into_write_op. We must have it here
+// to avoid cyclic dependency with AptosVMView.
+fn try_into_write_op(
+    delta_op: DeltaOp,
+    state_view: &impl AptosVMView,
+    state_key: &StateKey,
+) -> anyhow::Result<Op<Vec<u8>>, VMStatus> {
+    state_view
+        .get_aggregator_value(state_key)
+        .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))
+        .and_then(|maybe_bytes| {
+            match maybe_bytes {
+                Some(bytes) => {
+                    let base = deserialize(&bytes);
+                    delta_op
+                        .apply_to(base)
+                        .map_err(|partial_error| {
+                            // If delta application fails, transform partial VM
+                            // error into an appropriate VM status.
+                            partial_error
+                                .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+                                .into_vm_status()
+                        })
+                        .map(|result| Op::Modification(serialize(&result)))
+                },
+                // Something is wrong, the value to which we apply delta should
+                // always exist. Guard anyway.
+                None => Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+            }
+        })
+}
+
 impl WriteChangeSet<Vec<u8>> {
     /// Consumes the delta change set and tries to materialize it. Returns a
     /// write set if materialization succeeds.
     pub fn from_deltas(
         deltas: DeltaChangeSet,
-        state_view: &impl StateView,
+        state_view: &impl AptosVMView,
     ) -> anyhow::Result<Self, VMStatus> {
-        let materialized_writes = deltas.take(state_view)?;
-        Ok(Self(ChangeSet::new(
-            materialized_writes
-                .into_iter()
-                .map(|(k, w)| (k, Op::from_write_op(w))),
-        )))
+        let mut materialized_writes = Vec::with_capacity(deltas.len());
+
+        for (state_key, delta_op) in deltas {
+            let op = try_into_write_op(delta_op, state_view, &state_key)?;
+            materialized_writes.push((state_key, op));
+        }
+
+        Ok(Self(ChangeSet::new(materialized_writes)))
     }
 }

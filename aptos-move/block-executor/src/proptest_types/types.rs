@@ -11,7 +11,6 @@ use aptos_aggregator::{
     transaction::AggregatorValue,
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -19,7 +18,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::TransactionWrite,
 };
-use aptos_vm_types::op::Op;
+use aptos_vm_types::{op::Op, vm_view::VMView};
 use claims::{assert_none, assert_ok};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -44,30 +43,28 @@ pub(crate) struct DeltaDataView<K, V> {
     pub(crate) phantom: PhantomData<(K, V)>,
 }
 
-impl<K, V> TStateView for DeltaDataView<K, V>
+impl<K, V> VMView for DeltaDataView<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
 
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
-        // When aggregator value has to be resolved from storage, pretend it is 100.
-        Ok(Some(StateValue::new_legacy(serialize(
-            &STORAGE_AGGREGATOR_VALUE,
-        ))))
-    }
-
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
-    }
-
-    fn is_genesis(&self) -> bool {
+    fn get_move_module(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
         unreachable!();
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_move_resource(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        unreachable!();
+    }
+
+    /// Gets the state value for a given state key.
+    fn get_aggregator_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        // When aggregator value has to be resolved from storage, pretend it is 100.
+        Ok(Some(serialize(&STORAGE_AGGREGATOR_VALUE)))
+    }
+
+    fn get_storage_usage_at_epoch_end(&self) -> anyhow::Result<StateStorageUsage> {
         unreachable!();
     }
 }
@@ -76,27 +73,26 @@ pub(crate) struct EmptyDataView<K, V> {
     pub(crate) phantom: PhantomData<(K, V)>,
 }
 
-impl<K, V> TStateView for EmptyDataView<K, V>
+impl<K, V> VMView for EmptyDataView<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
 
-    /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> anyhow::Result<Option<StateValue>> {
+    fn get_move_module(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
         Ok(None)
     }
 
-    fn id(&self) -> StateViewId {
-        StateViewId::Miscellaneous
+    fn get_move_resource(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(None)
     }
 
-    fn is_genesis(&self) -> bool {
-        unreachable!();
+    fn get_aggregator_value(&self, _state_key: &Self::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(None)
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_storage_usage_at_epoch_end(&self) -> anyhow::Result<StateStorageUsage> {
         unreachable!();
     }
 }
@@ -428,7 +424,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = K>,
+        view: &impl VMView<Key = K>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -451,7 +447,8 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     // TODO: later test errors as well? (by fixing state_view behavior).
-                    reads_result.push(view.get_state_value_bytes(k).unwrap());
+                    // TODO: Is this correct?
+                    reads_result.push(view.get_aggregator_value(k).unwrap());
                 }
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),

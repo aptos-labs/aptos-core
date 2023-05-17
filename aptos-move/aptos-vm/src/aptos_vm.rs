@@ -25,7 +25,6 @@ use aptos_gas::{
     StorageGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
@@ -44,7 +43,8 @@ use aptos_vm_logging::{
     init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
 };
 use aptos_vm_types::{
-    change_set::AptosChangeSet, vm_output::VMOutput, write_change_set::WriteChangeSet,
+    change_set::AptosChangeSet, vm_output::VMOutput, vm_view::AptosVMView,
+    write_change_set::WriteChangeSet,
 };
 use fail::fail_point;
 use move_binary_format::{
@@ -113,16 +113,16 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new(state: &impl StateView) -> Self {
-        Self(AptosVMImpl::new(state))
+    pub fn new(vm_view: &impl AptosVMView) -> Self {
+        Self(AptosVMImpl::new(vm_view))
     }
 
-    pub fn new_for_validation(state: &impl StateView) -> Self {
+    pub fn new_for_validation(vm_view: &impl AptosVMView) -> Self {
         info!(
-            AdapterLogSchema::new(state.id(), 0),
+            AdapterLogSchema::new(vm_view.id(), 0),
             "Adapter created for Validation"
         );
-        Self::new(state)
+        Self::new(vm_view)
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -302,14 +302,12 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // TODO: Make DeltaStateView take different write sets and deltas when
-        // a new View trait is added.
-        let storage_with_changes =
-            DeltaStateView::new(resolver, user_txn_change_set.aggregator_writes());
-        let storage_with_changes =
-            DeltaStateView::new(&storage_with_changes, user_txn_change_set.module_writes());
-        let storage_with_changes =
-            DeltaStateView::new(&storage_with_changes, user_txn_change_set.resource_writes());
+        let storage_with_changes = DeltaStateView::new(
+            resolver,
+            user_txn_change_set.resource_writes(),
+            user_txn_change_set.module_writes(),
+            user_txn_change_set.aggregator_writes(),
+        );
 
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
@@ -321,7 +319,15 @@ impl AptosVM {
         // handling quite challenging.
         let deltas = user_txn_change_set.deltas().clone();
         let materialized_deltas = WriteChangeSet::from_deltas(deltas, resolver)?;
-        let delta_state_view = DeltaStateView::new(&storage_with_changes, &materialized_deltas);
+
+        let empty_resources: WriteChangeSet<Vec<u8>> = WriteChangeSet::empty();
+        let empty_modules: WriteChangeSet<Vec<u8>> = WriteChangeSet::empty();
+        let delta_state_view = DeltaStateView::new(
+            &storage_with_changes,
+            &empty_resources,
+            &empty_modules,
+            &materialized_deltas,
+        );
         let resolver = delta_state_view.as_move_resolver();
 
         let mut session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
@@ -669,19 +675,25 @@ impl AptosVM {
             txn_data.gas_unit_price,
         ));
 
-        // TODO: Make DeltaStateView take different write sets and deltas when
-        // a new View trait is added.
-        let storage_with_changes = DeltaStateView::new(resolver, change_set.aggregator_writes());
-        let storage_with_changes =
-            DeltaStateView::new(&storage_with_changes, change_set.module_writes());
-        let storage_with_changes =
-            DeltaStateView::new(&storage_with_changes, change_set.resource_writes());
+        let storage_with_changes = DeltaStateView::new(
+            resolver,
+            change_set.resource_writes(),
+            change_set.module_writes(),
+            change_set.aggregator_writes(),
+        );
 
         // TODO: Avoid delta materialization here.
         let deltas = change_set.deltas().clone();
         let materialized_deltas = WriteChangeSet::from_deltas(deltas, resolver)?;
 
-        let delta_state_view = DeltaStateView::new(&storage_with_changes, &materialized_deltas);
+        let empty_resources: WriteChangeSet<Vec<u8>> = WriteChangeSet::empty();
+        let empty_modules: WriteChangeSet<Vec<u8>> = WriteChangeSet::empty();
+        let delta_state_view = DeltaStateView::new(
+            &storage_with_changes,
+            &empty_resources,
+            &empty_modules,
+            &materialized_deltas,
+        );
         let resolver = delta_state_view.as_move_resolver();
         let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
         cleanup_session.execute_function_bypass_visibility(
@@ -1154,7 +1166,7 @@ impl AptosVM {
     }
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
-        state_view: &impl StateView,
+        state_view: &impl AptosVMView,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
@@ -1232,14 +1244,20 @@ impl AptosVM {
 
     fn read_writeset(
         &self,
-        state_view: &impl StateView,
-        writes: &WriteChangeSet<Vec<u8>>,
+        state_view: &impl AptosVMView,
+        resource_writes: &WriteChangeSet<Vec<u8>>,
+        module_writes: &WriteChangeSet<Vec<u8>>,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (state_key, _) in writes.iter() {
+        for (state_key, _) in resource_writes.iter() {
             state_view
-                .get_state_value_bytes(state_key)
+                .get_move_resource(state_key)
+                .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
+        }
+        for (state_key, _) in module_writes.iter() {
+            state_view
+                .get_move_module(state_key)
                 .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
@@ -1285,8 +1303,11 @@ impl AptosVM {
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         assert!(change_set.aggregator_writes().is_empty());
-        self.read_writeset(resolver, change_set.resource_writes())?;
-        self.read_writeset(resolver, change_set.module_writes())?;
+        self.read_writeset(
+            resolver,
+            change_set.resource_writes(),
+            change_set.module_writes(),
+        )?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = VMOutput::from_change_set(change_set, 0, VMStatus::Executed.into());
@@ -1347,31 +1368,31 @@ impl AptosVM {
 
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
-        state_view: &impl StateView,
+        vm_view: &impl AptosVMView,
     ) -> (VMStatus, VMOutput) {
-        let vm = AptosVM::new(state_view);
+        let vm = AptosVM::new(vm_view);
         let simulation_vm = AptosSimulationVM(vm);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        simulation_vm.simulate_signed_transaction(&state_view.as_move_resolver(), txn, &log_context)
+        let log_context = AdapterLogSchema::new(vm_view.id(), 0);
+        simulation_vm.simulate_signed_transaction(&vm_view.as_move_resolver(), txn, &log_context)
     }
 
     pub fn execute_view_function(
-        state_view: &impl StateView,
+        vm_view: &impl AptosVMView,
         module_id: ModuleId,
         func_name: Identifier,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_budget: u64,
     ) -> Result<Vec<Vec<u8>>> {
-        let vm = AptosVM::new(state_view);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let vm = AptosVM::new(vm_view);
+        let log_context = AdapterLogSchema::new(vm_view.id(), 0);
         let mut gas_meter = StandardGasMeter::new(
             vm.0.get_gas_feature_version(),
             vm.0.get_gas_parameters(&log_context)?.clone(),
             vm.0.get_storage_gas_parameters(&log_context)?.clone(),
             gas_budget,
         );
-        let resolver = &state_view.as_move_resolver();
+        let resolver = &vm_view.as_move_resolver();
         let mut session = vm.new_session(resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1459,7 +1480,7 @@ impl VMExecutor for AptosVM {
     /// transaction output.
     fn execute_block(
         transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
+        state_view: &(impl AptosVMView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1506,7 +1527,7 @@ impl VMValidator for AptosVM {
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
-        state_view: &impl StateView,
+        state_view: &impl AptosVMView,
     ) -> VMValidatorResult {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);

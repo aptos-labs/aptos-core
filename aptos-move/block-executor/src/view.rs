@@ -11,14 +11,15 @@ use aptos_mvhashmap::{
     types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
     MVHashMap,
 };
-use aptos_state_view::{StateViewId, TStateView};
+use aptos_state_view::StateViewId;
 use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
-    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    state_store::state_storage_usage::StateStorageUsage,
     vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::vm_view::VMView;
 use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
@@ -164,13 +165,13 @@ enum ViewMapKind<'a, T: Transaction> {
     BTree(&'a BTreeMap<T::Key, T::Value>),
 }
 
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
+pub(crate) struct LatestView<'a, T: Transaction, S: VMView<Key = T::Key>> {
     base_view: &'a S,
     latest_view: ViewMapKind<'a, T>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: VMView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
         map: &'a MVHashMapView<'a, T::Key, T::Value>,
@@ -195,8 +196,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         }
     }
 
-    fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        let ret = self.base_view.get_state_value(state_key);
+    fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<Vec<u8>>> {
+        let ret = self.base_view.get_aggregator_value(state_key);
 
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
@@ -212,70 +213,106 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: VMView<Key = T::Key>> VMView for LatestView<'a, T, S> {
     type Key = T::Key;
-
-    fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        match self.latest_view {
-            ViewMapKind::MultiVersion(map) => match state_key.module_path() {
-                Some(_) => {
-                    use MVCodeError::*;
-                    use MVCodeOutput::*;
-
-                    match map.fetch_code(state_key, self.txn_idx) {
-                        Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                        Ok(Module((v, _))) => Ok(v.as_state_value()),
-                        Err(Dependency(_)) => {
-                            // Return anything (e.g. module does not exist) to avoid waiting,
-                            // because parallel execution will fall back to sequential anyway.
-                            Ok(None)
-                        },
-                        Err(NotFound) => self.base_view.get_state_value(state_key),
-                    }
-                },
-                None => {
-                    let mut mv_value = map.fetch_data(state_key, self.txn_idx);
-
-                    if matches!(mv_value, ReadResult::Unresolved) {
-                        let from_storage =
-                            self.base_view.get_state_value_bytes(state_key)?.map_or(
-                                Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
-                                |bytes| Ok(deserialize(&bytes)),
-                            )?;
-
-                        // Store base value in the versioned data-structure directly, so subsequent
-                        // reads can be resolved to U128 directly without storage calls.
-                        map.set_aggregator_base_value(state_key, from_storage);
-
-                        mv_value = map.fetch_data(state_key, self.txn_idx);
-                    }
-
-                    match mv_value {
-                        ReadResult::Value(v) => Ok(v.as_state_value()),
-                        ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
-                        ReadResult::None => self.get_base_value(state_key),
-                        ReadResult::Unresolved => unreachable!(
-                            "Must be resolved as base value is recorded in the MV data structure"
-                        ),
-                    }
-                },
-            },
-            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
-                || self.get_base_value(state_key),
-                |v| Ok(v.as_state_value()),
-            ),
-        }
-    }
 
     fn id(&self) -> StateViewId {
         self.base_view.id()
     }
 
-    fn is_genesis(&self) -> bool {
-        self.base_view.is_genesis()
+    fn get_move_module(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                use MVCodeError::*;
+                use MVCodeOutput::*;
+
+                match map.fetch_code(state_key, self.txn_idx) {
+                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
+                    Ok(Module((v, _))) => Ok(v.as_state_value().map(|s| s.into_bytes())),
+                    Err(Dependency(_)) => {
+                        // Return anything (e.g. module does not exist) to avoid waiting,
+                        // because parallel execution will fall back to sequential anyway.
+                        Ok(None)
+                    },
+                    Err(NotFound) => self.base_view.get_move_module(state_key),
+                }
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.get_base_value(state_key),
+                |v| Ok(v.as_state_value().map(|s| s.into_bytes())),
+            ),
+        }
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
-        self.base_view.get_usage()
+    fn get_move_resource(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                let mut mv_value = map.fetch_data(state_key, self.txn_idx);
+
+                if matches!(mv_value, ReadResult::Unresolved) {
+                    let from_storage = self.base_view.get_move_resource(state_key)?.map_or(
+                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                        |bytes| Ok(deserialize(&bytes)),
+                    )?;
+
+                    // Store base value in the versioned data-structure directly, so subsequent
+                    // reads can be resolved to U128 directly without storage calls.
+                    map.set_aggregator_base_value(state_key, from_storage);
+
+                    mv_value = map.fetch_data(state_key, self.txn_idx);
+                }
+
+                match mv_value {
+                    ReadResult::Value(v) => Ok(v.as_state_value().map(|s| s.into_bytes())),
+                    ReadResult::U128(v) => Ok(Some(serialize(&v))),
+                    ReadResult::None => self.get_base_value(state_key),
+                    ReadResult::Unresolved => unreachable!(
+                        "Must be resolved as base value is recorded in the MV data structure"
+                    ),
+                }
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.get_base_value(state_key),
+                |v| Ok(v.as_state_value().map(|s| s.into_bytes())),
+            ),
+        }
+    }
+
+    fn get_aggregator_value(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => {
+                let mut mv_value = map.fetch_data(state_key, self.txn_idx);
+
+                if matches!(mv_value, ReadResult::Unresolved) {
+                    let from_storage = self.base_view.get_move_resource(state_key)?.map_or(
+                        Err(VMStatus::Error(StatusCode::STORAGE_ERROR, None)),
+                        |bytes| Ok(deserialize(&bytes)),
+                    )?;
+
+                    // Store base value in the versioned data-structure directly, so subsequent
+                    // reads can be resolved to U128 directly without storage calls.
+                    map.set_aggregator_base_value(state_key, from_storage);
+
+                    mv_value = map.fetch_data(state_key, self.txn_idx);
+                }
+
+                match mv_value {
+                    ReadResult::Value(v) => Ok(v.as_state_value().map(|s| s.into_bytes())),
+                    ReadResult::U128(v) => Ok(Some(serialize(&v))),
+                    ReadResult::None => self.get_base_value(state_key),
+                    ReadResult::Unresolved => unreachable!(
+                        "Must be resolved as base value is recorded in the MV data structure"
+                    ),
+                }
+            },
+            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+                || self.get_base_value(state_key),
+                |v| Ok(v.as_state_value().map(|s| s.into_bytes())),
+            ),
+        }
+    }
+
+    fn get_storage_usage_at_epoch_end(&self) -> Result<StateStorageUsage> {
+        self.base_view.get_storage_usage_at_epoch_end()
     }
 }
