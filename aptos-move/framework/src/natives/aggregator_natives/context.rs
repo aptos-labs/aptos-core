@@ -156,8 +156,7 @@ impl AggregatorChangeSet {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_extension::aggregator_id_for_test,
-        delta_change_set::serialize
+        aggregator_extension::aggregator_id_for_test, delta_change_set::serialize,
     };
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::state_store::state_key::StateKey;
