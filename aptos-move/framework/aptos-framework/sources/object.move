@@ -538,6 +538,14 @@ module aptos_framework::object {
     }
 
     #[test_only]
+    public fun create_constructor_ref(s: &signer, can_delete: bool): ConstructorRef {
+        ConstructorRef {
+            self: signer::address_of(s),
+            can_delete
+        }
+    }
+
+    #[test_only]
     use std::option::{Self, Option};
 
     #[test_only]

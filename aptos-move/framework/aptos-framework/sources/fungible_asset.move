@@ -590,6 +590,14 @@ module aptos_framework::fungible_asset {
     struct TestToken has key {}
 
     #[test_only]
+    public fun test_burn(fa: FungibleAsset) {
+        let FungibleAsset {
+            amount: _,
+            metadata: _,
+        } = fa;
+    }
+
+    #[test_only]
     public fun create_test_token(creator: &signer): (ConstructorRef, Object<TestToken>) {
         account::create_account_for_test(signer::address_of(creator));
         let creator_ref = object::create_named_object(creator, b"TEST");

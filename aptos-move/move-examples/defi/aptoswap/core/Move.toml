@@ -1,0 +1,14 @@
+[package]
+name = "AptoswapPoolManager"
+version = "0.0.0"
+
+[addresses]
+aptoswap = "_"
+pool_manager = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../../framework/aptos-framework" }
+AptoswapInit = { local = "../init" }
+
+[dev-dependencies]
+ManagedFungibleAsset = { local = "../../../fungible_asset/managed_fungible_asset" }
