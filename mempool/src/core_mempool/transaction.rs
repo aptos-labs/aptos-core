@@ -44,7 +44,7 @@ impl MempoolTransaction {
             txn,
             expiration_time,
             ranking_score,
-            timeline_state,
+            timeline_state: timeline_state.clone(),
             insertion_info: InsertionInfo::new(insertion_time, client_submitted, timeline_state),
             was_parked: false,
         }
@@ -67,12 +67,14 @@ impl MempoolTransaction {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize, Hash, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Hash, Serialize)]
 pub enum TimelineState {
+    // TODO: retire the word "broadcast"?
     // The transaction is ready for broadcast.
-    // Associated integer represents it's position in the log of such transactions.
-    Ready(u64),
-    // Transaction is not yet ready for broadcast, but it might change in a future.
+    // The vector shows the position in the log -- the transaction can be present in multiple
+    // positions in the log due to retries to other peers.
+    Ready(Vec<u64>),
+    // Transaction is not yet ready for broadcast, but it might change in the future.
     NotReady,
     // Transaction will never be qualified for broadcasting.
     // Currently we don't broadcast transactions originated on other peers.

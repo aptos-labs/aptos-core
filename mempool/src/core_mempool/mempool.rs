@@ -12,11 +12,14 @@ use crate::{
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
-    shared_mempool::types::MultiBucketTimelineIndexIds,
+    shared_mempool::{
+        broadcast_peers_selector::BroadcastPeersSelector, types::MultiBucketTimelineIndexIds,
+    },
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
 use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::HashValue;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
@@ -26,6 +29,7 @@ use aptos_types::{
 };
 use std::{
     collections::{HashMap, HashSet},
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
@@ -37,9 +41,12 @@ pub struct Mempool {
 }
 
 impl Mempool {
-    pub fn new(config: &NodeConfig) -> Self {
+    pub fn new(
+        config: &NodeConfig,
+        broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
+    ) -> Self {
         Mempool {
-            transactions: TransactionStore::new(&config.mempool),
+            transactions: TransactionStore::new(&config.mempool, broadcast_peers_selector),
             system_transaction_timeout: Duration::from_secs(
                 config.mempool.system_transaction_timeout_secs,
             ),
@@ -386,21 +393,33 @@ impl Mempool {
         self.transactions.gc_by_expiration_time(block_time);
     }
 
+    pub(crate) fn redirect_no_peers(&mut self) {
+        info!("redirect_no_peers");
+        self.transactions.redirect_no_peers();
+    }
+
+    pub(crate) fn redirect(&mut self, peer: PeerNetworkId) {
+        info!("redirect: {}", peer);
+        self.transactions.redirect(peer);
+    }
+
     /// Returns block of transactions and new last_timeline_id.
     pub(crate) fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        peer: Option<PeerNetworkId>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
-        self.transactions.read_timeline(timeline_id, count)
+        self.transactions.read_timeline(timeline_id, count, peer)
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
+        peer: Option<PeerNetworkId>,
     ) -> Vec<SignedTransaction> {
-        self.transactions.timeline_range(start_end_pairs)
+        self.transactions.timeline_range(start_end_pairs, peer)
     }
 
     pub fn gen_snapshot(&self) -> TxnsLog {

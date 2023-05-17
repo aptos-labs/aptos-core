@@ -15,10 +15,14 @@ use crate::{
     counters,
     counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
-    shared_mempool::types::MultiBucketTimelineIndexIds,
+    shared_mempool::{
+        broadcast_peers_selector::{BroadcastPeersSelector, SelectedPeers},
+        types::MultiBucketTimelineIndexIds,
+    },
 };
-use aptos_config::config::MempoolConfig;
+use aptos_config::{config::MempoolConfig, network_id::PeerNetworkId};
 use aptos_crypto::HashValue;
+use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
@@ -27,9 +31,10 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     mem::size_of,
     ops::Bound,
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
@@ -69,6 +74,7 @@ pub struct TransactionStore {
     size_bytes: usize,
     // keeps track of txns that were resubmitted with higher gas
     gas_upgraded_index: HashMap<TxnPointer, u64>,
+    ready_no_peers_index: HashSet<TxnPointer>,
 
     // configuration
     capacity: usize,
@@ -79,10 +85,15 @@ pub struct TransactionStore {
     // eager expiration
     eager_expire_threshold: Option<Duration>,
     eager_expire_time: Duration,
+
+    broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
 }
 
 impl TransactionStore {
-    pub(crate) fn new(config: &MempoolConfig) -> Self {
+    pub(crate) fn new(
+        config: &MempoolConfig,
+        broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
+    ) -> Self {
         Self {
             // main DS
             transactions: HashMap::new(),
@@ -101,6 +112,7 @@ impl TransactionStore {
             // estimated size in bytes
             size_bytes: 0,
             gas_upgraded_index: HashMap::new(),
+            ready_no_peers_index: HashSet::new(),
 
             // configuration
             capacity: config.capacity,
@@ -111,6 +123,8 @@ impl TransactionStore {
             // eager expiration
             eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
             eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
+
+            broadcast_peers_selector,
         }
     }
 
@@ -124,6 +138,17 @@ impl TransactionStore {
             .get(address)
             .and_then(|txns| txns.get(&sequence_number))
     }
+
+    // #[inline]
+    // fn get_mempool_txn_mut(
+    //     &mut self,
+    //     address: &AccountAddress,
+    //     sequence_number: u64,
+    // ) -> Option<&mut MempoolTransaction> {
+    //     self.transactions
+    //         .get_mut(address)
+    //         .and_then(|txns| txns.get_mut(&sequence_number))
+    // }
 
     /// Fetch transaction by account address + sequence_number.
     pub(crate) fn get(
@@ -434,7 +459,22 @@ impl TransactionStore {
 
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
-                    self.timeline_index.insert(txn);
+                    match self
+                        .broadcast_peers_selector
+                        .read()
+                        .broadcast_peers(address)
+                    {
+                        SelectedPeers::None => {
+                            self.ready_no_peers_index
+                                .insert(TxnPointer::from(&txn.clone()));
+                        },
+                        SelectedPeers::All => {
+                            self.timeline_index.insert(txn, None);
+                        },
+                        SelectedPeers::Selected(peers) => {
+                            self.timeline_index.insert(txn, Some(peers));
+                        },
+                    }
                 }
 
                 if process_ready {
@@ -555,7 +595,9 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
-        self.gas_upgraded_index.remove(&TxnPointer::from(txn));
+        let txn_pointer = TxnPointer::from(txn);
+        self.gas_upgraded_index.remove(&txn_pointer);
+        self.ready_no_peers_index.remove(&txn_pointer);
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
@@ -576,19 +618,15 @@ impl TransactionStore {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        peer: Option<PeerNetworkId>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         let mut batch = vec![];
         let mut batch_total_bytes: u64 = 0;
-        let mut last_timeline_id = timeline_id.id_per_bucket.clone();
 
+        let (buckets, updated_timeline_ids) =
+            self.timeline_index.read_timeline(timeline_id, count, peer);
         // Add as many transactions to the batch as possible
-        for (i, bucket) in self
-            .timeline_index
-            .read_timeline(timeline_id, count)
-            .iter()
-            .enumerate()
-            .rev()
-        {
+        for bucket in buckets.iter().rev() {
             for (address, sequence_number) in bucket {
                 if let Some(txn) = self.get_mempool_txn(address, *sequence_number) {
                     let transaction_bytes = txn.txn.raw_txn_bytes_len() as u64;
@@ -597,9 +635,6 @@ impl TransactionStore {
                     } else {
                         batch.push(txn.txn.clone());
                         batch_total_bytes = batch_total_bytes.saturating_add(transaction_bytes);
-                        if let TimelineState::Ready(timeline_id) = txn.timeline_state {
-                            last_timeline_id[i] = timeline_id;
-                        }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
                         Mempool::log_txn_latency(
                             txn.insertion_info,
@@ -617,15 +652,16 @@ impl TransactionStore {
             }
         }
 
-        (batch, last_timeline_id.into())
+        (batch, updated_timeline_ids)
     }
 
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
+        peer: Option<PeerNetworkId>,
     ) -> Vec<SignedTransaction> {
         self.timeline_index
-            .timeline_range(start_end_pairs)
+            .timeline_range(start_end_pairs, peer)
             .iter()
             .filter_map(|(account, sequence_number)| {
                 self.transactions
@@ -753,6 +789,75 @@ impl TransactionStore {
             trace!(LogSchema::event_log(LogEntry::GCRemoveTxns, log_event).txns(gc_txns_log));
         }
         self.track_indices();
+    }
+
+    // TODO: there's repeated code, kind of hard to refactor because of mutable/immutable borrows.
+    pub(crate) fn redirect_no_peers(&mut self) {
+        if self.ready_no_peers_index.is_empty() {
+            return;
+        }
+        info!(
+            "redirect_no_peers, with index size: {}",
+            self.ready_no_peers_index.len()
+        );
+
+        let mut reinsert = vec![];
+        for txn_pointer in &self.ready_no_peers_index {
+            if let Some(mempool_txn) =
+                self.get_mempool_txn(&txn_pointer.sender, txn_pointer.sequence_number)
+            {
+                match self
+                    .broadcast_peers_selector
+                    .read()
+                    .broadcast_peers(&txn_pointer.sender)
+                {
+                    SelectedPeers::All => panic!("Unexpected"),
+                    SelectedPeers::None => {
+                        warn!("On redirect, empty again!");
+                        reinsert.push(TxnPointer::from(mempool_txn));
+                    },
+                    SelectedPeers::Selected(new_peers) => {
+                        let mut txn = mempool_txn.clone();
+                        self.timeline_index.update(&mut txn, new_peers);
+                        if let Some(txns) = self.transactions.get_mut(&txn_pointer.sender) {
+                            txns.insert(txn_pointer.sequence_number, txn);
+                        }
+                    },
+                }
+            }
+        }
+        self.ready_no_peers_index.clear();
+        for txn_pointer in reinsert {
+            self.ready_no_peers_index.insert(txn_pointer);
+        }
+    }
+
+    pub(crate) fn redirect(&mut self, peer: PeerNetworkId) {
+        // TODO: look at this again
+        let to_redirect = self.timeline_index.timeline(Some(peer));
+        info!("to_redirect: {:?}", to_redirect);
+        for (account, seq_no) in &to_redirect {
+            if let Some(mempool_txn) = self.get_mempool_txn(account, *seq_no) {
+                match self
+                    .broadcast_peers_selector
+                    .read()
+                    .broadcast_peers(account)
+                {
+                    SelectedPeers::All => panic!("Unexpected"),
+                    SelectedPeers::None => {
+                        self.ready_no_peers_index
+                            .insert(TxnPointer::from(mempool_txn));
+                    },
+                    SelectedPeers::Selected(new_peers) => {
+                        let mut txn = mempool_txn.clone();
+                        self.timeline_index.update(&mut txn, new_peers);
+                        if let Some(txns) = self.transactions.get_mut(account) {
+                            txns.insert(*seq_no, txn);
+                        }
+                    },
+                }
+            }
+        }
     }
 
     pub(crate) fn iter_queue(&self) -> PriorityQueueIter {

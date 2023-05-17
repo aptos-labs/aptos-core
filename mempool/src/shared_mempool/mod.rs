@@ -9,5 +9,6 @@ pub(crate) mod types;
 pub use runtime::bootstrap;
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) use runtime::start_shared_mempool;
+pub mod broadcast_peers_selector;
 mod coordinator;
 pub(crate) mod tasks;

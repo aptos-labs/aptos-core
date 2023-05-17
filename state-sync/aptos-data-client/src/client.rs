@@ -575,7 +575,6 @@ impl AptosDataClient {
             .await
     }
 
-    /// Returns a copy of the peer states for testing
     #[cfg(test)]
     pub(crate) fn get_peer_states(&self) -> Arc<PeerStates> {
         self.peer_states.clone()
