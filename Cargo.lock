@@ -3132,6 +3132,7 @@ dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "arr_macro",
  "bcs 0.1.4",
  "chrono",
  "claims",
