@@ -264,7 +264,6 @@ describe("Indexer", () => {
     it(
       "returns same result for getTokenOwnedFromCollectionNameAndCreatorAddress and getTokenOwnedFromCollectionAddress",
       async () => {
-        console.log(alice.address().hex());
         const collectionAddress = await indexerClient.getCollectionAddress(alice.address().hex(), collectionNameV2);
         const tokensFromCollectionAddress = await indexerClient.getTokenOwnedFromCollectionAddress(
           alice.address().hex(),

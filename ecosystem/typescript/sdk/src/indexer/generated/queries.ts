@@ -2,6 +2,45 @@ import * as Types from './operations';
 
 import { GraphQLClient } from 'graphql-request';
 import * as Dom from 'graphql-request/dist/types.dom';
+export const CurrentTokenOwnershipFieldsFragmentDoc = `
+    fragment CurrentTokenOwnershipFields on current_token_ownerships_v2 {
+  token_standard
+  is_fungible_v2
+  is_soulbound_v2
+  property_version_v1
+  table_type_v1
+  token_properties_mutated_v1
+  amount
+  last_transaction_timestamp
+  last_transaction_version
+  storage_id
+  owner_address
+  current_token_data {
+    token_name
+    token_data_id
+    token_uri
+    token_properties
+    supply
+    maximum
+    last_transaction_version
+    last_transaction_timestamp
+    largest_property_version_v1
+    current_collection {
+      collection_name
+      creator_address
+      description
+      uri
+      collection_id
+      last_transaction_version
+      current_supply
+      mutable_description
+      total_minted_v2
+      table_handle_v1
+      mutable_uri
+    }
+  }
+}
+    `;
 export const TokenDataFieldsFragmentDoc = `
     fragment TokenDataFields on current_token_datas {
   creator_address
@@ -149,44 +188,10 @@ export const GetOwnedTokens = `
     offset: $offset
     limit: $limit
   ) {
-    token_standard
-    is_fungible_v2
-    is_soulbound_v2
-    property_version_v1
-    table_type_v1
-    token_properties_mutated_v1
-    amount
-    last_transaction_timestamp
-    last_transaction_version
-    storage_id
-    owner_address
-    current_token_data {
-      token_name
-      token_data_id
-      token_uri
-      token_properties
-      supply
-      maximum
-      last_transaction_version
-      last_transaction_timestamp
-      largest_property_version_v1
-      current_collection {
-        collection_name
-        creator_address
-        description
-        uri
-        collection_id
-        last_transaction_version
-        current_supply
-        mutable_description
-        total_minted_v2
-        table_handle_v1
-        mutable_uri
-      }
-    }
+    ...CurrentTokenOwnershipFields
   }
 }
-    `;
+    ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenActivities = `
     query getTokenActivities($idHash: String!, $offset: Int, $limit: Int) {
   token_activities(
@@ -245,44 +250,10 @@ export const GetTokenOwnedFromCollection = `
     offset: $offset
     limit: $limit
   ) {
-    token_standard
-    is_fungible_v2
-    is_soulbound_v2
-    property_version_v1
-    table_type_v1
-    token_properties_mutated_v1
-    amount
-    last_transaction_timestamp
-    last_transaction_version
-    storage_id
-    owner_address
-    current_token_data {
-      token_name
-      token_data_id
-      token_uri
-      token_properties
-      supply
-      maximum
-      last_transaction_version
-      last_transaction_timestamp
-      largest_property_version_v1
-      current_collection {
-        collection_name
-        creator_address
-        description
-        uri
-        collection_id
-        last_transaction_version
-        current_supply
-        mutable_description
-        total_minted_v2
-        table_handle_v1
-        mutable_uri
-      }
-    }
+    ...CurrentTokenOwnershipFields
   }
 }
-    `;
+    ${CurrentTokenOwnershipFieldsFragmentDoc}`;
 export const GetTokenOwnersData = `
     query getTokenOwnersData($token_id: String, $property_version: numeric) {
   current_token_ownerships(
