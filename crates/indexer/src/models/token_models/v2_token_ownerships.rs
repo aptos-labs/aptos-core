@@ -112,7 +112,7 @@ impl TokenOwnershipV2 {
             .context("If token data exists objectcore must exist")?;
         let object_core = metadata.object.clone();
         let token_data_id = token_data.token_data_id.clone();
-        let owner_address = object_core.owner.clone();
+        let owner_address = object_core.get_owner_address();
         let storage_id = token_data_id.clone();
         let is_soulbound = !object_core.allow_ungated_transfer;
 
@@ -202,10 +202,11 @@ impl TokenOwnershipV2 {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
         {
-            if let Some(object_core) = ObjectCore::from_write_resource(write_resource, txn_version)?
+            if let Some(object_core) =
+                &ObjectCore::from_write_resource(write_resource, txn_version)?
             {
                 let token_data_id = token_address.clone();
-                let owner_address = object_core.owner.clone();
+                let owner_address = object_core.get_owner_address();
                 let storage_id = token_data_id.clone();
                 let is_soulbound = !object_core.allow_ungated_transfer;
 
