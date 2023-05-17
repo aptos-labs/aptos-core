@@ -80,11 +80,11 @@ where
         query,
         where_clause: additional_where_clause,
     };
-    let debug = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
-    aptos_logger::debug!("Executing query: {:?}", debug);
+    let debug_string = diesel::debug_query::<diesel::pg::Pg, _>(&final_query).to_string();
+    tracing::debug!("Executing query: {:?}", debug_string);
     let res = final_query.execute(conn);
     if let Err(ref e) = res {
-        aptos_logger::warn!("Error running query: {:?}\n{}", e, debug);
+        tracing::warn!("Error running query: {:?}\n{:?}", e, debug_string);
     }
     res
 }
