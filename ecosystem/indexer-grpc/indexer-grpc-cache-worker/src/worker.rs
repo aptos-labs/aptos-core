@@ -7,13 +7,14 @@ use crate::metrics::{
 };
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
-    config::IndexerGrpcFileStoreConfig,
+    config::{IndexerGrpcConfig, IndexerGrpcFileStoreConfig},
     create_grpc_client,
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
     time_diff_since_pb_timestamp_in_secs,
 };
+use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
     stream_status::StatusType, transactions_from_node_response::Response,
@@ -21,7 +22,6 @@ use aptos_protos::internal::fullnode::v1::{
 };
 use futures::{self, StreamExt};
 use prost::Message;
-use tracing::{error, info};
 
 type ChainID = u32;
 type StartingVersion = u64;
@@ -59,17 +59,14 @@ pub(crate) enum GrpcDataStatus {
 }
 
 impl Worker {
-    pub async fn new(
-        fullnode_grpc_address: String,
-        redis_main_instance_address: String,
-        file_store: IndexerGrpcFileStoreConfig,
-    ) -> Self {
-        let redis_client = redis::Client::open(format!("redis://{}", redis_main_instance_address))
+    pub async fn new(config: IndexerGrpcConfig) -> Self {
+        let redis_client = redis::Client::open(format!("redis://{}", config.redis_address))
             .expect("Create redis client failed.");
         Self {
             redis_client,
-            file_store,
-            fullnode_grpc_address: format!("http://{}", fullnode_grpc_address),
+            // The fullnode grpc address is required.
+            fullnode_grpc_address: format!("http://{}", config.fullnode_grpc_address.unwrap()),
+            file_store: config.file_store,
         }
     }
 
@@ -294,7 +291,7 @@ async fn process_streaming_response(
                     PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
                     LATEST_PROCESSED_VERSION.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    info!(
+                    aptos_logger::info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] Data chunk received.",
@@ -312,7 +309,7 @@ async fn process_streaming_response(
                     start_version,
                     num_of_transactions,
                 } => {
-                    info!(
+                    aptos_logger::info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] End signal received for current batch.",

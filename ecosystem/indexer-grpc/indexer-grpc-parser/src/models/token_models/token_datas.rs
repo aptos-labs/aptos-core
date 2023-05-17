@@ -157,7 +157,7 @@ impl TokenData {
                     },
                 )));
             } else {
-                tracing::warn!(
+                aptos_logger::warn!(
                     transaction_version = txn_version,
                     key_type = table_item_data.key_type,
                     key = table_item_data.key,

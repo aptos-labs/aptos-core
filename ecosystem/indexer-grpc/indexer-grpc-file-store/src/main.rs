@@ -1,39 +1,45 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
 use aptos_indexer_grpc_file_store::processor::Processor;
-use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
-use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
+use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IndexerGrpcFileStoreWorkerConfig {
-    pub server_name: String,
-    pub file_store_config: IndexerGrpcFileStoreConfig,
-    pub redis_main_instance_address: String,
+#[derive(Parser)]
+pub struct Args {
+    #[clap(short, long)]
+    pub config_path: String,
 }
 
-#[async_trait::async_trait]
-impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
-    async fn run(&self) -> Result<()> {
-        let mut processor = Processor::new(
-            self.redis_main_instance_address.clone(),
-            self.file_store_config.clone(),
-        );
+fn main() {
+    aptos_logger::Logger::new().init();
+    aptos_crash_handler::setup_panic_handler();
+    // Load config.
+    let args = Args::parse();
+    let config = aptos_indexer_grpc_utils::config::IndexerGrpcConfig::load(
+        std::path::PathBuf::from(args.config_path),
+    )
+    .unwrap();
+
+    let runtime = aptos_runtimes::spawn_named_runtime("indexerfile".to_string(), None);
+
+    let health_port = config.health_check_port;
+    runtime.spawn(async move {
+        let mut processor = Processor::new(config);
         processor.run().await;
-        Ok(())
-    }
+    });
 
-    fn get_server_name(&self) -> String {
-        self.server_name.clone()
-    }
-}
+    // Start liveness and readiness probes.
+    runtime.spawn(async move {
+        register_probes_and_metrics_handler(health_port).await;
+    });
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let args = ServerArgs::parse();
-    args.run::<IndexerGrpcFileStoreWorkerConfig>().await
+    let term = Arc::new(AtomicBool::new(false));
+    while !term.load(Ordering::Acquire) {
+        std::thread::park();
+    }
 }

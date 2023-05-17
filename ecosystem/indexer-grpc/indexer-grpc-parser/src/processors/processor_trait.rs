@@ -49,7 +49,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                 },
                 Err(err) => {
                     UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                    tracing::error!(
+                    aptos_logger::error!(
                         "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
                         pool.connection_timeout(),
                         err
