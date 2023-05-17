@@ -1,30 +1,6 @@
 ---
 remote_endpoint: ~
 proposals:
-  - name: enable_signature_checker
-    metadata:
-      title: "Enable the new signature checker"
-      description: "This enables the improved signature checker implementation."
-      source_code_url: "TBD"
-      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/7856"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - signature_checker_v2
-        disabled: []
-  - name: enable_struct_constructor
-    metadata:
-      title: "Enable Struct Constructor Feature"
-      description: "AIP-25: Enable some select set of structs as valid parameters to entry and view functions."
-      source_code_url: "TBD"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/104"
-    execution_mode: MultiStep
-    update_sequence:
-    - FeatureFlag:
-        enabled:
-          - struct_constructors
-        disabled: []
   - name: upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
@@ -37,27 +13,40 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_ed25519_pubkey_validate_return_false_wrong_length
+  - name: enable_bls12381
     metadata:
-      title: "Enable ed25519_pubkey_validate_return_false_wrong_length"
-      description: "AIP-23: Make ed25519 public key validation return none if key has the wrong length."
+      title: "Enable bls12381"
+      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
       source_code_url: "TBD"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/102"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
         enabled:
-          - ed25519_pubkey_validate_return_false_wrong_length
-        disabled: []
-  - name: enable_transaction_shuffling
+          - cryptography_algebra_natives
+          - bls12381_structures
+  - name: enable_quorum_store
     metadata:
-      title: "Enable Transaction Shuffling"
-      description: "AIP-27: Sender Aware Transaction Shuffling"
+      title: "Enable Quorum Store"
+      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
       source_code_url: "TBD"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/109"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
     execution_mode: MultiStep
     update_sequence:
-    - Execution:
-        V1:
-          transaction_shuffler_type:
-            sender_aware_v1: 32
+    - Consensus:
+        V2:
+          decoupled_execution: true
+          back_pressure_limit: 10
+          exclude_round: 40
+          proposer_election_type:
+            leader_reputation:
+              proposer_and_voter_v2:
+                active_weight: 1000
+                inactive_weight: 10
+                failed_weight: 1
+                failure_threshold_percent: 10
+                proposer_window_num_validators_multiplier: 10
+                voter_window_num_validators_multiplier: 1
+                weight_by_voting_power: true
+                use_history_from_previous_epoch_max_count: 5
+          max_failed_authors_to_store: 10

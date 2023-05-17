@@ -18,6 +18,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
+use std::collections::HashMap;
 
 fn put_value_set(
     state_store: &StateStore,
@@ -25,9 +26,13 @@ fn put_value_set(
     version: Version,
     base_version: Option<Version>,
 ) -> HashValue {
+    let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(key, value)| (key.clone(), Some(value.clone())))
+        .map(|(key, value)| {
+            sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
+            (key.clone(), Some(value.clone()))
+        })
         .collect();
     let jmt_updates = jmt_updates(&value_set);
 
@@ -38,7 +43,7 @@ fn put_value_set(
     let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     state_store
         .put_value_sets(
-            vec![&value_set],
+            vec![&sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
             None,

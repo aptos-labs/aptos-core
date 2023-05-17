@@ -6,7 +6,7 @@ use crate::natives::helpers::make_test_only_native_from_func;
 use crate::{
     natives::{
         cryptography::ed25519::GasParameters,
-        helpers::{make_native_from_func, make_safe_native, SafeNativeContext, SafeNativeResult},
+        helpers::{make_safe_native, SafeNativeContext, SafeNativeResult},
     },
     safely_assert_eq, safely_pop_arg,
 };
@@ -20,7 +20,7 @@ use aptos_crypto::{
     multi_ed25519,
     traits::*,
 };
-use aptos_types::on_chain_config::{Features, TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
@@ -34,53 +34,6 @@ use move_vm_types::{
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
-
-/// DEPRECATED: See `public_key_validate_internal` comments in `multi_ed25519.move`.
-///
-/// Simply put, this function should have checked that `num_sub_pks > 0` and should abort PK
-/// validation as soon as an invalid sub-PK is found, charging gas accordingly, rather than charge
-/// gas for validating all `num_sub_pks` sub-PKs.
-fn native_public_key_validate(
-    gas_params: &GasParameters,
-    _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
-    mut arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(_ty_args.is_empty());
-    debug_assert!(arguments.len() == 1);
-
-    let pks_bytes = pop_arg!(arguments, Vec<u8>);
-
-    let num_sub_pks = pks_bytes.len() / ED25519_PUBLIC_KEY_LENGTH;
-
-    let mut cost = gas_params.base;
-
-    if num_sub_pks > multi_ed25519::MAX_NUM_OF_KEYS {
-        return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
-    };
-
-    let num_valid = pks_bytes
-        .chunks_exact(ED25519_PUBLIC_KEY_LENGTH)
-        .filter(|&pk_bytes| {
-            <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(pk_bytes)
-                .ok()
-                .and_then(|slice| CompressedEdwardsY(slice).decompress())
-                .map_or(false, |point| !point.is_small_order())
-        })
-        .count();
-
-    let all_valid = num_valid == num_sub_pks;
-    let mut num_checked = num_valid;
-    if !all_valid {
-        num_checked += 1;
-    }
-
-    let num_checked = NumArgs::new(num_checked as u64);
-    cost += gas_params.per_pubkey_deserialize * num_checked
-        + gas_params.per_pubkey_small_order_check * num_checked;
-
-    Ok(NativeResult::ok(cost, smallvec![Value::bool(all_valid)]))
-}
 
 /// See `public_key_validate_v2_internal` comments in `multi_ed25519.move`.
 fn native_public_key_validate_v2(
@@ -275,18 +228,12 @@ pub fn make_all(
         // MultiEd25519
         (
             "public_key_validate_internal",
-            if timed_features
-                .is_enabled(TimedFeatureFlag::MultiEd25519NativePublicKeyValidateGasFix)
-            {
-                make_safe_native(
-                    gas_params.clone(),
-                    timed_features.clone(),
-                    features.clone(),
-                    native_public_key_validate_with_gas_fix,
-                )
-            } else {
-                make_native_from_func(gas_params.clone(), native_public_key_validate)
-            },
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                native_public_key_validate_with_gas_fix,
+            ),
         ),
         (
             "public_key_validate_v2_internal",

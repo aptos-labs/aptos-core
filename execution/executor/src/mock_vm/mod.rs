@@ -64,6 +64,18 @@ impl TransactionBlockExecutor<Transaction> for MockVM {
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
     }
+
+    fn execute_transaction_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<ChunkOutput> {
+        ChunkOutput::by_transaction_execution_with_gas_limit::<MockVM>(
+            transactions,
+            state_view,
+            maybe_gas_limit,
+        )
+    }
 }
 
 impl VMExecutor for MockVM {
@@ -198,6 +210,14 @@ impl VMExecutor for MockVM {
         }
 
         Ok(outputs)
+    }
+
+    fn execute_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        MockVM::execute_block(transactions, state_view)
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(

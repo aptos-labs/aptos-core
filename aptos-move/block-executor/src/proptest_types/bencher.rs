@@ -100,7 +100,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
-        let expected_output = ExpectedOutput::generate_baseline(&transactions, None);
+        let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
             transactions,
@@ -124,7 +124,7 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get(), executor_thread_pool)
+        >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.expected_output.assert_output(&output);

@@ -160,7 +160,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3); // append state checkpoint txn
+    let block3 = block(block3, executor.get_block_gas_limit()); // append state checkpoint txn
 
     let output1 = executor
         .execute_block((block1_id, block1.clone()), parent_block_id)
@@ -429,9 +429,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     })
     .unwrap();
 
+    // With block gas limit, StateCheckpoint txn is inserted to block after execution.
+    let diff = executor.get_block_gas_limit().map(|_| 0).unwrap_or(1);
+
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(14, 16, current_version, false)
+        .get_transactions(14, 15 + diff, current_version, false)
         .unwrap();
     verify_transactions(&transaction_list_with_proof, &block3).unwrap();
 

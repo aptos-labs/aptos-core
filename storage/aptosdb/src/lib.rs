@@ -104,6 +104,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
+        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -834,6 +835,7 @@ impl AptosDB {
                     .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
                     .collect::<Vec<_>>();
 
+                // TODO(grao): Make state_store take sharded state updates.
                 self.state_store.put_value_sets(
                     state_updates_vec,
                     first_version,
@@ -1044,6 +1046,7 @@ impl AptosDB {
                         txns_to_commit[..=idx]
                             .iter()
                             .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
+                            .flatten()
                             .collect(),
                     )
                 } else {
@@ -1955,7 +1958,7 @@ impl DbWriter for AptosDB {
         sync_commit: bool,
         // TODO(grao): Consider remove this.
         latest_in_memory_state: StateDelta,
-        block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        block_state_updates: ShardedStateUpdates,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         gauged_api("save_transaction_block", || {
@@ -1999,9 +2002,19 @@ impl DbWriter for AptosDB {
                     ledger_info_with_sigs,
                 )?;
 
+                let updates = {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["flatten_states"])
+                        .start_timer();
+                    Some(block_state_updates.into_iter().flatten().collect())
+                };
                 if !txns_to_commit.is_empty() {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
+                    // TODO(grao): Make BufferedState take sharded updates.
                     buffered_state.update(
-                        Some(block_state_updates),
+                        updates,
                         latest_in_memory_state,
                         sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
                     )?;
