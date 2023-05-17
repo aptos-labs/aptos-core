@@ -7,6 +7,7 @@ module aptos_std::pedersen {
     use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
     use std::option::Option;
     use std::vector;
+    use aptos_std::debug::print;
 
     ///
     /// Error Codes 
