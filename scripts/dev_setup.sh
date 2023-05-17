@@ -656,6 +656,14 @@ function install_lld {
   fi
 }
 
+# this is needed for hdpi crate from aptos-ledger
+function install_libudev-dev {
+  # Need to install libudev-dev for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg libudev-dev "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Aptos!
@@ -1009,6 +1017,8 @@ fi
 
 install_python3
 pip3 install pre-commit
+
+install_libudev-dev
 
 # For now best effort install, will need to improve later
 if command -v pre-commit; then

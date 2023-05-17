@@ -112,20 +112,20 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
         PayloadType::EntryFunctionPayload(inner) => {
             let clean = get_clean_entry_function_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                aptos_logger::error!(version = version, "Unable to serialize payload into value");
+                tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
         },
         PayloadType::ScriptPayload(inner) => {
             let clean = get_clean_script_payload(inner, version);
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                aptos_logger::error!(version = version, "Unable to serialize payload into value");
+                tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
         },
         PayloadType::ModuleBundlePayload(inner) => {
             Some(serde_json::to_value(inner).unwrap_or_else(|_| {
-                aptos_logger::error!(version = version, "Unable to serialize payload into value");
+                tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
         },
@@ -142,7 +142,7 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                     MultisigPayloadType::EntryFunctionPayload(payload) => {
                         let clean = get_clean_entry_function_payload(payload, version);
                         Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                            aptos_logger::error!(
+                            tracing::error!(
                                 version = version,
                                 "Unable to serialize payload into value"
                             );
@@ -161,7 +161,7 @@ pub fn get_clean_payload(payload: &TransactionPayload, version: i64) -> Option<V
                 }
             };
             Some(serde_json::to_value(clean).unwrap_or_else(|_| {
-                aptos_logger::error!(version = version, "Unable to serialize payload into value");
+                tracing::error!(version = version, "Unable to serialize payload into value");
                 panic!()
             }))
         },
@@ -177,7 +177,7 @@ pub fn get_clean_writeset(writeset: &WriteSet, version: i64) -> Option<Value> {
             Some(
                 serde_json::to_value(get_clean_script_payload(payload, version)).unwrap_or_else(
                     |_| {
-                        aptos_logger::error!(
+                        tracing::error!(
                             version = version,
                             "Unable to serialize payload into value"
                         );
@@ -203,10 +203,7 @@ fn get_clean_entry_function_payload(
             .iter()
             .map(|arg| {
                 serde_json::from_str(arg).unwrap_or_else(|_| {
-                    aptos_logger::error!(
-                        version = version,
-                        "Unable to serialize payload into value"
-                    );
+                    tracing::error!(version = version, "Unable to serialize payload into value");
                     panic!()
                 })
             })
@@ -224,10 +221,7 @@ fn get_clean_script_payload(payload: &ScriptPayload, version: i64) -> ScriptPayl
             .iter()
             .map(|arg| {
                 serde_json::from_str(arg).unwrap_or_else(|_| {
-                    aptos_logger::error!(
-                        version = version,
-                        "Unable to serialize payload into value"
-                    );
+                    tracing::error!(version = version, "Unable to serialize payload into value");
                     panic!()
                 })
             })

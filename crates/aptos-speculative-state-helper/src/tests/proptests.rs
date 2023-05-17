@@ -254,7 +254,7 @@ fn test_events(counter_ops: Vec<(usize, usize)>) {
 
     while worker_done_cnt.load(Ordering::Relaxed) != 4 {}
 
-    spec_events.flush();
+    spec_events.flush(num_counters);
     // Need the number of recorded events after last clear.
     let expected_dispatched_events = recorded_final_event_cnt.load(Ordering::Relaxed);
     while arc_event_done_cnt.load(Ordering::Relaxed) != expected_dispatched_events {}

@@ -12,6 +12,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::create_empty_sharded_state_updates,
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
 
@@ -46,10 +47,14 @@ impl ExecutedChunk {
         self.to_commit
             .iter()
             .map(|(txn, txn_data)| {
+                let mut sharded_state_updates = create_empty_sharded_state_updates();
+                txn_data.state_updates().iter().for_each(|(k, v)| {
+                    sharded_state_updates[k.get_shard_id() as usize].insert(k.clone(), v.clone());
+                });
                 Ok(TransactionToCommit::new(
                     txn.clone(),
                     txn_data.txn_info.clone(),
-                    txn_data.state_updates().clone(),
+                    sharded_state_updates,
                     txn_data.write_set().clone(),
                     txn_data.events().to_vec(),
                     txn_data.is_reconfig(),

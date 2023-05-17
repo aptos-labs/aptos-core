@@ -74,12 +74,27 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for AptosVM {
         transactions: Vec<BenchmarkTransaction>,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
-        AptosVM::execute_transaction_block(
+        ChunkOutput::by_transaction_execution_sharded::<AptosVM>(
             transactions
                 .into_iter()
                 .map(|txn| txn.transaction)
                 .collect(),
             state_view,
+        )
+    }
+
+    fn execute_transaction_block_with_gas_limit(
+        transactions: Vec<BenchmarkTransaction>,
+        state_view: CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<ChunkOutput> {
+        AptosVM::execute_transaction_block_with_gas_limit(
+            transactions
+                .into_iter()
+                .map(|txn| txn.transaction)
+                .collect(),
+            state_view,
+            maybe_gas_limit,
         )
     }
 }

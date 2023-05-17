@@ -21,7 +21,13 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
@@ -34,6 +40,7 @@ use aptos_vm::counters::TXN_GAS_USAGE;
 use gen_executor::DbGenInitTransactionExecutor;
 use pipeline::PipelineConfig;
 use std::{
+    collections::HashMap,
     fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
@@ -146,6 +153,37 @@ pub fn run_benchmark<V>(
 
     let mut start_time = Instant::now();
     let start_gas = TXN_GAS_USAGE.get_sample_sum();
+
+    let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+    let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+    let other_labels = vec![
+        ("1.", true, "verified_state_view"),
+        ("2.", true, "apply_to_ledger"),
+        ("2.1.", false, "sort_transactions"),
+        ("2.2.", false, "calculate_for_transaction_block"),
+        ("2.2.1.", false, "get_sharded_state_updates"),
+        ("2.2.2.", false, "calculate_block_state_updates"),
+        ("2.2.3.", false, "calculate_usage"),
+        ("2.2.4.", false, "make_checkpoint"),
+        ("2.3.", false, "assemble_ledger_diff_for_block"),
+        ("2.3.1.", false, "calculate_events_and_writeset_hashes"),
+        ("3.", true, "as_state_compute_result"),
+        ("4.", true, "get_txns_to_commit"),
+    ];
+
+    let start_by_other = other_labels
+        .iter()
+        .map(|(_prefix, _top_level, other_label)| {
+            (
+                other_label.to_string(),
+                APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&[other_label])
+                    .get_sample_sum(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
+
     if let Some(transaction_generator_creator) = transaction_generator_creator {
         generator.run_workload(
             block_size,
@@ -163,8 +201,8 @@ pub fn run_benchmark<V>(
     generator.drop_sender();
     pipeline.join();
 
-    let elapsed = start_time.elapsed().as_secs_f32();
-    let delta_v = db.reader.get_latest_version().unwrap() - version;
+    let elapsed = start_time.elapsed().as_secs_f64();
+    let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
     let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
     info!(
         "Executed workload {}",
@@ -174,8 +212,43 @@ pub fn run_benchmark<V>(
             "raw transfer".to_string()
         }
     );
-    info!("Overall TPS: {} txn/s", delta_v as f32 / elapsed);
-    info!("Overall GPS: {} gas/s", delta_gas as f32 / elapsed);
+    info!("Overall TPS: {} txn/s", delta_v / elapsed);
+    info!("Overall GPS: {} gas/s", delta_gas / elapsed);
+
+    let time_in_execution =
+        APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
+    info!(
+        "Overall fraction of total: {:.3} in execution (component TPS: {})",
+        time_in_execution / elapsed,
+        delta_v / time_in_execution
+    );
+    let time_in_vm = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_only;
+    info!(
+        "Overall fraction of execution {:.3} in VM (component TPS: {})",
+        time_in_vm / time_in_execution,
+        delta_v / time_in_vm
+    );
+    for (prefix, top_level, other_label) in other_labels {
+        let time_in_label = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&[other_label])
+            .get_sample_sum()
+            - start_by_other.get(other_label).unwrap();
+        if top_level || time_in_label / time_in_execution > 0.01 {
+            info!(
+                "Overall fraction of execution {:.3} in {} {} (component TPS: {})",
+                time_in_label / time_in_execution,
+                prefix,
+                other_label,
+                delta_v / time_in_label
+            );
+        }
+    }
+    let time_in_commit = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total;
+    info!(
+        "Overall fraction of total: {:.3} in commit (component TPS: {})",
+        time_in_commit / elapsed,
+        delta_v / time_in_commit
+    );
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);

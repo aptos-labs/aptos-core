@@ -17,11 +17,13 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use arr_macro::arr;
+use core::fmt;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
+    fmt::{Debug, Formatter},
     sync::Arc,
 };
 
@@ -94,6 +96,12 @@ pub struct CachedStateView {
     /// in JMT node.
     sharded_state_cache: ShardedStateCache,
     proof_fetcher: Arc<AsyncProofFetcher>,
+}
+
+impl Debug for CachedStateView {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.id)
+    }
 }
 
 impl CachedStateView {
