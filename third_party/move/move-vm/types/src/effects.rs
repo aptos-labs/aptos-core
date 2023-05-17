@@ -11,7 +11,6 @@ use move_core_types::{
     },
     identifier::Identifier,
     language_storage::StructTag,
-    vm_status::StatusCode,
 };
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -34,28 +33,27 @@ impl<M: Store, R: Store> AccountChangeSet<M, R> {
         (self.modules, self.resources)
     }
 
+    /// Returns a serialized version of account change set.
     fn into_serialized_account_change_set(self) -> PartialVMResult<SerializedAccountChangeSet> {
-        let (modules, resources) = self.into_inner();
-        macro_rules! into_bytes {
-            ($new_changes:ident, $old_changes:ident) => {{
-                for (key, op) in $old_changes {
-                    let new_op = op.and_then(|change| {
-                        change
-                            .into_bytes()
-                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
-                    })?;
-                    $new_changes.insert(key, new_op);
-                }
-            }};
+        let (module_ops, resource_ops) = self.into_inner();
+
+        // Serialize modules.
+        let mut serialized_module_ops = BTreeMap::new();
+        for (identifier, module_op) in module_ops {
+            let blob_op = module_op.and_then(|m| m.into_bytes())?;
+            serialized_module_ops.insert(identifier, blob_op);
         }
 
-        let (mut module_bytes, mut resource_bytes) = (BTreeMap::new(), BTreeMap::new());
-        into_bytes!(module_bytes, modules);
-        into_bytes!(resource_bytes, resources);
+        // Serialize resources.
+        let mut serialized_resource_ops = BTreeMap::new();
+        for (tag, resource_op) in resource_ops {
+            let blob_op = resource_op.and_then(|r| r.into_bytes())?;
+            serialized_resource_ops.insert(tag, blob_op);
+        }
 
         Ok(SerializedAccountChangeSet::from_modules_resources(
-            module_bytes,
-            resource_bytes,
+            serialized_module_ops,
+            serialized_resource_ops,
         ))
     }
 }
@@ -91,6 +89,7 @@ impl<M: Store, R: Store> ChangeSet<M, R> {
         Ok(())
     }
 
+    /// Returns a serialized version of a change set.
     pub fn into_serialized_change_set(self) -> VMResult<SerializedChangeSet> {
         let accounts = self.into_inner();
         let mut change_set = SerializedChangeSet::new();
@@ -102,7 +101,7 @@ impl<M: Store, R: Store> ChangeSet<M, R> {
                         .into_serialized_account_change_set()
                         .map_err(|e: PartialVMError| e.finish(Location::Undefined))?,
                 )
-                .expect("accounts should be unique");
+                .expect("All accounts should be unique.");
         }
         Ok(change_set)
     }

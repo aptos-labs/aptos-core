@@ -7,6 +7,7 @@ use move_core_types::{
     resolver::ModuleResolver,
 };
 
+/// A trait to resolve non-serialized resources.
 pub trait ResourceRefResolver {
     /// Returns a resource reference if it exists.
     fn get_resource_ref_with_metadata(
@@ -17,7 +18,8 @@ pub trait ResourceRefResolver {
     ) -> anyhow::Result<Option<ResourceRef>>;
 
     /// Returns resource bytes if the resource exists. This allows avoiding
-    /// passing MoveTypeLayout between MoveVM and cache/storage.
+    /// passing layout between MoveVM and cache/storage as well as to use
+    /// standard serialized values.
     fn get_resource_bytes_with_metadata(
         &self,
         address: &AccountAddress,
