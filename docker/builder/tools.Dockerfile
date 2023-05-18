@@ -34,7 +34,7 @@ COPY --link --from=tools-builder /aptos/dist/aptos-transaction-emitter /usr/loca
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move
-COPY --link --from=tools-builder /aptos/dist/head.mrb /aptos-framework/move/head.mrb
+COPY --link --from=framework-builder /aptos/dist/head.mrb /aptos-framework/move/head.mrb
 
 # add build info
 ARG BUILD_DATE

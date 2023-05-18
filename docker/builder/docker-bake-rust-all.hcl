@@ -112,11 +112,23 @@ target "tools-builder" {
   ]
 }
 
+target "framework-builder" {
+  dockerfile = "docker/builder/builder.Dockerfile"
+  target = "framework-builder"
+  contexts = {
+    builder-base =  "target:builder-base"
+  }
+  secret = [
+    "id=GIT_CREDENTIALS"
+  ]
+}
+
 target "_common" {
   contexts = {
     debian-base = "target:debian-base"
     node-builder = "target:aptos-node-builder"
     tools-builder = "target:tools-builder"
+    framework-builder = "target:framework-builder"
   }
   labels = {
     "org.label-schema.schema-version" = "1.0",

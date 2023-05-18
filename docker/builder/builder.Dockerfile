@@ -61,3 +61,11 @@ RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
     --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache \
         docker/builder/build-tools.sh
+
+FROM builder-base as framework-builder
+
+RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
+    --mount=type=cache,target=/usr/local/cargo/git,id=framework-builder-cargo-git-cache \
+    --mount=type=cache,target=/usr/local/cargo/registry,id=framework-builder-cargo-registry-cache \
+    --mount=type=cache,target=/aptos/target,id=framework-builder-target-cache \
+        docker/builder/build-framework.sh
