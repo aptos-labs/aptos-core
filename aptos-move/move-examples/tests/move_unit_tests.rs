@@ -111,6 +111,15 @@ fn test_message_board() {
 }
 
 #[test]
+fn test_fungible_asset() {
+    let named_address = BTreeMap::from([(
+        String::from("fungible_asset_extension"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("fungible_asset", named_address);
+}
+
+#[test]
 fn test_mint_nft() {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let named_address = BTreeMap::from([
