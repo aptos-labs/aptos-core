@@ -181,11 +181,5 @@ loadTestGenesis: false
 # -- TEST ONLY: Enable running as root for profiling
 enablePrivilegedMode: false
 
-pyroscope:
-  # -- Enable Pyroscope profiling
-  enabled: false
-  # -- Secret which contains the Pyroscope API key and other configuration
-  secretName: pyroscope
-
 # Additional labels
 labels:
