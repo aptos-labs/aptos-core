@@ -97,7 +97,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -155,7 +155,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -213,7 +213,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -272,7 +272,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -335,7 +335,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -388,7 +388,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -447,7 +447,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -504,7 +504,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -567,7 +567,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -615,7 +615,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -674,7 +674,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -725,7 +725,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -767,7 +767,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -819,7 +819,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -879,7 +879,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -927,7 +927,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -969,7 +969,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1006,7 +1006,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1072,7 +1072,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1118,7 +1118,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1506,7 +1506,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.0-cloud.5.a016665c",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1847,7 +1847,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
           "unit": "none"
         },
         "overrides": []
@@ -1900,7 +1900,7 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
           "unit": "none"
         },
         "overrides": []
@@ -2914,7 +2914,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
@@ -2930,7 +2936,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "p50",
@@ -2940,7 +2946,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p90",
           "range": true,
@@ -2949,7 +2955,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p99",
           "range": true,
@@ -3550,7 +3556,7 @@
       "type": "barchart"
     }
   ],
-  "refresh": "1m",
+  "refresh": false,
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3714,6 +3720,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 13,
+  "version": 14,
   "weekStart": ""
 }

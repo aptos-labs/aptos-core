@@ -1258,6 +1258,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
+ "aptos-language-e2e-tests",
  "aptos-move-stdlib",
  "aptos-sdk-builder",
  "aptos-state-view",
