@@ -78,8 +78,16 @@ impl StateSnapshotCommitter {
                     let (top_levels_batch, sharded_batch, root_hash) = self
                         .state_db
                         .state_merkle_db
+                        // TODO(grao): Provide a sharded version of this function.
                         .merklize_value_set(
-                            jmt_update_refs(&jmt_updates(&delta_to_commit.updates_since_base)),
+                            jmt_update_refs(&jmt_updates(
+                                &delta_to_commit
+                                    .updates_since_base
+                                    .iter()
+                                    .flatten()
+                                    .map(|(k, v)| (k, v.as_ref()))
+                                    .collect(),
+                            )),
                             Some(&node_hashes),
                             version,
                             base_version,
