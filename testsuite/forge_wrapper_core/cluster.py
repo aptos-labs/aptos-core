@@ -146,21 +146,7 @@ class ForgeCluster:
     async def write_cluster_config(
         self, shell: Shell, cluster_name: str, temp: str
     ) -> None:
-        if cluster_name == "multiregion":
-            cmd = [
-                "gcloud",
-                "secrets",
-                "versions",
-                "access",
-                "latest",
-                "--secret",
-                "karmada-kubeconfig",
-                "--project",
-                "forge-gcp-multiregion-test",
-                "--out-file",
-                temp,
-            ]
-        elif self.cloud == Cloud.AWS:
+        if self.cloud == Cloud.AWS:
             cmd = [
                 "aws",
                 "eks",
