@@ -129,43 +129,8 @@ impl Default for ConsensusConfig {
 
             // Voting backpressure is only used as a backup, to make sure pending rounds don't
             // increase uncontrollably, and we know when to go to state sync.
-            vote_back_pressure_limit: 30,
+            vote_back_pressure_limit: 10,
             pipeline_backpressure: vec![
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 100,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4000,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~1000 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
             ],
             window_for_chain_health: 100,
             chain_health_backoff: vec![
