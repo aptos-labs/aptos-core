@@ -9,7 +9,7 @@ authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
-repository = { workspace = true }
+repository = "https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-ledger"
 rust-version = { workspace = true }
 
 [dependencies]
