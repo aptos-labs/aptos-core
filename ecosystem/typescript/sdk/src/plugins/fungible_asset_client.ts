@@ -9,7 +9,7 @@ export class FungibleAssetClient {
   readonly assetType: string = "0x1::fungible_asset::Metadata";
 
   /**
-   * Creates new FungibleAsset instance
+   * Creates new FungibleAssetClient instance
    *
    * @param provider Provider instance
    */
@@ -18,13 +18,13 @@ export class FungibleAssetClient {
   }
 
   /**
-   * Transfer an asset amount from the sender primary_store to the recipient primary_store
+   * Transfer an amount of fungible asset from the sender primary_fungible_store to the recipient primary_fungible_store
    *
-   * Use this method to transfer any fungible asset including fungible token.
+   * Use this method to transfer any fungible asset.
    *
    * @param sender The sender account
    * @param assetAddress The fungible asset address - For example if you’re transferring USDT, this would be the USDT address
-   * @param recipient Recipient primary wallet address
+   * @param recipient Recipient address
    * @param amount Number of assets to transfer
    * @param assetType The fungible asset type
    * @returns The hash of the transaction submitted to the API

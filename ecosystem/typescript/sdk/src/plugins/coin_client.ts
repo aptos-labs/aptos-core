@@ -33,7 +33,7 @@ export class CoinClient {
    * this to true, the transaction will fail if the receiver account does not
    * exist on-chain.
    *
-   * Since version 1.9.1, TS SDK supports fungible assets operations. For CoinClient
+   * TS SDK supports fungible assets operations. For CoinClient
    * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
    * object where you can set the fungible asset address you wish to transfer. This option
    * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
@@ -100,9 +100,9 @@ export class CoinClient {
    * Get the balance of the account. By default it checks the balance of
    * 0x1::aptos_coin::AptosCoin, but you can specify a different coin type.
    *
-   * Since version 1.9.1, TS SDK supports fungible assets operations. For CoinClient
+   * TS SDK supports fungible assets operations. For CoinClient
    * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
-   * object where you can set the fungible asset address you wish to transfer. This option
+   * object where you can set the fungible asset address you wish to check balance for. This option
    * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
    * to use a different type, set the `coinType` to be the fungible asset type.
    *
