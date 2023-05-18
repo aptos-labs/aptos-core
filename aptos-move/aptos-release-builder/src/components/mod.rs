@@ -573,9 +573,9 @@ impl Default for ProposalMetadata {
     fn default() -> Self {
         ProposalMetadata {
             title: "default".to_string(),
-            description:  "default".to_string(),
+            description: "default".to_string(),
             // Aptos CLI need a valid url for the two fields.
-            source_code_url:  default_url(),
+            source_code_url: default_url(),
             discussion_url: default_url(),
         }
     }
