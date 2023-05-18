@@ -10,7 +10,7 @@ use crate::{
     schema::coin_infos,
     utils::{database::PgPoolConnection, util::standardize_address},
 };
-use aptos_protos::transaction::testing1::v1::WriteResource;
+use aptos_protos::transaction::v1::WriteResource;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

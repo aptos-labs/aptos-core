@@ -8,7 +8,7 @@ use crate::{
     schema::delegated_staking_activities,
     utils::util::{standardize_address, u64_to_bigdecimal},
 };
-use aptos_protos::transaction::testing1::v1::{transaction::TxnData, Transaction};
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
