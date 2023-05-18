@@ -963,7 +963,9 @@ impl Context {
             .cloned()
             .collect();
         latest_prices.sort();
-        let market_price = latest_prices[latest_prices.len() / 2];
+        let p50_price = latest_prices[latest_prices.len() / 2];
+        // round up to next bucket
+        let market_price = self.next_bucket(p50_price);
 
         // (3) aggressive
         min_inclusion_prices.sort();
