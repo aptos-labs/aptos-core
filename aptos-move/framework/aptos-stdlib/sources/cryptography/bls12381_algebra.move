@@ -770,6 +770,32 @@ module aptos_std::bls12381_algebra {
         multi_scalar_mul(&elements, &scalars);
     }
 
+    #[test_only]
+    /// The maximum number of `G1` elements that can be created in a transaction,
+    /// calculated by the current memory limit (1MB) and the in-mem G1 representation size (144 bytes per element).
+    const G1_NUM_MAX: u64 = 1048576 / 144;
+
+    #[test(fx = @std)]
+    fun test_memory_limit(fx: signer) {
+        enable_cryptography_algebra_natives(&fx);
+        let remaining = G1_NUM_MAX;
+        while (remaining > 0) {
+            zero<G1>();
+            remaining = remaining - 1;
+        }
+    }
+
+    #[test(fx = @std)]
+    #[expected_failure(abort_code = 0x090003, location = std::crypto_algebra)]
+    fun test_memory_limit_exceeded_with_g1(fx: signer) {
+        enable_cryptography_algebra_natives(&fx);
+        let remaining = G1_NUM_MAX + 1;
+        while (remaining > 0) {
+            zero<G1>();
+            remaining = remaining - 1;
+        }
+    }
+
     //
     // (Tests end here.)
     //

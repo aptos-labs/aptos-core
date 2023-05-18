@@ -6,8 +6,10 @@ use crate::{data_notification::DataNotification, data_stream::DataStreamListener
 use aptos_config::config::AptosDataClientConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_data_client::{
-    AdvertisedData, AptosDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
-    ResponseCallback, ResponseContext, ResponseError,
+    global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
+    interface::{
+        AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
+    },
 };
 use aptos_infallible::Mutex;
 use aptos_logger::Level;
@@ -139,9 +141,9 @@ impl MockAptosDataClient {
         thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
     }
 
-    fn emulate_subscription_expiration(&self) -> aptos_data_client::Error {
+    fn emulate_subscription_expiration(&self) -> aptos_data_client::error::Error {
         thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
-        aptos_data_client::Error::TimeoutWaitingForResponse("RPC timed out!".into())
+        aptos_data_client::error::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
 
     fn calculate_last_index(&self, start_index: u64, end_index: u64) -> u64 {
@@ -198,7 +200,7 @@ impl MockAptosDataClient {
 }
 
 #[async_trait]
-impl AptosDataClient for MockAptosDataClient {
+impl AptosDataClientInterface for MockAptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {
@@ -242,7 +244,7 @@ impl AptosDataClient for MockAptosDataClient {
         start_index: u64,
         end_index: u64,
         request_timeout_ms: u64,
-    ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -284,7 +286,7 @@ impl AptosDataClient for MockAptosDataClient {
         start_epoch: Epoch,
         end_epoch: Epoch,
         request_timeout_ms: u64,
-    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::Error> {
+    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -320,7 +322,7 @@ impl AptosDataClient for MockAptosDataClient {
         request_timeout_ms: u64,
     ) -> Result<
         Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
-        aptos_data_client::Error,
+        aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
             request_timeout_ms,
@@ -381,7 +383,7 @@ impl AptosDataClient for MockAptosDataClient {
         request_timeout_ms: u64,
     ) -> Result<
         Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
-        aptos_data_client::Error,
+        aptos_data_client::error::Error,
     > {
         self.verify_request_timeout(
             request_timeout_ms,
@@ -442,7 +444,7 @@ impl AptosDataClient for MockAptosDataClient {
         known_epoch: Epoch,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> aptos_data_client::Result<
+    ) -> aptos_data_client::error::Result<
         Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>,
     > {
         self.verify_request_timeout(
@@ -493,7 +495,7 @@ impl AptosDataClient for MockAptosDataClient {
         &self,
         version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<u64>, aptos_data_client::Error> {
+    ) -> Result<Response<u64>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -510,7 +512,7 @@ impl AptosDataClient for MockAptosDataClient {
         start_version: Version,
         end_version: Version,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -537,7 +539,7 @@ impl AptosDataClient for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::Error> {
+    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::error::Error> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,
@@ -567,7 +569,7 @@ impl AptosDataClient for MockAptosDataClient {
         end_version: Version,
         include_events: bool,
         request_timeout_ms: u64,
-    ) -> aptos_data_client::Result<Response<TransactionOrOutputListWithProof>> {
+    ) -> aptos_data_client::error::Result<Response<TransactionOrOutputListWithProof>> {
         self.verify_request_timeout(
             request_timeout_ms,
             false,

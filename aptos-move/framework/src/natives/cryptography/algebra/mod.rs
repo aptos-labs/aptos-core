@@ -149,14 +149,24 @@ impl TryFrom<TypeTag> for HashToStructureSuite {
     }
 }
 
+/// This limit ensures that no more than 1MB will be allocated for elements per VM session.
+const MEMORY_LIMIT_IN_BYTES: usize = 1 << 20;
+
+/// Equivalent to `std::error::resource_exhausted(3)` in Move.
+const E_TOO_MUCH_MEMORY_USED: u64 = 0x09_0003;
+
 #[derive(Tid, Default)]
 pub struct AlgebraContext {
+    bytes_used: usize,
     objs: Vec<Rc<dyn Any>>,
 }
 
 impl AlgebraContext {
     pub fn new() -> Self {
-        Self { objs: Vec::new() }
+        Self {
+            bytes_used: 0,
+            objs: Vec::new(),
+        }
     }
 }
 
@@ -182,10 +192,19 @@ macro_rules! safe_borrow_element {
 #[macro_export]
 macro_rules! store_element {
     ($context:expr, $obj:expr) => {{
-        let target_vec = &mut $context.extensions_mut().get_mut::<AlgebraContext>().objs;
-        let ret = target_vec.len();
-        target_vec.push(Rc::new($obj));
-        ret
+        let context = &mut $context.extensions_mut().get_mut::<AlgebraContext>();
+        let new_size = context.bytes_used + std::mem::size_of_val(&$obj);
+        if new_size > MEMORY_LIMIT_IN_BYTES {
+            Err(SafeNativeError::Abort {
+                abort_code: E_TOO_MUCH_MEMORY_USED,
+            })
+        } else {
+            let target_vec = &mut context.objs;
+            context.bytes_used = new_size;
+            let ret = target_vec.len();
+            target_vec.push(Rc::new($obj));
+            Ok(ret)
+        }
     }};
 }
 

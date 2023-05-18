@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters, scheduler::Scheduler, task::Transaction, txn_last_input_output::ReadDescriptor,
+    counters,
+    scheduler::{DependencyResult, DependencyStatus, Scheduler},
+    task::Transaction,
+    txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
@@ -44,6 +47,8 @@ pub(crate) enum ReadResult<V> {
     U128(u128),
     // Read could not resolve the delta (no base value).
     Unresolved,
+    // Parallel execution halts.
+    ExecutionHalted,
     // Read did not return anything.
     None,
 }
@@ -120,7 +125,7 @@ impl<
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
-                        Some(dep_condition) => {
+                        DependencyResult::Dependency(dep_condition) => {
                             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
                             // Wait on a condition variable corresponding to the encountered
                             // read dependency. Once the dep_idx finishes re-execution, scheduler
@@ -138,11 +143,17 @@ impl<
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
-                            while !*dep_resolved {
+                            while let DependencyStatus::Unresolved = *dep_resolved {
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
+                            if let DependencyStatus::ExecutionHalted = *dep_resolved {
+                                return ReadResult::ExecutionHalted;
+                            }
                         },
-                        None => continue,
+                        DependencyResult::ExecutionHalted => {
+                            return ReadResult::ExecutionHalted;
+                        },
+                        DependencyResult::Resolved => continue,
                     }
                 },
                 Err(DeltaApplicationFailure) => {
@@ -253,6 +264,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     match mv_value {
                         ReadResult::Value(v) => Ok(v.as_state_value()),
                         ReadResult::U128(v) => Ok(Some(StateValue::new_legacy(serialize(&v)))),
+                        // ExecutionHalted indicates that the parallel execution is halted.
+                        // The read should return immediately and log the error.
+                        // For now we use STORAGE_ERROR as the VM will not log the speculative eror,
+                        // so no actual error will be logged once the execution is halted and
+                        // the speculative logging is flushed.
+                        ReadResult::ExecutionHalted => Err(anyhow::Error::new(VMStatus::Error(
+                            StatusCode::STORAGE_ERROR,
+                            Some("Speculative error to halt BlockSTM early.".to_string()),
+                        ))),
                         ReadResult::None => self.get_base_value(state_key),
                         ReadResult::Unresolved => unreachable!(
                             "Must be resolved as base value is recorded in the MV data structure"

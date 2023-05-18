@@ -65,7 +65,7 @@ impl InMemoryStateCalculator {
     pub fn new(base: &StateDelta, state_cache: StateCache) -> Self {
         let StateCache {
             frozen_base,
-            state_cache,
+            sharded_state_cache,
             proofs,
         } = state_cache;
         let StateDelta {
@@ -75,6 +75,14 @@ impl InMemoryStateCalculator {
             current_version,
             updates_since_base,
         } = base.clone();
+
+        // TODO(grao): Rethink the strategy for state sync, and optimize this.
+        let state_cache = sharded_state_cache
+            .iter()
+            .flatten()
+            .into_iter()
+            .map(|entry| (entry.key().clone(), entry.value().1.clone()))
+            .collect();
 
         Self {
             _frozen_base: frozen_base,

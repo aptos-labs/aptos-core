@@ -7,11 +7,11 @@
 
 use super::{
     token_utils::TokenWriteSet,
-    v2_token_utils::{TokenStandard, TokenV2AggregatedDataMapping, V2TokenResource},
+    v2_token_utils::{TokenStandard, TokenV2, TokenV2AggregatedDataMapping},
 };
 use crate::{
-    models::move_resources::MoveResource,
     schema::{current_token_datas_v2, token_datas_v2},
+    util::standardize_address,
 };
 use aptos_api_types::{WriteResource as APIWriteResource, WriteTableItem as APIWriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
@@ -68,30 +68,13 @@ impl TokenDataV2 {
         txn_timestamp: chrono::NaiveDateTime,
         token_v2_metadata: &TokenV2AggregatedDataMapping,
     ) -> anyhow::Result<Option<(Self, CurrentTokenDataV2)>> {
-        let type_str = format!(
-            "{}::{}::{}",
-            write_resource.data.typ.address,
-            write_resource.data.typ.module,
-            write_resource.data.typ.name
-        );
-        if !V2TokenResource::is_resource_supported(type_str.as_str()) {
-            return Ok(None);
-        }
-        let resource = MoveResource::from_write_resource(
-            write_resource,
-            0, // Placeholder, this isn't used anyway
-            txn_version,
-            0, // Placeholder, this isn't used anyway
-        );
-
-        if let V2TokenResource::Token(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
+        if let Some(inner) = &TokenV2::from_write_resource(write_resource, txn_version)? {
+            let token_data_id = standardize_address(&write_resource.address.to_string());
             // Get maximum, supply, and is fungible from fungible asset if this is a fungible token
             let (maximum, supply, is_fungible_v2) = (None, BigDecimal::zero(), Some(false));
             // Get token properties from 0x4::property_map::PropertyMap
             let mut token_properties = serde_json::Value::Null;
-            if let Some(metadata) = token_v2_metadata.get(&resource.address) {
+            if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
                 token_properties = metadata
                     .property_map
                     .as_ref()
@@ -102,8 +85,7 @@ impl TokenDataV2 {
                 return Ok(None);
             }
 
-            let collection_id = inner.collection.inner.clone();
-            let token_data_id = resource.address;
+            let collection_id = inner.get_collection_address();
             let token_name = inner.get_name_trunc();
             let token_uri = inner.get_uri_trunc();
 
@@ -133,7 +115,7 @@ impl TokenDataV2 {
                     largest_property_version_v1: None,
                     token_uri,
                     token_properties,
-                    description: inner.description,
+                    description: inner.description.clone(),
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2,
                     last_transaction_version: txn_version,

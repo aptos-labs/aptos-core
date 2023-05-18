@@ -10,6 +10,7 @@ license = "Apache-2.0"
 anyhow = "1.0.52"
 # diem dependencies
 move-compiler = { path = "../../move-compiler" }
+move-core-types = { path = "../../move-core/types" }
 move-model = { path = "../../move-model" }
 
 # external dependencies

@@ -25,7 +25,7 @@ use itertools::Either;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{Exp, ExpData, TempIndex},
-    model::{FunId, GlobalEnv, ModuleId},
+    model::{FunId, GlobalEnv, ModuleId, Parameter},
     ty::{PrimitiveType, Type},
 };
 use std::{
@@ -334,7 +334,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
                                         let local_map = body_exp.free_local_vars_with_node_id();
-                                        for (i, (sym, _)) in
+                                        for (i, Parameter(sym, _)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {
                                             if local_map.contains_key(sym) {

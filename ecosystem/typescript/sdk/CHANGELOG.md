@@ -8,6 +8,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 - Fix get number of delegators Indexer query
 - Include static methods from `AptosClient` and `IndexerClient` classes in the `Provider` class
+- Add Indexer queries for tokens - `getAccountTokens`, `getTokenOwnedFromCollectionAddress`, `getTokenOwnedFromCollectionNameAndCreatorAddress`, `getCollectionData`, `getCollectionAddress`
 
 ## 1.8.5 (2023-04-29)
 

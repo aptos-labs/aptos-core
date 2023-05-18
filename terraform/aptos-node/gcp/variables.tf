@@ -61,6 +61,11 @@ variable "record_name" {
   default     = "<workspace>.aptos"
 }
 
+variable "create_dns_records" {
+  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
+}
+
 variable "helm_chart" {
   description = "Path to aptos-validator Helm chart file"
   default     = ""

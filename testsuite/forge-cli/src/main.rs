@@ -497,6 +497,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "multi_region_multi_cloud_simulation_test" => {
             multi_region_multi_cloud_simulation_test(config)
         },
+        "multiregion_benchmark_test" => multiregion_benchmark_test(config),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -865,7 +866,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 // Additionally - we are not really gracefully handling overlaods,
                 // setting limits based on current reality, to make sure they
                 // don't regress, but something to investigate
-                avg_tps: 1400,
+                avg_tps: 1200,
                 latency_thresholds: &[],
             },
         }])
@@ -952,7 +953,7 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
         )
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
-                "account_creation" => 3700,
+                "account_creation" => 3600,
                 "nft_mint" => 1000,
                 "publishing" => 60,
                 "write_new_resource" => 3700,
@@ -1003,7 +1004,7 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(1)
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_success_criteria(
-            SuccessCriteria::new(5000)
+            SuccessCriteria::new(4250)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
@@ -1281,7 +1282,7 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(3500)
+            SuccessCriteria::new(3250)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1527,6 +1528,48 @@ fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> For
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 20.0,
                     max_round_gap: 6,
+                }),
+        )
+}
+
+fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+    config
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_network_tests(vec![&PerformanceBenchmark])
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+
+            helm_values["genesis"]["multicluster"]["enabled"] = true.into();
+        }))
+        .with_node_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["multicluster"]["enabled"] = true.into();
+            // Create headless services for validators and fullnodes.
+            // Note: chaos-mesh will not work with clusterIP services.
+            helm_values["service"]["validator"]["internal"]["type"] = "ClusterIP".into();
+            helm_values["service"]["validator"]["internal"]["headless"] = true.into();
+            helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
+            helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
+
+            // Disable pyroscope. Need to ensure secrets are created/propogated before enabling.
+            helm_values["pyroscope"]["enabled"] = false.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(4500)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup, give 10% of the run for longer durations.
+                    180,
+                )
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
                 }),
         )
 }

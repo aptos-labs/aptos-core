@@ -9,14 +9,24 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainExecutionConfig {
     V1(ExecutionConfigV1),
+    V2(ExecutionConfigV2),
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainExecutionConfig {
-    /// The number of recent rounds that don't count into reputations.
+    /// The type of the transaction shuffler being used.
     pub fn transaction_shuffler_type(&self) -> TransactionShufflerType {
         match &self {
             OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
+        }
+    }
+
+    /// The per-block gas limit being used.
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        match &self {
+            OnChainExecutionConfig::V1(_config) => None,
+            OnChainExecutionConfig::V2(config) => config.block_gas_limit,
         }
     }
 }
@@ -59,6 +69,21 @@ impl Default for ExecutionConfigV1 {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV2 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit: Option<u64>,
+}
+
+impl Default for ExecutionConfigV2 {
+    fn default() -> Self {
+        Self {
+            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+            block_gas_limit: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
@@ -70,6 +95,7 @@ pub enum TransactionShufflerType {
 mod test {
     use super::*;
     use crate::on_chain_config::OnChainConfigPayload;
+    use rand::Rng;
     use std::{collections::HashMap, sync::Arc};
 
     #[test]
@@ -100,6 +126,35 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV1(32)
         ));
+
+        // V2 test with random per-block gas limit
+        let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
+        let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: Some(rand_gas_limit),
+        });
+
+        let s = serde_yaml::to_string(&config).unwrap();
+        let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
+        assert!(matches!(
+            result.transaction_shuffler_type(),
+            TransactionShufflerType::SenderAwareV1(32)
+        ));
+        assert!(result.block_gas_limit() == Some(rand_gas_limit));
+
+        // V2 test with no per-block gas limit
+        let config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: None,
+        });
+
+        let s = serde_yaml::to_string(&config).unwrap();
+        let result = serde_yaml::from_str::<OnChainExecutionConfig>(&s).unwrap();
+        assert!(matches!(
+            result.transaction_shuffler_type(),
+            TransactionShufflerType::SenderAwareV1(32)
+        ));
+        assert!(matches!(result.block_gas_limit(), None));
     }
 
     #[test]
@@ -122,5 +177,50 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV1(32)
         ));
+
+        // V2 test with random per-block gas limit
+        let rand_gas_limit = rand::thread_rng().gen_range(0, 1000000) as u64;
+        let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: Some(rand_gas_limit),
+        });
+
+        let mut configs = HashMap::new();
+        configs.insert(
+            OnChainExecutionConfig::CONFIG_ID,
+            // Requires double serialization, check deserialize_into_config for more details
+            bcs::to_bytes(&bcs::to_bytes(&execution_config).unwrap()).unwrap(),
+        );
+
+        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+
+        let result: OnChainExecutionConfig = payload.get().unwrap();
+        assert!(matches!(
+            result.transaction_shuffler_type(),
+            TransactionShufflerType::SenderAwareV1(32)
+        ));
+        assert!(result.block_gas_limit() == Some(rand_gas_limit));
+
+        // V2 test with no per-block gas limit
+        let execution_config = OnChainExecutionConfig::V2(ExecutionConfigV2 {
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV1(32),
+            block_gas_limit: None,
+        });
+
+        let mut configs = HashMap::new();
+        configs.insert(
+            OnChainExecutionConfig::CONFIG_ID,
+            // Requires double serialization, check deserialize_into_config for more details
+            bcs::to_bytes(&bcs::to_bytes(&execution_config).unwrap()).unwrap(),
+        );
+
+        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+
+        let result: OnChainExecutionConfig = payload.get().unwrap();
+        assert!(matches!(
+            result.transaction_shuffler_type(),
+            TransactionShufflerType::SenderAwareV1(32)
+        ));
+        assert!(matches!(result.block_gas_limit(), None));
     }
 }

@@ -20,6 +20,8 @@ script {
 
     fun main(src: &signer, dest: address, desired_balance: u64) {
         let src_addr = signer::address_of(src);
+        
+        addr::my_module::do_nothing();
 
         let balance = coin::balance<aptos_coin::AptosCoin>(src_addr);
         if (balance < desired_balance) {
@@ -41,89 +43,94 @@ Now that you know what you would like to accomplish, you need to determine:
 Let us run through how to execute a Move script with a step-by-step example using the [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md).
 
 1. Make a new directory for your work:
-```sh
-mkdir testing
-cd testing
-```
+    ```sh
+    mkdir testing
+    cd testing
+    ```
 
 2. Set up the Aptos CLI and [create an account](../../tools/aptos-cli-tool/use-aptos-cli#initialize-local-configuration-and-create-an-account):
-```sh
-aptos init
-```
-The CLI will ask you which network you want to work with (e.g. `devnet`, `testnet`, `mainnet`). Enter: `devnet`
-
-You may reuse an existing private key (which looks like this: `0xf1adc8d01c1a890f17efc6b08f92179e6008d43026dd56b71e7b0d9b453536be`), or it can generate a new one for you, as part of setting up your account.
+    ```sh
+    aptos init --network devnet
+    ```
+    
+    You may reuse an existing private key (which looks like this: `0xbd944102bf5b5dfafa7fe865d8fa719da6a1f0eafa3cd600f93385482d2c37a4`), or it can generate a new one for you, as part of setting up your account. Let's say your account looks like the example below:
+    ```sh
+    ---
+    profiles:
+      default:
+        private_key: "0xbd944102bf5b5dfafa7fe865d8fa719da6a1f0eafa3cd600f93385482d2c37a4"
+        public_key: "0x47673ec83bb254cc9a8bfdb31846daacd0c96fe41f81855462f5fc5306312b1b"
+        account: cb265645385819f3dbe71aac266e319e7f77aed252cacf2930b68102828bf615
+        rest_url: "https://fullnode.devnet.aptoslabs.com"
+        faucet_url: "https://faucet.devnet.aptoslabs.com"
+    ```
 
 3. From this same directory, initialize a new Move project:
-```sh
-aptos move init --name my_script
-```
+    ```sh
+    aptos move init --name run_script
+    ```
 
-4. Create a `top_up.move` file containing the example script above in a `sources/` subdirectory of your `testing/` directory.
+4. Create a `my_script.move` file containing the example script above in a `sources/` subdirectory of your `testing/` directory. Also, create a `my_module.move` file as seen in the example below:
+    ```
+    module addr::my_module {
+        public entry fun do_nothing() { }
+    }
+    ```
 
-5. Create a `Move.toml` file in the root of your `testing/` directory containing:
+    This results in the following file structure:
+    ```
+    testing/
+       Move.toml
+       sources/
+          my_script.move
+          my_module.move
+    ```
 
-```
-[package]
-name = 'my_script'
-version = '1.0.0'
+5. Compile the script:
+    ```
+    $ aptos move compile --named-addresses addr=cb265645385819f3dbe71aac266e319e7f77aed252cacf2930b68102828bf615
+    Compiling, may take a little while to download git dependencies...
+    INCLUDING DEPENDENCY AptosFramework
+    INCLUDING DEPENDENCY AptosStdlib
+    INCLUDING DEPENDENCY MoveStdlib
+    BUILDING run_script
+    {
+      "Result": [
+        "cb265645385819f3dbe71aac266e319e7f77aed252cacf2930b68102828bf615::my_module"
+      ]
+    }
+    ```
 
-[dependencies.AptosFramework]
-git = 'https://github.com/aptos-labs/aptos-core.git'
-rev = 'devnet'
-subdir = 'aptos-move/framework/aptos-framework'
-```
+    Note how we use the `--named-addresses` argument. This is necessary because in the code we refer to this named address called `addr`. The compiler needs to know what this refers to. Instead of using this CLI argument, you could put something like this in your `Move.toml`:
 
-This results in a file structure of:
-```
-testing/
-   Move.toml
-   sources/
-      top_up.move
-      my_module.move
-```
+    ```
+    [addresses]
+    addr = "cb265645385819f3dbe71aac266e319e7f77aed252cacf2930b68102828bf615"
+    ```
 
-6. Compile the script:
-```
-$ aptos move compile --named-addresses addr=81e2e2499407693c81fe65c86405ca70df529438339d9da7a6fc2520142b591e
-Compiling, may take a little while to download git dependencies...
-INCLUDING DEPENDENCY AptosFramework
-INCLUDING DEPENDENCY AptosStdlib
-INCLUDING DEPENDENCY MoveStdlib
-BUILDING my_script
-{
-  "Result": []
-}
-```
-Note how we use the `--named-addresses` argument. This is necessary because in the code we refer to this named address called `addr`. The compiler needs to know what this refers to. Instead of using this CLI argument, you could put something like this in your `Move.toml`:
-```
-[addresses]
-addr = "b078d693856a65401d492f99ca0d6a29a0c5c0e371bc2521570a86e40d95f823"
-```
+6. Run the compiled script:
+    ```
+    $ aptos move run-script --compiled-script-path build/my_script/bytecode_scripts/main.mv --args address:b078d693856a65401d492f99ca0d6a29a0c5c0e371bc2521570a86e40d95f823 --args u64:5
+    Do you want to submit a transaction for a range of [17000 - 25500] Octas at a gas unit price of 100 Octas? [yes/no] >
+    yes
+    {
+      "Result": {
+        "transaction_hash": "0xa6ca6275c73f82638b88a830015ab81734a533aebd36cc4647b48ff342434cdf",
+        "gas_used": 3,
+        "gas_unit_price": 100,
+        "sender": "cb265645385819f3dbe71aac266e319e7f77aed252cacf2930b68102828bf615",
+        "sequence_number": 4,
+        "success": true,
+        "timestamp_us": 1683030933803632,
+        "version": 3347495,
+        "vm_status": "Executed successfully"
+      }
+    }
+    ```
 
-7. Run the compiled script:
-```
-$ aptos move run-script --compiled-script-path build/my_script/bytecode_scripts/main.mv --args address:b078d693856a65401d492f99ca0d6a29a0c5c0e371bc2521570a86e40d95f823 --args u64:5
-Do you want to submit a transaction for a range of [17000 - 25500] Octas at a gas unit price of 100 Octas? [yes/no] >
-yes
-{
-  "Result": {
-    "transaction_hash": "0x655f839a45c5f14ba92590c321f97c3c3f9aba334b9152e994fb715d5648db4b",
-    "gas_used": 178,
-    "gas_unit_price": 100,
-    "sender": "81e2e2499407693c81fe65c86405ca70df529438339d9da7a6fc2520142b591e",
-    "sequence_number": 53,
-    "success": true,
-    "timestamp_us": 1669811892262502,
-    "version": 370133122,
-    "vm_status": "Executed successfully"
-  }
-}
-```
+Note that the path of the compiled script is under `build/run_script/`, not `build/my_script/`. This is because it uses the name of the project contained in `Move.toml`, which is `run_script` from when we ran `aptos move init --name run_script`.
 
-Note that the path of the compiled script is under `build/my_script/`, not `build/top_up/`. This is because it uses the name of the project contained in `Move.toml`, which is `my_script` from when we ran `aptos move init --name my_script`.
-
-See the code used for this document at: https://github.com/banool/move-examples/tree/main/run_script. The full example explains how to use a Move script that relies on a user-created Move module as well.
+See the [code](https://github.com/banool/move-examples/tree/main/run_script) used for this document. The full example explains how to use a Move script that relies on a user-created Move module as well.
 
 See also how to do this with the [Rust SDK](https://stackoverflow.com/questions/74452702/how-do-i-execute-a-move-script-on-aptos-using-the-rust-sdk) instead of the Aptos CLI in Stack Overflow.
 

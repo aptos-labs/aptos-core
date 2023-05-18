@@ -44,7 +44,6 @@ move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
-read-write-set-dynamic = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
@@ -60,4 +59,3 @@ mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]
- 

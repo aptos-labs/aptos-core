@@ -40,9 +40,9 @@ pub const UNLOCK_STAKE_FUNCTION: &str = "unlock_stake";
 pub const DISTRIBUTE_STAKING_REWARDS_FUNCTION: &str = "distribute";
 
 // Delegation Pool Contract
-pub const ADD_DELEGATED_STAKE_FUNCTION: &str = "add_delegated_stake";
-pub const UNLOCK_DELEGATED_STAKE_FUNCTION: &str = "unlock_delegated_stake";
-pub const WITHDRAW_UNDELEGATED_FUNDS_FUNCTION: &str = "withdraw_undelegated_funds";
+pub const DELEGATION_POOL_ADD_STAKE_FUNCTION: &str = "add_stake";
+pub const DELEGATION_POOL_UNLOCK_FUNCTTON: &str = "unlock";
+pub const DELEGATION_POOL_WITHDRAW_FUNCTION: &str = "withdraw";
 
 pub const DECIMALS_FIELD: &str = "decimal";
 pub const DEPOSIT_EVENTS_FIELD: &str = "deposit_events";
@@ -212,7 +212,6 @@ pub struct AddDelegationEvent {
     pub pool_address: AccountAddress,
     pub delegator_address: AccountAddress,
     pub amount_added: u64,
-    pub add_stake_fee: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
