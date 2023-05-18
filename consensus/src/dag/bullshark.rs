@@ -3,7 +3,7 @@
 
 use super::counters::{
     DAG_NODE_TO_BLOCK_LATENCY, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND,
-    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND,
+    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND, DAG_NODE_ROUND_DIFF, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN,
 };
 use crate::{
     block_storage::update_counters_for_committed_blocks, dag::anchor_election::AnchorElection,
@@ -234,6 +234,15 @@ impl Bullshark {
                 DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND.observe(duration);
             } else {
                 DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND.observe(duration);
+            }
+            let round_diff = round - node.round();
+            DAG_NODE_ROUND_DIFF.observe(round_diff as f64);
+            if round_diff <= 2 {
+                if node.round() % 2 == 0 {
+                    DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN.observe(duration);
+                } else {
+                    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN.observe(duration);
+                }
             }
 
             payload.extend(node.take_payload());
