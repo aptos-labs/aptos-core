@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::counters::{
+    DAG_NODE_TO_BLOCK_LATENCY, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND,
+    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND,
+};
 use crate::{
-    dag::anchor_election::AnchorElection,
-    experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer, block_storage::update_counters_for_committed_blocks,
+    block_storage::update_counters_for_committed_blocks, dag::anchor_election::AnchorElection,
+    experimental::ordering_state_computer::OrderingStateComputer, state_replication::StateComputer,
 };
 use aptos_consensus_types::{
     block::Block,
@@ -33,6 +37,7 @@ use std::{
     hash::Hash,
     iter::Extend,
     sync::Arc,
+    time::{Instant, SystemTime, Duration},
 };
 
 pub struct Bullshark {
@@ -220,6 +225,17 @@ impl Bullshark {
         let author = ordered_history[0].source();
 
         ordered_history.into_iter().rev().for_each(|node| {
+            let duration = aptos_infallible::duration_since_epoch()
+                .checked_sub(Duration::from_micros(node.timestamp()))
+                .expect("Duration should work")
+                .as_secs_f64();
+            DAG_NODE_TO_BLOCK_LATENCY.observe(duration);
+            if node.round() % 2 == 0 {
+                DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND.observe(duration);
+            } else {
+                DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND.observe(duration);
+            }
+
             payload.extend(node.take_payload());
         });
 
