@@ -313,14 +313,13 @@ impl AggregatorData {
         resolver: &dyn TableResolver,
         aggregator_enabled: bool,
     ) -> PartialVMResult<&mut Aggregator> {
-        self.aggregators.entry(id).or_insert_with(|| Aggregator {
+        let aggregator = self.aggregators.entry(id).or_insert(Aggregator {
             value: 0,
             state: AggregatorState::PositiveDelta,
             limit,
             history: Some(History::new()),
         });
 
-        let aggregator = self.aggregators.get_mut(&id).unwrap();
         if !aggregator_enabled {
             aggregator.read_and_materialize(resolver, &id)?;
         }
