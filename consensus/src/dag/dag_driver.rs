@@ -23,7 +23,7 @@ use aptos_consensus_types::{
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::spawn_named;
+use aptos_logger::{spawn_named, debug};
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
@@ -121,7 +121,9 @@ impl DagDriver {
     }
 
     async fn remote_fetch_missing_nodes(&self) {
+        debug!("DAG: remote fetch missing nodes {}", self.dag.missing_nodes_metadata().len());
         for (node_meta_data, nodes_to_request) in self.dag.missing_nodes_metadata() {
+            debug!("DAG: request missing node: {:?} from {:?}", node_meta_data, nodes_to_request);
             let request = CertifiedNodeRequest::new(node_meta_data, self.author);
             self.network_sender
                 .send_certified_node_request(request, nodes_to_request)
@@ -130,6 +132,7 @@ impl DagDriver {
     }
 
     async fn handle_node_request(&mut self, node_request: CertifiedNodeRequest) {
+        debug!("DAG: handle node request: {:?}", node_request);
         if let Some(certified_node) = self.dag.get_node(&node_request) {
             self.network_sender
                 .send_certified_node(
@@ -138,6 +141,8 @@ impl DagDriver {
                     false,
                 )
                 .await
+        } else {
+            debug!("DAG: node not found: {:?}", node_request);
         }
     }
 
@@ -194,7 +199,7 @@ impl DagDriver {
             .await
             .expect("dag: reliable broadcast receiver dropped");
 
-        let mut interval_missing_nodes = time::interval(Duration::from_millis(500)); // time out should be slightly more than one network round trip.
+        let mut interval_missing_nodes = time::interval(Duration::from_millis(200)); // time out should be slightly more than one network round trip.
         let mut interval_timeout = time::interval(Duration::from_millis(1000)); // similar to leader timeout in our consensus
         let mut close_rx = close_rx.into_stream();
         loop {
@@ -202,7 +207,8 @@ impl DagDriver {
                 biased;
 
                 _ = interval_missing_nodes.tick() => {
-                    self.remote_fetch_missing_nodes().await
+                    self.remote_fetch_missing_nodes().await;
+                    interval_missing_nodes.reset();
                 },
 
                 _ = interval_timeout.tick() => {
@@ -221,7 +227,7 @@ impl DagDriver {
                     match msg {
 
                         VerifiedEvent::CertifiedNodeMsg(certified_node, ack_required) => {
-
+                            debug!("DAG: handle certified node: {:?}", certified_node.metadata());
                             self.handle_certified_node(*certified_node, ack_required).await;
                             if let Some(node) = self.try_advance_round().await {
                                 self.rb_tx.send(ReliableBroadcastCommand::BroadcastRequest(node)).await.expect("dag: reliable broadcast receiver dropped");
