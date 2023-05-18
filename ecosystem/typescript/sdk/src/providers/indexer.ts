@@ -17,6 +17,9 @@ import {
   GetTokenOwnersDataQuery,
   GetTopUserTransactionsQuery,
   GetUserTransactionsQuery,
+  GetOwnedTokensQuery,
+  GetTokenOwnedFromCollectionQuery,
+  GetCollectionDataQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -33,6 +36,9 @@ import {
   GetTokenOwnersData,
   GetTopUserTransactions,
   GetUserTransactions,
+  GetOwnedTokens,
+  GetTokenOwnedFromCollection,
+  GetCollectionData,
 } from "../indexer/generated/queries";
 
 /**
@@ -47,6 +53,8 @@ interface PaginationArgs {
   offset?: AnyNumber;
   limit?: number;
 }
+
+type TokenStandard = "v1" | "v2";
 
 type GraphqlQuery = {
   query: string;
@@ -74,7 +82,7 @@ export class IndexerClient {
    */
   static validateAddress(address: string): void {
     if (address.length < 66) {
-      throw new Error("Address needs to be 66 chars long.");
+      throw new Error(`${address} is less than 66 chars long.`);
     }
   }
 
@@ -309,5 +317,142 @@ export class IndexerClient {
       variables: { poolAddress: address },
     };
     return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries account's current owned tokens.
+   * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
+   *
+   * @param ownerAddress The token owner address we want to get the tokens for
+   * @returns GetOwnedTokensQuery response type
+   */
+  async getOwnedTokens(
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      options?: PaginationArgs;
+    },
+  ): Promise<GetOwnedTokensQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+    const graphqlQuery = {
+      query: GetOwnedTokens,
+      variables: { address, offset: extraArgs?.options?.offset, limit: extraArgs?.options?.limit },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns by the collection address
+   *
+   * @param ownerAddress owner address that owns the tokens
+   * @param collectionAddress the collection address
+   * @returns GetTokenOwnedFromCollectionQuery response type
+   */
+  async getTokenOwnedFromCollectionAddress(
+    ownerAddress: MaybeHexString,
+    collectionAddress: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetTokenOwnedFromCollectionQuery> {
+    const ownerHexAddress = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(ownerHexAddress);
+
+    const collectionHexAddress = HexString.ensure(collectionAddress).hex();
+    IndexerClient.validateAddress(collectionHexAddress);
+
+    const graphqlQuery = {
+      query: GetTokenOwnedFromCollection,
+      variables: {
+        collection_id: collectionHexAddress,
+        owner_address: ownerHexAddress,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns by the collection name and collection
+   * creator address
+   *
+   * @param ownerAddress owner address that owns the tokens
+   * @param collectionName the collection name
+   * @param creatorAddress the collection creator address
+   * @returns GetTokenOwnedFromCollectionQuery response type
+   */
+  async getTokenOwnedFromCollectionNameAndCreatorAddress(
+    ownerAddress: MaybeHexString,
+    collectionName: string,
+    creatorAddress: MaybeHexString,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetTokenOwnedFromCollectionQuery> {
+    const collectionAddress = await this.getCollectionAddress(creatorAddress, collectionName, extraArgs);
+    const tokens = await this.getTokenOwnedFromCollectionAddress(ownerAddress, collectionAddress, extraArgs);
+    return tokens;
+  }
+
+  /**
+   * Queries data of a specific collection by the collection creator address and the collection name.
+   *
+   * if, for some reason, a creator account has 2 collections with the same name in v1 and v2,
+   * can pass an optional `tokenStandard` parameter to query a specific standard
+   *
+   * @param creatorAddress the collection creator address
+   * @param collectionName the collection name
+   * @returns GetCollectionDataQuery response type
+   */
+  async getCollectionData(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetCollectionDataQuery> {
+    const address = HexString.ensure(creatorAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      collection_name: { _eq: collectionName },
+      creator_address: { _eq: address },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetCollectionData,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries a collection address.
+   *
+   * @param creatorAddress the collection creator address
+   * @param collectionName the collection name
+   * @returns the collection address
+   */
+  async getCollectionAddress(
+    creatorAddress: MaybeHexString,
+    collectionName: string,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+    },
+  ): Promise<string> {
+    return (await this.getCollectionData(creatorAddress, collectionName, extraArgs)).current_collections_v2[0]
+      .collection_id;
   }
 }
