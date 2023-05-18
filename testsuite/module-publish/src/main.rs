@@ -4,11 +4,7 @@
 use anyhow::Result;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use move_binary_format::CompiledModule;
-use std::{
-    fs,
-    fs::{DirEntry, File},
-    io::Write,
-};
+use std::{fs, fs::File, io::Write, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -22,7 +18,18 @@ struct Args {
     out_dir: Option<String>,
 }
 
-// Update `raw_module_data.rs` in
+// List of additional packages (beyond those in testsuite/module-publish/src/packages) to include
+fn additional_packages() -> Vec<(&'static str, &'static str)> {
+    // Pairs of (package_name, package_path)
+    vec![(
+        "ambassador_token",
+        "../../aptos-move/move-examples/token_objects/ambassador/move",
+    )]
+}
+
+// Run "cargo run -p module-publish" to generate the file `raw_module_data.rs`.
+
+// This file updates `raw_module_data.rs` in
 // `crates/transaction-emitter-lib/src/transaction_generator/publishing/` by default,
 // or in a provided directory.
 // That file contains `Lazy` static variables for the binary of all the packages in
@@ -44,6 +51,7 @@ fn main() -> Result<()> {
         None => env!("CARGO_MANIFEST_DIR"),
         Some(str) => str,
     };
+    println!("Building GenericModule in {}", provided_dir);
     let base_dir = std::path::Path::new(provided_dir);
     // this is gotta be the most brittle solution ever!
     // If directory structure changes this breaks.
@@ -70,13 +78,13 @@ fn main() -> Result<()> {
         r#"
 // This file was generated. Do not modify!
 //
-// To update this code, run `cargo run` from `testsuite/module-publish` in aptos core.
+// To update this code, run `cargo run -p module-publish` in aptos core.
 // That test compiles the set of modules defined in
 // `testsuite/simple/src/simple/sources/`
 // and it writes the binaries here.
 // The module name (prefixed with `MODULE_`) is a `Lazy` instance that returns the
 // byte array of the module binary.
-// This create should also provide a Rust file that allows proper manipulation of each
+// This crate should also provide a Rust file that allows proper manipulation of each
 // module defined below."#
     )
     .expect("Writing header comment failed");
@@ -106,9 +114,23 @@ use once_cell::sync::Lazy;"#,
             continue;
         }
 
+        let file_name = dir.file_name();
+
         // write out package metadata
         writeln!(generic_mod).expect("Empty line failed");
-        packages.push(write_pacakge(&mut generic_mod, dir));
+        packages.push(write_package(
+            &mut generic_mod,
+            dir.path(),
+            file_name.to_str().unwrap(),
+        ));
+    }
+
+    for (package_name, additional_package) in additional_packages() {
+        packages.push(write_package(
+            &mut generic_mod,
+            base_dir.join(additional_package),
+            package_name,
+        ));
     }
 
     write_accessors(&mut generic_mod, packages);
@@ -117,12 +139,10 @@ use once_cell::sync::Lazy;"#,
 }
 
 // Write out given package
-fn write_pacakge(file: &mut File, package_folder: DirEntry) -> String {
-    let file_name = package_folder.file_name();
-    let package_name = file_name.to_str().unwrap();
+fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> String {
     println!("Building package {}", package_name);
     // build package
-    let package = BuiltPackage::build(package_folder.path(), BuildOptions::default())
+    let package = BuiltPackage::build(package_path, BuildOptions::default())
         .expect("building package must succeed");
     let code = package.extract_code();
     let package_metadata = package.extract_metadata().expect("Metadata must exist");
