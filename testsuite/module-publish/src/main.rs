@@ -95,9 +95,8 @@ fn main() -> Result<()> {
     writeln!(
         generic_mod,
         r#"
-use std::collections::HashMap;
-
-use once_cell::sync::Lazy;"#,
+use once_cell::sync::Lazy;
+use std::collections::HashMap;"#,
     )
     .expect("Use directive failed");
 
