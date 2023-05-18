@@ -3,7 +3,7 @@
 
 use super::counters::{
     DAG_NODE_TO_BLOCK_LATENCY, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND,
-    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND, DAG_NODE_ROUND_DIFF, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN,
+    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND, DAG_NODE_ROUND_DIFF, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY,
 };
 use crate::{
     block_storage::update_counters_for_committed_blocks, dag::anchor_election::AnchorElection,
@@ -229,12 +229,18 @@ impl Bullshark {
                 .checked_sub(Duration::from_micros(node.timestamp()))
                 .expect("Duration should work")
                 .as_secs_f64();
+
             DAG_NODE_TO_BLOCK_LATENCY.observe(duration);
             if node.round() % 2 == 0 {
                 DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND.observe(duration);
             } else {
                 DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND.observe(duration);
             }
+
+            if node.source() == author {
+                DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY.observe(duration);
+            }
+
             let round_diff = round - node.round();
             DAG_NODE_ROUND_DIFF.observe(round_diff as f64);
             if round_diff <= 2 {
