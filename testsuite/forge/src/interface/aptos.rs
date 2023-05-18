@@ -113,6 +113,7 @@ impl<'t> AptosContext<'t> {
 
 pub struct AptosPublicInfo<'t> {
     chain_id: ChainId,
+    inspection_service_url: Url,
     rest_api_url: Url,
     rest_client: RestClient,
     root_account: &'t mut LocalAccount,
@@ -122,11 +123,14 @@ pub struct AptosPublicInfo<'t> {
 impl<'t> AptosPublicInfo<'t> {
     pub fn new(
         chain_id: ChainId,
+        inspection_service_url_str: String,
         rest_api_url_str: String,
         root_account: &'t mut LocalAccount,
     ) -> Self {
         let rest_api_url = Url::parse(&rest_api_url_str).unwrap();
+        let inspection_service_url = Url::parse(&inspection_service_url_str).unwrap();
         Self {
+            inspection_service_url,
             rest_client: RestClient::new(rest_api_url.clone()),
             rest_api_url,
             chain_id,
@@ -141,6 +145,10 @@ impl<'t> AptosPublicInfo<'t> {
 
     pub fn url(&self) -> &str {
         self.rest_api_url.as_str()
+    }
+
+    pub fn inspection_service_url(&self) -> &str {
+        self.inspection_service_url.as_str()
     }
 
     pub fn root_account(&mut self) -> &mut LocalAccount {

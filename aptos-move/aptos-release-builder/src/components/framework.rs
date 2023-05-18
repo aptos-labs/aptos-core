@@ -6,7 +6,7 @@ use anyhow::Result;
 use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
-use git2::{Oid, Repository};
+use git2::Repository;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
@@ -41,12 +41,11 @@ pub fn generate_upgrade_proposals(
     let commit_info = if let Some(revision) = &config.git_hash {
         // If a commit hash is set, clone the repo from github and checkout to desired hash to a local temp directory.
         let repository = Repository::clone(APTOS_GIT_PATH, temp_root_path.path())?;
-        let commit = repository.find_commit(Oid::from_str(revision)?)?;
+        let (commit, _) = repository.revparse_ext(revision.as_str())?;
         let commit_info = commit
-            .as_object()
             .describe(&git2::DescribeOptions::default())?
             .format(None)?;
-        repository.checkout_tree(commit.as_object(), None)?;
+        repository.checkout_tree(&commit, None)?;
         commit_info
     } else {
         aptos_build_info::get_git_hash()

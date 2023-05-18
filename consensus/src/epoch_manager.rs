@@ -680,6 +680,7 @@ impl EpochManager {
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
+        let block_gas_limit = onchain_execution_config.block_gas_limit();
         self.quorum_store_msg_tx = quorum_store_msg_tx;
 
         let payload_client = QuorumStoreClient::new(
@@ -692,6 +693,7 @@ impl EpochManager {
             &epoch_state,
             payload_manager.clone(),
             transaction_shuffler,
+            block_gas_limit,
         );
         let state_computer = if onchain_consensus_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(

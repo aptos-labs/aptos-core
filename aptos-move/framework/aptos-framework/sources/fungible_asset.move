@@ -321,9 +321,8 @@ module aptos_framework::fungible_asset {
         metadata: Object<T>,
     ): Object<FungibleStore> {
         let store_obj = &object::generate_signer(constructor_ref);
-        let metadata = object::convert<T, Metadata>(metadata);
         move_to(store_obj, FungibleStore {
-            metadata,
+            metadata: object::convert(metadata),
             balance: 0,
             frozen: false,
         });
@@ -466,6 +465,15 @@ module aptos_framework::fungible_asset {
         deposit_with_ref(transfer_ref, to, fa);
     }
 
+    /// Create a fungible asset with zero amount.
+    /// This can be useful when starting a series of computations where the initial value is 0.
+    public fun zero<T: key>(metadata: Object<T>): FungibleAsset {
+        FungibleAsset {
+            metadata: object::convert(metadata),
+            amount: 0,
+        }
+    }
+
     /// Extract a given amount from the given fungible asset and return a new one.
     public fun extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
         assert!(fungible_asset.amount >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
@@ -492,6 +500,8 @@ module aptos_framework::fungible_asset {
 
     fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
+        if (amount == 0) return;
+
         let store_metadata = store_metadata(store);
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -607,7 +617,7 @@ module aptos_framework::fungible_asset {
     ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint, transfer, burn) = init_test_metadata(&creator_ref);
-        (mint, transfer, burn, object::convert<TestToken, Metadata>(token_object))
+        (mint, transfer, burn, object::convert(token_object))
     }
 
     #[test_only]

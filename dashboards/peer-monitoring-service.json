@@ -89,7 +89,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "rate(peer_monitoring_client_sent_requests{chain_name=~\"$chain_name\",  kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_types}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network}}-{{request_types}}",
           "range": true,
           "refId": "A"
         }
@@ -144,7 +144,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "rate(peer_monitoring_client_success_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network}}-{{response_type}}",
           "range": true,
           "refId": "A"
         }
@@ -254,7 +254,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "rate(peer_monitoring_client_error_responses{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{response_type}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network}}-{{response_type}}",
           "range": true,
           "refId": "A"
         }
@@ -377,7 +377,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
           "expr": "peer_monitoring_client_request_latencies_sum{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}/peer_monitoring_client_request_latencies_count{chain_name=~\"$chain_name\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}",
-          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{request_type}}",
+          "legendFormat": "{{kubernetes_pod_name}}-{{role}}-{{network}}-{{request_type}}",
           "range": true,
           "refId": "A"
         }
@@ -856,6 +856,6 @@
   "timezone": "",
   "title": "peer-monitoring-service",
   "uid": "peer_monitoring_service",
-  "version": 2,
+  "version": 4,
   "weekStart": ""
 }

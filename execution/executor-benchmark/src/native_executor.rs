@@ -439,4 +439,17 @@ impl TransactionBlockExecutor<BenchmarkTransaction> for NativeExecutor {
             state_cache: state_view.into_state_cache(),
         })
     }
+
+    // Dummy function that is not supposed to be used
+    fn execute_transaction_block_with_gas_limit(
+        _transactions: Vec<BenchmarkTransaction>,
+        state_view: CachedStateView,
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<ChunkOutput> {
+        Ok(ChunkOutput {
+            transactions: vec![],
+            transaction_outputs: vec![],
+            state_cache: state_view.into_state_cache(),
+        })
+    }
 }

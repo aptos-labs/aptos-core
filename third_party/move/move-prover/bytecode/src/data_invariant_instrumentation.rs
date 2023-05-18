@@ -172,7 +172,7 @@ impl<'a> Instrumenter<'a> {
                 let struct_env = env.get_module(*mid).into_struct(*sid);
                 if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
                     let decl = env
-                        .intrinsics
+                        .get_intrinsics()
                         .get_decl_for_struct(&mid.qualified(*sid))
                         .expect("intrinsic declaration");
                     let spec_fun_get = decl

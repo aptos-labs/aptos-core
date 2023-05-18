@@ -28,7 +28,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-fast-mainnet-main
-      BRANCH: main
+      GIT_REF: main
       NETWORK: mainnet
       BOOTSTRAPPING_MODE: DownloadLatestStates
       CONTINUOUS_SYNCING_MODE: ExecuteTransactions

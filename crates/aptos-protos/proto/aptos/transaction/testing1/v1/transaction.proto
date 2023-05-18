@@ -22,7 +22,7 @@ message Block {
   aptos.util.timestamp.Timestamp timestamp = 1;
 
   // Height represents the block number and ultimately, is the count of `BlockMetadataTransaction` that happened on the chain.
-  uint64 height = 2;
+  uint64 height = 2 [jstype = JS_STRING];
 
   // Transactions holds all transactions that happened in the Block, which is transactions that happened starting with (and including)
   // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`.
@@ -39,10 +39,10 @@ message Block {
 // - Genesis Transaction: the first transaction of the chain, with all core contract and validator information baked in
 message Transaction {
   aptos.util.timestamp.Timestamp timestamp = 1;
-  uint64 version = 2;
+  uint64 version = 2 [jstype = JS_STRING];
   TransactionInfo info = 3;
-  uint64 epoch = 4;
-  uint64 block_height = 5;
+  uint64 epoch = 4 [jstype = JS_STRING];
+  uint64 block_height = 5 [jstype = JS_STRING];
 
   enum TransactionType {
     TRANSACTION_TYPE_UNSPECIFIED = 0;
@@ -64,7 +64,7 @@ message Transaction {
 
 message BlockMetadataTransaction {
   string id = 1;
-  uint64 round = 2;
+  uint64 round = 2 [jstype = JS_STRING];
   repeated Event events = 3;
   bytes previous_block_votes_bitvec = 4;
   string proposer = 5;
@@ -86,7 +86,7 @@ message UserTransaction {
 
 message Event {
   EventKey key = 1;
-  uint64 sequence_number = 2;
+  uint64 sequence_number = 2 [jstype = JS_STRING];
   MoveType type = 3;
   string type_str = 5;
   string data = 4;
@@ -97,7 +97,7 @@ message TransactionInfo {
   bytes state_change_hash = 2;
   bytes event_root_hash = 3;
   optional bytes state_checkpoint_hash = 4;
-  uint64 gas_used = 5;
+  uint64 gas_used = 5 [jstype = JS_STRING];
   bool success = 6;
   string vm_status = 7;
   bytes accumulator_root_hash = 8;
@@ -105,15 +105,15 @@ message TransactionInfo {
 }
 
 message EventKey {
-  uint64 creation_number = 1;
+  uint64 creation_number = 1 [jstype = JS_STRING];
   string account_address = 2;
 }
 
 message UserTransactionRequest {
   string sender = 1;
-  uint64 sequence_number = 2;
-  uint64 max_gas_amount = 3;
-  uint64 gas_unit_price = 4;
+  uint64 sequence_number = 2 [jstype = JS_STRING];
+  uint64 max_gas_amount = 3 [jstype = JS_STRING];
+  uint64 gas_unit_price = 4 [jstype = JS_STRING];
   aptos.util.timestamp.Timestamp expiration_timestamp_secs = 5;
   TransactionPayload payload = 6;
   Signature signature = 7;

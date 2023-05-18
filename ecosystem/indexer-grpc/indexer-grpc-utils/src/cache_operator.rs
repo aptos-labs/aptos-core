@@ -127,7 +127,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             .await
             .expect("Redis latest_version check failed.");
         if version_inserted {
-            aptos_logger::info!(
+            tracing::info!(
                 initialized_latest_version = CACHE_DEFAULT_LATEST_VERSION_NUMBER,
                 "Cache latest version is initialized."
             );
@@ -228,7 +228,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         version: u64,
     ) -> anyhow::Result<()> {
         let script = redis::Script::new(CACHE_SCRIPT_UPDATE_LATEST_VERSION);
-        aptos_logger::info!(
+        tracing::info!(
             num_of_versions = num_of_versions,
             version = version,
             "Updating latest version in cache."
@@ -242,7 +242,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
             .expect("Redis latest version update failed.")
         {
             2 => {
-                aptos_logger::error!(version=version, "Redis latest version update failed. The version is beyond the next expected version.");
+                tracing::error!(version=version, "Redis latest version update failed. The version is beyond the next expected version.");
                 panic!("version is not right.");
             },
             _ => Ok(()),

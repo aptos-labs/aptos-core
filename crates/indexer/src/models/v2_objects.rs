@@ -9,7 +9,6 @@ use super::token_models::v2_token_utils::ObjectCore;
 use crate::{
     models::move_resources::MoveResource,
     schema::{current_objects, objects},
-    util::standardize_address,
 };
 use aptos_api_types::{DeleteResource, Transaction, WriteResource, WriteSetChange};
 use bigdecimal::BigDecimal;
@@ -96,7 +95,7 @@ impl Object {
                     transaction_version: txn_version,
                     write_set_change_index,
                     object_address: resource.address.clone(),
-                    owner_address: Some(standardize_address(inner.owner.as_str())),
+                    owner_address: Some(inner.get_owner_address()),
                     state_key_hash: resource.state_key_hash.clone(),
                     guid_creation_num: Some(inner.guid_creation_num.clone()),
                     allow_ungated_transfer: Some(inner.allow_ungated_transfer),
@@ -104,7 +103,7 @@ impl Object {
                 },
                 CurrentObject {
                     object_address: resource.address,
-                    owner_address: Some(standardize_address(inner.owner.as_str())),
+                    owner_address: Some(inner.get_owner_address()),
                     state_key_hash: resource.state_key_hash,
                     allow_ungated_transfer: Some(inner.allow_ungated_transfer),
                     last_guid_creation_num: Some(inner.guid_creation_num),

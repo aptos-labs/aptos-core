@@ -1,45 +1,39 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Result;
 use aptos_indexer_grpc_file_store::processor::Processor;
-use aptos_indexer_grpc_utils::register_probes_and_metrics_handler;
+use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
+use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use clap::Parser;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use serde::{Deserialize, Serialize};
 
-#[derive(Parser)]
-pub struct Args {
-    #[clap(short, long)]
-    pub config_path: String,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexerGrpcFileStoreWorkerConfig {
+    pub server_name: String,
+    pub file_store_config: IndexerGrpcFileStoreConfig,
+    pub redis_main_instance_address: String,
 }
 
-fn main() {
-    aptos_logger::Logger::new().init();
-    aptos_crash_handler::setup_panic_handler();
-    // Load config.
-    let args = Args::parse();
-    let config = aptos_indexer_grpc_utils::config::IndexerGrpcConfig::load(
-        std::path::PathBuf::from(args.config_path),
-    )
-    .unwrap();
-
-    let runtime = aptos_runtimes::spawn_named_runtime("indexerfile".to_string(), None);
-
-    let health_port = config.health_check_port;
-    runtime.spawn(async move {
-        let mut processor = Processor::new(config);
+#[async_trait::async_trait]
+impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
+    async fn run(&self) -> Result<()> {
+        let mut processor = Processor::new(
+            self.redis_main_instance_address.clone(),
+            self.file_store_config.clone(),
+        );
         processor.run().await;
-    });
-
-    // Start liveness and readiness probes.
-    runtime.spawn(async move {
-        register_probes_and_metrics_handler(health_port).await;
-    });
-
-    let term = Arc::new(AtomicBool::new(false));
-    while !term.load(Ordering::Acquire) {
-        std::thread::park();
+        Ok(())
     }
+
+    fn get_server_name(&self) -> String {
+        self.server_name.clone()
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = ServerArgs::parse();
+    args.run::<IndexerGrpcFileStoreWorkerConfig>().await
 }

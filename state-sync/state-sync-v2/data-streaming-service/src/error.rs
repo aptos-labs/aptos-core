@@ -39,8 +39,8 @@ impl Error {
     }
 }
 
-impl From<aptos_data_client::Error> for Error {
-    fn from(error: aptos_data_client::Error) -> Self {
+impl From<aptos_data_client::error::Error> for Error {
+    fn from(error: aptos_data_client::error::Error) -> Self {
         Error::AptosDataClientError(error.to_string())
     }
 }

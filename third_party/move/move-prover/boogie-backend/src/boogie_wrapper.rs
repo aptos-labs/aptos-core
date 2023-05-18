@@ -334,7 +334,7 @@ impl<'env> BoogieWrapper<'env> {
                             };
                             let ty = fun_target.get_return_type(*idx);
                             let pretty =
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty);
                             display.extend(self.make_trace_entry(var_name, pretty));
                         }
                     },
@@ -1506,7 +1506,7 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
-        let entries = if struct_env.is_native_or_intrinsic() {
+        let entries = if struct_env.is_intrinsic() {
             let mut rep = self.extract_literal()?.to_string();
             if rep.starts_with("T@") {
                 if let Some(i) = rep.rfind('!') {

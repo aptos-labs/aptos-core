@@ -13,6 +13,7 @@ use crate::{
     delta_state_view::DeltaStateView,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
+    sharded_block_executor::ShardedBlockExecutor,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -69,7 +70,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    cmp::min,
+    cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     convert::{AsMut, AsRef},
     marker::Sync,
@@ -80,6 +81,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
@@ -141,6 +143,19 @@ impl AptosVM {
     pub fn get_concurrency_level() -> usize {
         match EXECUTION_CONCURRENCY_LEVEL.get() {
             Some(concurrency_level) => *concurrency_level,
+            None => 1,
+        }
+    }
+
+    pub fn set_num_shards_once(mut num_shards: usize) {
+        num_shards = max(num_shards, 1);
+        // Only the first call succeeds, due to OnceCell semantics.
+        NUM_EXECUTION_SHARD.set(num_shards).ok();
+    }
+
+    pub fn get_num_shards() -> usize {
+        match NUM_EXECUTION_SHARD.get() {
+            Some(num_shards) => *num_shards,
             None => 1,
         }
     }
@@ -243,7 +258,9 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, TransactionOutputExt) {
-        let mut session = self.0.new_session(resolver, SessionId::txn_meta(txn_data));
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::txn_meta(txn_data), true);
 
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
@@ -321,7 +338,9 @@ impl AptosVM {
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
         let resolver = delta_state_view.as_move_resolver();
 
-        let mut session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
+        let mut session = self
+            .0
+            .new_session(&resolver, SessionId::txn_meta(txn_data), true);
 
         self.0
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
@@ -669,7 +688,9 @@ impl AptosVM {
             .try_into_write_set(resolver)?;
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
         let resolver = delta_state_view.as_move_resolver();
-        let mut cleanup_session = self.0.new_session(&resolver, SessionId::txn_meta(txn_data));
+        let mut cleanup_session =
+            self.0
+                .new_session(&resolver, SessionId::txn_meta(txn_data), true);
         cleanup_session.execute_function_bypass_visibility(
             &MULTISIG_ACCOUNT_MODULE,
             SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
@@ -699,7 +720,9 @@ impl AptosVM {
     ) -> Result<ChangeSetExt, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
-        let mut cleanup_session = self.0.new_session(resolver, SessionId::txn_meta(txn_data));
+        let mut cleanup_session = self
+            .0
+            .new_session(resolver, SessionId::txn_meta(txn_data), true);
         let execution_error = ExecutionError::try_from(execution_error)
             .map_err(|_| VMStatus::Error(StatusCode::UNREACHABLE, None))?;
         // Serialization is not expected to fail so we're using invariant_violation error here.
@@ -1017,7 +1040,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, TransactionOutputExt) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::txn(txn));
+        let mut session = self.0.new_session(resolver, SessionId::txn(txn), true);
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1034,7 +1057,7 @@ impl AptosVM {
             // have been previously cached in the prologue.
             //
             // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
-            session = self.0.new_session(resolver, SessionId::txn(txn));
+            session = self.0.new_session(resolver, SessionId::txn(txn), true);
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
@@ -1185,7 +1208,7 @@ impl AptosVM {
                 Arc::new(change_set_configs),
             )),
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.0.new_session(resolver, session_id);
+                let mut tmp_session = self.0.new_session(resolver, session_id, true);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1300,9 +1323,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self
-            .0
-            .new_session(resolver, SessionId::block_meta(&block_metadata));
+        let mut session =
+            self.0
+                .new_session(resolver, SessionId::block_meta(&block_metadata), true);
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
@@ -1455,6 +1478,39 @@ impl VMExecutor for AptosVM {
                 None,
             ))
         });
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret = BlockAptosVM::execute_block(
+            Arc::clone(&RAYON_EXEC_POOL),
+            transactions,
+            state_view,
+            Self::get_concurrency_level(),
+            None,
+        );
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
+    }
+
+    fn execute_block_with_gas_limit(
+        transactions: Vec<Transaction>,
+        state_view: &(impl StateView + Sync),
+        maybe_gas_limit: Option<u64>,
+    ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
+        fail_point!("move_adapter::execute_block", |_| {
+            Err(VMStatus::Error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
@@ -1469,6 +1525,32 @@ impl VMExecutor for AptosVM {
             transactions,
             state_view,
             Self::get_concurrency_level(),
+            maybe_gas_limit,
+        );
+        if ret.is_ok() {
+            // Record the histogram count for transactions per block.
+            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+        }
+        ret
+    }
+
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
+        sharded_block_executor: &ShardedBlockExecutor<S>,
+        transactions: Vec<Transaction>,
+        state_view: Arc<S>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        info!(
+            log_context,
+            "Executing block, transaction count: {}",
+            transactions.len()
+        );
+
+        let count = transactions.len();
+        let ret = sharded_block_executor.execute_block(
+            state_view,
+            transactions,
+            AptosVM::get_concurrency_level(),
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
@@ -1541,7 +1623,7 @@ impl VMAdapter for AptosVM {
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id)
+        self.0.new_session(resolver, session_id, true)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {

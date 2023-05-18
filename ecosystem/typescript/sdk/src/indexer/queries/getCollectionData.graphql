@@ -1,0 +1,11 @@
+query getCollectionData($where_condition: current_collections_v2_bool_exp!, $offset: Int, $limit: Int) {
+  current_collections_v2(where: $where_condition, offset: $offset, limit: $limit) {
+    collection_id
+    token_standard
+    collection_name
+    creator_address
+    current_supply
+    description
+    uri
+  }
+}
