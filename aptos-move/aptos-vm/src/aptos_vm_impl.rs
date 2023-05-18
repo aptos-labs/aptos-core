@@ -524,7 +524,6 @@ impl AptosVMImpl {
         });
 
         let transaction_validation = self.transaction_validation();
-        let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
         session
@@ -535,7 +534,7 @@ impl AptosVMImpl {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(0),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),
@@ -557,7 +556,6 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
-        let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();
         let txn_max_gas_units = txn_data.max_gas_amount();
         session
@@ -568,7 +566,7 @@ impl AptosVMImpl {
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
-                    MoveValue::U64(txn_sequence_number),
+                    MoveValue::U64(0),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(gas_remaining.into()),

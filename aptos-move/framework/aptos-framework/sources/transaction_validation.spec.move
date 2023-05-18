@@ -132,7 +132,7 @@ spec aptos_framework::transaction_validation {
     /// Skip transaction_fee::burn_fee verification.
     spec epilogue(
         account: signer,
-        _txn_sequence_number: u64,
+        storage_fee_octa: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64
@@ -146,16 +146,21 @@ spec aptos_framework::transaction_validation {
         use aptos_framework::optional_aggregator;
         use aptos_framework::transaction_fee::{AptosCoinCapabilities, CollectedFeesPerBlock};
 
-        aborts_if !(txn_max_gas_units >= gas_units_remaining);
-        let gas_used = txn_max_gas_units - gas_units_remaining;
+        let max_gas_octa = txn_gas_price * txn_max_gas_units;
+        aborts_if !(max_gas_octa <= MAX_U64);
+        let gas_remaining_octa = txn_gas_price * gas_units_remaining;
+        aborts_if !(max_gas_octa >=  gas_remaining_octa);
+        let total_charge_octa = max_gas_octa - gas_remaining_octa;
+        aborts_if !(total_charge_octa >= storage_fee_octa);
+        let execution_gas = total_charge_octa - storage_fee_octa;
 
-        aborts_if !(txn_gas_price * gas_used <= MAX_U64);
-        let transaction_fee_amount = txn_gas_price * gas_used;
+        // TODO: deposit storage fee to the storage fund
+        aborts_if !(storage_fee_octa == 0);
 
         let addr = signer::address_of(account);
         aborts_if !exists<CoinStore<AptosCoin>>(addr);
         // Sufficiency of funds
-        aborts_if !(global<CoinStore<AptosCoin>>(addr).coin.value >= transaction_fee_amount);
+        aborts_if !(global<CoinStore<AptosCoin>>(addr).coin.value >= total_charge_octa);
 
         aborts_if !exists<Account>(addr);
         aborts_if !(global<Account>(addr).sequence_number < MAX_U64);
@@ -164,7 +169,7 @@ spec aptos_framework::transaction_validation {
         let post balance = global<coin::CoinStore<AptosCoin>>(addr).coin.value;
         let pre_account = global<account::Account>(addr);
         let post account = global<account::Account>(addr);
-        ensures balance == pre_balance - transaction_fee_amount;
+        ensures balance == pre_balance - execution_gas;
         ensures account.sequence_number == pre_account.sequence_number + 1;
 
 
@@ -182,19 +187,19 @@ spec aptos_framework::transaction_validation {
         // N.B.: Why can't `features::is_enabled`
         aborts_if if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES)) {
             !exists<CollectedFeesPerBlock>(@aptos_framework)
-                || transaction_fee_amount > 0 &&
+                || execution_gas > 0 &&
                     ( // `exists<CoinStore<AptosCoin>>(addr)` checked above.
                       // Sufficiency of funds is checked above.
-                      aggr_val + transaction_fee_amount > aggr_lim
-                        || aggr_val + transaction_fee_amount > MAX_U128)
+                      aggr_val + execution_gas > aggr_lim
+                        || aggr_val + execution_gas > MAX_U128)
         } else {
             // Existence of CoinStore in `addr` is checked above.
             // Sufficiency of funds is checked above.
             !exists<AptosCoinCapabilities>(@aptos_framework) ||
             // Existence of APT's CoinInfo
-            transaction_fee_amount > 0 && !exists<CoinInfo<AptosCoin>>(aptos_addr) ||
+            execution_gas > 0 && !exists<CoinInfo<AptosCoin>>(aptos_addr) ||
             // Sufficiency of APT's supply
-            option::spec_is_some(maybe_apt_supply) && apt_supply_value < transaction_fee_amount
+            option::spec_is_some(maybe_apt_supply) && apt_supply_value < execution_gas
         };
     }
 }

@@ -203,6 +203,15 @@ important to the semantics of the system.
 
 
 
+<a name="0x1_transaction_validation_PROLOGUE_STORAGE_FUND_NOT_ENABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_STORAGE_FUND_NOT_ENABLED">PROLOGUE_STORAGE_FUND_NOT_ENABLED</a>: u64 = 1010;
+</code></pre>
+
+
+
 <a name="0x1_transaction_validation_initialize"></a>
 
 ## Function `initialize`
@@ -448,7 +457,7 @@ Epilogue function is run after a transaction is successfully executed.
 Called by the Adapter
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _txn_sequence_number: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_octa: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
 </code></pre>
 
 
@@ -459,36 +468,40 @@ Called by the Adapter
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    _txn_sequence_number: u64,
+    storage_fee_octa: u64,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
     gas_units_remaining: u64
 ) {
-    <b>assert</b>!(txn_max_gas_units &gt;= gas_units_remaining, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
-    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+    <b>let</b> max_gas_octa = (txn_gas_price <b>as</b> u128) * (txn_max_gas_units <b>as</b> u128);
+    <b>assert</b>!(max_gas_octa &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> gas_remaining_octa = (txn_gas_price <b>as</b> u128) * (gas_units_remaining <b>as</b> u128);
+    <b>assert</b>!(max_gas_octa &gt;= gas_remaining_octa, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> total_charge_octa = ((max_gas_octa - gas_remaining_octa) <b>as</b> u64);
+    <b>assert</b>!(total_charge_octa &gt;= storage_fee_octa, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>));
+    <b>let</b> execution_gas = total_charge_octa - storage_fee_octa;
 
-    <b>assert</b>!(
-        (txn_gas_price <b>as</b> u128) * (gas_used <b>as</b> u128) &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_EOUT_OF_GAS">EOUT_OF_GAS</a>)
-    );
-    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     // it's important <b>to</b> maintain the <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> <a href="code.md#0x1_code">code</a> consistent <b>with</b> vm
     // <b>to</b> do failed transaction cleanup.
     <b>assert</b>!(
-        <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(addr) &gt;= transaction_fee_amount,
+        <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(addr) &gt;= total_charge_octa,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
     );
+
+    // TODO: deposit storage fee <b>to</b> the storage fund
+    // transaction_fee::collect_storage_fee(addr, storage_fee_octa);
+    <b>assert</b>!(storage_fee_octa == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_STORAGE_FUND_NOT_ENABLED">PROLOGUE_STORAGE_FUND_NOT_ENABLED</a>));
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         // If transaction fees are redistributed <b>to</b> validators, collect them here for
         // later redistribution.
-        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(addr, transaction_fee_amount);
+        <a href="transaction_fee.md#0x1_transaction_fee_collect_fee">transaction_fee::collect_fee</a>(addr, execution_gas);
     } <b>else</b> {
         // Otherwise, just burn the fee.
         // TODO: this branch should be removed completely when transaction fee collection
         // is tested and is fully proven <b>to</b> work well.
-        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(addr, transaction_fee_amount);
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(addr, execution_gas);
     };
 
     // Increment sequence number
@@ -652,7 +665,7 @@ not equal the number of singers.
 ### Function `epilogue`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _txn_sequence_number: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_octa: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64)
 </code></pre>
 
 
@@ -661,20 +674,24 @@ Abort according to the conditions.
 Skip transaction_fee::burn_fee verification.
 
 
-<pre><code><b>aborts_if</b> !(txn_max_gas_units &gt;= gas_units_remaining);
-<b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
-<b>aborts_if</b> !(txn_gas_price * gas_used &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
-<b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+<pre><code><b>let</b> max_gas_octa = txn_gas_price * txn_max_gas_units;
+<b>aborts_if</b> !(max_gas_octa &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
+<b>let</b> gas_remaining_octa = txn_gas_price * gas_units_remaining;
+<b>aborts_if</b> !(max_gas_octa &gt;=  gas_remaining_octa);
+<b>let</b> total_charge_octa = max_gas_octa - gas_remaining_octa;
+<b>aborts_if</b> !(total_charge_octa &gt;= storage_fee_octa);
+<b>let</b> execution_gas = total_charge_octa - storage_fee_octa;
+<b>aborts_if</b> !(storage_fee_octa == 0);
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr);
-<b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr).<a href="coin.md#0x1_coin">coin</a>.value &gt;= transaction_fee_amount);
+<b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr).<a href="coin.md#0x1_coin">coin</a>.value &gt;= total_charge_octa);
 <b>aborts_if</b> !<b>exists</b>&lt;Account&gt;(addr);
 <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
 <b>let</b> pre_balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>let</b> <b>post</b> balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(addr).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>let</b> pre_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>let</b> <b>post</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-<b>ensures</b> balance == pre_balance - transaction_fee_amount;
+<b>ensures</b> balance == pre_balance - execution_gas;
 <b>ensures</b> <a href="account.md#0x1_account">account</a>.sequence_number == pre_account.sequence_number + 1;
 <b>let</b> collected_fees = <b>global</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;
 <b>let</b> aggr = collected_fees.value;
@@ -687,19 +704,19 @@ Skip transaction_fee::burn_fee verification.
 <b>let</b> apt_supply_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(apt_supply);
 <b>aborts_if</b> <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">features::COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)) {
     !<b>exists</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework)
-        || transaction_fee_amount &gt; 0 &&
+        || execution_gas &gt; 0 &&
             ( // `<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr)` checked above.
               // Sufficiency of funds is checked above.
-              aggr_val + transaction_fee_amount &gt; aggr_lim
-                || aggr_val + transaction_fee_amount &gt; MAX_U128)
+              aggr_val + execution_gas &gt; aggr_lim
+                || aggr_val + execution_gas &gt; MAX_U128)
 } <b>else</b> {
     // Existence of CoinStore in `addr` is checked above.
     // Sufficiency of funds is checked above.
     !<b>exists</b>&lt;AptosCoinCapabilities&gt;(@aptos_framework) ||
     // Existence of APT's CoinInfo
-    transaction_fee_amount &gt; 0 && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr) ||
+    execution_gas &gt; 0 && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr) ||
     // Sufficiency of APT's supply
-    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply) && apt_supply_value &lt; transaction_fee_amount
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply) && apt_supply_value &lt; execution_gas
 };
 </code></pre>
 

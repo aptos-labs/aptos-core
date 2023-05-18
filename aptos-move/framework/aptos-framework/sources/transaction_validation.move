@@ -42,6 +42,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
+    const PROLOGUE_STORAGE_FUND_NOT_ENABLED: u64 = 1010;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -184,36 +185,40 @@ module aptos_framework::transaction_validation {
     /// Called by the Adapter
     fun epilogue(
         account: signer,
-        _txn_sequence_number: u64,
+        storage_fee_octa: u64,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
-        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
-        let gas_used = txn_max_gas_units - gas_units_remaining;
+        let max_gas_octa = (txn_gas_price as u128) * (txn_max_gas_units as u128);
+        assert!(max_gas_octa <= MAX_U64, error::out_of_range(EOUT_OF_GAS));
+        let gas_remaining_octa = (txn_gas_price as u128) * (gas_units_remaining as u128);
+        assert!(max_gas_octa >= gas_remaining_octa, error::out_of_range(EOUT_OF_GAS));
+        let total_charge_octa = ((max_gas_octa - gas_remaining_octa) as u64);
+        assert!(total_charge_octa >= storage_fee_octa, error::out_of_range(EOUT_OF_GAS));
+        let execution_gas = total_charge_octa - storage_fee_octa;
 
-        assert!(
-            (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
-            error::out_of_range(EOUT_OF_GAS)
-        );
-        let transaction_fee_amount = txn_gas_price * gas_used;
         let addr = signer::address_of(&account);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         assert!(
-            coin::balance<AptosCoin>(addr) >= transaction_fee_amount,
+            coin::balance<AptosCoin>(addr) >= total_charge_octa,
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
+
+        // TODO: deposit storage fee to the storage fund
+        // transaction_fee::collect_storage_fee(addr, storage_fee_octa);
+        assert!(storage_fee_octa == 0, error::invalid_argument(PROLOGUE_STORAGE_FUND_NOT_ENABLED));
 
         if (features::collect_and_distribute_gas_fees()) {
             // If transaction fees are redistributed to validators, collect them here for
             // later redistribution.
-            transaction_fee::collect_fee(addr, transaction_fee_amount);
+            transaction_fee::collect_fee(addr, execution_gas);
         } else {
             // Otherwise, just burn the fee.
             // TODO: this branch should be removed completely when transaction fee collection
             // is tested and is fully proven to work well.
-            transaction_fee::burn_fee(addr, transaction_fee_amount);
+            transaction_fee::burn_fee(addr, execution_gas);
         };
 
         // Increment sequence number
