@@ -82,17 +82,14 @@ pub mod test_helper;
 
 use crate::metrics::{APTOS_JELLYFISH_LEAF_COUNT, APTOS_JELLYFISH_LEAF_DELETION_COUNT};
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_crypto::{
-    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey};
+use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::arbitrary::Arbitrary;
@@ -219,8 +216,6 @@ pub struct StaleNodeIndex {
 pub struct TreeUpdateBatch<K> {
     pub node_batch: Vec<Vec<(NodeKey, Node<K>)>>,
     pub stale_node_index_batch: Vec<Vec<StaleNodeIndex>>,
-    pub num_new_leaves: usize,
-    pub num_stale_leaves: usize,
 }
 
 impl<K> TreeUpdateBatch<K>
@@ -231,8 +226,6 @@ where
         Self {
             node_batch: vec![vec![]],
             stale_node_index_batch: vec![vec![]],
-            num_new_leaves: 0,
-            num_stale_leaves: 0,
         }
     }
 
@@ -240,14 +233,10 @@ where
         let Self {
             node_batch,
             stale_node_index_batch,
-            num_new_leaves,
-            num_stale_leaves,
         } = other;
 
         self.node_batch.extend(node_batch);
         self.stale_node_index_batch.extend(stale_node_index_batch);
-        self.num_new_leaves += num_new_leaves;
-        self.num_stale_leaves += num_stale_leaves;
     }
 
     #[cfg(test)]
@@ -255,30 +244,11 @@ where
         self.stale_node_index_batch.iter().map(Vec::len).sum()
     }
 
-    fn inc_num_new_leaves(&mut self) {
-        self.num_new_leaves += 1;
-    }
-
-    fn inc_num_stale_leaves(&mut self) {
-        self.num_stale_leaves += 1;
-    }
-
     pub fn put_node(&mut self, node_key: NodeKey, node: Node<K>) {
-        if node.is_leaf() {
-            self.inc_num_new_leaves();
-        }
         self.node_batch[0].push((node_key, node))
     }
 
-    pub fn put_stale_node(
-        &mut self,
-        node_key: NodeKey,
-        stale_since_version: Version,
-        node: &Node<K>,
-    ) {
-        if node.is_leaf() {
-            self.inc_num_stale_leaves();
-        }
+    pub fn put_stale_node(&mut self, node_key: NodeKey, stale_since_version: Version) {
         self.stale_node_index_batch[0].push(StaleNodeIndex {
             node_key,
             stale_since_version,
@@ -392,55 +362,100 @@ where
     /// the returned batch, the state `S_{i+1}` is ready to be read from the tree by calling
     /// [`get_with_proof`](struct.JellyfishMerkleTree.html#method.get_with_proof). Anything inside
     /// the batch is not reachable from public interfaces before being committed.
-    pub fn batch_put_value_set(
+    ///
+    /// Assumes 16 shards in total here.
+    pub fn batch_put_value_set_for_shard(
         &self,
+        shard_id: u8,
         value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
-    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
+    ) -> Result<(Node<K>, TreeUpdateBatch<K>)> {
         let deduped_and_sorted_kvs = value_set
             .into_iter()
+            .map(|kv| {
+                assert!(kv.0.nibble(0) == shard_id);
+                kv
+            })
             .collect::<BTreeMap<_, _>>()
             .into_iter()
             .collect::<Vec<_>>();
 
-        let mut batch = TreeUpdateBatch::new();
-        let root_node_opt = if let Some(persisted_version) = persisted_version {
+        let shard_root_node_key = NodeKey::new(version, NibblePath::new_odd(vec![shard_id << 4]));
+
+        let mut shard_batch = TreeUpdateBatch::new();
+        let shard_root_node_opt = if let Some(persisted_version) = persisted_version {
             IO_POOL.install(|| {
                 self.batch_insert_at(
-                    &NodeKey::new_empty_path(persisted_version),
+                    &NodeKey::new(persisted_version, NibblePath::new_odd(vec![shard_id << 4])),
                     version,
                     deduped_and_sorted_kvs.as_slice(),
-                    0,
+                    /*depth=*/ 1,
                     &node_hashes,
-                    &mut batch,
+                    &mut shard_batch,
                 )
             })?
         } else {
             batch_update_subtree(
-                &NodeKey::new_empty_path(version),
+                &shard_root_node_key,
                 version,
                 deduped_and_sorted_kvs.as_slice(),
-                0,
+                /*depth=*/ 1,
                 &node_hashes,
-                &mut batch,
+                &mut shard_batch,
             )?
         };
 
-        let node_key = NodeKey::new_empty_path(version);
-        let root_hash = if let Some(root_node) = root_node_opt {
-            APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
-            let hash = root_node.hash();
-            batch.put_node(node_key, root_node);
-            hash
+        let shard_root_node = if let Some(shard_root_node) = shard_root_node_opt {
+            shard_batch.put_node(shard_root_node_key, shard_root_node.clone());
+            shard_root_node
         } else {
-            APTOS_JELLYFISH_LEAF_COUNT.set(0);
-            batch.put_node(node_key, Node::Null);
-            *SPARSE_MERKLE_PLACEHOLDER_HASH
+            Node::Null
         };
 
-        Ok((root_hash, batch))
+        Ok((shard_root_node, shard_batch))
+    }
+
+    /// Assumes 16 shards here, top levels only contain root node.
+    pub fn put_top_levels_nodes(
+        &self,
+        shard_root_nodes: Vec<Node<K>>,
+        persisted_version: Option<Version>,
+        version: Version,
+    ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
+        ensure!(shard_root_nodes.len() == 16);
+
+        let children: Children = shard_root_nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, shard_root_node)| {
+                let node_type = shard_root_node.node_type();
+                match node_type {
+                    NodeType::Null => None,
+                    _ => Some((
+                        Nibble::from(i as u8),
+                        Child::new(shard_root_node.hash(), version, node_type),
+                    )),
+                }
+            })
+            .collect();
+        let root_node = if children.is_empty() {
+            Node::Null
+        } else {
+            Node::Internal(InternalNode::new(children))
+        };
+        APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
+
+        let root_hash = root_node.hash();
+
+        let mut tree_update_batch = TreeUpdateBatch::new();
+        if let Some(persisted_version) = persisted_version {
+            tree_update_batch.put_stale_node(NodeKey::new_empty_path(persisted_version), version);
+        }
+        tree_update_batch.put_node(NodeKey::new_empty_path(version), root_node);
+
+        Ok((root_hash, tree_update_batch))
     }
 
     fn batch_insert_at(
@@ -453,7 +468,7 @@ where
         batch: &mut TreeUpdateBatch<K>,
     ) -> Result<Option<Node<K>>> {
         let node = self.reader.get_node_with_tag(node_key, "commit")?;
-        batch.put_stale_node(node_key.clone(), version, &node);
+        batch.put_stale_node(node_key.clone(), version);
 
         match node {
             Node::Internal(internal_node) => {
@@ -537,7 +552,7 @@ where
                             let old_child_node = self
                                 .reader
                                 .get_node_with_tag(&old_child_node_key, "commit")?;
-                            batch.put_stale_node(old_child_node_key, version, &old_child_node);
+                            batch.put_stale_node(old_child_node_key, version);
                             return Ok(Some(old_child_node));
                         }
                     }
@@ -606,9 +621,7 @@ where
         Ok((child_index, new_child_node_option))
     }
 
-    /// This is a convenient function that calls
-    ///
-    /// [`put_value_sets`](struct.JellyfishMerkleTree.html#method.put_value_set) without the node hash
+    /// This is a convenient function for test only, without providing the node hash
     /// cache and assuming the base version is the immediate previous version.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set_test(
@@ -616,12 +629,31 @@ where
         value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<K>)> {
-        self.batch_put_value_set(
-            value_set.into_iter().map(|(k, v)| (k, v)).collect(),
-            None,
-            version.checked_sub(1),
-            version,
-        )
+        let mut tree_update_batch = TreeUpdateBatch::new();
+        let mut shard_root_nodes = Vec::with_capacity(16);
+        for shard_id in 0..16 {
+            let value_set_for_shard = value_set
+                .iter()
+                .filter(|(k, _v)| k.nibble(0) == shard_id)
+                .cloned()
+                .collect();
+            let (shard_root_node, shard_batch) = self.batch_put_value_set_for_shard(
+                shard_id,
+                value_set_for_shard,
+                None,
+                version.checked_sub(1),
+                version,
+            )?;
+
+            tree_update_batch.combine(shard_batch);
+            shard_root_nodes.push(shard_root_node);
+        }
+
+        let (root_hash, top_levels_batch) =
+            self.put_top_levels_nodes(shard_root_nodes, version.checked_sub(1), version)?;
+        tree_update_batch.combine(top_levels_batch);
+
+        Ok((root_hash, tree_update_batch))
     }
 
     /// Returns the value (if applicable) and the corresponding merkle proof.
@@ -962,13 +994,11 @@ trait NibbleExt {
 impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
-        Nibble::from(
-            if index % 2 == 0 {
-                self[index / 2] >> 4
-            } else {
-                self[index / 2] & 0x0F
-            },
-        )
+        Nibble::from(if index % 2 == 0 {
+            self[index / 2] >> 4
+        } else {
+            self[index / 2] & 0x0F
+        })
     }
 
     /// Returns the length of common prefix of `self` and `other` in nibbles.
