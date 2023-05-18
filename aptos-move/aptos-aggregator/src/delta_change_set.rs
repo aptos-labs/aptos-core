@@ -295,21 +295,8 @@ impl DeltaChangeSet {
         }
     }
 
-    pub fn contains_key(&self, key: &StateKey) -> bool {
-        self.delta_change_set.contains_key(key)
-    }
-
-    pub fn get_write_op(
-        &self,
-        state_view: &impl StateView,
-        key: &StateKey,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
-        let write_op = self
-            .delta_change_set
-            .get(key)
-            .expect("Unable to find the key in delta_change_set")
-            .try_into_write_op(state_view, key)?;
-        Ok(write_op)
+    pub fn get(&self, key: &StateKey) -> Option<&DeltaOp> {
+        self.delta_change_set.get(key)
     }
 
     pub fn insert(&mut self, delta: (StateKey, DeltaOp)) {

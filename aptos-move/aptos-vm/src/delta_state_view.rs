@@ -33,16 +33,14 @@ where
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        if self.change_set.delta_change_set().contains_key(state_key) {
-            return Ok(self
-                .change_set
-                .delta_change_set
-                .get_write_op(self.base, state_key)?
-                .as_state_value());
-        }
-        match self.change_set.write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base.get_state_value(state_key),
+        match self.change_set.delta_change_set().get(state_key) {
+            Some(delta_op) => Ok(delta_op
+                .try_into_write_op(self.base, state_key)?
+                .as_state_value()),
+            None => match self.change_set.write_set().get(state_key) {
+                Some(write_op) => Ok(write_op.as_state_value()),
+                None => self.base.get_state_value(state_key),
+            },
         }
     }
 
