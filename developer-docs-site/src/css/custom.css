@@ -366,6 +366,10 @@ b.navbar__title{
   color: black;
 }
 
+html[data-theme='dark'] .list-group-item small {
+  color: white;
+}
+
 .list-group-item-action {
   width: 100%;
   /* color: #495057; */
