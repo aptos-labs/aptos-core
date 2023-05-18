@@ -10,12 +10,9 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Version,
-};
+use aptos_types::{state_store::ShardedStateUpdates, transaction::Version};
+use itertools::zip_eq;
 use std::{
-    collections::HashMap,
     mem::swap,
     sync::{
         mpsc,
@@ -103,7 +100,12 @@ impl BufferedState {
             let take_out_to_commit = {
                 let state_until_checkpoint =
                     self.state_until_checkpoint.as_ref().expect("Must exist");
-                state_until_checkpoint.updates_since_base.len() >= self.target_items
+                state_until_checkpoint
+                    .updates_since_base
+                    .iter()
+                    .map(|shard| shard.len())
+                    .sum::<usize>()
+                    >= self.target_items
                     || state_until_checkpoint.current_version.map_or(0, |v| v + 1)
                         - state_until_checkpoint.base_version.map_or(0, |v| v + 1)
                         >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
@@ -140,9 +142,7 @@ impl BufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<
-            HashMap<StateKey, Option<StateValue>>,
-        >,
+        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
         mut new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
@@ -152,9 +152,13 @@ impl BufferedState {
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
-            self.state_after_checkpoint
-                .updates_since_base
-                .extend(updates_until_next_checkpoint_since_current);
+            zip_eq(
+                self.state_after_checkpoint.updates_since_base.iter_mut(),
+                updates_until_next_checkpoint_since_current.into_iter(),
+            )
+            .for_each(|(base, delta)| {
+                base.extend(delta);
+            });
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             swap(
