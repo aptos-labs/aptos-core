@@ -115,6 +115,9 @@ pub trait StateValueInterface {
         peer_network_id: &PeerNetworkId,
         error: Error,
     );
+
+    /// Updates the peer state metrics for the given peer
+    fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId);
 }
 
 /// A simple enum representing the different types of
