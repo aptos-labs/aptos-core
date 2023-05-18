@@ -8,8 +8,6 @@ import { AptosAccount } from "../../account/aptos_account";
 import { CoinClient } from "../../plugins/coin_client";
 import { HexString } from "../../utils";
 import { Module } from "../../aptos_types";
-import { AptosToken } from "../../plugins";
-import { Provider } from "../../providers";
 
 test(
   "transfer and checkBalance coin works",

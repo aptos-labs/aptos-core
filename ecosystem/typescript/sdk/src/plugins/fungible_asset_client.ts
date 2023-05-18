@@ -4,7 +4,7 @@ import { OptionalTransactionArgs, AptosClient, Provider } from "../providers";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { MaybeHexString, HexString } from "../utils";
 
-export class FungibleAsset {
+export class FungibleAssetClient {
   provider: Provider;
 
   /**
@@ -58,12 +58,13 @@ export class FungibleAsset {
    * @param assetType The fungible asset type
    * @returns Promise that resolves to the balance
    */
-  async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType: string): Promise<Gen.MoveValue[]> {
+  async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType: string): Promise<bigint> {
     const payload: Gen.ViewRequest = {
       function: "0x1::primary_fungible_store::balance",
       type_arguments: [assetType],
       arguments: [HexString.ensure(account).hex(), HexString.ensure(assetAddress).hex()],
     };
-    return this.provider.view(payload);
+    const response = await this.provider.view(payload);
+    return BigInt((response as any)[0]);
   }
 }

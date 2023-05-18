@@ -5,7 +5,7 @@ import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_a
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { MaybeHexString, APTOS_COIN, NetworkToIndexerAPI, NodeAPIToNetwork } from "../utils";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
-import { FungibleAsset } from "./fungible_asset_client";
+import { FungibleAssetClient } from "./fungible_asset_client";
 import { Provider } from "../providers";
 
 /**
@@ -69,7 +69,7 @@ export class CoinClient {
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
-      const fungibleAsset = new FungibleAsset(provider);
+      const fungibleAsset = new FungibleAssetClient(provider);
       if (to instanceof AptosAccount) {
         to = to.address();
       }
@@ -110,7 +110,7 @@ export class CoinClient {
       coinType?: string;
       assetAddress?: MaybeHexString;
     },
-  ): Promise<bigint | Gen.MoveValue[]> {
+  ): Promise<bigint> {
     if (extraArgs?.assetAddress) {
       // asking for a fungible asset object
       if (!extraArgs.coinType) {
@@ -121,7 +121,7 @@ export class CoinClient {
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
-      const fungibleAsset = new FungibleAsset(provider);
+      const fungibleAsset = new FungibleAssetClient(provider);
       if (account instanceof AptosAccount) {
         account = account.address();
       }
