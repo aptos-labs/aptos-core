@@ -143,14 +143,14 @@ async fn test_gas_estimation() {
     };
     println!("{:?}", estimation);
     // Note: it's quite hard to get deprioritized_gas_estimate higher in smoke tests
-    assert_eq!(txn_gas_price + 1, estimation.gas_estimate);
+    assert_eq!(next_bucket(txn_gas_price), estimation.gas_estimate);
     assert_eq!(
-        Some(next_bucket(txn_gas_price)),
+        Some(next_bucket(next_bucket(txn_gas_price))),
         estimation.prioritized_gas_estimate
     );
 
     // Empty blocks will reset the prices
-    std::thread::sleep(Duration::from_secs(20));
+    std::thread::sleep(Duration::from_secs(40));
     // Multiple times, to exercise cache
     for _i in 0..2 {
         let estimation = match client.estimate_gas_price().await {
