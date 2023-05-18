@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-import * as Gen from "../generated/index";
 import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
 import { MaybeHexString, APTOS_COIN, NetworkToIndexerAPI, NodeAPIToNetwork } from "../utils";
@@ -34,6 +33,12 @@ export class CoinClient {
    * this to true, the transaction will fail if the receiver account does not
    * exist on-chain.
    *
+   * Since version 1.9.1, TS SDK supports fungible assets operations. For CoinClient
+   * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
+   * object where you can set the fungible asset address you wish to transfer. This option
+   * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
+   * to use a different type, set the `coinType` to be the fungible asset type.
+   *
    * @param from Account sending the coins
    * @param to Account to receive the coins
    * @param amount Number of coins to transfer
@@ -56,15 +61,12 @@ export class CoinClient {
       // If this is the first time an account has received the specified coinType,
       // and this is set to false, the transaction would fail.
       createReceiverIfMissing?: boolean;
+      // fungible asset address if you wish to transfer a fungible asset
       assetAddress?: MaybeHexString;
     },
   ): Promise<string> {
     if (extraArgs?.assetAddress) {
-      // asking for a fungible asset object
-      if (!extraArgs.coinType) {
-        throw Error("Need to provide an asset type");
-      }
-      console.warn("to transfer a fungible asset, use `FungibleAsset()` class for a better support");
+      console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for a better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
@@ -98,6 +100,12 @@ export class CoinClient {
    * Get the balance of the account. By default it checks the balance of
    * 0x1::aptos_coin::AptosCoin, but you can specify a different coin type.
    *
+   * Since version 1.9.1, TS SDK supports fungible assets operations. For CoinClient
+   * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
+   * object where you can set the fungible asset address you wish to transfer. This option
+   * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
+   * to use a different type, set the `coinType` to be the fungible asset type.
+   *
    * @param account Account that you want to get the balance of.
    * @param extraArgs Extra args for checking the balance.
    * @returns Promise that resolves to the balance as a bigint.
@@ -108,15 +116,12 @@ export class CoinClient {
     extraArgs?: {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
+      // fungible asset address if you wish to transfer a fungible asset
       assetAddress?: MaybeHexString;
     },
   ): Promise<bigint> {
     if (extraArgs?.assetAddress) {
-      // asking for a fungible asset object
-      if (!extraArgs.coinType) {
-        throw Error("Need to provide an asset type");
-      }
-      console.warn("to check balance for a fungible asset, use `FungibleAsset()` class for a better support");
+      console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for a better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,

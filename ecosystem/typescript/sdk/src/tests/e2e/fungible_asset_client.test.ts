@@ -31,9 +31,6 @@ describe("fungible asset", () => {
     await faucetClient.fundAccount(alice.address(), 100_000_000);
     await faucetClient.fundAccount(bob.address(), 100_000_000);
 
-    console.log("publisher", publisher.address());
-    console.log("alice", alice.address());
-    console.log("bob", bob.address());
     // Publish contract
     const txnHash = await provider.publishPackage(
       publisher,
@@ -77,30 +74,24 @@ describe("fungible asset", () => {
    * Test `transferAmount` and `balance` functions in FungibleAssetClient class
    */
   test(
-    "it trasfers amount of fungible asset and get the correct balance",
+    "it trasfers amount of fungible asset and gets the correct balance",
     async () => {
       const fungibleAsset = new FungibleAssetClient(provider);
 
       // Alice has 5 amounts of the fungible asset
-      const aliceInitialBalance = await fungibleAsset.balance(alice.address(), assetAddress, `0x1::object::ObjectCore`);
+      const aliceInitialBalance = await fungibleAsset.balance(alice.address(), assetAddress);
       expect(aliceInitialBalance).toEqual(BigInt(5));
 
       // Alice transfers 2 amounts of the fungible asset to Bob
-      const transactionHash = await fungibleAsset.transferAmount(
-        alice,
-        assetAddress,
-        bob.address(),
-        2,
-        `0x1::object::ObjectCore`,
-      );
+      const transactionHash = await fungibleAsset.transferAmount(alice, assetAddress, bob.address(), 2);
       await provider.waitForTransaction(transactionHash);
 
       // Alice has 3 amounts of the fungible asset
-      const aliceCurrentBalance = await fungibleAsset.balance(alice.address(), assetAddress, `0x1::object::ObjectCore`);
+      const aliceCurrentBalance = await fungibleAsset.balance(alice.address(), assetAddress);
       expect(aliceCurrentBalance).toEqual(BigInt(3));
 
       // Bob has 2 amounts of the fungible asset
-      const bobBalance = await fungibleAsset.balance(bob.address(), assetAddress, `0x1::object::ObjectCore`);
+      const bobBalance = await fungibleAsset.balance(bob.address(), assetAddress);
       expect(bobBalance).toEqual(BigInt(2));
     },
     longTestTimeout,

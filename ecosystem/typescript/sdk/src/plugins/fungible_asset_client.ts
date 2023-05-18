@@ -6,6 +6,7 @@ import { MaybeHexString, HexString } from "../utils";
 
 export class FungibleAssetClient {
   provider: Provider;
+  readonly assetType: string = "0x1::fungible_asset::Metadata";
 
   /**
    * Creates new FungibleAsset instance
@@ -33,7 +34,7 @@ export class FungibleAssetClient {
     assetAddress: MaybeHexString,
     recipient: MaybeHexString,
     amount: number | bigint,
-    assetType: string,
+    assetType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
@@ -42,7 +43,7 @@ export class FungibleAssetClient {
     });
     const rawTxn = await builder.build(
       "0x1::primary_fungible_store::transfer",
-      [assetType],
+      [assetType || this.assetType],
       [HexString.ensure(assetAddress).hex(), HexString.ensure(recipient).hex(), amount],
     );
     const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTxn);
@@ -58,10 +59,10 @@ export class FungibleAssetClient {
    * @param assetType The fungible asset type
    * @returns Promise that resolves to the balance
    */
-  async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType: string): Promise<bigint> {
+  async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType?: string): Promise<bigint> {
     const payload: Gen.ViewRequest = {
       function: "0x1::primary_fungible_store::balance",
-      type_arguments: [assetType],
+      type_arguments: [assetType || this.assetType],
       arguments: [HexString.ensure(account).hex(), HexString.ensure(assetAddress).hex()],
     };
     const response = await this.provider.view(payload);
