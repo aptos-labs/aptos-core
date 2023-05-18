@@ -12,7 +12,7 @@
 /// 4. The fungible asset metadata object calls `deposit` on the recipient's primary store to deposit `amount` of
 /// fungible asset to it. This emits an deposit event.
 module aptos_framework::primary_fungible_store {
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::option::Option;
@@ -72,6 +72,7 @@ module aptos_framework::primary_fungible_store {
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
         let metadata_addr = object::object_address(&metadata);
+        object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
         let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
 
