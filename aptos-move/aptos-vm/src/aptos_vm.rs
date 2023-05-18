@@ -321,8 +321,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let storage_with_changes =
-            DeltaStateView::new(resolver, user_txn_change_set_ext.write_set());
+        let storage_with_changes = DeltaStateView::new(resolver, &user_txn_change_set_ext);
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use
@@ -331,12 +330,7 @@ impl AptosVM {
         // Also, it is worth mentioning that current VM error handling is
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
-        let delta_write_set = user_txn_change_set_ext
-            .delta_change_set()
-            .clone()
-            .try_into_write_set(resolver)?;
-        let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
-        let resolver = delta_state_view.as_move_resolver();
+        let resolver = storage_with_changes.as_move_resolver();
 
         let mut session = self
             .0
@@ -680,14 +674,8 @@ impl AptosVM {
             txn_data.gas_unit_price,
         )?;
 
-        let storage_with_changes =
-            DeltaStateView::new(resolver, inner_function_change_set_ext.write_set());
-        let delta_write_set = inner_function_change_set_ext
-            .delta_change_set()
-            .clone()
-            .try_into_write_set(resolver)?;
-        let delta_state_view = DeltaStateView::new(&storage_with_changes, &delta_write_set);
-        let resolver = delta_state_view.as_move_resolver();
+        let storage_with_changes = DeltaStateView::new(resolver, &inner_function_change_set_ext);
+        let resolver = storage_with_changes.as_move_resolver();
         let mut cleanup_session =
             self.0
                 .new_session(&resolver, SessionId::txn_meta(txn_data), true);

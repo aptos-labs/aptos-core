@@ -2,22 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_aggregator::transaction::ChangeSetExt;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::TransactionWrite,
 };
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
-    write_set: &'b WriteSet,
+    change_set: &'b ChangeSetExt,
 }
 
 impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, write_set: &'b WriteSet) -> Self {
-        Self { base, write_set }
+    pub fn new(base: &'a S, change_set: &'b ChangeSetExt) -> Self {
+        Self { base, change_set }
     }
 }
 
@@ -32,7 +33,14 @@ where
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
-        match self.write_set.get(state_key) {
+        if self.change_set.delta_change_set().contains_key(state_key) {
+            return Ok(self
+                .change_set
+                .delta_change_set
+                .get_write_op(self.base, state_key)?
+                .as_state_value());
+        }
+        match self.change_set.write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base.get_state_value(state_key),
         }
