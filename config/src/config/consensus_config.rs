@@ -11,7 +11,7 @@ use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
+pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 20000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -101,12 +101,12 @@ impl Default for ConsensusConfig {
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 600 * 1024, // 600 KB
-            max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
+            max_sending_block_bytes_quorum_store_override: 20 * 1024 * 1024, // 5MB
             max_receiving_block_txns: 10000,
             max_receiving_block_txns_quorum_store_override: 2
                 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
+            max_receiving_block_bytes_quorum_store_override: 20 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -148,12 +148,12 @@ impl Default for ConsensusConfig {
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
                     max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
+                    max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2500,
-                    max_sending_block_txns_override: 2000,
+                    max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
                 },
@@ -163,7 +163,7 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~1000 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
+                    max_sending_block_txns_override: 10000,
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 300,
@@ -179,20 +179,20 @@ impl Default for ConsensusConfig {
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
-                    max_sending_block_txns_override: 2000,
+                    max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
-                    max_sending_block_txns_override: 1000,
+                    max_sending_block_txns_override: 10000,
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 500,
+                    max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
@@ -202,7 +202,7 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~500 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 250,
+                    max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 15 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
