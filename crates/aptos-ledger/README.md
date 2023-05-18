@@ -2,9 +2,12 @@
 
 Provides a set of commands and methods to communicate with Aptos app on Ledger
 
-- Read the Aptos app official name and current version
-- Get the public key
-- Sign a Transaction
+The methods supported by the aptos-ledger are:
+
+- get_app_version()
+- get_app_name()
+- get_public_key()
+- sign_txn()
 
 NOTE: All methods and commands requires the user to have Aptos ledger app unlocked and open
 
@@ -16,8 +19,8 @@ NOTE: All methods and commands requires the user to have Aptos ledger app unlock
 use aptos_ledger::get_public_key;
 
 let public_key = match get_public_key(false);
-println!("Version: {:?}", version);
-// "Version: x.x.x"
+println!("Public Key: {:?}", version);
+// "Public Key: ______"
 ```
 
 ### Sign Transaction
