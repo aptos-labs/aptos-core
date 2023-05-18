@@ -66,6 +66,8 @@ pub struct RocksdbOpt {
     #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
     #[clap(long, hidden(true))]
+    split_ledger_db: bool,
+    #[clap(long, hidden(true))]
     use_state_kv_db: bool,
     #[clap(long, hidden(true))]
     use_sharded_state_merkle_db: bool,
@@ -96,6 +98,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },
+            split_ledger_db: opt.split_ledger_db,
             use_state_kv_db: opt.use_state_kv_db,
             use_sharded_state_merkle_db: opt.use_sharded_state_merkle_db,
             state_kv_db_config: RocksdbConfig {

@@ -24,6 +24,7 @@ pub mod state_restore;
 
 mod db_options;
 mod event_store;
+mod ledger_db;
 mod ledger_store;
 mod lru_node_cache;
 mod pruner;

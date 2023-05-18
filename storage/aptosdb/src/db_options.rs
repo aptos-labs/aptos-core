@@ -33,6 +33,61 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        EVENT_ACCUMULATOR_CF_NAME,
+        EVENT_BY_KEY_CF_NAME,
+        EVENT_BY_VERSION_CF_NAME,
+        EVENT_CF_NAME,
+    ]
+}
+
+pub(super) fn transaction_accumulator_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        TRANSACTION_ACCUMULATOR_CF_NAME,
+    ]
+}
+
+pub(super) fn transaction_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        TRANSACTION_CF_NAME,
+        TRANSACTION_BY_ACCOUNT_CF_NAME,
+        TRANSACTION_BY_HASH_CF_NAME,
+    ]
+}
+
+pub(super) fn transaction_info_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        TRANSACTION_INFO_CF_NAME,
+    ]
+}
+
+pub(super) fn write_set_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        WRITE_SET_CF_NAME,
+    ]
+}
+
+pub(super) fn ledger_metadata_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        EPOCH_BY_VERSION_CF_NAME,
+        LEDGER_INFO_CF_NAME,
+        VERSION_DATA_CF_NAME,
+    ]
+}
+
 pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -83,6 +138,42 @@ fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut O
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
         cf_opts.set_prefix_extractor(prefix_extractor);
     }
+}
+
+pub(super) fn gen_event_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = event_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_transaction_accumulator_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = transaction_accumulator_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_transaction_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = transaction_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_transaction_info_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = transaction_info_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_write_set_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = write_set_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
+}
+
+pub(super) fn gen_ledger_metadata_cfds(
+    rocksdb_config: &RocksdbConfig,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = ledger_metadata_db_column_families();
+    gen_cfds(rocksdb_config, cfs, |_, _| {})
 }
 
 pub(super) fn gen_ledger_cfds(rocksdb_config: &RocksdbConfig) -> Vec<ColumnFamilyDescriptor> {
