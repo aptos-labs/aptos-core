@@ -10,10 +10,12 @@ use crate::{
     },
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
+use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt, wait_for_all_nodes_to_catchup_to_epoch, wait_for_all_nodes_to_catchup};
+use aptos_logger::debug;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
+use serde_json::de;
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -620,7 +622,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
         .unwrap()
         .rest_client();
     let (mut account_0, mut account_1) = create_test_accounts(swarm).await;
-    execute_transactions_and_wait(swarm, &validator_client_0, &mut account_0, &account_1, true)
+    execute_transactions_and_wait(swarm, &validator_client_0, &mut account_0, &account_1, false)
         .await;
 
     // Stop the validator and delete the storage
@@ -628,14 +630,68 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
     stop_validator_and_delete_storage(swarm, validator).await;
 
     // Execute more transactions
-    execute_transactions(swarm, &validator_client_0, &mut account_1, &account_0, true).await;
+    execute_transactions(swarm, &validator_client_0, &mut account_1, &account_0, false).await;
 
     // Restart the validator and wait for all nodes to catchup
     swarm.validator_mut(validator).unwrap().start().unwrap();
     wait_for_all_nodes(swarm).await;
 
     // Execute multiple transactions and verify the validator can sync
-    execute_transactions_and_wait(swarm, &validator_client_0, &mut account_0, &account_1, true)
+    execute_transactions_and_wait(swarm, &validator_client_0, &mut account_0, &account_1, false)
+        .await;
+}
+
+#[tokio::test]
+async fn test_rati_fixes_dag() {
+    // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+        }))
+        .build()
+        .await;
+
+    // Execute multiple transactions through validator 0
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+    let rest_clients = validator_peer_ids.iter().skip(1).map(|peer_id| {
+        let node = swarm.validator(peer_id.clone()).unwrap();
+        (node.name().to_string(), node.rest_client())
+    }).collect::<Vec<_>>();
+
+    wait_for_all_nodes_to_catchup(&rest_clients.as_slice(), Duration::from_secs(60)).await.unwrap();
+
+    debug!("creating test accounts");
+
+    // Create test accounts
+    let validator_client_1 = swarm
+        .validator(validator_peer_ids[1])
+        .unwrap()
+        .rest_client();
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+
+    wait_for_all_nodes_to_catchup(&rest_clients.as_slice(), Duration::from_secs(60)).await.unwrap();
+
+    debug!("executing transactions");
+
+    // Execute more transactions
+    execute_transactions(&mut swarm, &validator_client_1, &mut account_1, &account_0, false).await;
+
+    debug!("waiting for all alive nodes to catchup");
+
+    wait_for_all_nodes_to_catchup(rest_clients.as_slice(), Duration::from_secs(60)).await.unwrap();
+
+    debug!("starting validator 0");
+    // Restart the validator and wait for all nodes to catchup
+    swarm.validator_mut(validator_peer_ids[0]).unwrap().start().unwrap();
+    wait_for_all_nodes(&mut swarm).await;
+
+    // Execute multiple transactions and verify the validator can sync
+    execute_transactions_and_wait(&mut swarm, &validator_client_1, &mut account_0, &account_1, false)
         .await;
 }
 
@@ -783,7 +839,7 @@ async fn execute_transactions(
     receiver: &LocalAccount,
     execute_epoch_changes: bool,
 ) {
-    let num_transfers = 10;
+    let num_transfers = 20;
 
     let transaction_factory = swarm.chain_info().transaction_factory();
     if execute_epoch_changes {

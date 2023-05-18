@@ -252,7 +252,7 @@ impl LocalSwarm {
         self.launched = true;
 
         // Start all the validators
-        for validator in self.validators.values_mut() {
+        for validator in self.validators.values_mut().skip(1) {
             validator.start()?;
         }
 
@@ -273,10 +273,10 @@ impl LocalSwarm {
 
     pub async fn wait_for_startup(&mut self) -> Result<()> {
         let num_attempts = 30;
-        let mut done = vec![false; self.validators.len()];
+        let mut done = vec![false; self.validators.len() - 1];
         for i in 0..num_attempts {
             info!("Wait for startup attempt: {} of {}", i, num_attempts);
-            for (node, done) in self.validators.values_mut().zip(done.iter_mut()) {
+            for (node, done) in self.validators.values_mut().skip(1).zip(done.iter_mut()) {
                 if *done {
                     continue;
                 }
@@ -552,12 +552,14 @@ impl Swarm for LocalSwarm {
     fn chain_info(&mut self) -> ChainInfo<'_> {
         let rest_api_url = self
             .validators()
+            .skip(1)
             .next()
             .unwrap()
             .rest_api_endpoint()
             .to_string();
         let inspection_service_url = self
             .validators()
+            .skip(1)
             .next()
             .unwrap()
             .inspection_service_endpoint()
