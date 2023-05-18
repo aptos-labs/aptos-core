@@ -416,7 +416,7 @@ module 0xABCD::simple {
         table_entries: Table<u64, u64>
     }
 
-    fun make_or_change_table(owner: &signer, count: u64) acquires TableStore {
+    fun make_or_change_table(owner: &signer, offset: u64, count: u64) acquires TableStore {
         let owner_address = signer::address_of(owner);
         if (!exists<TableStore>(owner_address)) {
             move_to<TableStore>(owner, TableStore {
@@ -427,7 +427,7 @@ module 0xABCD::simple {
 
         while (count > 0) {
             count = count - 1;
-            let table_entry = table::borrow_mut_with_default(table_entries, count, 0);
+            let table_entry = table::borrow_mut_with_default(table_entries, offset+count, 0);
             *table_entry = *table_entry + 1;
         }
     }
