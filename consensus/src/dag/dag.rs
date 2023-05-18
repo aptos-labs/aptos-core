@@ -666,8 +666,6 @@ impl Dag {
         let mut maybe_node_status = None;
         let mut add_to_pending = false;
 
-        let mut add_to_pending = false;
-
         match self.missing_nodes.entry(certified_node.digest()) {
             // Node not in the system
             Entry::Vacant(_) => {

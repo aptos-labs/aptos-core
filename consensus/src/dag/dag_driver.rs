@@ -145,8 +145,8 @@ impl DagDriver {
             next_round_payload_filter: None,
             next_round_parents: None,
 
-            interval_timer: TickingTimer::new(100),
-            remote_fetch_timer: TickingTimer::new(50),
+            interval_timer: TickingTimer::new(50),
+            remote_fetch_timer: TickingTimer::new(20),
             rb_command: None,
             highest_commit_info: root_commit_ledger_info,
 
