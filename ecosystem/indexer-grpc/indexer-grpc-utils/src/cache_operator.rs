@@ -118,8 +118,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
 
     // Set up the cache if needed.
     pub async fn cache_setup_if_needed(&mut self) -> bool {
-        let version_inserted: bool =
-            redis::cmd("SET")
+        let version_inserted: bool = redis::cmd("SET")
             .arg(CACHE_KEY_LATEST_VERSION)
             .arg(CACHE_DEFAULT_LATEST_VERSION_NUMBER)
             .arg("NX")
