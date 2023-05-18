@@ -22,20 +22,27 @@ use std::{
 ///
 /// Execution in the system happens piece-wiese, where each piece contains a continuous
 /// sub-sequence of ledger of the ordered transactions. For example, in our codebase,
-/// pieces are called 'blocks' during the original execution / 'chunks' during state-sync.
-/// The only exception to this occurs while the cache in the Before(id) state is updated,
-/// adding and removing elements (potentially concurrently) in order to convert it to
-/// contain the executables at version corresponding to after the execution of the piece.
-/// When the update is done, it is the user's responsibility to mark the state as Updated.
-/// Currently, this happens after parallel execution in the block-executor crate.
+/// pieces are called 'blocks' during the original execution or 'chunks' during state-sync.
 ///
-/// After updating the ExecutableStore, it must be pruned to control the memory usage.
-/// Currently, this happens in aptos-vm based on a single threshold, clearing the store
-/// if the size exceeds the threshold. Then, it is the caller's responsibility to change
-/// the status to Pruned (ensuring we will never use the ExecutableStore without pruning).
-/// After pruning, the state may change to After(id), with the id of the latest piece.
-/// To go back to the Before(id') state, the parent of piece id' is conformed to be id,
-/// ensuring correctness. This currently occurs in execution/executor, as the information
+/// Most of the methods, e.g. to manage the state, are designed to be called in quiescence,
+/// i.e. not concurrently with other methods, and in between the piecewise execution. An
+/// exception to this occurs while the cache in the Before(id) state is updated, adding and
+/// removing elements (potentially concurrently) to convert it to contain the executables
+/// at a version corresponding to after the execution of the piece. When the update is done,
+/// it is the user's responsibility to mark the state as Updated. Currently, this happens
+/// right at the end of parallel execution inside block-executor (sequential execution mode
+/// currently does not re-use the cache acrosss pieces).
+///
+/// ExecutableStore must be pruned to control the memory usage. Currently this is done after
+/// the cache is updated, from outside the block-executor (in aptos-vm). Pruning happens
+/// based on a threshold parameter, and it simply clears the store if the size exceeds
+/// the threshold. It is the caller's responsibility to properly set the status to Pruned
+/// (ensuring we will never use the ExecutableStore without pruning).
+///
+/// After pruning, the state is supposed to change to After(id), with the id of the most
+/// recent piece that was executed. To change the state from After(id) to Before(id'), the
+/// parent of piece id' (as provided by the caller) is conformed to be id, ensuring
+/// correctness. These states are currently set in execution/executor, as the information
 /// about pieces (ids and their relation to each other) is only available there.
 ///
 /// The full state transition diagram is below:
@@ -64,7 +71,7 @@ use std::{
 enum ExecutableStoreState<ID: Clone + Debug + PartialEq> {
     // Cache is empty and ready to be used.
     Empty,
-    // The cache is ready-to-use at a ledger state after a piece of txns with ID id.
+    // The cache is ready-to-use at a ledger state before a piece of txns with ID id.
     // We could represent empty as Before(None), but separating for clarity.
     Before(ID),
     // The cache is updated / synchronized after a piece is executed.
