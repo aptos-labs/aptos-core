@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::new_test_context;
+use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -25,7 +27,8 @@ use move_core_types::{
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
+use tokio::time::sleep;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_deserialize_genesis_transaction() {
@@ -1034,13 +1037,123 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
     context.check_golden_output(resp);
 }
 
-#[ignore]
+// Note: in tests, the min gas unit price is 0
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_gas_estimation() {
+async fn test_gas_estimation_empty() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get("/estimate_gas_price").await;
     assert!(context.last_updated_gas_schedule().is_some());
     context.check_golden_output(resp);
+}
+
+async fn fill_block(
+    block: &mut Vec<SignedTransaction>,
+    ctx: &mut TestContext,
+    creator: &mut LocalAccount,
+) {
+    let owner = &mut ctx.gen_account();
+    for _i in 0..(500 - block.len()) {
+        let txn = ctx.account_transfer(creator, owner, 1);
+        block.push(txn);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_ten_blocks() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the first block
+    let mut block = vec![mint_txn];
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        fill_block(&mut block, ctx, creator).await;
+        ctx.commit_block(&block).await;
+        block.clear();
+    }
+
+    let resp = context.get("/estimate_gas_price").await;
+    // multiple times, to exercise cache
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_ten_empty_blocks() {
+    let mut context = new_test_context(current_function_name!());
+
+    let ctx = &mut context;
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        ctx.commit_block(&[]).await;
+    }
+
+    let resp = context.get("/estimate_gas_price").await;
+    // multiple times, to exercise cache
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_cache() {
+    let mut node_config = NodeConfig::default();
+    // Sets max cache size to 10
+    let max_block_history = 10;
+    node_config.api.gas_estimation.low_block_history = max_block_history;
+    node_config.api.gas_estimation.market_block_history = max_block_history;
+    node_config.api.gas_estimation.aggressive_block_history = max_block_history;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let ctx = &mut context;
+    // First block is ignored in gas estimate, so expect 4 entries
+    for _i in 0..5 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 4);
+
+    // Expect max of 10 entries
+    for _i in 0..8 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
+    // Wait for cache to expire
+    sleep(Duration::from_secs(1)).await;
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
+
+    // Expect max of 10 entries
+    for _i in 0..8 {
+        ctx.commit_block(&[]).await;
+    }
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
+    // Wait for cache to expire
+    sleep(Duration::from_secs(1)).await;
+    ctx.get("/estimate_gas_price").await;
+    assert_eq!(
+        ctx.last_updated_gas_estimation_cache_size(),
+        max_block_history
+    );
 }
 
 fn gen_string(len: u64) -> String {

@@ -2,20 +2,22 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::{
+    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    txn_emitter::generate_traffic,
+};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_forge::Swarm;
-use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule};
+use aptos_forge::{NodeExt, Swarm, TransactionType};
+use aptos_global_constants::{DEFAULT_BUCKETS, GAS_UNIT_PRICE};
 use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
-    on_chain_config::GasScheduleV2,
     transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
 };
-use std::{convert::TryFrom, str::FromStr};
+use std::{convert::TryFrom, str::FromStr, sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_get_index() {
@@ -70,127 +72,100 @@ async fn test_basic_client() {
     info.client().get_transactions(None, None).await.unwrap();
 }
 
-// Test needs to be fixed to estimate over a longer period of time / probably needs an adjustable window
-// to test
-#[ignore]
+fn next_bucket(gas_unit_price: u64) -> u64 {
+    *DEFAULT_BUCKETS
+        .iter()
+        .find(|bucket| **bucket > gas_unit_price)
+        .unwrap()
+}
+
 #[tokio::test]
 async fn test_gas_estimation() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-    let mut public_info = swarm.aptos_public_info();
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_init_config(Arc::new(|_, conf, _| {
+            let max_block_txns = 3;
+            // Use a small full block threshold to make gas estimates update sooner.
+            conf.api.gas_estimation.full_block_txns = max_block_txns as usize;
+            // Wait for full blocks with small block size to advance consensus at a fast rate.
+            conf.consensus.quorum_store_poll_time_ms = 200;
+            conf.consensus.wait_for_full_blocks_above_pending_blocks = 0;
+            conf.consensus.max_sending_block_txns = max_block_txns;
+            conf.consensus.max_sending_block_txns_quorum_store_override = max_block_txns;
+            conf.consensus.quorum_store.sender_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .sender_max_batch_txns
+                .min(max_block_txns as usize);
+            conf.consensus.quorum_store.receiver_max_batch_txns = conf
+                .consensus
+                .quorum_store
+                .receiver_max_batch_txns
+                .min(max_block_txns as usize);
+        }))
+        .build()
+        .await;
+    let client = swarm.validators().next().unwrap().rest_client();
+    let estimation = match client.estimate_gas_price().await {
+        Ok(res) => res.into_inner(),
+        Err(e) => panic!("Client error: {:?}", e),
+    };
+    println!("{:?}", estimation);
+    // Note: in testing GAS_UNIT_PRICE = 0
+    assert_eq!(Some(GAS_UNIT_PRICE), estimation.deprioritized_gas_estimate);
+    assert_eq!(GAS_UNIT_PRICE, estimation.gas_estimate);
+    assert_eq!(
+        Some(next_bucket(GAS_UNIT_PRICE)),
+        estimation.prioritized_gas_estimate
+    );
 
-    let gas_schedule: GasScheduleV2 = public_info
-        .client()
-        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::gas_schedule::GasScheduleV2")
-        .await
-        .unwrap()
-        .into_inner();
-    let feaure_version = gas_schedule.feature_version;
-    let gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-        &gas_schedule.to_btree_map(),
-        feaure_version,
+    let txn_gas_price = 100;
+    let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
+    let txn_stat = generate_traffic(
+        &mut swarm,
+        &all_validators,
+        Duration::from_secs(20),
+        txn_gas_price,
+        vec![vec![(
+            TransactionType::CoinTransfer {
+                invalid_transaction_ratio: 0,
+                sender_use_account_pool: false,
+            },
+            100,
+        )]],
     )
+    .await
     .unwrap();
+    println!("{:?}", txn_stat.rate());
 
-    // No transactions should always return 1 as the estimated gas
+    let estimation = match client.estimate_gas_price().await {
+        Ok(res) => res.into_inner(),
+        Err(e) => panic!("Client error: {:?}", e),
+    };
+    println!("{:?}", estimation);
+    // Note: it's quite hard to get deprioritized_gas_estimate higher in smoke tests
+    assert_eq!(next_bucket(txn_gas_price), estimation.gas_estimate);
     assert_eq!(
-        u64::from(gas_params.txn.min_price_per_gas_unit),
-        public_info
-            .client()
-            .estimate_gas_price()
-            .await
-            .unwrap()
-            .into_inner()
-            .gas_estimate,
-        "No transactions should equate to lowest gas price"
+        Some(next_bucket(next_bucket(txn_gas_price))),
+        estimation.prioritized_gas_estimate
     );
-    let account1 = public_info
-        .create_and_fund_user_account(100_000_000)
-        .await
-        .expect("Should create account");
-    let account2 = public_info
-        .create_and_fund_user_account(100_000_000)
-        .await
-        .expect("Should create account");
 
-    // When we have higher cost transactions, it should shift to a non-1 value (if it's higher than 1)
-    let transfer1 = public_info
-        .transaction_factory()
-        .transfer(account2.address(), 10)
-        .gas_unit_price(5)
-        .sequence_number(0)
-        .sender(account1.address())
-        .build();
-    let transfer2 = public_info
-        .transaction_factory()
-        .transfer(account2.address(), 10)
-        .gas_unit_price(5)
-        .sequence_number(1)
-        .sender(account1.address())
-        .build();
-    let transfer3 = public_info
-        .transaction_factory()
-        .transfer(account2.address(), 10)
-        .gas_unit_price(5)
-        .sequence_number(2)
-        .sender(account1.address())
-        .build();
-    let transfer4 = public_info
-        .transaction_factory()
-        .transfer(account2.address(), 10)
-        .gas_unit_price(5)
-        .sequence_number(3)
-        .sender(account1.address())
-        .build();
-    let transfer5 = public_info
-        .transaction_factory()
-        .transfer(account2.address(), 10)
-        .gas_unit_price(5)
-        .sequence_number(4)
-        .sender(account1.address())
-        .build();
-    let transfer1 = account1.sign_transaction(transfer1);
-    let transfer2 = account1.sign_transaction(transfer2);
-    let transfer3 = account1.sign_transaction(transfer3);
-    let transfer4 = account1.sign_transaction(transfer4);
-    let transfer5 = account1.sign_transaction(transfer5);
-    public_info
-        .client()
-        .submit(&transfer1)
-        .await
-        .expect("Should successfully submit");
-    public_info
-        .client()
-        .submit(&transfer2)
-        .await
-        .expect("Should successfully submit");
-    public_info
-        .client()
-        .submit(&transfer3)
-        .await
-        .expect("Should successfully submit");
-    public_info
-        .client()
-        .submit(&transfer4)
-        .await
-        .expect("Should successfully submit");
-    public_info
-        .client()
-        .submit_and_wait_bcs(&transfer5)
-        .await
-        .expect("Should successfully submit and wait")
-        .into_inner();
-
-    assert_eq!(
-        5,
-        public_info
-            .client()
-            .estimate_gas_price()
-            .await
-            .unwrap()
-            .into_inner()
-            .gas_estimate,
-        "Gas estimate should move based on median"
-    );
+    // Empty blocks will reset the prices
+    std::thread::sleep(Duration::from_secs(40));
+    // Multiple times, to exercise cache
+    for _i in 0..2 {
+        let estimation = match client.estimate_gas_price().await {
+            Ok(res) => res.into_inner(),
+            Err(e) => panic!("Client error: {:?}", e),
+        };
+        println!("{:?}", estimation);
+        // Note: in testing GAS_UNIT_PRICE = 0
+        assert_eq!(Some(GAS_UNIT_PRICE), estimation.deprioritized_gas_estimate);
+        assert_eq!(GAS_UNIT_PRICE, estimation.gas_estimate);
+        assert_eq!(
+            Some(next_bucket(GAS_UNIT_PRICE)),
+            estimation.prioritized_gas_estimate
+        );
+    }
 }
 
 #[tokio::test]
