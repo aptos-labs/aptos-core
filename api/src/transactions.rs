@@ -584,8 +584,9 @@ impl TransactionsApi {
     /// minimum gas unit price.)
     ///
     /// The estimation is given in three values: de-prioritized (low), regular, and prioritized
-    /// (aggressive). The more aggressive the value, the larger the history and higher percentile
-    /// statistics are used. More details are in AIP-34.
+    /// (aggressive). Using a more aggressive value increases the likelihood that the transaction
+    /// will make it into the next block; more aggressive values are computed with a larger history
+    /// and higher percentile statistics. More details are in AIP-34.
     #[oai(
         path = "/estimate_gas_price",
         method = "get",

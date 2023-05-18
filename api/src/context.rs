@@ -924,7 +924,7 @@ impl Context {
                         if prices.len() < config.full_block_txns {
                             min_gas_unit_price
                         } else {
-                            prices.iter().min().unwrap() + 1
+                            self.next_bucket(*prices.iter().min().unwrap())
                         }
                     },
                     Err(_) => min_gas_unit_price,
@@ -963,9 +963,7 @@ impl Context {
             .cloned()
             .collect();
         latest_prices.sort();
-        let p50_price = latest_prices[latest_prices.len() / 2];
-        // round up to next bucket
-        let market_price = self.next_bucket(p50_price);
+        let market_price = latest_prices[latest_prices.len() / 2];
 
         // (3) aggressive
         min_inclusion_prices.sort();
