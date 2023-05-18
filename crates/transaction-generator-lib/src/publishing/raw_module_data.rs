@@ -12,9 +12,8 @@
 // This create should also provide a Rust file that allows proper manipulation of each
 // module defined below.
 
-use std::collections::HashMap;
-
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 #[rustfmt::skip]
 pub static PACKAGE_SIMPLE_METADATA: Lazy<Vec<u8>> = Lazy::new(|| {
