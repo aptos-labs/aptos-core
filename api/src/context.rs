@@ -863,12 +863,19 @@ impl Context {
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
         let epoch = ledger_info.epoch.0;
 
-        // 0. Return cached result if it exists
+        // 0. (0) Return cached result if it exists
         if let Some(cached_gas_estimation) = self.cached_gas_estimation(epoch) {
             return Ok(cached_gas_estimation);
         }
 
+        // 0. (1) Write lock and prepare cache
         let mut cache = self.gas_estimation_cache.write().unwrap();
+        if let Some(cached_epoch) = cache.last_updated_epoch {
+            if cached_epoch != epoch {
+                cache.min_inclusion_prices.clear();
+            }
+        }
+
         let max_block_history = config.aggressive_block_history;
         // 1. Get the block metadata txns
         let mut lookup_version = ledger_info.ledger_version.0;
@@ -909,7 +916,8 @@ impl Context {
             self.update_cached_gas_estimation(&mut cache, epoch, estimation);
             return Ok(estimation);
         }
-        let remaining = max_block_history - blocks.len();
+        let blocks_len = blocks.len();
+        let remaining = max_block_history - blocks_len;
 
         // 2. Get gas prices per block
         let mut min_inclusion_prices = vec![];
@@ -963,11 +971,35 @@ impl Context {
             .cloned()
             .collect();
         latest_prices.sort();
-        let market_price = latest_prices[latest_prices.len() / 2];
+        let market_price = match latest_prices.get(latest_prices.len() / 2) {
+            None => {
+                error!(
+                    "prices empty, blocks.len={}, cached_blocks_hit={}, epoch={}, version={}",
+                    blocks_len,
+                    cached_blocks_hit,
+                    ledger_info.epoch.0,
+                    ledger_info.ledger_version.0
+                );
+                return Ok(self.default_gas_estimation(min_gas_unit_price));
+            },
+            Some(price) => *price,
+        };
 
         // (3) aggressive
         min_inclusion_prices.sort();
-        let p90_price = min_inclusion_prices[min_inclusion_prices.len() * 9 / 10];
+        let p90_price = match min_inclusion_prices.get(min_inclusion_prices.len() * 9 / 10) {
+            None => {
+                error!(
+                    "prices empty, blocks.len={}, cached_blocks_hit={}, epoch={}, version={}",
+                    blocks_len,
+                    cached_blocks_hit,
+                    ledger_info.epoch.0,
+                    ledger_info.ledger_version.0
+                );
+                return Ok(self.default_gas_estimation(min_gas_unit_price));
+            },
+            Some(price) => *price,
+        };
         // round up to next bucket
         let aggressive_price = self.next_bucket(p90_price);
 

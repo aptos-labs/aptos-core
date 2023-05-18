@@ -28,6 +28,7 @@ use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::json;
 use std::{path::PathBuf, time::Duration};
+use tokio::time::sleep;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_deserialize_genesis_transaction() {
@@ -1130,7 +1131,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    std::thread::sleep(Duration::from_secs(1));
+    sleep(Duration::from_secs(1)).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),
@@ -1147,7 +1148,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    std::thread::sleep(Duration::from_secs(1));
+    sleep(Duration::from_secs(1)).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),

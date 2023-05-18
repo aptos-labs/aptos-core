@@ -60,6 +60,21 @@ impl ConfigSanitizer for GasEstimationConfig {
             ));
         }
 
+        if gas_estimation_config.low_block_history == 0
+            || gas_estimation_config.market_block_history == 0
+            || gas_estimation_config.aggressive_block_history == 0
+        {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                format!(
+                    "low {}, market {}, aggressive {} block history must be > 0",
+                    gas_estimation_config.low_block_history,
+                    gas_estimation_config.market_block_history,
+                    gas_estimation_config.aggressive_block_history
+                ),
+            ));
+        }
+
         Ok(())
     }
 }
