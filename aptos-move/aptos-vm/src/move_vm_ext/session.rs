@@ -29,13 +29,16 @@ use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
-        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
+        AccountChangeSet, ChangeSet as MoveChangeSet, Changes, Event as MoveEvent,
+        Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
+    value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -129,7 +132,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<ChangeSetExt> {
         let move_vm = self.inner.get_move_vm();
-        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let (change_set, events, mut extensions) =
+            self.inner.finish_without_serialization_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
@@ -187,7 +191,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn MoveResolverExt,
-        change_set: MoveChangeSet,
+        change_set: Changes<Vec<u8>, (Value, MoveTypeLayout)>,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
@@ -204,10 +208,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
-            for (struct_tag, blob_op) in resources {
+            for (struct_tag, resource_op) in resources {
                 let resource_group = runtime.with_module_metadata(&struct_tag.module_id(), |md| {
                     get_resource_group_from_metadata(&struct_tag, md)
                 });
+
+                // Also serialize all resources.
+                let blob_op = resource_op.and_then(|(value, layout)| {
+                    value.simple_serialize(&layout).ok_or_else(|| {
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                            .with_message(format!("Error when serializing resource {}.", value))
+                            .finish(Location::Undefined)
+                    })
+                })?;
 
                 if let Some(resource_group) = resource_group {
                     resource_groups
