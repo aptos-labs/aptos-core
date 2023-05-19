@@ -1247,7 +1247,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_node_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["fullnode"]["config"]["mempool"]["default_failovers"] = 19.into();
+            helm_values["fullnode"]["config"]["mempool"]["default_failovers"] = 9.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(
