@@ -66,16 +66,25 @@ export class CoinClient {
     },
   ): Promise<string> {
     if (extraArgs?.assetAddress) {
+      /* eslint-disable no-console */
       console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for a better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      if (to instanceof AptosAccount) {
-        to = to.address();
+      let recipient = to;
+      if (recipient instanceof AptosAccount) {
+        recipient = recipient.address();
       }
-      return await fungibleAsset.transferAmount(from, extraArgs.assetAddress, to, amount, extraArgs.coinType);
+      const txnHash = await fungibleAsset.transferAmount(
+        from,
+        extraArgs.assetAddress,
+        recipient,
+        amount,
+        extraArgs.coinType,
+      );
+      return txnHash;
     }
 
     // If none is explicitly given, use 0x1::aptos_coin::AptosCoin as the coin type.
@@ -121,16 +130,19 @@ export class CoinClient {
     },
   ): Promise<bigint> {
     if (extraArgs?.assetAddress) {
+      /* eslint-disable no-console */
       console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for a better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      if (account instanceof AptosAccount) {
-        account = account.address();
+      let owner = account;
+      if (owner instanceof AptosAccount) {
+        owner = owner.address();
       }
-      return await fungibleAsset.balance(account, extraArgs.assetAddress, extraArgs.coinType);
+      const balance = await fungibleAsset.balance(owner, extraArgs.assetAddress, extraArgs.coinType);
+      return balance;
     }
 
     const coinType = extraArgs?.coinType ?? APTOS_COIN;

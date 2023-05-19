@@ -7,6 +7,7 @@ import { MaybeHexString, HexString } from "../utils";
 
 export class FungibleAssetClient {
   provider: Provider;
+
   readonly assetType: string = "0x1::fungible_asset::Metadata";
 
   /**
@@ -24,7 +25,8 @@ export class FungibleAssetClient {
    * Use this method to transfer any fungible asset including fungible token.
    *
    * @param sender The sender account
-   * @param assetAddress The fungible asset address - For example if you’re transferring USDT, this would be the USDT address
+   * @param assetAddress The fungible asset address.
+   * For example if you’re transferring USDT this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
    * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
@@ -39,7 +41,8 @@ export class FungibleAssetClient {
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
     const rawTxn = await this.generateTransferAmount(sender, assetAddress, recipient, amount, assetType, extraArgs);
-    return await this.submit(sender, rawTxn);
+    const txnHash = await this.submit(sender, rawTxn);
+    return txnHash;
   }
 
   /**
@@ -69,7 +72,8 @@ export class FungibleAssetClient {
    * first simulate the transaction and then sign and submit it.
    *
    * @param sender The sender account
-   * @param assetAddress The fungible asset address - For example if you’re transferring USDT, this would be the USDT address
+   * @param assetAddress The fungible asset address.
+   * For example if you’re transferring USDT this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
    * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
@@ -103,6 +107,7 @@ export class FungibleAssetClient {
    * @returns The hash of the transaction submitted to the API
    */
   async submit(sender: AptosAccount, rawTransaction: RawTransaction): Promise<string> {
-    return await this.provider.signAndSubmitTransaction(sender, rawTransaction);
+    const txnHash = this.provider.signAndSubmitTransaction(sender, rawTransaction);
+    return txnHash;
   }
 }
