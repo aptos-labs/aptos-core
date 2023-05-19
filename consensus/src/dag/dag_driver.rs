@@ -79,7 +79,7 @@ impl DagDriver {
         );
 
         let proposer_election = Arc::new(LeaderReputationElection::new(&verifier));
-        let enable_pipeline = true;
+        let enable_pipeline = false;
 
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
             epoch,
