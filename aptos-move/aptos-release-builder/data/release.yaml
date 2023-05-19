@@ -1,5 +1,6 @@
 ---
 remote_endpoint: ~
+name: "v1.5"
 proposals:
   - name: upgrade_framework
     metadata:
