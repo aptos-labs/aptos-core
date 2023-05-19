@@ -398,7 +398,7 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let res = self
             .harness
             .resource_store

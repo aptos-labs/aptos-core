@@ -97,6 +97,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
             }
         }
 
+        // TODO
         self.base.get_resource_with_metadata(address, tag, metadata)
     }
 }
