@@ -18,6 +18,7 @@ COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-cache-worker /us
 COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
 COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
 COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-parser /usr/local/bin/aptos-indexer-grpc-parser
+COPY --link --from=tools-builder /aptos/dist/aptos-indexer-grpc-post-processor /usr/local/bin/aptos-indexer-grpc-post-processor
 
 # The health check port
 EXPOSE 8080

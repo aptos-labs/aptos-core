@@ -13,12 +13,12 @@ module fungible_asset_extension::coin_example {
         let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         managed_fungible_asset::initialize(
             constructor_ref,
-            false,
             0, /* maximum_supply. 0 means no maximum */
             utf8(b"You only live once"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             8, /* decimals */
             utf8(b"http://example.com/favicon.ico"), /* icon */
+            utf8(b"http://example.com"), /* project */
         );
     }
 

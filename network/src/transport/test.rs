@@ -79,7 +79,7 @@ where
         Auth::Mutual => {
             // Create the dialer and listener network contexts
             let (dialer_network_context, listener_network_context, peers_and_metadata) =
-                testutils::create_client_server_network_context(None, None);
+                testutils::create_client_server_network_context(None, None, None);
 
             // Add the trusted peers
             let network_id = listener_network_context.network_id();
@@ -111,6 +111,7 @@ where
                 testutils::create_client_server_network_context(
                     Some(dialer_key.public_key()),
                     Some(listener_key.public_key()),
+                    None,
                 );
 
             // Add the trusted peers
@@ -143,6 +144,7 @@ where
                 testutils::create_client_server_network_context(
                     Some(dialer_key.public_key()),
                     Some(listener_key.public_key()),
+                    None,
                 );
 
             // Get the trusted peers

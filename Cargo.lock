@@ -958,6 +958,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executable-store"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "claims",
+ "dashmap",
+ "proptest",
+ "proptest-derive",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
@@ -1258,6 +1272,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas",
  "aptos-gas-algebra-ext",
+ "aptos-language-e2e-tests",
  "aptos-move-stdlib",
  "aptos-sdk-builder",
  "aptos-state-view",
@@ -2418,7 +2433,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "pbjson",
  "prost",
@@ -2845,6 +2860,7 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
+ "itertools",
  "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
@@ -2879,6 +2895,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-netcore",
  "aptos-network",
  "aptos-storage-interface",
  "aptos-storage-service-types",

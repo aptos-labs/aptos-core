@@ -130,6 +130,7 @@ members = [
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
     "storage/db-tool",
+    "storage/executable-store",
     "storage/indexer",
     "storage/jellyfish-merkle",
     "storage/rocksdb-options",
@@ -267,6 +268,7 @@ aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
+aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }

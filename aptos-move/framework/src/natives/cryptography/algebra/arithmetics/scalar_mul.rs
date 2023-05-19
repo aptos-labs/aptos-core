@@ -5,6 +5,7 @@ use crate::{
     natives::{
         cryptography::algebra::{
             abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
             MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{log2_ceil, SafeNativeContext, SafeNativeError, SafeNativeResult},
@@ -49,7 +50,7 @@ macro_rules! ark_scalar_mul_internal {
         let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
         $context.charge($gas)?;
         let new_element = element.$op(scalar_bigint);
-        let new_handle = store_element!($context, new_element);
+        let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -127,7 +128,7 @@ pub fn scalar_mul_internal(
             let scalar_bigint: ark_ff::BigInteger256 = (*scalar).into();
             context.charge(gas_params.ark_bls12_381_fq12_pow_u256 * NumArgs::one())?;
             let new_element = element.pow(scalar_bigint);
-            let new_handle = store_element!(context, new_element);
+            let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort {
@@ -179,7 +180,7 @@ macro_rules! ark_msm_internal {
         ))?;
         let new_element: $element_typ =
             ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).unwrap();
-        let new_handle = store_element!($context, new_element);
+        let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
