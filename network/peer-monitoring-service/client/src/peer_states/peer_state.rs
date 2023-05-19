@@ -24,7 +24,14 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt,
+    fmt::{Display, Formatter},
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{runtime::Handle, task::JoinHandle, time::sleep};
 
 #[derive(Clone, Debug)]
@@ -144,7 +151,7 @@ impl PeerState {
             );
 
             // Update the latency ping metrics
-            metrics::observe_value(
+            metrics::observe_value_with_label(
                 &metrics::REQUEST_LATENCIES,
                 monitoring_service_request.get_label(),
                 &peer_network_id,
@@ -162,6 +169,20 @@ impl PeerState {
         Ok(join_handle)
     }
 
+    /// Updates the peer metrics for the given peer state key
+    pub fn update_peer_state_metrics(
+        &self,
+        peer_network_id: &PeerNetworkId,
+        peer_state_key: &PeerStateKey,
+    ) -> Result<(), Error> {
+        let peer_state_value = self.get_peer_state_value(peer_state_key)?;
+        peer_state_value
+            .read()
+            .update_peer_state_metrics(peer_network_id);
+
+        Ok(())
+    }
+
     /// Extracts peer monitoring metadata from the overall peer state
     pub fn extract_peer_monitoring_metadata(&self) -> Result<PeerMonitoringMetadata, Error> {
         // Create an empty metadata entry for the peer
@@ -171,6 +192,10 @@ impl PeerState {
         let latency_info_state = self.get_latency_info_state()?;
         let average_latency_ping_secs = latency_info_state.get_average_latency_ping_secs();
         peer_monitoring_metadata.average_ping_latency_secs = average_latency_ping_secs;
+
+        // Get and store the detailed monitoring metadata
+        let internal_client_state = self.get_internal_client_state()?;
+        peer_monitoring_metadata.internal_client_state = internal_client_state;
 
         // Get and store the latest network info response
         let network_info_state = self.get_network_info_state()?;
@@ -260,6 +285,41 @@ impl PeerState {
                 peer_state_value
             ))),
         }
+    }
+
+    /// Returns a detailed internal state string (for logging and debugging purposes)
+    fn get_internal_client_state(&self) -> Result<Option<String>, Error> {
+        // Construct a string map for each of the state entries
+        let mut client_state_strings = HashMap::new();
+        for (state_key, state_value) in self.state_entries.read().iter() {
+            let peer_state_label = state_key.get_label().to_string();
+            let peer_state_value = format!("{}", state_value.read().deref());
+            client_state_strings.insert(peer_state_label, peer_state_value);
+        }
+
+        // Pretty print and return the client state string
+        let client_state_string =
+            serde_json::to_string_pretty(&client_state_strings).map_err(|error| {
+                Error::UnexpectedError(format!(
+                    "Failed to serialize the client state string: {:?}",
+                    error
+                ))
+            })?;
+        Ok(Some(client_state_string))
+    }
+}
+
+impl Display for PeerState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // Display format the monitoring metadata
+        let peer_monitoring_metadata = self.extract_peer_monitoring_metadata();
+        let output_string = match peer_monitoring_metadata {
+            Ok(peer_monitoring_metadata) => format!("{}", peer_monitoring_metadata),
+            Err(error) => format!("{:?}", error),
+        };
+
+        // Write the string to the formatter
+        write!(f, "PeerState {{ {} }}", output_string)
     }
 }
 

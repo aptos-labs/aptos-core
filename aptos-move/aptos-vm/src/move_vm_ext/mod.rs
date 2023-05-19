@@ -10,5 +10,5 @@ mod vm;
 pub use crate::move_vm_ext::{
     resolver::MoveResolverExt,
     session::{SessionExt, SessionId},
-    vm::{verifier_config, MoveVmExt},
+    vm::{get_max_binary_format_version, verifier_config, MoveVmExt},
 };

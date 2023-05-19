@@ -1075,6 +1075,25 @@ Insufficient token balance
 
 
 
+<a name="0x3_token_EURI_TOO_LONG"></a>
+
+The URI is too long
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 27;
+</code></pre>
+
+
+
+<a name="0x3_token_MAX_URI_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
+</code></pre>
+
+
+
 <a name="0x3_token_BURNABLE_BY_CREATOR"></a>
 
 
@@ -1431,16 +1450,6 @@ TokenStore doesn't exist
 
 
 
-<a name="0x3_token_EURI_TOO_LONG"></a>
-
-The URI is too long
-
-
-<pre><code><b>const</b> <a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 27;
-</code></pre>
-
-
-
 <a name="0x3_token_EUSER_NOT_OPT_IN_DIRECT_TRANSFER"></a>
 
 User didn't opt-in direct transfer
@@ -1485,15 +1494,6 @@ Cannot withdraw 0 token
 
 
 <pre><code><b>const</b> <a href="token.md#0x3_token_MAX_NFT_NAME_LENGTH">MAX_NFT_NAME_LENGTH</a>: u64 = 128;
-</code></pre>
-
-
-
-<a name="0x3_token_MAX_URI_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
 </code></pre>
 
 

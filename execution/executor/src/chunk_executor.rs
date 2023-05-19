@@ -143,7 +143,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         transaction_infos: &[TransactionInfo],
     ) -> Result<ExecutedChunk> {
         let (mut executed_chunk, to_discard, to_retry) =
-            chunk_output.apply_to_ledger(latest_view)?;
+            chunk_output.apply_to_ledger(latest_view, None)?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
         executed_chunk.ledger_info = executed_chunk
@@ -587,7 +587,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         let state_view = self.state_view(latest_view)?;
         let chunk_output = ChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
-        let (executed_batch, to_discard, to_retry) = chunk_output.apply_to_ledger(latest_view)?;
+        let (executed_batch, to_discard, to_retry) =
+            chunk_output.apply_to_ledger(latest_view, None)?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
         executed_batch.ensure_transaction_infos_match(&txn_infos)?;

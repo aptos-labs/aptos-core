@@ -4,13 +4,13 @@ import subprocess, re
 
 # Set the tps threshold for block size 1k, 10k and 50k
 BLOCK_SIZES = ["1k", "10k", "50k"]
-THRESHOLDS = {"1k": 3900, "10k": 4400, "50k": 4500}
+THRESHOLDS = {"1k": 3000, "10k": 4000, "50k": 7000}
 THRESHOLD_NOISE = 0.1
 
 # Run the VM sequential execution with performance optimizations enabled
 target_directory = "aptos-move/aptos-transaction-benchmarks/src/"
 output = subprocess.check_output(
-    "cargo run --profile performance main false true",
+    "cargo run --profile performance  param-sweep  --skip-parallel",
     shell=True,
     text=True,
     cwd=target_directory,

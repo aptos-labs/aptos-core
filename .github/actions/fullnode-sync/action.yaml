@@ -2,11 +2,8 @@ name: "Fullnode Sync"
 description: |
   Runs a fullnode from aptos-core, assuming it is already checked out in the current working directory.
 inputs:
-  TIMEOUT_MINUTES:
-    description: "The number of minutes to wait for fullnode sync to finish."
-    required: true
-  BRANCH:
-    description: "The aptos-core branch to switch to before running the fullnode."
+  GIT_REF:
+    description: "The aptos-core git ref (branch or commit hash) to switch to before running the fullnode."
     required: true
   NETWORK:
     description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
@@ -37,9 +34,9 @@ runs:
       run: |
         source "$HOME/.cargo/env" # Required for allowing python access to cargo
         pip install -r ${{ github.action_path }}/requirements.txt
-        timeout "${{ inputs.TIMEOUT_MINUTES }}m" python3 ${{ github.action_path }}/fullnode_sync.py
+        python3 ${{ github.action_path }}/fullnode_sync.py
       env:
-        BRANCH: ${{ inputs.BRANCH }}
+        GIT_REF: ${{ inputs.GIT_REF }}
         NETWORK: ${{ inputs.NETWORK }}
         BOOTSTRAPPING_MODE: ${{ inputs.BOOTSTRAPPING_MODE }}
         CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}

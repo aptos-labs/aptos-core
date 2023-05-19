@@ -111,7 +111,7 @@ impl TokenOwnership {
                 Some(tm.table_type.clone()),
             ),
             None => {
-                aptos_logger::warn!(
+                tracing::warn!(
                     transaction_version = txn_version,
                     table_handle = table_handle,
                     "Missing table handle metadata for TokenStore. {:?}",

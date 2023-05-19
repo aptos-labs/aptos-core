@@ -12,6 +12,8 @@ module 0xABCD::simple {
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
+    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::account;
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
@@ -43,6 +45,12 @@ module 0xABCD::simple {
     // though there is a lot happening to get to this point.
     // In a sense compute the cost of an "empty" transaction.
     public entry fun nop(_s: &signer) {
+    }
+
+    public entry fun nop_2_signers(_s1: &signer, _s2: &signer) {
+    }
+
+    public entry fun nop_5_signers(_s1: &signer, _s2: &signer, _s3: &signer, _s4: &signer, _s5: &signer) {
     }
 
     // Test simple CPU usage. Loop as defined by the input `count`.
@@ -405,4 +413,29 @@ module 0xABCD::simple {
 
 
 
+    struct SimpleEvent has drop, store {
+        event_id: u64
+    }
+
+    struct EventStore has key {
+        simple_events: EventHandle<SimpleEvent>,
+    }
+
+    fun emit_events(owner: &signer, count: u64) acquires EventStore
+    {
+        let owner_address = signer::address_of(owner);
+        if (!exists<EventStore>(owner_address)) {
+            move_to<EventStore>(owner, EventStore {
+                simple_events: account::new_event_handle<SimpleEvent>(owner)
+            });
+        };
+        let event_store = borrow_global_mut<EventStore>(owner_address);
+        while (count > 0) {
+            count = count - 1;
+            event::emit_event<SimpleEvent>(
+                &mut event_store.simple_events,
+                SimpleEvent { event_id: count },
+            );
+        }
+    }
 }

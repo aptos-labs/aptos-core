@@ -10,6 +10,7 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    metadata::Metadata,
     resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -182,7 +183,16 @@ impl<'r> TransactionDataCache<'r> {
             // TODO(Gas): Shall we charge for this?
             let ty_layout = loader.type_to_type_layout(ty)?;
 
-            let gv = match self.remote.get_resource(&addr, &ty_tag) {
+            let module = loader.get_module(&ty_tag.module_id());
+            let metadata: &[Metadata] = match &module {
+                Some(module) => &module.module().metadata,
+                None => &[],
+            };
+
+            let gv = match self
+                .remote
+                .get_resource_with_metadata(&addr, &ty_tag, metadata)
+            {
                 Ok(Some(blob)) => {
                     load_res = Some(Some(NumBytes::new(blob.len() as u64)));
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {
@@ -205,10 +215,7 @@ impl<'r> TransactionDataCache<'r> {
                 },
                 Err(err) => {
                     let msg = format!("Unexpected storage error: {:?}", err);
-                    return Err(
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message(msg),
-                    );
+                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg));
                 },
             };
 
@@ -238,11 +245,9 @@ impl<'r> TransactionDataCache<'r> {
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
-                Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(msg)
-                        .finish(Location::Undefined),
-                )
+                Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(msg)
+                    .finish(Location::Undefined))
             },
         }
     }

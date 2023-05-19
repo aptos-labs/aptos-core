@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::Error;
-use aptos_secure_storage::{
-    GitHubStorage, InMemoryStorage, Namespaced, OnDiskStorage, RocksDbStorage, Storage,
-    VaultStorage, SECURE_STORAGE_DB_NAME,
-};
+use aptos_secure_storage::{InMemoryStorage, Namespaced, OnDiskStorage, Storage, VaultStorage};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -17,20 +14,16 @@ use std::{
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SecureBackend {
-    GitHub(GitHubConfig),
     InMemoryStorage,
     Vault(VaultConfig),
     OnDiskStorage(OnDiskStorageConfig),
-    RocksDbStorage(RocksDbStorageConfig),
 }
 
 impl SecureBackend {
     pub fn namespace(&self) -> Option<&str> {
         match self {
-            SecureBackend::GitHub(GitHubConfig { namespace, .. })
-            | SecureBackend::Vault(VaultConfig { namespace, .. })
-            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
-            | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
+            SecureBackend::Vault(VaultConfig { namespace, .. })
+            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. }) => {
                 namespace.as_deref()
             },
             SecureBackend::InMemoryStorage => None,
@@ -39,10 +32,8 @@ impl SecureBackend {
 
     pub fn clear_namespace(&mut self) {
         match self {
-            SecureBackend::GitHub(GitHubConfig { namespace, .. })
-            | SecureBackend::Vault(VaultConfig { namespace, .. })
-            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. })
-            | SecureBackend::RocksDbStorage(RocksDbStorageConfig { namespace, .. }) => {
+            SecureBackend::Vault(VaultConfig { namespace, .. })
+            | SecureBackend::OnDiskStorage(OnDiskStorageConfig { namespace, .. }) => {
                 *namespace = None;
             },
             SecureBackend::InMemoryStorage => {},
@@ -53,28 +44,6 @@ impl SecureBackend {
     pub fn is_in_memory(&self) -> bool {
         matches!(self, SecureBackend::InMemoryStorage)
     }
-
-    /// Returns true iff the backend is github
-    pub fn is_github(&self) -> bool {
-        matches!(self, SecureBackend::GitHub(_))
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct GitHubConfig {
-    /// The owner or account that hosts a repository
-    pub repository_owner: String,
-    /// The repository where storage will mount
-    pub repository: String,
-    /// The branch containing storage, defaults to master
-    pub branch: Option<String>,
-    /// The authorization token for accessing the repository
-    pub token: Token,
-    /// A namespace is an optional portion of the path to a key stored within GitHubConfig. For
-    /// example, a key, S, without a namespace would be available in S, with a namespace, N, it
-    /// would be in N/S.
-    pub namespace: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -179,43 +148,6 @@ impl OnDiskStorageConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct RocksDbStorageConfig {
-    // Required path for on disk storage
-    pub path: PathBuf,
-    /// A namespace is an optional portion of the path to a key stored within OnDiskStorage. For
-    /// example, a key, S, without a namespace would be available in S, with a namespace, N, it
-    /// would be in N/S.
-    pub namespace: Option<String>,
-    #[serde(skip)]
-    data_dir: PathBuf,
-}
-
-impl Default for RocksDbStorageConfig {
-    fn default() -> Self {
-        Self {
-            namespace: None,
-            path: PathBuf::from(SECURE_STORAGE_DB_NAME),
-            data_dir: PathBuf::from("/opt/aptos/data"),
-        }
-    }
-}
-
-impl RocksDbStorageConfig {
-    pub fn path(&self) -> PathBuf {
-        if self.path.is_relative() {
-            self.data_dir.join(&self.path)
-        } else {
-            self.path.clone()
-        }
-    }
-
-    pub fn set_data_dir(&mut self, data_dir: PathBuf) {
-        self.data_dir = data_dir;
-    }
-}
-
 fn read_file(path: &Path) -> Result<String, Error> {
     let mut file =
         File::open(path).map_err(|e| Error::IO(path.to_str().unwrap().to_string(), e))?;
@@ -228,34 +160,9 @@ fn read_file(path: &Path) -> Result<String, Error> {
 impl From<&SecureBackend> for Storage {
     fn from(backend: &SecureBackend) -> Self {
         match backend {
-            SecureBackend::GitHub(config) => {
-                let storage = Storage::from(GitHubStorage::new(
-                    config.repository_owner.clone(),
-                    config.repository.clone(),
-                    config
-                        .branch
-                        .as_ref()
-                        .cloned()
-                        .unwrap_or_else(|| "master".to_string()),
-                    config.token.read_token().expect("Unable to read token"),
-                ));
-                if let Some(namespace) = &config.namespace {
-                    Storage::from(Namespaced::new(namespace, Box::new(storage)))
-                } else {
-                    storage
-                }
-            },
             SecureBackend::InMemoryStorage => Storage::from(InMemoryStorage::new()),
             SecureBackend::OnDiskStorage(config) => {
                 let storage = Storage::from(OnDiskStorage::new(config.path()));
-                if let Some(namespace) = &config.namespace {
-                    Storage::from(Namespaced::new(namespace, Box::new(storage)))
-                } else {
-                    storage
-                }
-            },
-            SecureBackend::RocksDbStorage(config) => {
-                let storage = Storage::from(RocksDbStorage::new(config.path()));
                 if let Some(namespace) = &config.namespace {
                     Storage::from(Namespaced::new(namespace, Box::new(storage)))
                 } else {

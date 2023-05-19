@@ -15,7 +15,8 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -37,7 +38,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table,
+        table, ShardedStateUpdates,
     },
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
@@ -106,9 +107,6 @@ impl FakeBufferedState {
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
-            self.state_after_checkpoint
-                .updates_since_base
-                .extend(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             swap(
@@ -313,6 +311,7 @@ impl FakeAptosDB {
                                 .flat_map(|txn_to_commit| {
                                     txn_to_commit.borrow().state_updates().clone()
                                 })
+                                .flatten()
                                 .collect(),
                         )
                     } else {
@@ -417,7 +416,8 @@ impl DbWriter for FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        _block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        _block_state_updates: ShardedStateUpdates,
+        _sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         self.save_transactions_impl(
             txns_to_commit,

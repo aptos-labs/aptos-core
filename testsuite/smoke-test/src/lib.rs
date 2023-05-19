@@ -21,6 +21,8 @@ mod genesis;
 #[cfg(test)]
 mod indexer;
 #[cfg(test)]
+mod inspection_service;
+#[cfg(test)]
 mod network;
 #[cfg(test)]
 mod rest_api;

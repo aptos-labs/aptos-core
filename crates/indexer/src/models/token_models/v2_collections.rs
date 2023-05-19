@@ -100,9 +100,11 @@ impl CollectionV2 {
             0, // Placeholder, this isn't used anyway
         );
 
-        if let V2TokenResource::Collection(inner) =
-            V2TokenResource::from_resource(&type_str, resource.data.as_ref().unwrap(), txn_version)?
-        {
+        if let V2TokenResource::Collection(inner) = &V2TokenResource::from_resource(
+            &type_str,
+            resource.data.as_ref().unwrap(),
+            txn_version,
+        )? {
             let (mut current_supply, mut max_supply, mut total_minted_v2) =
                 (BigDecimal::zero(), None, None);
             let (mut mutable_description, mut mutable_uri) = (None, None);
@@ -137,7 +139,7 @@ impl CollectionV2 {
             }
 
             let collection_id = resource.address.clone();
-            let creator_address = inner.creator.clone();
+            let creator_address = inner.get_creator_address();
             let collection_name = inner.get_name_trunc();
             let description = inner.description.clone();
             let uri = inner.get_uri_trunc();

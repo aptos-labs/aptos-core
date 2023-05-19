@@ -24,6 +24,7 @@ locals {
 data "kubernetes_service" "validator-lb" {
   count = var.zone_id == "" || !var.create_records ? 0 : 1
   metadata {
+    # This is the main validator LB service that is created by the aptos-node helm chart
     name = "${local.workspace_name}-aptos-node-0-validator-lb"
   }
   depends_on = [time_sleep.lb_creation]
@@ -32,6 +33,7 @@ data "kubernetes_service" "validator-lb" {
 data "kubernetes_service" "fullnode-lb" {
   count = var.zone_id == "" || !var.create_records ? 0 : 1
   metadata {
+    # This is the main fullnode LB service that is created by the aptos-node helm chart
     name = "${local.workspace_name}-aptos-node-0-fullnode-lb"
   }
   depends_on = [time_sleep.lb_creation]
