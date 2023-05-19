@@ -4,7 +4,8 @@ import { AptosClient, Provider } from "../../providers";
 import { TxnBuilderTypes } from "../../transaction_builder";
 import { HexString } from "../../utils";
 import { getFaucetClient, longTestTimeout, PROVIDER_LOCAL_NETWORK_CONFIG } from "../unit/test_helper.test";
-import { FungibleAssetClient } from "../../plugins";
+import { CoinClient, FungibleAssetClient } from "../../plugins";
+import { RawTransaction } from "../../aptos_types";
 
 const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
 const faucetClient = getFaucetClient();
@@ -96,4 +97,33 @@ describe("fungible asset", () => {
     },
     longTestTimeout,
   );
+
+  /**
+   * Test `transfer` and `checkBalance` functions in CoinClient class
+   */
+  test("coin client supports fungible assets operations", async () => {
+    const coinClient = new CoinClient(provider.aptosClient);
+    // Test `transfer` and `checkBalance`
+
+    // Alice transfers 2 more amount of fungible asset to Bob
+    await provider.waitForTransaction(
+      await coinClient.transfer(alice, bob, 2, {
+        assetAddress,
+      }),
+      { checkSuccess: true },
+    );
+    // Bob balance is now 4
+    expect(
+      await coinClient.checkBalance(bob, {
+        assetAddress,
+      }),
+    ).toEqual(BigInt(4));
+  });
+
+  test("it generates and returns a transferAmount raw transaction", async () => {
+    const fungibleAsset = new FungibleAssetClient(provider);
+    const rawTxn = await fungibleAsset.generateTransferAmount(alice, assetAddress, bob.address(), 2);
+    expect(rawTxn instanceof RawTransaction).toBeTruthy();
+    expect(rawTxn.sender.toHexString()).toEqual(alice.address().hex());
+  });
 });
