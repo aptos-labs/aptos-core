@@ -14,7 +14,7 @@ use crate::{
     payload_manager::PayloadManager,
     round_manager::VerifiedEvent,
     state_replication::{PayloadClient, StateComputer},
-    util::time_service::TimeService,
+    util::time_service::TimeService, liveness::proposer_election,
 };
 use aptos_channels::aptos_channel;
 use aptos_config::config::DagConfig;
@@ -79,6 +79,7 @@ impl DagDriver {
         );
 
         let proposer_election = Arc::new(LeaderReputationElection::new(&verifier));
+        let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
         let enable_pipeline = true;
 
         let bullshark = Arc::new(Mutex::new(Bullshark::new(
