@@ -35,7 +35,7 @@ use aptos_types::{
     contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig},
+    on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
         state_key::{StateKey, StateKeyInner},
         state_key_prefix::StateKeyPrefix,
@@ -65,6 +65,7 @@ pub struct Context {
     pub node_config: NodeConfig,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
+    gas_limit_cache: Arc<RwLock<GasLimitCache>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -94,6 +95,10 @@ impl Context {
                 last_updated_time: None,
                 estimation: None,
                 min_inclusion_prices: BTreeMap::new(),
+            })),
+            gas_limit_cache: Arc::new(RwLock::new(GasLimitCache {
+                last_updated_epoch: None,
+                block_gas_limit: None,
             })),
         }
     }
@@ -861,6 +866,7 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        let block_gas_limit = self.block_gas_limit(ledger_info)?;
         if !config.enabled {
             return Ok(self.default_gas_estimation(min_gas_unit_price));
         }
@@ -874,6 +880,7 @@ impl Context {
 
         // 0. (1) Write lock and prepare cache
         let mut cache = self.gas_estimation_cache.write().unwrap();
+        // TODO: retry cached result after acquiring write lock
         if let Some(cached_epoch) = cache.last_updated_epoch {
             if cached_epoch != epoch {
                 cache.min_inclusion_prices.clear();
@@ -933,12 +940,16 @@ impl Context {
                 ledger_info.ledger_version.0,
             ) {
                 Ok(prices_and_used) => {
-                    if prices_and_used.len() < config.full_block_txns
-                        && prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
-                            < config.full_block_gas_used
-                    {
-                        min_gas_unit_price
+                    let is_full_block = if prices_and_used.len() >= config.full_block_txns {
+                        true
+                    } else if let Some(full_block_gas_used) = block_gas_limit {
+                        prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
+                            >= full_block_gas_used
                     } else {
+                        false
+                    };
+
+                    if is_full_block {
                         self.next_bucket(
                             prices_and_used
                                 .iter()
@@ -946,6 +957,8 @@ impl Context {
                                 .min()
                                 .unwrap(),
                         )
+                    } else {
+                        min_gas_unit_price
                     }
                 },
                 Err(_) => min_gas_unit_price,
@@ -1111,6 +1124,49 @@ impl Context {
         }
     }
 
+    pub fn block_gas_limit<E: InternalError>(
+        &self,
+        ledger_info: &LedgerInfo,
+    ) -> Result<Option<u64>, E> {
+        // If it's the same epoch, use the cached results
+        {
+            let cache = self.gas_limit_cache.read().unwrap();
+            if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
+                if *last_updated_epoch == ledger_info.epoch.0 {
+                    return Ok(cache.block_gas_limit);
+                }
+            }
+        }
+
+        // Otherwise refresh the cache
+        {
+            let mut cache = self.gas_limit_cache.write().unwrap();
+            // If a different thread updated the cache, we can exit early
+            if let Some(ref last_updated_epoch) = cache.last_updated_epoch {
+                if *last_updated_epoch == ledger_info.epoch.0 {
+                    return Ok(cache.block_gas_limit);
+                }
+            }
+
+            // Retrieve the execution config from storage and parse it accordingly
+            let state_view = self
+                .db
+                .state_view_at_version(Some(ledger_info.version()))
+                .map_err(|e| {
+                    E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
+                })?;
+            let storage_adapter = StorageAdapter::new(&state_view);
+
+            let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
+                .and_then(|config| config.block_gas_limit());
+
+            // Update the cache
+            cache.block_gas_limit = block_gas_limit;
+            cache.last_updated_epoch = Some(ledger_info.epoch.0);
+            Ok(block_gas_limit)
+        }
+    }
+
     pub fn check_api_output_enabled<E: ForbiddenError>(
         &self,
         api_name: &'static str,
@@ -1155,4 +1211,9 @@ pub struct GasEstimationCache {
     estimation: Option<GasEstimation>,
     /// (epoch, lookup_version) -> min_inclusion_price
     min_inclusion_prices: BTreeMap<(u64, u64), u64>,
+}
+
+pub struct GasLimitCache {
+    last_updated_epoch: Option<u64>,
+    block_gas_limit: Option<u64>,
 }
