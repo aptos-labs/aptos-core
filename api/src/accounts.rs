@@ -27,8 +27,8 @@ use aptos_types::{
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
+    resolver::MoveResolver,
 };
-use move_vm_types::resolver::MoveRefResolver;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -519,7 +519,7 @@ impl Account {
         let resolver = state_view.as_move_resolver();
 
         let bytes = resolver
-            .get_resource_bytes(&self.address.into(), resource_type)
+            .get_resource(&self.address.into(), resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, self.address

@@ -17,12 +17,11 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
     parser,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, ResourceResolver},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue, MoveValueAnnotator};
-use move_vm_types::{resolver::ResourceRefResolver, types::ResourceRef};
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -413,25 +412,14 @@ impl ModuleResolver for OnDiskStateView {
     }
 }
 
-impl ResourceRefResolver for OnDiskStateView {
-    fn get_resource_ref_with_metadata(
+impl ResourceResolver for OnDiskStateView {
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
-        tag: &StructTag,
+        struct_tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<ResourceRef>> {
-        Ok(self
-            .get_resource_bytes(*address, tag.clone())?
-            .map(ResourceRef::Serialized))
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>> {
-        self.get_resource_bytes(*address, tag.clone())
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        self.get_resource_bytes(*address, struct_tag.clone())
     }
 }
 

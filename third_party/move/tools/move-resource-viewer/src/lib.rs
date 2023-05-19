@@ -17,11 +17,11 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    resolver::MoveResolver,
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
-use move_vm_types::resolver::MoveRefResolver;
 use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
     convert::{TryFrom, TryInto},
@@ -83,7 +83,7 @@ pub struct MoveValueAnnotator<'a, T: ?Sized> {
     cache: Resolver<'a, T>,
 }
 
-impl<'a, T: MoveRefResolver + ?Sized> MoveValueAnnotator<'a, T> {
+impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
     pub fn new(view: &'a T) -> Self {
         Self {
             cache: Resolver::new(view),
@@ -92,7 +92,7 @@ impl<'a, T: MoveRefResolver + ?Sized> MoveValueAnnotator<'a, T> {
 
     // TODO
     pub fn get_resource_bytes(&self, addr: &AccountAddress, tag: &StructTag) -> Option<Vec<u8>> {
-        self.cache.state.get_resource_bytes(addr, tag).ok()?
+        self.cache.state.get_resource(addr, tag).ok()?
     }
 
     pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {

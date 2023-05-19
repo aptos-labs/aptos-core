@@ -276,7 +276,6 @@ dependencies = [
  "mime",
  "move-core-types",
  "move-package",
- "move-vm-types",
  "num_cpus",
  "once_cell",
  "paste",
@@ -8700,7 +8699,6 @@ dependencies = [
 name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bcs 0.1.4",
  "move-binary-format",
  "move-core-types",

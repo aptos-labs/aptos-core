@@ -10,13 +10,13 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver, types::ResourceRef};
+use move_vm_types::gas::UnmeteredGasMeter;
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 
@@ -520,19 +520,8 @@ impl ModuleResolver for BogusStorage {
     }
 }
 
-impl ResourceRefResolver for BogusStorage {
-    fn get_resource_ref_with_metadata(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<ResourceRef>> {
-        Ok(Err(
-            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
-        )?)
-    }
-
-    fn get_resource_bytes_with_metadata(
+impl ResourceResolver for BogusStorage {
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,

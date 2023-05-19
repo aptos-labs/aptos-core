@@ -187,7 +187,7 @@ impl AptosVMImpl {
         resolver: &impl MoveResolverExt,
     ) -> Option<TransactionValidation> {
         match resolver
-            .get_resource_bytes(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
+            .get_resource(&CORE_CODE_ADDRESS, &TransactionValidation::struct_tag())
             .ok()?
         {
             Some(blob) => bcs::from_bytes::<TransactionValidation>(&blob).ok(),
@@ -246,12 +246,12 @@ impl AptosVMImpl {
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
         if txn_data.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
-            let data = resolver
-                .get_resource_bytes(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
+            let data =
+                resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag());
 
-            let valid = if let Ok(Some(bytes)) = data {
+            let valid = if let Ok(Some(data)) = data {
                 let approved_execution_hashes =
-                    bcs::from_bytes::<ApprovedExecutionHashes>(&bytes).ok();
+                    bcs::from_bytes::<ApprovedExecutionHashes>(&data).ok();
                 let valid = approved_execution_hashes
                     .map(|aeh| {
                         aeh.entries

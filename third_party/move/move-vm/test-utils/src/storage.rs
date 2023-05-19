@@ -9,14 +9,10 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, MoveResolver, ResourceResolver},
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
-use move_vm_types::{
-    resolver::{MoveRefResolver, ResourceRefResolver},
-    types::ResourceRef,
-};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -42,17 +38,8 @@ impl ModuleResolver for BlankStorage {
     }
 }
 
-impl ResourceRefResolver for BlankStorage {
-    fn get_resource_ref_with_metadata(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> Result<Option<ResourceRef>> {
-        Ok(None)
-    }
-
-    fn get_resource_bytes_with_metadata(
+impl ResourceResolver for BlankStorage {
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
@@ -97,31 +84,20 @@ impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: ResourceRefResolver> ResourceRefResolver for DeltaStorage<'a, 'b, S> {
-    fn get_resource_ref_with_metadata(
+impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<ResourceRef>> {
-        let maybe_bytes = self.get_resource_bytes_with_metadata(address, tag, metadata)?;
-        Ok(maybe_bytes.map(ResourceRef::Serialized))
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 return Ok(blob_opt.clone().ok());
             }
         }
 
-        self.base
-            .get_resource_bytes_with_metadata(address, tag, metadata)
+        self.base.get_resource_with_metadata(address, tag, metadata)
     }
 }
 
@@ -137,7 +113,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: MoveRefResolver> DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: MoveResolver> DeltaStorage<'a, 'b, S> {
     pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
         Self { base, delta }
     }
@@ -320,29 +296,13 @@ impl ModuleResolver for InMemoryStorage {
     }
 }
 
-impl ResourceRefResolver for InMemoryStorage {
-    fn get_resource_ref_with_metadata(
+impl ResourceResolver for InMemoryStorage {
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<ResourceRef>> {
-        if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage
-                .resources
-                .get(tag)
-                .cloned()
-                .map(ResourceRef::Serialized));
-        }
-        Ok(None)
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             return Ok(account_storage.resources.get(tag).cloned());
         }

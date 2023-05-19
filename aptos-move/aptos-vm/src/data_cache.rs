@@ -21,11 +21,10 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use move_vm_types::{resolver::ResourceRefResolver, types::ResourceRef};
 use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
 
 pub(crate) fn get_resource_group_from_metadata(
@@ -129,25 +128,14 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
     }
 }
 
-impl<'a, S: StateView> ResourceRefResolver for StorageAdapter<'a, S> {
-    fn get_resource_ref_with_metadata(
+impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
-        tag: &StructTag,
+        struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> anyhow::Result<Option<ResourceRef>> {
-        Ok(self
-            .get_resource_bytes_with_metadata(address, tag, metadata)?
-            .map(ResourceRef::Serialized))
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> anyhow::Result<Option<Vec<u8>>> {
-        Ok(self.get_any_resource(address, tag, metadata)?)
+    ) -> Result<Option<Vec<u8>>, Error> {
+        Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
 

@@ -13,17 +13,15 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet as SerializedChangeSet, Event},
+    effects::{ChangeSet, Event},
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
 };
 use move_vm_types::{
-    effects::ChangeSet,
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    types::Resource,
     values::GlobalValue,
 };
 use std::{borrow::Borrow, sync::Arc};
@@ -258,15 +256,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<(SerializedChangeSet, Vec<Event>)> {
-        let (change_set, events) = self.finish_without_serialization()?;
-        let serialized_change_set = change_set.into_serialized_change_set()?;
-        Ok((serialized_change_set, events))
-    }
-
-    pub fn finish_without_serialization(
-        self,
-    ) -> VMResult<(ChangeSet<Vec<u8>, Resource>, Vec<Event>)> {
+    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -275,20 +265,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(
         self,
-    ) -> VMResult<(SerializedChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
-        let (change_set, events, native_extensions) =
-            self.finish_without_serialization_with_extensions()?;
-        let serialized_change_set = change_set.into_serialized_change_set()?;
-        Ok((serialized_change_set, events, native_extensions))
-    }
-
-    pub fn finish_without_serialization_with_extensions(
-        self,
-    ) -> VMResult<(
-        ChangeSet<Vec<u8>, Resource>,
-        Vec<Event>,
-        NativeContextExtensions<'r>,
-    )> {
+    ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
             native_extensions,
