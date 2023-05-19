@@ -98,6 +98,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
+    "execution/block-partitioner",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -270,6 +271,7 @@ aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
+aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }

@@ -13,7 +13,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::Transaction,
+    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
 };
 use aptos_vm::{data_cache::AsMoveResolver, sharded_block_executor::ShardedBlockExecutor};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
@@ -247,7 +247,7 @@ where
         }
     }
 
-    pub fn gen_transaction(&mut self, no_conflict_txns: bool) -> Vec<Transaction> {
+    pub fn gen_transaction(&mut self, no_conflict_txns: bool) -> Vec<AnalyzedTransaction> {
         if no_conflict_txns {
             // resetting the picker here so that we can re-use the same accounts from last block
             // but still generate non conflicting transactions for this block.
@@ -258,10 +258,10 @@ where
             .new_tree(&mut runner)
             .expect("creating a new value should succeed")
             .current();
-        let mut transactions: Vec<Transaction> = transaction_gens
+        let mut transactions: Vec<AnalyzedTransaction> = transaction_gens
             .into_iter()
             .map(|txn_gen| {
-                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0).into()
             })
             .collect();
 
@@ -281,7 +281,7 @@ where
             1,
         );
 
-        transactions.insert(0, Transaction::BlockMetadata(new_block));
+        transactions.insert(0, Transaction::BlockMetadata(new_block).into());
         transactions
     }
 
@@ -309,7 +309,7 @@ where
 
     fn execute_benchmark(
         &self,
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
         concurrency_level_per_shard: usize,
     ) -> usize {

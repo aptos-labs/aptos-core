@@ -125,7 +125,10 @@ pub use crate::aptos_vm::AptosVM;
 use crate::sharded_block_executor::ShardedBlockExecutor;
 use aptos_state_view::StateView;
 use aptos_types::{
-    transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, VMValidatorResult,
+    },
     vm_status::VMStatus,
 };
 use std::{marker::Sync, sync::Arc};
@@ -165,7 +168,7 @@ pub trait VMExecutor: Send + Sync {
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         state_view: Arc<S>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }

@@ -15,7 +15,10 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
+        TransactionToCommit, Version,
+    },
     vm_status::VMStatus,
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
@@ -72,7 +75,7 @@ impl TransactionBlockExecutor for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<Transaction>,
+        _transactions: Vec<AnalyzedTransaction>,
         _state_view: Arc<S>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())

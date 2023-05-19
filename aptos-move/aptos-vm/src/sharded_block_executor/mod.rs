@@ -2,13 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    block_partitioner::{BlockPartitioner, UniformPartitioner},
-    executor_shard::ExecutorShard,
-};
+use crate::sharded_block_executor::executor_shard::ExecutorShard;
+use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
-use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_types::transaction::{
+    analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
+};
 use move_core_types::vm_status::VMStatus;
 use std::{
     marker::PhantomData,
@@ -19,7 +19,6 @@ use std::{
     thread,
 };
 
-mod block_partitioner;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
@@ -83,7 +82,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<Transaction>,
+        block: Vec<AnalyzedTransaction>,
         concurrency_level_per_shard: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
@@ -94,7 +93,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             self.command_txs[i]
                 .send(ExecutorShardCommand::ExecuteBlock(
                     state_view.clone(),
-                    transactions,
+                    transactions
+                        .into_iter()
+                        .map(|t| t.into())
+                        .collect::<Vec<Transaction>>(),
                     concurrency_level_per_shard,
                 ))
                 .unwrap();

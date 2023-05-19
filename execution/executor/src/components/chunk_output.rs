@@ -16,7 +16,10 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
+        TransactionStatus,
+    },
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
 use fail::fail_point;
@@ -87,22 +90,25 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs =
             Self::execute_block_sharded::<V>(transactions.clone(), state_view_arc.clone())?;
 
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+        // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
+        // Unwrapping here is safe because the execution has finished and it is guaranteed that
+        // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions,
+            transactions: transactions
+                .into_iter()
+                .map(|t| t.into())
+                .collect::<Vec<Transaction>>(),
             transaction_outputs,
-            // Unwrapping here is safe because the execution has finished and it is guaranteed that
-            // the state view is not used anymore.
             state_cache: state_view.into_state_cache(),
         })
     }
@@ -170,7 +176,7 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: Vec<AnalyzedTransaction>,
         state_view: Arc<CachedStateView>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
