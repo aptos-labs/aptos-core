@@ -36,23 +36,9 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Run validator-testnet docker compose
-        run: docker-compose up -d
+      - name: Set up and verify indexer GRPC local docker
         shell: bash
-        working-directory: docker/compose/validator-testnet
-
-      - name: Wait for the validator to make some progress
-        run: sleep 30
-        shell: bash
-
-      - name: Run indexer-grpc docker compose
-        run: docker-compose up -d
-        shell: bash
-        working-directory: docker/compose/indexer-grpc
-
-      - name: Test with grpcurl
-        run: ./docker/compose/indexer-grpc/test_indexer_grpc_docker_compose.sh
-        shell: bash
+        run: ./testsuite/indexer_grpc_local.py --verbose up
 
       - name: Print docker-compose validator-testnet logs on failure
         if: ${{ failure() }}
