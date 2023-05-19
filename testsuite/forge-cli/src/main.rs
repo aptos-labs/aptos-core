@@ -102,7 +102,10 @@ enum OperatorCommand {
 }
 
 #[derive(StructOpt, Debug)]
-struct LocalSwarm {}
+struct LocalSwarm {
+    #[structopt(long, help = "directory to build local swarm under")]
+    swarmdir: Option<String>,
+}
 
 #[derive(StructOpt, Debug)]
 struct K8sSwarm {
@@ -238,7 +241,7 @@ fn main() -> Result<()> {
 
             // Run the test suite
             match test_cmd {
-                TestCommand::LocalSwarm(..) => {
+                TestCommand::LocalSwarm(local_cfg) => {
                     // Loosen all criteria for local runs
                     test_suite.get_success_criteria_mut().avg_tps = 400;
                     let previous_emit_job = test_suite.get_emit_job().clone();
@@ -246,11 +249,11 @@ fn main() -> Result<()> {
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
                             mempool_backlog: 5000,
                         }));
-
+                    let swarm_dir = local_cfg.swarmdir.clone();
                     run_forge(
                         duration,
                         test_suite,
-                        LocalFactory::from_workspace()?,
+                        LocalFactory::from_workspace(swarm_dir)?,
                         &args.options,
                         args.changelog.clone(),
                     )
