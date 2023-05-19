@@ -19,7 +19,7 @@ export class FungibleAssetClient {
   }
 
   /**
-   * Transfer an asset amount from the sender primary_store to the recipient primary_store
+   * Transfer an asset amount from the sender primary_fungible_store to the recipient primary_fungible_store
    *
    * Use this method to transfer any fungible asset including fungible token.
    *
@@ -27,7 +27,7 @@ export class FungibleAssetClient {
    * @param assetAddress The fungible asset address - For example if you’re transferring USDT, this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
-   * @param assetType The fungible asset type
+   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns The hash of the transaction submitted to the API
    */
   async transferAmount(
@@ -47,7 +47,7 @@ export class FungibleAssetClient {
    *
    * @param account Account that you want to get the balance of.
    * @param assetAddress The fungible asset address you want to check the balance of
-   * @param assetType The fungible asset type
+   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns Promise that resolves to the balance
    */
   async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType?: string): Promise<bigint> {
@@ -62,7 +62,9 @@ export class FungibleAssetClient {
 
   /**
    *
-   * Generate a transfer transaction.
+   * Generate a transfer transaction that can be used to sign and submit to transfer an asset amount
+   * from the sender primary_fungible_store to the recipient primary_fungible_store.
+   *
    * This method can be used if you want/need to get the raw transaction so you can
    * first simulate the transaction and then sign and submit it.
    *
@@ -70,7 +72,7 @@ export class FungibleAssetClient {
    * @param assetAddress The fungible asset address - For example if you’re transferring USDT, this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
-   * @param assetType The fungible asset type
+   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns Raw Transaction
    */
   async generateTransferAmount(

@@ -16,7 +16,7 @@ const alice = new AptosAccount();
 const bob = new AptosAccount();
 let assetAddress = "";
 /**
- * Since there is no ready-to-use fungible asset contract/module on aptos framework address
+ * Since there is no ready-to-use fungible asset contract/module on an aptos framework address
  * we pre compiled ../../../aptos-move/move-examples/fungible_token contract and publish
  * it here to local testnet so we can intercat with it to mint a fungible asset and then
  * test FungibleAssetClient class
@@ -48,8 +48,8 @@ describe("fungible asset", () => {
         ),
       ],
     );
-
     await provider.waitForTransaction(txnHash);
+
     // Mint fungible asset to Alice
     const payload: Gen.EntryFunctionPayload = {
       function: `${publisher.address().hex()}::managed_fungible_token::mint`,
