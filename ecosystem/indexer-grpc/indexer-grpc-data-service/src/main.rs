@@ -24,7 +24,6 @@ use tonic::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcDataServiceConfig {
-    pub server_name: String,
     pub data_service_grpc_listen_address: String,
     pub whitelisted_auth_tokens: Vec<String>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
@@ -82,7 +81,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxdata".to_string()
     }
 }
 
