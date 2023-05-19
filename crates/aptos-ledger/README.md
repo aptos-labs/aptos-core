@@ -5,7 +5,9 @@ Provides a set of commands and methods to communicate with Aptos app on Ledger
 The methods supported by the aptos-ledger are:
 
 - `get_app_version()`
-- get_app_name()
+- `get_app_name()`
+- `get_public_key()`
+- `sign_txn()`
 - get_public_key()
 - sign_txn()
 
