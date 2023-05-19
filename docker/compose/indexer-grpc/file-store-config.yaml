@@ -1,7 +1,6 @@
 health_check_port: 8083
 
 server_config:
-  server_name: "file-store"
   redis_main_instance_address: 172.16.1.12:6379
   file_store_config:
     file_store_type: LocalFileStore
