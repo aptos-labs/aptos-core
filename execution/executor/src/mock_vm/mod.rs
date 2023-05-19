@@ -23,9 +23,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
+        analyzed_transaction::AnalyzedTransaction, ChangeSet, ExecutionStatus, RawTransaction,
+        Script, SignedTransaction, Transaction, TransactionArgument, TransactionOutput,
+        TransactionPayload, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -208,7 +208,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<Transaction>,
+        _transactions: Vec<AnalyzedTransaction>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {

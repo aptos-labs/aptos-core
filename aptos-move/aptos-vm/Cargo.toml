@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true }
+aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-framework =  { workspace = true }
@@ -45,6 +46,7 @@ move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 ouroboros = { workspace = true }
+rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

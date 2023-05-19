@@ -35,6 +35,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
+pub mod analyzed_transaction;
 pub mod authenticator;
 mod change_set;
 mod module;
@@ -950,6 +951,10 @@ impl TransactionOutput {
             gas_used,
             status,
         }
+    }
+
+    pub fn retried() -> Self {
+        Self::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
     }
 
     pub fn into(self) -> (WriteSet, Vec<ContractEvent>) {
