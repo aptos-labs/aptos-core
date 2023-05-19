@@ -959,6 +959,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executable-store"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "claims",
+ "dashmap",
+ "proptest",
+ "proptest-derive",
+ "rayon",
+]
+
+[[package]]
 name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
@@ -2421,7 +2435,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "pbjson",
  "prost",
@@ -2883,6 +2897,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-netcore",
  "aptos-network",
  "aptos-storage-interface",
  "aptos-storage-service-types",

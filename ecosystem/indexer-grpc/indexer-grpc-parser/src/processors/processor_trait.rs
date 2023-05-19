@@ -9,7 +9,7 @@ use crate::{
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
     },
 };
-use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
+use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use std::fmt::Debug;

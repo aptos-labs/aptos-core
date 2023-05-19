@@ -861,6 +861,10 @@ impl Context {
     ) -> Result<GasEstimation, E> {
         let config = &self.node_config.api.gas_estimation;
         let min_gas_unit_price = self.min_gas_unit_price(ledger_info)?;
+        if !config.enabled {
+            return Ok(self.default_gas_estimation(min_gas_unit_price));
+        }
+
         let epoch = ledger_info.epoch.0;
 
         // 0. (0) Return cached result if it exists

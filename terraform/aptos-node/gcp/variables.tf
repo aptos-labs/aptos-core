@@ -171,8 +171,19 @@ variable "manage_via_tf" {
   default     = true
 }
 
-### Autoscaling
+### Cluster node config
 
+variable "gke_cluster_enable_gcfs" {
+  description = "Enable GCFS at the cluster level"
+  default     = false
+}
+
+variable "gke_cluster_enable_gvnic" {
+  description = "Enable GVNIC (networking driver) at the cluster level"
+  default     = false
+}
+
+### Autoscaling
 
 variable "gke_enable_node_autoprovisioning" {
   description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"

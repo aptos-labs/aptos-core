@@ -105,6 +105,16 @@ module token_objects::ambassador {
         );
     }
 
+    public entry fun mint_ambassador_token_by_user(
+        user: &signer,
+        creator: &signer,
+        description: String,
+        name: String,
+        uri: String,
+    ) {
+        mint_ambassador_token(creator, description, name, uri, signer::address_of(user));
+    }
+
     /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
     /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
     public entry fun mint_ambassador_token(
