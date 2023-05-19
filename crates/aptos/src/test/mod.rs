@@ -1114,6 +1114,8 @@ impl CliTestFramework {
         is_multi_step: bool,
     ) -> CliTypedResult<ProposalSubmissionSummary> {
         SubmitProposal {
+            #[cfg(feature = "no-upload-proposal")]
+            metadata_path: None,
             metadata_url: Url::parse(metadata_url).unwrap(),
             pool_address_args: PoolAddressArgs { pool_address },
             txn_options: self.transaction_options(index, None),
