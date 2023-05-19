@@ -29,12 +29,7 @@ use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
-use futures::{
-    channel::oneshot,
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
-    sink::SinkExt,
-    stream::StreamExt,
-};
+use futures::{channel::oneshot, io::{AsyncRead, AsyncWrite, AsyncWriteExt}, sink::SinkExt, Stream, stream::StreamExt};
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,
@@ -42,9 +37,12 @@ use std::{
     time::Duration,
 };
 use std::cell::RefCell;
+use std::ops::DerefMut;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use futures_util::stream::FusedStream;
 use tokio::runtime::Handle;
-use tokio::sync::mpsc::Sender;
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 pub mod builder;
 pub mod conn_notifs_channel;
@@ -152,6 +150,10 @@ where
     max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
+    /// rpc response messages in from peers
+    rpc_response_tx: tokio::sync::mpsc::Sender<(PeerId, RpcResponse)>,
+    //rpc_response_rx: Box<dyn FusedRpcReceiver<Item=()>>,//tokio_stream::stream_ext::fuse::Fuse<RpcResponse>,
+    rpc_response_rx: FusedReceiverStream<(PeerId, RpcResponse)>,//tokio_stream::stream_ext::fuse::Fuse<RpcResponse>,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -201,6 +203,8 @@ where
             transport_reqs_rx,
             transport_notifs_tx_clone,
         );
+        let (rpc_response_tx, rpc_response_rx) = tokio::sync::mpsc::channel(1024); // TODO: configure
+        let mut rpc_response_rx = FusedReceiverStream::new(rpc_response_rx);//Box::pin(FusedReceiverStream::new(rpc_response_rx).fuse());
 
         Self {
             network_context,
@@ -226,6 +230,8 @@ where
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
+            rpc_response_tx,
+            rpc_response_rx,
         }
     }
 
@@ -278,6 +284,7 @@ where
             "Start listening for incoming connections on {}", self.listen_addr
         );
         self.start_connection_listener();
+
         loop {
             ::futures::select! {
                 connection_event = self.transport_notifs_rx.select_next_some() => {
@@ -288,6 +295,10 @@ where
                 }
                 request = self.requests_rx.select_next_some() => {
                     self.handle_outbound_request(request).await;
+                }
+                peer_id_response = self.rpc_response_rx.select_next_some() => {
+                    let (peer_id, response) = peer_id_response;
+                    self.handle_rpc_response(peer_id, response).await;
                 }
                 complete => {
                     break;
@@ -577,7 +588,6 @@ where
                 }))
             },
             PeerManagerRequest::SendRpc(peer_id, req) => {
-                // TODO: peer.outbound_rpcs.handle_outbound_request(req, sender)
                 if let Some(pmp) = self.active_peers.get_mut(&peer_id) {
                     pmp.outbound_rpcs.handle_outbound_request(req, &mut pmp.sender);
                 } else {
@@ -618,6 +628,14 @@ where
                 self.network_context,
                 peer_id.short_str()
             );
+        }
+    }
+
+    async fn handle_rpc_response(&mut self, peer_id: PeerId, response: RpcResponse) {
+        if let Some(pmp) = self.active_peers.get_mut(&peer_id) {
+            pmp.outbound_rpcs.handle_inbound_response(response)
+        } else {
+            // TODO: log, counter (response with no internal accounting to match it to)
         }
     }
 
@@ -800,7 +818,8 @@ where
         let mut direct_map = self.direct_map.clone();
         let mut rpc_map = self.rpc_map.clone();
         let network_context = self.network_context;
-        let ne_stream = ReceiverStream::new(network_events);
+        let ne_stream = FusedReceiverStream::new(network_events);
+        let mut rpc_response = self.rpc_response_tx.clone();
         self.executor.spawn(ne_stream.for_each_concurrent(
             self.max_concurrent_network_reqs,
             move |inbound_event| {
@@ -811,6 +830,7 @@ where
                     //&mut upstream_handlers,
                     &mut direct_map,
                     &mut rpc_map,
+                    &mut rpc_response,
                 );
                 futures::future::ready(())
             },
@@ -831,6 +851,7 @@ fn handle_inbound_request(
     // >,
     direct_map: &mut HashMap<ProtocolId, Sender<IncomingMessage>>,
     rpc_map: &mut HashMap<ProtocolId, Sender<IncomingRpcRequest>>,
+    rpc_response: &mut Sender<(PeerId, RpcResponse)>,
 ) {
     match inbound_event {
         NetworkMessage::DirectSendMsg(msg) => {
@@ -869,7 +890,10 @@ fn handle_inbound_request(
                 // TODO: log, counter
             }
         }
-        NetworkMessage::RpcResponse(res) => { // TODO: reconnect with peer.outbound_rpcs.handle_inbound_response(res)
+        NetworkMessage::RpcResponse(res) => {
+            if let Err(e) = rpc_response.try_send((peer_id, res)) {
+                // TODO: log, counter (internal queue was full, message dropped)
+            }
         }
         NetworkMessage::Error(_) => {return} // don't care, drop. TODO: counter? log?
     };
@@ -906,4 +930,84 @@ fn handle_inbound_request(
     //         notification,
     //     );
     // }
+}
+
+/// Like tokio_stream::wrappers::ReceiverStream, but also FusedStream
+/// A wrapper around [`tokio::sync::mpsc::Receiver`] that implements [`Stream`].
+///
+/// [`tokio::sync::mpsc::Receiver`]: struct@tokio::sync::mpsc::Receiver
+/// [`Stream`]: trait@crate::Stream
+#[derive(Debug)]
+pub struct FusedReceiverStream<T> {
+    inner: Receiver<T>,
+    done: bool,
+}
+
+impl<T> FusedReceiverStream<T> {
+    /// Create a new `FusedReceiverStream`.
+    pub fn new(recv: Receiver<T>) -> Self {
+        Self { inner: recv, done: false }
+    }
+
+    /// Get back the inner `Receiver`.
+    pub fn into_inner(self) -> Receiver<T> {
+        self.inner
+    }
+
+    /// Closes the receiving half of a channel without dropping it.
+    ///
+    /// This prevents any further messages from being sent on the channel while
+    /// still enabling the receiver to drain messages that are buffered. Any
+    /// outstanding [`Permit`] values will still be able to send messages.
+    ///
+    /// To guarantee no messages are dropped, after calling `close()`, you must
+    /// receive all items from the stream until `None` is returned.
+    ///
+    /// [`Permit`]: struct@tokio::sync::mpsc::Permit
+    pub fn close(&mut self) {
+        self.inner.close()
+    }
+}
+
+impl<T> Stream for FusedReceiverStream<T> {
+    type Item = T;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.done {
+            return Poll::Ready(None);
+        }
+        let ret = self.inner.poll_recv(cx);
+        match &ret {
+            Poll::Ready(maybe) => match maybe {
+                None => { self.done = true}
+                Some(_) => {}
+            }
+            Poll::Pending => {}
+        }
+        return ret;
+    }
+}
+
+impl<T> AsRef<Receiver<T>> for FusedReceiverStream<T> {
+    fn as_ref(&self) -> &Receiver<T> {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<Receiver<T>> for FusedReceiverStream<T> {
+    fn as_mut(&mut self) -> &mut Receiver<T> {
+        &mut self.inner
+    }
+}
+
+impl<T> From<Receiver<T>> for FusedReceiverStream<T> {
+    fn from(recv: Receiver<T>) -> Self {
+        Self::new(recv)
+    }
+}
+
+impl<T> FusedStream for FusedReceiverStream<T> {
+    fn is_terminated(&self) -> bool {
+        self.done
+    }
 }
