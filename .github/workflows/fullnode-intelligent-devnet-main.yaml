@@ -29,7 +29,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-intelligent-devnet-main
-      BRANCH: main
+      GIT_REF: main
       NETWORK: devnet
       BOOTSTRAPPING_MODE: ExecuteOrApplyFromGenesis
       CONTINUOUS_SYNCING_MODE: ExecuteTransactionsOrApplyOutputs

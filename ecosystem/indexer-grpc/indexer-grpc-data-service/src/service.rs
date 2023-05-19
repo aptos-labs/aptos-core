@@ -16,7 +16,7 @@ use aptos_indexer_grpc_utils::{
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-    transaction::testing1::v1::Transaction,
+    transaction::v1::Transaction,
 };
 use futures::Stream;
 use prost::Message;

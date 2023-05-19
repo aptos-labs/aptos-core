@@ -131,8 +131,6 @@ impl Factory for K8sFactory {
             // create the forge-management configmap before installing anything
             create_management_configmap(self.kube_namespace.clone(), self.keep, cleanup_duration)
                 .await?;
-            // create a secret to access pyroscope
-            create_pyroscope_secret(self.kube_namespace.clone()).await?;
             if let Some(existing_db_tag) = existing_db_tag {
                 // TODO(prod-eng): For now we are managing PVs out of forge, and bind them manually
                 // with the volume. Going forward we should consider automate this process.

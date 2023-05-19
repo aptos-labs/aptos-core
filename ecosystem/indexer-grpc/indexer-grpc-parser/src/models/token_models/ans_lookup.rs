@@ -11,7 +11,7 @@ use crate::{
         bigdecimal_to_u64, deserialize_from_string, parse_timestamp_secs, standardize_address,
     },
 };
-use aptos_protos::transaction::testing1::v1::{
+use aptos_protos::transaction::v1::{
     move_type::Content, transaction::TxnData, Transaction as TransactionPB,
 };
 use bigdecimal::BigDecimal;

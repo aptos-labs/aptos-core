@@ -234,6 +234,19 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
 
+  indexer-grpc-e2e-tests:
+    needs: [rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
+    if: |
+      (github.event_name == 'push' && github.ref_name != 'main') ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+      github.event.pull_request.auto_merge != null ||
+      contains(github.event.pull_request.body, '#e2e')
+    uses: ./.github/workflows/docker-indexer-grpc-test.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+
   forge-e2e-test:
     needs: [rust-images-all, determine-docker-build-metadata]
     if: | # always() ensures that the job will run even if some of the previous docker variant build jobs were skipped https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions

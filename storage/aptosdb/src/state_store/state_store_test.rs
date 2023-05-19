@@ -31,7 +31,7 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| {
             sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
-            (key.clone(), Some(value.clone()))
+            (key, Some(value))
         })
         .collect();
     let jmt_updates = jmt_updates(&value_set);

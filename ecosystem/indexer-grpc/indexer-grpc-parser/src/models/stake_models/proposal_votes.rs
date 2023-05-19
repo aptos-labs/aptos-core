@@ -9,7 +9,7 @@ use crate::{
     schema::proposal_votes,
     utils::util::{parse_timestamp, standardize_address},
 };
-use aptos_protos::transaction::testing1::v1::{transaction::TxnData, Transaction};
+use aptos_protos::transaction::v1::{transaction::TxnData, Transaction};
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

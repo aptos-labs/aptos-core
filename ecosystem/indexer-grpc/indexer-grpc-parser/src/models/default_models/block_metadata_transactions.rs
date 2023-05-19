@@ -11,7 +11,7 @@ use crate::{
     utils::util::{parse_timestamp, standardize_address},
 };
 use aptos_protos::{
-    transaction::testing1::v1::BlockMetadataTransaction as BlockMetadataTransactionPB,
+    transaction::v1::BlockMetadataTransaction as BlockMetadataTransactionPB,
     util::timestamp::Timestamp,
 };
 use field_count::FieldCount;

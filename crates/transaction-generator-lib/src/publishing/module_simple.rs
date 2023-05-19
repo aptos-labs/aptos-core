@@ -159,7 +159,6 @@ pub enum EntryPoints {
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
 
-    TokenV2AmbassadorInitCollection,
     TokenV2AmbassadorMint,
 }
 
@@ -191,9 +190,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorInitCollection | EntryPoints::TokenV2AmbassadorMint => {
-                "framework_usecases"
-            },
+            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
         }
     }
 
@@ -224,9 +221,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
-            EntryPoints::TokenV2AmbassadorInitCollection | EntryPoints::TokenV2AmbassadorMint => {
-                "ambassador"
-            },
+            EntryPoints::TokenV2AmbassadorMint => "ambassador",
         }
     }
 
@@ -328,29 +323,15 @@ impl EntryPoints {
                 ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
-
-            EntryPoints::TokenV2AmbassadorInitCollection => {
-                let rng: &mut StdRng = rng.expect("Must provide RNG");
-                get_payload(
-                    module_id,
-                    ident_str!("create_ambassador_collection").to_owned(),
-                    vec![
-                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
-                        bcs::to_bytes(&"unique ambasador collection").unwrap(), // name
-                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
-                    ],
-                )
-            },
             EntryPoints::TokenV2AmbassadorMint => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
-                    ident_str!("mint_ambassador_token").to_owned(),
+                    ident_str!("mint_ambassador_token_by_user").to_owned(),
                     vec![
-                        bcs::to_bytes(&"unique ambasador collection").unwrap(), // collection_name
-                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(),         // description
-                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),          // name
-                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),          // uri
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),  // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                     ],
                 )
             },
@@ -366,9 +347,6 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
-            },
-            EntryPoints::TokenV2AmbassadorMint => {
-                Some(EntryPoints::TokenV2AmbassadorInitCollection)
             },
             _ => None,
         }
