@@ -525,40 +525,6 @@ impl NetworkTask {
         while let Some(message) = self.all_events.next().await {
             monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
-                    // counters::CONSENSUS_RECEIVED_MSGS
-                    //     .with_label_values(&[msg.name()])
-                    //     .inc();
-                    // match msg {
-                    //     ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
-                    //         warn!("unexpected rpc msg");
-                    //     },
-                    //     quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
-                    //     | ConsensusMsg::BatchMsg(_)
-                    //     | ConsensusMsg::ProofOfStoreMsg(_)) => {
-                    //         Self::push_msg(
-                    //             peer_id,
-                    //             quorum_store_msg,
-                    //             &self.quorum_store_messages_tx,
-                    //         );
-                    //     },
-                    //     buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
-                    //     | ConsensusMsg::CommitDecisionMsg(_)) => {
-                    //         Self::push_msg(
-                    //             peer_id,
-                    //             buffer_manager_msg,
-                    //             &self.buffer_manager_messages_tx,
-                    //         );
-                    //     },
-                    //     consensus_msg => {
-                    //         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
-                    //             observe_block(
-                    //                 proposal.proposal().timestamp_usecs(),
-                    //                 BlockStage::NETWORK_RECEIVED,
-                    //             );
-                    //         }
-                    //         Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
-                    //     },
-                    // }
                     self.handle_message(peer_id, msg);
                 },
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
