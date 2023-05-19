@@ -19,7 +19,7 @@ NOTE: All methods and commands requires the user to have Aptos ledger app unlock
 use aptos_ledger::get_public_key;
 
 let public_key = match get_public_key(false);
-println!("Public Key: {:?}", version);
+println!("Public Key: {:?}", public_key);
 // "Public Key: ______"
 ```
 
