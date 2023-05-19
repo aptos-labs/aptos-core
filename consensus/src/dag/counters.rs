@@ -83,3 +83,47 @@ pub static DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY: Lazy<Histogram> = Lazy::new(||
     )
     .unwrap()
 });
+
+pub static DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_dag_node_to_block_same_author_even_round_latency",
+        // metric description
+        "The time from node creation to node ordering/block creation same author nodes",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_dag_node_to_block_same_author_odd_round_latency",
+        // metric description
+        "The time from node creation to node ordering/block creation same author nodes",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND_MIN: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_dag_node_to_block_same_author_even_round_latency_min",
+        // metric description
+        "The time from node creation to node ordering/block creation same author nodes",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND_MIN: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_dag_node_to_block_same_author_odd_round_latency_min",
+        // metric description
+        "The time from node creation to node ordering/block creation same author nodes",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
