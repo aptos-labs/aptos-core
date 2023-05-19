@@ -148,6 +148,18 @@ variable "enable_prometheus_node_exporter" {
   default     = true
 }
 
+### Cluster node config
+
+variable "gke_cluster_enable_gcfs" {
+  description = "Enable GCFS at the cluster level"
+  default     = false
+}
+
+variable "gke_cluster_enable_gvnic" {
+  description = "Enable GVNIC (networking driver) at the cluster level"
+  default     = false
+}
+
 ### Autoscaling
 
 variable "gke_enable_node_autoprovisioning" {

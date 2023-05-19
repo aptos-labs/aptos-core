@@ -37,6 +37,8 @@ impl<'a> LogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     ReceivedStorageRequest,
+    RequestModeratorIgnoredPeer,
+    RequestModeratorRefresh,
     SentStorageResponse,
     StorageServiceError,
     StorageSummaryRefresh,

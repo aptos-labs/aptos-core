@@ -312,6 +312,7 @@ mod test {
     };
     use aptos_api_test_context::new_test_context;
     use aptos_api_types::{LedgerInfo as APILedgerInfo, Transaction, U64};
+    use aptos_config::config::NodeConfig;
     use diesel::RunQueryDsl;
     use serde_json::json;
 
@@ -375,7 +376,8 @@ mod test {
         let conn_pool = new_db_pool(database_url.as_str())?;
         wipe_database(&mut conn_pool.get()?);
 
-        let test_context = new_test_context("doesnt_matter".to_string(), true);
+        let test_context =
+            new_test_context("doesnt_matter".to_string(), NodeConfig::default(), true);
         let context: Arc<ApiContext> = Arc::new(test_context.context);
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
         let mut tailer = Tailer::new(

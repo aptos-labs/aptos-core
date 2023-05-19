@@ -4,7 +4,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use super::transactions::{Transaction, TransactionQuery};
 use crate::{schema::events, utils::util::standardize_address};
-use aptos_protos::transaction::testing1::v1::Event as EventPB;
+use aptos_protos::transaction::v1::Event as EventPB;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 

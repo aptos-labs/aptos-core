@@ -5,7 +5,8 @@ use crate::{
     natives::{
         cryptography::algebra::{
             abort_invariant_violated, feature_flag_from_structure, gas::GasParameters,
-            AlgebraContext, Structure, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            AlgebraContext, Structure, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -24,7 +25,7 @@ macro_rules! ark_inverse_internal {
         $context.charge($gas)?;
         match element.inverse() {
             Some(new_element) => {
-                let new_handle = store_element!($context, new_element);
+                let new_handle = store_element!($context, new_element)?;
                 Ok(smallvec![Value::bool(true), Value::u64(new_handle as u64)])
             },
             None => Ok(smallvec![Value::bool(false), Value::u64(0)]),

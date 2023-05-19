@@ -81,10 +81,13 @@ impl InMemoryStateCalculatorV2 {
             base.base_version,
             base.current_version,
         );
-        ensure!(
-            base.updates_since_base.is_empty(),
-            "Updates is not empty, cannot calculate state."
-        );
+        base.updates_since_base.iter().try_for_each(|shard| {
+            ensure!(
+                shard.is_empty(),
+                "Updates is not empty, cannot calculate state."
+            );
+            Ok(())
+        })?;
 
         let num_txns = to_keep.len();
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
@@ -142,7 +145,7 @@ impl InMemoryStateCalculatorV2 {
             new_checkpoint_version,
             new_checkpoint,
             new_checkpoint_version,
-            HashMap::new(),
+            create_empty_sharded_state_updates(),
         );
 
         Ok((

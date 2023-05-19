@@ -61,6 +61,11 @@ variable "record_name" {
   default     = "<workspace>.aptos"
 }
 
+variable "create_dns_records" {
+  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
+}
+
 variable "helm_chart" {
   description = "Path to aptos-validator Helm chart file"
   default     = ""
@@ -166,8 +171,19 @@ variable "manage_via_tf" {
   default     = true
 }
 
-### Autoscaling
+### Cluster node config
 
+variable "gke_cluster_enable_gcfs" {
+  description = "Enable GCFS at the cluster level"
+  default     = false
+}
+
+variable "gke_cluster_enable_gvnic" {
+  description = "Enable GVNIC (networking driver) at the cluster level"
+  default     = false
+}
+
+### Autoscaling
 
 variable "gke_enable_node_autoprovisioning" {
   description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"

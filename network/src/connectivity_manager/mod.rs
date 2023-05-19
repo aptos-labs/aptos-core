@@ -449,11 +449,12 @@ where
                     // TODO: We should prevent `Unknown` from discovery sources
                     if !self.mutual_authentication
                         && metadata.origin == ConnectionOrigin::Inbound
-                        && metadata.role == PeerRole::Unknown
+                        && (metadata.role == PeerRole::ValidatorFullNode
+                            || metadata.role == PeerRole::Unknown)
                     {
                         None
                     } else {
-                        Some(*peer_id)
+                        Some(*peer_id) // The peer is stale
                     }
                 });
 
@@ -860,6 +861,12 @@ where
                 }
             },
         }
+    }
+
+    #[cfg(test)]
+    /// Returns the set of connected peers (for test purposes)
+    fn get_connected_peers(&self) -> HashMap<PeerId, ConnectionMetadata> {
+        self.connected.clone()
     }
 }
 

@@ -1550,9 +1550,6 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
             helm_values["service"]["validator"]["internal"]["headless"] = true.into();
             helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
             helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
-
-            // Disable pyroscope. Need to ensure secrets are created/propogated before enabling.
-            helm_values["pyroscope"]["enabled"] = false.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)
