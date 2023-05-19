@@ -3,7 +3,7 @@
 
 syntax = "proto3";
 
-package aptos.transaction.testing1.v1;
+package aptos.transaction.v1;
 
 import "aptos/util/timestamp/timestamp.proto";
 

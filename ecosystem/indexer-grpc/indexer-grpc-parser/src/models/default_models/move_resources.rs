@@ -5,7 +5,7 @@
 use super::transactions::Transaction;
 use crate::{schema::move_resources, utils::util::standardize_address};
 use anyhow::{Context, Result};
-use aptos_protos::transaction::testing1::v1::{
+use aptos_protos::transaction::v1::{
     DeleteResource, MoveStructTag as MoveStructTagPB, WriteResource,
 };
 use field_count::FieldCount;

@@ -137,6 +137,21 @@ pub struct EmitArgs {
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
 
+    /// Number of copies of the modules that will be published,
+    /// under separate accounts, creating independent contracts,
+    /// removing contention.
+    /// For example for NFT minting, setting to 1 will be equivalent
+    /// to minting from single collection,
+    /// setting to 20 means minting from 20 collections in parallel.
+    #[clap(long)]
+    pub module_working_set_size: Option<usize>,
+
+    /// Whether to use burner accounts for the sender.
+    /// For example when transaction can only be done once per account.
+    /// (pool needs to be populated by account-creation transactions)
+    #[clap(long)]
+    pub sender_use_account_pool: Option<bool>,
+
     #[clap(long, min_values = 0)]
     pub transaction_weights: Vec<usize>,
 

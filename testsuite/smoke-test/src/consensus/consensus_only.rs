@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{smoke_test_environment::new_local_swarm_with_aptos, txn_emitter::generate_traffic};
-use aptos_forge::TransactionType;
+use aptos_forge::args::TransactionTypeArg;
 use std::time::Duration;
 
 #[ignore]
@@ -19,8 +19,11 @@ async fn test_consensus_only_with_txn_emitter() {
         Duration::from_secs(10),
         1,
         vec![vec![
-            (TransactionType::default_coin_transfer(), 70),
-            (TransactionType::default_account_generation(), 20),
+            (TransactionTypeArg::CoinTransfer.materialize_default(), 70),
+            (
+                TransactionTypeArg::AccountGeneration.materialize_default(),
+                20,
+            ),
         ]],
     )
     .await

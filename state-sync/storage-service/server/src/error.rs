@@ -10,6 +10,8 @@ pub enum Error {
     InvalidRequest(String),
     #[error("Storage error encountered: {0}")]
     StorageErrorEncountered(String),
+    #[error("Too many invalid requests: {0}")]
+    TooManyInvalidRequests(String),
     #[error("Unexpected error encountered: {0}")]
     UnexpectedErrorEncountered(String),
 }
@@ -20,6 +22,7 @@ impl Error {
         match self {
             Error::InvalidRequest(_) => "invalid_request",
             Error::StorageErrorEncountered(_) => "storage_error",
+            Error::TooManyInvalidRequests(_) => "too_many_invalid_requests",
             Error::UnexpectedErrorEncountered(_) => "unexpected_error",
         }
     }

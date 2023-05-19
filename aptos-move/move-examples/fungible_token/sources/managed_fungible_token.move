@@ -50,7 +50,8 @@ module fungible_token::managed_fungible_token {
             utf8(b"test fungible asset name"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
             2, /* decimals */
-            utf8(b"http://aptoslabs.com/favicon.ico")
+            utf8(b"http://aptoslabs.com/favicon.ico"),
+            utf8(b"http://aptoslabs.com/")
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.

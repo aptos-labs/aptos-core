@@ -613,8 +613,10 @@ impl AptosVMImpl {
         &self,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
+        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
-        self.move_vm.new_session(resolver, session_id)
+        self.move_vm
+            .new_session(resolver, session_id, aggregator_enabled)
     }
 
     pub fn load_module<'r>(

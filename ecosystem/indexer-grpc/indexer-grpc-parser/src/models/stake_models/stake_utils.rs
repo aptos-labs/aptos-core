@@ -6,7 +6,7 @@ use crate::{
     utils::util::deserialize_from_string,
 };
 use anyhow::{Context, Result};
-use aptos_protos::transaction::testing1::v1::WriteResource;
+use aptos_protos::transaction::v1::WriteResource;
 use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 

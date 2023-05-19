@@ -6,7 +6,7 @@ use crate::{
         cryptography::algebra::{
             feature_flag_from_structure, gas::GasParameters, AlgebraContext, Structure,
             BLS12381_GT_GENERATOR, BLS12381_Q12_LENDIAN, BLS12381_R_LENDIAN,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -24,7 +24,7 @@ macro_rules! ark_constant_op_internal {
     ($context:expr, $ark_typ:ty, $ark_func:ident, $gas:expr) => {{
         $context.charge($gas)?;
         let new_element = <$ark_typ>::$ark_func();
-        let new_handle = store_element!($context, new_element);
+        let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
 }
@@ -110,7 +110,7 @@ pub fn one_internal(
         Some(Structure::BLS12381Gt) => {
             context.charge(gas_params.ark_bls12_381_fq12_clone * NumArgs::one())?;
             let element = *Lazy::force(&BLS12381_GT_GENERATOR);
-            let handle = store_element!(context, element);
+            let handle = store_element!(context, element)?;
             Ok(smallvec![Value::u64(handle as u64)])
         },
         _ => Err(SafeNativeError::Abort {

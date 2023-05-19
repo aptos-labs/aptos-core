@@ -5,7 +5,8 @@ use crate::{
     natives::{
         cryptography::algebra::{
             abort_invariant_violated, gas::GasParameters, AlgebraContext, SerializationFormat,
-            Structure, BLS12381_R_SCALAR, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            Structure, BLS12381_R_SCALAR, E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
+            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -186,7 +187,7 @@ macro_rules! ark_deserialize_internal {
         $context.charge($gas)?;
         match <$ark_typ>::$ark_deser_func($bytes) {
             Ok(element) => {
-                let handle = store_element!($context, element);
+                let handle = store_element!($context, element)?;
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
             Err(ark_serialize::SerializationError::InvalidData)
@@ -206,7 +207,7 @@ macro_rules! ark_ec_point_deserialize_internal {
         match <$typ>::$deser_func($bytes) {
             Ok(element) => {
                 let element_proj = ark_ec::short_weierstrass::Projective::from(element);
-                let handle = store_element!($context, element_proj);
+                let handle = store_element!($context, element_proj)?;
                 Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
             },
             Err(ark_serialize::SerializationError::InvalidData)
@@ -343,7 +344,7 @@ pub fn deserialize_internal(
                             * NumArgs::one(),
                     )?;
                     if element.pow(BLS12381_R_SCALAR.0) == ark_bls12_381::Fq12::one() {
-                        let handle = store_element!(context, element);
+                        let handle = store_element!(context, element)?;
                         Ok(smallvec![Value::bool(true), Value::u64(handle as u64)])
                     } else {
                         Ok(smallvec![Value::bool(false), Value::u64(0)])
