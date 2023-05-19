@@ -84,6 +84,7 @@ async fn test_gas_estimation() {
     let mut swarm = SwarmBuilder::new_local(1)
         .with_init_config(Arc::new(|_, conf, _| {
             let max_block_txns = 3;
+            conf.api.gas_estimation.enabled = true;
             // Use a small full block threshold to make gas estimates update sooner.
             conf.api.gas_estimation.full_block_txns = max_block_txns as usize;
             // Wait for full blocks with small block size to advance consensus at a fast rate.
