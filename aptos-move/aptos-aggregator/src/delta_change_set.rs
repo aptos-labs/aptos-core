@@ -13,7 +13,6 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
-use move_core_types::vm_status::AbortLocation;
 use std::collections::BTreeMap;
 
 /// When `Addition` operation overflows the `limit`.
@@ -322,7 +321,9 @@ impl DeltaChangeSet {
         &mut self.delta_change_set
     }
 
-    pub(crate) fn take(
+    /// Converts deltas to a vector of write ops. In case conversion to a write op
+    /// failed, the error is propagated to the caller.
+    pub(crate) fn take_materialized(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
@@ -336,42 +337,20 @@ impl DeltaChangeSet {
         Ok(ret)
     }
 
-    /// Consumes the delta change set and tries to materialize it. Returns a
-    /// mutable write set if materialization succeeds (mutability since we want
-    /// to merge these writes with transaction outputs).
+    /// Consumes the delta change set and tries to materialize it into a write set.
     pub fn try_into_write_set(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
-        match self.take(state_view) {
-            Ok(materialized_write_set) => {
-                // Materialization successful, we can construct a write set.
-                WriteSetMut::new(materialized_write_set)
-                    .freeze()
-                    .map_err(|_err| {
-                        VMStatus::Error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            Some("Error when freezing materialized deltas.".to_string()),
-                        )
-                    })
-            },
-            Err(vm_status) => {
-                // Error from failed delta application. Right now we do not support
-                // this case (and do not have to because deltas are used for total
-                // supply only).
-                if let VMStatus::MoveAbort(AbortLocation::Module(id), code) = &vm_status {
-                    if id == &*AGGREGATOR_MODULE
-                        && (*code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW)
-                    {
-                        unimplemented!("Applying aggregator deltas failed but is not supported.")
-                    }
-                }
-
-                // Otherwise just propagate the error.
-                debug_assert!(vm_status.status_code() == StatusCode::STORAGE_ERROR);
-                Err(vm_status)
-            },
-        }
+        let materialized_write_set = self.take_materialized(state_view)?;
+        WriteSetMut::new(materialized_write_set)
+            .freeze()
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Error when freezing materialized deltas.".to_string()),
+                )
+            })
     }
 }
 
@@ -635,18 +614,23 @@ mod test {
         let state_view = BadStorage;
         let deltas = vec![(KEY.clone(), delta_add(10, 100))];
         let delta_change_set = DeltaChangeSet::new(deltas);
-        assert_err!(delta_change_set.try_into_write_set(&state_view));
+        assert_matches!(
+            delta_change_set.try_into_write_set(&state_view),
+            Err(VMStatus::Error(StatusCode::STORAGE_ERROR, Some(_)))
+        );
     }
 
     #[test]
-    #[should_panic]
-    fn test_delta_materialization_failure_unsupported() {
+    fn test_delta_materialization_failure() {
         let mut state_view = FakeDataStore::default();
         state_view.set_legacy(KEY.clone(), serialize(&99));
 
         let deltas = vec![(KEY.clone(), delta_add(10, 100))];
         let delta_change_set = DeltaChangeSet::new(deltas);
-        delta_change_set.try_into_write_set(&state_view).unwrap();
+        assert_matches!(
+            delta_change_set.try_into_write_set(&state_view),
+            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
+        );
     }
 
     #[test]
