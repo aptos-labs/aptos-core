@@ -31,9 +31,12 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
+use moka::sync::{OwnedKeyEntrySelector, SegmentedCache};
+use aptos_crypto::HashValue;
+use aptos_crypto::hash::CryptoHash;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -135,6 +138,19 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
 pub struct BlockAptosVM();
 
+
+/// A best-effort 4MB cache that help de-dup duplicated transactions potentially from quorum store.
+static TXN_CACHE: Lazy<SegmentedCache<HashValue, u64>> = Lazy::new(|| SegmentedCache::new(100000, 256));
+
+/// Insert a transaction hash into `TXN_CACHE` if not present.
+/// Return whether the insertion happened (i.e., cache miss).
+fn insert_into_txn_cache(txn: &Transaction) -> bool {
+    let key = txn.hash();
+    let nonce_in = rand::random::<u64>();
+    let nonce_out = TXN_CACHE.get_with(key, || nonce_in);
+    nonce_in == nonce_out
+}
+
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
@@ -154,6 +170,7 @@ impl BlockAptosVM {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
+                    .filter(|txn: &Transaction| insert_into_txn_cache(txn))
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
