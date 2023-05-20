@@ -18,9 +18,10 @@ mod tests;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{NodeConfig, PersistableConfig};
+use aptos_config::{config::{NodeConfig, PersistableConfig}, network_id::NetworkId};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_network::counters::APTOS_CONNECTIONS;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
@@ -35,7 +36,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    thread,
+    thread, collections::HashMap, time::Duration,
 };
 use tokio::runtime::Runtime;
 
@@ -511,7 +512,7 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
-        peers_and_metadata,
+        peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
 
@@ -546,6 +547,17 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
         );
+
+    loop {
+        let expected_peers = { peers_and_metadata.get_trusted_peers(&NetworkId::Validator).unwrap().read().len() };
+        let conn_peers = peers_and_metadata.get_connected_peers_and_metadata().unwrap().len();
+        debug!("Expected peers: {}, connected peers: {}", expected_peers, conn_peers);
+        if conn_peers >= expected_peers && expected_peers > 0 {
+            thread::sleep(Duration::from_secs(20));
+            break;
+        }
+        thread::sleep(Duration::from_secs(5));
+    }
 
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
