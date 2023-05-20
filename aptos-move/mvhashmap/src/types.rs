@@ -30,7 +30,7 @@ pub enum MVDataError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVCodeError {
+pub enum MVModulesError {
     /// No prior entry is found.
     NotFound,
     /// A dependency on other transaction has been found during the read.
@@ -51,12 +51,12 @@ pub enum MVDataOutput<V> {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVCodeOutput<M, X> {
+pub enum MVModulesOutput<M, X> {
     /// Arc to the executable corresponding to the latest module, and a descriptor
     /// with either the module hash or indicator that the module is from storage.
     Executable((Arc<X>, ExecutableDescriptor)),
     /// Arc to the latest module, together with its (cryptographic) hash. Note that
-    /// this can't be a storage-level module, as it's from multi-versioned code map.
+    /// this can't be a storage-level module, as it's from multi-versioned modules map.
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
     Module((Arc<M>, HashValue)),

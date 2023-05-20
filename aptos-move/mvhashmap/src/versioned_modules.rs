@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, MVCodeError, MVCodeOutput, TxnIndex};
+use crate::types::{Flag, MVModulesError, MVModulesOutput, TxnIndex};
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor},
@@ -35,14 +35,12 @@ struct Entry<V: TransactionWrite> {
 struct VersionedValue<V: TransactionWrite, X: Executable> {
     versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
 
-    /// Executable based on the storage version of the module.
-    base_executable: Option<Arc<X>>,
     /// Executables corresponding to published versions of the module, based on hash.
     executables: HashMap<HashValue, Arc<X>>,
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
-pub struct VersionedCode<K, V: TransactionWrite, X: Executable> {
+pub struct VersionedModules<K, V: TransactionWrite, X: Executable> {
     values: DashMap<K, VersionedValue<V, X>>,
 }
 
@@ -77,23 +75,21 @@ impl<V: TransactionWrite, X: Executable> VersionedValue<V, X> {
     pub fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
-            base_executable: None,
             executables: HashMap::new(),
         }
     }
 
-    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<V>, HashValue), MVCodeError> {
-        use MVCodeError::*;
+    fn read(&self, txn_idx: TxnIndex) -> anyhow::Result<(Arc<V>, HashValue), MVModulesError> {
+        match self.versioned_map.range(0..txn_idx).next_back() {
+            Some((idx, entry)) => {
+                if entry.flag() == Flag::Estimate {
+                    // Found a dependency.
+                    return Err(MVModulesError::Dependency(*idx));
+                }
 
-        if let Some((idx, entry)) = self.versioned_map.range(0..txn_idx).next_back() {
-            if entry.flag() == Flag::Estimate {
-                // Found a dependency.
-                return Err(Dependency(*idx));
-            }
-
-            Ok((entry.module.clone(), entry.hash))
-        } else {
-            Err(NotFound)
+                Ok((entry.module.clone(), entry.hash))
+            },
+            None => Err(MVModulesError::NotFound),
         }
     }
 }
@@ -104,7 +100,7 @@ impl<V: TransactionWrite, X: Executable> Default for VersionedValue<V, X> {
     }
 }
 
-impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedCode<K, V, X> {
+impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<K, V, X> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -119,52 +115,34 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedCode<K, 
             .mark_estimate();
     }
 
-    pub(crate) fn write(&self, key: &K, txn_idx: TxnIndex, data: V) {
-        let mut v = self.values.entry(key.clone()).or_default();
+    pub(crate) fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
+        let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
     }
 
-    pub(crate) fn store_executable(
-        &self,
-        key: &K,
-        descriptor: ExecutableDescriptor,
-        executable: X,
-    ) {
-        let x = Arc::new(executable);
-        match descriptor {
-            ExecutableDescriptor::Published(hash) => {
-                let mut v = self.values.get_mut(key).expect("Path must exist");
-                v.executables.entry(hash).or_insert(x);
-            },
-            ExecutableDescriptor::Storage => {
-                let mut v = self.values.entry(key.clone()).or_default();
-                v.base_executable.get_or_insert(x);
-            },
-        };
+    pub(crate) fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
+        let mut v = self.values.get_mut(key).expect("Path must exist");
+        v.executables
+            .entry(descriptor_hash)
+            .or_insert_with(|| Arc::new(executable));
     }
 
-    pub(crate) fn fetch_code(
+    pub(crate) fn fetch_module(
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<V, X>, MVCodeError> {
-        use MVCodeError::*;
-        use MVCodeOutput::*;
+    ) -> anyhow::Result<MVModulesOutput<V, X>, MVModulesError> {
+        use MVModulesError::*;
+        use MVModulesOutput::*;
 
         match self.values.get(key) {
-            Some(v) => match v.read(txn_idx) {
-                Ok((module, hash)) => Ok(match v.executables.get(&hash) {
+            Some(v) => v
+                .read(txn_idx)
+                .map(|(module, hash)| match v.executables.get(&hash) {
                     Some(x) => Executable((x.clone(), ExecutableDescriptor::Published(hash))),
                     None => Module((module, hash)),
                 }),
-                Err(NotFound) => v
-                    .base_executable
-                    .as_ref()
-                    .map(|x| Executable((x.clone(), ExecutableDescriptor::Storage)))
-                    .ok_or(NotFound),
-                Err(Dependency(idx)) => Err(Dependency(idx)),
-            },
             None => Err(NotFound),
         }
     }
@@ -176,11 +154,5 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedCode<K, 
             v.versioned_map.remove(&txn_idx).is_some(),
             "Entry must exist to be deleted"
         );
-    }
-}
-
-impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> Default for VersionedCode<K, V, X> {
-    fn default() -> Self {
-        VersionedCode::new()
     }
 }
