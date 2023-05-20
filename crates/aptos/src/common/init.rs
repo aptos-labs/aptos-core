@@ -12,7 +12,11 @@ use crate::{
         utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
     },
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    PrivateKey, ValidCryptoMaterialStringExt,
+};
+use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
@@ -48,6 +52,9 @@ pub struct InitTool {
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
+
+    #[clap(long)]
+    pub from_ledger: bool,
 
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -86,7 +93,6 @@ impl CliCommand<()> for InitTool {
         } else {
             ProfileConfig::default()
         };
-
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
@@ -131,33 +137,64 @@ impl CliCommand<()> for InitTool {
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
-        // Private key
-        let private_key = if let Some(private_key) = self
-            .private_key_options
-            .extract_private_key_cli(self.encoding_options.encoding)?
-        {
-            eprintln!("Using command line argument for private key");
-            private_key
+        // Set the BIP44 index to 0
+        // TODO: Need to update this allow account at different bip44 derivative path index
+        profile_config.bip44_index = if self.from_ledger {
+            Some("0".to_string())
         } else {
-            eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
-            let input = read_line("Private key")?;
-            let input = input.trim();
-            if input.is_empty() {
-                if let Some(private_key) = profile_config.private_key {
-                    eprintln!("No key given, keeping existing key...");
-                    private_key
-                } else {
-                    eprintln!("No key given, generating key...");
-                    self.rng_args
-                        .key_generator()?
-                        .generate_ed25519_private_key()
-                }
-            } else {
-                Ed25519PrivateKey::from_encoded_string(input)
-                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
-            }
+            None
         };
-        let public_key = private_key.public_key();
+
+        // Private key
+        let private_key = if self.from_ledger {
+            // Private key stays in ledger
+            None
+        } else {
+            let inner_pkey = if let Some(key) = self
+                .private_key_options
+                .extract_private_key_cli(self.encoding_options.encoding)?
+            {
+                eprintln!("Using command line argument for private key");
+                key
+            } else {
+                eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+                let input = read_line("Private key")?;
+                let input = input.trim();
+                if input.is_empty() {
+                    if let Some(key) = profile_config.private_key {
+                        eprintln!("No key given, keeping existing key...");
+                        key
+                    } else {
+                        eprintln!("No key given, generating key...");
+                        self.rng_args
+                            .key_generator()?
+                            .generate_ed25519_private_key()
+                    }
+                } else {
+                    Ed25519PrivateKey::from_encoded_string(input).map_err(|err| {
+                        CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
+                    })?
+                }
+            };
+
+            Some(inner_pkey)
+        };
+
+        // Public key
+        let public_key = if self.from_ledger {
+            let pub_key_str = match aptos_ledger::get_public_key(false) {
+                Ok(pub_key_str) => pub_key_str,
+                Err(err) => {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Unexpected Ledger Error: {:?}",
+                        err.to_string()
+                    )))
+                },
+            };
+            Ed25519PublicKey::from_encoded_string(&pub_key_str)?
+        } else {
+            private_key.clone().unwrap().public_key()
+        };
 
         let client = aptos_rest_client::Client::new(
             Url::parse(
@@ -174,7 +211,7 @@ impl CliCommand<()> for InitTool {
         let derived_address = account_address_from_public_key(&public_key);
         let address = lookup_address(&client, derived_address, false).await?;
 
-        profile_config.private_key = Some(private_key);
+        profile_config.private_key = private_key;
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 

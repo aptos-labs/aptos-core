@@ -162,6 +162,7 @@ dependencies = [
  "aptos-github-client",
  "aptos-global-constants",
  "aptos-keygen",
+ "aptos-ledger 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
@@ -1970,6 +1971,19 @@ version = "0.2.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
+ "hex",
+ "ledger-apdu",
+ "ledger-transport-hid",
+ "once_cell",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-ledger"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0ed01cb40b4828546eb717af0a3471d2b8c4cfdfe8bd6d3cb68ef99be6353a9"
+dependencies = [
  "hex",
  "ledger-apdu",
  "ledger-transport-hid",
