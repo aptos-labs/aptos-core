@@ -9,8 +9,7 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_DUPLICATES_FILTERED,
-        BLOCK_EXECUTOR_DUPLICATES_SECONDS, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
+        BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS, BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
     },
     AptosVM,
 };
@@ -23,6 +22,7 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -31,10 +31,11 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use moka::sync::SegmentedCache;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -136,6 +137,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
 pub struct BlockAptosVM();
 
+/// Insert a transaction hash into `TXN_CACHE` if not present.
+/// Return whether the insertion happened (i.e., cache miss).
+fn insert_into_txn_cache(cache: &SegmentedCache<HashValue, u64>, txn: &Transaction) -> bool {
+    let key = txn.hash();
+    let nonce_in = rand::random::<u64>();
+    let nonce_out = cache.get_with(key, || nonce_in);
+    nonce_in == nonce_out
+}
+
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
@@ -146,35 +156,27 @@ impl BlockAptosVM {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
-        let dedup_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
-        let before_dedup_len = transactions.len();
-        let mut duplicate_map = HashSet::new();
-        let transactions: Vec<_> = transactions
-            .into_iter()
-            .filter(|txn| match txn {
-                Transaction::UserTransaction(txn) => {
-                    duplicate_map.insert((txn.sender(), txn.sequence_number()))
-                },
-                _ => true,
-            })
-            .collect();
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((transactions.len() - before_dedup_len) as f64);
-        drop(dedup_timer);
-
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
 
+        let before_dedup_len = transactions.len();
+        let duplicate_map = SegmentedCache::new(100000, 256);
+
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
+                    .filter(|txn: &Transaction| insert_into_txn_cache(&duplicate_map, txn))
                     .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
+
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED
+            .observe((signature_verified_block.len() - before_dedup_len) as f64);
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
