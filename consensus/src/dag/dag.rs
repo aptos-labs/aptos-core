@@ -573,7 +573,10 @@ impl Dag {
             .is_err()
         {
             return false;
+        } else {
+            return true;
         }
+
         if timeout {
             return true;
         }
