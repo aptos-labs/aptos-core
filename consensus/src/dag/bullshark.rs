@@ -185,6 +185,11 @@ impl Bullshark {
             let anchor_author = self
                 .proposer_election
                 .get_round_anchor_peer_id(current_round);
+
+            if self.dag.len() <= current_round as usize + 1 {
+                return None
+            }
+
             let voters = self
                 .dag
                 .get(current_round as usize + 1)
@@ -227,11 +232,13 @@ impl Bullshark {
 
         // With each instance of leader reputation, finds the first anchor and commits its causal history
         // Update the leader reputation and repeat until either everything is committed or no anchor can be committed.
+        let mut end_round = round;
         while self.lowest_unordered_anchor_round <= round {
-            if let Some(anchor) = self.find_first_anchor_with_enough_votes(round) {
+            if let Some(anchor) = self.find_first_anchor_with_enough_votes(end_round) {
                 let order_anchor_stack = self.find_first_anchor_to_commit(anchor);
                 let ordered_history = self.order_anchor_causal_history(order_anchor_stack);
                 self.push_to_execution(ordered_history).await;
+                end_round = end_round + 1;
             } else {
                 break;
             }
