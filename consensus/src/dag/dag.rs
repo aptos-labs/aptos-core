@@ -578,8 +578,8 @@ impl Dag {
             return true;
         }
 
-        let wave = self.current_round / 2;
-        let anchor = self.proposer_election.get_round_anchor_peer_id(wave);
+        // let wave = self.current_round / 2;
+        let anchor = self.proposer_election.get_round_anchor_peer_id(self.current_round);
         let maybe_anchor_node_meta_data =
             self.get_node_metadata_from_dag(self.current_round, anchor);
 
