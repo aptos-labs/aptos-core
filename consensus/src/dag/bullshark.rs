@@ -3,7 +3,7 @@
 
 use super::counters::{
     DAG_NODE_TO_BLOCK_LATENCY, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND,
-    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND, DAG_NODE_ROUND_DIFF, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND_MIN,
+    DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND, DAG_NODE_ROUND_DIFF, DAG_NODE_TO_BLOCK_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_LATENCY_ODD_ROUND_MIN, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_EVEN_ROUND_MIN, DAG_NODE_TO_BLOCK_SAME_AUTHOR_LATENCY_ODD_ROUND_MIN, DAG_ANCHOR_COMMIT_LATENCY,
 };
 use crate::{
     block_storage::update_counters_for_committed_blocks, dag::anchor_election::AnchorElection,
@@ -224,8 +224,15 @@ impl Bullshark {
         let timestamp = ordered_history[0].timestamp();
         let author = ordered_history[0].source();
 
+        let current_timestamp = aptos_infallible::duration_since_epoch();
+        let duration = current_timestamp
+                .checked_sub(Duration::from_micros(timestamp))
+                .expect("Duration should work")
+                .as_secs_f64();
+        DAG_ANCHOR_COMMIT_LATENCY.observe(duration);
+
         ordered_history.into_iter().rev().for_each(|node| {
-            let duration = aptos_infallible::duration_since_epoch()
+            let duration = current_timestamp
                 .checked_sub(Duration::from_micros(node.timestamp()))
                 .expect("Duration should work")
                 .as_secs_f64();

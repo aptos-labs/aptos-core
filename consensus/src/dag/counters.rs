@@ -3,6 +3,17 @@
 use aptos_metrics_core::{Histogram, register_histogram, exponential_buckets, register_counter, register_int_counter, IntCounter};
 use once_cell::sync::Lazy;
 
+/// Latency
+pub static DAG_ANCHOR_COMMIT_LATENCY: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_dag_anchor_commit_latency",
+        // metric description
+        "The time from node creation to node ordering/block creation",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
 
 /// Latency
 pub static DAG_NODE_TO_BLOCK_LATENCY: Lazy<Histogram> = Lazy::new(|| {
