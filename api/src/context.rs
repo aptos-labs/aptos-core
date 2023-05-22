@@ -860,6 +860,36 @@ impl Context {
         cache.last_updated_time = Some(Instant::now());
     }
 
+    fn get_gas_prices_and_used(
+        &self,
+        start_version: Version,
+        limit: u64,
+        ledger_version: Version,
+    ) -> Result<Vec<(u64, u64)>> {
+        if start_version > ledger_version || limit == 0 {
+            return Ok(vec![]);
+        }
+
+        // This is just an estimation, so we cna just skip over errors
+        let limit = std::cmp::min(limit, ledger_version - start_version + 1);
+        let txns = self.db.get_transaction_iterator(start_version, limit)?;
+        let infos = self
+            .db
+            .get_transaction_info_iterator(start_version, limit)?;
+        let gas_prices: Vec<_> = txns
+            .zip(infos)
+            .filter_map(|(txn, info)| {
+                txn.as_ref()
+                    .ok()
+                    .and_then(|t| t.try_as_signed_user_txn())
+                    .map(|t| (t.gas_unit_price(), info))
+            })
+            .filter_map(|(unit_price, info)| info.as_ref().ok().map(|i| (unit_price, i.gas_used())))
+            .collect();
+
+        Ok(gas_prices)
+    }
+
     pub fn estimate_gas_price<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
@@ -934,7 +964,7 @@ impl Context {
         let mut min_inclusion_prices = vec![];
         // TODO: if multiple calls to db is a perf issue, combine into a single call and then split
         for (first, last) in blocks {
-            let min_inclusion_price = match self.db.get_gas_prices_and_used(
+            let min_inclusion_price = match self.get_gas_prices_and_used(
                 first,
                 last - first,
                 ledger_info.ledger_version.0,

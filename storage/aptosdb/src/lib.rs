@@ -1339,45 +1339,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_gas_prices_and_used(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<(u64, u64)>> {
-        const MAX_GAS_LOOKUP: u64 = 100_000;
-        gauged_api("get_gas_prices_and_used", || {
-            error_if_too_many_requested(limit, MAX_GAS_LOOKUP)?;
-
-            if start_version > ledger_version || limit == 0 {
-                return Ok(vec![]);
-            }
-
-            // This is just an estimation, so we cna just skip over errors
-            let limit = std::cmp::min(limit, ledger_version - start_version + 1);
-            let txns = self
-                .transaction_store
-                .get_transaction_iter(start_version, limit as usize)?;
-            let infos = self
-                .ledger_store
-                .get_transaction_info_iter(start_version, limit as usize)?;
-            let gas_prices: Vec<_> = txns
-                .zip(infos)
-                .filter_map(|(txn, info)| {
-                    txn.as_ref()
-                        .ok()
-                        .and_then(|t| t.try_as_signed_user_txn())
-                        .map(|t| (t.gas_unit_price(), info))
-                })
-                .filter_map(|(unit_price, info)| {
-                    info.as_ref().ok().map(|i| (unit_price, i.gas_used()))
-                })
-                .collect();
-
-            Ok(gas_prices)
-        })
-    }
-
     /// Get the first version that txn starts existent.
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
