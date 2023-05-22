@@ -162,7 +162,6 @@ impl BlockAptosVM {
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
 
-        let before_dedup_len = transactions.len();
         let duplicate_map = SegmentedCache::new(100000, 256);
 
         let signature_verified_block: Vec<PreprocessedTransaction> =
@@ -177,8 +176,11 @@ impl BlockAptosVM {
                     .collect()
             });
 
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED
-            .observe((before_dedup_len - signature_verified_block.len()) as f64);
+        let num_filtered = signature_verified_block
+            .iter()
+            .filter(|txn| matches!(txn, PreprocessedTransaction::Duplicate))
+            .count();
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_filtered as f64);
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
