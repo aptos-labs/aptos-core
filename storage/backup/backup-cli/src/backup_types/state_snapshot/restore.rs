@@ -23,6 +23,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_db::state_restore::StateSnapshotRestoreMode;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::StateSnapshotReceiver;
@@ -53,6 +54,8 @@ pub struct StateSnapshotRestoreOpt {
     pub version: Version,
     #[clap(long)]
     pub validate_modules: bool,
+    #[clap(long)]
+    pub restore_mode: StateSnapshotRestoreMode,
 }
 
 pub struct StateSnapshotRestoreController {
@@ -67,6 +70,7 @@ pub struct StateSnapshotRestoreController {
     epoch_history: Option<Arc<EpochHistory>>,
     concurrent_downloads: usize,
     validate_modules: bool,
+    restore_mode: StateSnapshotRestoreMode,
 }
 
 impl StateSnapshotRestoreController {
@@ -85,6 +89,7 @@ impl StateSnapshotRestoreController {
             epoch_history,
             concurrent_downloads: global_opt.concurrent_downloads,
             validate_modules: opt.validate_modules,
+            restore_mode: opt.restore_mode,
         }
     }
 
@@ -133,10 +138,11 @@ impl StateSnapshotRestoreController {
             epoch_history.verify_ledger_info(&li)?;
         }
 
-        let receiver = Arc::new(Mutex::new(Some(
-            self.run_mode
-                .get_state_restore_receiver(self.version, manifest.root_hash)?,
-        )));
+        let receiver = Arc::new(Mutex::new(Some(self.run_mode.get_state_restore_receiver(
+            self.version,
+            manifest.root_hash,
+            self.restore_mode,
+        )?)));
 
         let (ver_gauge, tgt_leaf_idx, leaf_idx) = if self.run_mode.is_verify() {
             (

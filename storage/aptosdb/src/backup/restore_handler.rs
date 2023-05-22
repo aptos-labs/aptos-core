@@ -7,7 +7,7 @@ use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema},
     event_store::EventStore,
     ledger_store::LedgerStore,
-    state_restore::StateSnapshotRestore,
+    state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
     transaction_store::TransactionStore,
     AptosDB,
@@ -60,6 +60,7 @@ impl RestoreHandler {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        restore_mode: StateSnapshotRestoreMode,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         StateSnapshotRestore::new(
             &self.state_store.state_merkle_db,
@@ -67,6 +68,7 @@ impl RestoreHandler {
             version,
             expected_root_hash,
             true, /* async_commit */
+            restore_mode,
         )
     }
 
@@ -109,12 +111,38 @@ impl RestoreHandler {
             self.ledger_store.clone(),
             self.transaction_store.clone(),
             self.event_store.clone(),
+            self.state_store.clone(),
             first_version,
             txns,
             txn_infos,
             events,
             write_sets,
             None,
+            false,
+        )
+    }
+
+    pub fn save_transactions_and_replay_kv(
+        &self,
+        first_version: Version,
+        txns: &[Transaction],
+        txn_infos: &[TransactionInfo],
+        events: &[Vec<ContractEvent>],
+        write_sets: Vec<WriteSet>,
+    ) -> Result<()> {
+        restore_utils::save_transactions(
+            self.ledger_db.clone(),
+            self.ledger_store.clone(),
+            self.transaction_store.clone(),
+            self.event_store.clone(),
+            self.state_store.clone(),
+            first_version,
+            txns,
+            txn_infos,
+            events,
+            write_sets,
+            None,
+            true,
         )
     }
 
@@ -125,7 +153,14 @@ impl RestoreHandler {
             .map_or(0, |(ver, _txn_info)| ver + 1))
     }
 
-    pub fn get_in_progress_state_snapshot_version(&self) -> Result<Option<Version>> {
+    pub fn get_state_snapshot_before(
+        &self,
+        version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.aptosdb.get_state_snapshot_before(version)
+    }
+
+    pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
         let mut iter = self
             .aptosdb
             .ledger_db
