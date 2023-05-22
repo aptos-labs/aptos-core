@@ -1,6 +1,6 @@
 # Using Terraform
 
-If you're not familar with GCP (Google Cloud Platform), checkout this [tutorial](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
+If you're not familar with GCP (Google Cloud Platform), checkout this [tutorial](https://aptos.dev/nodes/full-node/run-a-fullnode-on-gcp#prerequisites) for GCP account setup.
 
 ## Run on GCP
 This guide assumes you already have GCP account setup, and have created a new project for deploying Aptos node.

@@ -20,7 +20,7 @@ or use the browser bundle
 
 Then, the SDK can be accessed through `window.aptosSDK`.
 
-Learn the basics of how to use the SDK by following [this tutorial](https://aptos.dev/tutorials/your-first-transaction-sdk) in the Aptos developer site.
+Learn the basics of how to use the SDK by following [this tutorial](https://aptos.dev/integration/creating-a-signed-transaction) in the Aptos developer site.
 
 ## Usage
 

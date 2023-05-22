@@ -298,7 +298,6 @@ where
 
         create_txn_generator_creator(
             &[vec![(transaction_type, 1)]],
-            1,
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -481,7 +480,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize(2)),
+            transaction_type.map(|t| t.materialize(2, false)),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */

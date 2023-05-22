@@ -103,7 +103,7 @@ impl ReplayVerifyCoordinator {
                 "DB already has non-empty State DB.",
             );
             (None, next_txn_version)
-        } else if let Some(version) = run_mode.get_in_progress_state_snapshot()? {
+        } else if let Some(version) = run_mode.get_in_progress_state_kv_snapshot()? {
             info!(
                 version = version,
                 "Found in progress state snapshot restore",
@@ -142,6 +142,7 @@ impl ReplayVerifyCoordinator {
                     manifest_handle: backup.manifest,
                     version: backup.version,
                     validate_modules: self.validate_modules,
+                    restore_mode: Default::default(),
                 },
                 global_opt.clone(),
                 Arc::clone(&self.storage),
@@ -156,8 +157,9 @@ impl ReplayVerifyCoordinator {
             global_opt,
             self.storage,
             txn_manifests,
-            Some(replay_transactions_from_version), /* replay_from_version */
-            None,                                   /* epoch_history */
+            None,
+            Some((replay_transactions_from_version, false)), /* replay_from_version */
+            None,                                            /* epoch_history */
             self.verify_execution_mode.clone(),
             None,
         )

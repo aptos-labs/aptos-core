@@ -18,21 +18,21 @@ fi
 # try getting the internal grpc on the fullnode itself
 stream_time_seconds=30
 start_time=$(date +%s)
-timeout "${stream_time_seconds}s" grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -import-path crates/aptos-protos/proto -proto aptos/internal/fullnode/v1/fullnode_data.proto  -plaintext 127.0.0.1:50051 aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode
+timeout "${stream_time_seconds}s" grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -import-path crates/aptos-protos/proto -proto aptos/internal/fullnode/v1/fullnode_data.proto  -plaintext 127.0.0.1:50051 aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode > fullnode_grpc_response.txt
 end_time=$(date +%s)
 total_time=$((end_time - start_time))
 echo "grpcurl took ${total_time} seconds to run"
 
 if [ $total_time -lt "${stream_time_seconds}" ]; then
     echo "grpcurl exited early, which indicates failure"
-    echo "RawData/GetTransactions on the aptos-node should be an endless stream"
+    echo "FullnodeData/GetTransactionsFromNode on the aptos-node should be an endless stream"
     exit 1
 fi
 
 # try hitting the data service
 stream_time_seconds=30
 start_time=$(date +%s)
-timeout "${stream_time_seconds}s" grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -H "x-aptos-data-authorization:dummy_token"  -import-path crates/aptos-protos/proto -proto aptos/indexer/v1/raw_data.proto  -plaintext 127.0.0.1:50052 aptos.indexer.v1.RawData/GetTransactions
+timeout "${stream_time_seconds}s" grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -H "x-aptos-data-authorization:dummy_token"  -import-path crates/aptos-protos/proto -proto aptos/indexer/v1/raw_data.proto  -plaintext 127.0.0.1:50052 aptos.indexer.v1.RawData/GetTransactions > data_service_grpc_response.txt
 end_time=$(date +%s)
 total_time=$((end_time - start_time))
 echo "grpcurl took ${total_time} seconds to run"
