@@ -19,12 +19,12 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceRefResolver, types::ResourceRef};
+use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
 // make a script with a given signature for main.
@@ -259,22 +259,13 @@ impl ModuleResolver for RemoteStore {
     }
 }
 
-impl ResourceRefResolver for RemoteStore {
-    fn get_resource_ref_with_metadata(
+impl ResourceResolver for RemoteStore {
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<ResourceRef>> {
-        Ok(None)
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-        _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
         Ok(None)
     }
 }

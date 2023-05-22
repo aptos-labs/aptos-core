@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Transaction;
 
-pub trait BlockPartitioner {
+pub trait BlockPartitioner: Send + Sync {
     fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
         -> Vec<Vec<Transaction>>;
 }
@@ -18,6 +18,9 @@ impl BlockPartitioner for UniformPartitioner {
         num_shards: usize,
     ) -> Vec<Vec<Transaction>> {
         let total_txns = transactions.len();
+        if total_txns == 0 {
+            return vec![];
+        }
         let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
 
         let mut result = Vec::new();

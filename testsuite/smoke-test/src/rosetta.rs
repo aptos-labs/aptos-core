@@ -38,6 +38,7 @@ use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
     on_chain_config::GasScheduleV2, transaction::SignedTransaction,
 };
+use serde_json::json;
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
@@ -500,6 +501,24 @@ async fn unlock_stake(
         .sequence_number(sequence_number);
 
     let txn = account.sign_with_transaction_builder(unlock_stake);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn create_delegation_pool(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    commission_percentage: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let delegation_pool_creation = info
+        .transaction_factory()
+        .payload(aptos_stdlib::delegation_pool_initialize_delegation_pool(
+            commission_percentage,
+            vec![],
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(delegation_pool_creation);
     info.client().submit_and_wait(&txn).await.unwrap()
 }
 
@@ -1512,6 +1531,121 @@ async fn parse_operations(
                     panic!("Not a user transaction");
                 }
             },
+            OperationType::AddDelegatedStake => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful add_delegated_stake operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed add_delegated_stake operation"
+                    );
+                }
+
+                // Check that add stake was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_pool_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+
+                        let pool_address = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .pool_address
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+
+                        assert_eq!(actual_pool_address, pool_address);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
+            OperationType::UnlockDelegatedStake => {
+                if actual_successful {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful unlock_delegated_stake operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed unlock_delegated_stake operation"
+                    );
+                }
+
+                // Check that unlock stake was set the same
+                if let aptos_types::transaction::Transaction::UserTransaction(ref txn) =
+                    actual_txn.transaction
+                {
+                    if let aptos_types::transaction::TransactionPayload::EntryFunction(
+                        ref payload,
+                    ) = txn.payload()
+                    {
+                        let actual_pool_address: AccountAddress =
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
+                        let pool_address = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .pool_address
+                            .as_ref()
+                            .unwrap()
+                            .account_address()
+                            .unwrap();
+
+                        assert_eq!(actual_pool_address, pool_address);
+
+                        let actual_amount: u64 =
+                            bcs::from_bytes(payload.args().get(1).unwrap()).unwrap();
+
+                        let amount = operation
+                            .metadata
+                            .as_ref()
+                            .unwrap()
+                            .amount
+                            .as_ref()
+                            .unwrap()
+                            .0;
+
+                        assert_eq!(actual_amount, amount);
+                    } else {
+                        panic!("Not an entry function");
+                    }
+                } else {
+                    panic!("Not a user transaction");
+                }
+            },
         }
     }
 
@@ -2099,6 +2233,266 @@ fn expiry_time(txn_expiry_duration: Duration) -> Duration {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .saturating_add(txn_expiry_duration)
+}
+
+async fn add_delegated_stake_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    pool_address: AccountAddress,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .add_delegated_stake(
+            network_identifier,
+            sender_key,
+            pool_address,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+async fn unlock_delegated_stake_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    pool_address: AccountAddress,
+    amount: Option<u64>,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+    max_gas: Option<u64>,
+    gas_unit_price: Option<u64>,
+) -> Result<Box<UserTransaction>, ErrorWrapper> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .unlock_delegated_stake(
+            network_identifier,
+            sender_key,
+            pool_address,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+        )
+        .await
+        .map_err(ErrorWrapper::BeforeSubmission)?
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash)
+        .await
+        .map_err(ErrorWrapper::AfterSubmission)
+}
+
+#[tokio::test]
+async fn test_delegation_pool_operations() {
+    const NUM_TXNS_PER_PAGE: u16 = 2;
+
+    let (mut swarm, cli, _, rosetta_client) = setup_test(
+        2,
+        Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
+    )
+    .await;
+
+    // 20 APT
+    let delegate_initial_balance = 20 * u64::pow(10, 8);
+    cli.fund_account(0, Some(delegate_initial_balance))
+        .await
+        .unwrap();
+    let delegate_account_private_key = cli.private_key(0);
+
+    let chain_id = swarm.chain_id();
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let _request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+    let network_identifier = chain_id.into();
+
+    let root_address = swarm.aptos_public_info().root_account().address();
+    let root_sequence_number = swarm
+        .aptos_public_info()
+        .client()
+        .get_account_bcs(root_address)
+        .await
+        .unwrap()
+        .into_inner()
+        .sequence_number();
+
+    *swarm
+        .aptos_public_info()
+        .root_account()
+        .sequence_number_mut() = root_sequence_number;
+
+    let mut delegation_pool_creator_account = swarm
+        .aptos_public_info()
+        .create_and_fund_user_account(1_000_000_000_000_000)
+        .await
+        .unwrap();
+
+    let res = create_delegation_pool(
+        &swarm.aptos_public_info(),
+        &mut delegation_pool_creator_account,
+        10,
+        1,
+    )
+    .await;
+
+    let (tx, _) = res.into_parts();
+    let tx_serialized = json!(tx);
+    let mut pool_address_str = "";
+
+    if let Some(changes) = tx_serialized["changes"].as_array() {
+        for change in changes {
+            if change["data"]["type"] == "0x1::delegation_pool::DelegationPool" {
+                pool_address_str = change["address"].as_str().unwrap();
+                break;
+            }
+        }
+    }
+    let pool_address = AccountAddress::from_hex_literal(pool_address_str).unwrap();
+
+    // Must stake at least 11 APT
+    let staked_amount = 11 * u64::pow(10, 8);
+
+    add_delegated_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        delegate_account_private_key,
+        pool_address,
+        Some(staked_amount),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully add delegated stake");
+
+    let final_txn = unlock_delegated_stake_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        delegate_account_private_key,
+        pool_address,
+        Some(staked_amount),
+        Duration::from_secs(5),
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("Should successfully unlock delegated stake");
+
+    let final_block_to_check = rest_client
+        .get_block_by_version(final_txn.info.version.0, false)
+        .await
+        .expect("Should be able to get block info for completed txns");
+
+    // Check a couple blocks past the final transaction to check more txns
+    let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
+
+    // TODO: Track total supply?
+    // TODO: Check account balance block hashes?
+    // TODO: Handle multiple coin types
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= final_block_height {
+            break;
+        }
+    }
+
+    // Now we have to watch all the changes
+    let mut current_version = 0;
+    let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, i128>>::new();
+    let mut previous_block_index = 0;
+    let mut block_hashes = HashSet::new();
+    for block_height in 0..final_block_height {
+        let request = BlockRequest::by_index(chain_id, block_height);
+        let response: BlockResponse = rosetta_client
+            .block(&request)
+            .await
+            .expect("Should be able to get blocks that are already known");
+        let block = response.block;
+        let actual_block = rest_client
+            .get_block_by_height_bcs(block_height, true)
+            .await
+            .expect("Should be able to get block for a known block")
+            .into_inner();
+
+        assert_eq!(
+            block.block_identifier.index, block_height,
+            "The block should match the requested block"
+        );
+        assert_eq!(
+            block.block_identifier.hash,
+            BlockHash::new(chain_id, block_height).to_string(),
+            "Block hash should match chain_id-block_height"
+        );
+        assert_eq!(
+            block.parent_block_identifier.index, previous_block_index,
+            "Parent block index should be previous block"
+        );
+        assert_eq!(
+            block.parent_block_identifier.hash,
+            BlockHash::new(chain_id, previous_block_index).to_string(),
+            "Parent block hash should be previous block chain_id-block_height"
+        );
+        assert!(
+            block_hashes.insert(block.block_identifier.hash.clone()),
+            "Block hash was repeated {}",
+            block.block_identifier.hash
+        );
+
+        // It's only greater or equal because microseconds are cut off
+        let expected_timestamp = if block_height == 0 {
+            Y2K_MS
+        } else {
+            actual_block.block_timestamp.saturating_div(1000)
+        };
+        assert_eq!(
+            expected_timestamp, block.timestamp,
+            "Block timestamp should match actual timestamp but in ms"
+        );
+
+        // TODO: double check that all transactions do show with the flag, and that all expected txns
+        // are shown without the flag
+
+        let actual_txns = actual_block
+            .transactions
+            .as_ref()
+            .expect("Every actual block should have transactions");
+
+        parse_block_transactions(&block, &mut balances, actual_txns, &mut current_version).await;
+
+        // Keep track of the previous
+        previous_block_index = block_height;
+    }
 }
 
 #[derive(Debug)]

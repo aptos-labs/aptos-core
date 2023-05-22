@@ -23,11 +23,10 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::ModuleResolver,
+    resolver::{ModuleResolver, ResourceResolver},
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
-use move_vm_types::{resolver::ResourceRefResolver, types::ResourceRef};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -393,28 +392,18 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
     }
 }
 
-impl<'a> ResourceRefResolver for HarnessProxy<'a> {
-    fn get_resource_ref_with_metadata(
+impl<'a> ResourceResolver for HarnessProxy<'a> {
+    fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> anyhow::Result<Option<ResourceRef>> {
-        let res = self.get_resource_bytes_with_metadata(address, tag, metadata)?;
-        Ok(res.map(ResourceRef::Serialized))
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
+        typ: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let res = self
             .harness
             .resource_store
             .borrow()
-            .get(&(*address, tag.clone()))
+            .get(&(*address, typ.clone()))
             .cloned();
         Ok(res)
     }

@@ -15,6 +15,7 @@ use reqwest::Url;
 pub struct ChainInfo<'t> {
     pub root_account: &'t mut LocalAccount,
     pub rest_api_url: String,
+    pub inspection_service_url: String,
     pub chain_id: ChainId,
 }
 
@@ -22,11 +23,13 @@ impl<'t> ChainInfo<'t> {
     pub fn new(
         root_account: &'t mut LocalAccount,
         rest_api_url: String,
+        inspection_service_url: String,
         chain_id: ChainId,
     ) -> Self {
         Self {
             root_account,
             rest_api_url,
+            inspection_service_url,
             chain_id,
         }
     }
@@ -61,6 +64,11 @@ impl<'t> ChainInfo<'t> {
     }
 
     pub fn into_aptos_public_info(self) -> AptosPublicInfo<'t> {
-        AptosPublicInfo::new(self.chain_id, self.rest_api_url.clone(), self.root_account)
+        AptosPublicInfo::new(
+            self.chain_id,
+            self.inspection_service_url.clone(),
+            self.rest_api_url.clone(),
+            self.root_account,
+        )
     }
 }

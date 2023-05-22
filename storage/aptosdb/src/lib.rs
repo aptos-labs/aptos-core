@@ -99,11 +99,13 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
+        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -117,6 +119,7 @@ use arr_macro::arr;
 use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::{
     borrow::Borrow,
     collections::HashMap,
@@ -834,6 +837,7 @@ impl AptosDB {
                     .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
                     .collect::<Vec<_>>();
 
+                // TODO(grao): Make state_store take sharded state updates.
                 self.state_store.put_value_sets(
                     state_updates_vec,
                     first_version,
@@ -1040,12 +1044,16 @@ impl AptosDB {
                             first_version + idx as u64
                         );
                     end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                    Some(
-                        txns_to_commit[..=idx]
-                            .iter()
-                            .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                            .collect(),
-                    )
+                    let mut sharded_state_updates = create_empty_sharded_state_updates();
+                    sharded_state_updates.par_iter_mut().enumerate().for_each(
+                        |(shard_id, state_updates_shard)| {
+                            txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
+                                state_updates_shard
+                                    .extend(txn_to_commit.state_updates()[shard_id].clone());
+                            })
+                        },
+                    );
+                    Some(sharded_state_updates)
                 } else {
                     None
                 }
@@ -1955,7 +1963,7 @@ impl DbWriter for AptosDB {
         sync_commit: bool,
         // TODO(grao): Consider remove this.
         latest_in_memory_state: StateDelta,
-        block_state_updates: HashMap<StateKey, Option<StateValue>>,
+        block_state_updates: ShardedStateUpdates,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
         gauged_api("save_transaction_block", || {
@@ -2000,6 +2008,9 @@ impl DbWriter for AptosDB {
                 )?;
 
                 if !txns_to_commit.is_empty() {
+                    let _timer = OTHER_TIMERS_SECONDS
+                        .with_label_values(&["buffered_state___update"])
+                        .start_timer();
                     buffered_state.update(
                         Some(block_state_updates),
                         latest_in_memory_state,

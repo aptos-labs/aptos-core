@@ -965,7 +965,7 @@ impl AptosGasMeter for StandardGasMeter {
         // Because the storage fees are defined in terms of fixed APT costs, we need
         // to convert them into gas units.
         //
-        // u128 is used to protect against overflow and preverse as much precision as
+        // u128 is used to protect against overflow and preserve as much precision as
         // possible in the extreme cases.
         fn div_ceil(n: u128, d: u128) -> u128 {
             if n % d == 0 {

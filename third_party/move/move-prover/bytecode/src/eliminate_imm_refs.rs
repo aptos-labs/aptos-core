@@ -53,10 +53,16 @@ impl<'a> EliminateImmRefs<'a> {
             .into_iter()
             .map(|ty| self.transform_type(ty))
             .collect();
-        self.builder.data.return_types = std::mem::take(&mut self.builder.data.return_types)
-            .into_iter()
-            .map(|ty| self.transform_type(ty))
-            .collect();
+        self.builder.data.result_type = Type::tuple(
+            self.builder
+                .data
+                .result_type
+                .clone()
+                .flatten()
+                .into_iter()
+                .map(|ty| self.transform_type(ty))
+                .collect(),
+        );
     }
 
     fn transform_type(&self, ty: Type) -> Type {

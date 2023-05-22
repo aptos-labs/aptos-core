@@ -9,7 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    scheduler::{Scheduler, SchedulerTask, Wave},
+    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -40,7 +40,7 @@ use std::{
 
 #[derive(Debug)]
 enum CommitRole {
-    Coordinator(Vec<Sender<TxnIndex>>, usize),
+    Coordinator(Vec<Sender<TxnIndex>>),
     Worker(Receiver<TxnIndex>),
 }
 
@@ -49,6 +49,7 @@ pub struct BlockExecutor<T, E, S> {
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
+    maybe_gas_limit: Option<u64>,
     phantom: PhantomData<(T, E, S)>,
 }
 
@@ -60,7 +61,11 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(concurrency_level: usize, executor_thread_pool: Arc<ThreadPool>) -> Self {
+    pub fn new(
+        concurrency_level: usize,
+        executor_thread_pool: Arc<ThreadPool>,
+        maybe_gas_limit: Option<u64>,
+    ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
@@ -69,6 +74,7 @@ where
         Self {
             concurrency_level,
             executor_thread_pool,
+            maybe_gas_limit,
             phantom: PhantomData,
         }
     }
@@ -145,7 +151,15 @@ where
             versioned_cache.delete(&k, idx_to_execute);
         }
 
-        last_input_output.record(idx_to_execute, speculative_view.take_reads(), result);
+        if last_input_output
+            .record(idx_to_execute, speculative_view.take_reads(), result)
+            .is_err()
+        {
+            // When there is module publishing r/w intersection, can early halt BlockSTM to
+            // fallback to sequential execution.
+            scheduler.halt();
+            return SchedulerTask::NoTask;
+        }
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -164,7 +178,7 @@ where
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
-            .expect("Prior read-set must be recorded");
+            .expect("[BlockSTM]: Prior read-set must be recorded");
 
         let valid = read_set.iter().all(|r| {
             match versioned_cache.fetch_data(r.path(), idx_to_validate) {
@@ -205,7 +219,72 @@ where
         }
     }
 
-    fn commit_hook(
+    fn coordinator_commit_hook(
+        &self,
+        maybe_gas_limit: Option<u64>,
+        scheduler: &Scheduler,
+        post_commit_txs: &Vec<Sender<u32>>,
+        worker_idx: &mut usize,
+        accumulated_gas: &mut u64,
+        scheduler_task: &mut SchedulerTask,
+        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+    ) {
+        while let Some(txn_idx) = scheduler.try_commit() {
+            post_commit_txs[*worker_idx]
+                .send(txn_idx)
+                .expect("Worker must be available");
+            // Iterate round robin over workers to do commit_hook.
+            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
+
+            // Committed the last transaction, BlockSTM finishes execution.
+            if txn_idx as usize + 1 == scheduler.num_txns() as usize {
+                *scheduler_task = SchedulerTask::Done;
+
+                counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
+                break;
+            }
+
+            // For committed txns with Success status, calculate the accumulated gas.
+            // For committed txns with Abort or SkipRest status, early halt BlockSTM.
+            match last_input_output.gas_used(txn_idx) {
+                Some(gas) => {
+                    *accumulated_gas += gas;
+                    counters::PARALLEL_PER_TXN_GAS.observe(gas as f64);
+                },
+                None => {
+                    scheduler.halt();
+
+                    counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
+                    debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
+                    break;
+                },
+            };
+
+            if let Some(per_block_gas_limit) = maybe_gas_limit {
+                // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
+                if *accumulated_gas >= per_block_gas_limit {
+                    // Set the execution output status to be SkipRest, to skip the rest of the txns.
+                    last_input_output.update_to_skip_rest(txn_idx);
+                    scheduler.halt();
+
+                    counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
+                    counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", *accumulated_gas, per_block_gas_limit);
+                    break;
+                }
+            }
+
+            // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
+            // will be properly handled by the threads. For instance, it is possible that the committing
+            // thread holds an execution task from the last iteration, and then early halts the BlockSTM
+            // due to a txn execution abort. In this case, we cannot reset the scheduler_task of the
+            // committing thread (to be Done), otherwise some other pending thread waiting for the execution
+            // will be pending on read forever (since the halt logic let the execution task to wake up such
+            // pending task).
+        }
+    }
+
+    fn worker_commit_hook(
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
@@ -263,31 +342,34 @@ where
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
-        let committing = matches!(role, CommitRole::Coordinator(_, _));
+        let committing = matches!(role, CommitRole::Coordinator(_));
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
+        let mut accumulated_gas = 0;
+        let mut worker_idx = 0;
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
-                CommitRole::Coordinator(post_commit_txs, mut idx) => {
-                    while let Some(txn_idx) = scheduler.try_commit() {
-                        post_commit_txs[idx]
-                            .send(txn_idx)
-                            .expect("Worker must be available");
-                        // Iterate round robin over workers to do commit_hook.
-                        idx = (idx + 1) % post_commit_txs.len();
-
-                        if txn_idx as usize + 1 == block.len() {
-                            // Committed the last transaction / everything.
-                            scheduler_task = SchedulerTask::Done;
-                            break;
-                        }
-                    }
+                CommitRole::Coordinator(post_commit_txs) => {
+                    self.coordinator_commit_hook(
+                        self.maybe_gas_limit,
+                        scheduler,
+                        post_commit_txs,
+                        &mut worker_idx,
+                        &mut accumulated_gas,
+                        &mut scheduler_task,
+                        last_input_output,
+                    );
                 },
                 CommitRole::Worker(rx) => {
                     while let Ok(txn_idx) = rx.try_recv() {
-                        self.commit_hook(txn_idx, versioned_cache, last_input_output, base_view);
+                        self.worker_commit_hook(
+                            txn_idx,
+                            versioned_cache,
+                            last_input_output,
+                            base_view,
+                        );
                     }
                 },
             }
@@ -312,7 +394,7 @@ where
                 SchedulerTask::ExecutionTask(_, Some(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
-                    *lock.lock() = true;
+                    *lock.lock() = DependencyStatus::Resolved;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
 
@@ -324,7 +406,7 @@ where
                     if let CommitRole::Worker(rx) = &role {
                         // Until the sender drops the tx, an index for commit_hook might be sent.
                         while let Ok(txn_idx) = rx.recv() {
-                            self.commit_hook(
+                            self.worker_commit_hook(
                                 txn_idx,
                                 versioned_cache,
                                 last_input_output,
@@ -362,7 +444,7 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let mut roles: Vec<CommitRole> = vec![];
-        let mut senders = Vec::with_capacity(self.concurrency_level - 1);
+        let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
         for _ in 0..(self.concurrency_level - 1) {
             let (tx, rx) = mpsc::channel();
             roles.push(CommitRole::Worker(rx));
@@ -373,7 +455,7 @@ where
         // Note: It is important that the Coordinator is the first thread that
         // picks up a role will be a coordinator. Hence, if multiple parallel
         // executors are running concurrently, they will all have active coordinator.
-        roles.push(CommitRole::Coordinator(senders, 0));
+        roles.push(CommitRole::Coordinator(senders));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -447,6 +529,7 @@ where
         let mut data_map = BTreeMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
+        let mut accumulated_gas = 0;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
@@ -456,7 +539,6 @@ where
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
-
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     assert_eq!(
@@ -468,6 +550,10 @@ where
                     for (ap, write_op) in output.get_writes().into_iter() {
                         data_map.insert(ap, write_op);
                     }
+                    // Calculating the accumulated gas of the committed txns.
+                    let txn_gas = output.gas_used();
+                    accumulated_gas += txn_gas;
+                    counters::SEQUENTIAL_PER_TXN_GAS.observe(txn_gas as f64);
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
@@ -476,11 +562,24 @@ where
                 },
             }
 
+            // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
+                debug!("[Execution]: Sequential execution early halted due to SkipRest txn.");
                 break;
+            }
+
+            if let Some(per_block_gas_limit) = self.maybe_gas_limit {
+                // When the accumulated gas of the committed txns
+                // exceeds per_block_gas_limit, halt sequential execution.
+                if accumulated_gas >= per_block_gas_limit {
+                    counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
+                    debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, per_block_gas_limit);
+                    break;
+                }
             }
         }
 
+        counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }

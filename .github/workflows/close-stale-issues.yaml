@@ -20,3 +20,5 @@ jobs:
           operations-per-run: 500
           stale-issue-message: "This issue is stale because it has been open 45 days with no activity. Remove the `stale` label or comment - otherwise this will be closed in 15 days."
           stale-pr-message: "This issue is stale because it has been open 45 days with no activity. Remove the `stale` label, comment or push a commit - otherwise this will be closed in 15 days."
+          exempt-issue-labels: stale-exempt
+          exempt-pr-labels: stale-exempt

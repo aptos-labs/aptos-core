@@ -162,6 +162,11 @@ const config = {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
+            {
+              type: "doc",
+              label: "Advanced Builder Guides",
+              docId: "/category/advanced-builders",
+            },
           ],
         },
         {

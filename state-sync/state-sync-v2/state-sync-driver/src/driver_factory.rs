@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationListener;
-use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_data_client::client::AptosDataClient;
 use aptos_data_streaming_service::streaming_client::StreamingServiceClient;
 use aptos_event_notifications::{EventNotificationSender, EventSubscriptionService};
 use aptos_executor_types::ChunkExecutorTrait;
@@ -49,7 +49,7 @@ impl DriverFactory {
         metadata_storage: MetadataStorage,
         consensus_listener: ConsensusNotificationListener,
         mut event_subscription_service: EventSubscriptionService,
-        aptos_data_client: AptosNetDataClient,
+        aptos_data_client: AptosDataClient,
         streaming_service_client: StreamingServiceClient,
         time_service: TimeService,
     ) -> Self {
@@ -77,8 +77,13 @@ impl DriverFactory {
         let consensus_notification_handler = ConsensusNotificationHandler::new(consensus_listener);
         let (error_notification_sender, error_notification_listener) =
             ErrorNotificationListener::new();
-        let mempool_notification_handler =
-            MempoolNotificationHandler::new(mempool_notification_sender);
+        let mempool_notification_handler = MempoolNotificationHandler::new(
+            mempool_notification_sender,
+            node_config
+                .state_sync
+                .state_sync_driver
+                .mempool_commit_ack_timeout_ms,
+        );
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {

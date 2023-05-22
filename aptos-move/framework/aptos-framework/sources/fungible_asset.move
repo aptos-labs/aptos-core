@@ -87,6 +87,8 @@ module aptos_framework::fungible_asset {
         /// The Uniform Resource Identifier (uri) pointing to an image that can be used as the icon for this fungible
         /// asset.
         icon_uri: String,
+        /// The Uniform Resource Identifier (uri) pointing to the website for the fungible asset.
+        project_uri: String,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -157,6 +159,7 @@ module aptos_framework::fungible_asset {
         symbol: String,
         decimals: u8,
         icon_uri: String,
+        project_uri: String,
     ): Object<Metadata> {
         assert!(!object::can_generate_delete_ref(constructor_ref), error::invalid_argument(EOBJECT_IS_DELETABLE));
         let metadata_object_signer = &object::generate_signer(constructor_ref);
@@ -164,12 +167,14 @@ module aptos_framework::fungible_asset {
         assert!(string::length(&symbol) <= MAX_SYMBOL_LENGTH, error::out_of_range(ESYMBOL_TOO_LONG));
         assert!(decimals <= MAX_DECIMALS, error::out_of_range(EDECIMALS_TOO_LARGE));
         assert!(string::length(&icon_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
+        assert!(string::length(&project_uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         move_to(metadata_object_signer,
             Metadata {
                 name,
                 symbol,
                 decimals,
                 icon_uri,
+                project_uri,
             }
         );
         move_to(metadata_object_signer, Supply {
@@ -321,9 +326,8 @@ module aptos_framework::fungible_asset {
         metadata: Object<T>,
     ): Object<FungibleStore> {
         let store_obj = &object::generate_signer(constructor_ref);
-        let metadata = object::convert<T, Metadata>(metadata);
         move_to(store_obj, FungibleStore {
-            metadata,
+            metadata: object::convert(metadata),
             balance: 0,
             frozen: false,
         });
@@ -466,6 +470,15 @@ module aptos_framework::fungible_asset {
         deposit_with_ref(transfer_ref, to, fa);
     }
 
+    /// Create a fungible asset with zero amount.
+    /// This can be useful when starting a series of computations where the initial value is 0.
+    public fun zero<T: key>(metadata: Object<T>): FungibleAsset {
+        FungibleAsset {
+            metadata: object::convert(metadata),
+            amount: 0,
+        }
+    }
+
     /// Extract a given amount from the given fungible asset and return a new one.
     public fun extract(fungible_asset: &mut FungibleAsset, amount: u64): FungibleAsset {
         assert!(fungible_asset.amount >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
@@ -492,6 +505,8 @@ module aptos_framework::fungible_asset {
 
     fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
+        if (amount == 0) return;
+
         let store_metadata = store_metadata(store);
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -594,6 +609,7 @@ module aptos_framework::fungible_asset {
             string::utf8(b"@@"),
             0,
             string::utf8(b"http://www.example.com/favicon.ico"),
+            string::utf8(b"http://www.example.com"),
         );
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);
@@ -607,7 +623,7 @@ module aptos_framework::fungible_asset {
     ): (MintRef, TransferRef, BurnRef, Object<Metadata>) {
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint, transfer, burn) = init_test_metadata(&creator_ref);
-        (mint, transfer, burn, object::convert<TestToken, Metadata>(token_object))
+        (mint, transfer, burn, object::convert(token_object))
     }
 
     #[test_only]

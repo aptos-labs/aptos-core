@@ -55,7 +55,6 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
-use num_cpus;
 use serde::Serialize;
 use std::{
     env,
@@ -83,7 +82,6 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
-#[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,
     executor_thread_pool: Arc<rayon::ThreadPool>,
@@ -94,6 +92,7 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
+    aggregator_enabled: bool,
 }
 
 impl FakeExecutor {
@@ -115,11 +114,16 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: chain_id.id(),
+            aggregator_enabled: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
         aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
+    }
+
+    pub fn set_aggregator_enabled(&mut self, aggregator_enabled: bool) {
+        self.aggregator_enabled = aggregator_enabled;
     }
 
     /// Configure this executor to not use parallel execution.
@@ -176,6 +180,7 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            aggregator_enabled: true,
         }
     }
 
@@ -410,6 +415,7 @@ impl FakeExecutor {
             txn_block,
             &self.data_store,
             usize::min(4, num_cpus::get()),
+            None,
         )
     }
 
@@ -619,7 +625,8 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -667,7 +674,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

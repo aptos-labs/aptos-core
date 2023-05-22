@@ -18,6 +18,7 @@ pub mod test_node;
 pub fn create_client_server_network_context(
     client_public_key: Option<PublicKey>,
     server_public_key: Option<PublicKey>,
+    peers_and_metadata: Option<Arc<PeersAndMetadata>>,
 ) -> (NetworkContext, NetworkContext, Arc<PeersAndMetadata>) {
     // Create the client context
     let client_network_context = create_context_for_public_key(client_public_key);
@@ -30,7 +31,8 @@ pub fn create_client_server_network_context(
     );
 
     // Create the trusted peers and metadata
-    let peers_and_metadata = PeersAndMetadata::new(&[client_network_context.network_id()]);
+    let peers_and_metadata = peers_and_metadata
+        .unwrap_or_else(|| PeersAndMetadata::new(&[client_network_context.network_id()]));
 
     (
         client_network_context,

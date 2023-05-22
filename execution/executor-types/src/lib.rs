@@ -124,6 +124,10 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+
+    fn get_block_gas_limit(&self) -> Option<u64>;
+
+    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>);
 }
 
 #[derive(Clone)]

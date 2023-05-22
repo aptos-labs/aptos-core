@@ -236,7 +236,7 @@ impl<'a> Context<'a> {
     /// Adds function and all its called functions to the targets.
     fn add_fun(targets: &mut FunctionTargetsHolder, fun: &FunctionEnv<'_>) {
         targets.add_target(fun);
-        for qid in fun.get_called_functions() {
+        for qid in fun.get_called_functions().cloned().unwrap_or_default() {
             let called_fun = fun.module_env.env.get_function(qid);
             if !targets.has_target(&called_fun, &FunctionVariant::Baseline) {
                 Self::add_fun(targets, &called_fun)
@@ -538,7 +538,11 @@ impl<'a> Context<'a> {
     pub fn make_contract_name(&self, module: &ModuleEnv) -> String {
         let mod_name = module.get_name();
         let mod_sym = module.symbol_pool().string(mod_name.name());
-        format!("A{}_{}", mod_name.addr().to_str_radix(16), mod_sym)
+        format!(
+            "A{}_{}",
+            mod_name.addr().expect_numerical().short_str_lossless(),
+            mod_sym
+        )
     }
 
     /// Make the name of function.

@@ -29,13 +29,16 @@ use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{
-        AccountChangeSet, ChangeSet as MoveChangeSet, Event as MoveEvent, Op as MoveStorageOp,
+        AccountChangeSet, ChangeSet as MoveChangeSet, Changes, Event as MoveEvent,
+        Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
+    value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -129,7 +132,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<AptosChangeSet> {
         let move_vm = self.inner.get_move_vm();
-        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let (change_set, events, mut extensions) =
+            self.inner.finish_without_serialization_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
@@ -187,73 +191,74 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn MoveResolverExt,
-        change_set: MoveChangeSet,
+        change_set: Changes<Vec<u8>, (Value, MoveTypeLayout)>,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
-        let common_error = PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-            .with_message("split_and_merge_resource_groups error".to_string())
-            .finish(Location::Undefined);
+        let common_error = || {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("split_and_merge_resource_groups error".to_string())
+                .finish(Location::Undefined)
+        };
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
+            let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
-            for (struct_tag, blob_op) in resources {
+            for (struct_tag, resource_op) in resources {
                 let resource_group = runtime.with_module_metadata(&struct_tag.module_id(), |md| {
                     get_resource_group_from_metadata(&struct_tag, md)
                 });
+
+                // Also serialize all resources.
+                let blob_op = resource_op.and_then(|(value, layout)| {
+                    value.simple_serialize(&layout).ok_or_else(|| {
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                            .with_message(format!("Error when serializing resource {}.", value))
+                            .finish(Location::Undefined)
+                    })
+                })?;
 
                 if let Some(resource_group) = resource_group {
                     resource_groups
                         .entry(resource_group)
                         .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
+                        .map_err(|_| common_error())?;
                 } else {
-                    change_set_filtered
-                        .add_resource_op(addr, struct_tag, blob_op)
-                        .map_err(|_| common_error.clone())?;
+                    resources_filtered.insert(struct_tag, blob_op);
                 }
             }
 
-            for (name, blob_op) in modules {
-                change_set_filtered
-                    .add_module_op(ModuleId::new(addr, name), blob_op)
-                    .map_err(|_| common_error.clone())?;
-            }
+            change_set_filtered
+                .add_account_changeset(
+                    addr,
+                    AccountChangeSet::from_modules_resources(modules, resources_filtered),
+                )
+                .map_err(|_| common_error())?;
 
             for (resource_tag, resources) in resource_groups {
-                let source_data = remote
-                    .get_resource_group_data(&addr, &resource_tag)
-                    .map_err(|_| common_error.clone())?;
-                let (mut source_data, create) = if let Some(source_data) = source_data {
-                    let source_data =
-                        bcs::from_bytes(&source_data).map_err(|_| common_error.clone())?;
-                    (source_data, false)
-                } else {
-                    (BTreeMap::new(), true)
-                };
+                let mut source_data = remote
+                    .release_resource_group_cache(&addr, &resource_tag)
+                    .unwrap_or_default();
+                let create = source_data.is_empty();
 
                 for (struct_tag, current_op) in resources.into_resources() {
                     match current_op {
                         MoveStorageOp::Delete => {
-                            source_data
-                                .remove(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
+                            source_data.remove(&struct_tag).ok_or_else(common_error)?;
                         },
                         MoveStorageOp::Modify(new_data) => {
-                            let data = source_data
-                                .get_mut(&struct_tag)
-                                .ok_or_else(|| common_error.clone())?;
+                            let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                             *data = new_data;
                         },
                         MoveStorageOp::New(data) => {
                             let data = source_data.insert(struct_tag, data);
                             if data.is_some() {
-                                return Err(common_error);
+                                return Err(common_error());
                             }
                         },
                     }
@@ -262,17 +267,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
-                    )
+                    MoveStorageOp::New(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 } else {
-                    MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data).map_err(|_| common_error.clone())?,
-                    )
+                    MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
                 resource_group_change_set
                     .add_resource_op(addr, resource_tag, op)
-                    .map_err(|_| common_error.clone())?;
+                    .map_err(|_| common_error())?;
             }
         }
 

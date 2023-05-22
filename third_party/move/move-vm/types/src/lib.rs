@@ -22,12 +22,9 @@ macro_rules! debug_writeln {
     };
 }
 
-pub mod effects;
 pub mod gas;
 pub mod loaded_data;
 pub mod natives;
-pub mod resolver;
-pub mod types;
 pub mod values;
 pub mod views;
 

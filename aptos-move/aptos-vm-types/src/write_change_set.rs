@@ -59,8 +59,20 @@ impl WriteChangeSet {
         deltas: DeltaChangeSet,
         state_view: &impl StateView,
     ) -> anyhow::Result<Self, VMStatus> {
-        let materialized_writes = deltas.take(state_view)?;
-        Ok(Self(ChangeSet::new(materialized_writes)))
+        /// Consumes the delta change set and tries to materialize it into a write set.
+    pub fn try_into_write_set(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<WriteSet, VMStatus> {
+        let materialized_write_set = self.deltas.take_materialized(state_view)?;
+        WriteSetMut::new(materialized_write_set)
+            .freeze()
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Error when freezing materialized deltas.".to_string()),
+                )
+            })
     }
 
     /// Converts the set of writes produced by the VM into storage-friendly

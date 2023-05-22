@@ -2588,6 +2588,15 @@ impl GlobalValue {
         self.0.into_effect().map(|op| op.map(Value))
     }
 
+    pub fn into_effect_with_layout(
+        self,
+        layout: MoveTypeLayout,
+    ) -> Option<Op<(Value, MoveTypeLayout)>> {
+        self.0
+            .into_effect()
+            .map(|op| op.map(|v| (Value(v), layout)))
+    }
+
     pub fn is_mutated(&self) -> bool {
         self.0.is_mutated()
     }
@@ -2938,14 +2947,6 @@ impl Value {
         })
         .ok()
     }
-
-    pub fn serialized_size(&self, layout: &MoveTypeLayout) -> Option<usize> {
-        bcs::serialized_size(&AnnotatedValue {
-            layout,
-            val: &self.0,
-        })
-        .ok()
-    }
 }
 
 impl Struct {
@@ -2955,14 +2956,6 @@ impl Struct {
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&AnnotatedValue {
-            layout,
-            val: &self.fields,
-        })
-        .ok()
-    }
-
-    pub fn serialized_size(&self, layout: &MoveStructLayout) -> Option<usize> {
-        bcs::serialized_size(&AnnotatedValue {
             layout,
             val: &self.fields,
         })

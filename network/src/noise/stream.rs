@@ -578,13 +578,19 @@ mod test {
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
 
         // perform the handshake
+        let server_peer_id = server.network_context.peer_id();
         let (client_session, server_session) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                AntiReplayTimestamps::now,
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
         //
-        let client_session = client_session.unwrap();
+        let (client_session, _) = client_session.unwrap();
         let (server_session, _, _) = server_session.unwrap();
         (client_session, server_session)
     }
@@ -684,13 +690,19 @@ mod test {
         let ((client, _client_public_key), (server, server_public_key)) = build_peers();
 
         // perform the handshake
+        let server_peer_id = server.network_context.peer_id();
         let (client, server) = block_on(join(
-            client.upgrade_outbound(dialer_socket, server_public_key, AntiReplayTimestamps::now),
+            client.upgrade_outbound(
+                dialer_socket,
+                server_peer_id,
+                server_public_key,
+                AntiReplayTimestamps::now,
+            ),
             server.upgrade_inbound(listener_socket),
         ));
 
         // get session
-        let mut client = client.unwrap();
+        let (mut client, _) = client.unwrap();
         let (mut server, _, _) = server.unwrap();
 
         // test send and receive
