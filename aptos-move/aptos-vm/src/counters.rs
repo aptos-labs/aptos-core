@@ -3,14 +3,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
-    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
+    exponential_buckets, register_avg_counter, register_histogram, register_int_counter,
+    register_int_counter_vec, register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
 const BLOCK_EXECUTION_TIME_BUCKETS: [f64; 16] = [
     0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0, 5.0,
 ];
+
+pub static BLOCK_EXECUTOR_DUPLICATES_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "block_executor_duplicates_seconds",
+        // metric description
+        "The time spent in seconds for filtering duplicates per block in block executor",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static BLOCK_EXECUTOR_DUPLICATES_FILTERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "block_executor_duplicates_filtered",
+        "The number of duplicates filtered per block",
+    )
+});
 
 pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
