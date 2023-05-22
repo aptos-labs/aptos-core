@@ -1735,6 +1735,13 @@ impl VMAdapter for AptosVM {
                     Some("state_checkpoint".into()),
                 )
             },
+            PreprocessedTransaction::Duplicate => {
+                let (vm_status, output) = discard_error_vm_status(VMStatus::Error(
+                    StatusCode::SEQUENCE_NUMBER_TOO_OLD,
+                    None,
+                ));
+                (vm_status, output, None)
+            },
         })
     }
 }

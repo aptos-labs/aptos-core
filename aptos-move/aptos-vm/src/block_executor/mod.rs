@@ -151,11 +151,13 @@ impl BlockAptosVM {
         let mut duplicate_map = HashSet::new();
         let transactions: Vec<_> = transactions
             .into_iter()
-            .filter(|txn| match txn {
-                Transaction::UserTransaction(txn) => {
-                    duplicate_map.insert((txn.sender(), txn.sequence_number()))
-                },
-                _ => true,
+            .map(|txn| {
+                if let Transaction::UserTransaction(ref inner) = txn {
+                    if !duplicate_map.insert((inner.sender(), inner.sequence_number())) {
+                        return None;
+                    }
+                }
+                Some(txn)
             })
             .collect();
         BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((before_dedup_len - transactions.len()) as f64);
@@ -172,7 +174,10 @@ impl BlockAptosVM {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
+                    .map(|maybe_txn| match maybe_txn {
+                        None => PreprocessedTransaction::Duplicate,
+                        Some(txn) => preprocess_transaction::<AptosVM>(txn),
+                    })
                     .collect()
             });
         drop(signature_verification_timer);

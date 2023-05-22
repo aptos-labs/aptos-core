@@ -87,6 +87,7 @@ pub enum PreprocessedTransaction {
     BlockMetadata(BlockMetadata),
     InvalidSignature,
     StateCheckpoint,
+    Duplicate,
 }
 
 /// Check the signature (if any) of a transaction. If the signature is OK, the result
