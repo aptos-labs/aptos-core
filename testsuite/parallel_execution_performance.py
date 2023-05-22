@@ -73,10 +73,21 @@ for threads in THREADS:
             )
             fail = True
 
-        if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW or speedups - SPEEDUPS[key] > SPEEDUPS_NOISE_ABOVE:
-            direction = "below" if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW else "above"
-            noise = SPEEDUPS_NOISE_BELOW if direction == "below" else SPEEDUPS_NOISE_ABOVE
-            action = "optimize the execution performance" if direction == "below" else "increase the hard-coded speedup threshold since you improved the execution performance"
+        if (
+            SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW
+            or speedups - SPEEDUPS[key] > SPEEDUPS_NOISE_ABOVE
+        ):
+            direction = (
+                "below" if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW else "above"
+            )
+            noise = (
+                SPEEDUPS_NOISE_BELOW if direction == "below" else SPEEDUPS_NOISE_ABOVE
+            )
+            action = (
+                "optimize the execution performance"
+                if direction == "below"
+                else "increase the hard-coded speedup threshold since you improved the execution performance"
+            )
             print(
                 f"Parallel SPEEDUPS {speedups} {direction} the threshold {SPEEDUPS[key]} by {noise} for {block_size} block size with {threads} threads! Please {action}. :)\n"
             )
