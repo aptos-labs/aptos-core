@@ -44,6 +44,8 @@ use std::{
     time::Duration,
 };
 use std::sync::mpsc::Receiver;
+use futures::stream::FusedStream;
+use aptos_channels::fused_receiver_stream::FusedReceiverStream;
 use aptos_network::protocols::network::{IncomingMessage, NetworkEvents2};
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -397,7 +399,11 @@ pub struct NetworkTask {
         (AccountAddress, ConsensusMsg),
     >,
     rpc_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
-    all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
+    //all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
+    self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
+    //all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
+    direct_receiver: Box<dyn FusedStream<Item = IncomingMessage> + Unpin + Send>,
+    rpc_receiver: Box<dyn FusedStream<Item = aptos_network::protocols::network::IncomingRpcRequest> + Unpin + Send>,
 }
 
 impl NetworkTask {
@@ -425,31 +431,36 @@ impl NetworkTask {
         let (rpc_tx, rpc_rx) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::RPC_CHANNEL_MSGS));
 
+        // Consensus should have one network and it should be the Validator network
+        if (network_service_events.network_and_events.values().len() != 1)
+            || !network_service_events.network_and_events.contains_key(&NetworkId::Validator)
+        {
+            panic!("The network has not been setup correctly for consensus!");
+        }
+
         let mut all_directs = Vec::new();//Vec::<Receiver<IncomingMessage>>::new();
         let mut all_rpcrequests = Vec::new();
         for (network_id, ne2) in network_service_events.network_and_events.into_iter() {
             // let directs = ne2.direct_streams;
             for (_, dr) in ne2.direct_streams.into_iter() {
-                all_directs.push(ReceiverStream::new(dr));
+                all_directs.push(FusedReceiverStream::new(dr));
             }
             for (_, rr) in ne2.rpc_streams.into_iter() {
-                all_rpcrequests.push(ReceiverStream::new(rr));
+                all_rpcrequests.push(FusedReceiverStream::new(rr));
             }
         }
-        let direct_selector = select_all(all_directs).fuse();
+        let direct_receiver = Box::new(select_all(all_directs));
+        let rpc_receiver = Box::new(select_all(all_rpcrequests));
+        //let network_and_events = network_service_events.network_and_events;
         // Verify the network events have been constructed correctly
         // let network_and_events = network_service_events.into_network_and_events(); // TODO: reimplement
-        // if (network_and_events.values().len() != 1)
-        //     || !network_and_events.contains_key(&NetworkId::Validator)
-        // {
-        //     panic!("The network has not been setup correctly for consensus!");
-        // }
 
         // Collect all the network events into a single stream
-        // let network_events: Vec<_> = network_and_events.into_values().collect();
-        // let network_events = select_all(network_events).fuse();
+        //let network_events: Vec<_> = network_and_events.into_values().collect();
+        //for ne2 in network_events
+        //let network_events = select_all(network_events).fuse();
         // let all_events = Box::new(select(network_events, self_receiver));
-        let all_events = Box::new(self_receiver);
+        //let all_events = Box::new(self_receiver);
 
         (
             NetworkTask {
@@ -457,7 +468,10 @@ impl NetworkTask {
                 buffer_manager_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
-                all_events,
+                //all_events,
+                self_receiver,
+                direct_receiver,
+                rpc_receiver,
             },
             NetworkReceivers {
                 consensus_messages,
@@ -521,70 +535,92 @@ impl NetworkTask {
         }
     }
 
-    pub async fn start(mut self) {
-        while let Some(message) = self.all_events.next().await {
-            monitor!("network_main_loop", match message {
-                Event::Message(peer_id, msg) => {
-                    self.handle_message(peer_id, msg);
-                },
-                Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
-                    ConsensusMsg::BlockRetrievalRequest(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BlockRetrievalRequest"])
-                            .inc();
-                        debug!(
+    pub async fn handle_rpc_request(&mut self, peer_id: AccountAddress, msg: ConsensusMsg, protocol: ProtocolId, callback: oneshot::Sender<Result<Bytes, RpcError>>) {
+        match msg {
+            ConsensusMsg::BlockRetrievalRequest(request) => {
+                counters::CONSENSUS_RECEIVED_MSGS
+                    .with_label_values(&["BlockRetrievalRequest"])
+                    .inc();
+                debug!(
                             remote_peer = peer_id,
                             event = LogEvent::ReceiveBlockRetrieval,
                             "{}",
                             request
                         );
-                        if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
-                            warn!(
+                if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
+                    warn!(
                                 remote_peer = peer_id,
                                 "Ignore block retrieval with too many blocks: {}",
                                 request.num_blocks()
                             );
-                            continue;
-                        }
-                        let req_with_callback =
-                            IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    ConsensusMsg::BatchRequestMsg(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BatchRetrievalRequest"])
-                            .inc();
-                        debug!(
+                    return;
+                }
+                let req_with_callback =
+                    IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
+                        req: *request,
+                        protocol,
+                        response_sender: callback,
+                    });
+                if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                    warn!(error = ?e, "aptos channel closed");
+                }
+            },
+            ConsensusMsg::BatchRequestMsg(request) => {
+                counters::CONSENSUS_RECEIVED_MSGS
+                    .with_label_values(&["BatchRetrievalRequest"])
+                    .inc();
+                debug!(
                             remote_peer = peer_id,
                             event = LogEvent::ReceiveBatchRetrieval,
                             "{:?}",
                             request
                         );
-                        let req_with_callback =
-                            IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
-                                req: *request,
-                                protocol,
-                                response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
+                let req_with_callback =
+                    IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
+                        req: *request,
+                        protocol,
+                        response_sender: callback,
+                    });
+                if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
+                    warn!(error = ?e, "aptos channel closed");
+                }
+            },
+            _ => {
+                warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
+                return;
+            },
+        }
+    }
+
+    pub async fn start(mut self) {
+        loop {
+            tokio::select! {
+                event = self.self_receiver.select_next_some() => match event {
+                    Event::Message(peer_id, msg) => {
+                        self.handle_message(peer_id, msg).await
                     },
-                    _ => {
-                        warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
-                        continue;
+                    Event::RpcRequest(peer_id, msg, protocol, callback) => {
+                        self.handle_rpc_request(peer_id, msg, protocol, callback).await
                     },
+                    _ => {}
+                },
+                dm = self.direct_receiver.select_next_some() => {
+
+                },
+            }
+        }
+/*        while let Some(message) = self.all_events.next().await {
+            monitor!("network_main_loop", match message {
+                Event::Message(peer_id, msg) => {
+                    self.handle_message(peer_id, msg);
+                },
+                Event::RpcRequest(peer_id, msg, protocol, callback) => {
+                    self.handle_rpc_request(peer_id, msg, protocol, callback)
                 },
                 _ => {
                     // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }
-    }
+*/    }
 }

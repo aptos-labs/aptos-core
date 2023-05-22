@@ -30,6 +30,8 @@ pub mod aptos_channel;
 #[cfg(test)]
 mod aptos_channel_test;
 
+pub mod fused_receiver_stream;
+
 pub mod message_queues;
 #[cfg(test)]
 mod message_queues_test;
