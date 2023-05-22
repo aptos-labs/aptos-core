@@ -111,7 +111,7 @@ async fn test_db_restore() {
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
-    let (backup_path, _) = db_backup(port, 5, 400, 200, 5, &[]);
+    let (backup_path, snapshot_ver) = db_backup(port, 5, 400, 200, 5, &[]);
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
     swarm.validator_mut(node_to_restart).unwrap().stop();
@@ -132,7 +132,7 @@ async fn test_db_restore() {
         db_dir.as_path(),
         &[],
         node0_config.storage.rocksdb_configs.use_state_kv_db,
-        None,
+        Some(snapshot_ver),
     );
 
     expected_balance_0 -= 3;
