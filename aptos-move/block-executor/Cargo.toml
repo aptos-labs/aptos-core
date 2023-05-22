@@ -26,7 +26,6 @@ arc-swap = { workspace = true }
 bcs = { workspace = true }
 criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
-crossbeam-queue = { workspace = true }
 dashmap = { workspace = true }
 move-binary-format = { workspace = true }
 num_cpus = { workspace = true }

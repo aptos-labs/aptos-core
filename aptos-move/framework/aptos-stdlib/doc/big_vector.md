@@ -23,6 +23,21 @@
 -  [Function `contains`](#0x1_big_vector_contains)
 -  [Function `length`](#0x1_big_vector_length)
 -  [Function `is_empty`](#0x1_big_vector_is_empty)
+-  [Specification](#@Specification_1)
+    -  [Struct `BigVector`](#@Specification_1_BigVector)
+    -  [Function `empty`](#@Specification_1_empty)
+    -  [Function `singleton`](#@Specification_1_singleton)
+    -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `append`](#@Specification_1_append)
+    -  [Function `push_back`](#@Specification_1_push_back)
+    -  [Function `pop_back`](#@Specification_1_pop_back)
+    -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `swap_remove`](#@Specification_1_swap_remove)
+    -  [Function `swap`](#@Specification_1_swap)
+    -  [Function `reverse`](#@Specification_1_reverse)
+    -  [Function `index_of`](#@Specification_1_index_of)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -391,8 +406,13 @@ Disclaimer: This function is costly. Use it at your own discretion.
     <b>let</b> cur_bucket_index = i / v.bucket_size + 1;
     <b>let</b> cur_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> v.buckets, cur_bucket_index - 1);
     <b>let</b> res = <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(cur_bucket, i % v.bucket_size);
+    v.end_index = v.end_index - 1;
     <b>move</b> cur_bucket;
-    <b>while</b> (cur_bucket_index &lt; num_buckets) {
+    <b>while</b> ({<b>spec</b> {
+        <b>invariant</b> cur_bucket_index &lt;= num_buckets;
+        <b>invariant</b> <a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(v.buckets) == num_buckets;
+    };
+        (cur_bucket_index &lt; num_buckets)}) {
         // remove one element from the start of current <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>
         <b>let</b> cur_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> v.buckets, cur_bucket_index);
         <b>let</b> t = <a href="../../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(cur_bucket, 0);
@@ -402,6 +422,9 @@ Disclaimer: This function is costly. Use it at your own discretion.
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(prev_bucket, t);
         cur_bucket_index = cur_bucket_index + 1;
     };
+    <b>spec</b> {
+        <b>assert</b> cur_bucket_index == num_buckets;
+    };
 
     // Shrink the <a href="table.md#0x1_table">table</a> <b>if</b> the last <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> is empty.
     <b>let</b> last_bucket = <a href="table_with_length.md#0x1_table_with_length_borrow_mut">table_with_length::borrow_mut</a>(&<b>mut</b> v.buckets, num_buckets - 1);
@@ -409,7 +432,6 @@ Disclaimer: This function is costly. Use it at your own discretion.
         <b>move</b> last_bucket;
         <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> v.buckets, num_buckets - 1));
     };
-    v.end_index = v.end_index - 1;
 
     res
 }
@@ -684,6 +706,334 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_BigVector"></a>
+
+### Struct `BigVector`
+
+
+<pre><code><b>struct</b> <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt; <b>has</b> store
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>buckets: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u64, <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>end_index: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>bucket_size: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> bucket_size != 0;
+<b>invariant</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0 ==&gt; end_index == 0;
+<b>invariant</b> end_index == 0 ==&gt; <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0;
+<b>invariant</b> end_index &lt;= <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) * bucket_size;
+<b>invariant</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0
+    || (<b>forall</b> i in 0..<a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets)-1: len(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(buckets, i)) == bucket_size);
+<b>invariant</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0
+    || len(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(buckets, <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) -1 )) &lt;= bucket_size;
+<b>invariant</b> <b>forall</b> i in 0..<a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets): <a href="big_vector.md#0x1_big_vector_spec_table_contains">spec_table_contains</a>(buckets, i);
+<b>invariant</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == (end_index + bucket_size - 1) / bucket_size;
+<b>invariant</b> (<a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0 && end_index == 0)
+    || (<a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) != 0 && ((<a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) - 1) * bucket_size) + (len(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(buckets, <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) - 1))) == end_index);
+<b>invariant</b> <b>forall</b> i: u64 <b>where</b> i &gt;= <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets):  {
+    !<a href="big_vector.md#0x1_big_vector_spec_table_contains">spec_table_contains</a>(buckets, i)
+};
+<b>invariant</b> <b>forall</b> i: u64 <b>where</b> i &lt; <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets):  {
+    <a href="big_vector.md#0x1_big_vector_spec_table_contains">spec_table_contains</a>(buckets, i)
+};
+<b>invariant</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) == 0
+    || (len(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(buckets, <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(buckets) - 1)) &gt; 0);
+</code></pre>
+
+
+
+<a name="@Specification_1_empty"></a>
+
+### Function `empty`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_vector.md#0x1_big_vector_empty">empty</a>&lt;T: store&gt;(bucket_size: u64): <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> bucket_size == 0;
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(result) == 0;
+<b>ensures</b> result.bucket_size == bucket_size;
+</code></pre>
+
+
+
+<a name="@Specification_1_singleton"></a>
+
+### Function `singleton`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_vector.md#0x1_big_vector_singleton">singleton</a>&lt;T: store&gt;(element: T, bucket_size: u64): <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(result) == 1;
+<b>ensures</b> result.bucket_size == bucket_size;
+</code></pre>
+
+
+
+<a name="@Specification_1_destroy_empty"></a>
+
+### Function `destroy_empty`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_destroy_empty">destroy_empty</a>&lt;T&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<a href="big_vector.md#0x1_big_vector_is_empty">is_empty</a>(v);
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_borrow">borrow</a>&lt;T&gt;(v: &<a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, i: u64): &T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
+<b>ensures</b> result == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i);
+</code></pre>
+
+
+
+<a name="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_borrow_mut">borrow_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, i: u64): &<b>mut</b> T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
+<b>ensures</b> result == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i);
+</code></pre>
+
+
+
+<a name="@Specification_1_append"></a>
+
+### Function `append`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_append">append</a>&lt;T: store&gt;(lhs: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, other: <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_push_back"></a>
+
+### Function `push_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_push_back">push_back</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, val: T)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> num_buckets = <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(v.buckets);
+<b>aborts_if</b> num_buckets * v.bucket_size &gt; MAX_U64;
+<b>aborts_if</b> v.end_index + 1 &gt; MAX_U64;
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v)) + 1;
+<b>ensures</b> v.end_index == <b>old</b>(v.end_index) + 1;
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, v.end_index-1) == val;
+<b>ensures</b> <b>forall</b> i in 0..v.end_index-1: <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
+</code></pre>
+
+
+
+<a name="@Specification_1_pop_back"></a>
+
+### Function `pop_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_pop_back">pop_back</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;): T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="big_vector.md#0x1_big_vector_is_empty">is_empty</a>(v);
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v)) - 1;
+<b>ensures</b> result == <b>old</b>(<a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, v.end_index-1));
+<b>ensures</b> <b>forall</b> i in 0..v.end_index: <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
+</code></pre>
+
+
+
+<a name="@Specification_1_remove"></a>
+
+### Function `remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_remove">remove</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, i: u64): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_swap_remove"></a>
+
+### Function `swap_remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_swap_remove">swap_remove</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, i: u64): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v)) - 1;
+<b>ensures</b> result == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
+</code></pre>
+
+
+
+<a name="@Specification_1_swap"></a>
+
+### Function `swap`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_swap">swap</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, i: u64, j: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v) || j &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v));
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), j);
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, j) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
+<b>ensures</b> <b>forall</b> idx in 0..<a href="big_vector.md#0x1_big_vector_length">length</a>(v)
+    <b>where</b> idx != i && idx != j:
+    <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, idx) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), idx);
+</code></pre>
+
+
+
+<a name="@Specification_1_reverse"></a>
+
+### Function `reverse`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_reverse">reverse</a>&lt;T&gt;(v: &<b>mut</b> <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_index_of"></a>
+
+### Function `index_of`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_index_of">index_of</a>&lt;T&gt;(v: &<a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;, val: &T): (bool, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_big_vector_spec_table_len"></a>
+
+
+<pre><code><b>fun</b> <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;): u64 {
+   <a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(t)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_big_vector_spec_table_contains"></a>
+
+
+<pre><code><b>fun</b> <a href="big_vector.md#0x1_big_vector_spec_table_contains">spec_table_contains</a>&lt;K, V&gt;(t: TableWithLength&lt;K, V&gt;, k: K): bool {
+   <a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(t, k)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_big_vector_spec_at"></a>
+
+
+<pre><code><b>fun</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>&lt;T&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;, i: u64): T {
+   <b>let</b> bucket = i / v.bucket_size;
+   <b>let</b> idx = i % v.bucket_size;
+   <b>let</b> v = <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(v.buckets, bucket);
+   v[idx]
+}
+</code></pre>
 
 
 [move-book]: https://aptos.dev/guides/move-guides/book/SUMMARY

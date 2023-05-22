@@ -4,23 +4,25 @@
 
 use crate::{
     metadata::{
-        EpochEndingBackupMeta, IdentityMeta, Metadata, StateSnapshotBackupMeta,
-        TransactionBackupMeta,
+        CompactionTimestampsMeta, EpochEndingBackupMeta, IdentityMeta, Metadata,
+        StateSnapshotBackupMeta, TransactionBackupMeta,
     },
     storage::FileHandle,
 };
 use anyhow::{anyhow, ensure, Result};
+use aptos_infallible::duration_since_epoch;
 use aptos_types::transaction::Version;
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct MetadataView {
     epoch_ending_backups: Vec<EpochEndingBackupMeta>,
     state_snapshot_backups: Vec<StateSnapshotBackupMeta>,
     transaction_backups: Vec<TransactionBackupMeta>,
     _identity: Option<IdentityMeta>,
-    file_handles: Option<Vec<FileHandle>>,
+    // The compaction timestamps of the file handles producing this view
+    compaction_timestamps: Option<CompactionTimestampsMeta>,
 }
 
 impl MetadataView {
@@ -29,6 +31,7 @@ impl MetadataView {
         let mut state_snapshot_backups = Vec::new();
         let mut transaction_backups = Vec::new();
         let mut identity = None;
+        let mut compaction_timestamps = Vec::new();
 
         for meta in metadata_vec {
             match meta {
@@ -36,6 +39,7 @@ impl MetadataView {
                 Metadata::StateSnapshotBackup(s) => state_snapshot_backups.push(s),
                 Metadata::TransactionBackup(t) => transaction_backups.push(t),
                 Metadata::Identity(i) => identity = Some(i),
+                Metadata::CompactionTimestamps(t) => compaction_timestamps.push(t),
             }
         }
         epoch_ending_backups.sort_unstable();
@@ -45,12 +49,31 @@ impl MetadataView {
         transaction_backups.sort_unstable();
         transaction_backups.dedup();
 
+        let mut compaction_meta_opt = compaction_timestamps.iter().max().cloned();
+        if let Some(ref mut compaction_meta) = compaction_meta_opt {
+            // insert new_files into the previous_compaction_timestamps
+            for file in file_handles.into_iter() {
+                // if file is not in timestamps, set it to None, otherwise, keep it the same
+                compaction_meta
+                    .compaction_timestamps
+                    .entry(file)
+                    .or_insert(None);
+            }
+        } else {
+            // Create new compaction timestamp meta with new files only
+            let compaction_timestamps = file_handles.into_iter().map(|file| (file, None)).collect();
+            compaction_meta_opt = Some(CompactionTimestampsMeta {
+                file_compacted_at: duration_since_epoch().as_secs(),
+                compaction_timestamps,
+            });
+        };
+
         Self {
             epoch_ending_backups,
             state_snapshot_backups,
             transaction_backups,
             _identity: identity,
-            file_handles: Some(file_handles),
+            compaction_timestamps: compaction_meta_opt,
         }
     }
 
@@ -75,6 +98,10 @@ impl MetadataView {
             latest_state_snapshot_version,
             latest_transaction_version,
         })
+    }
+
+    pub fn select_latest_compaction_timestamps(&self) -> Option<CompactionTimestampsMeta> {
+        self.compaction_timestamps.clone()
     }
 
     pub fn select_state_snapshot(
@@ -203,7 +230,10 @@ impl MetadataView {
     }
 
     pub fn get_file_handles(&self) -> Vec<FileHandle> {
-        self.file_handles.clone().unwrap_or_default()
+        self.select_latest_compaction_timestamps()
+            .as_ref()
+            .map(|t| t.compaction_timestamps.keys().cloned().collect::<Vec<_>>())
+            .unwrap_or_default()
     }
 }
 

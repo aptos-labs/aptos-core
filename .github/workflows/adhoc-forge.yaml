@@ -22,8 +22,6 @@ on:
         description: Test suite to run
       
 env:
-  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-  AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   GIT_SHA: ${{ github.sha }}
 
 permissions:

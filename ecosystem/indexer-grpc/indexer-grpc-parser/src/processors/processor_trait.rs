@@ -5,11 +5,11 @@ use crate::{
     models::processor_status::ProcessorStatus,
     schema::processor_status,
     utils::{
-        counters::{GOT_CONNECTION, UNABLE_TO_GET_CONNECTION},
+        counters::{GOT_CONNECTION_COUNT, UNABLE_TO_GET_CONNECTION_COUNT},
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
     },
 };
-use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
+use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use std::fmt::Debug;
@@ -44,12 +44,12 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         loop {
             match pool.get() {
                 Ok(conn) => {
-                    GOT_CONNECTION.inc();
+                    GOT_CONNECTION_COUNT.inc();
                     return conn;
                 },
                 Err(err) => {
-                    UNABLE_TO_GET_CONNECTION.inc();
-                    aptos_logger::error!(
+                    UNABLE_TO_GET_CONNECTION_COUNT.inc();
+                    tracing::error!(
                         "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
                         pool.connection_timeout(),
                         err

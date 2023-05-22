@@ -76,6 +76,11 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_common_account() {
+    test_common("common_account");
+}
+
+#[test]
 fn test_data_structures() {
     test_common("data_structures");
 }
@@ -83,6 +88,11 @@ fn test_data_structures() {
 #[test]
 fn test_defi() {
     test_common("defi");
+}
+
+#[test]
+fn test_groth16() {
+    test_common("groth16_example");
 }
 
 #[test]
@@ -98,6 +108,15 @@ fn test_marketplace() {
 #[test]
 fn test_message_board() {
     test_common("message_board");
+}
+
+#[test]
+fn test_fungible_asset() {
+    let named_address = BTreeMap::from([(
+        String::from("fungible_asset_extension"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("fungible_asset", named_address);
 }
 
 #[test]
@@ -143,7 +162,12 @@ fn test_shared_account() {
 
 #[test]
 fn test_token_objects() {
-    test_common("token_objects");
+    let named_address = BTreeMap::from([(
+        String::from("token_objects"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("token_objects/hero", named_address.clone());
+    run_tests_for_pkg("token_objects/ambassador/move", named_address);
 }
 
 #[test]
@@ -154,13 +178,7 @@ fn test_two_by_two_transfer() {
 #[test]
 fn test_post_mint_reveal_nft() {
     let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-    let named_address = BTreeMap::from([
-        (
-            String::from("post_mint_reveal_nft"),
-            create_resource_address(addr, &[]),
-        ),
-        (String::from("source_addr"), addr),
-    ]);
+    let named_address = BTreeMap::from([(String::from("post_mint_reveal_nft"), addr)]);
     run_tests_for_pkg("post_mint_reveal_nft", named_address);
 }
 

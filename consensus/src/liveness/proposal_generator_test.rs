@@ -5,7 +5,9 @@
 use crate::{
     block_storage::BlockReader,
     liveness::{
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
+        },
         rotating_proposer_election::RotatingProposer,
         unequivocal_proposer_election::UnequivocalProposerElection,
     },
@@ -18,7 +20,7 @@ use aptos_consensus_types::{
 };
 use aptos_types::validator_signer::ValidatorSigner;
 use futures::{future::BoxFuture, FutureExt};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 fn empty_callback() -> BoxFuture<'static, ()> {
     async move {}.boxed()
@@ -33,9 +35,11 @@ async fn test_proposal_generation_empty_tree() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
+        Duration::ZERO,
         1,
         10,
         10,
+        PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -71,9 +75,11 @@ async fn test_proposal_generation_parent() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
+        Duration::ZERO,
         1,
         1000,
         10,
+        PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -141,9 +147,11 @@ async fn test_old_proposal_generation() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
+        Duration::ZERO,
         1,
         1000,
         10,
+        PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );
@@ -176,9 +184,11 @@ async fn test_correct_failed_authors() {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         Arc::new(SimulatedTimeService::new()),
+        Duration::ZERO,
         1,
         1000,
         10,
+        PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );

@@ -14,7 +14,7 @@ use crate::{
     utils::{database::PgPoolConnection, util::standardize_address},
 };
 use anyhow::Context;
-use aptos_protos::transaction::testing1::v1::WriteTableItem;
+use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;

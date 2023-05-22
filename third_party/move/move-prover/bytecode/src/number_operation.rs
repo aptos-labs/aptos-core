@@ -6,6 +6,7 @@
 //! mark the operation (arithmetic or bitwise) that a variable or a field involves,
 //! which will be used later when the correct number type (`int` or `bv<N>`) in the boogie program
 
+use crate::COMPILED_MODULE_AVAILABLE;
 use itertools::Itertools;
 use move_model::{
     ast::{PropertyValue, TempIndex, Value},
@@ -216,7 +217,7 @@ impl GlobalNumberOperationState {
             } else {
                 // If not appearing in the pragma, mark it as Arithmetic or Bottom
                 // Similar logic when populating ret_operation_map below
-                let local_ty = func_env.get_local_type(i);
+                let local_ty = func_env.get_local_type(i).expect(COMPILED_MODULE_AVAILABLE);
                 let arith_flag = if let Type::Reference(_, tr) = local_ty {
                     tr.is_number()
                 } else if let Type::Vector(tr) = local_ty {
@@ -237,7 +238,7 @@ impl GlobalNumberOperationState {
             if ret_idx_vec.contains(&i) {
                 default_ret_operation_map.insert(i, Bitwise);
             } else {
-                let ret_ty = func_env.get_return_type(i);
+                let ret_ty = func_env.get_result_type_at(i);
                 let arith_flag = if let Type::Reference(_, tr) = ret_ty {
                     tr.is_number()
                 } else if let Type::Vector(tr) = ret_ty {

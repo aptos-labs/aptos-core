@@ -23,6 +23,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 pub use error::Error;
+pub use executed_block::ExecutedBlock;
 pub use executed_chunk::ExecutedChunk;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ use std::{
 };
 
 mod error;
+mod executed_block;
 mod executed_chunk;
 pub mod in_memory_state_calculator;
 mod parsed_transaction_output;
@@ -122,6 +124,10 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+
+    fn get_block_gas_limit(&self) -> Option<u64>;
+
+    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>);
 }
 
 #[derive(Clone)]

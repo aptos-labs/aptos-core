@@ -1,5 +1,6 @@
 {
   "description": "This is a pure dependency package.json which installs dependencies for js utility scripts used in the repo",
+  "packageManager": "pnpm@8.3.1",
   "private": true,
   "type": "module",
   "devDependencies": {

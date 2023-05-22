@@ -17,7 +17,8 @@ provider "helm" {
 module "validator" {
   source = "../../aptos-node/gcp"
 
-  manage_via_tf = var.manage_via_tf
+  cluster_bootstrap = var.cluster_bootstrap
+  manage_via_tf     = var.manage_via_tf
 
   # Project config
   project = var.project
@@ -28,6 +29,9 @@ module "validator" {
   zone_name    = var.zone_name # keep empty if you don't want a DNS name
   zone_project = var.zone_project
   record_name  = var.record_name
+  # do not create the main fullnode and validator DNS records
+  # instead, rely on external-dns from the testnet-addons
+  create_dns_records = false
 
   # General chain config
   era            = var.era
@@ -39,6 +43,10 @@ module "validator" {
   # K8s config
   k8s_api_sources         = var.k8s_api_sources
   cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
+
+  # node config
+  gke_cluster_enable_gcfs  = var.gke_cluster_enable_gcfs
+  gke_cluster_enable_gvnic = var.gke_cluster_enable_gvnic
 
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
@@ -60,8 +68,8 @@ module "validator" {
   validator_instance_type = var.validator_instance_type
 
   # addons
-  enable_monitoring      = true
-  enable_node_exporter   = true
+  enable_monitoring      = var.enable_monitoring
+  enable_node_exporter   = var.enable_prometheus_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
 }
 

@@ -4,9 +4,11 @@
 
 mod account_generator;
 pub mod benchmark_transaction;
+pub mod db_access;
 pub mod db_generator;
-pub mod fake_executor;
+mod gen_executor;
 mod metrics;
+pub mod native_executor;
 pub mod pipeline;
 pub mod transaction_committer;
 pub mod transaction_executor;
@@ -19,13 +21,32 @@ use crate::{
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    metrics::{
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+    },
+};
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::info;
 use aptos_storage_interface::DbReaderWriter;
-use std::{fs, path::Path, time::Instant};
+use aptos_transaction_generator_lib::{
+    create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
+};
+use aptos_vm::counters::TXN_GAS_USAGE;
+use gen_executor::DbGenInitTransactionExecutor;
+use pipeline::PipelineConfig;
+use std::{
+    collections::HashMap,
+    fs,
+    path::Path,
+    sync::{atomic::AtomicUsize, Arc},
+    time::Instant,
+};
+use tokio::runtime::Runtime;
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
@@ -69,14 +90,18 @@ fn create_checkpoint(
 /// Runs the benchmark with given parameters.
 pub fn run_benchmark<V>(
     block_size: usize,
-    num_transfer_blocks: usize,
+    num_blocks: usize,
+    transaction_type: Option<TransactionType>,
     transactions_per_sender: usize,
+    num_main_signer_accounts: usize,
+    num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -93,30 +118,199 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
+
+    let transaction_generator_creator = transaction_type.map(|transaction_type| {
+        init_workload::<V, _>(
+            transaction_type,
+            num_main_signer_accounts,
+            num_additional_dst_pool_accounts,
+            db.clone(),
+            &source_dir,
+            // Initialization pipeline is temporary, so needs to be fully committed.
+            // No discards/aborts allowed during initialization, even if they are allowed later.
+            PipelineConfig {
+                delay_execution_start: false,
+                split_stages: false,
+                skip_commit: false,
+                allow_discards: false,
+                allow_aborts: false,
+            },
+        )
+    });
+
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
-
+    let (pipeline, block_sender) =
+        Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,
         source_dir,
         version,
+        Some(num_main_signer_accounts),
     );
 
-    let start_time = Instant::now();
-    generator.run_transfer(block_size, num_transfer_blocks, transactions_per_sender);
+    let mut start_time = Instant::now();
+    let start_gas = TXN_GAS_USAGE.get_sample_sum();
+
+    let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+    let start_vm_only = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
+    let other_labels = vec![
+        ("1.", true, "verified_state_view"),
+        ("2.", true, "apply_to_ledger"),
+        ("2.1.", false, "sort_transactions"),
+        ("2.2.", false, "calculate_for_transaction_block"),
+        ("2.2.1.", false, "get_sharded_state_updates"),
+        ("2.2.2.", false, "calculate_block_state_updates"),
+        ("2.2.3.", false, "calculate_usage"),
+        ("2.2.4.", false, "make_checkpoint"),
+        ("2.3.", false, "assemble_ledger_diff_for_block"),
+        ("2.3.1.", false, "calculate_events_and_writeset_hashes"),
+        ("3.", true, "as_state_compute_result"),
+        ("4.", true, "get_txns_to_commit"),
+    ];
+
+    let start_by_other = other_labels
+        .iter()
+        .map(|(_prefix, _top_level, other_label)| {
+            (
+                other_label.to_string(),
+                APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&[other_label])
+                    .get_sample_sum(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
+
+    if let Some(transaction_generator_creator) = transaction_generator_creator {
+        generator.run_workload(
+            block_size,
+            num_blocks,
+            transaction_generator_creator,
+            transactions_per_sender,
+        );
+    } else {
+        generator.run_transfer(block_size, num_blocks, transactions_per_sender);
+    }
+    if pipeline_config.delay_execution_start {
+        start_time = Instant::now();
+    }
+    pipeline.start_execution();
     generator.drop_sender();
     pipeline.join();
 
-    let elapsed = start_time.elapsed().as_secs_f32();
-    let delta_v = db.reader.get_latest_version().unwrap() - version;
-    info!("Overall TPS: transfer: {} txn/s", delta_v as f32 / elapsed,);
+    let elapsed = start_time.elapsed().as_secs_f64();
+    let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
+    let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+    info!(
+        "Executed workload {}",
+        if let Some(ttype) = transaction_type {
+            format!("{:?} via txn generator", ttype)
+        } else {
+            "raw transfer".to_string()
+        }
+    );
+    info!("Overall TPS: {} txn/s", delta_v / elapsed);
+    info!("Overall GPS: {} gas/s", delta_gas / elapsed);
+
+    let time_in_execution =
+        APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_execution_total;
+    info!(
+        "Overall fraction of total: {:.3} in execution (component TPS: {})",
+        time_in_execution / elapsed,
+        delta_v / time_in_execution
+    );
+    let time_in_vm = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_only;
+    info!(
+        "Overall fraction of execution {:.3} in VM (component TPS: {})",
+        time_in_vm / time_in_execution,
+        delta_v / time_in_vm
+    );
+    for (prefix, top_level, other_label) in other_labels {
+        let time_in_label = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+            .with_label_values(&[other_label])
+            .get_sample_sum()
+            - start_by_other.get(other_label).unwrap();
+        if top_level || time_in_label / time_in_execution > 0.01 {
+            info!(
+                "Overall fraction of execution {:.3} in {} {} (component TPS: {})",
+                time_in_label / time_in_execution,
+                prefix,
+                other_label,
+                delta_v / time_in_label
+            );
+        }
+    }
+    let time_in_commit = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() - start_commit_total;
+    info!(
+        "Overall fraction of total: {:.3} in commit (component TPS: {})",
+        time_in_commit / elapsed,
+        delta_v / time_in_commit
+    );
 
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader);
     }
+}
+
+fn init_workload<V, P: AsRef<Path>>(
+    transaction_type: TransactionType,
+    num_main_signer_accounts: usize,
+    num_additional_dst_pool_accounts: usize,
+    db: DbReaderWriter,
+    db_dir: &P,
+    pipeline_config: PipelineConfig,
+) -> Box<dyn TransactionGeneratorCreator>
+where
+    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+{
+    let version = db.reader.get_latest_version().unwrap();
+    let (pipeline, block_sender) = Pipeline::<V>::new(
+        BlockExecutor::new(db.clone()),
+        version,
+        pipeline_config,
+        None,
+    );
+
+    let runtime = Runtime::new().unwrap();
+
+    let num_existing_accounts = TransactionGenerator::read_meta(db_dir);
+    let num_cached_accounts = std::cmp::min(
+        num_existing_accounts,
+        num_main_signer_accounts + num_additional_dst_pool_accounts,
+    );
+    let accounts_cache =
+        TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_cached_accounts);
+
+    let (mut main_signer_accounts, burner_accounts) =
+        accounts_cache.split(num_main_signer_accounts);
+    let transaction_factory = TransactionGenerator::create_transaction_factory();
+
+    let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
+        let phase = Arc::new(AtomicUsize::new(0));
+
+        let db_gen_init_transaction_executor = DbGenInitTransactionExecutor {
+            db: db.clone(),
+            block_sender,
+        };
+
+        create_txn_generator_creator(
+            &[vec![(transaction_type, 1)]],
+            &mut main_signer_accounts,
+            burner_accounts,
+            &db_gen_init_transaction_executor,
+            &transaction_factory,
+            &transaction_factory,
+            phase,
+        )
+        .await
+    });
+
+    pipeline.join();
+
+    txn_generator_creator
 }
 
 pub fn add_accounts<V>(
@@ -129,6 +323,7 @@ pub fn add_accounts<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -148,6 +343,7 @@ pub fn add_accounts<V>(
         verify_sequence_numbers,
         use_state_kv_db,
         use_sharded_state_merkle_db,
+        pipeline_config,
     );
 }
 
@@ -161,6 +357,7 @@ fn add_accounts_impl<V>(
     verify_sequence_numbers: bool,
     use_state_kv_db: bool,
     use_sharded_state_merkle_db: bool,
+    pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
 {
@@ -173,7 +370,12 @@ fn add_accounts_impl<V>(
 
     let version = db.reader.get_latest_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(executor, version);
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        version,
+        pipeline_config,
+        Some(1 + num_new_accounts / block_size * 101 / 100),
+    );
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
@@ -181,6 +383,7 @@ fn add_accounts_impl<V>(
         block_sender,
         &source_dir,
         version,
+        None,
     );
 
     let start_time = Instant::now();
@@ -191,6 +394,7 @@ fn add_accounts_impl<V>(
         init_account_balance,
         block_size,
     );
+    pipeline.start_execution();
     generator.drop_sender();
     pipeline.join();
 
@@ -229,37 +433,86 @@ fn add_accounts_impl<V>(
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
+        pipeline::PipelineConfig,
+    };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+    use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
+    use aptos_transaction_generator_lib::args::TransactionTypeArg;
     use aptos_vm::AptosVM;
 
-    #[test]
-    fn test_benchmark() {
+    fn test_generic_benchmark<E>(
+        transaction_type: Option<TransactionTypeArg>,
+        verify_sequence_numbers: bool,
+    ) where
+        E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    {
+        aptos_logger::Logger::new().init();
+
         let storage_dir = TempPath::new();
         let checkpoint_dir = TempPath::new();
 
-        crate::db_generator::run::<AptosVM>(
-            25, /* num_accounts */
+        println!("db_generator::create_db_with_accounts");
+
+        crate::db_generator::create_db_with_accounts::<E>(
+            100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
             5,           /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
-            true,
+            verify_sequence_numbers,
             false,
             false,
+            PipelineConfig {
+                delay_execution_start: false,
+                split_stages: false,
+                skip_commit: false,
+                allow_discards: false,
+                allow_aborts: false,
+            },
         );
 
-        super::run_benchmark::<AptosVM>(
+        println!("run_benchmark");
+
+        super::run_benchmark::<E>(
             6, /* block_size */
-            5, /* num_transfer_blocks */
-            2, /* transactions per sender */
+            5, /* num_blocks */
+            transaction_type.map(|t| t.materialize(2, false)),
+            2,  /* transactions per sender */
+            25, /* num_main_signer_accounts */
+            30, /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
-            true,
+            verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
             false,
             false,
+            PipelineConfig {
+                delay_execution_start: false,
+                split_stages: true,
+                skip_commit: false,
+                allow_discards: false,
+                allow_aborts: false,
+            },
         );
+    }
+
+    #[test]
+    fn test_benchmark() {
+        test_generic_benchmark::<AptosVM>(None, true);
+    }
+
+    #[test]
+    fn test_benchmark_transaction() {
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
+    }
+
+    #[test]
+    fn test_native_benchmark() {
+        // correct execution not yet implemented, so cannot be checked for validity
+        test_generic_benchmark::<NativeExecutor>(None, false);
     }
 }

@@ -14,6 +14,7 @@ anyhow = "1.0.52"
 fail = "0.4.0"
 move-binary-format = { path = "../move-binary-format" }
 petgraph = "0.5.1"
+typed-arena = "2.0.2"
 
 move-borrow-graph = { path = "../move-borrow-graph" }
 move-core-types = { path = "../move-core/types" }

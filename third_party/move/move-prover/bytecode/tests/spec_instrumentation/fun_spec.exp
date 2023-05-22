@@ -324,7 +324,7 @@ fun Test::resource_with_old($t0|val: u64) {
      var $t10: u64
      var $t11: &mut u64
   0: assume Gt($t0, 0)
-  1: assume CanModify<Test::R>(0)
+  1: assume CanModify<Test::R>(0x0)
   2: @0 := save_mem(Test::R)
   3: $t2 := 0x0
   4: $t3 := exists<Test::R>($t2)
@@ -347,17 +347,17 @@ fun Test::resource_with_old($t0|val: u64) {
  20: write_back[Test::R@]($t8)
  21: label L2
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:41:6+35
- 22: assert Not(Not(exists[@0]<Test::R>(0)))
+ 22: assert Not(Not(exists[@0]<Test::R>(0x0)))
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:42:6+58
- 23: assert Not(Ge(Add(select Test::R.v(global[@0]<Test::R>(0)), $t0), 18446744073709551615))
+ 23: assert Not(Ge(Add(select Test::R.v(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:43:6+58
- 24: assert Eq<u64>(select Test::R.v(global<Test::R>(0)), Add(select Test::R.v(global[@0]<Test::R>(0)), $t0))
+ 24: assert Eq<u64>(select Test::R.v(global<Test::R>(0x0)), Add(select Test::R.v(global[@0]<Test::R>(0x0)), $t0))
  25: return ()
  26: label L3
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/fun_spec.move:39:2+250
- 27: assert Or(Not(exists[@0]<Test::R>(0)), Ge(Add(select Test::R.v(global[@0]<Test::R>(0)), $t0), 18446744073709551615))
+ 27: assert Or(Not(exists[@0]<Test::R>(0x0)), Ge(Add(select Test::R.v(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
      # VC: abort code not covered by any of the `aborts_if` or `aborts_with` clauses at tests/spec_instrumentation/fun_spec.move:39:2+250
- 28: assert Or(And(Not(exists[@0]<Test::R>(0)), Eq(33, $t6)), Ge(Add(select Test::R.v(global[@0]<Test::R>(0)), $t0), 18446744073709551615))
+ 28: assert Or(And(Not(exists[@0]<Test::R>(0x0)), Eq(33, $t6)), Ge(Add(select Test::R.v(global[@0]<Test::R>(0x0)), $t0), 18446744073709551615))
  29: abort($t6)
 }
 
@@ -444,17 +444,17 @@ spec {
 fun Test::resource_with_old[baseline]
 spec {
   requires Gt($t0, 0);
-  aborts_if Not(exists<Test::R>(0));
-  aborts_if Ge(Add(select Test::R.v(global<Test::R>(0)), $t0), 18446744073709551615);
-  ensures Eq<u64>(select Test::R.v(global<Test::R>(0)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0))), $t0));
-  modifies global<Test::R>(0);
+  aborts_if Not(exists<Test::R>(0x0));
+  aborts_if Ge(Add(select Test::R.v(global<Test::R>(0x0)), $t0), 18446744073709551615);
+  ensures Eq<u64>(select Test::R.v(global<Test::R>(0x0)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0x0))), $t0));
+  modifies global<Test::R>(0x0);
 }
 
 fun Test::resource_with_old[verification]
 spec {
   requires Gt($t0, 0);
-  aborts_if Not(exists<Test::R>(0));
-  aborts_if Ge(Add(select Test::R.v(global<Test::R>(0)), $t0), 18446744073709551615);
-  ensures Eq<u64>(select Test::R.v(global<Test::R>(0)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0))), $t0));
-  modifies global<Test::R>(0);
+  aborts_if Not(exists<Test::R>(0x0));
+  aborts_if Ge(Add(select Test::R.v(global<Test::R>(0x0)), $t0), 18446744073709551615);
+  ensures Eq<u64>(select Test::R.v(global<Test::R>(0x0)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0x0))), $t0));
+  modifies global<Test::R>(0x0);
 }

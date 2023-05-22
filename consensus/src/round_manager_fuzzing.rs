@@ -5,7 +5,9 @@
 use crate::{
     block_storage::BlockStore,
     liveness::{
-        proposal_generator::{ChainHealthBackoffConfig, ProposalGenerator},
+        proposal_generator::{
+            ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
+        },
         rotating_proposer_election::RotatingProposer,
         round_state::{ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState},
     },
@@ -161,9 +163,11 @@ fn create_node_for_fuzzing() -> RoundManager {
         block_store.clone(),
         Arc::new(MockPayloadManager::new(None)),
         time_service,
+        Duration::ZERO,
         1,
         1024,
         10,
+        PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
     );

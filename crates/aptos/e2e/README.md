@@ -23,6 +23,24 @@ For example:
 poetry run python main.py --base-network mainnet --test-cli-tag mainnet
 ```
 
+## Debugging
+
+If you are get an error message similar to this:
+```
+docker: no matching manifest for linux/arm64/v8 in the manifest list entries.
+```
+
+Try running the poetry command with this env var:
+```
+DOCKER_DEFAULT_PLATFORM=linux/amd64 poetry run python main.py --base-network testnet --test-cli-path ~/aptos-core/target/debug/aptos
+```
+This makes the docker commands use the x86_64 images since we don't publish images for ARM.
+
+When running the e2e test using poetry locally, make sure you set your aptos config type to `workspace`, otherwise it won't be able to find the test account after `aptos init`. You can change it back to `global` afterward:
+```
+aptos config set-global-config --config-type workspace
+```
+
 ## Writing new test cases
 To write a new test case, follow these steps:
 1. (Optional) Make a new file in [cases/](cases/) if none of the existing files seem appropriate.

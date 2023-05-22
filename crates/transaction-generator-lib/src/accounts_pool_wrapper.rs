@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{TransactionGenerator, TransactionGeneratorCreator};
+use crate::{get_account_to_burn_from_pool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
-use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
-use async_trait::async_trait;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 /// Wrapper that allows inner transaction generator to have unique accounts
 /// for all transactions (instead of having 5-20 transactions per account, as default)
@@ -30,30 +28,21 @@ impl AccountsPoolWrapperGenerator {
     }
 }
 
-#[async_trait]
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        _account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let needed = accounts.len() * transactions_per_account;
-
-        let mut accounts_pool = self.accounts_pool.write();
-        let num_in_pool = accounts_pool.len();
-        if num_in_pool < needed {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(10)),
-                warn!("Cannot fetch enough accounts from pool, left in pool {}, needed {}", num_in_pool, needed);
-            );
+        let mut accounts_to_burn =
+            get_account_to_burn_from_pool(&self.accounts_pool, num_to_create);
+        if accounts_to_burn.is_empty() {
             return Vec::new();
         }
-        let mut accounts_to_burn = accounts_pool
-            .drain((num_in_pool - needed)..)
-            .collect::<Vec<_>>();
-
-        self.creator
-            .generate_transactions(accounts_to_burn.iter_mut().collect(), 1)
+        accounts_to_burn
+            .iter_mut()
+            .flat_map(|account| self.creator.generate_transactions(account, 1))
+            .collect()
     }
 }
 
@@ -74,11 +63,10 @@ impl AccountsPoolWrapperCreator {
     }
 }
 
-#[async_trait]
 impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountsPoolWrapperGenerator::new(
-            self.creator.create_transaction_generator().await,
+            self.creator.create_transaction_generator(),
             self.accounts_pool.clone(),
         ))
     }

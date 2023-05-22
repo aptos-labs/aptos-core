@@ -4,18 +4,16 @@
 # Module `0x1::aptos_governance`
 
 
-* AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
-* current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
-* the stake pool's lockup needs to be at least as long as the proposal's duration.
-*
-* It provides the following flow:
-* 1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
-* needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
-* track proposal creation and proposal ids.
-* 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
-* only be used to vote on each proposal exactly once.
-*
+AptosGovernance represents the on-chain governance of the Aptos network. Voting power is calculated based on the
+current epoch's voting power of the proposer or voter's backing stake pool. In addition, for it to count,
+the stake pool's lockup needs to be at least as long as the proposal's duration.
 
+It provides the following flow:
+1. Proposers can create a proposal by calling AptosGovernance::create_proposal. The proposer's backing stake pool
+needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
+track proposal creation and proposal ids.
+2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. Each stake pool can
+only be used to vote on each proposal exactly once.
 
 
 -  [Resource `GovernanceResponsbility`](#0x1_aptos_governance_GovernanceResponsbility)
@@ -1028,7 +1026,7 @@ are too large (e.g. module upgrades).
     <b>let</b> execution_hash = <a href="voting.md#0x1_voting_get_execution_hash">voting::get_execution_hash</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
 
     // If this is a multi-step proposal, the proposal id will already exist in the <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> map.
-    // We will <b>update</b> execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> in <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> <b>to</b> be the next_execution_hash.
+    // We will <b>update</b> execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> in <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> <b>to</b> be the next_execution_hash.
     <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(&approved_hashes.hashes, &proposal_id)) {
         <b>let</b> current_execution_hash = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow_mut">simple_map::borrow_mut</a>(&<b>mut</b> approved_hashes.hashes, &proposal_id);
         *current_execution_hash = execution_hash;
@@ -1089,12 +1087,12 @@ Resolve a successful multi-step proposal. This would fail if the proposal is not
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_resolve_multi_step_proposal">resolve_multi_step_proposal</a>(proposal_id: u64, signer_address: <b>address</b>, next_execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>, <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> {
     <a href="voting.md#0x1_voting_resolve_proposal_v2">voting::resolve_proposal_v2</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id, next_execution_hash);
     // If the current step is the last step of this multi-step proposal,
-    // we will remove the execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> from the <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> map.
+    // we will remove the execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> from the <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> map.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&next_execution_hash) == 0) {
         <a href="aptos_governance.md#0x1_aptos_governance_remove_approved_hash">remove_approved_hash</a>(proposal_id);
     } <b>else</b> {
         // If the current step is not the last step of this proposal,
-        // we replace the current execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a> <b>with</b> the next execution <a href="../../aptos-stdlib/doc/hash.md#0x1_hash">hash</a>
+        // we replace the current execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> <b>with</b> the next execution <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>
         // in the <a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a> map.
         <a href="aptos_governance.md#0x1_aptos_governance_add_approved_script_hash">add_approved_script_hash</a>(proposal_id)
     };
@@ -1477,17 +1475,6 @@ Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
 
-
-<a name="0x1_aptos_governance_AbortsIfNotGovernanceConfig"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_AbortsIfNotGovernanceConfig">AbortsIfNotGovernanceConfig</a> {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
-}
-</code></pre>
-
-
-
 <a name="@Specification_1_create_proposal"></a>
 
 ### Function `create_proposal`
@@ -1703,8 +1690,10 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 
-<pre><code><b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);

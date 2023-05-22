@@ -27,7 +27,9 @@ aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+arr_macro = { workspace = true }
 bcs = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }

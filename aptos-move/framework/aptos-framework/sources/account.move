@@ -248,7 +248,7 @@ module aptos_framework::account {
 
     #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        *&borrow_global<Account>(addr).authentication_key
+        borrow_global<Account>(addr).authentication_key
     }
 
     /// This function is used to rotate a resource account's authentication key to 0, so that no private key can control
@@ -685,6 +685,22 @@ module aptos_framework::account {
     }
 
     ///////////////////////////////////////////////////////////////////////////
+    // Test-only create signerCapabilityOfferProofChallengeV2 and return it
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test_only]
+    public fun get_signer_capability_offer_proof_challenge_v2(
+        source_address: address,
+        recipient_address: address,
+    ): SignerCapabilityOfferProofChallengeV2 acquires Account {
+        SignerCapabilityOfferProofChallengeV2 {
+            sequence_number: borrow_global_mut<Account>(source_address).sequence_number,
+            source_address,
+            recipient_address,
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
     /// Capability based functions for efficient use.
     ///////////////////////////////////////////////////////////////////////////
 
@@ -769,7 +785,7 @@ module aptos_framework::account {
         let eve = create_account_from_ed25519_public_key(eve_pk_bytes);
         let recipient_address = signer::address_of(&eve);
 
-        let seed = *&eve_pk_bytes; // multisig public key
+        let seed = eve_pk_bytes; // multisig public key
         vector::push_back(&mut seed, 1); // multisig threshold
         vector::push_back(&mut seed, 1); // signature scheme id
         let (resource, _) = create_resource_account(&alice, seed);
@@ -785,7 +801,7 @@ module aptos_framework::account {
 
         // Construct a malicious 1-out-of-2 multisig PK over Alice's authentication key and Eve's Ed25519 PK.
         let account_public_key_bytes = alice_auth;
-        vector::append(&mut account_public_key_bytes, *&eve_pk_bytes);
+        vector::append(&mut account_public_key_bytes, eve_pk_bytes);
         vector::push_back(&mut account_public_key_bytes, 1); // Multisig verification threshold.
         let fake_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
 

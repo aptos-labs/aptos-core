@@ -11,20 +11,21 @@ use crate::{
         transaction_store::TransactionStore,
     },
     counters,
-    counters::{CONSENSUS_PULLED_LABEL, E2E_LABEL, INSERT_LABEL, LOCAL_LABEL, REMOVE_LABEL},
     logging::{LogEntry, LogSchema, TxnsLog},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
+use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     time::{Duration, SystemTime},
 };
 
@@ -54,7 +55,7 @@ impl Mempool {
         self.log_latency(*sender, sequence_number, counters::COMMIT_ACCEPTED_LABEL);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
-                REMOVE_LABEL,
+                counters::REMOVE_LABEL,
                 counters::COMMIT_ACCEPTED_LABEL,
                 self.transactions.get_bucket(ranking_score),
                 ranking_score,
@@ -65,26 +66,47 @@ impl Mempool {
             .commit_transaction(sender, sequence_number);
     }
 
+    fn log_reject_transaction(
+        &self,
+        sender: &AccountAddress,
+        sequence_number: u64,
+        reason_label: &'static str,
+    ) {
+        trace!(
+            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
+            is_rejected = true,
+            label = reason_label,
+        );
+        self.log_latency(*sender, sequence_number, reason_label);
+        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
+            counters::core_mempool_txn_ranking_score(
+                counters::REMOVE_LABEL,
+                reason_label,
+                self.transactions.get_bucket(ranking_score),
+                ranking_score,
+            );
+        }
+    }
+
     pub(crate) fn reject_transaction(
         &mut self,
         sender: &AccountAddress,
         sequence_number: u64,
         hash: &HashValue,
+        reason: &DiscardedVMStatus,
     ) {
-        trace!(
-            LogSchema::new(LogEntry::RemoveTxn).txns(TxnsLog::new_txn(*sender, sequence_number)),
-            is_rejected = true
-        );
-        self.log_latency(*sender, sequence_number, counters::COMMIT_REJECTED_LABEL);
-        if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
-            counters::core_mempool_txn_ranking_score(
-                REMOVE_LABEL,
-                counters::COMMIT_REJECTED_LABEL,
-                self.transactions.get_bucket(ranking_score),
-                ranking_score,
-            );
+        if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+            self.log_reject_transaction(sender, sequence_number, counters::COMMIT_IGNORED_LABEL);
+            // Do not remove the transaction from mempool
+            return;
         }
 
+        let label = if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+            counters::COMMIT_REJECTED_DUPLICATE_LABEL
+        } else {
+            counters::COMMIT_REJECTED_LABEL
+        };
+        self.log_reject_transaction(sender, sequence_number, label);
         self.transactions
             .reject_transaction(sender, sequence_number, hash);
     }
@@ -96,9 +118,9 @@ impl Mempool {
         {
             if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
                 let scope = if is_end_to_end {
-                    E2E_LABEL
+                    counters::E2E_LABEL
                 } else {
-                    LOCAL_LABEL
+                    counters::LOCAL_LABEL
                 };
                 counters::core_mempool_txn_commit_latency(stage, scope, bucket, time_delta);
             }
@@ -148,7 +170,7 @@ impl Mempool {
 
         let status = self.transactions.insert(txn_info);
         counters::core_mempool_txn_ranking_score(
-            INSERT_LABEL,
+            counters::INSERT_LABEL,
             status.code.to_string().as_str(),
             self.transactions.get_bucket(ranking_score),
             ranking_score,
@@ -157,8 +179,11 @@ impl Mempool {
     }
 
     /// Fetches next block of transactions for consensus.
-    /// `batch_size` - size of requested block.
-    /// `seen_txns` - transactions that were sent to Consensus but were not committed yet,
+    /// `return_non_full` - if false, only return transactions when max_txns or max_bytes is reached
+    ///                     Should always be true for Quorum Store.
+    /// `include_gas_upgraded` - Return transactions that had gas upgraded, even if they are in
+    ///                          exclude_transactions. Should only be true for Quorum Store.
+    /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_batch(
@@ -166,8 +191,32 @@ impl Mempool {
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-        mut seen: HashSet<TxnPointer>,
+        include_gas_upgraded: bool,
+        mut exclude_transactions: Vec<TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
+        // Sort, so per TxnPointer the highest gas will be in the map
+        if include_gas_upgraded {
+            exclude_transactions.sort();
+        }
+        let mut seen: HashMap<TxnPointer, u64> = exclude_transactions
+            .iter()
+            .map(|txn| (txn.summary, txn.gas_unit_price))
+            .collect();
+        // Do not exclude transactions that had a gas upgrade
+        if include_gas_upgraded {
+            let mut seen_and_upgraded = vec![];
+            for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
+                if let Some(gas) = seen.get(txn_pointer) {
+                    if *new_gas > *gas {
+                        seen_and_upgraded.push(txn_pointer);
+                    }
+                }
+            }
+            for txn_pointer in seen_and_upgraded {
+                seen.remove(txn_pointer);
+            }
+        }
+
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
         // with increasing gas price (e.g. user submits transactions with sequence number 1, 2
@@ -182,17 +231,18 @@ impl Mempool {
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
-            if seen.contains(&TxnPointer::from(txn)) {
+            if seen.contains_key(&TxnPointer::from(txn)) {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            let seen_previous = tx_seq > 0 && seen.contains(&(txn.address, tx_seq - 1));
+            let seen_previous =
+                tx_seq > 0 && seen.contains_key(&TxnPointer::new(txn.address, tx_seq - 1));
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
             if seen_previous || account_sequence_number == Some(&tx_seq) {
                 let ptr = TxnPointer::from(txn);
-                seen.insert(ptr);
+                seen.insert(ptr, txn.gas_ranking_score);
                 result.push(ptr);
                 if (result.len() as u64) == max_txns {
                     break;
@@ -200,14 +250,14 @@ impl Mempool {
 
                 // check if we can now include some transactions
                 // that were skipped before for given account
-                let mut skipped_txn = (txn.address, tx_seq + 1);
+                let mut skipped_txn = TxnPointer::new(txn.address, tx_seq + 1);
                 while skipped.contains(&skipped_txn) {
-                    seen.insert(skipped_txn);
+                    seen.insert(skipped_txn, txn.gas_ranking_score);
                     result.push(skipped_txn);
                     if (result.len() as u64) == max_txns {
                         break 'main;
                     }
-                    skipped_txn = (txn.address, skipped_txn.1 + 1);
+                    skipped_txn = TxnPointer::new(txn.address, skipped_txn.sequence_number + 1);
                 }
             } else {
                 skipped.insert(TxnPointer::from(txn));
@@ -216,9 +266,10 @@ impl Mempool {
         let result_size = result.len();
         let mut block = Vec::with_capacity(result_size);
         let mut full_bytes = false;
-        for (address, seq) in result {
-            if let Some((txn, ranking_score)) =
-                self.transactions.get_with_ranking_score(&address, seq)
+        for txn_pointer in result {
+            if let Some((txn, ranking_score)) = self
+                .transactions
+                .get_with_ranking_score(&txn_pointer.sender, txn_pointer.sequence_number)
             {
                 let txn_size = txn.raw_txn_bytes_len();
                 if total_bytes + txn_size > max_bytes as usize {
@@ -228,8 +279,8 @@ impl Mempool {
                 total_bytes += txn_size;
                 block.push(txn);
                 counters::core_mempool_txn_ranking_score(
-                    CONSENSUS_PULLED_LABEL,
-                    CONSENSUS_PULLED_LABEL,
+                    counters::CONSENSUS_PULLED_LABEL,
+                    counters::CONSENSUS_PULLED_LABEL,
                     self.transactions.get_bucket(ranking_score),
                     ranking_score,
                 );

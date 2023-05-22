@@ -9,11 +9,7 @@ const NOT_YET_SPECIFIED: u64 = END_OF_TIME; /* Thursday, December 31, 2099 11:59
 pub const END_OF_TIME: u64 = 4102444799000; /* Thursday, December 31, 2099 11:59:59 PM */
 #[derive(Debug, Clone, Copy)]
 pub enum TimedFeatureFlag {
-    VerifierLimitBackEdges,
-    NativesAbortEarlyIfOutOfGas,
-    VerifierMetering,
-    MultiEd25519NativePublicKeyValidateGasFix,
-    Ristretto255NativeFloatingPointFix,
+    DisableInvariantViolationCheckInSwapLoc,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -40,19 +36,10 @@ impl TimedFeatureOverride {
 
         Some(match self {
             Replay => match flag {
-                // During replay we want to have metering on but none of the other new features
-                VerifierMetering => true,
-                VerifierLimitBackEdges => false,
-                // Disable the early-abort on out-of-gas in the installed safe natives, so we can test historical TXNs replay the same way.
-                //NativesAbortEarlyIfOutOfGas => false,
-                // Do not install the new safe native for Ristretto255 MSM, since it returns a different gas cost and would abort the replay test.
-                //Ristretto255NativeFloatingPointFix => false,
-                // Do not install the new safe native for MultiEd25519 PK validation, since it returns a different gas cost and would abort the replay test.
-                //MultiEd25519NativePublicKeyValidateGasFix => false,
                 // Add overrides for replay here.
                 _ => return None,
             },
-            Testing => !matches!(flag, VerifierLimitBackEdges), // Activate all flags but not legacy back edges
+            Testing => false, // Activate all flags
         })
     }
 }
@@ -69,20 +56,8 @@ impl TimedFeatureFlag {
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
-            (VerifierLimitBackEdges, TESTNET) => 1675792800000, /* Tuesday, February 7, 2023 10:00:00 AM GMT-08:00 */
-            (VerifierLimitBackEdges, MAINNET) => NOT_YET_SPECIFIED,
-
-            (VerifierMetering, TESTNET) => NOT_YET_SPECIFIED,
-            (VerifierMetering, MAINNET) => NOT_YET_SPECIFIED,
-
-            (NativesAbortEarlyIfOutOfGas, TESTNET) => NOT_YET_SPECIFIED,
-            (NativesAbortEarlyIfOutOfGas, MAINNET) => NOT_YET_SPECIFIED,
-
-            (MultiEd25519NativePublicKeyValidateGasFix, TESTNET) => NOT_YET_SPECIFIED,
-            (MultiEd25519NativePublicKeyValidateGasFix, MAINNET) => NOT_YET_SPECIFIED,
-
-            (Ristretto255NativeFloatingPointFix, TESTNET) => NOT_YET_SPECIFIED,
-            (Ristretto255NativeFloatingPointFix, MAINNET) => NOT_YET_SPECIFIED,
+            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => NOT_YET_SPECIFIED,
+            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => NOT_YET_SPECIFIED,
 
             // If unspecified, a timed feature is considered enabled from the very beginning of time.
             _ => 0,

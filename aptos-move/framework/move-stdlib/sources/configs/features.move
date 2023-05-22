@@ -1,32 +1,31 @@
 /// Defines feature flags for Aptos. Those are used in Aptos specific implementations of features in
 /// the Move stdlib, the Aptos stdlib, and the Aptos framework.
+///
+/// ============================================================================================
+/// Feature Flag Definitions
+///
+/// Each feature flag should come with documentation which justifies the need of the flag.
+/// Introduction of a new feature flag requires approval of framework owners. Be frugal when
+/// introducing new feature flags, as too many can make it hard to understand the code.
+///
+/// Each feature flag should come with a specification of a lifetime:
+///
+/// - a *transient* feature flag is only needed until a related code rollout has happened. This
+///   is typically associated with the introduction of new native Move functions, and is only used
+///   from Move code. The owner of this feature is obliged to remove it once this can be done.
+///
+/// - a *permanent* feature flag is required to stay around forever. Typically, those flags guard
+///   behavior in native code, and the behavior with or without the feature need to be preserved
+///   for playback.
+///
+/// Note that removing a feature flag still requires the function which tests for the feature
+/// (like `code_dependency_check_enabled` below) to stay around for compatibility reasons, as it
+/// is a public function. However, once the feature flag is disabled, those functions can constantly
+/// return true.
 module std::features {
     use std::error;
     use std::signer;
     use std::vector;
-
-    // ============================================================================================
-    // Feature Flag Definitions
-
-    // Each feature flag should come with documentation which justifies the need of the flag.
-    // Introduction of a new feature flag requires approval of framework owners. Be frugal when
-    // introducing new feature flags, as too many can make it hard to understand the code.
-    //
-    // Each feature flag should come with a specification of a lifetime:
-    //
-    // - a *transient* feature flag is only needed until a related code rollout has happened. This
-    //   is typically associated with the introduction of new native Move functions, and is only used
-    //   from Move code. The owner of this feature is obliged to remove it once this can be done.
-    //
-    // - an *permanent* feature flag is required to stay around forever. Typically, those flags guard
-    //   behavior in native code, and the behavior with or without the feature need to be preserved
-    //   for playback.
-    //
-    // Note that removing a feature flag still requires the function which tests for the feature
-    // (like `code_dependency_check_enabled` below) to stay around for compatibility reasons, as it
-    // is a public function. However, once the feature flag is disabled, those functions can constantly
-    // return true.
-
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -140,7 +139,7 @@ module std::features {
         is_enabled(DELEGATION_POOLS)
     }
 
-    /// Whether generic algebra basic operation support in `algebra.move` are enabled.
+    /// Whether generic algebra basic operation support in `crypto_algebra.move` are enabled.
     ///
     /// Lifetime: transient
     const CRYPTOGRAPHY_ALGEBRA_NATIVES: u64 = 12;
@@ -166,6 +165,22 @@ module std::features {
     ///
     /// Lifetime: transient
     const STRUCT_CONSTRUCTORS: u64 = 15;
+
+    /// Whether reward rate decreases periodically.
+    /// Lifetime: transient
+    const PERIODICAL_REWARD_RATE_DECREASE: u64 = 16;
+    public fun get_periodical_reward_rate_decrease_feature(): u64 { PERIODICAL_REWARD_RATE_DECREASE }
+    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+        is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
+    }
+
+    /// Whether enable paritial governance voting.
+    /// Lifetime: transient
+    const PARTIAL_GOVERNANCE_VOTING: u64 = 17;
+    public fun get_partial_governance_voting(): u64 { PARTIAL_GOVERNANCE_VOTING }
+    public fun partial_governance_voting_enabled(): bool acquires Features {
+        is_enabled(PARTIAL_GOVERNANCE_VOTING)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

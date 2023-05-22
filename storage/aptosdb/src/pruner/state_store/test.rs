@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    new_sharded_schema_batch,
+    new_sharded_kv_schema_batch,
     pruner::{state_merkle_pruner_worker::StateMerklePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
@@ -24,6 +24,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use arr_macro::arr;
 use proptest::{prelude::*, proptest};
 use std::{collections::HashMap, sync::Arc};
 
@@ -32,9 +33,13 @@ fn put_value_set(
     value_set: Vec<(StateKey, StateValue)>,
     version: Version,
 ) -> HashValue {
+    let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(key, value)| (key.clone(), Some(value.clone())))
+        .map(|(key, value)| {
+            sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
+            (key, Some(value))
+        })
         .collect();
     let jmt_updates = jmt_updates(&value_set);
 
@@ -48,12 +53,13 @@ fn put_value_set(
         .unwrap();
 
     let ledger_batch = SchemaBatch::new();
-    let sharded_state_kv_batches = new_sharded_schema_batch();
+    let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     state_store
         .put_value_sets(
-            vec![&value_set],
+            vec![&sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
+            None,
             &ledger_batch,
             &sharded_state_kv_batches,
         )

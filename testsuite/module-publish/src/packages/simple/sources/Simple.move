@@ -7,16 +7,22 @@
 // contains a `CompiledModule` for the module below.
 // A helper file is provided to manipulate that file to generate
 // multiple, publishable module.
-module 0xABCD::Simple {
+module 0xABCD::simple {
+    use std::error;
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
+    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::account;
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
     // That would affect the size of the module being published
     // and the cost of loading a constant.
     const RANDOM: vector<u64> = vector<u64>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    // Resource being modified doesn't exist
+    const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
 
     // Load and return a value from the constant `RANDOM`.
     // No data read or write.
@@ -39,6 +45,12 @@ module 0xABCD::Simple {
     // though there is a lot happening to get to this point.
     // In a sense compute the cost of an "empty" transaction.
     public entry fun nop(_s: &signer) {
+    }
+
+    public entry fun nop_2_signers(_s1: &signer, _s2: &signer) {
+    }
+
+    public entry fun nop_5_signers(_s1: &signer, _s2: &signer, _s3: &signer, _s4: &signer, _s5: &signer) {
     }
 
     // Test simple CPU usage. Loop as defined by the input `count`.
@@ -80,7 +92,7 @@ module 0xABCD::Simple {
     // classic langages) by `COUNTER_STEP`.
     // The idea is that `COUNTER_STEP` is one of the few values (if not the only
     // one) that changes across versions.
-    public entry fun step(s: &signer) acquires Counter {
+    public entry fun step_signer(s: &signer) acquires Counter {
         let counter = borrow_global_mut<Counter>(signer::address_of(s));
         *(&mut counter.count) = counter.count + COUNTER_STEP;
     }
@@ -89,6 +101,22 @@ module 0xABCD::Simple {
     public entry fun get_counter(s: &signer) acquires Counter {
         let counter = borrow_global<Counter>(signer::address_of(s));
         counter.count;
+    }
+
+    public entry fun step_destination(owner: &signer, destination: address) acquires Counter {
+        let value = {
+            assert!(exists<Counter>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+
+            let counter = borrow_global_mut<Counter>(destination);
+            *(&mut counter.count) = counter.count + COUNTER_STEP;
+            counter.count
+        };
+        if (exists<Counter>(signer::address_of(owner))) {
+            let counter_owner = borrow_global_mut<Counter>(signer::address_of(owner));
+            *(&mut counter_owner.count) = value;
+        } else {
+            move_to<Counter>(owner, Counter { count: value });
+        }
     }
 
     //
@@ -380,6 +408,34 @@ module 0xABCD::Simple {
             ret1
         } else {
             ret2
+        }
+    }
+
+
+
+    struct SimpleEvent has drop, store {
+        event_id: u64
+    }
+
+    struct EventStore has key {
+        simple_events: EventHandle<SimpleEvent>,
+    }
+
+    fun emit_events(owner: &signer, count: u64) acquires EventStore
+    {
+        let owner_address = signer::address_of(owner);
+        if (!exists<EventStore>(owner_address)) {
+            move_to<EventStore>(owner, EventStore {
+                simple_events: account::new_event_handle<SimpleEvent>(owner)
+            });
+        };
+        let event_store = borrow_global_mut<EventStore>(owner_address);
+        while (count > 0) {
+            count = count - 1;
+            event::emit_event<SimpleEvent>(
+                &mut event_store.simple_events,
+                SimpleEvent { event_id: count },
+            );
         }
     }
 }

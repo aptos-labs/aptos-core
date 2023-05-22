@@ -81,7 +81,7 @@ spec aptos_framework::vesting {
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
     }
 
-    spec shareholder(vesting_contract_address: address, beneficiary: address): address {
+    spec shareholder(vesting_contract_address: address, shareholder_or_beneficiary: address): address {
         include ActiveVestingContractAbortsIf<VestingContract>{contract_address: vesting_contract_address};
     }
 

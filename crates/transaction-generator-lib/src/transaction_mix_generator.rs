@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
-use async_trait::async_trait;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -39,8 +38,8 @@ impl PhasedTxnMixGenerator {
 impl TransactionGenerator for PhasedTxnMixGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {
             // when only single txn_mix is passed, use it for all phases, for simplicity
@@ -52,7 +51,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
         for (gen, weight) in &mut self.txn_mix_per_phase[phase] {
             if picked < *weight {
-                return gen.generate_transactions(accounts, transactions_per_account);
+                return gen.generate_transactions(account, num_to_create);
             }
             picked -= *weight;
         }
@@ -80,17 +79,13 @@ impl PhasedTxnMixGeneratorCreator {
     }
 }
 
-#[async_trait]
 impl TransactionGeneratorCreator for PhasedTxnMixGeneratorCreator {
-    async fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         let mut txn_mix_per_phase = Vec::<Vec<(Box<dyn TransactionGenerator>, usize)>>::new();
         for txn_mix_creators in self.txn_mix_per_phase_creators.iter_mut() {
             let mut txn_mix = Vec::<(Box<dyn TransactionGenerator>, usize)>::new();
             for (generator_creator, weight) in txn_mix_creators.iter_mut() {
-                txn_mix.push((
-                    generator_creator.create_transaction_generator().await,
-                    *weight,
-                ));
+                txn_mix.push((generator_creator.create_transaction_generator(), *weight));
             }
             txn_mix_per_phase.push(txn_mix);
         }

@@ -821,7 +821,7 @@ module aptos_token::token {
             let new_token = Token {
                 id: new_token_id,
                 amount: 1,
-                token_properties: *&token_data.default_properties,
+                token_properties: token_data.default_properties,
             };
             direct_deposit(token_owner, new_token);
             update_token_property_internal(token_owner, new_token_id, keys, values, types);
@@ -963,7 +963,7 @@ module aptos_token::token {
         withdraw_proof: WithdrawCapability,
     ): Token acquires TokenStore {
         // verify the delegation hasn't expired yet
-        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+        assert!(timestamp::now_seconds() <= withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
 
         withdraw_with_event_internal(
             withdraw_proof.token_owner,
@@ -978,7 +978,7 @@ module aptos_token::token {
         withdraw_amount: u64,
     ): (Token, Option<WithdrawCapability>) acquires TokenStore {
         // verify the delegation hasn't expired yet
-        assert!(timestamp::now_seconds() <= *&withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
+        assert!(timestamp::now_seconds() <= withdraw_proof.expiration_sec, error::invalid_argument(EWITHDRAW_PROOF_EXPIRES));
 
         assert!(withdraw_amount <= withdraw_proof.amount, error::invalid_argument(EINSUFFICIENT_WITHDRAW_CAPABILITY_AMOUNT));
 
@@ -1050,7 +1050,7 @@ module aptos_token::token {
         let mutability_config = create_collection_mutability_config(&mutate_setting);
         let collection = CollectionData {
             description,
-            name: *&name,
+            name: name,
             uri,
             supply: 0,
             maximum,
@@ -1063,7 +1063,7 @@ module aptos_token::token {
             &mut collection_handle.create_collection_events,
             CreateCollectionEvent {
                 creator: account_addr,
-                collection_name: *&name,
+                collection_name: name,
                 uri,
                 description,
                 maximum,
@@ -1433,10 +1433,10 @@ module aptos_token::token {
             let all_token_data = &borrow_global<Collections>(creator_addr).token_data;
             assert!(table::contains(all_token_data, token_id.token_data_id), error::not_found(ETOKEN_DATA_NOT_PUBLISHED));
             let token_data = table::borrow(all_token_data, token_id.token_data_id);
-            *&token_data.default_properties
+            token_data.default_properties
         } else {
             let tokens = &borrow_global<TokenStore>(owner).tokens;
-            *&table::borrow(tokens, token_id).token_properties
+            table::borrow(tokens, token_id).token_properties
         }
     }
 

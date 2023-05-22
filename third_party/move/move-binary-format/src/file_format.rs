@@ -619,6 +619,13 @@ impl Ability {
             Self::Key => AbilitySet::EMPTY,
         }
     }
+
+    /// Returns an interator that iterates over all abilities.
+    pub fn all() -> impl ExactSizeIterator<Item = Ability> {
+        use Ability::*;
+
+        [Copy, Drop, Store, Key].into_iter()
+    }
 }
 
 /// A set of `Ability`s
@@ -673,6 +680,11 @@ impl AbilitySet {
         self.has_ability(Ability::Key)
     }
 
+    #[allow(clippy::should_implement_trait)]
+    pub fn add(self, ability: Ability) -> Self {
+        Self(self.0 | ability as u8)
+    }
+
     pub fn remove(self, ability: Ability) -> Self {
         Self(self.0 & (!(ability as u8)))
     }
@@ -683,6 +695,18 @@ impl AbilitySet {
 
     pub fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    pub fn requires(self) -> Self {
+        let mut requires = Self::EMPTY;
+
+        for ability in Ability::all() {
+            if self.has_ability(ability) {
+                requires = requires.add(ability.requires())
+            }
+        }
+
+        requires
     }
 
     #[inline]
@@ -1756,11 +1780,6 @@ impl Bytecode {
             pc < u16::MAX && (pc as usize) < code.len(),
             "Program counter out of bounds"
         );
-
-        // Return early to prevent overflow if pc is hiting the end of max number of instructions allowed (u16::MAX).
-        if pc > u16::max_value() - 2 {
-            return vec![];
-        }
 
         let bytecode = &code[pc as usize];
         let mut v = vec![];

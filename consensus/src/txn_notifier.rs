@@ -70,11 +70,12 @@ impl TxnNotifier for MempoolNotifier {
         }
         let user_txn_status = &compute_status[1..txns.len() + 1];
         for (txn, status) in txns.iter().zip_eq(user_txn_status) {
-            if let TransactionStatus::Discard(_) = status {
+            if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {
                     sender: txn.sender(),
                     sequence_number: txn.sequence_number(),
                     hash: txn.clone().committed_hash(),
+                    reason: *reason,
                 });
             }
         }

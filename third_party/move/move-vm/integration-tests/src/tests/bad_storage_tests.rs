@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, as_script, compile_units};
-use move_binary_format::errors::{Location, PartialVMError, VMError};
+use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+    metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
@@ -508,22 +509,27 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
-    type Error = VMError;
+    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
+        vec![]
+    }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        Ok(Err(
+            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
+        )?)
     }
 }
 
 impl ResourceResolver for BogusStorage {
-    type Error = VMError;
-
-    fn get_resource(
+    fn get_resource_with_metadata(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        Err(PartialVMError::new(self.bad_status_code).finish(Location::Undefined))
+        _metadata: &[Metadata],
+    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+        Ok(Err(
+            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
+        )?)
     }
 }
 

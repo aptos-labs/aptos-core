@@ -1,7 +1,7 @@
 [package]
 name = "aptos-node"
 description = "Aptos node"
-version = "0.1.0"
+version = "1.4.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -68,6 +68,8 @@ rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_merge = { workspace = true }
+serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 url = { workspace = true }
@@ -76,9 +78,11 @@ url = { workspace = true }
 jemallocator = { workspace = true }
 
 [features]
-default = []
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
-indexer = ["aptos-indexer"]
 check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
+default = []
+failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints"]
+indexer = ["aptos-indexer"]
+network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]
+tokio-console = ["aptos-logger/tokio-console"]

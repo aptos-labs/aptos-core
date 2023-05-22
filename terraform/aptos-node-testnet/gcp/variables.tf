@@ -1,5 +1,11 @@
 ### Project config
 
+variable "cluster_bootstrap" {
+  description = "Set when bootstrapping a new cluster"
+  type        = bool
+  default     = false
+}
+
 variable "project" {
   description = "GCP project"
   type        = string
@@ -126,10 +132,32 @@ variable "enable_forge" {
   default     = false
 }
 
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  default     = true
+}
+
 variable "monitoring_helm_values" {
   description = "Map of values to pass to monitoring Helm"
   type        = any
   default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  default     = true
+}
+
+### Cluster node config
+
+variable "gke_cluster_enable_gcfs" {
+  description = "Enable GCFS at the cluster level"
+  default     = false
+}
+
+variable "gke_cluster_enable_gvnic" {
+  description = "Enable GVNIC (networking driver) at the cluster level"
+  default     = false
 }
 
 ### Autoscaling

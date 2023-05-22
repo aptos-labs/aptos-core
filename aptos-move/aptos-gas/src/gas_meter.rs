@@ -33,6 +33,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V8
+//   - Added BLS12-381 operations.
 // - V7
 //   - Native support for exists<T>
 //   - New formulae for storage fees based on fixed APT costs
@@ -57,7 +59,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 7;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 8;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -963,7 +965,7 @@ impl AptosGasMeter for StandardGasMeter {
         // Because the storage fees are defined in terms of fixed APT costs, we need
         // to convert them into gas units.
         //
-        // u128 is used to protect against overflow and preverse as much precision as
+        // u128 is used to protect against overflow and preserve as much precision as
         // possible in the extreme cases.
         fn div_ceil(n: u128, d: u128) -> u128 {
             if n % d == 0 {

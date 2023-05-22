@@ -4,26 +4,26 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, Get, K8sApi, K8sNode,
-    NodeConfigFn, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_ROOT_KEY, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
+    Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
     MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
-use aptos_logger::{info, warn};
+use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
-    batch::{v1::Job, v1beta1::CronJob},
-    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod, Secret},
+    batch::v1::Job,
+    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
-    Config, Error as KubeError,
+    Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
 use serde::de::DeserializeOwned;
@@ -31,7 +31,9 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
-    env, fs,
+    env,
+    fmt::Debug,
+    fs,
     fs::File,
     io::Write,
     net::TcpListener,
@@ -159,11 +161,15 @@ async fn wait_nodes_stateful_set(
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
-async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
+async fn delete_k8s_collection<T: kube::Resource>(
     api: Api<T>,
     name: &'static str,
     label_selector: &str,
-) -> Result<()> {
+) -> Result<()>
+where
+    T: Clone + DeserializeOwned + Debug,
+    <T as kube::Resource>::DynamicType: Default,
+{
     match api
         .delete_collection(
             &DeleteParams::default(),
@@ -172,7 +178,7 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
         .await?
     {
         either::Left(list) => {
-            let names: Vec<_> = list.iter().map(Meta::name).collect();
+            let names: Vec<_> = list.iter().map(ResourceExt::name).collect();
             info!("Deleting collection of {}: {:?}", name, names);
         },
         either::Right(status) => {
@@ -196,7 +202,6 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
     let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), kube_namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), kube_namespace);
     let jobs: Api<Job> = Api::namespaced(client.clone(), kube_namespace);
-    let cronjobs: Api<CronJob> = Api::namespaced(client.clone(), kube_namespace);
     // service deletion by label selector is not supported in this version of k8s api
     // let services: Api<Service> = Api::namespaced(client.clone(), kube_namespace);
 
@@ -210,7 +215,9 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
         delete_k8s_collection(stateful_sets.clone(), "StatefulSets", selector).await?;
         delete_k8s_collection(pvcs.clone(), "PersistentVolumeClaims", selector).await?;
         delete_k8s_collection(jobs.clone(), "Jobs", selector).await?;
-        delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
+        // This is causing problem on gcp forge for some reason?!
+        // HACK remove to unblock
+        // delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
         // delete_k8s_collection(services.clone(), "Services", selector).await?;
     }
 
@@ -706,7 +713,8 @@ pub async fn collect_running_nodes(
 
 pub async fn create_k8s_client() -> K8sClient {
     // get the client from the local kube context
-    let config_infer = Config::infer().await.unwrap();
+    let mut config_infer = Config::infer().await.unwrap();
+    config_infer.accept_invalid_certs = true;
     K8sClient::try_from(config_infer).unwrap()
 }
 
@@ -806,54 +814,6 @@ async fn create_namespace(
     Ok(())
 }
 
-pub async fn create_pyroscope_secret(kube_namespace: String) -> Result<()> {
-    let kube_client = create_k8s_client().await;
-    let kube_namespace_name = kube_namespace.clone();
-    let default_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
-        kube_client.clone(),
-        Some("default".to_string()),
-    ));
-    let namespace_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
-        kube_client.clone(),
-        Some(kube_namespace_name.to_string()),
-    ));
-    // load in the secret from namespace and copy it to the new namespace
-    if let Ok(secret) = default_secrets_api.get("pyroscope").await {
-        info!("Secret pyroscope exists, continuing with it");
-        let pyroscope_secret_data = secret.data.clone();
-        let namespaced_pyroscope_secret = Secret {
-            metadata: ObjectMeta {
-                name: Some("pyroscope".to_string()),
-                ..ObjectMeta::default()
-            },
-            data: pyroscope_secret_data,
-            string_data: None,
-            type_: None,
-        };
-        if let Err(KubeError::Api(api_err)) = namespace_secrets_api
-            .create(&PostParams::default(), &namespaced_pyroscope_secret)
-            .await
-        {
-            if api_err.code == 409 {
-                info!(
-                    "Secret pyroscope already exists in namespace {}, continuing with it",
-                    &kube_namespace_name
-                );
-            } else {
-                return Err(format_err!(
-                    "Failed to create secret pyroscope in namespace {}: {:?}",
-                    &kube_namespace_name,
-                    api_err
-                ));
-            }
-        }
-    } else {
-        warn!("Secret pyroscope does not exist. This test run will not be profiled");
-        // do not exit with an error, but throw a warning
-    }
-    Ok(())
-}
-
 pub async fn create_management_configmap(
     kube_namespace: String,
     keep: bool,
@@ -897,6 +857,7 @@ pub async fn create_management_configmap(
             name: Some(management_configmap_name.clone()),
             ..ObjectMeta::default()
         },
+        immutable: None,
     };
     if let Err(KubeError::Api(api_err)) =
         configmap_api.create(&PostParams::default(), &config).await

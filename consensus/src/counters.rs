@@ -11,6 +11,15 @@ use aptos_metrics_core::{
 };
 use once_cell::sync::Lazy;
 
+/// Transaction commit was successful
+pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
+/// Transaction commit failed (will not be retried)
+pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
+/// Transaction commit failed (will not be retried) because of a duplicate
+pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit was unsuccessful, but will be retried
+pub const TXN_COMMIT_RETRY_LABEL: &str = "retry";
+
 //////////////////////
 // HEALTH COUNTERS
 //////////////////////
@@ -42,6 +51,15 @@ pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_consensus_last_committed_version",
         "The counter corresponds to the version of the last committed ledger info."
+    )
+    .unwrap()
+});
+
+/// Count of the committed failed rounds since last restart.
+pub static COMMITTED_FAILED_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_committed_failed_rounds_count",
+        "Count of the committed failed rounds since last restart."
     )
     .unwrap()
 });
@@ -200,6 +218,39 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
         "aptos_wait_for_full_blocks_triggered",
         "Counts when waiting for full blocks is triggered",
     )
+});
+
+/// Counts when chain_health backoff is triggered
+pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_pipeline_backpressure_on_proposal_triggered",
+        "Counts when chain_health backoff is triggered",
+    )
+});
+
+/// number of rounds pending when creating proposal
+pub static CONSENSUS_PROPOSAL_PENDING_ROUNDS: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_proposal_pending_rounds",
+        "number of rounds pending when creating proposal",
+    )
+});
+
+/// duration pending when creating proposal
+pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_proposal_pending_duration",
+        "duration pending when creating proposal",
+    )
+});
+
+/// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
+pub static PROPOSER_DELAY_PROPOSAL: Lazy<Gauge> = Lazy::new(|| {
+    register_gauge!(
+        "aptos_proposer_delay_proposal",
+        "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
+    )
+    .unwrap()
 });
 
 /// How many pending blocks are there, when we make a proposal
@@ -500,11 +551,17 @@ pub static NUM_BLOCKS_IN_PIPELINE: Lazy<IntGaugeVec> = Lazy::new(|| {
 //     .unwrap()
 // });
 
+const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 24] = [
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
+];
+
 /// Histogram for the number of txns per (committed) blocks.
 pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_num_txns_per_block",
-        "Histogram for the number of txns per (committed) blocks."
+        "Histogram for the number of txns per (committed) blocks.",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -519,14 +576,17 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+const CONSENSUS_WAIT_DURATION_BUCKETS: [f64; 19] = [
+    0.005, 0.01, 0.015, 0.02, 0.04, 0.06, 0.08, 0.10, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3,
+    0.4, 0.6, 0.8, 2.0,
+];
+
 /// Histogram of the time it requires to wait before inserting blocks into block store.
 /// Measured as the block's timestamp minus local timestamp.
 pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
-    DurationHistogram::new(
-        register_histogram!("aptos_consensus_wait_duration_s",
-            "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp."
-        ).unwrap()
-    )
+    DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s",
+    "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
+    CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
 });
 
 ///////////////////
@@ -677,11 +737,17 @@ pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+const PROPSER_ELECTION_DURATION_BUCKETS: [f64; 17] = [
+    0.001, 0.002, 0.003, 0.004, 0.006, 0.008, 0.01, 0.012, 0.014, 0.0175, 0.02, 0.025, 0.05, 0.25,
+    0.5, 1.0, 2.0,
+];
+
 /// Time it takes for proposer election to compute proposer (when not cached)
 pub static PROPOSER_ELECTION_DURATION: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_proposer_election_duration",
-        "Time it takes for proposer election to compute proposer (when not cached)"
+        "Time it takes for proposer election to compute proposer (when not cached)",
+        PROPSER_ELECTION_DURATION_BUCKETS.to_vec()
     )
     .unwrap()
 });

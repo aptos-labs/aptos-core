@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Exp, ExpData, LocalVarDecl, Operation, QuantKind, TempIndex, Value},
+    ast::{Address, Exp, ExpData, Operation, Pattern, QuantKind, TempIndex, Value},
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedId, QualifiedInstId, SpecFunId,
         StructId,
@@ -12,7 +12,7 @@ use crate::{
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
 };
 use itertools::Itertools;
-use num::BigUint;
+use move_core_types::account_address::AccountAddress;
 
 /// A trait that defines a generator for `Exp`.
 pub trait ExpGenerator<'env> {
@@ -64,9 +64,9 @@ pub trait ExpGenerator<'env> {
     }
 
     /// Make an address constant.
-    fn mk_address_const(&self, value: BigUint) -> Exp {
+    fn mk_address_const(&self, value: AccountAddress) -> Exp {
         let node_id = self.new_node(Type::Primitive(PrimitiveType::Address), None);
-        ExpData::Value(node_id, Value::Address(value)).into_exp()
+        ExpData::Value(node_id, Value::Address(Address::Numerical(value))).into_exp()
     }
 
     /// Makes a Call expression.
@@ -190,7 +190,7 @@ pub trait ExpGenerator<'env> {
     {
         let elem = self.mk_local("$elem", elem_ty.clone());
         if let Some(body) = f(elem) {
-            let range_decl = self.mk_decl(self.mk_symbol("$elem"), elem_ty.clone(), None);
+            let range_decl = self.mk_decl(self.mk_symbol("$elem"), elem_ty.clone());
             let node_id = self.new_node(BOOL_TYPE.clone(), None);
             Some(
                 ExpData::Quant(
@@ -241,7 +241,7 @@ pub trait ExpGenerator<'env> {
             vec![map.clone(), key.clone()],
         );
         if let Some(body) = self.mk_join_opt_bool(Operation::And, f(key), f(val)) {
-            let range_decl = self.mk_decl(self.mk_symbol("$key"), key_ty.clone(), None);
+            let range_decl = self.mk_decl(self.mk_symbol("$key"), key_ty.clone());
             let node_id = self.new_node(BOOL_TYPE.clone(), None);
             Some(
                 ExpData::Quant(node_id, kind, vec![(range_decl, map)], vec![], None, body)
@@ -272,7 +272,7 @@ pub trait ExpGenerator<'env> {
             .get_module(mem.module_id)
             .into_struct(mem.id);
         let type_inst = (0..struct_env.get_type_parameters().len())
-            .map(|i| Type::TypeParameter(i as u16))
+            .map(Type::new_param)
             .collect_vec();
         let struct_ty = Type::Struct(mem.module_id, mem.id, type_inst);
         let value = self.mk_local("$rsc", struct_ty.clone());
@@ -284,7 +284,7 @@ pub trait ExpGenerator<'env> {
             let resource_domain =
                 ExpData::Call(resource_domain_node_id, Operation::ResourceDomain, vec![])
                     .into_exp();
-            let resource_decl = self.mk_decl(self.mk_symbol("$rsc"), struct_ty, None);
+            let resource_decl = self.mk_decl(self.mk_symbol("$rsc"), struct_ty);
             let quant_node_id = self.new_node(BOOL_TYPE.clone(), None);
             Some(ExpData::Quant(
                 quant_node_id,
@@ -325,7 +325,7 @@ pub trait ExpGenerator<'env> {
             let resource_domain =
                 ExpData::Call(resource_domain_node_id, Operation::ResourceDomain, vec![])
                     .into_exp();
-            let resource_decl = self.mk_decl(self.mk_symbol("$rsc"), struct_ty, None);
+            let resource_decl = self.mk_decl(self.mk_symbol("$rsc"), struct_ty);
             let quant_node_id = self.new_node(BOOL_TYPE.clone(), None);
             Some(
                 ExpData::Quant(
@@ -344,13 +344,9 @@ pub trait ExpGenerator<'env> {
     }
 
     /// Makes a local variable declaration.
-    fn mk_decl(&self, name: Symbol, ty: Type, binding: Option<Exp>) -> LocalVarDecl {
+    fn mk_decl(&self, name: Symbol, ty: Type) -> Pattern {
         let node_id = self.new_node(ty, None);
-        LocalVarDecl {
-            id: node_id,
-            name,
-            binding,
-        }
+        Pattern::Var(node_id, name)
     }
 
     /// Makes a symbol from a string.

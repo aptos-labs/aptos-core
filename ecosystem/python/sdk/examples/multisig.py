@@ -7,9 +7,15 @@ from aptos_sdk.authenticator import Authenticator, MultiEd25519Authenticator
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.ed25519 import MultiPublicKey, MultiSignature
-from aptos_sdk.transactions import (EntryFunction, RawTransaction, Script,
-                                    ScriptArgument, SignedTransaction,
-                                    TransactionArgument, TransactionPayload)
+from aptos_sdk.transactions import (
+    EntryFunction,
+    RawTransaction,
+    Script,
+    ScriptArgument,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
 from aptos_sdk.type_tag import StructTag, TypeTag
 
 from .common import FAUCET_URL, NODE_URL

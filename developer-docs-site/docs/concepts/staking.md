@@ -8,7 +8,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Staking
 
 :::tip Consensus
-We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](../guides/basics-life-of-txn.md#consensus) before proceeding further. 
+We strongly recommend that you read the consensus section of [Aptos Blockchain Deep Dive](./blockchain.md#consensus) before proceeding further. 
 :::
 
 In a distributed system like blockchain, executing a transaction is distinct from updating the state of the ledger and persisting the results in storage. An agreement, i.e., consensus, must be reached by a quorum of validators on the ordering of transactions and their execution results before these results are persisted in storage and the state of the ledger is updated. 
@@ -36,7 +36,6 @@ Below is a summary flow diagram of how staking on the Aptos blockchain works. Th
   }}
 /> --->
 
-
 The Aptos staking module defines a capability that represents ownership. 
 
 :::tip Ownership
@@ -47,7 +46,6 @@ The `OwnerCapability` resource can be used to control the stake pool. Three pers
 - Owner
 - Operator
 - Voter
-
 
 Using this owner-operator-voter model, a custodian can assume the owner persona and stake on the Aptos blockchain and participate in the Aptos governance. This model allows delegations and staking services to be built as it separates the account that is control of the funds from the other accounts (operator, voter), hence allows secure delegations of responsibilities. 
 
@@ -60,21 +58,23 @@ The owner is the owner of the funds. For example, Bob creates an account on the 
 As an owner:
 
 - Bob owns the funds that will be used for staking.
-- Only Bob can add or unlock or withdraw funds.
+- Only Bob can add, unlock or withdraw funds.
 - Only Bob can extend the lockup period.
 - Bob can change the node operator Alice to some other node operator anytime Bob wishes to do so.
+- Bob can set the operator commission percentage.
 - The reward will be deposited into Bob's (owner's) account.
 
 ### Operator
 
-A node operator is assigned by the fund owner to run the validator node. The two personas, the owner and the operator, can be two separate entities or the same. For example, Alice (operator) runs the validator node, operating at the behest of Bob, the fund owner.
+A node operator is assigned by the fund owner to run the validator node and receives commission as set by the owner. The two personas, the owner and the operator, can be two separate entities or the same. For example, Alice (operator) runs the validator node, operating at the behest of Bob, the fund owner.
 
 As an operator:
 
 - Alice has permissions only to join or leave the validator set.
 - As a validator, Alice will perform the validating function.
 - Alice has the permissions to change the consensus key and network addresses. The consensus key is used by Alice to participate in the validator consensus process, i.e., to vote and propose a block. Alice is allowed to change ("rotate") this key in case this key is compromised.
-- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource.
+- However, Alice cannot move funds (unless Alice is the owner, i.e., Alice has the `OwnerCapability` resource).
+- The operator commission is deducted from the staker (owner) rewards and deposited into the operator account.
 
 ### Voter
 
@@ -90,7 +90,7 @@ Throughout the duration of an epoch, the following flow of events occurs several
 
 - A validator leader is selected by a deterministic formula based on the validator reputation determined by validator's performance (including whether the validator has voted in the past or not) and stake. **This leader selection is not done by voting.**
 - The selected leader sends a proposal containing the collected quorum votes of the previous proposal and the leader's proposed order of transactions for the new block. 
-- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validators, not to the voter validators.**
+- All the validators from the validator set will vote on the leader's proposal for the new block. Once consensus is reached, the block can be finalized. Hence, the actual list of votes to achieve consensus is a subset of all the validators in the validator set. This leader validator is rewarded. **Rewards are given only to the leader validator, not to the voter validators.**
 - The above flow repeats with the selection of another validator leader and repeating the steps for the next new block. Rewards are given at the end of the epoch. 
 
 ## Validator state and stake state
@@ -121,7 +121,7 @@ sources={{
 />
 
 There are two edge cases to call out:
-1. If a validator's stake drops below the required minimum, that validator can be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
+1. If a validator's stake drops below the required [minimum](#minimum-and-maximum-stake), that validator will be moved from active state directly to the inactive state during an epoch change. This happens only during an epoch change.
 2. Aptos governance can also directly remove validators from the active set. **Note that governance proposals will always trigger an epoch change.**
 
 ### Stake state
@@ -179,7 +179,7 @@ For step-by-step instructions on how to join the validator set, see: [Joining Va
 
 ### Minimum and maximum stake
 
-You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. 
+You must stake the required minimum amount to join the validator set. Moreover, you can only stake up to the maximum stake amount. The current required minimum for staking is 1M APT tokens.
 
 If at any time after joining the validator set, your current staked amount exceeds the maximum allowed stake (for example as the rewards are added to your staked amount), then your voting power and the rewards will be calculated only using the maximum allowed stake amount, and not your current staked amount. 
 
@@ -195,7 +195,14 @@ When your lockup period expires, it will be automatically renewed, so that you c
 
 ### Unlocking your stake
 
-You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. 
+You can request to unlock your stake at any time. However, your stake will only become withdrawable when your current lockup expires. This can be at most as long as the fixed lockup duration. You will continue earning rewards on your stake until it becomes withdrawable. 
+
+The principal amount is updated when any of the following actions occur:
+1. Operator [requests commission unlock](../nodes/validator-node/operator/staking-pool-operations.md#requesting-commission)
+2. Staker (owner) withdraws funds
+3. Staker (owner) switches operators
+
+When the staker unlocks stake, this also triggers a commission unlock. The full commission amount for any staking rewards earned is unlocked. This is not proportional to the unlock stake amount. Commission is distributed to the operator after the lockup ends when `request commission` is called a second time or when staker withdraws (distributes) the unlocked stake. 
 
 ### Resetting the lockup
 

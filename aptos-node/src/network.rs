@@ -30,11 +30,6 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
-// TODO: should the applications not make these configurable?
-// Application network channel sizes
-const CONSENSUS_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1024;
-const MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE: usize = 1024;
-
 /// A simple struct that holds both the network client
 /// and receiving interfaces for an application.
 pub struct ApplicationNetworkInterfaces<T> {
@@ -52,7 +47,7 @@ struct ApplicationNetworkHandle<T> {
 
 /// TODO: make this configurable (e.g., for compression)
 /// Returns the network application config for the consensus client and service
-pub fn consensus_network_configuration() -> NetworkApplicationConfig {
+pub fn consensus_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols: Vec<ProtocolId> = DIRECT_SEND.into();
     let rpc_protocols: Vec<ProtocolId> = RPC.into();
 
@@ -61,7 +56,7 @@ pub fn consensus_network_configuration() -> NetworkApplicationConfig {
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(CONSENSUS_NETWORK_CHANNEL_BUFFER_SIZE)
+        aptos_channel::Config::new(node_config.consensus.max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
             .counters(&aptos_consensus::counters::PENDING_CONSENSUS_NETWORK_EVENTS),
     );
@@ -69,7 +64,7 @@ pub fn consensus_network_configuration() -> NetworkApplicationConfig {
 }
 
 /// Returns the network application config for the mempool client and service
-pub fn mempool_network_configuration() -> NetworkApplicationConfig {
+pub fn mempool_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
     let direct_send_protocols = vec![ProtocolId::MempoolDirectSend];
     let rpc_protocols = vec![]; // Mempool does not use RPC
 
@@ -78,7 +73,7 @@ pub fn mempool_network_configuration() -> NetworkApplicationConfig {
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE)
+        aptos_channel::Config::new(node_config.mempool.max_network_channel_size)
             .queue_style(QueueStyle::KLAST) // TODO: why is this not FIFO?
             .counters(&aptos_mempool::counters::PENDING_MEMPOOL_NETWORK_EVENTS),
     );
@@ -129,12 +124,8 @@ pub fn storage_service_network_configuration(node_config: &NodeConfig) -> Networ
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-/// Extracts all network configs and ids from the given node config.
-/// This method also does some basic verification of the network configs.
-fn extract_network_configs_and_ids(
-    node_config: &NodeConfig,
-) -> (Vec<NetworkConfig>, Vec<NetworkId>) {
-    // Extract all network configs
+/// Extracts all network configs from the given node config
+fn extract_network_configs(node_config: &NodeConfig) -> Vec<NetworkConfig> {
     let mut network_configs: Vec<NetworkConfig> = node_config.full_node_networks.to_vec();
     if let Some(network_config) = node_config.validator_network.as_ref() {
         // Ensure that mutual authentication is enabled by default!
@@ -143,28 +134,28 @@ fn extract_network_configs_and_ids(
         }
         network_configs.push(network_config.clone());
     }
+    network_configs
+}
 
-    // Extract all network IDs
-    let mut network_ids = vec![];
-    for network_config in &network_configs {
-        // Guarantee there is only one of this network
-        let network_id = network_config.network_id;
-        if network_ids.contains(&network_id) {
-            panic!(
-                "Duplicate NetworkId: '{}'. Can't start node with duplicate networks! Check the node config!",
-                network_id
-            );
-        }
-        network_ids.push(network_id);
-    }
+/// Extracts all network ids from the given node config
+fn extract_network_ids(node_config: &NodeConfig) -> Vec<NetworkId> {
+    extract_network_configs(node_config)
+        .into_iter()
+        .map(|network_config| network_config.network_id)
+        .collect()
+}
 
-    (network_configs, network_ids)
+/// Creates the global peers and metadata struct
+pub fn create_peers_and_metadata(node_config: &NodeConfig) -> Arc<PeersAndMetadata> {
+    let network_ids = extract_network_ids(node_config);
+    PeersAndMetadata::new(&network_ids)
 }
 
 /// Sets up all networks and returns the appropriate application network interfaces
 pub fn setup_networks_and_get_interfaces(
     node_config: &NodeConfig,
     chain_id: ChainId,
+    peers_and_metadata: Arc<PeersAndMetadata>,
     event_subscription_service: &mut EventSubscriptionService,
 ) -> (
     Vec<Runtime>,
@@ -173,11 +164,8 @@ pub fn setup_networks_and_get_interfaces(
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
 ) {
-    // Gather all network configs and network ids
-    let (network_configs, network_ids) = extract_network_configs_and_ids(node_config);
-
-    // Create the global peers and metadata
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+    // Gather all network configs
+    let network_configs = extract_network_configs(node_config);
 
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
@@ -212,7 +200,7 @@ pub fn setup_networks_and_get_interfaces(
                 consensus_network_handle = Some(register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
-                    consensus_network_configuration(),
+                    consensus_network_configuration(node_config),
                 ));
             }
         }
@@ -221,7 +209,7 @@ pub fn setup_networks_and_get_interfaces(
         let mempool_network_handle = register_client_and_service_with_network(
             &mut network_builder,
             network_id,
-            mempool_network_configuration(),
+            mempool_network_configuration(node_config),
         );
         mempool_network_handles.push(mempool_network_handle);
 
@@ -323,13 +311,13 @@ fn transform_network_handles_into_interfaces(
     let consensus_interfaces = consensus_network_handle.map(|consensus_network_handle| {
         create_network_interfaces(
             vec![consensus_network_handle],
-            consensus_network_configuration(),
+            consensus_network_configuration(node_config),
             peers_and_metadata.clone(),
         )
     });
     let mempool_interfaces = create_network_interfaces(
         mempool_network_handles,
-        mempool_network_configuration(),
+        mempool_network_configuration(node_config),
         peers_and_metadata.clone(),
     );
     let peer_monitoring_service_interfaces = create_network_interfaces(

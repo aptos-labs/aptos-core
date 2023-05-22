@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::state_store::StateStore;
 ///! This file contains utilities that are helpful for performing
 ///! database restore operations, as required by restore and
 ///! state sync v2.
 use crate::{
-    event_store::EventStore, ledger_store::LedgerStore,
+    event_store::EventStore, ledger_store::LedgerStore, new_sharded_kv_schema_batch,
     schema::transaction_accumulator::TransactionAccumulatorSchema,
-    transaction_store::TransactionStore,
+    transaction_store::TransactionStore, ShardedStateKvSchemaBatch,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -91,44 +92,63 @@ pub fn confirm_or_save_frozen_subtrees(
 
 /// Saves the given transactions to the db. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
-pub fn save_transactions(
-    db: Arc<DB>,
+pub(crate) fn save_transactions(
+    ledger_db: Arc<DB>,
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: Vec<WriteSet>,
-    existing_batch: Option<&mut SchemaBatch>,
+    existing_batch: Option<(&mut SchemaBatch, &mut ShardedStateKvSchemaBatch)>,
+    kv_replay: bool,
 ) -> Result<()> {
     if let Some(existing_batch) = existing_batch {
+        let batch = existing_batch.0;
+        let state_kv_batches = existing_batch.1;
         save_transactions_impl(
             ledger_store,
             transaction_store,
             event_store,
+            state_store,
             first_version,
             txns,
             txn_infos,
             events,
             write_sets.as_ref(),
-            existing_batch,
+            batch,
+            state_kv_batches,
+            kv_replay,
         )?;
     } else {
         let mut batch = SchemaBatch::new();
+        let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
         save_transactions_impl(
             ledger_store,
             transaction_store,
             event_store,
+            Arc::clone(&state_store),
             first_version,
             txns,
             txn_infos,
             events,
             write_sets.as_ref(),
             &mut batch,
+            &mut sharded_kv_schema_batch,
+            kv_replay,
         )?;
-        db.write_schemas(batch)?;
+        // get the last version and commit to the state kv db
+        // commit the state kv before ledger in case of failure happens
+        let last_version = first_version + txns.len() as u64 - 1;
+        state_store
+            .state_db
+            .state_kv_db
+            .commit(last_version, sharded_kv_schema_batch)?;
+
+        ledger_db.write_schemas(batch)?;
     }
 
     Ok(())
@@ -179,16 +199,19 @@ fn save_ledger_infos_impl(
 }
 
 /// A helper function that saves the transactions to the given change set
-pub fn save_transactions_impl(
+pub(crate) fn save_transactions_impl(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     event_store: Arc<EventStore>,
+    state_store: Arc<StateStore>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
     events: &[Vec<ContractEvent>],
     write_sets: &[WriteSet],
     batch: &mut SchemaBatch,
+    state_kv_batches: &mut ShardedStateKvSchemaBatch,
+    kv_replay: bool,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
         transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
@@ -198,6 +221,10 @@ pub fn save_transactions_impl(
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
         transaction_store.put_write_set(first_version + idx as Version, ws, batch)?;
+    }
+
+    if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
+        state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
     }
 
     Ok(())

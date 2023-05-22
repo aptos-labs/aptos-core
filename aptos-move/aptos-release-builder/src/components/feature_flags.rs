@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
+    #[serde(default)]
     pub enabled: Vec<FeatureFlag>,
+    #[serde(default)]
     pub disabled: Vec<FeatureFlag>,
 }
 
@@ -32,6 +34,10 @@ pub enum FeatureFlag {
     Bls12381Structures,
     Ed25519PubkeyValidateReturnFalseWrongLength,
     StructConstructors,
+    PeriodicalRewardRateReduction,
+    PartialGovernanceVoting,
+    SignatureCheckerV2,
+    StorageSlotMetadata,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -140,6 +146,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH
             },
             FeatureFlag::StructConstructors => AptosFeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::PeriodicalRewardRateReduction => {
+                AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE
+            },
+            FeatureFlag::PartialGovernanceVoting => AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING,
+            FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::StorageSlotMetadata => AptosFeatureFlag::STORAGE_SLOT_METADATA,
         }
     }
 }
@@ -173,6 +185,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::Ed25519PubkeyValidateReturnFalseWrongLength
             },
             AptosFeatureFlag::STRUCT_CONSTRUCTORS => FeatureFlag::StructConstructors,
+            AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE => {
+                FeatureFlag::PeriodicalRewardRateReduction
+            },
+            AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING => FeatureFlag::PartialGovernanceVoting,
+            AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
+            AptosFeatureFlag::STORAGE_SLOT_METADATA => FeatureFlag::StorageSlotMetadata,
         }
     }
 }

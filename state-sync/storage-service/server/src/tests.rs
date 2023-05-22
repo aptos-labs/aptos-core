@@ -5,28 +5,38 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    get_peers_with_ready_subscriptions, metrics, network::StorageServiceNetworkEvents,
-    remove_expired_data_subscriptions, DataSubscriptionRequest, ResponseSender, StorageReader,
+    metrics,
+    moderator::{RequestModerator, UnhealthyPeerState},
+    network::{ResponseSender, StorageServiceNetworkEvents},
+    storage::StorageReader,
+    subscription::{
+        get_peers_with_ready_subscriptions, remove_expired_data_subscriptions,
+        DataSubscriptionRequest,
+    },
     StorageServiceServer,
 };
 use anyhow::{format_err, Result};
 use aptos_bitvec::BitVec;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::StorageServiceConfig,
+    config::{PeerRole, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
+use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
-    application::interface::NetworkServiceEvents,
+    application::{
+        interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
+    },
     peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
         rpc::InboundRpcRequest,
-        wire::handshake::v1::ProtocolId,
+        wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     },
+    transport::{ConnectionId, ConnectionMetadata},
 };
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
 use aptos_storage_service_types::{
@@ -53,6 +63,7 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    network_address::NetworkAddress,
     on_chain_config::ValidatorSet,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
@@ -82,11 +93,12 @@ use mockall::{
     Sequence,
 };
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 /// Various test constants for storage
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
+const MAX_WAIT_TIME_SECS: u64 = 60;
 const PROTOCOL_VERSION: u64 = 1;
 
 #[tokio::test]
@@ -125,13 +137,20 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Create test data with an empty storage server summary
     let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
-    let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let request_moderator = Arc::new(RequestModerator::new(
+        cached_storage_server_summary.clone(),
+        create_peers_and_metadata(vec![]),
+        StorageServiceConfig::default(),
+        time_service.clone(),
+    ));
 
     // Verify that there are no peers with ready subscriptions
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
-        lru_storage_cache.clone(),
+        lru_response_cache.clone(),
+        request_moderator.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -140,6 +159,9 @@ async fn test_peers_with_ready_subscriptions() {
 
     // Update the storage server summary so that there is new data for subscription 1
     let mut storage_server_summary = StorageServerSummary::default();
+    storage_server_summary
+        .data_summary
+        .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 1).unwrap());
     let synced_ledger_info = create_test_ledger_info_with_sigs(1, 2);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info.clone());
     *cached_storage_server_summary.write() = storage_server_summary;
@@ -148,7 +170,8 @@ async fn test_peers_with_ready_subscriptions() {
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary.clone(),
         data_subscriptions.clone(),
-        lru_storage_cache.clone(),
+        lru_response_cache.clone(),
+        request_moderator.clone(),
         storage_reader.clone(),
         time_service.clone(),
     )
@@ -164,6 +187,9 @@ async fn test_peers_with_ready_subscriptions() {
     // Update the storage server summary so that there is new data for subscription 2,
     // but the subscription is invalid because it doesn't respect an epoch boundary.
     let mut storage_server_summary = StorageServerSummary::default();
+    storage_server_summary
+        .data_summary
+        .epoch_ending_ledger_infos = Some(CompleteDataRange::new(0, 2).unwrap());
     let synced_ledger_info = create_test_ledger_info_with_sigs(2, 100);
     storage_server_summary.data_summary.synced_ledger_info = Some(synced_ledger_info);
     *cached_storage_server_summary.write() = storage_server_summary;
@@ -172,7 +198,8 @@ async fn test_peers_with_ready_subscriptions() {
     let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
         cached_storage_server_summary,
         data_subscriptions,
-        lru_storage_cache,
+        lru_response_cache,
+        request_moderator,
         storage_reader,
         time_service,
     )
@@ -293,7 +320,8 @@ async fn test_cachable_requests_compression() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
     // Repeatedly fetch the data and verify the responses
@@ -362,7 +390,8 @@ async fn test_cachable_requests_eviction() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version + 10, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch a state chunk. This should cache and serve the response.
@@ -419,7 +448,8 @@ async fn test_cachable_requests_data_versions() {
     }
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, end_version, 10);
     tokio::spawn(service.start());
 
     // Repeatedly fetch the data and verify the responses
@@ -458,7 +488,7 @@ async fn test_cachable_requests_data_versions() {
 #[tokio::test]
 async fn test_get_server_protocol_version() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version
@@ -505,7 +535,8 @@ async fn test_get_states_with_proof() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch a states chunk with a proof
@@ -551,7 +582,8 @@ async fn test_get_states_with_proof_chunk_limit() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch a states chunk with a proof
@@ -582,9 +614,35 @@ async fn test_get_states_with_proof_network_limit() {
 }
 
 #[tokio::test]
+async fn test_get_states_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_state_chunk_size = StorageServiceConfig::default().max_state_chunk_size;
+    for chunk_size in [1, 100, max_state_chunk_size] {
+        // Create test data
+        let version = 101;
+        let start_index = 100;
+        let end_index = start_index + chunk_size - 1;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Process a request to fetch a states chunk with a proof
+        let response =
+            get_state_values_with_proof(&mut mock_client, version, start_index, end_index, false)
+                .await
+                .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
+}
+
+#[tokio::test]
 async fn test_get_states_with_proof_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -632,7 +690,7 @@ async fn test_get_new_transactions() {
             );
 
             // Create the storage client and server
-            let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+            let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
             tokio::spawn(service.start());
 
             // Send a request to subscribe to new transactions
@@ -708,7 +766,7 @@ async fn test_get_new_transactions_epoch_change() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
         tokio::spawn(service.start());
 
         // Send a request to subscribe to new transactions
@@ -783,7 +841,7 @@ async fn test_get_new_transactions_different_networks() {
             );
 
             // Create the storage client and server
-            let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+            let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
             tokio::spawn(service.start());
 
             // Send a request to subscribe to new transactions for peer 1
@@ -867,7 +925,7 @@ async fn test_get_new_transactions_max_chunk() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
         tokio::spawn(service.start());
 
         // Send a request to subscribe to new transactions
@@ -919,7 +977,7 @@ async fn test_get_new_transaction_outputs() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
         tokio::spawn(service.start());
 
         // Send a request to subscribe to new transaction outputs
@@ -979,7 +1037,7 @@ async fn test_get_new_transaction_outputs_different_networks() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
         tokio::spawn(service.start());
 
         // Send a request to subscribe to new transaction outputs for peer 1
@@ -1067,7 +1125,7 @@ async fn test_get_new_transaction_outputs_epoch_change() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
     tokio::spawn(service.start());
 
     // Send a request to subscribe to new transaction outputs
@@ -1115,7 +1173,7 @@ async fn test_get_new_transaction_outputs_max_chunk() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
     tokio::spawn(service.start());
 
     // Send a request to subscribe to new transaction outputs
@@ -1185,7 +1243,7 @@ async fn test_get_new_transactions_or_outputs() {
                 &output_list_with_proof,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, mock_time) =
+            let (mut mock_client, service, mock_time, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
             tokio::spawn(service.start());
 
@@ -1297,7 +1355,7 @@ async fn test_get_new_transactions_or_outputs_different_network() {
                 &output_list_with_proof_1,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, mock_time) =
+            let (mut mock_client, service, mock_time, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
             tokio::spawn(service.start());
 
@@ -1438,7 +1496,7 @@ async fn test_get_new_transactions_or_outputs_epoch_change() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, mock_time) =
+        let (mut mock_client, service, mock_time, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         tokio::spawn(service.start());
 
@@ -1532,7 +1590,7 @@ async fn test_get_new_transactions_or_outputs_max_chunk() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, mock_time) =
+        let (mut mock_client, service, mock_time, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         tokio::spawn(service.start());
 
@@ -1587,7 +1645,8 @@ async fn test_get_number_of_states_at_version() {
         .returning(move |_| Ok(number_of_states as usize));
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
@@ -1604,6 +1663,25 @@ async fn test_get_number_of_states_at_version() {
 }
 
 #[tokio::test]
+async fn test_get_number_of_states_at_version_not_serviceable() {
+    // Create test data
+    let version = 101;
+
+    // Create the storage client and server (that cannot service the request)
+    let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+    update_storage_server_summary(&mut service, version - 1, 10);
+    tokio::spawn(service.start());
+
+    // Process a request to fetch the number of states at a version
+    let response = get_number_of_states(&mut mock_client, version, false)
+        .await
+        .unwrap_err();
+
+    // Verify the request is not serviceable
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+}
+
+#[tokio::test]
 async fn test_get_number_of_states_at_version_invalid() {
     // Create test data
     let version = 1;
@@ -1617,7 +1695,8 @@ async fn test_get_number_of_states_at_version_invalid() {
         .returning(move |_| Err(format_err!("Version does not exist!")));
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, version, 10);
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
@@ -1662,7 +1741,7 @@ async fn test_get_storage_server_summary() {
         .returning(move || Ok(true));
 
     // Create the storage client and server
-    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, service, mock_time, _) = MockClient::new(Some(db_reader), None);
     tokio::spawn(service.start());
 
     // Fetch the storage summary and verify we get a default summary response
@@ -1683,6 +1762,7 @@ async fn test_get_storage_server_summary() {
     let response = get_storage_server_summary(&mut mock_client, true)
         .await
         .unwrap();
+
     // Verify the response is correct (after the cache update)
     let default_storage_config = StorageServiceConfig::default();
     let expected_server_summary = StorageServerSummary {
@@ -1749,7 +1829,8 @@ async fn test_get_transactions_with_proof() {
             );
 
             // Create the storage client and server
-            let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+            let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+            update_storage_server_summary(&mut service, proof_version, 10);
             tokio::spawn(service.start());
 
             // Create a request to fetch transactions with a proof
@@ -1804,7 +1885,8 @@ async fn test_get_transactions_with_chunk_limit() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions with a proof
@@ -1830,6 +1912,41 @@ async fn test_get_transactions_with_chunk_limit() {
 }
 
 #[tokio::test]
+async fn test_get_transactions_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+    for chunk_size in [2, 100, max_transaction_chunk_size] {
+        // Test event inclusion
+        for include_events in [true, false] {
+            // Create test data
+            let start_version = 0;
+            let end_version = start_version + chunk_size - 1;
+            let proof_version = end_version;
+
+            // Create the storage client and server (that cannot service the request)
+            let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+            update_storage_server_summary(&mut service, proof_version - 1, 10);
+            tokio::spawn(service.start());
+
+            // Create a request to fetch transactions with a proof
+            let response = get_transactions_with_proof(
+                &mut mock_client,
+                start_version,
+                end_version,
+                proof_version,
+                include_events,
+                true,
+            )
+            .await
+            .unwrap_err();
+
+            // Verify the request is not serviceable
+            assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        }
+    }
+}
+
+#[tokio::test]
 async fn test_get_transactions_with_proof_network_limit() {
     // Test different byte limits
     for network_limit_bytes in [1, 1024, 10 * 1024, 100 * 1024] {
@@ -1840,7 +1957,7 @@ async fn test_get_transactions_with_proof_network_limit() {
 #[tokio::test]
 async fn test_get_transactions_with_proof_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -1883,7 +2000,8 @@ async fn test_get_transaction_outputs_with_proof() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, proof_version + 100, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions outputs with a proof
@@ -1932,7 +2050,8 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
     tokio::spawn(service.start());
 
     // Create a request to fetch transactions outputs with a proof
@@ -1959,6 +2078,37 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
 }
 
 #[tokio::test]
+async fn test_get_transaction_outputs_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [2, 100, max_output_chunk_size] {
+        // Create test data
+        let start_version = 0;
+        let end_version = start_version + chunk_size - 1;
+        let proof_version = end_version;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, proof_version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch transactions outputs with a proof
+        let response = get_outputs_with_proof(
+            &mut mock_client,
+            start_version,
+            end_version,
+            end_version,
+            true,
+        )
+        .await
+        .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
+}
+
+#[tokio::test]
 async fn test_get_transaction_outputs_with_proof_network_limit() {
     // Test different byte limits
     for network_limit_bytes in [1, 5 * 1024, 50 * 1024, 100 * 1024] {
@@ -1969,7 +2119,7 @@ async fn test_get_transaction_outputs_with_proof_network_limit() {
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -2037,8 +2187,9 @@ async fn test_get_transactions_or_outputs_with_proof() {
                 &output_list_with_proof,
                 &transaction_list_with_proof,
             );
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 100, 10);
             tokio::spawn(service.start());
 
             // Create a request to fetch transactions or outputs with a proof
@@ -2066,6 +2217,39 @@ async fn test_get_transactions_or_outputs_with_proof() {
 }
 
 #[tokio::test]
+async fn test_get_transactions_or_outputs_with_proof_not_serviceable() {
+    // Test small and large chunk requests
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    for chunk_size in [2, 100, max_output_chunk_size] {
+        // Create test data
+        let start_version = 0;
+        let end_version = start_version + chunk_size - 1;
+        let proof_version = end_version;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, proof_version - 1, 10);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch transactions or outputs with a proof
+        let response = get_transactions_or_outputs_with_proof(
+            &mut mock_client,
+            start_version,
+            end_version,
+            end_version,
+            false,
+            5,
+            true,
+        )
+        .await
+        .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
+}
+
+#[tokio::test]
 async fn test_get_transactions_or_outputs_with_proof_network_limit() {
     // Test different byte limits
     for network_limit_bytes in [1, 2 * 1024, 10 * 1024, 30 * 1024] {
@@ -2076,7 +2260,7 @@ async fn test_get_transactions_or_outputs_with_proof_network_limit() {
 #[tokio::test]
 async fn test_get_transactions_or_outputs_with_proof_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -2140,7 +2324,9 @@ async fn test_get_transactions_or_outputs_with_proof_chunk_limit() {
             &output_list_with_proof,
             &transaction_list_with_proof,
         );
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions outputs with a proof
@@ -2192,7 +2378,8 @@ async fn test_get_epoch_ending_ledger_infos() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());
 
         // Create a request to fetch epoch ending ledger infos
@@ -2236,16 +2423,18 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
         epoch_change_proof.clone(),
     );
 
-    // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(Some(db_reader), None);
-    tokio::spawn(service.start());
-
     // Create a request to fetch epoch ending ledger infos
+    let expected_end_epoch = start_epoch + chunk_size - 1;
     let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
         start_epoch,
-        expected_end_epoch: start_epoch + chunk_size - 1,
+        expected_end_epoch,
     });
     let storage_request = StorageServiceRequest::new(data_request, true);
+
+    // Create the storage client and server
+    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    update_storage_server_summary(&mut service, 1000, expected_end_epoch);
+    tokio::spawn(service.start());
 
     // Process the request
     let response = mock_client.process_request(storage_request).await.unwrap();
@@ -2260,6 +2449,38 @@ async fn test_get_epoch_ending_ledger_infos_chunk_limit() {
 }
 
 #[tokio::test]
+async fn test_get_epoch_ending_ledger_infos_not_serviceable() {
+    // Test small and large chunk requests
+    let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
+    for chunk_size in [1, 100, max_epoch_chunk_size] {
+        // Create test data
+        let start_epoch = 11;
+        let expected_end_epoch = start_epoch + chunk_size - 1;
+
+        // Create the storage client and server (that cannot service the request)
+        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch - 1);
+        tokio::spawn(service.start());
+
+        // Create a request to fetch epoch ending ledger infos
+        let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch,
+            expected_end_epoch,
+        });
+        let storage_request = StorageServiceRequest::new(data_request, true);
+
+        // Process the request
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
+
+        // Verify the request is not serviceable
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
+}
+
+#[tokio::test]
 async fn test_get_epoch_ending_ledger_infos_network_limit() {
     // Test different byte limits
     for network_limit_bytes in [1, 10 * 1024, 50 * 1024, 100 * 1024, 1024 * 1024] {
@@ -2270,7 +2491,7 @@ async fn test_get_epoch_ending_ledger_infos_network_limit() {
 #[tokio::test]
 async fn test_get_epoch_ending_ledger_infos_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -2291,6 +2512,335 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
     }
 }
 
+#[tokio::test]
+async fn test_request_moderator_ignore_pfn() {
+    // Create test data
+    let highest_synced_version = 100;
+    let highest_synced_epoch = 10;
+
+    // Create a storage service config for testing
+    let max_invalid_requests_per_peer = 5;
+    let storage_service_config = StorageServiceConfig {
+        max_invalid_requests_per_peer,
+        ..Default::default()
+    };
+
+    // Create the storage client and server
+    let (mut mock_client, mut service, _, _) = MockClient::new(None, Some(storage_service_config));
+    update_storage_server_summary(&mut service, highest_synced_version, highest_synced_epoch);
+
+    // Get the request moderator and verify the initial state
+    let request_moderator = service.get_request_moderator();
+    let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
+    assert!(unhealthy_peer_states.read().is_empty());
+
+    // Spawn the server
+    tokio::spawn(service.start());
+
+    // Process several invalid PFN requests
+    let pfn_peer_network_id = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+    for _ in 0..max_invalid_requests_per_peer {
+        // Send the invalid request
+        let response = send_invalid_transaction_request(
+            highest_synced_version,
+            &mut mock_client,
+            pfn_peer_network_id,
+        )
+        .await;
+
+        // Verify we get an invalid request error
+        assert_matches!(
+            response.unwrap_err(),
+            StorageServiceError::InvalidRequest(_)
+        );
+    }
+
+    // Send another request and verify the PFN is now ignored
+    let response = send_invalid_transaction_request(
+        highest_synced_version,
+        &mut mock_client,
+        pfn_peer_network_id,
+    )
+    .await;
+    assert_matches!(
+        response.unwrap_err(),
+        StorageServiceError::TooManyInvalidRequests(_)
+    );
+
+    // Process many invalid requests from a VFN and verify it is never ignored
+    let vfn_peer_network_id = PeerNetworkId::new(NetworkId::Vfn, PeerId::random());
+    for _ in 0..max_invalid_requests_per_peer * 2 {
+        // Send the invalid request
+        let response = send_invalid_transaction_request(
+            highest_synced_version,
+            &mut mock_client,
+            vfn_peer_network_id,
+        )
+        .await;
+
+        // Verify we get an invalid request error
+        assert_matches!(
+            response.unwrap_err(),
+            StorageServiceError::InvalidRequest(_)
+        );
+    }
+
+    // Verify the unhealthy peer states
+    assert_eq!(unhealthy_peer_states.read().len(), 2);
+
+    // Verify the unhealthy peer state for the PFN
+    let unhealthy_pfn_state = unhealthy_peer_states
+        .read()
+        .get(&pfn_peer_network_id)
+        .cloned()
+        .unwrap();
+    assert!(unhealthy_pfn_state.is_ignored());
+
+    // Verify the unhealthy peer state for the VFN
+    let unhealthy_vfn_state = unhealthy_peer_states
+        .read()
+        .get(&vfn_peer_network_id)
+        .cloned()
+        .unwrap();
+    assert!(!unhealthy_vfn_state.is_ignored());
+}
+
+#[tokio::test]
+async fn test_request_moderator_ignore_increase_time() {
+    // Create test data
+    let highest_synced_version = 500;
+    let highest_synced_epoch = 3;
+
+    // Create a storage service config for testing
+    let max_invalid_requests_per_peer = 3;
+    let min_time_to_ignore_peers_secs = 10;
+    let storage_service_config = StorageServiceConfig {
+        max_invalid_requests_per_peer,
+        min_time_to_ignore_peers_secs,
+        ..Default::default()
+    };
+
+    // Create the storage client and server
+    let (mut mock_client, mut service, time_service, peers_and_metadata) =
+        MockClient::new(None, Some(storage_service_config));
+    update_storage_server_summary(&mut service, highest_synced_version, highest_synced_epoch);
+
+    // Get the request moderator and unhealthy peer states
+    let request_moderator = service.get_request_moderator();
+    let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
+
+    // Create and connect a new peer
+    let peer_network_id = PeerNetworkId::new(NetworkId::Public, PeerId::random());
+    peers_and_metadata
+        .insert_connection_metadata(
+            peer_network_id,
+            create_connection_metadata(peer_network_id.peer_id(), 0),
+        )
+        .unwrap();
+
+    // Spawn the server
+    tokio::spawn(service.start());
+
+    // Go through several iterations of ignoring and refreshing a bad peer
+    for i in 0..10 {
+        // Process enough invalid requests to ignore the peer
+        for _ in 0..max_invalid_requests_per_peer {
+            // Send the invalid request
+            let response = send_invalid_transaction_request(
+                highest_synced_version,
+                &mut mock_client,
+                peer_network_id,
+            )
+            .await;
+
+            // Verify we get an invalid request error
+            assert_matches!(
+                response.unwrap_err(),
+                StorageServiceError::InvalidRequest(_)
+            );
+        }
+
+        // Send the invalid request
+        let response = send_invalid_transaction_request(
+            highest_synced_version,
+            &mut mock_client,
+            peer_network_id,
+        )
+        .await;
+
+        // Verify we get an error for too many invalid requests
+        assert_matches!(
+            response.unwrap_err(),
+            StorageServiceError::TooManyInvalidRequests(_)
+        );
+
+        // Verify the peer is now ignored
+        let unhealthy_peer_state = unhealthy_peer_states
+            .read()
+            .get(&peer_network_id)
+            .cloned()
+            .unwrap();
+        assert!(unhealthy_peer_state.is_ignored());
+
+        // Wait until the peer is no longer ignored
+        wait_for_request_moderator_to_unblock_peer(
+            unhealthy_peer_states.clone(),
+            &time_service,
+            &peer_network_id,
+            min_time_to_ignore_peers_secs * 2_i32.pow(i) as u64,
+        )
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn test_request_moderator_peer_garbage_collect() {
+    // Create test data
+    let highest_synced_version = 500;
+    let highest_synced_epoch = 3;
+
+    // Create a storage service config for testing
+    let max_invalid_requests_per_peer = 3;
+    let storage_service_config = StorageServiceConfig {
+        max_invalid_requests_per_peer,
+        ..Default::default()
+    };
+
+    // Create the storage client and server
+    let (mut mock_client, mut service, time_service, peers_and_metadata) =
+        MockClient::new(None, Some(storage_service_config));
+    update_storage_server_summary(&mut service, highest_synced_version, highest_synced_epoch);
+
+    // Get the request moderator and unhealthy peer states
+    let request_moderator = service.get_request_moderator();
+    let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
+
+    // Connect multiple peers
+    let peer_network_ids = vec![
+        PeerNetworkId::new(NetworkId::Validator, PeerId::random()),
+        PeerNetworkId::new(NetworkId::Vfn, PeerId::random()),
+        PeerNetworkId::new(NetworkId::Public, PeerId::random()),
+    ];
+    for (index, peer_network_id) in peer_network_ids.iter().enumerate() {
+        peers_and_metadata
+            .insert_connection_metadata(
+                *peer_network_id,
+                create_connection_metadata(peer_network_id.peer_id(), index as u32),
+            )
+            .unwrap();
+    }
+
+    // Spawn the server
+    tokio::spawn(service.start());
+
+    // Send an invalid request from the first two peers
+    for peer_network_id in peer_network_ids.iter().take(2) {
+        // Send the invalid request
+        send_invalid_transaction_request(
+            highest_synced_version,
+            &mut mock_client,
+            *peer_network_id,
+        )
+        .await
+        .unwrap_err();
+
+        // Verify the peer is now tracked as unhealthy
+        assert!(unhealthy_peer_states.read().contains_key(peer_network_id));
+    }
+
+    // Verify that only the first two peers are being tracked
+    assert_eq!(unhealthy_peer_states.read().len(), 2);
+
+    // Disconnect the first peer
+    peers_and_metadata
+        .update_connection_state(peer_network_ids[0], ConnectionState::Disconnecting)
+        .unwrap();
+
+    // Elapse enough time for the peer monitor loop to garbage collect the peer
+    wait_for_request_moderator_to_garbage_collect(
+        unhealthy_peer_states.clone(),
+        &time_service,
+        &peer_network_ids[0],
+    )
+    .await;
+
+    // Verify that only the second peer is being tracked
+    assert_eq!(unhealthy_peer_states.read().len(), 1);
+
+    // Disconnect the second peer
+    peers_and_metadata
+        .remove_peer_metadata(peer_network_ids[1], ConnectionId::from(1))
+        .unwrap();
+
+    // Elapse enough time for the peer monitor loop to garbage collect the peer
+    wait_for_request_moderator_to_garbage_collect(
+        unhealthy_peer_states.clone(),
+        &time_service,
+        &peer_network_ids[1],
+    )
+    .await;
+
+    // Verify that no peer is being tracked
+    assert!(unhealthy_peer_states.read().is_empty());
+
+    // Reconnect the first peer
+    peers_and_metadata
+        .update_connection_state(peer_network_ids[0], ConnectionState::Connected)
+        .unwrap();
+
+    // Send an invalid request from the first peer
+    send_invalid_transaction_request(
+        highest_synced_version,
+        &mut mock_client,
+        peer_network_ids[0],
+    )
+    .await
+    .unwrap_err();
+
+    // Verify the peer is now tracked as unhealthy
+    assert!(unhealthy_peer_states
+        .read()
+        .contains_key(&peer_network_ids[0]));
+
+    // Process enough invalid requests to ignore the third peer
+    for _ in 0..max_invalid_requests_per_peer {
+        send_invalid_transaction_request(
+            highest_synced_version,
+            &mut mock_client,
+            peer_network_ids[2],
+        )
+        .await
+        .unwrap_err();
+    }
+
+    // Verify the third peer is now tracked and blocked
+    assert_eq!(unhealthy_peer_states.read().len(), 2);
+    assert!(unhealthy_peer_states
+        .read()
+        .get(&peer_network_ids[2])
+        .unwrap()
+        .is_ignored());
+
+    // Disconnect the third peer
+    peers_and_metadata
+        .remove_peer_metadata(peer_network_ids[2], ConnectionId::from(2))
+        .unwrap();
+
+    // Elapse enough time for the peer monitor loop to garbage collect the peer
+    wait_for_request_moderator_to_garbage_collect(
+        unhealthy_peer_states.clone(),
+        &time_service,
+        &peer_network_ids[2],
+    )
+    .await;
+
+    // Verify that the peer is no longer being tracked
+    assert!(!unhealthy_peer_states
+        .read()
+        .contains_key(&peer_network_ids[2]));
+    assert_eq!(unhealthy_peer_states.read().len(), 1);
+}
+
 /// A wrapper around the inbound network interface/channel for easily sending
 /// mock client requests to a [`StorageServiceServer`].
 struct MockClient {
@@ -2302,7 +2852,12 @@ impl MockClient {
     fn new(
         db_reader: Option<MockDatabaseReader>,
         storage_config: Option<StorageServiceConfig>,
-    ) -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
+    ) -> (
+        Self,
+        StorageServiceServer<StorageReader>,
+        MockTimeService,
+        Arc<PeersAndMetadata>,
+    ) {
         initialize_logger();
 
         // Create the storage reader
@@ -2316,7 +2871,7 @@ impl MockClient {
         let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
         let mut network_and_events = HashMap::new();
         let mut peer_manager_notifiers = HashMap::new();
-        for network_id in network_ids {
+        for network_id in network_ids.clone() {
             let queue_cfg =
                 aptos_channel::Config::new(storage_config.max_network_channel_size as usize)
                     .queue_style(QueueStyle::FIFO)
@@ -2335,13 +2890,15 @@ impl MockClient {
             StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
 
         // Create the storage service
+        let peers_and_metadata = create_peers_and_metadata(network_ids);
         let executor = tokio::runtime::Handle::current();
         let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
-            StorageServiceConfig::default(),
+            storage_config,
             executor,
             storage_reader,
             mock_time_service.clone(),
+            peers_and_metadata.clone(),
             storage_service_network_events,
         );
 
@@ -2349,7 +2906,12 @@ impl MockClient {
         let mock_client = Self {
             peer_manager_notifiers,
         };
-        (mock_client, storage_server, mock_time_service.into_mock())
+        (
+            mock_client,
+            storage_server,
+            mock_time_service.into_mock(),
+            peers_and_metadata,
+        )
     }
 
     /// Send the given storage request and wait for a response
@@ -2415,6 +2977,11 @@ impl MockClient {
     }
 }
 
+/// Creates a peers and metadata struct for test purposes
+fn create_peers_and_metadata(network_ids: Vec<NetworkId>) -> Arc<PeersAndMetadata> {
+    PeersAndMetadata::new(&network_ids)
+}
+
 /// A helper method to request a states with proof chunk using the
 /// the specified network limit.
 async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
@@ -2423,6 +2990,7 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
         let min_bytes_per_ledger_info = 5000;
         let start_epoch = 98754;
+        let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
 
         // Create the mock db reader
         let mut db_reader = create_mock_db_reader();
@@ -2451,13 +3019,15 @@ async fn get_epoch_ending_ledger_infos_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, 1000, expected_end_epoch);
         tokio::spawn(service.start());
 
         // Process a request to fetch epoch ending ledger infos
         let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
             start_epoch,
-            expected_end_epoch: start_epoch + max_epoch_chunk_size - 1,
+            expected_end_epoch,
         });
         let storage_request = StorageServiceRequest::new(data_request, use_compression);
         let response = mock_client.process_request(storage_request).await.unwrap();
@@ -2523,7 +3093,9 @@ async fn get_states_with_proof_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch a states chunk with a proof
@@ -2588,7 +3160,9 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, service, _) = MockClient::new(Some(db_reader), Some(storage_config));
+        let (mut mock_client, mut service, _, _) =
+            MockClient::new(Some(db_reader), Some(storage_config));
+        update_storage_server_summary(&mut service, proof_version, 10);
         tokio::spawn(service.start());
 
         // Process a request to fetch outputs with a proof
@@ -2663,8 +3237,9 @@ async fn get_transactions_with_proof_network_limit(network_limit_bytes: u64) {
             };
 
             // Create the storage client and server
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 1, 10);
             tokio::spawn(service.start());
 
             // Process a request to fetch transactions with a proof
@@ -2754,8 +3329,9 @@ async fn get_transactions_or_outputs_with_proof_network_limit(network_limit_byte
                 max_network_chunk_bytes: network_limit_bytes,
                 ..Default::default()
             };
-            let (mut mock_client, service, _) =
+            let (mut mock_client, mut service, _, _) =
                 MockClient::new(Some(db_reader), Some(storage_config));
+            update_storage_server_summary(&mut service, proof_version + 100, 10);
             tokio::spawn(service.start());
 
             // Process a request to fetch transactions or outputs with a proof
@@ -2839,6 +3415,88 @@ async fn wait_for_subscription_service_to_refresh(
 
     // Elapse enough time to force the subscription thread to work
     advance_storage_refresh_time(mock_time).await;
+}
+
+/// Waits for the request moderator to garbage collect the peer state
+async fn wait_for_request_moderator_to_garbage_collect(
+    unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
+    mock_time: &MockTimeService,
+    peer_network_id: &PeerNetworkId,
+) {
+    // Wait for the request moderator to garbage collect the peer state
+    let garbage_collect = async move {
+        loop {
+            // Elapse enough time to force the moderator to refresh peer states
+            advance_moderator_refresh_time(mock_time).await;
+
+            // Check if the peer is still being tracked
+            if !unhealthy_peer_states.read().contains_key(peer_network_id) {
+                return; // The peer has been garbage collected
+            }
+
+            // Wait before retrying
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        garbage_collect,
+        "Timed-out while waiting for the request moderator to perform garbage collection",
+    )
+    .await;
+}
+
+/// Waits for the request moderator to refresh the peer state
+/// and stop ignoring the specified peer.
+async fn wait_for_request_moderator_to_unblock_peer(
+    unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
+    mock_time: &MockTimeService,
+    peer_network_id: &PeerNetworkId,
+    min_time_to_ignore_peers_secs: u64,
+) {
+    // Wait for the request moderator to stop ignoring the specified peer
+    let unblock_peer = async move {
+        loop {
+            // Elapse enough time to allow the peer to be unblocked
+            mock_time
+                .advance_secs_async(min_time_to_ignore_peers_secs)
+                .await;
+
+            // Elapse enough time to force the moderator to refresh peer states
+            advance_moderator_refresh_time(mock_time).await;
+
+            // Check if the peer is still being ignored
+            let unhealthy_peer_state = unhealthy_peer_states
+                .read()
+                .get(peer_network_id)
+                .cloned()
+                .unwrap();
+            if !unhealthy_peer_state.is_ignored() {
+                return; // The peer is no longer being ignored
+            }
+
+            // Wait before retrying
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    };
+
+    // Spawn the task with a timeout
+    spawn_with_timeout(
+        unblock_peer,
+        "Timed-out while waiting for the request moderator to unblock the peer",
+    )
+    .await;
+}
+
+/// Advances the given timer by the amount of time it takes to refresh the moderator
+async fn advance_moderator_refresh_time(mock_time: &MockTimeService) {
+    let default_storage_config = StorageServiceConfig::default();
+    let moderator_refresh_interval_ms =
+        default_storage_config.request_moderator_refresh_interval_ms;
+    mock_time
+        .advance_ms_async(moderator_refresh_interval_ms)
+        .await;
 }
 
 /// Advances the given timer by the amount of time it takes to refresh storage
@@ -3067,6 +3725,34 @@ async fn get_new_transactions_or_outputs_with_proof_for_peer(
         .await
 }
 
+/// Sends a request to get a transaction list with proof at an invalid version
+async fn send_invalid_transaction_request(
+    highest_synced_version: u64,
+    mock_client: &mut MockClient,
+    peer_network_id: PeerNetworkId,
+) -> Result<StorageServiceResponse, StorageServiceError> {
+    // Create a data request for the missing transaction data
+    let request = StorageServiceRequest::new(
+        DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            proof_version: highest_synced_version + 1,
+            start_version: highest_synced_version + 1,
+            end_version: highest_synced_version + 2,
+            include_events: false,
+        }),
+        true,
+    );
+
+    // Send the request and get the response
+    let receiver = mock_client
+        .send_request(
+            request,
+            Some(peer_network_id.peer_id()),
+            Some(peer_network_id.network_id()),
+        )
+        .await;
+    mock_client.wait_for_response(receiver).await
+}
+
 /// Extracts the peer and network ids from an optional peer network id
 fn extract_peer_and_network_id(
     peer_network_id: Option<PeerNetworkId>,
@@ -3226,6 +3912,19 @@ fn configure_network_chunk_limit(
         max_network_chunk_bytes,
         ..Default::default()
     }
+}
+
+/// A simple utility function to create a new connection metadata for tests
+fn create_connection_metadata(peer_id: AccountAddress, connection_id: u32) -> ConnectionMetadata {
+    ConnectionMetadata::new(
+        peer_id,
+        ConnectionId::from(connection_id),
+        NetworkAddress::from_str("/ip4/127.0.0.1/tcp/8081").unwrap(),
+        ConnectionOrigin::Inbound,
+        MessagingProtocolVersion::V1,
+        ProtocolIdSet::empty(),
+        PeerRole::Unknown,
+    )
 }
 
 /// Creates a test epoch ending ledger info
@@ -3627,6 +4326,36 @@ pub fn initialize_logger() {
         .build();
 }
 
+/// Updates the storage server summary with the specified data
+fn update_storage_server_summary(
+    storage_server: &mut StorageServiceServer<StorageReader>,
+    highest_synced_version: u64,
+    highest_synced_epoch: Epoch,
+) {
+    // Create a storage server summary
+    let mut storage_server_summary = StorageServerSummary::default();
+
+    // Set the highest synced ledger info
+    let mut data_summary = &mut storage_server_summary.data_summary;
+    data_summary.synced_ledger_info = Some(create_epoch_ending_ledger_info(
+        highest_synced_epoch,
+        highest_synced_version,
+    ));
+
+    // Set the epoch ending ledger info range
+    let data_range = CompleteDataRange::new(0, highest_synced_epoch).unwrap();
+    data_summary.epoch_ending_ledger_infos = Some(data_range);
+
+    // Set the transaction and state ranges
+    let data_range = CompleteDataRange::new(0, highest_synced_version).unwrap();
+    data_summary.states = Some(data_range);
+    data_summary.transactions = Some(data_range);
+    data_summary.transaction_outputs = Some(data_range);
+
+    // Update the storage server summary
+    *storage_server.cached_storage_server_summary.write() = storage_server_summary;
+}
+
 /// Returns a random network ID
 fn get_random_network_id() -> NetworkId {
     let mut rng = OsRng;
@@ -3637,6 +4366,14 @@ fn get_random_network_id() -> NetworkId {
         2 => NetworkId::Public,
         num => panic!("This shouldn't be possible! Got num: {:?}", num),
     }
+}
+
+/// Spawns the given task with a timeout
+pub async fn spawn_with_timeout(task: impl Future<Output = ()>, timeout_error_message: &str) {
+    let timeout_duration = Duration::from_secs(MAX_WAIT_TIME_SECS);
+    timeout(timeout_duration, task)
+        .await
+        .expect(timeout_error_message)
 }
 
 /// Creates a mock database reader
