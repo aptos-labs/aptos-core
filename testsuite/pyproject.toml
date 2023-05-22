@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "aptos_forge_cli"
+name = "aptos_testsuite"
 version = "0.1.0"
-description = "CLI for the Forge E2E testing environment"
+description = "Aptos E2E tests, including Forge"
 authors = []
 readme = "README.md"
 
@@ -16,3 +16,6 @@ black = "^23.3.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+reportUndefinedVariable = "none"

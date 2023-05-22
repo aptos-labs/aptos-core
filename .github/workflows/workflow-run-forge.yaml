@@ -109,8 +109,12 @@ jobs:
 
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
 
-      - name: Install python deps
-        run: pip3 install click==8.1.3 psutil==5.9.1
+      - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
+        with:
+          version: 1.2.2
+      - run: poetry install
+        shell: bash
+        working-directory: testsuite
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
@@ -148,7 +152,8 @@ jobs:
         shell: bash
         env:
           FORGE_RUNNER_MODE: pre-forge
-        run: testsuite/run_forge.sh
+        run: poetry run python3 forge.py test
+        working-directory: testsuite
 
       - name: Post pre-Forge comment
         if: env.COMMENT_ON_PR == 'true' && github.event.number != null
@@ -160,8 +165,9 @@ jobs:
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
+        run: ./testrun forge.py test
         shell: bash
-        run: testsuite/run_forge.sh
+        working-directory: testsuite
 
       - name: Post forge result comment
         # Post a Github comment if the run has not been cancelled and if we're running on a PR

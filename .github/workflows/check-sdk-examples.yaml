@@ -51,7 +51,7 @@ jobs:
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - uses: snok/install-poetry@v1
+      - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
         with:
           version: 1.2.2
 

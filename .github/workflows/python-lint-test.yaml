@@ -29,7 +29,7 @@ jobs:
 
       - name: Should run tests
         run: >
-          python testsuite/determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/.*py' ${{steps.changed-files.outputs.all_changed_files }}
+          python3 testsuite/determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/.*py' ${{steps.changed-files.outputs.all_changed_files }}
         id: should-run-tests
 
       - name: Install Python Dev Dependencies
@@ -46,4 +46,4 @@ jobs:
 
       - name: Run python unit tests
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: python -m unittest testsuite/*test*.py
+        run: python3 -m unittest testsuite/**/*test.py -b

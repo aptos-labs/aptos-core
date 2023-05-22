@@ -30,14 +30,14 @@ from typing import (
     Union,
 )
 from urllib.parse import ParseResult, urlunparse, urlencode
-from applogging import logger, init_logging
-from forge_wrapper_core.filesystem import Filesystem, LocalFilesystem
-from forge_wrapper_core.git import Git
-from forge_wrapper_core.process import Processes, SystemProcesses
+from test_framework.logging import init_logging, log
+from test_framework.filesystem import Filesystem, LocalFilesystem
+from test_framework.git import Git
+from test_framework.process import Processes, SystemProcesses
 
-from forge_wrapper_core.shell import LocalShell, Shell
-from forge_wrapper_core.time import SystemTime, Time
-from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
+from test_framework.shell import LocalShell, Shell
+from test_framework.time import SystemTime, Time
+from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
 
 # map of build variant (e.g. cargo profile and feature flags)
 BUILD_VARIANT_TAG_PREFIX_MAP = {
@@ -53,6 +53,8 @@ FORGE_IMAGE_NAME = "aptos/forge"
 
 DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
+
+FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 
 @dataclass
@@ -104,12 +106,8 @@ except ImportError:
     "--log-metadata/--no-log-metadata",
     default=True,
 )
-@logger
 def main(log_metadata: bool) -> None:
     init_logging(logger=log, print_metadata=log_metadata)
-    # Check that the current directory is the root of the repository.
-    if not os.path.exists(".git"):
-        log.fatal("This script must be run from the root of the repository.")
 
 
 def envoption(name: str, default: Optional[Any] = None) -> Any:
@@ -686,7 +684,12 @@ class K8sForgeRunner(ForgeRunner):
                 f"forge-namespace={context.forge_namespace}",
             ]
         )
-        template = context.filesystem.read("testsuite/forge-test-runner-template.yaml")
+        if context.filesystem.exists(FORGE_TEST_RUNNER_TEMPLATE_PATH):
+            template = context.filesystem.read(FORGE_TEST_RUNNER_TEMPLATE_PATH)
+        else:
+            template = context.filesystem.read(
+                os.path.join("testsuite", FORGE_TEST_RUNNER_TEMPLATE_PATH)
+            )
         forge_triggered_by = "github-actions" if context.github_actions else "other"
 
         assert context.aws_account_num is not None, "AWS account number is required"
