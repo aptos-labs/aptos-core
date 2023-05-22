@@ -441,9 +441,11 @@ mod compaction_tests {
 
         // assert the kv are the same in db and new_db
         // current all the kv are still stored in the ledger db
+        //
+        // TODO(grao): Support state kv db sharding here.
         for ver in start..=end {
             let new_iter = PrefixedStateValueIterator::new(
-                ledger_db.deref(),
+                ledger_db.metadata_db(),
                 StateKeyPrefix::new(AccessPath, b"".to_vec()),
                 None,
                 ver,
