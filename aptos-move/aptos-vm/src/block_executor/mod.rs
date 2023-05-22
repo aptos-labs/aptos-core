@@ -170,8 +170,10 @@ impl BlockAptosVM {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
-                    .filter(|txn: &Transaction| insert_into_txn_cache(&duplicate_map, txn))
-                    .map(preprocess_transaction::<AptosVM>)
+                    .map(|txn| match insert_into_txn_cache(&duplicate_map, &txn) {
+                        false => PreprocessedTransaction::Duplicate,
+                        true => preprocess_transaction::<AptosVM>(txn),
+                    })
                     .collect()
             });
 
