@@ -147,20 +147,21 @@ impl BlockAptosVM {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
         let dedup_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
-        let before_dedup_len = transactions.len();
         let mut duplicate_map = HashSet::new();
+        let mut num_duplicates = 0;
         let transactions: Vec<_> = transactions
             .into_iter()
             .map(|txn| {
                 if let Transaction::UserTransaction(ref inner) = txn {
                     if !duplicate_map.insert((inner.sender(), inner.sequence_number())) {
+                        num_duplicates += 1;
                         return None;
                     }
                 }
                 Some(txn)
             })
             .collect();
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((before_dedup_len - transactions.len()) as f64);
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(dedup_timer);
 
         // Verify the signatures of all the transactions in parallel.
