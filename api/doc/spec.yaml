@@ -8238,12 +8238,17 @@ paths:
       - Transactions
       summary: Estimate gas price
       description: |-
-        Currently, the gas estimation is handled by taking the median of the last 100,000 transactions
-        If a user wants to prioritize their transaction and is willing to pay, they can pay more
-        than the gas price.  If they're willing to wait longer, they can pay less.  Note that the
-        gas price moves with the fee market, and should only increase when demand outweighs supply.
+        Gives an estimate of the gas unit price required to get a transaction on chain in a
+        reasonable amount of time. The gas unit price is the amount that each transaction commits to
+        pay for each unit of gas consumed in executing the transaction. The estimate is based on
+        recent history: it gives the minimum gas that would have been required to get into recent
+        blocks, for blocks that were full. (When blocks are not full, the estimate will match the
+        minimum gas unit price.)
 
-        If there have been no transactions in the last 100,000 transactions, the price will be 1.
+        The estimation is given in three values: de-prioritized (low), regular, and prioritized
+        (aggressive). Using a more aggressive value increases the likelihood that the transaction
+        will make it into the next block; more aggressive values are computed with a larger history
+        and higher percentile statistics. More details are in AIP-34.
       responses:
         '200':
           description: ''

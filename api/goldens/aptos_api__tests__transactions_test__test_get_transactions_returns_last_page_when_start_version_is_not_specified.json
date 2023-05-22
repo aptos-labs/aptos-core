@@ -83,7 +83,7 @@
       }
     ],
     "id": "0x8c9a041f736278db6559cb7f1de04381d82258dc80fa9e128d9e44bc47487682",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -94,7 +94,7 @@
         "sequence_number": "13",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "13",
@@ -361,7 +361,7 @@
       }
     ],
     "id": "0x9ebb53fc221a6fc07f89f8048c6071e6460792b92ffe078247a77e73abc5297c",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -372,7 +372,7 @@
         "sequence_number": "14",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "14",
@@ -639,7 +639,7 @@
       }
     ],
     "id": "0x3ddcb6c382270184cb1c0e7044b272ba0b2382d21b06966dd5ff00f5fa36dbef",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -650,7 +650,7 @@
         "sequence_number": "15",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "15",
@@ -917,7 +917,7 @@
       }
     ],
     "id": "0x5d05da6e72c49bf2791775d0465453e709d3d46d8aae837610781514ae1b0ee6",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -928,7 +928,7 @@
         "sequence_number": "16",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "16",
@@ -1195,7 +1195,7 @@
       }
     ],
     "id": "0xd2d00107d2f0b1323b9e27213f8b003f78a5cdd081007bd11f09b7e6fa232b0a",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -1206,7 +1206,7 @@
         "sequence_number": "17",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "17",
@@ -1473,7 +1473,7 @@
       }
     ],
     "id": "0xa8d6521a26daafda96dacf7f582cb1dbdc84c06e7953e5f1c769ef8a93dcbeb3",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -1484,7 +1484,7 @@
         "sequence_number": "18",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "18",
@@ -1751,7 +1751,7 @@
       }
     ],
     "id": "0x142c31e08bfca525c34fa8a59ebcb300e72586225d613eb0af32ce80b0e9529f",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -1762,7 +1762,7 @@
         "sequence_number": "19",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "19",
@@ -2029,7 +2029,7 @@
       }
     ],
     "id": "0xf6ce4988f3b078f37f863539358646c46f14aa24caa8745bf26f63f76d85fdbd",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -2040,7 +2040,7 @@
         "sequence_number": "20",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "20",

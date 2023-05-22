@@ -31,7 +31,7 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| {
             sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
-            (key.clone(), Some(value.clone()))
+            (key, Some(value))
         })
         .collect();
     let jmt_updates = jmt_updates(&value_set);
@@ -338,7 +338,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -436,7 +436,7 @@ proptest! {
         let store2 = &db2.state_store;
         let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
 
         let dummy_state_key = StateKey::raw(vec![]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();

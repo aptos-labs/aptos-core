@@ -21,9 +21,11 @@ pub mod errors;
 pub mod metrics;
 pub mod schema;
 pub mod state_restore;
+pub mod utils;
 
 mod db_options;
 mod event_store;
+mod ledger_db;
 mod ledger_store;
 mod lru_node_cache;
 mod pruner;
@@ -31,7 +33,6 @@ mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
 mod transaction_store;
-mod utils;
 mod versioned_node_cache;
 
 #[cfg(test)]
@@ -99,6 +100,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
@@ -118,6 +120,7 @@ use arr_macro::arr;
 use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
+use rayon::prelude::*;
 use std::{
     borrow::Borrow,
     collections::HashMap,
@@ -300,6 +303,7 @@ impl AptosDB {
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        empty_buffered_state_for_restore: bool,
     ) -> Self {
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
@@ -322,6 +326,7 @@ impl AptosDB {
             state_kv_pruner,
             buffered_state_target_items,
             hack_for_tests,
+            empty_buffered_state_for_restore,
         ));
 
         let ledger_pruner = LedgerPrunerManager::new(
@@ -348,7 +353,7 @@ impl AptosDB {
         }
     }
 
-    pub fn open<P: AsRef<Path> + Clone>(
+    fn open_internal<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
         pruner_config: PrunerConfig,
@@ -356,6 +361,7 @@ impl AptosDB {
         enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
+        empty_buffered_state_for_restore: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -376,6 +382,7 @@ impl AptosDB {
             pruner_config,
             buffered_state_target_items,
             readonly,
+            empty_buffered_state_for_restore,
         );
 
         if !readonly && enable_indexer {
@@ -383,6 +390,48 @@ impl AptosDB {
         }
 
         Ok(myself)
+    }
+
+    pub fn open<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            false,
+        )
+    }
+
+    pub fn open_kv_only<P: AsRef<Path> + Clone>(
+        db_root_path: P,
+        readonly: bool,
+        pruner_config: PrunerConfig,
+        rocksdb_configs: RocksdbConfigs,
+        enable_indexer: bool,
+        buffered_state_target_items: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
+    ) -> Result<Self> {
+        Self::open_internal(
+            db_root_path,
+            readonly,
+            pruner_config,
+            rocksdb_configs,
+            enable_indexer,
+            buffered_state_target_items,
+            max_num_nodes_per_lru_cache_shard,
+            true,
+        )
     }
 
     pub fn open_dbs<P: AsRef<Path> + Clone>(
@@ -1042,13 +1091,16 @@ impl AptosDB {
                             first_version + idx as u64
                         );
                     end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                    Some(
-                        txns_to_commit[..=idx]
-                            .iter()
-                            .flat_map(|txn_to_commit| txn_to_commit.state_updates().clone())
-                            .flatten()
-                            .collect(),
-                    )
+                    let mut sharded_state_updates = create_empty_sharded_state_updates();
+                    sharded_state_updates.par_iter_mut().enumerate().for_each(
+                        |(shard_id, state_updates_shard)| {
+                            txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
+                                state_updates_shard
+                                    .extend(txn_to_commit.state_updates()[shard_id].clone());
+                            })
+                        },
+                    );
+                    Some(sharded_state_updates)
                 } else {
                     None
                 }
@@ -2002,19 +2054,12 @@ impl DbWriter for AptosDB {
                     ledger_info_with_sigs,
                 )?;
 
-                let updates = {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["flatten_states"])
-                        .start_timer();
-                    Some(block_state_updates.into_iter().flatten().collect())
-                };
                 if !txns_to_commit.is_empty() {
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["buffered_state___update"])
                         .start_timer();
-                    // TODO(grao): Make BufferedState take sharded updates.
                     buffered_state.update(
-                        updates,
+                        Some(block_state_updates),
                         latest_in_memory_state,
                         sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
                     )?;
@@ -2074,7 +2119,7 @@ impl DbWriter for AptosDB {
 
             // Create a single change set for all further write operations
             let mut batch = SchemaBatch::new();
-
+            let mut sharded_kv_batch = new_sharded_kv_schema_batch();
             // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
@@ -2091,17 +2136,20 @@ impl DbWriter for AptosDB {
                 .map(|output| output.write_set().clone())
                 .collect();
             let transaction_infos = output_with_proof.proof.transaction_infos;
+            // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
                 self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
+                self.state_store.clone(),
                 version,
                 &transactions,
                 &transaction_infos,
                 &events,
                 wsets,
-                Some(&mut batch),
+                Option::Some((&mut batch, &mut sharded_kv_batch)),
+                false,
             )?;
 
             // Save the epoch ending ledger infos

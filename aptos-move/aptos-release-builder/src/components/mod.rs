@@ -35,6 +35,7 @@ pub mod version;
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct ReleaseConfig {
+    pub name: String,
     pub remote_endpoint: Option<Url>,
     pub proposals: Vec<Proposal>,
 }
@@ -47,12 +48,18 @@ pub struct Proposal {
     pub update_sequence: Vec<ReleaseEntry>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ProposalMetadata {
     title: String,
     description: String,
+    #[serde(default = "default_url")]
     source_code_url: String,
+    #[serde(default = "default_url")]
     discussion_url: String,
+}
+
+fn default_url() -> String {
+    "https://github.com/aptos-labs/aptos-core".to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
@@ -339,9 +346,16 @@ impl ReleaseConfig {
         std::fs::create_dir(source_dir.as_path())
             .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
 
+        source_dir.push(&self.name);
+        std::fs::create_dir(source_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for source: {:?}", err))?;
+
         let mut metadata_dir = base_path.to_path_buf();
         metadata_dir.push("metadata");
 
+        std::fs::create_dir(metadata_dir.as_path())
+            .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
+        metadata_dir.push(&self.name);
         std::fs::create_dir(metadata_dir.as_path())
             .map_err(|err| anyhow!("Fail to create folder for metadata: {:?}", err))?;
 
@@ -350,6 +364,7 @@ impl ReleaseConfig {
         for proposal in &self.proposals {
             let mut proposal_dir = base_path.to_path_buf();
             proposal_dir.push("sources");
+            proposal_dir.push(&self.name);
             proposal_dir.push(proposal.name.as_str());
 
             std::fs::create_dir(proposal_dir.as_path())
@@ -452,6 +467,7 @@ impl ReleaseConfig {
 impl Default for ReleaseConfig {
     fn default() -> Self {
         ReleaseConfig {
+            name: "TestingConfig".to_string(),
             remote_endpoint: None,
             proposals: vec![
                 Proposal {
@@ -551,4 +567,16 @@ fn append_script_hash(raw_script: String) -> String {
     .unwrap();
 
     format!("// Script hash: {} \n{}", hash, raw_script)
+}
+
+impl Default for ProposalMetadata {
+    fn default() -> Self {
+        ProposalMetadata {
+            title: "default".to_string(),
+            description: "default".to_string(),
+            // Aptos CLI need a valid url for the two fields.
+            source_code_url: default_url(),
+            discussion_url: default_url(),
+        }
+    }
 }

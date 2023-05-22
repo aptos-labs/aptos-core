@@ -204,9 +204,9 @@ mod test {
     //     |  200  |               |   yes     | yes |         |
     //     |  300  |               |   yes     |     |   yes   |
     //     |  400  |               |   yes     |     |         |
-    //     |  500  |               |   Yes     | yes |   yes   |
-    //     |  600  |               |   Yes     | yes |         |
-    //     |  700  |               |   Yes     | yes |         |
+    //     |  500  |               |           | yes |   yes   |
+    //     |  600  |               |           | yes |         |
+    //     |  700  |               |           | yes |         |
     //     |  800  |               |           |     |   yes   |
     //     +-------+---------------+-----------+-----+---------+
     fn test_set_up(context: &NativeAggregatorContext, aggregator_enabled: bool) {

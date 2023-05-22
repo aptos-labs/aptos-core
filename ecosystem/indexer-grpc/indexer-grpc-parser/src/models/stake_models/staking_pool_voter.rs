@@ -6,7 +6,7 @@
 
 use super::stake_utils::StakeResource;
 use crate::{schema::current_staking_pool_voter, utils::util::standardize_address};
-use aptos_protos::transaction::testing1::v1::{write_set_change::Change, Transaction};
+use aptos_protos::transaction::v1::{write_set_change::Change, Transaction};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

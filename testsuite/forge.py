@@ -122,7 +122,6 @@ def envoption(name: str, default: Optional[Any] = None) -> Any:
 
 # o11y resources
 GRAFANA_BASE_URL = "https://aptoslabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery"
-PYROSCOPE_BASE_URL = "https://pyroscope.o11y.aptosdev.com"
 
 # helm chart default override values
 HELM_CHARTS = ["aptos-node", "aptos-genesis"]
@@ -496,13 +495,6 @@ def get_humio_logs_link(
     )
 
 
-def get_pyroscope_profiling_link(
-    forge_namespace: str,
-) -> str:
-    """Get a link to the pyroscope profiling for a given test run in a given namespace. Note that there is no time filtering yet"""
-    return f'{PYROSCOPE_BASE_URL}/?query=aptos-node.cpu%7Bnamespace%3D"{forge_namespace}"%7D&from=now-24h'
-
-
 def format_github_info(context: ForgeContext) -> str:
     if not context.github_job_url:
         return ""
@@ -537,7 +529,6 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
         True,
     )
-    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     return (
         textwrap.dedent(
@@ -545,7 +536,6 @@ def format_pre_comment(context: ForgeContext) -> str:
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
-            * [Pyroscope Profiling]({pyroscope_profiling_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -562,7 +552,6 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         context.forge_namespace,
         (result.start_time, result.end_time),
     )
-    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     if result.state == ForgeState.PASS:
         forge_comment_header = f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
@@ -586,7 +575,6 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
-        * [Pyroscope Profiling]({pyroscope_profiling_link})
         """
         )
         + format_github_info(context)

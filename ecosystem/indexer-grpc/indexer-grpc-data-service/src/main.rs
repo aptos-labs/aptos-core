@@ -7,7 +7,7 @@ use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use aptos_protos::{
     internal::fullnode::v1::FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
-    transaction::testing1::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use clap::Parser;
@@ -24,7 +24,6 @@ use tonic::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcDataServiceConfig {
-    pub server_name: String,
     pub data_service_grpc_listen_address: String,
     pub whitelisted_auth_tokens: Vec<String>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
@@ -82,7 +81,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxdata".to_string()
     }
 }
 

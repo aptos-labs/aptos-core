@@ -894,10 +894,13 @@ dependencies = [
  "aptos-executor-types",
  "aptos-logger",
  "aptos-push-metrics",
+ "aptos-state-view",
+ "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "async-trait",
  "clap 3.2.23",
+ "itertools",
  "owo-colors",
  "tokio",
 ]
@@ -955,6 +958,20 @@ dependencies = [
  "move-core-types",
  "serde 1.0.149",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-executable-store"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "claims",
+ "dashmap",
+ "proptest",
+ "proptest-derive",
+ "rayon",
 ]
 
 [[package]]
@@ -2419,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "pbjson",
  "prost",
@@ -2846,6 +2863,7 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
+ "itertools",
  "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
@@ -2880,6 +2898,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-netcore",
  "aptos-network",
  "aptos-storage-interface",
  "aptos-storage-service-types",
