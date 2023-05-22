@@ -24,7 +24,7 @@ use aptos_types::{
     transaction::SignatureCheckedTransaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::AptosChangeSet, write_change_set::WriteChangeSet};
+use aptos_vm_types::change_set::AptosChangeSet;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -45,6 +45,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use aptos_types::write_set::WriteSetMut;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -293,7 +294,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<AptosChangeSet, VMStatus> {
-        let mut writes = WriteChangeSet::empty();
+        let mut writes = WriteSetMut::default();
         let mut deltas = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
@@ -373,6 +374,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
+        let writes = writes.freeze().expect("should not fail");
         AptosChangeSet::new(writes, deltas, events, configs)
     }
 }

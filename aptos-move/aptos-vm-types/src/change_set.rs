@@ -1,115 +1,33 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::write_change_set::WriteChangeSet;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaChangeSet};
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 use std::collections::{
     btree_map::{
-        Entry,
         Entry::{Occupied, Vacant},
-        IntoIter, Iter, Keys,
     },
-    BTreeMap,
 };
-
-/// Container to hold arbitrary changes to the global state produced by the VM.
-#[derive(Clone, Debug)]
-pub struct ChangeSet<T> {
-    inner: BTreeMap<StateKey, T>,
-}
-
-impl<T> ChangeSet<T> {
-    pub fn new(items: impl IntoIterator<Item = (StateKey, T)>) -> Self {
-        Self {
-            inner: items.into_iter().collect(),
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            inner: BTreeMap::new(),
-        }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.inner.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    #[inline]
-    pub fn insert(&mut self, change: (StateKey, T)) {
-        self.inner.insert(change.0, change.1);
-    }
-
-    #[inline]
-    pub fn get(&self, key: &StateKey) -> Option<&T> {
-        self.inner.get(key)
-    }
-
-    #[inline]
-    pub fn get_mut(&mut self, key: &StateKey) -> Option<&mut T> {
-        self.inner.get_mut(key)
-    }
-
-    #[inline]
-    pub fn entry(&mut self, key: StateKey) -> Entry<'_, StateKey, T> {
-        self.inner.entry(key)
-    }
-
-    #[inline]
-    pub fn extend<I: IntoIterator<Item = (StateKey, T)>>(&mut self, iter: I) {
-        self.inner.extend(iter)
-    }
-
-    #[inline]
-    pub fn keys(&self) -> Keys<'_, StateKey, T> {
-        self.inner.keys()
-    }
-
-    #[inline]
-    pub fn remove(&mut self, key: &StateKey) -> Option<T> {
-        self.inner.remove(key)
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, StateKey, T> {
-        self.inner.iter()
-    }
-}
-
-impl<T> IntoIterator for ChangeSet<T> {
-    type IntoIter = IntoIter<StateKey, T>;
-    type Item = (StateKey, T);
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.inner.into_iter()
-    }
-}
+use aptos_types::write_set::WriteSet;
 
 pub trait SizeChecker {
-    fn check_writes(&self, writes: &WriteChangeSet) -> Result<(), VMStatus>;
+    fn check_writes(&self, writes: &WriteSet) -> Result<(), VMStatus>;
     fn check_events(&self, events: &[ContractEvent]) -> Result<(), VMStatus>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AptosChangeSet {
-    writes: WriteChangeSet,
+    writes: WriteSet,
     deltas: DeltaChangeSet,
     events: Vec<ContractEvent>,
 }
 
 impl AptosChangeSet {
     pub fn new(
-        writes: WriteChangeSet,
+        writes: WriteSet,
         deltas: DeltaChangeSet,
         events: Vec<ContractEvent>,
         checker: &dyn SizeChecker,
@@ -124,7 +42,7 @@ impl AptosChangeSet {
         Ok(change_set)
     }
 
-    pub fn writes(&self) -> &WriteChangeSet {
+    pub fn writes(&self) -> &WriteSet {
         &self.writes
     }
 
@@ -136,14 +54,21 @@ impl AptosChangeSet {
         &self.events
     }
 
-    pub fn into_inner(self) -> (WriteChangeSet, DeltaChangeSet, Vec<ContractEvent>) {
+    pub fn into_inner(self) -> (WriteSet, DeltaChangeSet, Vec<ContractEvent>) {
         (self.writes, self.deltas, self.events)
     }
 
-    fn squash_delta_change_set(&mut self, deltas: DeltaChangeSet) -> anyhow::Result<()> {
+    pub fn squash_delta_change_set(self, other: DeltaChangeSet) -> anyhow::Result<Self> {
         use WriteOp::*;
-        for (key, mut op) in deltas.into_iter() {
-            if let Some(r) = self.writes.get_mut(&key) {
+
+        let (write_set, mut delta_set, events) = self.into_inner();
+        let mut write_set = write_set.into_mut();
+
+        let delta_ops = delta_set.as_inner_mut();
+        let write_ops = write_set.as_inner_mut();
+
+        for (key, mut op) in other.into_iter() {
+            if let Some(r) = write_ops.get_mut(&key) {
                 match r {
                     Creation(data)
                     | Modification(data)
@@ -157,7 +82,7 @@ impl AptosChangeSet {
                     },
                 }
             } else {
-                match self.deltas.entry(key) {
+                match delta_ops.entry(key) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming `op` to the existing
                         // delta, ensuring the strict ordering.
@@ -171,36 +96,44 @@ impl AptosChangeSet {
             }
         }
 
-        Ok(())
+        Ok(Self {
+            writes: write_set.freeze()?,
+            deltas: delta_set,
+            events,
+        })
     }
 
-    fn squash_write_change_set(&mut self, writes: WriteChangeSet) -> anyhow::Result<()> {
-        for (key, write) in writes.into_iter() {
-            match self.writes.entry(key) {
+    pub fn squash_write_set(self, other_write_set: WriteSet, other_events: Vec<ContractEvent>) -> anyhow::Result<Self> {
+        let (write_set, mut delta, mut events) = self.into_inner();
+        let mut write_set = write_set.into_mut();
+        let write_ops = write_set.as_inner_mut();
+
+        for (key, op) in other_write_set.into_iter() {
+            match write_ops.entry(key) {
                 Occupied(mut entry) => {
-                    if !WriteOp::squash(entry.get_mut(), write)? {
+                    if !WriteOp::squash(entry.get_mut(), op)? {
                         entry.remove();
                     }
                 },
                 Vacant(entry) => {
-                    self.deltas.remove(entry.key());
-                    entry.insert(write);
+                    delta.remove(entry.key());
+                    entry.insert(op);
                 },
             }
         }
-        Ok(())
+
+        events.extend(other_events);
+
+        Ok(Self {
+            writes: write_set.freeze()?,
+            deltas: delta,
+            events,
+        })
     }
 
-    fn squash_events(&mut self, events: Vec<ContractEvent>) -> anyhow::Result<()> {
-        self.events.extend(events);
-        Ok(())
-    }
-
-    pub fn squash(&mut self, change_set: Self) -> anyhow::Result<()> {
-        let (writes, deltas, events) = change_set.into_inner();
-        self.squash_delta_change_set(deltas)?;
-        self.squash_write_change_set(writes)?;
-        self.squash_events(events)?;
-        Ok(())
+    pub fn squash(self, other: Self) -> anyhow::Result<Self> {
+        let (writes, deltas, events) = other.into_inner();
+        self.squash_write_set(writes, events)?
+            .squash_delta_change_set(deltas)
     }
 }

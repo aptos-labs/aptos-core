@@ -9,12 +9,13 @@ use aptos_types::{
     transaction::{ChangeSet, CheckChangeSet},
     write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::SizeChecker, write_change_set::WriteChangeSet};
+use aptos_vm_types::change_set::SizeChecker;
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
 };
 use std::fmt::Debug;
+use aptos_types::write_set::WriteSet;
 
 #[derive(Clone, Debug)]
 pub struct StoragePricingV1 {
@@ -273,7 +274,7 @@ fn size_error() -> VMStatus {
 }
 
 impl SizeChecker for ChangeSetConfigs {
-    fn check_writes(&self, writes: &WriteChangeSet) -> Result<(), VMStatus> {
+    fn check_writes(&self, writes: &WriteSet) -> Result<(), VMStatus> {
         let mut write_set_size = 0;
         for (key, op) in writes.iter() {
             if let Some(bytes) = op.bytes() {

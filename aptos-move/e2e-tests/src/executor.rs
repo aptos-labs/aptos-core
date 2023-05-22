@@ -650,7 +650,7 @@ impl FakeExecutor {
                 )
                 .expect("Failed to generate txn effects");
             let (writes, _deltas, _events) = change_set.into_inner();
-            writes.into_write_set().unwrap()
+            writes
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -693,8 +693,7 @@ impl FakeExecutor {
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (writes, _deltas, _events) = change_set.into_inner();
-        let write_set = writes.into_write_set().unwrap();
-        Ok(write_set)
+        Ok(writes)
     }
 
     pub fn execute_view_function(

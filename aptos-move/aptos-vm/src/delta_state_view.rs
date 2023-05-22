@@ -9,15 +9,15 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
-use aptos_vm_types::write_change_set::WriteChangeSet;
+use aptos_types::write_set::WriteSet;
 
 pub struct DeltaStateView<'a, 'b, S> {
     base: &'a S,
-    writes: &'b WriteChangeSet,
+    writes: &'b WriteSet,
 }
 
 impl<'a, 'b, S> DeltaStateView<'a, 'b, S> {
-    pub fn new(base: &'a S, writes: &'b WriteChangeSet) -> Self {
+    pub fn new(base: &'a S, writes: &'b WriteSet) -> Self {
         Self { base, writes }
     }
 }

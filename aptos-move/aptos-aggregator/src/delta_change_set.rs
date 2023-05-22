@@ -14,6 +14,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
+use aptos_types::write_set::{WriteSet, WriteSetMut};
 
 /// When `Addition` operation overflows the `limit`.
 const EADD_OVERFLOW: u64 = 0x02_0001;
@@ -333,7 +334,7 @@ impl DeltaChangeSet {
 
     /// Converts deltas to a vector of write ops. In case conversion to a write op
     /// failed, the error is propagated to the caller.
-    pub(crate) fn take_materialized(
+    pub fn take_materialized(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
@@ -345,6 +346,19 @@ impl DeltaChangeSet {
         }
 
         Ok(ret)
+    }
+
+    pub fn try_into_write_set(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<WriteSet, VMStatus> {
+        let materialized_write_set = self
+            .take_materialized(state_view)
+            .expect("something terrible happened when applying aggregator deltas");
+
+        WriteSetMut::new(materialized_write_set)
+            .freeze()
+            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
     }
 }
 

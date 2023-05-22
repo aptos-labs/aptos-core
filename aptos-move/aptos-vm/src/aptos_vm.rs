@@ -45,9 +45,7 @@ use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{
     init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
 };
-use aptos_vm_types::{
-    change_set::AptosChangeSet, vm_output::VMOutput, write_change_set::WriteChangeSet,
-};
+use aptos_vm_types::{change_set::AptosChangeSet, vm_output::VMOutput};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -78,6 +76,7 @@ use std::{
         Arc,
     },
 };
+use aptos_types::write_set::WriteSet;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -257,7 +256,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
-        let mut session = self.0.new_session(resolver, SessionId::txn_meta(txn_data));
+        let mut session = self.new_session(resolver, SessionId::txn_meta(txn_data));
 
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
@@ -312,7 +311,7 @@ impl AptosVM {
     fn success_transaction_cleanup(
         &self,
         resolver: &impl MoveResolverExt,
-        mut user_txn_change_set: AptosChangeSet,
+        user_txn_change_set: AptosChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
@@ -328,7 +327,7 @@ impl AptosVM {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         let deltas = user_txn_change_set.deltas().clone();
-        let materialized_deltas = WriteChangeSet::from_deltas(deltas, resolver)?;
+        let materialized_deltas = deltas.try_into_write_set(resolver)?;
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &materialized_deltas);
         let resolver = delta_state_view.as_move_resolver();
 
@@ -340,7 +339,7 @@ impl AptosVM {
             .run_success_epilogue(&mut session, gas_meter.balance(), txn_data, log_context)?;
 
         let epilogue_change_set = session.finish(&mut (), change_set_configs)?;
-        user_txn_change_set
+        let change_set = user_txn_change_set
             .squash(epilogue_change_set)
             .map_err(|_err| {
                 VMStatus::Error(
@@ -349,7 +348,7 @@ impl AptosVM {
                 )
             })?;
 
-        let (writes, deltas, events) = user_txn_change_set.into_inner();
+        let (writes, deltas, events) = change_set.into_inner();
         let gas_used = txn_data
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
@@ -661,7 +660,7 @@ impl AptosVM {
         // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
-        let mut change_set = session.finish(&mut (), change_set_configs)?;
+        let change_set = session.finish(&mut (), change_set_configs)?;
         gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
         gas_meter.charge_storage_fee_for_all(
             change_set.writes().iter(),
@@ -674,7 +673,7 @@ impl AptosVM {
 
         // TODO: Avoid delta materialization here.
         let deltas = change_set.deltas().clone();
-        let materialized_deltas = WriteChangeSet::from_deltas(deltas, resolver)?;
+        let materialized_deltas = deltas.try_into_write_set(&storage_with_changes)?;
 
         let delta_state_view = DeltaStateView::new(&storage_with_changes, &materialized_deltas);
         let resolver = delta_state_view.as_move_resolver();
@@ -690,7 +689,7 @@ impl AptosVM {
         )?;
         let cleanup_change_set = cleanup_session.finish(&mut (), change_set_configs)?;
         // Merge the inner function writeset with cleanup writeset.
-        change_set.squash(cleanup_change_set).map_err(|_err| {
+        let change_set = change_set.squash(cleanup_change_set).map_err(|_err| {
             VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 Some("Failed to squash writeset".to_string()),
@@ -1194,7 +1193,7 @@ impl AptosVM {
             WriteSetPayload::Direct(change_set) => {
                 let (write_set, events) = change_set.clone().into_inner();
                 Ok(AptosChangeSet::new(
-                    WriteChangeSet::new(write_set),
+                    write_set,
                     DeltaChangeSet::empty(),
                     events,
                     &change_set_configs,
@@ -1234,7 +1233,7 @@ impl AptosVM {
     fn read_writeset(
         &self,
         state_view: &impl StateView,
-        writes: &WriteChangeSet,
+        writes: &WriteSet,
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
@@ -1577,7 +1576,7 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = &state_view.as_move_resolver();
-        let mut session = self.new_session(resolver, SessionId::txn(&txn));
+        let mut session = self.0.new_session(resolver, SessionId::txn(&txn), true);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             resolver,

@@ -138,7 +138,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let mut change_set = session
+    let change_set = session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
@@ -154,7 +154,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
-    change_set
+    let change_set = change_set
         .squash(
             session
                 .finish(
@@ -175,9 +175,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     assert!(!writes.iter().any(|(_, op)| op.is_deletion()));
     verify_genesis_write_set(&events);
 
-    let write_set = writes.into_write_set().unwrap();
     Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new_unchecked(
-        write_set, events,
+        writes, events,
     )))
 }
 
@@ -258,7 +257,7 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let mut change_set = session
+    let change_set = session
         .finish(
             &mut (),
             &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
@@ -275,7 +274,7 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
 
-    change_set
+    let change_set = change_set
         .squash(
             session
                 .finish(
@@ -295,8 +294,7 @@ pub fn encode_genesis_change_set(
 
     assert!(!writes.iter().any(|(_, op)| op.is_deletion()));
     verify_genesis_write_set(&events);
-    let write_set = writes.into_write_set().unwrap();
-    ChangeSet::new_unchecked(write_set, events)
+    ChangeSet::new_unchecked(writes, events)
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
