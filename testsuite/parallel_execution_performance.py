@@ -55,7 +55,7 @@ for threads in THREADS:
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )
-    print(output)
+    # print(output)
 
     for i, block_size in enumerate(BLOCK_SIZES):
         tps_index = i * 2
@@ -73,15 +73,15 @@ for threads in THREADS:
             )
             fail = True
 
-        for speedup_threshold, noise, above in (
-            (SPEEDUPS[key], SPEEDUPS_NOISE_BELOW, False),
-            (SPEEDUPS[key], SPEEDUPS_NOISE_ABOVE, True),
-        ):
-            if abs((diff := speedups - speedup_threshold) / speedup_threshold) > noise:
-                print(
-                    f"Parallel SPEEDUPS {speedups} {'below' if not above else 'above'} the threshold {speedup_threshold} by {noise} for {block_size} block size with {threads} threads!  Please {'optimize' if not above else 'increase the hard-coded speedup threshold since you improved'} the execution performance. :)\n"
-                )
-                fail = True
+        if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW or speedups - SPEEDUPS[key] > SPEEDUPS_NOISE_ABOVE:
+            direction = "below" if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW else "above"
+            noise = SPEEDUPS_NOISE_BELOW if direction == "below" else SPEEDUPS_NOISE_ABOVE
+            action = "optimize the execution performance" if direction == "below" else "increase the hard-coded speedup threshold since you improved the execution performance"
+            print(
+                f"Parallel SPEEDUPS {speedups} {direction} the threshold {SPEEDUPS[key]} by {noise} for {block_size} block size with {threads} threads! Please {action}. :)\n"
+            )
+            fail = True
+
 
 for block_size in BLOCK_SIZES:
     for threads in THREADS:
