@@ -615,8 +615,8 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 # Econia
-econia_db = { package = "db", path = "../econia/src/rust/db" }
-econia_types = { package = "types", path = "../econia/src/rust/types", features = ["serde"] }
+econia_db = { package = "db", path = "../../db" }
+econia_types = { package = "types", path = "../../types", features = ["serde"] }
 
 [profile.release]
 debug = true
