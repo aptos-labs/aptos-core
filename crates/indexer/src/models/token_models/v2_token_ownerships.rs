@@ -336,6 +336,9 @@ impl TokenOwnershipV2 {
             let maybe_table_metadata = table_handle_to_owner.get(&table_handle);
             let (curr_token_ownership, owner_address, table_type) = match maybe_table_metadata {
                 Some(tm) => {
+                    if tm.table_type != "0x3::token::TokenStore" {
+                        return Ok(None);
+                    }
                     let owner_address = standardize_address(&tm.owner_address);
                     (
                         Some(CurrentTokenOwnershipV2 {
@@ -417,6 +420,9 @@ impl TokenOwnershipV2 {
             let maybe_table_metadata = table_handle_to_owner.get(&table_handle);
             let (curr_token_ownership, owner_address, table_type) = match maybe_table_metadata {
                 Some(tm) => {
+                    if tm.table_type != "0x3::token::TokenStore" {
+                        return Ok(None);
+                    }
                     let owner_address = standardize_address(&tm.owner_address);
                     (
                         Some(CurrentTokenOwnershipV2 {

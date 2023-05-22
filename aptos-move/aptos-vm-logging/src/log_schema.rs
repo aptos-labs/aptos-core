@@ -63,6 +63,12 @@ impl AdapterLogSchema {
         }
     }
 
+    // Is the adapter log schema used in a context that supports speculative
+    // logging (block execution and state-sync). It is from the name.
+    pub(crate) fn speculation_supported(&self) -> bool {
+        matches!(self.name, LogEntry::Execution)
+    }
+
     pub(crate) fn get_txn_idx(&self) -> usize {
         self.txn_idx
     }

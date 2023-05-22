@@ -12,7 +12,9 @@ use crate::{
     stale_state_value_index::StaleStateValueIndexSchema,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
+    state_restore::{
+        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
+    },
     state_store::buffered_state::BufferedState,
     utils::{
         iterators::PrefixedStateValueIterator,
@@ -43,6 +45,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
@@ -50,6 +53,7 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::Version,
+    write_set::{TransactionWrite, WriteSet},
 };
 use arr_macro::arr;
 use claims::{assert_ge, assert_le};
@@ -94,7 +98,7 @@ pub(crate) struct StateDb {
 }
 
 pub(crate) struct StateStore {
-    pub(crate) state_db: Arc<StateDb>,
+    pub state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
@@ -300,6 +304,7 @@ impl StateStore {
         state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        empty_buffered_state_for_restore: bool,
     ) -> Self {
         Self::sync_commit_progress(
             Arc::clone(&ledger_db),
@@ -314,19 +319,32 @@ impl StateStore {
             epoch_snapshot_pruner,
             state_kv_pruner,
         });
-        let buffered_state = Mutex::new(
-            Self::create_buffered_state_from_latest_snapshot(
+        if empty_buffered_state_for_restore {
+            let buffered_state = Mutex::new(BufferedState::new(
                 &state_db,
+                StateDelta::new_empty(),
                 buffered_state_target_items,
-                hack_for_tests,
-                /*check_max_versions_after_snapshot=*/ true,
-            )
-            .expect("buffered state creation failed."),
-        );
-        Self {
-            state_db,
-            buffered_state,
-            buffered_state_target_items,
+            ));
+            Self {
+                state_db,
+                buffered_state,
+                buffered_state_target_items,
+            }
+        } else {
+            let buffered_state = Mutex::new(
+                Self::create_buffered_state_from_latest_snapshot(
+                    &state_db,
+                    buffered_state_target_items,
+                    hack_for_tests,
+                    /*check_max_versions_after_snapshot=*/ true,
+                )
+                .expect("buffered state creation failed."),
+            );
+            Self {
+                state_db,
+                buffered_state,
+                buffered_state_target_items,
+            }
         }
     }
 
@@ -447,9 +465,10 @@ impl StateStore {
             .map(|(version, _)| version + 1)
             .unwrap_or(0);
 
+        // The latest snapshot can be at exactly num_transactions or before it.
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(num_transactions)
+            .get_state_snapshot_version_before(num_transactions + 1)
             .expect("Failed to query latest node on initialization.");
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
@@ -517,6 +536,7 @@ impl StateStore {
                 .last()
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
+
             let calculator = InMemoryStateCalculator::new(
                 buffered_state.current_state(),
                 latest_snapshot_state_view.into_state_cache(),
@@ -583,6 +603,51 @@ impl StateStore {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
+    /// Put the write sets on top of current state
+    pub fn put_write_sets(
+        &self,
+        write_sets: Vec<WriteSet>,
+        first_version: Version,
+        batch: &SchemaBatch,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["put_writesets"])
+            .start_timer();
+
+        // convert value state sets to hash map reference
+        let value_state_sets_raw: Vec<ShardedStateUpdates> = write_sets
+            .iter()
+            .map(|ws| {
+                let mut sharded_state_updates = create_empty_sharded_state_updates();
+                ws.iter().for_each(|(key, value)| {
+                    sharded_state_updates[key.get_shard_id() as usize]
+                        .insert(key.clone(), value.as_state_value());
+                });
+                sharded_state_updates
+            })
+            .collect::<Vec<_>>();
+
+        let value_state_sets = value_state_sets_raw.iter().collect::<Vec<_>>();
+
+        self.put_stats_and_indices(
+            value_state_sets.as_slice(),
+            first_version,
+            StateStorageUsage::new_untracked(),
+            None,
+            batch,
+            sharded_state_kv_batches,
+        )?;
+
+        self.put_state_values(
+            value_state_sets.to_vec(),
+            first_version,
+            sharded_state_kv_batches,
+        )?;
+
+        Ok(())
+    }
+
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
@@ -610,6 +675,15 @@ impl StateStore {
             .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
+        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)
+    }
+
+    pub fn put_state_values(
+        &self,
+        value_state_sets: Vec<&ShardedStateUpdates>,
+        first_version: Version,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
         sharded_state_kv_batches
             .par_iter()
             .enumerate()
@@ -915,6 +989,7 @@ impl StateStore {
             version,
             expected_root_hash,
             false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
         )?))
     }
 

@@ -204,7 +204,7 @@ impl TransactionOutputExt {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         delta_change_set
-            .take(state_view)
+            .take_materialized(state_view)
             .map(|materialized_deltas| Self::merge_delta_writes(txn_output, materialized_deltas))
             .expect("Failed to apply aggregator delta outputs")
     }
