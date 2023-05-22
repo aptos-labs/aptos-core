@@ -24,7 +24,7 @@ use aptos_types::{
     transaction::SignatureCheckedTransaction,
     write_set::{WriteOp, WriteSetMut},
 };
-use aptos_vm_types::change_set::AptosChangeSet;
+use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -130,7 +130,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<AptosChangeSet> {
+    ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
         let (change_set, events, mut extensions) =
             self.inner.finish_without_serialization_with_extensions()?;
@@ -292,7 +292,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<AptosChangeSet, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let mut write_set_mut = WriteSetMut::new(Vec::new());
         let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
@@ -354,12 +354,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             match change {
                 AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    write_set_mut.insert((state_key, write_op))
+                    write_set_mut.insert((state_key, write_op));
                 },
                 AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    write_set_mut.insert((state_key, write_op))
+                    write_set_mut.insert((state_key, write_op));
                 },
             }
         }
@@ -376,7 +376,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
-        AptosChangeSet::new(write_set, delta_change_set, events, configs)
+        VMChangeSet::new(write_set, delta_change_set, events, configs)
     }
 }
 

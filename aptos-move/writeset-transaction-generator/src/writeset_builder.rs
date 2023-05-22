@@ -143,8 +143,8 @@ where
     };
 
     // Genesis never produces the delta change set.
-    assert!(change_set.deltas().is_empty());
+    assert!(change_set.delta_change_set().is_empty());
 
-    let (writes, _deltas, events) = change_set.into_inner();
-    ChangeSet::new_unchecked(writes, events)
+    let (write_set, _delta_change_set, events) = change_set.into_inner();
+    ChangeSet::new(write_set, events)
 }

@@ -29,7 +29,7 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::AptosChangeSet, output::VMOutput};
+use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 
@@ -219,7 +219,7 @@ impl AptosDebugger {
             .await
     }
 
-    pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<AptosChangeSet>
+    pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<VMChangeSet>
     where
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
