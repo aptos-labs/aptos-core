@@ -468,7 +468,7 @@ impl AptosVM {
             )?;
 
             let change_set = session.finish(&mut (), change_set_configs)?;
-            gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
+            gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
             gas_meter.charge_storage_fee_for_all(
                 change_set.writes().iter(),
                 change_set.events(),
@@ -661,7 +661,7 @@ impl AptosVM {
         // cleanup writeset changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
         let change_set = session.finish(&mut (), change_set_configs)?;
-        gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
+        gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
         gas_meter.charge_storage_fee_for_all(
             change_set.writes().iter(),
             change_set.events(),
@@ -875,7 +875,7 @@ impl AptosVM {
         )?;
 
         let change_set = session.finish(&mut (), change_set_configs)?;
-        gas_meter.charge_io_gas_for_writes(change_set.writes().iter())?;
+        gas_meter.charge_io_gas_for_write_set(change_set.writes().iter())?;
         gas_meter.charge_storage_fee_for_all(
             change_set.writes().iter(),
             change_set.events(),
@@ -1826,7 +1826,7 @@ impl AptosSimulationVM {
                                     .finish(&mut (), &storage_gas_params.change_set_configs)?;
 
                                 return_on_failure!(
-                                    gas_meter.charge_io_gas_for_writes(change_set.writes().iter(),)
+                                    gas_meter.charge_io_gas_for_write_set(change_set.writes().iter(),)
                                 );
 
                                 return_on_failure!(gas_meter.charge_storage_fee_for_all(

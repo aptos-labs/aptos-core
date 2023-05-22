@@ -294,8 +294,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<AptosChangeSet, VMStatus> {
-        let mut writes = WriteSetMut::default();
-        let mut deltas = DeltaChangeSet::empty();
+        let mut write_set_mut = WriteSetMut::new(Vec::new());
+        let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
         if is_storage_slot_metadata_enabled {
             if let Some(payer) = new_slot_payer {
@@ -318,14 +318,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
                 )?;
-                writes.insert((state_key, op))
+                write_set_mut.insert((state_key, op))
             }
 
             for (name, blob_op) in modules {
                 let state_key =
                     StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                writes.insert((state_key, op))
+                write_set_mut.insert((state_key, op))
             }
         }
 
@@ -335,7 +335,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key =
                     StateKey::access_path(ap_cache.get_resource_group_path(addr, struct_tag));
                 let op = woc.convert(&state_key, blob_op, false)?;
-                writes.insert((state_key, op))
+                write_set_mut.insert((state_key, op))
             }
         }
 
@@ -343,7 +343,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (key, value_op) in change.entries {
                 let state_key = StateKey::table_item(handle.into(), key);
                 let op = woc.convert(&state_key, value_op, false)?;
-                writes.insert((state_key, op))
+                write_set_mut.insert((state_key, op))
             }
         }
 
@@ -354,16 +354,20 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
-                    writes.insert((state_key, write_op));
+                    let op = woc.convert_aggregator_mod(&state_key, value)?;
+                    write_set_mut.insert((state_key, op))
                 },
-                AggregatorChange::Merge(delta_op) => deltas.insert((state_key, delta_op)),
+                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
-                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    writes.insert((state_key, write_op));
+                    let op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
+                    write_set_mut.insert((state_key, op))
                 },
             }
         }
+
+        let write_set = write_set_mut
+            .freeze()
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, None))?;
 
         let events = events
             .into_iter()
@@ -373,9 +377,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
-
-        let writes = writes.freeze().expect("should not fail");
-        AptosChangeSet::new(writes, deltas, events, configs)
+        AptosChangeSet::new(write_set, delta_change_set, events, configs)
     }
 }
 
