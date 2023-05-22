@@ -150,7 +150,7 @@ impl CliCommand<()> for InitTool {
             // Private key stays in ledger
             None
         } else {
-            let inner_pkey = if let Some(key) = self
+            let ed25519_private_key = if let Some(key) = self
                 .private_key_options
                 .extract_private_key_cli(self.encoding_options.encoding)?
             {
@@ -177,7 +177,7 @@ impl CliCommand<()> for InitTool {
                 }
             };
 
-            Some(inner_pkey)
+            Some(ed25519_private_key)
         };
 
         // Public key
