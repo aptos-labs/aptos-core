@@ -218,12 +218,13 @@ impl BatchGenerator {
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
-        let exclude_txns: Vec<_> = self
-            .batches_in_progress
-            .values()
-            .flatten()
-            .cloned()
-            .collect();
+        // let exclude_txns: Vec<_> = self
+        //     .batches_in_progress
+        //     .values()
+        //     .flatten()
+        //     .cloned()
+        //     .collect();
+        let exclude_txns = Vec::new();
 
         trace!("QS: excluding txs len: {:?}", exclude_txns.len());
         let mut pulled_txns = self

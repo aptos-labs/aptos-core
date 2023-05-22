@@ -26,13 +26,13 @@ impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
-            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 3,
+            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 15,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 4,
+            backlog_per_validator_batch_limit_count: 20,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 160,
+            dynamic_min_txn_per_s: 1000,
             dynamic_max_txn_per_s: 2000,
         }
     }
