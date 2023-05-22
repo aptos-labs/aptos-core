@@ -92,12 +92,13 @@ jobs:
   # Because the docker build happens in a reusable workflow, have a separate job that collects the right metadata
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
   determine-docker-build-metadata:
+    needs: [permission-check]
     runs-on: ubuntu-latest
     steps:
       - name: collect metadata
         run: |
-          echo "GIT_SHA: ${{ env.GIT_SHA }}"
-          echo "TARGET_CACHE_ID: ${{ env.TARGET_CACHE_ID }}"
+          echo "GIT_SHA: ${GIT_SHA}"
+          echo "TARGET_CACHE_ID: ${TARGET_CACHE_ID}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
