@@ -158,7 +158,7 @@ impl BlockAptosVM {
                 _ => true,
             })
             .collect();
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((transactions.len() - before_dedup_len) as f64);
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((before_dedup_len - transactions.len()) as f64);
         drop(dedup_timer);
 
         // Verify the signatures of all the transactions in parallel.
