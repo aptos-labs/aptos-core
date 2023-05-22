@@ -41,6 +41,7 @@ impl<'a> LogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     DataSummaryPoller,
+    LatencyMonitor,
     PeerStates,
     StorageServiceRequest,
     StorageServiceResponse,
@@ -52,6 +53,7 @@ pub enum LogEntry {
 #[serde(rename_all = "snake_case")]
 pub enum LogEvent {
     AggregateSummary,
+    CaughtUpToLatest,
     NoPeersToPoll,
     PeerIgnored,
     PeerNoLongerIgnored,
@@ -61,4 +63,6 @@ pub enum LogEvent {
     ResponseError,
     ResponseSuccess,
     SendRequest,
+    StorageReadFailed,
+    UnexpectedError,
 }

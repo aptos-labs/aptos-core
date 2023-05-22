@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{client::AptosDataClient, poller::DataSummaryPoller};
+use crate::{
+    client::AptosDataClient,
+    error::Result,
+    global_summary::GlobalDataSummary,
+    interface::{AptosDataClientInterface, Response},
+    poller::DataSummaryPoller,
+};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -17,13 +23,23 @@ use aptos_network::{
     },
     transport::ConnectionMetadata,
 };
+use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
-use aptos_storage_service_types::StorageServiceMessage;
+use aptos_storage_service_types::{
+    responses::TransactionOrOutputListWithProof, Epoch, StorageServiceMessage,
+};
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::PeerId;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValueChunkWithProof,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    PeerId,
+};
+use async_trait::async_trait;
 use futures::StreamExt;
 use maplit::hashmap;
+use mockall::mock;
 use std::sync::Arc;
 
 /// A simple mock network for testing the data client
@@ -72,6 +88,7 @@ impl MockNetwork {
             data_client_config,
             base_config,
             mock_time.clone(),
+            create_mock_db_reader(),
             storage_service_client,
             None,
         );
@@ -142,7 +159,7 @@ impl MockNetwork {
             .unwrap();
     }
 
-    /// Get the next request sent from the client.
+    /// Get the next request sent from the client
     pub async fn next_request(&mut self) -> Option<NetworkRequest> {
         match self.peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
@@ -168,5 +185,104 @@ impl MockNetwork {
             Some(PeerManagerRequest::SendDirectSend(_, _)) => panic!("Unexpected direct send msg"),
             None => None,
         }
+    }
+}
+
+/// Creates a mock data client for testing
+pub fn create_mock_data_client() -> Arc<dyn AptosDataClientInterface + Send + Sync> {
+    Arc::new(MockAptosDataClient::new())
+}
+
+// This automatically creates a MockAptosDataClient
+mock! {
+    pub AptosDataClient {}
+
+    #[async_trait]
+    impl AptosDataClientInterface for AptosDataClient {
+        fn get_global_data_summary(&self) -> GlobalDataSummary;
+
+        async fn get_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: Epoch,
+            expected_end_epoch: Epoch,
+            request_timeout_ms: u64,
+        ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
+
+        async fn get_new_transaction_outputs_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn get_new_transactions_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn get_new_transactions_or_outputs_with_proof(
+            &self,
+            known_version: Version,
+            known_epoch: Epoch,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn get_number_of_states(
+            &self,
+            version: Version,
+            request_timeout_ms: u64,
+        ) -> Result<Response<u64>>;
+
+        async fn get_state_values_with_proof(
+            &self,
+            version: u64,
+            start_index: u64,
+            end_index: u64,
+            request_timeout_ms: u64,
+        ) -> Result<Response<StateValueChunkWithProof>>;
+
+        async fn get_transaction_outputs_with_proof(
+            &self,
+            proof_version: Version,
+            start_version: Version,
+            end_version: Version,
+            request_timeout_ms: u64,
+        ) -> Result<Response<TransactionOutputListWithProof>>;
+
+        async fn get_transactions_with_proof(
+            &self,
+            proof_version: Version,
+            start_version: Version,
+            end_version: Version,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<TransactionListWithProof>>;
+
+        async fn get_transactions_or_outputs_with_proof(
+            &self,
+            proof_version: Version,
+            start_version: Version,
+            end_version: Version,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<TransactionOrOutputListWithProof>>;
+    }
+}
+
+/// Creates a mock database reader for testing
+pub fn create_mock_db_reader() -> Arc<dyn DbReader> {
+    Arc::new(MockDatabaseReader {})
+}
+
+/// A simple mock database reader that only implements
+/// the functions required by the tests.
+pub struct MockDatabaseReader {}
+impl DbReader for MockDatabaseReader {
+    fn get_block_timestamp(&self, version: Version) -> anyhow::Result<u64> {
+        Ok(version * 100_000)
     }
 }

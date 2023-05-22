@@ -742,6 +742,7 @@ dependencies = [
 name = "aptos-data-client"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-channels",
  "aptos-config",
  "aptos-crypto",
@@ -751,6 +752,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-storage-interface",
  "aptos-storage-service-client",
  "aptos-storage-service-server",
  "aptos-storage-service-types",
@@ -762,6 +764,7 @@ dependencies = [
  "futures",
  "itertools",
  "maplit",
+ "mockall",
  "rand 0.7.3",
  "serde 1.0.149",
  "thiserror",
