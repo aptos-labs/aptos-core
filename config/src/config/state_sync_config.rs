@@ -236,6 +236,8 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    /// The interval (milliseconds) at which to refresh the latency monitor
+    pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of in-flight polls for priority peers
@@ -265,6 +267,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
