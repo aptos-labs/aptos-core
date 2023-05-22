@@ -53,6 +53,10 @@ pub struct InitTool {
     #[clap(long)]
     pub skip_faucet: bool,
 
+    /// Whether you want to create a profile from your ledger account
+    ///
+    /// Make sure that you have Ledger device connected, unlocked, and have Aptos app installed
+    /// and opened. Otherwise CLI would not be able to open the connection to your account
     #[clap(long)]
     pub from_ledger: bool,
 
