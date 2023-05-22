@@ -422,7 +422,7 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel = { version = "2.0.4", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
 diesel_migrations = { version = "2.0.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -614,8 +614,9 @@ move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
-econia_db = { package = "db", path = "../../db" }
-econia_types = { package = "types", path = "../../types" }
+# Econia
+econia_db = { package = "db", path = "../econia/src/rust/db" }
+econia_types = { package = "types", path = "../econia/src/rust/types", features = ["serde"] }
 
 [profile.release]
 debug = true

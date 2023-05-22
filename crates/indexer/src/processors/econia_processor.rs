@@ -20,7 +20,7 @@ use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
 use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
 use econia_types::{
-    book::{OrderBook, PriceLevel},
+    book::{OrderBook, PriceLevelWithId},
     events::{MakerEvent, TakerEvent},
     message::Update,
     order::{Fill, Order, OrderState, Side},
@@ -259,7 +259,7 @@ impl EconiaRedisCacher {
             .get(&price)
             .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
         let channel_name = format!("{}:{}", &self.config.book_prefix, mkt_id);
-        let update = Update::PriceLevels(PriceLevel {
+        let update = Update::PriceLevels(PriceLevelWithId {
             market_id: mkt_id,
             price,
             size: cum_size,
