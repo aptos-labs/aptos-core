@@ -8,7 +8,8 @@ use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
-        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_DUPLICATES_FILTERED,
+        BLOCK_EXECUTOR_DUPLICATES_SECONDS, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
         BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
     },
     AptosVM,
@@ -33,7 +34,7 @@ use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -144,11 +145,28 @@ impl BlockAptosVM {
         maybe_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+
+        let dedup_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
+        let before_dedup_len = transactions.len();
+        let mut duplicate_map = HashSet::new();
+        let transactions: Vec<_> = transactions
+            .into_iter()
+            .filter(|txn| match txn {
+                Transaction::UserTransaction(txn) => {
+                    duplicate_map.insert((txn.sender(), txn.sequence_number()))
+                },
+                _ => true,
+            })
+            .collect();
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe((transactions.len() - before_dedup_len) as f64);
+        drop(dedup_timer);
+
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
+
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
                 transactions
