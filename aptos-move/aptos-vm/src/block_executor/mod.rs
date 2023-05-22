@@ -176,7 +176,7 @@ impl BlockAptosVM {
             });
 
         BLOCK_EXECUTOR_DUPLICATES_FILTERED
-            .observe((signature_verified_block.len() - before_dedup_len) as f64);
+            .observe((before_dedup_len - signature_verified_block.len()) as f64);
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
