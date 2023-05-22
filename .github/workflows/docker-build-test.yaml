@@ -1,4 +1,4 @@
-## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
+## IMPORTANT NOTE TO EDITORS OF THIS FILE ## bla
 
 ## Note that when you create a PR the jobs in this file are triggered off the
 ## `pull_request_target` event instead of `pull_request` event. This is because
