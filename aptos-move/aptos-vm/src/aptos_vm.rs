@@ -40,12 +40,13 @@ use aptos_types::{
         WriteSetPayload,
     },
     vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
+    write_set::WriteSet,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{
     init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
 };
-use aptos_vm_types::{change_set::AptosChangeSet, vm_output::VMOutput};
+use aptos_vm_types::{change_set::AptosChangeSet, output::VMOutput};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -76,7 +77,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::write_set::WriteSet;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1825,9 +1825,8 @@ impl AptosSimulationVM {
                                 let change_set = session
                                     .finish(&mut (), &storage_gas_params.change_set_configs)?;
 
-                                return_on_failure!(
-                                    gas_meter.charge_io_gas_for_write_set(change_set.writes().iter(),)
-                                );
+                                return_on_failure!(gas_meter
+                                    .charge_io_gas_for_write_set(change_set.writes().iter(),));
 
                                 return_on_failure!(gas_meter.charge_storage_fee_for_all(
                                     change_set.writes().iter(),

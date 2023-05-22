@@ -88,9 +88,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// In parallel execution, will be called once per transaction when the output is
     /// ready to be committed. In sequential execution, won't be called (deltas are
     /// materialized and incorporated during execution).
-    fn incorporate_materialized_deltas(
+    fn incorporate_delta_writes(
         &self,
-        materialized_deltas: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
 
     /// Return the amount of gas consumed by the transaction.

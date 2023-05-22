@@ -292,7 +292,7 @@ where
         base_view: &S,
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
-        let mut materialized_deltas = Vec::with_capacity(num_deltas);
+        let mut delta_writes = Vec::with_capacity(num_deltas);
         for k in delta_keys {
             // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
@@ -319,12 +319,12 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            materialized_deltas.push((
+            delta_writes.push((
                 k.clone(),
                 WriteOp::Modification(serialize(&committed_delta)),
             ));
         }
-        last_input_output.record_materialized_deltas(txn_idx, materialized_deltas);
+        last_input_output.record_delta_writes(txn_idx, delta_writes);
     }
 
     fn work_task_with_scope(

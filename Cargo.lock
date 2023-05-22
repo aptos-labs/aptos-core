@@ -3383,11 +3383,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-state-view",
  "aptos-types",
- "bcs 0.1.4",
- "move-binary-format",
  "move-core-types",
- "move-vm-types",
- "once_cell",
 ]
 
 [[package]]

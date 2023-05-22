@@ -293,10 +293,10 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
     // corresponding to the (deltas) in the recorded final output of the transaction.
-    pub(crate) fn record_materialized_deltas(
+    pub(crate) fn record_delta_writes(
         &self,
         txn_idx: TxnIndex,
-        materialized_deltas: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
+        delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
         let _lock = self.commit_locks[txn_idx as usize].lock();
         match &self.outputs[txn_idx as usize]
@@ -305,7 +305,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             .output_status
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                t.incorporate_materialized_deltas(materialized_deltas);
+                t.incorporate_delta_writes(delta_writes);
             },
             ExecutionStatus::Abort(_) => {},
         };

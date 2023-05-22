@@ -22,7 +22,7 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
     transaction::SignatureCheckedTransaction,
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteSetMut},
 };
 use aptos_vm_types::change_set::AptosChangeSet;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
@@ -45,7 +45,6 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-use aptos_types::write_set::WriteSetMut;
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -354,13 +353,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
             match change {
                 AggregatorChange::Write(value) => {
-                    let op = woc.convert_aggregator_mod(&state_key, value)?;
-                    write_set_mut.insert((state_key, op))
+                    let write_op = woc.convert_aggregator_mod(&state_key, value)?;
+                    write_set_mut.insert((state_key, write_op))
                 },
                 AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
-                    let op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
-                    write_set_mut.insert((state_key, op))
+                    let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
+                    write_set_mut.insert((state_key, write_op))
                 },
             }
         }

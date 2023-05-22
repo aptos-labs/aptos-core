@@ -7,7 +7,7 @@ use aptos_types::{
     on_chain_config::StorageGasSchedule,
     state_store::state_key::StateKey,
     transaction::{ChangeSet, CheckChangeSet},
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteSet},
 };
 use aptos_vm_types::change_set::SizeChecker;
 use move_core_types::{
@@ -15,7 +15,6 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use std::fmt::Debug;
-use aptos_types::write_set::WriteSet;
 
 #[derive(Clone, Debug)]
 pub struct StoragePricingV1 {

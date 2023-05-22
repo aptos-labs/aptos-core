@@ -28,7 +28,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::vm_output::VMOutput;
+use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{

@@ -13,7 +13,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::vm_output::VMOutput;
+use aptos_vm_types::output::VMOutput;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.

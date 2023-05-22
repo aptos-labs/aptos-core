@@ -30,7 +30,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use aptos_vm_types::vm_output::VMOutput;
+use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -64,7 +64,7 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .output_with_materialized_deltas(vec![]),
+                .output_with_delta_writes(vec![]),
         }
     }
 }
@@ -77,7 +77,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
-    /// Should never be called after incorporate_materialized_deltas, as it
+    /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
@@ -90,7 +90,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    /// Should never be called after incorporate_materialized_deltas, as it
+    /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
         self.vm_output
@@ -105,7 +105,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Can be called (at most) once after transaction is committed to internally
     /// include the materialized delta outputs with the transaction outputs.
-    fn incorporate_materialized_deltas(&self, materialized_deltas: Vec<(StateKey, WriteOp)>) {
+    fn incorporate_delta_writes(&self, materialized_deltas: Vec<(StateKey, WriteOp)>) {
         assert!(
             self.committed_output
                 .set(
@@ -113,7 +113,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
-                        .output_with_materialized_deltas(materialized_deltas),
+                        .output_with_delta_writes(materialized_deltas),
                 )
                 .is_ok(),
             "Could not combine VMOutput with materialized deltas"

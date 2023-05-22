@@ -29,7 +29,7 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::AptosChangeSet, vm_output::VMOutput};
+use aptos_vm_types::{change_set::AptosChangeSet, output::VMOutput};
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 

@@ -3,15 +3,11 @@
 
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaChangeSet};
 use aptos_types::{
-    contract_event::ContractEvent, write_set::WriteOp,
+    contract_event::ContractEvent,
+    write_set::{WriteOp, WriteSet},
 };
 use move_core_types::vm_status::VMStatus;
-use std::collections::{
-    btree_map::{
-        Entry::{Occupied, Vacant},
-    },
-};
-use aptos_types::write_set::WriteSet;
+use std::collections::btree_map::Entry::{Occupied, Vacant};
 
 pub trait SizeChecker {
     fn check_writes(&self, writes: &WriteSet) -> Result<(), VMStatus>;
@@ -103,7 +99,11 @@ impl AptosChangeSet {
         })
     }
 
-    pub fn squash_write_set(self, other_write_set: WriteSet, other_events: Vec<ContractEvent>) -> anyhow::Result<Self> {
+    pub fn squash_write_set(
+        self,
+        other_write_set: WriteSet,
+        other_events: Vec<ContractEvent>,
+    ) -> anyhow::Result<Self> {
         let (write_set, mut delta, mut events) = self.into_inner();
         let mut write_set = write_set.into_mut();
         let write_ops = write_set.as_inner_mut();

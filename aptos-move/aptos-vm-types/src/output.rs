@@ -7,9 +7,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteSet},
 };
-use aptos_types::write_set::WriteSet;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 #[derive(Debug)]
@@ -92,21 +91,23 @@ impl VMOutput {
 
     /// Converts VM output into transaction output which storage or state sync
     /// understand. Extends writes with values from materialized deltas.
-    pub fn output_with_materialized_deltas(
+    pub fn output_with_delta_writes(
         self,
-        materialized_deltas: Vec<(StateKey, WriteOp)>,
+        delta_writes: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         // We should have a materialized delta for every delta in the output.
         let (writes, deltas, events, gas_used, status) = self.unpack();
-        assert_eq!(deltas.len(), materialized_deltas.len());
+        assert_eq!(deltas.len(), delta_writes.len());
 
         let mut write_set_mut = writes.into_mut();
         // Add the delta writes to the write set of the transaction.
-        materialized_deltas
+        delta_writes
             .into_iter()
             .for_each(|item| write_set_mut.insert(item));
 
-        let writes = write_set_mut.freeze().expect("Freezing of WriteSet should succeed.");
+        let writes = write_set_mut
+            .freeze()
+            .expect("Freezing of WriteSet should succeed.");
         TransactionOutput::new(writes, events, gas_used, status)
     }
 
@@ -121,15 +122,20 @@ impl VMOutput {
         }
 
         let (writes, deltas, events, gas_used, status) = self.unpack();
-        let materialized_deltas = deltas.take_materialized(state_view)?;
+        let delta_writes = deltas.take_materialized(state_view)?;
         let mut write_set_mut = writes.into_mut();
 
         // Add the delta writes to the write set of the transaction.
-        materialized_deltas
+        delta_writes
             .into_iter()
             .for_each(|item| write_set_mut.insert(item));
 
-        let writes = write_set_mut.freeze().map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR, Some("failed to freeze writeset".to_string())))?;
+        let writes = write_set_mut.freeze().map_err(|_| {
+            VMStatus::Error(
+                StatusCode::DATA_FORMAT_ERROR,
+                Some("failed to freeze writeset".to_string()),
+            )
+        })?;
         Ok(VMOutput::new(
             writes,
             DeltaChangeSet::empty(),
