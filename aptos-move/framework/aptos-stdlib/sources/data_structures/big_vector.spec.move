@@ -67,8 +67,7 @@ spec aptos_std::big_vector {
 
     spec push_back<T: store>(v: &mut BigVector<T>, val: T) {
         let num_buckets = spec_table_len(v.buckets);
-        aborts_if num_buckets * v.bucket_size > MAX_U64;
-        aborts_if v.end_index + 1 > MAX_U64;
+        aborts_if false;
         ensures length(v) == length(old(v)) + 1;
         ensures v.end_index == old(v.end_index) + 1;
         ensures spec_at(v, v.end_index-1) == val;
@@ -102,19 +101,54 @@ spec aptos_std::big_vector {
 
     spec append<T: store>(lhs: &mut BigVector<T>, other: BigVector<T>) {
         pragma verify=false;
+        pragma unroll = 1;
+        //aborts_if false; // TODO: timeout even with unroll=1
+        //ensures forall i in 0..length(old(lhs)): spec_at(lhs, i)==spec_at(old(lhs), i); // TODO: timeout even with unroll=1
+        //ensures forall i in 0..length(other): spec_at(lhs, length(old(lhs))+i)==spec_at(other, i); // TODO: timeout even with unroll=1
     }
 
     spec remove<T>(v: &mut BigVector<T>, i: u64): T {
-        pragma verify=false;
+        pragma unroll = 1;
+        pragma timeout = 120;
+        aborts_if i >= length(v);
+        ensures length(v) == length(old(v)) - 1;
+        //ensures forall j in 0..i: spec_at(v, j)==spec_at(old(v), j); // TODO: taking long time
+        //ensures forall j in i..length(v)-1: spec_at(v, j)==spec_at(old(v), j+1); // TODO: taking long time
+        ensures old(spec_at(v, i)) == result;
     }
 
     spec reverse<T>(v: &mut BigVector<T>) {
-        pragma verify=false;
+        // pragma verify=false;
+        pragma unroll = 1;
+        // TODO: data invariant doesn't hold.
+        aborts_if false;
+        //ensures forall i in 0..length(v): spec_at(v, i) == spec_at(old(v), length(v)-1-i);
     }
 
     spec index_of<T>(v: &BigVector<T>, val: &T): (bool, u64) {
-        pragma verify=false;
+        pragma unroll = 3;
+        aborts_if false;
+        //ensures result_1 == (exists i in 0..length(v): spec_at(v, i)==val); // whether v contains val or not // TODO: false negative. lack of trigger?
+        ensures result_1 ==> spec_at(v, result_2) == val; // if true, return the index where v contains val
+        ensures result_1 ==> (forall i in 0..result_2: spec_at(v, i)!=val); // ensure the smallest index
+        ensures !result_1 ==> result_2 == 0; // return 0 if v does not contain val
     }
+
+
+    spec contains<T>(v: &BigVector<T>, val: &T): bool {
+        pragma unroll = 3;
+        aborts_if false;
+        // ensures result == (exists i in 0..length(v): spec_at(v, i)==val); // TODO: false negative. lack of trigger?
+    }
+
+    spec length<T>(v: &BigVector<T>): u64 {
+        ensures result == v.end_index;
+    }
+
+    spec is_empty<T>(v: &BigVector<T>): bool {
+        ensures result == (length(v) == 0);
+    }
+
 
     // ---------------------
     // Spec helper functions

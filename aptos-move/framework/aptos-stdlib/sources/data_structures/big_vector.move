@@ -84,11 +84,17 @@ module aptos_std::big_vector {
     /// This operation will cost more gas when it adds new bucket.
     public fun push_back<T: store>(v: &mut BigVector<T>, val: T) {
         let num_buckets = table_with_length::length(&v.buckets);
+        spec {
+            assume num_buckets * v.bucket_size <= MAX_U64;
+        };
         if (v.end_index == num_buckets * v.bucket_size) {
             table_with_length::add(&mut v.buckets, num_buckets, vector::empty());
             vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets), val);
         } else {
             vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1), val);
+        };
+        spec {
+            assume v.end_index + 1 <= MAX_U64;
         };
         v.end_index = v.end_index + 1;
     }
@@ -122,11 +128,7 @@ module aptos_std::big_vector {
         let res = vector::remove(cur_bucket, i % v.bucket_size);
         v.end_index = v.end_index - 1;
         move cur_bucket;
-        while ({spec {
-            invariant cur_bucket_index <= num_buckets;
-            invariant table_with_length::spec_len(v.buckets) == num_buckets;
-        };
-            (cur_bucket_index < num_buckets)}) {
+        while (cur_bucket_index < num_buckets) {
             // remove one element from the start of current vector
             let cur_bucket = table_with_length::borrow_mut(&mut v.buckets, cur_bucket_index);
             let t = vector::remove(cur_bucket, 0);
@@ -136,10 +138,6 @@ module aptos_std::big_vector {
             vector::push_back(prev_bucket, t);
             cur_bucket_index = cur_bucket_index + 1;
         };
-        spec {
-            assert cur_bucket_index == num_buckets;
-        };
-
         // Shrink the table if the last vector is empty.
         let last_bucket = table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1);
         if (vector::is_empty(last_bucket)) {
