@@ -1517,7 +1517,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-cache-worker"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
@@ -1545,7 +1545,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-data-service"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
@@ -1574,7 +1574,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-file-store"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
@@ -1596,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-fullnode"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-api",
@@ -1649,7 +1649,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-parser"
-version = "0.0.2"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
@@ -1681,7 +1681,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-post-processor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
@@ -1705,7 +1705,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-server-framework"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-utils"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
@@ -2436,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "0.2.2"
+version = "1.0.0"
 dependencies = [
  "pbjson",
  "prost",
