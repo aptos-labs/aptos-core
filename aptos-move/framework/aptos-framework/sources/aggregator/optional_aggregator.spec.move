@@ -50,7 +50,7 @@ spec aptos_framework::optional_aggregator {
     }
 
     // TODO: Write spec for try_add.
-    spec try_add(optional_aggregator: &mut OptionalAggregator, value: u128) {
+    spec try_add(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
             + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))

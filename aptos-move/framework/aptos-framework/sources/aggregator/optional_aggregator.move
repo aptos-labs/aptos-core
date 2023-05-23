@@ -157,14 +157,15 @@ module aptos_framework::optional_aggregator {
     public fun try_add(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
         if (option::is_some(&optional_aggregator.aggregator)) {
             let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
-            return aggregator::try_add(aggregator, value);
+            aggregator::try_add(aggregator, value)
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
             if (value <= (integer.limit - integer.value)) {
                 integer.value = integer.value + value;
-                return true;
-            };
-            return false;
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -183,14 +184,15 @@ module aptos_framework::optional_aggregator {
     public fun try_sub(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
         if (option::is_some(&optional_aggregator.aggregator)) {
             let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
-            return aggregator::try_sub(aggregator, value);
+            aggregator::try_sub(aggregator, value)
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
             if (value <= integer.value) {
                 integer.value = integer.value - value;
-                return true;
-            };
-            return false;
+                true
+            } else {
+                false
+            }
         }
     }
 

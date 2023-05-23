@@ -59,7 +59,7 @@ fn native_try_add(
 
     match aggregator.add(value) {
         Ok(_) => Ok(smallvec![Value::bool(true)]),
-        Err(_) => Ok(smallvec![Value::bool(false)])
+        Err(_) => Ok(smallvec![Value::bool(false)]),
     }
 }
 
@@ -179,7 +179,7 @@ fn native_try_sub(
 
     match aggregator.sub(value) {
         Ok(_) => Ok(smallvec![Value::bool(true)]),
-        Err(_) => Ok(smallvec![Value::bool(false)])
+        Err(_) => Ok(smallvec![Value::bool(false)]),
     }
 }
 
