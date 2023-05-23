@@ -119,7 +119,17 @@ impl RestoreCoordinator {
         )
         .await?;
 
-        let target_version = self.global_opt.target_version;
+        let user_target_version = self.global_opt.target_version;
+        let epoch_ending_backups =
+            metadata_view.select_epoch_ending_backups(user_target_version)?;
+        let target_version = epoch_ending_backups
+            .last()
+            .expect("epoch ending backups should not be empty")
+            .last_version;
+        info!(
+            "Setting target_version to {} for user_target_version {}",
+            target_version, user_target_version
+        );
         COORDINATOR_TARGET_VERSION.set(target_version as i64);
 
         // calculate the start_version and replay_version
@@ -204,7 +214,6 @@ impl RestoreCoordinator {
         };
         let transaction_backups =
             metadata_view.select_transaction_backups(txn_start_version, target_version)?;
-        let epoch_ending_backups = metadata_view.select_epoch_ending_backups(target_version)?;
         let epoch_handles = epoch_ending_backups
             .iter()
             .filter(|e| e.first_version <= target_version)
