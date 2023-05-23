@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "aptos_testsuite"
 version = "0.1.0"
-description = "Aptos E2E tests, including Forge"
+description = "Aptos E2E tests and utilities in python, including Forge"
 authors = []
 readme = "README.md"
 
@@ -15,6 +15,7 @@ tabulate = "^0.9.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.3.0"
+pyright = "^1.1.309"
 
 [build-system]
 requires = ["poetry-core"]
