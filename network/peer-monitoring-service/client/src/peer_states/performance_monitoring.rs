@@ -363,6 +363,11 @@ impl StateValueInterface for PerformanceMonitoringState {
             .peer(peer_network_id)
             .error(&error));
     }
+
+    fn update_peer_state_metrics(&self, _peer_network_id: &PeerNetworkId) {
+        // TODO: Update the peer state metrics for performance monitoring.
+        // This is currently a no-op.
+    }
 }
 
 impl Display for PerformanceMonitoringState {

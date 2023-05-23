@@ -46,9 +46,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_utils::{aptos_try, return_on_failure};
-use aptos_vm_logging::{
-    init_speculative_logs, log_schema::AdapterLogSchema, speculative_error, speculative_log,
-};
+use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
@@ -1170,8 +1168,6 @@ impl AptosVM {
         F: FnOnce(u64, AptosGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
         // TODO(Gas): revisit this.
-        init_speculative_logs(1);
-
         let resolver = StorageAdapter::new(state_view);
         let vm = AptosVM::new(&resolver);
 

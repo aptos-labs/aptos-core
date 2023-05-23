@@ -162,6 +162,11 @@ const config = {
               label: "Build E2E Dapp on Aptos",
               to: "tutorials/build-e2e-dapp/e2e-dapp-index",
             },
+            {
+              type: "doc",
+              label: "Advanced Builder Guides",
+              docId: "/category/advanced-builders",
+            },
           ],
         },
         {
@@ -314,7 +319,16 @@ const config = {
     [
       "@docusaurus/plugin-client-redirects",
       {
-        redirects: [],
+        redirects: [
+          {
+            to: "/integration/creating-a-signed-transaction",
+            from: "/tutorials/your-first-transaction-sdk",
+          },
+          {
+            to: "/nodes/full-node/run-a-fullnode-on-gcp",
+            from: "/tutorials/run-a-fullnode-on-gcp",
+          },
+        ],
         createRedirects(existingPath) {
           if (existingPath.includes("/move")) {
             return [

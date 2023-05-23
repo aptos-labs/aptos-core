@@ -3,7 +3,7 @@
 
 use crate::models::property_map::PropertyMap;
 use aptos_protos::{
-    transaction::testing1::v1::{
+    transaction::v1::{
         multisig_transaction_payload::Payload as MultisigPayloadType,
         transaction_payload::Payload as PayloadType, write_set::WriteSet as WriteSetType,
         EntryFunctionId, EntryFunctionPayload, MoveScriptBytecode, MoveType, ScriptPayload,

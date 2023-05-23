@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{publishing::publish_util::Package, TransactionExecutor};
+use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
 use crate::{
     create_account_transaction, publishing::publish_util::PackageHandler, TransactionGenerator,
     TransactionGeneratorCreator,
@@ -51,7 +51,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         &self,
         init_accounts: &mut [LocalAccount],
         txn_factory: &TransactionFactory,
-        txn_executor: &dyn TransactionExecutor,
+        txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker>;
 }
@@ -113,7 +113,7 @@ impl CustomModulesDelegationGeneratorCreator {
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
         accounts: &mut [LocalAccount],
-        txn_executor: &dyn TransactionExecutor,
+        txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,

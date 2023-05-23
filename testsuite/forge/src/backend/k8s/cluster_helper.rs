@@ -4,25 +4,26 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, Get, K8sApi, K8sNode,
-    NodeConfigFn, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
-    DEFAULT_ROOT_KEY, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
+    Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
     MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{anyhow, bail, format_err};
-use aptos_logger::{info, warn};
+use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
     batch::v1::Job,
-    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod, Secret},
+    core::v1::{ConfigMap, Namespace, PersistentVolume, PersistentVolumeClaim, Pod},
 };
 use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
+    config::Kubeconfig,
     Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
@@ -248,7 +249,7 @@ pub(crate) fn delete_all_chaos(kube_namespace: &str) -> Result<()> {
 /// as well as all compute resources. If the namespace is a Forge namespace (has the "forge-*" prefix), then simply delete
 /// the entire namespace
 async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
-    let client: K8sClient = create_k8s_client().await;
+    let client: K8sClient = create_k8s_client().await?;
 
     // if operating on the default namespace,
     match kube_namespace.as_str() {
@@ -507,7 +508,7 @@ pub async fn install_testnet_resources(
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
 
     // get deployment-specific helm values and cache it
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
@@ -711,11 +712,29 @@ pub async fn collect_running_nodes(
     Ok((validators, fullnodes))
 }
 
-pub async fn create_k8s_client() -> K8sClient {
-    // get the client from the local kube context
-    let mut config_infer = Config::infer().await.unwrap();
-    config_infer.accept_invalid_certs = true;
-    K8sClient::try_from(config_infer).unwrap()
+pub async fn create_k8s_client() -> Result<K8sClient> {
+    let mut config = Config::infer().await?;
+    let cluster_name = Kubeconfig::read()
+        .map(|k| k.current_context.unwrap())
+        .unwrap_or_else(|_| config.cluster_url.to_string());
+
+    config.accept_invalid_certs = true;
+
+    let client = K8sClient::try_from(config)?;
+
+    // Test the connection, fail if request fails
+    client.apiserver_version().await.map_err(|_| {
+        if !cluster_name.contains("forge") {
+            format_err!(
+                "Failed to connect to kubernetes cluster {}, \
+                please make sure you have the right kubeconfig",
+                cluster_name
+            )
+        } else {
+            format_err!("Failed to connect to kubernetes cluster {}", cluster_name)
+        }
+    })?;
+    Ok(client)
 }
 
 /// Gets the result of helm status command as JSON
@@ -814,61 +833,12 @@ async fn create_namespace(
     Ok(())
 }
 
-pub async fn create_pyroscope_secret(kube_namespace: String) -> Result<()> {
-    let kube_client = create_k8s_client().await;
-    let kube_namespace_name = kube_namespace.clone();
-    let default_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
-        kube_client.clone(),
-        Some("default".to_string()),
-    ));
-    let namespace_secrets_api = Arc::new(K8sApi::<Secret>::from_client(
-        kube_client.clone(),
-        Some(kube_namespace_name.to_string()),
-    ));
-    // load in the secret from namespace and copy it to the new namespace
-    if let Ok(secret) = default_secrets_api.get("pyroscope").await {
-        info!("Secret pyroscope exists, continuing with it");
-        let pyroscope_secret_data = secret.data.clone();
-        let namespaced_pyroscope_secret = Secret {
-            metadata: ObjectMeta {
-                name: Some("pyroscope".to_string()),
-                ..ObjectMeta::default()
-            },
-            data: pyroscope_secret_data,
-            string_data: None,
-            type_: None,
-            immutable: None,
-        };
-        if let Err(KubeError::Api(api_err)) = namespace_secrets_api
-            .create(&PostParams::default(), &namespaced_pyroscope_secret)
-            .await
-        {
-            if api_err.code == 409 {
-                info!(
-                    "Secret pyroscope already exists in namespace {}, continuing with it",
-                    &kube_namespace_name
-                );
-            } else {
-                return Err(format_err!(
-                    "Failed to create secret pyroscope in namespace {}: {:?}",
-                    &kube_namespace_name,
-                    api_err
-                ));
-            }
-        }
-    } else {
-        warn!("Secret pyroscope does not exist. This test run will not be profiled");
-        // do not exit with an error, but throw a warning
-    }
-    Ok(())
-}
-
 pub async fn create_management_configmap(
     kube_namespace: String,
     keep: bool,
     cleanup_duration: Duration,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let namespaces_api = Arc::new(K8sApi::<Namespace>::from_client(kube_client.clone(), None));
     let other_kube_namespace = kube_namespace.clone();
 
@@ -934,7 +904,7 @@ pub async fn create_management_configmap(
 }
 
 pub async fn cleanup_cluster_with_management() -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let start = SystemTime::now();
     let time_since_the_epoch = start
         .duration_since(UNIX_EPOCH)

@@ -2,14 +2,14 @@
 name = "aptos-ledger"
 description = "Library for integration with the Aptos app on Ledger"
 version = "0.1.0"
+publish = true
 
 # Workspace inherited keys
 authors = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 license = { workspace = true }
-publish = { workspace = true }
-repository = { workspace = true }
+repository = "https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-ledger"
 rust-version = { workspace = true }
 
 [dependencies]

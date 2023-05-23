@@ -44,6 +44,10 @@ module "validator" {
   k8s_api_sources         = var.k8s_api_sources
   cluster_ipv4_cidr_block = var.cluster_ipv4_cidr_block
 
+  # node config
+  gke_cluster_enable_gcfs  = var.gke_cluster_enable_gcfs
+  gke_cluster_enable_gvnic = var.gke_cluster_enable_gvnic
+
   # autoscaling
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
   gke_node_autoprovisioning_max_cpu    = var.gke_node_autoprovisioning_max_cpu

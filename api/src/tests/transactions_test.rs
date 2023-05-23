@@ -1040,7 +1040,10 @@ async fn test_create_signing_message_rejects_no_content_length_request() {
 // Note: in tests, the min gas unit price is 0
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_empty() {
-    let mut context = new_test_context(current_function_name!());
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
     let resp = context.get("/estimate_gas_price").await;
     assert!(context.last_updated_gas_schedule().is_some());
     context.check_golden_output(resp);
@@ -1060,7 +1063,9 @@ async fn fill_block(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_ten_blocks() {
-    let mut context = new_test_context(current_function_name!());
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -1086,7 +1091,9 @@ async fn test_gas_estimation_ten_blocks() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_ten_empty_blocks() {
-    let mut context = new_test_context(current_function_name!());
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;
     // First block is ignored in gas estimate, so make 11
@@ -1106,6 +1113,7 @@ async fn test_gas_estimation_ten_empty_blocks() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_gas_estimation_cache() {
     let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = true;
     // Sets max cache size to 10
     let max_block_history = 10;
     node_config.api.gas_estimation.low_block_history = max_block_history;
@@ -1154,6 +1162,34 @@ async fn test_gas_estimation_cache() {
         ctx.last_updated_gas_estimation_cache_size(),
         max_block_history
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_gas_estimation_disabled() {
+    let mut node_config = NodeConfig::default();
+    node_config.api.gas_estimation.enabled = false;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let ctx = &mut context;
+    let creator = &mut ctx.gen_account();
+    let mint_txn = ctx.mint_user_account(creator).await;
+
+    // Include the mint txn in the first block
+    let mut block = vec![mint_txn];
+    // First block is ignored in gas estimate, so make 11
+    for _i in 0..11 {
+        fill_block(&mut block, ctx, creator).await;
+        ctx.commit_block(&block).await;
+        block.clear();
+    }
+
+    // It's disabled, so we always expect the default, despite the blocks being filled above
+    let resp = context.get("/estimate_gas_price").await;
+    for _i in 0..2 {
+        let cached = context.get("/estimate_gas_price").await;
+        assert_eq!(resp, cached);
+    }
+    context.check_golden_output(resp);
 }
 
 fn gen_string(len: u64) -> String {

@@ -22,14 +22,17 @@ use aptos_crypto::{
 };
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use curve25519_dalek::edwards::CompressedEdwardsY;
+#[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::gas_algebra::InternalGas;
 use move_core_types::gas_algebra::{InternalGasPerArg, NumArgs, NumBytes};
-use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
+#[cfg(feature = "testing")]
+use move_vm_runtime::native_functions::NativeContext;
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+#[cfg(feature = "testing")]
+use move_vm_types::{natives::function::NativeResult, pop_arg};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};

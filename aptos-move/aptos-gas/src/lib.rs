@@ -15,7 +15,7 @@
 //! The reason why we need two different representations is that they serve different purposes:
 //!   - The Rust structs are used for quick (static) lookups by the gas meter and native functions
 //!     when calculating gas costs.
-//!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrate it easily
+//!   - The on-chain gas schedule needs to be extensible and unordered so we can upgrade it easily
 //!     in the future.
 
 #[macro_use]
