@@ -53,6 +53,7 @@ pub(crate) trait VMAdapter {
         txn: &PreprocessedTransaction,
         data_cache: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 
     fn validate_signature_checked_transaction(

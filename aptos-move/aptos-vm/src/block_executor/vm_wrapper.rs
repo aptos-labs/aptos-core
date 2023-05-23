@@ -60,15 +60,20 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         view: &impl StateView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
-        _aggregator_enabled: bool,
+        aggregator_enabled: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
-        match self
-            .vm
-            .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
-        {
+        match self.vm.execute_single_transaction(
+            txn,
+            &view.as_move_resolver(),
+            &log_context,
+            aggregator_enabled,
+        ) {
             Ok((vm_status, output_ext, sender)) => {
+                if !aggregator_enabled {
+                    assert!(output_ext.delta_change_set().is_empty());
+                }
                 if output_ext.txn_output().status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

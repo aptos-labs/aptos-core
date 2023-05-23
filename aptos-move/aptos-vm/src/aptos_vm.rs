@@ -1036,9 +1036,12 @@ impl AptosVM {
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
+        aggregator_enabled: bool,
     ) -> (VMStatus, TransactionOutputExt) {
         // Revalidate the transaction.
-        let mut session = self.0.new_session(resolver, SessionId::txn(txn), true);
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::txn(txn), aggregator_enabled);
         if let Err(err) = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1149,12 +1152,19 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> (VMStatus, TransactionOutputExt) {
         let balance = TransactionMetadata::new(txn).max_gas_amount();
         // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
         let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
 
-        self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter)
+        self.execute_user_transaction_impl(
+            resolver,
+            txn,
+            log_context,
+            &mut gas_meter,
+            aggregator_enabled,
+        )
     }
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
@@ -1181,7 +1191,7 @@ impl AptosVM {
         )?;
 
         let (status, output) =
-            vm.execute_user_transaction_impl(&resolver, txn, log_context, &mut gas_meter);
+            vm.execute_user_transaction_impl(&resolver, txn, log_context, &mut gas_meter, true);
 
         Ok((status, output.into_transaction_output(&resolver), gas_meter))
     }
@@ -1668,6 +1678,7 @@ impl VMAdapter for AptosVM {
         txn: &PreprocessedTransaction,
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
@@ -1688,7 +1699,8 @@ impl VMAdapter for AptosVM {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_string();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
+                let (vm_status, output) =
+                    self.execute_user_transaction(resolver, txn, log_context, aggregator_enabled);
 
                 if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
                     vm_status.clone().keep_or_discard()
