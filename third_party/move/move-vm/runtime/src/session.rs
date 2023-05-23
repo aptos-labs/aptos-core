@@ -13,52 +13,18 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Changes, Event},
+    effects::{ChangeSet, Event},
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
-    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    values::{GlobalValue, Value},
+    values::GlobalValue,
 };
 use std::{borrow::Borrow, sync::Arc};
-
-fn serialize_changes(changes: Changes<Vec<u8>, (Value, MoveTypeLayout)>) -> VMResult<ChangeSet> {
-    let mut serialized_change_set = ChangeSet::new();
-    for (addr, account_change_set) in changes.into_inner() {
-        let mut serialized_account_change_set = AccountChangeSet::new();
-
-        // Currently all modules are serialized.
-        let (modules, resources) = account_change_set.into_inner();
-        for (identifier, blob_op) in modules {
-            serialized_account_change_set
-                .add_module_op(identifier, blob_op)
-                .expect("All identifiers are unique.");
-        }
-
-        // Resource stored as (value, layout) pairs. Serialize them as well.
-        for (tag, resource_op) in resources {
-            let blob_op = resource_op.and_then(|(value, layout)| {
-                value.simple_serialize(&layout).ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                        .finish(Location::Undefined)
-                })
-            })?;
-            serialized_account_change_set
-                .add_resource_op(tag, blob_op)
-                .expect("All struct tags are unique.");
-        }
-        serialized_change_set
-            .add_account_changeset(addr, serialized_account_change_set)
-            .expect("All addresses are unique.");
-    }
-    Ok(serialized_change_set)
-}
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -290,41 +256,13 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish_without_serialization(
-        self,
-    ) -> VMResult<(Changes<Vec<u8>, (Value, MoveTypeLayout)>, Vec<Event>)> {
+    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
         self.data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    pub fn finish(self) -> VMResult<(ChangeSet, Vec<Event>)> {
-        let (change_set, events) = self
-            .data_cache
-            .into_effects(self.move_vm.runtime.loader())
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((serialize_changes(change_set)?, events))
-    }
-
     /// Same like `finish`, but also extracts the native context extensions from the session.
-    pub fn finish_without_serialization_with_extensions(
-        self,
-    ) -> VMResult<(
-        Changes<Vec<u8>, (Value, MoveTypeLayout)>,
-        Vec<Event>,
-        NativeContextExtensions<'r>,
-    )> {
-        let Session {
-            data_cache,
-            native_extensions,
-            ..
-        } = self;
-        let (change_set, events) = data_cache
-            .into_effects(self.move_vm.runtime.loader())
-            .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set, events, native_extensions))
-    }
-
     pub fn finish_with_extensions(
         self,
     ) -> VMResult<(ChangeSet, Vec<Event>, NativeContextExtensions<'r>)> {
@@ -336,7 +274,7 @@ impl<'r, 'l> Session<'r, 'l> {
         let (change_set, events) = data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((serialize_changes(change_set)?, events, native_extensions))
+        Ok((change_set, events, native_extensions))
     }
 
     /// Try to load a resource from remote storage and create a corresponding GlobalValue

@@ -6,7 +6,7 @@ use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, Changes, Event, Op},
+    effects::{AccountChangeSet, ChangeSet, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -69,11 +69,8 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(
-        self,
-        loader: &Loader,
-    ) -> PartialVMResult<(Changes<Vec<u8>, (Value, MoveTypeLayout)>, Vec<Event>)> {
-        let mut change_set = Changes::new();
+    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
+        let mut change_set = ChangeSet::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
@@ -87,7 +84,7 @@ impl<'r> TransactionDataCache<'r> {
 
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv)) in account_data_cache.data_map {
-                let op = match gv.into_effect_with_layout(layout) {
+                let op = match gv.into_effect() {
                     Some(op) => op,
                     None => continue,
                 };
@@ -96,13 +93,30 @@ impl<'r> TransactionDataCache<'r> {
                     TypeTag::Struct(struct_tag) => *struct_tag,
                     _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                 };
-                resources.insert(struct_tag, op);
+
+                match op {
+                    Op::New(val) => {
+                        let resource_blob = val
+                            .simple_serialize(&layout)
+                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
+                        resources.insert(struct_tag, Op::New(resource_blob));
+                    },
+                    Op::Modify(val) => {
+                        let resource_blob = val
+                            .simple_serialize(&layout)
+                            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
+                        resources.insert(struct_tag, Op::Modify(resource_blob));
+                    },
+                    Op::Delete => {
+                        resources.insert(struct_tag, Op::Delete);
+                    },
+                }
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set
                     .add_account_changeset(
                         addr,
-                        AccountChanges::from_modules_resources(modules, resources),
+                        AccountChangeSet::from_modules_resources(modules, resources),
                     )
                     .expect("accounts should be unique");
             }

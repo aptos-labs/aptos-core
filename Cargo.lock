@@ -8458,7 +8458,6 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
- "move-vm-types",
  "once_cell",
  "serde 1.0.149",
 ]
