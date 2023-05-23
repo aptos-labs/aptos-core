@@ -987,7 +987,6 @@ dependencies = [
  "aptos-db",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
- "aptos-gas",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
@@ -3386,6 +3385,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-state-view",
  "aptos-types",
+ "move-binary-format",
  "move-core-types",
 ]
 

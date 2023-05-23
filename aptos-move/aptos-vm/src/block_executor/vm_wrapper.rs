@@ -8,11 +8,13 @@ use crate::{
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
 };
+use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::output::VMOutput;
 use move_core_types::{
     ident_str,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
@@ -71,9 +73,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
                     // TODO: Integrate delta application failure.
-                    vm_output = vm_output
-                        .try_materialize(view)
+                    let txn_output = vm_output
+                        .into_transaction_output(view)
                         .expect("Delta materialization failed");
+
+                    // Keep VMOutput type for wrapper.
+                    let (write_set, events, gas_used, status) = txn_output.unpack();
+                    vm_output =
+                        VMOutput::new(write_set, DeltaChangeSet::empty(), events, gas_used, status)
                 }
 
                 if vm_output.status().is_discarded() {

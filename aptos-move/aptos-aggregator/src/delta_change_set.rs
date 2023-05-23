@@ -313,11 +313,6 @@ impl DeltaChangeSet {
     }
 
     #[inline]
-    pub fn contains_key(&self, key: &StateKey) -> bool {
-        self.delta_change_set.contains_key(key)
-    }
-
-    #[inline]
     pub fn entry(&mut self, key: StateKey) -> Entry<StateKey, DeltaOp> {
         self.delta_change_set.entry(key)
     }
@@ -347,17 +342,21 @@ impl DeltaChangeSet {
         Ok(ret)
     }
 
+    /// Consumes the delta change set and tries to materialize it into a write set.
     pub fn try_into_write_set(
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
-        let materialized_write_set = self
-            .take_materialized(state_view)
-            .expect("something terrible happened when applying aggregator deltas");
+        let materialized_write_set = self.take_materialized(state_view)?;
 
         WriteSetMut::new(materialized_write_set)
             .freeze()
-            .map_err(|_err| VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None))
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Error when freezing materialized deltas.".to_string()),
+                )
+            })
     }
 }
 

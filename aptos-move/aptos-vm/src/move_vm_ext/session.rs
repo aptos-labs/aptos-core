@@ -317,6 +317,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     blob_op,
                     configs.legacy_resource_creation_as_modification(),
                 )?;
+
                 write_set_mut.insert((state_key, op))
             }
 

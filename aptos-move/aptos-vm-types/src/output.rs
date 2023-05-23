@@ -11,10 +11,12 @@ use aptos_types::{
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
+/// Output produced by the VM. Before VMOutput is passed to storage backends,
+/// it must be converted to TransactionOutput.
 #[derive(Debug)]
 pub struct VMOutput {
-    writes: WriteSet,
-    deltas: DeltaChangeSet,
+    write_set: WriteSet,
+    delta_change_set: DeltaChangeSet,
     events: Vec<ContractEvent>,
     gas_used: u64,
     status: TransactionStatus,
@@ -22,15 +24,15 @@ pub struct VMOutput {
 
 impl VMOutput {
     pub fn new(
-        writes: WriteSet,
-        deltas: DeltaChangeSet,
+        write_set: WriteSet,
+        delta_change_set: DeltaChangeSet,
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
     ) -> Self {
         Self {
-            writes,
-            deltas,
+            write_set,
+            delta_change_set,
             events,
             gas_used,
             status,
@@ -39,8 +41,8 @@ impl VMOutput {
 
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
-            writes: WriteSet::default(),
-            deltas: DeltaChangeSet::empty(),
+            write_set: WriteSet::default(),
+            delta_change_set: DeltaChangeSet::empty(),
             events: vec![],
             gas_used: 0,
             status,
@@ -48,7 +50,7 @@ impl VMOutput {
     }
 
     pub fn into(self) -> (WriteSet, DeltaChangeSet, Vec<ContractEvent>) {
-        (self.writes, self.deltas, self.events)
+        (self.write_set, self.delta_change_set, self.events)
     }
 
     pub fn unpack(
@@ -61,20 +63,20 @@ impl VMOutput {
         TransactionStatus,
     ) {
         (
-            self.writes,
-            self.deltas,
+            self.write_set,
+            self.delta_change_set,
             self.events,
             self.gas_used,
             self.status,
         )
     }
 
-    pub fn writes(&self) -> &WriteSet {
-        &self.writes
+    pub fn write_set(&self) -> &WriteSet {
+        &self.write_set
     }
 
-    pub fn deltas(&self) -> &DeltaChangeSet {
-        &self.deltas
+    pub fn delta_change_set(&self) -> &DeltaChangeSet {
+        &self.delta_change_set
     }
 
     pub fn events(&self) -> &[ContractEvent] {
@@ -89,6 +91,42 @@ impl VMOutput {
         &self.status
     }
 
+    /// Converts VMOutput into TransactionOutput which can be used by storage
+    /// backends. During this conversion delta materialization can fail, in
+    /// which case an error is returned.
+    pub fn into_transaction_output(
+        self,
+        state_view: &impl StateView,
+    ) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let (write_set, delta_change_set, events, gas_used, status) = self.unpack();
+
+        // First, check if output of transaction should be discarded or delta
+        // change set is empty. In both cases, we do not need to apply any
+        // deltas and can return immediately.
+        if status.is_discarded() || delta_change_set.is_empty() {
+            return Ok(TransactionOutput::new(write_set, events, gas_used, status));
+        }
+
+        // Try to materialize deltas and add them to the write set.
+        let mut write_set_mut = write_set.into_mut();
+        let delta_writes = delta_change_set.take_materialized(state_view)?;
+        delta_writes
+            .into_iter()
+            .for_each(|item| write_set_mut.insert(item));
+
+        let write_set = write_set_mut.freeze().map_err(|_| {
+            VMStatus::Error(
+                StatusCode::DATA_FORMAT_ERROR,
+                Some(
+                    "Failed to freeze write set when converting VMOutput to TransactionOutput"
+                        .to_string(),
+                ),
+            )
+        })?;
+
+        Ok(TransactionOutput::new(write_set, events, gas_used, status))
+    }
+
     /// Converts VM output into transaction output which storage or state sync
     /// understand. Extends writes with values from materialized deltas.
     pub fn output_with_delta_writes(
@@ -96,52 +134,18 @@ impl VMOutput {
         delta_writes: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         // We should have a materialized delta for every delta in the output.
-        let (writes, deltas, events, gas_used, status) = self.unpack();
-        assert_eq!(deltas.len(), delta_writes.len());
+        let (write_set, delta_change_set, events, gas_used, status) = self.unpack();
+        assert_eq!(delta_writes.len(), delta_change_set.len());
 
-        let mut write_set_mut = writes.into_mut();
+        let mut write_set_mut = write_set.into_mut();
         // Add the delta writes to the write set of the transaction.
         delta_writes
             .into_iter()
             .for_each(|item| write_set_mut.insert(item));
 
-        let writes = write_set_mut
+        let write_set = write_set_mut
             .freeze()
             .expect("Freezing of WriteSet should succeed.");
-        TransactionOutput::new(writes, events, gas_used, status)
-    }
-
-    /// Tries to materialize deltas and merges them with the set of writes produced
-    /// by this VM output.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
-        // First, check if output of transaction should be discarded or delta
-        // change set is empty. In both cases, we do not need to apply any
-        // deltas and can return immediately.
-        if self.status.is_discarded() || self.deltas.is_empty() {
-            return Ok(self);
-        }
-
-        let (writes, deltas, events, gas_used, status) = self.unpack();
-        let delta_writes = deltas.take_materialized(state_view)?;
-        let mut write_set_mut = writes.into_mut();
-
-        // Add the delta writes to the write set of the transaction.
-        delta_writes
-            .into_iter()
-            .for_each(|item| write_set_mut.insert(item));
-
-        let writes = write_set_mut.freeze().map_err(|_| {
-            VMStatus::Error(
-                StatusCode::DATA_FORMAT_ERROR,
-                Some("failed to freeze writeset".to_string()),
-            )
-        })?;
-        Ok(VMOutput::new(
-            writes,
-            DeltaChangeSet::empty(),
-            events,
-            gas_used,
-            status,
-        ))
+        TransactionOutput::new(write_set, events, gas_used, status)
     }
 }

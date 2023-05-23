@@ -3,10 +3,7 @@
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
-    contract_event::ContractEvent,
-    on_chain_config::StorageGasSchedule,
-    state_store::state_key::StateKey,
-    write_set::{WriteOp, WriteSet},
+    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
 use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use move_core_types::{

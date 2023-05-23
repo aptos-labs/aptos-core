@@ -17,4 +17,5 @@ anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
