@@ -37,7 +37,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
         vm: &'l AptosVMImpl,
         session_id: SessionId,
-        base_state_view: &'r dyn StateView,
+        base_state_view: &'r dyn StateView<Key = StateKey>,
         previous_session_change_set: ChangeSetExt,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
@@ -73,13 +73,16 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
 /// A state view as if a change set is applied on top of the base state view.
 struct ChangeSetStateView<'r> {
-    base: &'r dyn StateView,
+    base: &'r dyn StateView<Key = StateKey>,
     change_set: ChangeSetExt,
     materialized_delta_change_set: WriteSet,
 }
 
 impl<'r> ChangeSetStateView<'r> {
-    pub fn new(base: &'r dyn StateView, change_set: ChangeSetExt) -> Result<Self, VMStatus> {
+    pub fn new(
+        base: &'r dyn StateView<Key = StateKey>,
+        change_set: ChangeSetExt,
+    ) -> Result<Self, VMStatus> {
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use

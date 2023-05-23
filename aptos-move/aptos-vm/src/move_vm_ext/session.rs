@@ -103,7 +103,7 @@ impl SessionId {
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
-    remote: &'r dyn MoveResolverExt,
+    remote: &'r dyn MoveResolverExt<Key = StateKey>,
     new_slot_payer: Option<AccountAddress>,
     features: Arc<Features>,
 }
@@ -111,7 +111,7 @@ pub struct SessionExt<'r, 'l> {
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
         inner: Session<'r, 'l>,
-        remote: &'r dyn MoveResolverExt,
+        remote: &'r dyn MoveResolverExt<Key = StateKey>,
         new_slot_payer: Option<AccountAddress>,
         features: Arc<Features>,
     ) -> Self {
@@ -186,7 +186,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * Otherwise delete
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
-        remote: &dyn MoveResolverExt,
+        remote: &dyn MoveResolverExt<Key = StateKey>,
         change_set: MoveChangeSet,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
@@ -268,7 +268,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     pub fn convert_change_set<C: AccessPathCache>(
-        remote: &dyn MoveResolverExt,
+        remote: &dyn MoveResolverExt<Key = StateKey>,
         new_slot_payer: Option<AccountAddress>,
         is_storage_slot_metadata_enabled: bool,
         current_time: Option<&CurrentTimeMicroseconds>,
@@ -389,7 +389,7 @@ impl<'r, 'l> DerefMut for SessionExt<'r, 'l> {
 }
 
 struct WriteOpConverter<'r> {
-    remote: &'r dyn MoveResolverExt,
+    remote: &'r dyn MoveResolverExt<Key = StateKey>,
     new_slot_metadata: Option<StateValueMetadata>,
 }
 
