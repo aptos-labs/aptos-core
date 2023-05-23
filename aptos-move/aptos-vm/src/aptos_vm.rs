@@ -314,16 +314,12 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
         respawned_session.execute(|session| {
             self.0
                 .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
         })?;
-        let change_set_ext = respawned_session.finish(change_set_configs)?;
-
-        let (delta_change_set, change_set) = change_set_ext.into_inner();
-        let (write_set, events) = change_set.into_inner();
-
+        let change_set = respawned_session.finish(change_set_configs)?;
         let gas_used = txn_data
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
@@ -466,18 +462,18 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
-        let change_set_ext = session.finish(&mut (), change_set_configs)?;
-        gas_meter.charge_io_gas_for_write_set(change_set_ext.write_set().iter())?;
+        let change_set = session.finish(&mut (), change_set_configs)?;
+        gas_meter.charge_io_gas_for_write_set(change_set.write_set().iter())?;
         gas_meter.charge_storage_fee_for_all(
-            change_set_ext.write_set().iter(),
-            change_set_ext.change_set().events(),
+            change_set.write_set().iter(),
+            change_set.events(),
             txn_data.transaction_size,
             txn_data.gas_unit_price,
         )?;
 
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::txn_meta(txn_data);
-        RespawnedSession::spawn(&self.0, session_id, resolver, change_set_ext)
+        RespawnedSession::spawn(&self.0, session_id, resolver, change_set)
     }
 
     // Execute a multisig transaction:
@@ -593,7 +589,6 @@ impl AptosVM {
                 execution_error,
                 txn_data,
                 cleanup_args,
-                change_set_configs,
             )?
         } else {
             self.success_multisig_payload_cleanup(
@@ -676,7 +671,6 @@ impl AptosVM {
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
-        change_set_configs: &ChangeSetConfigs,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
@@ -684,7 +678,7 @@ impl AptosVM {
             &self.0,
             SessionId::txn_meta(txn_data),
             resolver,
-            ChangeSetExt::empty(Arc::new(change_set_configs.clone())),
+            VMChangeSet::empty(),
         )?;
 
         let execution_error = ExecutionError::try_from(execution_error)

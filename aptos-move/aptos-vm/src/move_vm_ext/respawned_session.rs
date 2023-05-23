@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_aggregator::transaction::ChangeSetExt;
 use aptos_gas::ChangeSetConfigs;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
@@ -16,6 +15,7 @@ use aptos_types::{
     },
     write_set::{TransactionWrite, WriteSet},
 };
+use aptos_vm_types::change_set::VMChangeSet;
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and
@@ -38,7 +38,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         vm: &'l AptosVMImpl,
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
-        previous_session_change_set: ChangeSetExt,
+        previous_session_change_set: VMChangeSet,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
 
@@ -57,29 +57,31 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn finish(
         mut self,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let new_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
         let change_set = self.into_heads().state_view.change_set;
-        change_set.squash(new_change_set).map_err(|_err| {
-            VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg("Failed to squash ChangeSetExt"),
-            )
-        })
+        change_set
+            .squash(new_change_set, change_set_configs)
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    err_msg("Failed to squash VMChangeSet"),
+                )
+            })
     }
 }
 
 /// A state view as if a change set is applied on top of the base state view.
 struct ChangeSetStateView<'r> {
     base: &'r dyn StateView,
-    change_set: ChangeSetExt,
+    change_set: VMChangeSet,
     materialized_delta_change_set: WriteSet,
 }
 
 impl<'r> ChangeSetStateView<'r> {
-    pub fn new(base: &'r dyn StateView, change_set: ChangeSetExt) -> Result<Self, VMStatus> {
+    pub fn new(base: &'r dyn StateView, change_set: VMChangeSet) -> Result<Self, VMStatus> {
         // TODO: at this point we know that delta application failed
         // (and it should have occurred in user transaction in general).
         // We need to rerun the epilogue and charge gas. Currently, the use
@@ -89,7 +91,7 @@ impl<'r> ChangeSetStateView<'r> {
         // rather ugly and has a lot of legacy code. This makes proper error
         // handling quite challenging.
         let materialized_delta_change_set = change_set
-            .delta_change_set
+            .delta_change_set()
             .clone()
             .try_into_write_set(base)?;
         Ok(Self {

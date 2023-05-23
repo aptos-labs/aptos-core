@@ -336,7 +336,7 @@ impl DeltaChangeSet {
         // conversion fails, error is returned.
         let into_write_set_item =
             |item: (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write_op = delta_op.try_into_write_op(state_view, &item.0)?;
+                let write_op = item.1.try_into_write_op(state_view, &item.0)?;
                 Ok((item.0, write_op))
             };
 
