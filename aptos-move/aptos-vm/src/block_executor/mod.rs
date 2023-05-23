@@ -140,6 +140,7 @@ pub struct BlockAptosVM();
 /// Insert a transaction hash into `TXN_CACHE` if not present.
 /// Return whether the insertion happened (i.e., cache miss).
 fn insert_into_txn_cache(cache: &SegmentedCache<HashValue, u64>, txn: &Transaction) -> bool {
+    // TODO: expensive, needs a hybrid approach
     let key = txn.hash();
     let nonce_in = rand::random::<u64>();
     let nonce_out = cache.get_with(key, || nonce_in);
