@@ -37,7 +37,7 @@ module aptos_framework::aggregator {
     /// Adds `value` to aggregator. 
     /// Returns a bool flag indicating whether the operation is successfull. 
     /// If the output is true, then there is no error in the operation.
-    /// If the output is false, then there is overflow/underflow error.
+    /// If the output is false, then there is overflow error.
     public native fun try_add(aggregator: &mut Aggregator, value: u128): bool;
 
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
@@ -46,7 +46,7 @@ module aptos_framework::aggregator {
     /// Subtracts `value` from aggregator. 
     /// Returns a bool flag indicating whether the operation is successfull. 
     /// If the output is true, then there is no error in the operation.
-    /// If the output is false, then there is overflow/underflow error.
+    /// If the output is false, then there is underflow error.
     public native fun try_sub(aggregator: &mut Aggregator, value: u128): bool;
 
     /// Subtracts `value` from aggregator. Aborts on going below zero.
