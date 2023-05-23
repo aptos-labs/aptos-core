@@ -20,6 +20,7 @@ import {
   GetOwnedTokensQuery,
   GetTokenOwnedFromCollectionQuery,
   GetCollectionDataQuery,
+  GetCollectionsWithOwnedTokensQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -39,6 +40,7 @@ import {
   GetOwnedTokens,
   GetTokenOwnedFromCollection,
   GetCollectionData,
+  GetCollectionsWithOwnedTokens,
 } from "../indexer/generated/queries";
 
 /**
@@ -456,5 +458,35 @@ export class IndexerClient {
   ): Promise<string> {
     return (await this.getCollectionData(creatorAddress, collectionName, extraArgs)).current_collections_v2[0]
       .collection_id;
+  }
+
+  async getCollectionsWithOwnedTokens(
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      tokenStandard?: TokenStandard;
+      options?: PaginationArgs;
+    },
+  ): Promise<GetCollectionsWithOwnedTokensQuery> {
+    const ownerHexAddress = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(ownerHexAddress);
+
+    const whereCondition: any = {
+      owner_address: { _eq: ownerHexAddress },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.current_collection = {};
+      whereCondition.current_collection.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
+    const graphqlQuery = {
+      query: GetCollectionsWithOwnedTokens,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
+    };
+    return this.queryIndexer(graphqlQuery);
   }
 }

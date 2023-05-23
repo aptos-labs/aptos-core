@@ -284,5 +284,25 @@ describe("Indexer", () => {
       },
       longTestTimeout,
     );
+
+    it(
+      "queries for all collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex());
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(2);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all v2 collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex(), {
+          tokenStandard: "v2",
+        });
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(1);
+      },
+      longTestTimeout,
+    );
   });
 });

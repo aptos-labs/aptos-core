@@ -150,6 +150,30 @@ export const GetCollectionData = `
   }
 }
     `;
+export const GetCollectionsWithOwnedTokens = `
+    query getCollectionsWithOwnedTokens($where_condition: current_collection_ownership_v2_view_bool_exp!, $offset: Int, $limit: Int) {
+  current_collection_ownership_v2_view(
+    where: $where_condition
+    order_by: {last_transaction_version: desc}
+    offset: $offset
+    limit: $limit
+  ) {
+    current_collection {
+      creator_address
+      collection_name
+      token_standard
+      collection_id
+      description
+      table_handle_v1
+      uri
+      total_minted_v2
+      max_supply
+    }
+    distinct_tokens
+    last_transaction_version
+  }
+}
+    `;
 export const GetDelegatedStakingActivities = `
     query getDelegatedStakingActivities($delegatorAddress: String, $poolAddress: String) {
   delegated_staking_activities(
@@ -307,6 +331,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getCollectionData(variables: Types.GetCollectionDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionDataQuery>(GetCollectionData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionData', 'query');
+    },
+    getCollectionsWithOwnedTokens(variables: Types.GetCollectionsWithOwnedTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionsWithOwnedTokensQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionsWithOwnedTokensQuery>(GetCollectionsWithOwnedTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionsWithOwnedTokens', 'query');
     },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');

@@ -115,6 +115,42 @@ export type Address_Version_From_EventsToken_Activities_AggregateArgs = {
   where?: InputMaybe<Token_Activities_Bool_Exp>;
 };
 
+/** aggregated selection of "address_version_from_events" */
+export type Address_Version_From_Events_Aggregate = {
+  __typename?: 'address_version_from_events_aggregate';
+  aggregate?: Maybe<Address_Version_From_Events_Aggregate_Fields>;
+  nodes: Array<Address_Version_From_Events>;
+};
+
+/** aggregate fields of "address_version_from_events" */
+export type Address_Version_From_Events_Aggregate_Fields = {
+  __typename?: 'address_version_from_events_aggregate_fields';
+  avg?: Maybe<Address_Version_From_Events_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Address_Version_From_Events_Max_Fields>;
+  min?: Maybe<Address_Version_From_Events_Min_Fields>;
+  stddev?: Maybe<Address_Version_From_Events_Stddev_Fields>;
+  stddev_pop?: Maybe<Address_Version_From_Events_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Address_Version_From_Events_Stddev_Samp_Fields>;
+  sum?: Maybe<Address_Version_From_Events_Sum_Fields>;
+  var_pop?: Maybe<Address_Version_From_Events_Var_Pop_Fields>;
+  var_samp?: Maybe<Address_Version_From_Events_Var_Samp_Fields>;
+  variance?: Maybe<Address_Version_From_Events_Variance_Fields>;
+};
+
+
+/** aggregate fields of "address_version_from_events" */
+export type Address_Version_From_Events_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Address_Version_From_Events_Avg_Fields = {
+  __typename?: 'address_version_from_events_avg_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** Boolean expression to filter rows from the table "address_version_from_events". All fields are combined with a logical 'AND'. */
 export type Address_Version_From_Events_Bool_Exp = {
   _and?: InputMaybe<Array<Address_Version_From_Events_Bool_Exp>>;
@@ -122,6 +158,20 @@ export type Address_Version_From_Events_Bool_Exp = {
   _or?: InputMaybe<Array<Address_Version_From_Events_Bool_Exp>>;
   account_address?: InputMaybe<String_Comparison_Exp>;
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Address_Version_From_Events_Max_Fields = {
+  __typename?: 'address_version_from_events_max_fields';
+  account_address?: Maybe<Scalars['String']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate min on columns */
+export type Address_Version_From_Events_Min_Fields = {
+  __typename?: 'address_version_from_events_min_fields';
+  account_address?: Maybe<Scalars['String']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
 };
 
 /** Ordering options when selecting data from "address_version_from_events". */
@@ -138,6 +188,24 @@ export enum Address_Version_From_Events_Select_Column {
   TransactionVersion = 'transaction_version'
 }
 
+/** aggregate stddev on columns */
+export type Address_Version_From_Events_Stddev_Fields = {
+  __typename?: 'address_version_from_events_stddev_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Address_Version_From_Events_Stddev_Pop_Fields = {
+  __typename?: 'address_version_from_events_stddev_pop_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Address_Version_From_Events_Stddev_Samp_Fields = {
+  __typename?: 'address_version_from_events_stddev_samp_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** Streaming cursor of the table "address_version_from_events" */
 export type Address_Version_From_Events_Stream_Cursor_Input = {
   /** Stream column input with initial value */
@@ -150,6 +218,30 @@ export type Address_Version_From_Events_Stream_Cursor_Input = {
 export type Address_Version_From_Events_Stream_Cursor_Value_Input = {
   account_address?: InputMaybe<Scalars['String']>;
   transaction_version?: InputMaybe<Scalars['bigint']>;
+};
+
+/** aggregate sum on columns */
+export type Address_Version_From_Events_Sum_Fields = {
+  __typename?: 'address_version_from_events_sum_fields';
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Address_Version_From_Events_Var_Pop_Fields = {
+  __typename?: 'address_version_from_events_var_pop_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Address_Version_From_Events_Var_Samp_Fields = {
+  __typename?: 'address_version_from_events_var_samp_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Address_Version_From_Events_Variance_Fields = {
+  __typename?: 'address_version_from_events_variance_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
 };
 
 /** columns and relationships of "address_version_from_move_resources" */
@@ -1022,6 +1114,170 @@ export type Current_Collection_Datas_Stream_Cursor_Value_Input = {
   supply?: InputMaybe<Scalars['numeric']>;
   table_handle?: InputMaybe<Scalars['String']>;
   uri_mutable?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** columns and relationships of "current_collection_ownership_v2_view" */
+export type Current_Collection_Ownership_V2_View = {
+  __typename?: 'current_collection_ownership_v2_view';
+  collection_id?: Maybe<Scalars['String']>;
+  /** An object relationship */
+  current_collection?: Maybe<Current_Collections_V2>;
+  distinct_tokens?: Maybe<Scalars['bigint']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+};
+
+/** aggregated selection of "current_collection_ownership_v2_view" */
+export type Current_Collection_Ownership_V2_View_Aggregate = {
+  __typename?: 'current_collection_ownership_v2_view_aggregate';
+  aggregate?: Maybe<Current_Collection_Ownership_V2_View_Aggregate_Fields>;
+  nodes: Array<Current_Collection_Ownership_V2_View>;
+};
+
+/** aggregate fields of "current_collection_ownership_v2_view" */
+export type Current_Collection_Ownership_V2_View_Aggregate_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_aggregate_fields';
+  avg?: Maybe<Current_Collection_Ownership_V2_View_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Current_Collection_Ownership_V2_View_Max_Fields>;
+  min?: Maybe<Current_Collection_Ownership_V2_View_Min_Fields>;
+  stddev?: Maybe<Current_Collection_Ownership_V2_View_Stddev_Fields>;
+  stddev_pop?: Maybe<Current_Collection_Ownership_V2_View_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Current_Collection_Ownership_V2_View_Stddev_Samp_Fields>;
+  sum?: Maybe<Current_Collection_Ownership_V2_View_Sum_Fields>;
+  var_pop?: Maybe<Current_Collection_Ownership_V2_View_Var_Pop_Fields>;
+  var_samp?: Maybe<Current_Collection_Ownership_V2_View_Var_Samp_Fields>;
+  variance?: Maybe<Current_Collection_Ownership_V2_View_Variance_Fields>;
+};
+
+
+/** aggregate fields of "current_collection_ownership_v2_view" */
+export type Current_Collection_Ownership_V2_View_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Current_Collection_Ownership_V2_View_Avg_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_avg_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Boolean expression to filter rows from the table "current_collection_ownership_v2_view". All fields are combined with a logical 'AND'. */
+export type Current_Collection_Ownership_V2_View_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Bool_Exp>>;
+  _not?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Bool_Exp>>;
+  collection_id?: InputMaybe<String_Comparison_Exp>;
+  current_collection?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+  distinct_tokens?: InputMaybe<Bigint_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  owner_address?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Current_Collection_Ownership_V2_View_Max_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_max_fields';
+  collection_id?: Maybe<Scalars['String']>;
+  distinct_tokens?: Maybe<Scalars['bigint']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+};
+
+/** aggregate min on columns */
+export type Current_Collection_Ownership_V2_View_Min_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_min_fields';
+  collection_id?: Maybe<Scalars['String']>;
+  distinct_tokens?: Maybe<Scalars['bigint']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+};
+
+/** Ordering options when selecting data from "current_collection_ownership_v2_view". */
+export type Current_Collection_Ownership_V2_View_Order_By = {
+  collection_id?: InputMaybe<Order_By>;
+  current_collection?: InputMaybe<Current_Collections_V2_Order_By>;
+  distinct_tokens?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_collection_ownership_v2_view" */
+export enum Current_Collection_Ownership_V2_View_Select_Column {
+  /** column name */
+  CollectionId = 'collection_id',
+  /** column name */
+  DistinctTokens = 'distinct_tokens',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  OwnerAddress = 'owner_address'
+}
+
+/** aggregate stddev on columns */
+export type Current_Collection_Ownership_V2_View_Stddev_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_stddev_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Current_Collection_Ownership_V2_View_Stddev_Pop_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_stddev_pop_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Current_Collection_Ownership_V2_View_Stddev_Samp_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_stddev_samp_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Streaming cursor of the table "current_collection_ownership_v2_view" */
+export type Current_Collection_Ownership_V2_View_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Collection_Ownership_V2_View_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Collection_Ownership_V2_View_Stream_Cursor_Value_Input = {
+  collection_id?: InputMaybe<Scalars['String']>;
+  distinct_tokens?: InputMaybe<Scalars['bigint']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  owner_address?: InputMaybe<Scalars['String']>;
+};
+
+/** aggregate sum on columns */
+export type Current_Collection_Ownership_V2_View_Sum_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_sum_fields';
+  distinct_tokens?: Maybe<Scalars['bigint']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Current_Collection_Ownership_V2_View_Var_Pop_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_var_pop_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Current_Collection_Ownership_V2_View_Var_Samp_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_var_samp_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Current_Collection_Ownership_V2_View_Variance_Fields = {
+  __typename?: 'current_collection_ownership_v2_view_variance_fields';
+  distinct_tokens?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
 };
 
 /** columns and relationships of "current_collection_ownership_view" */
@@ -2296,12 +2552,17 @@ export type Current_Token_Pending_Claims = {
   __typename?: 'current_token_pending_claims';
   amount: Scalars['numeric'];
   collection_data_id_hash: Scalars['String'];
+  collection_id: Scalars['String'];
   collection_name: Scalars['String'];
   creator_address: Scalars['String'];
   /** An object relationship */
   current_collection_data?: Maybe<Current_Collection_Datas>;
   /** An object relationship */
+  current_collection_v2?: Maybe<Current_Collections_V2>;
+  /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas>;
+  /** An object relationship */
+  current_token_data_v2?: Maybe<Current_Token_Datas_V2>;
   from_address: Scalars['String'];
   last_transaction_timestamp: Scalars['timestamp'];
   last_transaction_version: Scalars['bigint'];
@@ -2311,6 +2572,7 @@ export type Current_Token_Pending_Claims = {
   to_address: Scalars['String'];
   /** An object relationship */
   token?: Maybe<Tokens>;
+  token_data_id: Scalars['String'];
   token_data_id_hash: Scalars['String'];
 };
 
@@ -2321,10 +2583,13 @@ export type Current_Token_Pending_Claims_Bool_Exp = {
   _or?: InputMaybe<Array<Current_Token_Pending_Claims_Bool_Exp>>;
   amount?: InputMaybe<Numeric_Comparison_Exp>;
   collection_data_id_hash?: InputMaybe<String_Comparison_Exp>;
+  collection_id?: InputMaybe<String_Comparison_Exp>;
   collection_name?: InputMaybe<String_Comparison_Exp>;
   creator_address?: InputMaybe<String_Comparison_Exp>;
   current_collection_data?: InputMaybe<Current_Collection_Datas_Bool_Exp>;
+  current_collection_v2?: InputMaybe<Current_Collections_V2_Bool_Exp>;
   current_token_data?: InputMaybe<Current_Token_Datas_Bool_Exp>;
+  current_token_data_v2?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   from_address?: InputMaybe<String_Comparison_Exp>;
   last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
@@ -2333,6 +2598,7 @@ export type Current_Token_Pending_Claims_Bool_Exp = {
   table_handle?: InputMaybe<String_Comparison_Exp>;
   to_address?: InputMaybe<String_Comparison_Exp>;
   token?: InputMaybe<Tokens_Bool_Exp>;
+  token_data_id?: InputMaybe<String_Comparison_Exp>;
   token_data_id_hash?: InputMaybe<String_Comparison_Exp>;
 };
 
@@ -2340,10 +2606,13 @@ export type Current_Token_Pending_Claims_Bool_Exp = {
 export type Current_Token_Pending_Claims_Order_By = {
   amount?: InputMaybe<Order_By>;
   collection_data_id_hash?: InputMaybe<Order_By>;
+  collection_id?: InputMaybe<Order_By>;
   collection_name?: InputMaybe<Order_By>;
   creator_address?: InputMaybe<Order_By>;
   current_collection_data?: InputMaybe<Current_Collection_Datas_Order_By>;
+  current_collection_v2?: InputMaybe<Current_Collections_V2_Order_By>;
   current_token_data?: InputMaybe<Current_Token_Datas_Order_By>;
+  current_token_data_v2?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   from_address?: InputMaybe<Order_By>;
   last_transaction_timestamp?: InputMaybe<Order_By>;
   last_transaction_version?: InputMaybe<Order_By>;
@@ -2352,6 +2621,7 @@ export type Current_Token_Pending_Claims_Order_By = {
   table_handle?: InputMaybe<Order_By>;
   to_address?: InputMaybe<Order_By>;
   token?: InputMaybe<Tokens_Order_By>;
+  token_data_id?: InputMaybe<Order_By>;
   token_data_id_hash?: InputMaybe<Order_By>;
 };
 
@@ -2361,6 +2631,8 @@ export enum Current_Token_Pending_Claims_Select_Column {
   Amount = 'amount',
   /** column name */
   CollectionDataIdHash = 'collection_data_id_hash',
+  /** column name */
+  CollectionId = 'collection_id',
   /** column name */
   CollectionName = 'collection_name',
   /** column name */
@@ -2380,6 +2652,8 @@ export enum Current_Token_Pending_Claims_Select_Column {
   /** column name */
   ToAddress = 'to_address',
   /** column name */
+  TokenDataId = 'token_data_id',
+  /** column name */
   TokenDataIdHash = 'token_data_id_hash'
 }
 
@@ -2395,6 +2669,7 @@ export type Current_Token_Pending_Claims_Stream_Cursor_Input = {
 export type Current_Token_Pending_Claims_Stream_Cursor_Value_Input = {
   amount?: InputMaybe<Scalars['numeric']>;
   collection_data_id_hash?: InputMaybe<Scalars['String']>;
+  collection_id?: InputMaybe<Scalars['String']>;
   collection_name?: InputMaybe<Scalars['String']>;
   creator_address?: InputMaybe<Scalars['String']>;
   from_address?: InputMaybe<Scalars['String']>;
@@ -2404,6 +2679,7 @@ export type Current_Token_Pending_Claims_Stream_Cursor_Value_Input = {
   property_version?: InputMaybe<Scalars['numeric']>;
   table_handle?: InputMaybe<Scalars['String']>;
   to_address?: InputMaybe<Scalars['String']>;
+  token_data_id?: InputMaybe<Scalars['String']>;
   token_data_id_hash?: InputMaybe<Scalars['String']>;
 };
 
@@ -3174,6 +3450,8 @@ export type Query_Root = {
   __typename?: 'query_root';
   /** fetch data from the table: "address_version_from_events" */
   address_version_from_events: Array<Address_Version_From_Events>;
+  /** fetch aggregated fields from the table: "address_version_from_events" */
+  address_version_from_events_aggregate: Address_Version_From_Events_Aggregate;
   /** fetch data from the table: "address_version_from_move_resources" */
   address_version_from_move_resources: Array<Address_Version_From_Move_Resources>;
   coin_activities: Array<Coin_Activities>;
@@ -3207,6 +3485,10 @@ export type Query_Root = {
   current_collection_datas: Array<Current_Collection_Datas>;
   /** fetch data from the table: "current_collection_datas" using primary key columns */
   current_collection_datas_by_pk?: Maybe<Current_Collection_Datas>;
+  /** fetch data from the table: "current_collection_ownership_v2_view" */
+  current_collection_ownership_v2_view: Array<Current_Collection_Ownership_V2_View>;
+  /** fetch aggregated fields from the table: "current_collection_ownership_v2_view" */
+  current_collection_ownership_v2_view_aggregate: Current_Collection_Ownership_V2_View_Aggregate;
   /** fetch data from the table: "current_collection_ownership_view" */
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
   /** fetch data from the table: "current_collections_v2" */
@@ -3317,6 +3599,15 @@ export type Query_Root = {
 
 
 export type Query_RootAddress_Version_From_EventsArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Events_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
+};
+
+
+export type Query_RootAddress_Version_From_Events_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -3452,6 +3743,24 @@ export type Query_RootCurrent_Collection_DatasArgs = {
 
 export type Query_RootCurrent_Collection_Datas_By_PkArgs = {
   collection_data_id_hash: Scalars['String'];
+};
+
+
+export type Query_RootCurrent_Collection_Ownership_V2_ViewArgs = {
+  distinct_on?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Order_By>>;
+  where?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Collection_Ownership_V2_View_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Order_By>>;
+  where?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
 };
 
 
@@ -3878,6 +4187,8 @@ export type Subscription_Root = {
   __typename?: 'subscription_root';
   /** fetch data from the table: "address_version_from_events" */
   address_version_from_events: Array<Address_Version_From_Events>;
+  /** fetch aggregated fields from the table: "address_version_from_events" */
+  address_version_from_events_aggregate: Address_Version_From_Events_Aggregate;
   /** fetch data from the table in a streaming manner : "address_version_from_events" */
   address_version_from_events_stream: Array<Address_Version_From_Events>;
   /** fetch data from the table: "address_version_from_move_resources" */
@@ -3931,6 +4242,12 @@ export type Subscription_Root = {
   current_collection_datas_by_pk?: Maybe<Current_Collection_Datas>;
   /** fetch data from the table in a streaming manner : "current_collection_datas" */
   current_collection_datas_stream: Array<Current_Collection_Datas>;
+  /** fetch data from the table: "current_collection_ownership_v2_view" */
+  current_collection_ownership_v2_view: Array<Current_Collection_Ownership_V2_View>;
+  /** fetch aggregated fields from the table: "current_collection_ownership_v2_view" */
+  current_collection_ownership_v2_view_aggregate: Current_Collection_Ownership_V2_View_Aggregate;
+  /** fetch data from the table in a streaming manner : "current_collection_ownership_v2_view" */
+  current_collection_ownership_v2_view_stream: Array<Current_Collection_Ownership_V2_View>;
   /** fetch data from the table: "current_collection_ownership_view" */
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
   /** fetch data from the table in a streaming manner : "current_collection_ownership_view" */
@@ -4093,6 +4410,15 @@ export type Subscription_Root = {
 
 
 export type Subscription_RootAddress_Version_From_EventsArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Events_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
+};
+
+
+export type Subscription_RootAddress_Version_From_Events_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -4298,6 +4624,31 @@ export type Subscription_RootCurrent_Collection_Datas_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Current_Collection_Datas_Stream_Cursor_Input>>;
   where?: InputMaybe<Current_Collection_Datas_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Collection_Ownership_V2_ViewArgs = {
+  distinct_on?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Order_By>>;
+  where?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Collection_Ownership_V2_View_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collection_Ownership_V2_View_Order_By>>;
+  where?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Collection_Ownership_V2_View_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Collection_Ownership_V2_View_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Collection_Ownership_V2_View_Bool_Exp>;
 };
 
 

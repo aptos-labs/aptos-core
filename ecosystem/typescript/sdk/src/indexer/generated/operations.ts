@@ -56,6 +56,15 @@ export type GetCollectionDataQueryVariables = Types.Exact<{
 
 export type GetCollectionDataQuery = { __typename?: 'query_root', current_collections_v2: Array<{ __typename?: 'current_collections_v2', collection_id: string, token_standard: string, collection_name: string, creator_address: string, current_supply: any, description: string, uri: string }> };
 
+export type GetCollectionsWithOwnedTokensQueryVariables = Types.Exact<{
+  where_condition: Types.Current_Collection_Ownership_V2_View_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
+
+
+export type GetCollectionsWithOwnedTokensQuery = { __typename?: 'query_root', current_collection_ownership_v2_view: Array<{ __typename?: 'current_collection_ownership_v2_view', distinct_tokens?: any | null, last_transaction_version?: any | null, current_collection?: { __typename?: 'current_collections_v2', creator_address: string, collection_name: string, token_standard: string, collection_id: string, description: string, table_handle_v1?: string | null, uri: string, total_minted_v2?: any | null, max_supply?: any | null } | null }> };
+
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
   poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
