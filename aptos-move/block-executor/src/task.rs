@@ -62,7 +62,7 @@ pub trait ExecutorTask: Sync {
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        materialize_deltas: bool,
+        aggregator_enabled: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 

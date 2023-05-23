@@ -8,7 +8,6 @@ use crate::{
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
 };
-use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -61,7 +60,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         view: &impl StateView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
-        materialize_deltas: bool,
+        _aggregator_enabled: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
 
@@ -69,15 +68,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
         {
-            Ok((vm_status, mut output_ext, sender)) => {
-                if materialize_deltas {
-                    // Keep TransactionOutputExt type for wrapper.
-                    output_ext = TransactionOutputExt::new(
-                        DeltaChangeSet::empty(),                  // Cleared deltas.
-                        output_ext.into_transaction_output(view), // Materialize.
-                    );
-                }
-
+            Ok((vm_status, output_ext, sender)) => {
                 if output_ext.txn_output().status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

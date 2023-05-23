@@ -430,7 +430,7 @@ where
         view: &impl TStateView<Key = K>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _materialize_deltas: bool,
+        _aggregator_enabled: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
             Transaction::Write {

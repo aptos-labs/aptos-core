@@ -100,7 +100,7 @@ where
             &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
-            false,
+            true,
         );
         let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
@@ -535,7 +535,7 @@ where
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
-                true,
+                false,
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
