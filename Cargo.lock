@@ -3290,6 +3290,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas",
  "aptos-infallible",
+ "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-move-stdlib",
