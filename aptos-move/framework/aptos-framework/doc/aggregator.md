@@ -148,7 +148,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 Adds <code>value</code> to aggregator.
 Returns a bool flag indicating whether the operation is successfull.
 If the output is true, then there is no error in the operation.
-If the output is false, then there is overflow/underflow error.
+If the output is false, then there is overflow error.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
@@ -197,7 +197,7 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 Subtracts <code>value</code> from aggregator.
 Returns a bool flag indicating whether the operation is successfull.
 If the output is true, then there is no error in the operation.
-If the output is false, then there is overflow/underflow error.
+If the output is false, then there is underflow error.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
