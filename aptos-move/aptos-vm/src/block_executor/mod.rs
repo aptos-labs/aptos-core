@@ -22,7 +22,7 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -31,11 +31,13 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
-use moka::sync::SegmentedCache;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -137,15 +139,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
 pub struct BlockAptosVM();
 
-/// Insert a transaction hash into `TXN_CACHE` if not present.
-/// Return whether the insertion happened (i.e., cache miss).
-fn insert_into_txn_cache(cache: &SegmentedCache<HashValue, u64>, txn: &Transaction) -> bool {
-    let key = txn.hash();
-    let nonce_in = rand::random::<u64>();
-    let nonce_out = cache.get_with(key, || nonce_in);
-    nonce_in == nonce_out
-}
-
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
@@ -162,54 +155,69 @@ impl BlockAptosVM {
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
 
-        // Optimization to only check hashes for txns with matching (sender, sequence_number)
-        let mut possible_duplicate_map = HashSet::new();
-        {
-            let mut seen = HashSet::new();
-            for txn in &transactions {
-                if let Transaction::UserTransaction(ref inner) = txn {
-                    if !seen.insert((inner.sender(), inner.sequence_number())) {
-                        possible_duplicate_map.insert((inner.sender(), inner.sequence_number()));
-                    }
+        let mut seen = HashMap::new();
+        let mut is_possible_duplicate = false;
+        let mut possible_duplicates = vec![false; transactions.len()];
+        for (i, txn) in transactions.iter().enumerate() {
+            if let Transaction::UserTransaction(ref inner) = txn {
+                match seen.get(&(inner.sender(), inner.sequence_number())) {
+                    None => {
+                        seen.insert((inner.sender(), inner.sequence_number()), i);
+                    },
+                    Some(first_index) => {
+                        is_possible_duplicate = true;
+                        possible_duplicates[*first_index] = true;
+                        possible_duplicates[i] = true;
+                    },
                 }
             }
         }
-        let duplicate_map = if !possible_duplicate_map.is_empty() {
-            Some(SegmentedCache::new(
-                possible_duplicate_map.len() as u64,
-                std::cmp::min(possible_duplicate_map.len(), 256),
-            ))
+        let hashes: Vec<_> = if is_possible_duplicate {
+            executor_thread_pool.install(|| {
+                possible_duplicates
+                    .into_par_iter()
+                    .zip(&transactions)
+                    .with_min_len(25)
+                    .map(|(need_hash, txn)| match need_hash {
+                        true => Some(txn.hash()),
+                        false => None,
+                    })
+                    .collect()
+            })
         } else {
-            None
+            vec![None; transactions.len()]
         };
+        let mut seen_hashes = HashSet::new();
+        let mut num_duplicates = 0;
+        let duplicates: Vec<_> = hashes
+            .into_iter()
+            .map(|maybe_hash| match maybe_hash {
+                None => false,
+                Some(hash) => {
+                    if seen_hashes.insert(hash) {
+                        false
+                    } else {
+                        num_duplicates += 1;
+                        true
+                    }
+                },
+            })
+            .collect();
+
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
                 transactions
                     .into_par_iter()
+                    .zip(duplicates)
                     .with_min_len(25)
-                    .map(|txn| match txn {
-                        Transaction::UserTransaction(ref inner) => {
-                            if let Some(ref duplicate_map) = duplicate_map {
-                                if possible_duplicate_map
-                                    .contains(&(inner.sender(), inner.sequence_number()))
-                                    && !insert_into_txn_cache(duplicate_map, &txn)
-                                {
-                                    return PreprocessedTransaction::Duplicate;
-                                }
-                            }
-                            preprocess_transaction::<AptosVM>(txn)
-                        },
-                        _ => preprocess_transaction::<AptosVM>(txn),
+                    .map(|(txn, is_duplicate)| match is_duplicate {
+                        true => PreprocessedTransaction::Duplicate,
+                        false => preprocess_transaction::<AptosVM>(txn),
                     })
                     .collect()
             });
 
-        // Get the number for metrics
-        let num_filtered = signature_verified_block
-            .iter()
-            .filter(|txn| matches!(txn, PreprocessedTransaction::Duplicate))
-            .count();
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_filtered as f64);
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
