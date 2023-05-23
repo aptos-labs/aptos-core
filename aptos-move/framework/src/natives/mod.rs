@@ -246,8 +246,10 @@ impl GasParameters {
                 },
             },
             aggregator: aggregator::GasParameters {
+                try_add: aggregator::TryAddGasParameters { base: 0.into() },
                 add: aggregator::AddGasParameters { base: 0.into() },
                 read: aggregator::ReadGasParameters { base: 0.into() },
+                try_sub: aggregator::TrySubGasParameters { base: 0.into() },
                 sub: aggregator::SubGasParameters { base: 0.into() },
                 destroy: aggregator::DestroyGasParameters { base: 0.into() },
             },

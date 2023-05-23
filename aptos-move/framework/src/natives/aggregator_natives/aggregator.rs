@@ -23,6 +23,47 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, sync::Arc};
 
 /***************************************************************************************************
+ * native fun try_add(aggregator: &mut Aggregator, value: u128);
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TryAddGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_try_add(
+    gas_params: &TryAddGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
+
+    // Get aggregator information and a value to add.
+    let value = safely_pop_arg!(args, u128);
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+
+    // Get aggregator.
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let aggregator = aggregator_data.get_aggregator(
+        id,
+        limit,
+        aggregator_context.resolver,
+        aggregator_context.aggregator_enabled,
+    )?;
+
+    match aggregator.add(value) {
+        Ok(_) => Ok(smallvec![Value::bool(true)]),
+        Err(_) => Ok(smallvec![Value::bool(false)])
+    }
+}
+
+/***************************************************************************************************
  * native fun add(aggregator: &mut Aggregator, value: u128);
  *
  *   gas cost: base_cost
@@ -99,6 +140,47 @@ fn native_read(
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
     Ok(smallvec![Value::u128(value)])
+}
+
+/***************************************************************************************************
+ * native fun try_sub(aggregator: &mut Aggregator, value: u128);
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TrySubGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_try_sub(
+    gas_params: &TrySubGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 2);
+
+    context.charge(gas_params.base)?;
+
+    // Get aggregator information and a value to subtract.
+    let value = safely_pop_arg!(args, u128);
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+
+    // Get aggregator.
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let aggregator = aggregator_data.get_aggregator(
+        id,
+        limit,
+        aggregator_context.resolver,
+        aggregator_context.aggregator_enabled,
+    )?;
+
+    match aggregator.sub(value) {
+        Ok(_) => Ok(smallvec![Value::bool(true)]),
+        Err(_) => Ok(smallvec![Value::bool(false)])
+    }
 }
 
 /***************************************************************************************************
@@ -183,8 +265,10 @@ fn native_destroy(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
+    pub try_add: TryAddGasParameters,
     pub add: AddGasParameters,
     pub read: ReadGasParameters,
+    pub try_sub: TrySubGasParameters,
     pub sub: SubGasParameters,
     pub destroy: DestroyGasParameters,
 }
@@ -195,6 +279,15 @@ pub fn make_all(
     features: Arc<Features>,
 ) -> impl Iterator<Item = (String, NativeFunction)> {
     let natives = [
+        (
+            "try_add",
+            make_safe_native(
+                gas_params.try_add,
+                timed_features.clone(),
+                features.clone(),
+                native_try_add,
+            ),
+        ),
         (
             "add",
             make_safe_native(
@@ -211,6 +304,15 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 native_read,
+            ),
+        ),
+        (
+            "try_sub",
+            make_safe_native(
+                gas_params.try_sub,
+                timed_features.clone(),
+                features.clone(),
+                native_try_sub,
             ),
         ),
         (
