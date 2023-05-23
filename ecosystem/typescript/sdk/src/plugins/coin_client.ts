@@ -73,14 +73,10 @@ export class CoinClient {
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      let recipient = to;
-      if (recipient instanceof AptosAccount) {
-        recipient = recipient.address();
-      }
-      const txnHash = await fungibleAsset.transferAmount(
+      const txnHash = await fungibleAsset.transfer(
         from,
         extraArgs.assetAddress,
-        recipient,
+        getAddressFromAccountOrAddress(to),
         amount,
         extraArgs.coinType,
       );
@@ -137,11 +133,11 @@ export class CoinClient {
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      let owner = account;
-      if (owner instanceof AptosAccount) {
-        owner = owner.address();
-      }
-      const balance = await fungibleAsset.balance(owner, extraArgs.assetAddress, extraArgs.coinType);
+      const balance = await fungibleAsset.balance(
+        getAddressFromAccountOrAddress(account),
+        extraArgs.assetAddress,
+        extraArgs.coinType,
+      );
       return balance;
     }
 

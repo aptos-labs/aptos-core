@@ -20,7 +20,7 @@ export class FungibleAssetClient {
   }
 
   /**
-   * Transfer an asset amount from the sender primary_fungible_store to the recipient primary_fungible_store
+   *  Transfer `amount` of fungible asset from sender's primary store to recipient's primary store.
    *
    * Use this method to transfer any fungible asset including fungible token.
    *
@@ -32,7 +32,7 @@ export class FungibleAssetClient {
    * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns The hash of the transaction submitted to the API
    */
-  async transferAmount(
+  async transfer(
     sender: AptosAccount,
     assetAddress: MaybeHexString,
     recipient: MaybeHexString,
@@ -40,7 +40,7 @@ export class FungibleAssetClient {
     assetType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const rawTxn = await this.generateTransferAmount(sender, assetAddress, recipient, amount, assetType, extraArgs);
+    const rawTxn = await this.generateTransfer(sender, assetAddress, recipient, amount, assetType, extraArgs);
     const txnHash = await this.submit(sender, rawTxn);
     return txnHash;
   }
@@ -79,7 +79,7 @@ export class FungibleAssetClient {
    * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns Raw Transaction
    */
-  async generateTransferAmount(
+  async generateTransfer(
     sender: AptosAccount,
     assetAddress: MaybeHexString,
     recipient: MaybeHexString,
