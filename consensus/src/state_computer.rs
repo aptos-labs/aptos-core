@@ -288,7 +288,7 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        block_gas_limit: Option<u64>,
+        _block_gas_limit: Option<u64>,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
