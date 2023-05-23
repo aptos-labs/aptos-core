@@ -20,13 +20,17 @@ at the moment.**
 -  [Struct `Aggregator`](#0x1_aggregator_Aggregator)
 -  [Constants](#@Constants_0)
 -  [Function `limit`](#0x1_aggregator_limit)
+-  [Function `try_add`](#0x1_aggregator_try_add)
 -  [Function `add`](#0x1_aggregator_add)
+-  [Function `try_sub`](#0x1_aggregator_try_sub)
 -  [Function `sub`](#0x1_aggregator_sub)
 -  [Function `read`](#0x1_aggregator_read)
 -  [Function `destroy`](#0x1_aggregator_destroy)
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
+    -  [Function `try_add`](#@Specification_1_try_add)
     -  [Function `add`](#@Specification_1_add)
+    -  [Function `try_sub`](#@Specification_1_try_sub)
     -  [Function `sub`](#@Specification_1_sub)
     -  [Function `read`](#@Specification_1_read)
     -  [Function `destroy`](#@Specification_1_destroy)
@@ -137,6 +141,32 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 </details>
 
+<a name="0x1_aggregator_try_add"></a>
+
+## Function `try_add`
+
+Adds <code>value</code> to aggregator.
+Returns a bool flag indicating whether the operation is successfull.
+If the output is true, then there is no error in the operation.
+If the output is false, then there is overflow/underflow error.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128): bool;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_aggregator_add"></a>
 
 ## Function `add`
@@ -154,6 +184,32 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128);
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aggregator_try_sub"></a>
+
+## Function `try_sub`
+
+Subtracts <code>value</code> from aggregator.
+Returns a bool flag indicating whether the operation is successfull.
+If the output is true, then there is no error in the operation.
+If the output is false, then there is overflow/underflow error.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128): bool;
 </code></pre>
 
 
@@ -272,6 +328,27 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
+<a name="@Specification_1_try_add"></a>
+
+### Function `try_add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_add">try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; MAX_U128;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
+    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) + value);
+</code></pre>
+
+
+
 <a name="@Specification_1_add"></a>
 
 ### Function `add`
@@ -289,6 +366,26 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
 <b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
     <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) + value);
+</code></pre>
+
+
+
+<a name="@Specification_1_try_sub"></a>
+
+### Function `try_sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) &lt; value;
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
+<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
+    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) - value);
 </code></pre>
 
 

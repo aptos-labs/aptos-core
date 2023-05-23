@@ -153,6 +153,21 @@ module aptos_framework::optional_aggregator {
         limit
     }
 
+    /// Adds `value` to optional aggregator, returns `true` on success and `false` on overflow.
+    public fun try_add(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
+        if (option::is_some(&optional_aggregator.aggregator)) {
+            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+            return aggregator::try_add(aggregator, value);
+        } else {
+            let integer = option::borrow_mut(&mut optional_aggregator.integer);
+            if (value <= (integer.limit - integer.value)) {
+                integer.value = integer.value + value;
+                return true;
+            };
+            return false;
+        }
+    }
+
     /// Adds `value` to optional aggregator, aborting on exceeding the `limit`.
     public fun add(optional_aggregator: &mut OptionalAggregator, value: u128) {
         if (option::is_some(&optional_aggregator.aggregator)) {
@@ -161,6 +176,21 @@ module aptos_framework::optional_aggregator {
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
             add_integer(integer, value);
+        }
+    }
+
+    /// Subtracts `value` to optional aggregator, returns `true` on success and `false` on underflow.
+    public fun try_sub(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
+        if (option::is_some(&optional_aggregator.aggregator)) {
+            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+            return aggregator::try_sub(aggregator, value);
+        } else {
+            let integer = option::borrow_mut(&mut optional_aggregator.integer);
+            if (value <= integer.value) {
+                integer.value = integer.value - value;
+                return true;
+            };
+            return false;
         }
     }
 

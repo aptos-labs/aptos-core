@@ -3,6 +3,24 @@ spec aptos_framework::aggregator {
         pragma intrinsic;
     }
 
+    // TODO: Write spec for native_add and native_sub. 
+    spec try_add(aggregator: &mut Aggregator, value: u128): bool {
+        pragma opaque;
+        aborts_if spec_aggregator_get_val(aggregator) + value > spec_get_limit(aggregator);
+        aborts_if spec_aggregator_get_val(aggregator) + value > MAX_U128;
+        ensures spec_get_limit(aggregator) == spec_get_limit(old(aggregator));
+        ensures aggregator == spec_aggregator_set_val(old(aggregator),
+            spec_aggregator_get_val(old(aggregator)) + value);
+    }
+
+    spec try_sub(aggregator: &mut Aggregator, value: u128): bool {
+        pragma opaque;
+        aborts_if spec_aggregator_get_val(aggregator) < value;
+        ensures spec_get_limit(aggregator) == spec_get_limit(old(aggregator));
+        ensures aggregator == spec_aggregator_set_val(old(aggregator),
+            spec_aggregator_get_val(old(aggregator)) - value);
+    }
+
     spec add(aggregator: &mut Aggregator, value: u128) {
         pragma opaque;
         aborts_if spec_aggregator_get_val(aggregator) + value > spec_get_limit(aggregator);
