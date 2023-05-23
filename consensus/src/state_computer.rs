@@ -288,7 +288,7 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        block_gas_limit: Option<u64>,
+        _block_gas_limit: Option<u64>,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -298,7 +298,9 @@ impl StateComputer for ExecutionProxy {
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
-        self.executor.update_block_gas_limit(block_gas_limit);
+        // TODO: Temporarily disable initializing block gas limit and leave it as default None,
+        // until there is a better way to handle the possible panic when executor is initialized.
+        // self.executor.update_block_gas_limit(block_gas_limit);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
