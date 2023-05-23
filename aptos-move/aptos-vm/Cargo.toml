@@ -43,6 +43,7 @@ move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
+ouroboros = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
