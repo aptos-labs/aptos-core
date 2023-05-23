@@ -16,7 +16,6 @@ from test_framework.logging import init_logging, log
     "--log-metadata/--no-log-metadata",
     default=True,
 )
-@logger
 def main(log_metadata: bool) -> None:
     init_logging(logger=log, level=logging.DEBUG, print_metadata=log_metadata)
 

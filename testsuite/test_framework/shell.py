@@ -8,9 +8,8 @@ import subprocess
 import sys
 import tempfile
 import time
-import unittest
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Sequence, Union
 
 
 @dataclass

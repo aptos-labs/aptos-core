@@ -6,6 +6,7 @@ import sys
 # just define a global logger
 log = logging.getLogger("")
 
+
 def init_logging(
     logger: logging.Logger,
     level: int = logging.INFO,

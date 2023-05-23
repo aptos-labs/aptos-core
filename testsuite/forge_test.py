@@ -23,7 +23,6 @@ from forge import (
     ForgeState,
     K8sForgeRunner,
     LocalForgeRunner,
-    RunResult,
     SystemContext,
     ensure_provided_image_tags_has_profile_or_features,
     create_forge_command,
@@ -55,7 +54,7 @@ from test_framework.cluster import (
     AwsListClusterResult,
 )
 
-from test_framework.shell import SpyShell, FakeShell, FakeCommand
+from test_framework.shell import SpyShell, FakeShell, FakeCommand, RunResult
 from test_framework.time import FakeTime
 
 # Show the entire diff when unittest fails assertion
@@ -249,8 +248,8 @@ class ForgeRunnerTests(unittest.TestCase):
                 "temp1": template_fixture.read_bytes(),
             },
             {
-                "forge-test-runner-template.yaml": FILE_NOT_FOUND, 
-                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(), 
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
             },
         )
         context = fake_context(shell, filesystem, mode="k8s")

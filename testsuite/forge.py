@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import requests
 import resource
 import sys
 import textwrap
@@ -359,8 +360,6 @@ def shorten_link(link: str) -> str:
         }
     )
     try:
-        import requests
-
         response = requests.post(
             "https://api.aws3.link/shorten", headers=headers, data=body
         )
@@ -587,9 +586,10 @@ class ForgeRunner:
 def dump_forge_state(
     shell: Shell,
     forge_namespace: str,
-    kubeconf: str,
+    kubeconf: Optional[str] = None,
 ) -> str:
     try:
+        assert kubeconf is not None, "kubeconf is required"
         output = (
             shell.run(
                 [
@@ -656,6 +656,7 @@ class K8sForgeRunner(ForgeRunner):
         forge_pod_name = sanitize_forge_resource_name(
             f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}"
         )
+        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
         context.shell.run(
             [
                 "kubectl",
@@ -900,7 +901,7 @@ def find_recent_images(
     git: Git,
     num_images: int,
     image_name: str,
-    image_tag_prefixes: Sequence[str] = [""],
+    image_tag_prefixes: List[str] = [""],
     commit_threshold: int = 100,
 ) -> Sequence[str]:
     """
@@ -1610,6 +1611,7 @@ def tail(
     elif len(found_jobs) > 1:
         raise Exception(f"Found multiple jobs for name {job_name}")
     job = found_jobs[0]
+    assert job.cluster.kubeconf is not None, "kubeconf is required"
     shell.run(
         [
             "kubectl",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import resource
 import tempfile
+from typing import Dict, List, Optional
 
 
 class Filesystem:
@@ -120,7 +121,6 @@ class SpyFilesystem(FakeFilesystem):
             testcase.assertIn(
                 filename, self.expected_reads, f"{filename} was not expected to be read"
             )
-            
 
     def mkstemp(self) -> str:
         filename = f"temp{self.temp_count}"

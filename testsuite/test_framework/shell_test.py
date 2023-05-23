@@ -19,4 +19,3 @@ class SpyTests(unittest.TestCase):
         shell.run(["echo", "hello"])
         shell.run(["echo", "hello_banana"])
         shell.assert_commands(self)
-        assert False
