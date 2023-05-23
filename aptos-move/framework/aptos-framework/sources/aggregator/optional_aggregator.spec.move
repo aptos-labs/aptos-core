@@ -28,11 +28,9 @@ spec aptos_framework::optional_aggregator {
 
     // TODO: Write spec for try_sub.
     spec try_sub(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
-            < value);
-        aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value < value);
-        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) - value));
+        ensures is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator)) < value) ==> result == false;
+        ensures !is_parallelizable(optional_aggregator) && (option::borrow(optional_aggregator.integer).value < value) ==> result == false;
+        ensures result == true ==> ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) - value));
     }
 
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
@@ -51,15 +49,15 @@ spec aptos_framework::optional_aggregator {
 
     // TODO: Write spec for try_add.
     spec try_add(optional_aggregator: &mut OptionalAggregator, value: u128): bool {
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
-            + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));
-        aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
-            + value > MAX_U128);
-        aborts_if !is_parallelizable(optional_aggregator) &&
-            (option::borrow(optional_aggregator.integer).value + value > MAX_U128);
-        aborts_if !is_parallelizable(optional_aggregator) &&
-            (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value));
-        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) + value));
+        ensures is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+            + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator))) ==> result == false;
+        ensures is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
+            + value > MAX_U128) ==> result == false;
+        ensures !is_parallelizable(optional_aggregator) &&
+            (option::borrow(optional_aggregator.integer).value + value > MAX_U128) ==> result == false;
+        ensures !is_parallelizable(optional_aggregator) &&
+            (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value)) ==> result == false;
+        ensures result == true ==> ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) + value));
     }
 
     spec add(optional_aggregator: &mut OptionalAggregator, value: u128) {
