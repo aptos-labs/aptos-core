@@ -30,6 +30,7 @@ pub const TRANSACTION_DB_NAME: &str = "transaction_db";
 pub const TRANSACTION_INFO_DB_NAME: &str = "transaction_info_db";
 pub const WRITE_SET_DB_NAME: &str = "write_set_db";
 
+#[derive(Debug)]
 pub struct LedgerDb {
     ledger_metadata_db: Arc<DB>,
 
@@ -135,12 +136,20 @@ impl LedgerDb {
         todo!()
     }
 
-    pub(crate) fn metadata_db(&self) -> &DB {
+    pub fn metadata_db(&self) -> &DB {
         &self.ledger_metadata_db
+    }
+
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.ledger_metadata_db)
     }
 
     pub(crate) fn event_db(&self) -> &DB {
         &self.event_db
+    }
+
+    pub(crate) fn event_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.event_db)
     }
 
     pub(crate) fn transaction_accumulator_db(&self) -> &DB {

@@ -1,7 +1,7 @@
 [package]
 name = "aptos-indexer-grpc-parser"
-description = "Indexer GRPC Parser (Rust)"
-version = "0.0.2"
+description = "Indexer GRPC Parser, or processor, in Rust."
+version = "1.0.0"
 
 # Workspace inherited keys
 authors = { workspace = true }

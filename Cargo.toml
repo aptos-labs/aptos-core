@@ -509,6 +509,7 @@ quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
+random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script"] }
 redis-test = { version = "0.1.1", features = ["aio"] }

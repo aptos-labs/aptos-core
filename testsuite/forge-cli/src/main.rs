@@ -40,6 +40,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
@@ -85,20 +86,27 @@ struct Args {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
+    /// Subcommands to run forge tests
     Test(TestCommand),
+    /// Subcommands to set up or manage running forge networks
     Operator(OperatorCommand),
 }
 
 #[derive(StructOpt, Debug)]
 enum TestCommand {
+    /// Run tests using the local swarm backend
     LocalSwarm(LocalSwarm),
+    /// Run tests in cluster using the remote kubernetes backend
     K8sSwarm(K8sSwarm),
 }
 
 #[derive(StructOpt, Debug)]
 enum OperatorCommand {
+    /// Set the image tag for a node in the cluster
     SetNodeImageTag(SetNodeImageTag),
+    /// Clean up an existing cluster
     CleanUp(CleanUp),
+    /// Resize an existing cluster
     Resize(Resize),
 }
 
@@ -111,7 +119,7 @@ struct LocalSwarm {
 #[derive(StructOpt, Debug)]
 struct K8sSwarm {
     #[structopt(long, help = "The kubernetes namespace to use for test")]
-    namespace: String,
+    namespace: Option<String>,
     #[structopt(
         long,
         help = "The image tag currently is used for validators",
@@ -203,6 +211,17 @@ struct Resize {
     enable_haproxy: bool,
 }
 
+/// Make an easy to remember random namespace for your testnet
+fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
+    // Pick four random words
+    let random_words = dictionary
+        .choose_multiple(rng, 4)
+        .into_iter()
+        .cloned()
+        .collect::<Vec<String>>();
+    Ok(format!("forge-{}", random_words.join("-")))
+}
+
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
     logger.channel_size(1000).is_async(false).level(Level::Info);
@@ -263,11 +282,28 @@ fn main() -> Result<()> {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
+                    let namespace = if k8s.namespace.is_none() {
+                        let mut rng: ThreadRng = rand::thread_rng();
+                        // Lets pick some four letter words ;)
+                        let words = random_word::all_len(4)
+                            .ok_or_else(|| {
+                                format_err!(
+                                    "Failed to get namespace, rerun with --namespace <namespace>"
+                                )
+                            })?
+                            .to_vec()
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<String>>();
+                        random_namespace(words, &mut rng)?
+                    } else {
+                        k8s.namespace.clone().unwrap()
+                    };
                     run_forge(
                         duration,
                         test_suite,
                         K8sFactory::new(
-                            k8s.namespace.clone(),
+                            namespace,
                             k8s.image_tag.clone(),
                             k8s.upgrade_image_tag.clone(),
                             k8s.port_forward,
@@ -1033,7 +1069,7 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(1)
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_success_criteria(
-            SuccessCriteria::new(4250)
+            SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
@@ -1311,7 +1347,7 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(3250)
+            SuccessCriteria::new(3500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1771,5 +1807,22 @@ impl NetworkTest for EmitTransaction {
             .report_txn_stats(self.name().to_string(), &stats, duration);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_random_namespace() {
+        let mut rng = rand::rngs::mock::StepRng::new(100, 1);
+        let words = ["apple", "banana", "carrot", "durian", "eggplant", "fig"]
+            .to_vec()
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        let namespace = random_namespace(words, &mut rng).unwrap();
+        assert_eq!(namespace, "forge-durian-eggplant-fig-apple");
     }
 }
