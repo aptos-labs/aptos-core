@@ -23,6 +23,7 @@ use k8s_openapi::api::{
 use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
+    config::Kubeconfig,
     Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
@@ -248,7 +249,7 @@ pub(crate) fn delete_all_chaos(kube_namespace: &str) -> Result<()> {
 /// as well as all compute resources. If the namespace is a Forge namespace (has the "forge-*" prefix), then simply delete
 /// the entire namespace
 async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
-    let client: K8sClient = create_k8s_client().await;
+    let client: K8sClient = create_k8s_client().await?;
 
     // if operating on the default namespace,
     match kube_namespace.as_str() {
@@ -507,7 +508,7 @@ pub async fn install_testnet_resources(
     genesis_helm_config_fn: Option<GenesisConfigFn>,
     node_helm_config_fn: Option<NodeConfigFn>,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
 
     // get deployment-specific helm values and cache it
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
@@ -711,11 +712,29 @@ pub async fn collect_running_nodes(
     Ok((validators, fullnodes))
 }
 
-pub async fn create_k8s_client() -> K8sClient {
-    // get the client from the local kube context
-    let mut config_infer = Config::infer().await.unwrap();
-    config_infer.accept_invalid_certs = true;
-    K8sClient::try_from(config_infer).unwrap()
+pub async fn create_k8s_client() -> Result<K8sClient> {
+    let mut config = Config::infer().await?;
+    let cluster_name = Kubeconfig::read()
+        .map(|k| k.current_context.unwrap())
+        .unwrap_or_else(|_| config.cluster_url.to_string());
+
+    config.accept_invalid_certs = true;
+
+    let client = K8sClient::try_from(config)?;
+
+    // Test the connection, fail if request fails
+    client.apiserver_version().await.map_err(|_| {
+        if !cluster_name.contains("forge") {
+            format_err!(
+                "Failed to connect to kubernetes cluster {}, \
+                please make sure you have the right kubeconfig",
+                cluster_name
+            )
+        } else {
+            format_err!("Failed to connect to kubernetes cluster {}", cluster_name)
+        }
+    })?;
+    Ok(client)
 }
 
 /// Gets the result of helm status command as JSON
@@ -819,7 +838,7 @@ pub async fn create_management_configmap(
     keep: bool,
     cleanup_duration: Duration,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let namespaces_api = Arc::new(K8sApi::<Namespace>::from_client(kube_client.clone(), None));
     let other_kube_namespace = kube_namespace.clone();
 
@@ -885,7 +904,7 @@ pub async fn create_management_configmap(
 }
 
 pub async fn cleanup_cluster_with_management() -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let start = SystemTime::now();
     let time_since_the_epoch = start
         .duration_since(UNIX_EPOCH)

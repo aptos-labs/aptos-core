@@ -51,7 +51,11 @@ fn put_value_set(
             &sharded_state_kv_batches,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .ledger_db
+        .metadata_db()
+        .write_schemas(ledger_batch)
+        .unwrap();
     state_store
         .state_kv_db
         .commit(version, sharded_state_kv_batches)
@@ -273,6 +277,7 @@ pub fn test_get_state_snapshot_before() {
     let usage = store.get_usage(Some(0)).unwrap();
     store
         .ledger_db
+        .metadata_db()
         .put::<VersionDataSchema>(&1, &usage.into())
         .unwrap();
 

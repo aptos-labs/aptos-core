@@ -7,6 +7,7 @@
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
+    ledger_db::LedgerDb,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
@@ -34,7 +35,7 @@ use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
@@ -89,7 +90,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 });
 
 pub(crate) struct StateDb {
-    pub ledger_db: Arc<DB>,
+    pub ledger_db: Arc<LedgerDb>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -198,6 +199,7 @@ impl DbReader for StateDb {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(self
                 .ledger_db
+                .metadata_db()
                 .get::<VersionDataSchema>(&version)?
                 .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?
                 .get_state_storage_usage())
@@ -216,6 +218,7 @@ impl StateDb {
 
         let mut iter = self
             .ledger_db
+            .metadata_db()
             .iter::<EpochByVersionSchema>(ReadOptions::default())?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&prev_version)?;
@@ -296,7 +299,7 @@ impl StateDb {
 
 impl StateStore {
     pub fn new(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -351,11 +354,12 @@ impl StateStore {
     // We commit the overall commit progress at the last, and use it as the source of truth of the
     // commit progress.
     pub fn sync_commit_progress(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
         crash_if_difference_is_too_large: bool,
     ) {
-        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
+        let ledger_metadata_db = ledger_db.metadata_db();
+        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_metadata_db
             .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
             .expect("Failed to read overall commit progress.")
         {
@@ -363,7 +367,7 @@ impl StateStore {
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
             );
-            let ledger_commit_progress = ledger_db
+            let ledger_commit_progress = ledger_metadata_db
                 .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
                 .expect("Failed to read ledger commit progress.")
                 .expect("Ledger commit progress cannot be None.")
@@ -387,8 +391,9 @@ impl StateStore {
                 if crash_if_difference_is_too_large {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
+                // TODO(grao): Support truncation for splitted ledger DBs.
                 truncate_ledger_db(
-                    Arc::clone(&ledger_db),
+                    ledger_db,
                     ledger_commit_progress,
                     overall_commit_progress,
                     difference as usize,
@@ -420,7 +425,7 @@ impl StateStore {
 
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
@@ -1080,6 +1085,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.ledger_db
+            .metadata_db()
             .put::<VersionDataSchema>(&version, &usage.into())
     }
 

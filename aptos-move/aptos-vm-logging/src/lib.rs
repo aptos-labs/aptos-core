@@ -58,7 +58,7 @@ impl SpeculativeEvent for VMLogEntry {
 static BUFFERED_LOG_EVENTS: Lazy<ArcSwapOption<SpeculativeEvents<VMLogEntry>>> =
     Lazy::new(|| ArcSwapOption::from(None));
 
-static DISABLE_SPECULATION: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
+static DISABLE_SPECULATION: AtomicBool = AtomicBool::new(false);
 
 /// Disables speculation, clears the BUFFERED_LOG_EVENTS and overrides the corresponding
 /// errors on accesses. Dispatches log events directly.
@@ -87,7 +87,7 @@ pub fn init_speculative_logs(num_txns: usize) {
 pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String) {
     let txn_idx = context.get_txn_idx();
 
-    if !context.speculation_supported() && speculation_disabled() {
+    if !context.speculation_supported() || speculation_disabled() {
         // Speculation isn't supported in the current mode, or disabled globally.
         // log the entry directly.
         let log_event = VMLogEntry::new(level, context.clone(), message);

@@ -8,7 +8,7 @@ use aptos_rest_client::{aptos_api_types::TransactionInfo, error::RestError, Clie
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
 };
-use aptos_transaction_generator_lib::{CounterState, TransactionExecutor};
+use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
@@ -18,13 +18,13 @@ use std::{
 };
 
 // Reliable/retrying transaction executor, used for initializing
-pub struct RestApiTransactionExecutor {
+pub struct RestApiReliableTransactionSubmitter {
     pub rest_clients: Vec<RestClient>,
     pub max_retries: usize,
     pub retry_after: Duration,
 }
 
-impl RestApiTransactionExecutor {
+impl RestApiReliableTransactionSubmitter {
     fn random_rest_client(&self) -> &RestClient {
         let mut rng = thread_rng();
         self.rest_clients.choose(&mut rng).unwrap()
@@ -239,7 +239,7 @@ async fn submit_and_check(
 }
 
 #[async_trait]
-impl TransactionExecutor for RestApiTransactionExecutor {
+impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
         Ok(RETRY_POLICY
             .retry(move || {
