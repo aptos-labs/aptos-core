@@ -60,10 +60,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
+      - uses: ./.github/actions/python-setup
         with:
-          version: 1.2.2
-      - run: cd ecosystem/python/sdk && poetry install
+          POETRY_DIRECTORY: ecosystem/python/sdk
       - run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
 
   docs-lint:

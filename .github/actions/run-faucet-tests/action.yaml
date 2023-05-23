@@ -27,16 +27,9 @@ runs:
     - name: Set up Rust
       uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
 
-    # Install Poetry.
-    - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
+    - uses: ./.github/actions/python-setup
       with:
-        version: 1.2.2
-
-    # Install the script dependencies.
-    - name: Install script dependencies
-      working-directory: crates/aptos-faucet/integration-tests
-      shell: bash
-      run: poetry install
+        POETRY_DIRECTORY: crates/aptos-faucet/integration-tests
 
     # Run the faucet integration tests. This script will handle starting the local
     # testnet, moving the mint key where the tests expect it to be, and running the

@@ -69,14 +69,9 @@ jobs:
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
-
-      - uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d # pin@v1.3.3
+      - uses: ./.github/actions/python-setup
         with:
-          version: 1.2.2
-      - run: poetry install
-        shell: bash
-        working-directory: testsuite
+          POETRY_DIRECTORY: testsuite
 
       - name: Determine image tag
         id: determine-test-image-tag

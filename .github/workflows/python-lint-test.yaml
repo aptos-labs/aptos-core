@@ -22,9 +22,11 @@ jobs:
         uses: tj-actions/changed-files@60f4aabced9b4718c75acef86d42ffb631c4403a # pin@v29.0.3
 
       - uses: ./.github/actions/python-setup
+        with:
+          POETRY_DIRECTORY: testsuite
 
       - name: Should run tests
-        run: ./testrun determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/**/*.py' ${{steps.changed-files.outputs.all_changed_files }}
+        run: ./testrun determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'testsuite/.*py' ${{steps.changed-files.outputs.all_changed_files }}
         id: should-run-tests
         working-directory: testsuite
 

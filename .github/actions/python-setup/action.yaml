@@ -1,3 +1,9 @@
+name: "Python setup"
+description: |
+  Runs an opinionated and unified python setup action. It does the following:
+  * Installs python
+  * Installs poetry
+  * Installs a specified poetry project, if given
 inputs:
   POETRY_DIRECTORY:
     description: "Optional path to a poetry project"
@@ -14,11 +20,8 @@ runs:
       with:
         version: 1.2.2
 
-    - name: Install default python dependencies
-      run: poetry install
-      working-directory: testsuite
-
-    - name: Install additional specified python dependencies from poetry
+    - name: Install poetry project
       if: inputs.POETRY_DIRECTORY != ''
       run: poetry install
+      shell: bash
       working-directory: ${{ inputs.POETRY_DIRECTORY }}
