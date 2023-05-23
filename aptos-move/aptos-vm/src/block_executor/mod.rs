@@ -155,6 +155,8 @@ impl BlockAptosVM {
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
 
+        let duplicates_timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+
         let mut seen = HashMap::new();
         let mut is_possible_duplicate = false;
         let mut possible_duplicates = vec![false; transactions.len()];
@@ -204,6 +206,9 @@ impl BlockAptosVM {
             })
             .collect();
 
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
+        drop(duplicates_timer);
+
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
                 transactions
@@ -217,7 +222,6 @@ impl BlockAptosVM {
                     .collect()
             });
 
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
