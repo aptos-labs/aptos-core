@@ -44,9 +44,10 @@ pub mod db_debugger;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    db_options::{gen_ledger_cfds, ledger_db_column_families, state_merkle_db_column_families},
+    db_options::{ledger_db_column_families, state_merkle_db_column_families},
     errors::AptosDbError,
     event_store::EventStore,
+    ledger_db::LedgerDb,
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
@@ -54,8 +55,7 @@ use crate::{
     },
     pruner::{
         db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
-        ledger_store::ledger_store_pruner::LedgerPruner, pruner_manager::PrunerManager,
-        pruner_utils, state_kv_pruner::StateKvPruner,
+        pruner_manager::PrunerManager, pruner_utils, state_kv_pruner::StateKvPruner,
         state_kv_pruner_manager::StateKvPrunerManager,
         state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
     },
@@ -79,7 +79,6 @@ use aptos_crypto::hash::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
@@ -282,7 +281,7 @@ impl Drop for RocksdbPropertyReporter {
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 pub struct AptosDB {
-    ledger_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
     state_merkle_db: Arc<StateMerkleDb>,
     state_kv_db: Arc<StateKvDb>,
     event_store: Arc<EventStore>,
@@ -297,7 +296,7 @@ pub struct AptosDB {
 
 impl AptosDB {
     fn new_with_dbs(
-        ledger_rocksdb: Arc<DB>,
+        ledger_db: LedgerDb,
         state_merkle_db: StateMerkleDb,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
@@ -305,6 +304,7 @@ impl AptosDB {
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
     ) -> Self {
+        let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
         let state_merkle_pruner = StateMerklePrunerManager::new(
@@ -318,7 +318,7 @@ impl AptosDB {
         let state_kv_pruner =
             StateKvPrunerManager::new(Arc::clone(&state_kv_db), pruner_config.ledger_pruner_config);
         let state_store = Arc::new(StateStore::new(
-            Arc::clone(&ledger_rocksdb),
+            Arc::clone(&ledger_db),
             Arc::clone(&state_merkle_db),
             Arc::clone(&state_kv_db),
             state_merkle_pruner,
@@ -329,23 +329,21 @@ impl AptosDB {
             empty_buffered_state_for_restore,
         ));
 
-        let ledger_pruner = LedgerPrunerManager::new(
-            Arc::clone(&ledger_rocksdb),
-            pruner_config.ledger_pruner_config,
-        );
+        let ledger_pruner =
+            LedgerPrunerManager::new(Arc::clone(&ledger_db), pruner_config.ledger_pruner_config);
 
         AptosDB {
-            ledger_db: Arc::clone(&ledger_rocksdb),
+            ledger_db: Arc::clone(&ledger_db),
             state_merkle_db: Arc::clone(&state_merkle_db),
             state_kv_db: Arc::clone(&state_kv_db),
-            event_store: Arc::new(EventStore::new(Arc::clone(&ledger_rocksdb))),
-            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_rocksdb))),
+            event_store: Arc::new(EventStore::new(ledger_db.event_db_arc())),
+            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
             state_store,
-            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_rocksdb))),
+            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
             ledger_pruner,
             // TODO(grao): Include other DBs.
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
-                Arc::clone(&ledger_rocksdb),
+                ledger_db.metadata_db_arc(),
                 Arc::clone(&state_merkle_db),
             ),
             ledger_commit_lock: std::sync::Mutex::new(()),
@@ -439,33 +437,13 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
-    ) -> Result<(Arc<DB>, StateMerkleDb, StateKvDb)> {
-        let instant = Instant::now();
-
-        let ledger_db_path = db_root_path.as_ref().join(LEDGER_DB_NAME);
-
-        let ledger_db = if readonly {
-            DB::open_cf_readonly(
-                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, true),
-                ledger_db_path.clone(),
-                LEDGER_DB_NAME,
-                ledger_db_column_families(),
-            )?
-        } else {
-            DB::open_cf(
-                &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
-                ledger_db_path.clone(),
-                LEDGER_DB_NAME,
-                gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
-            )?
-        };
-
-        let ledger_db = Arc::new(ledger_db);
+    ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
+        let ledger_db = LedgerDb::new(db_root_path.as_ref(), rocksdb_configs, readonly)?;
         let state_kv_db = StateKvDb::new(
             db_root_path.as_ref(),
             rocksdb_configs,
             readonly,
-            Arc::clone(&ledger_db),
+            ledger_db.metadata_db_arc(),
         )?;
         let state_merkle_db = StateMerkleDb::new(
             db_root_path,
@@ -473,12 +451,6 @@ impl AptosDB {
             readonly,
             max_num_nodes_per_lru_cache_shard,
         )?;
-
-        info!(
-            ledger_db_path = ledger_db_path,
-            time_ms = %instant.elapsed().as_millis(),
-            "Opened AptosDB.",
-        );
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
     }
@@ -611,7 +583,7 @@ impl AptosDB {
 
     /// This force the db to update rocksdb properties immediately.
     pub fn update_rocksdb_properties(&self) -> Result<()> {
-        update_rocksdb_properties(&self.ledger_db, &self.state_merkle_db)
+        update_rocksdb_properties(&self.ledger_db.metadata_db_arc(), &self.state_merkle_db)
     }
 
     /// Returns ledger infos reflecting epoch bumps starting with the given epoch. If there are no
@@ -1055,7 +1027,11 @@ impl AptosDB {
                 let _timer = OTHER_TIMERS_SECONDS
                     .with_label_values(&["save_transactions_commit___ledger_commit"])
                     .start_timer();
-                self.ledger_db.write_schemas(ledger_batch).unwrap();
+                // TODO(grao): Support splitted ledger DBs here.
+                self.ledger_db
+                    .metadata_db()
+                    .write_schemas(ledger_batch)
+                    .unwrap();
             });
         });
 
@@ -1065,7 +1041,7 @@ impl AptosDB {
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(last_version),
         )?;
-        self.ledger_db.write_schemas(ledger_batch)
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)
     }
 
     fn maybe_commit_state_merkle_db(
@@ -2088,6 +2064,8 @@ impl DbWriter for AptosDB {
         ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         gauged_api("finalize_state_snapshot", || {
+            // TODO(grao): Support splitted ledger DBs in this function.
+
             // Ensure the output with proof only contains a single transaction output and info
             let num_transaction_outputs = output_with_proof.transactions_and_outputs.len();
             let num_transaction_infos = output_with_proof.proof.transaction_infos.len();
@@ -2111,7 +2089,7 @@ impl DbWriter for AptosDB {
                 .ledger_info_to_transaction_infos_proof
                 .left_siblings();
             restore_utils::confirm_or_save_frozen_subtrees(
-                self.ledger_db.clone(),
+                self.ledger_db.transaction_accumulator_db(),
                 version,
                 frozen_subtrees,
                 None,
@@ -2138,7 +2116,6 @@ impl DbWriter for AptosDB {
             let transaction_infos = output_with_proof.proof.transaction_infos;
             // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
-                self.ledger_db.clone(),
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
                 self.event_store.clone(),
@@ -2154,14 +2131,11 @@ impl DbWriter for AptosDB {
 
             // Save the epoch ending ledger infos
             restore_utils::save_ledger_infos(
-                self.ledger_db.clone(),
+                self.ledger_db.metadata_db(),
                 self.ledger_store.clone(),
                 ledger_infos,
                 Some(&mut batch),
             )?;
-
-            // Delete the genesis transaction
-            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut batch)?;
 
             batch.put::<DbMetadataSchema>(
                 &DbMetadataKey::LedgerCommitProgress,
@@ -2210,7 +2184,7 @@ impl DbWriter for AptosDB {
             self.state_kv_db
                 .clone()
                 .commit_nonsharded(version, state_kv_batch)?;
-            self.ledger_db.clone().write_schemas(batch)?;
+            self.ledger_db.metadata_db_arc().write_schemas(batch)?;
 
             restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
@@ -2251,7 +2225,6 @@ pub trait GetRestoreHandler {
 impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
         RestoreHandler::new(
-            Arc::clone(&self.ledger_db),
             Arc::clone(self),
             Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),
