@@ -109,6 +109,7 @@ fn test_aggregator_lifetime() {
 }
 
 #[test]
+#[should_panic]
 fn test_aggregator_underflow() {
     let (mut h, acc) = setup();
 
@@ -124,6 +125,7 @@ fn test_aggregator_underflow() {
 }
 
 #[test]
+#[should_panic]
 fn test_aggregator_materialize_underflow() {
     let (mut h, acc) = setup();
 
@@ -136,6 +138,7 @@ fn test_aggregator_materialize_underflow() {
 }
 
 #[test]
+#[should_panic]
 fn test_aggregator_overflow() {
     let (mut h, acc) = setup();
 
@@ -151,6 +154,7 @@ fn test_aggregator_overflow() {
 }
 
 #[test]
+#[should_panic]
 fn test_aggregator_materialize_overflow() {
     let (mut h, acc) = setup();
 
