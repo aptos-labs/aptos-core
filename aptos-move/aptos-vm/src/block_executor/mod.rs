@@ -174,8 +174,14 @@ impl BlockAptosVM {
                 }
             }
         }
-
-        let duplicate_map = SegmentedCache::new(100000, 256);
+        let duplicate_map = if !possible_duplicate_map.is_empty() {
+            Some(SegmentedCache::new(
+                possible_duplicate_map.len() as u64,
+                std::cmp::min(possible_duplicate_map.len(), 256),
+            ))
+        } else {
+            None
+        };
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
                 transactions
@@ -183,11 +189,13 @@ impl BlockAptosVM {
                     .with_min_len(25)
                     .map(|txn| match txn {
                         Transaction::UserTransaction(ref inner) => {
-                            if possible_duplicate_map
-                                .contains(&(inner.sender(), inner.sequence_number()))
-                                && !insert_into_txn_cache(&duplicate_map, &txn)
-                            {
-                                return PreprocessedTransaction::Duplicate;
+                            if let Some(ref duplicate_map) = duplicate_map {
+                                if possible_duplicate_map
+                                    .contains(&(inner.sender(), inner.sequence_number()))
+                                    && !insert_into_txn_cache(duplicate_map, &txn)
+                                {
+                                    return PreprocessedTransaction::Duplicate;
+                                }
                             }
                             preprocess_transaction::<AptosVM>(txn)
                         },
