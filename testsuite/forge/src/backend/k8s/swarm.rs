@@ -59,7 +59,7 @@ impl K8sSwarm {
         fullnodes: HashMap<AccountAddress, K8sNode>,
         keep: bool,
     ) -> Result<Self> {
-        let kube_client = create_k8s_client().await;
+        let kube_client = create_k8s_client().await?;
 
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
