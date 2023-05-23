@@ -25,6 +25,7 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `to_vec_pair`](#0x1_simple_map_to_vec_pair)
 -  [Function `destroy`](#0x1_simple_map_destroy)
 -  [Function `remove`](#0x1_simple_map_remove)
+-  [Function `entry_at_idx`](#0x1_simple_map_entry_at_idx)
 -  [Function `find`](#0x1_simple_map_find)
 -  [Specification](#@Specification_1)
     -  [Struct `SimpleMap`](#@Specification_1_SimpleMap)
@@ -457,6 +458,35 @@ using lambdas to destroy the individual keys and values.
     <b>let</b> placement = <a href="../../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maybe_idx);
     <b>let</b> <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value } = <a href="../../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> map.data, placement);
     (key, value)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_entry_at_idx"></a>
+
+## Function `entry_at_idx`
+
+Get the key and value at a given index in the underlying vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_entry_at_idx">entry_at_idx</a>&lt;Key: store, Value: store&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, idx: u64): (&Key, &Value)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_entry_at_idx">entry_at_idx</a>&lt;Key: store, Value: store&gt;(
+    map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;,
+    idx: u64
+): (&Key, &Value) {
+    <b>let</b> element = <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&map.data, idx);
+    (&element.key, &element.value)
 }
 </code></pre>
 

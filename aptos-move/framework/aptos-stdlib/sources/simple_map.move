@@ -134,12 +134,13 @@ module aptos_std::simple_map {
         (key, value)
     }
 
-    /// Get the key at a given index in the underlying vector.
-    public fun key_at_idx<Key: store, Value: store>(
+    /// Get the key and value at a given index in the underlying vector.
+    public fun entry_at_idx<Key: store, Value: store>(
         map: &SimpleMap<Key, Value>,
         idx: u64
-    ): &Key {
-        &vector::borrow(&map.data, idx).key
+    ): (&Key, &Value) {
+        let element = vector::borrow(&map.data, idx);
+        (&element.key, &element.value)
     }
 
     fun find<Key: store, Value: store>(
