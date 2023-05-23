@@ -1058,7 +1058,7 @@ impl AptosVM {
             // have been previously cached in the prologue.
             //
             // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
-            session = self.0.new_session(resolver, SessionId::txn(txn), true);
+            session = self.0.new_session(resolver, SessionId::txn(txn), aggregator_enabled);
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
