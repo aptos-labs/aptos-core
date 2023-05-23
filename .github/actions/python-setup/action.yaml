@@ -5,7 +5,7 @@ description: |
   * Installs poetry
   * Installs a specified poetry project, if given
 inputs:
-  POETRY_DIRECTORY:
+  pyproject_directory:
     description: "Optional path to a poetry project"
     required: false
 
@@ -21,7 +21,7 @@ runs:
         version: 1.2.2
 
     - name: Install poetry project
-      if: inputs.POETRY_DIRECTORY != ''
+      if: inputs.pyproject_directory != ''
       run: poetry install
       shell: bash
-      working-directory: ${{ inputs.POETRY_DIRECTORY }}
+      working-directory: ${{ inputs.pyproject_directory }}

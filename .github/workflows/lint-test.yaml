@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/python-setup
         with:
-          POETRY_DIRECTORY: ecosystem/python/sdk
+          pyproject_directory: ecosystem/python/sdk
       - run: make -C ecosystem/python/sdk fmt && ./scripts/fail_if_modified_files.sh
 
   docs-lint:

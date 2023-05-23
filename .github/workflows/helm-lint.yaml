@@ -23,7 +23,7 @@ jobs:
 
       - uses: ./.github/actions/python-setup
         with:
-          POETRY_DIRECTORY: testsuite
+          pyproject_directory: testsuite
 
       - name: Should run lint
         run: ./testrun determinator.py changed-files --github-output-key SHOULD_RUN --pattern 'terraform/helm/.*' ${{ steps.changed-files.outputs.all_changed_files }}

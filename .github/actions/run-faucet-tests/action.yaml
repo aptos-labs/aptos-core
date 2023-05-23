@@ -29,7 +29,7 @@ runs:
 
     - uses: ./.github/actions/python-setup
       with:
-        POETRY_DIRECTORY: crates/aptos-faucet/integration-tests
+        pyproject_directory: crates/aptos-faucet/integration-tests
 
     # Run the faucet integration tests. This script will handle starting the local
     # testnet, moving the mint key where the tests expect it to be, and running the

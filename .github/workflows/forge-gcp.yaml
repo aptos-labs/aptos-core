@@ -60,7 +60,7 @@ jobs:
 
       - uses: ./.github/actions/python-setup
         with:
-          POETRY_DIRECTORY: testsuite
+          pyproject_directory: testsuite
 
       - name: Determine image tag
         id: determine-test-image-tag
