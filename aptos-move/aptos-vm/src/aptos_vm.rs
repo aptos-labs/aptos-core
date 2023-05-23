@@ -320,14 +320,6 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         let storage_with_changes = DeltaStateView::new(resolver, &user_txn_change_set_ext);
-        // TODO: at this point we know that delta application failed
-        // (and it should have occurred in user transaction in general).
-        // We need to rerun the epilogue and charge gas. Currently, the use
-        // case of an aggregator is for gas fees (which are computed in
-        // the epilogue), and therefore this should never happen.
-        // Also, it is worth mentioning that current VM error handling is
-        // rather ugly and has a lot of legacy code. This makes proper error
-        // handling quite challenging.
         let resolver = storage_with_changes.as_move_resolver();
 
         let mut session = self

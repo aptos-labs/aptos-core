@@ -58,31 +58,18 @@ where
 mod test {
     use super::DeltaStateView;
     use aptos_aggregator::{
-        delta_change_set::{delta_add, serialize, DeltaChangeSet},
+        delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet},
         transaction::ChangeSetExt,
     };
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_state_view::TStateView;
     use aptos_types::{
-        state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
+        state_store::{state_key::StateKey, table::TableHandle},
         transaction::{ChangeSet, NoOpChangeSetChecker},
         write_set::{WriteOp, WriteSetMut},
     };
     use move_core_types::account_address::AccountAddress;
     use std::sync::Arc;
-
-    fn state_value_to_int(state_value: StateValue) -> u128 {
-        u128::from_be_bytes(
-            state_value
-                .into_bytes()
-                .iter()
-                .rev()
-                .cloned()
-                .collect::<Vec<u8>>()
-                .try_into()
-                .unwrap(),
-        )
-    }
 
     #[test]
     fn test_delta_state_view() {
@@ -117,15 +104,33 @@ mod test {
             DeltaStateView::new(&base_view, &change_set_ext);
 
         assert_eq!(
-            state_value_to_int(delta_state_view.get_state_value(&key1).unwrap().unwrap()),
+            deserialize(
+                delta_state_view
+                    .get_state_value(&key1)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
             155
         );
         assert_eq!(
-            state_value_to_int(delta_state_view.get_state_value(&key2).unwrap().unwrap()),
+            deserialize(
+                delta_state_view
+                    .get_state_value(&key2)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
             400
         );
         assert_eq!(
-            state_value_to_int(delta_state_view.get_state_value(&key3).unwrap().unwrap()),
+            deserialize(
+                delta_state_view
+                    .get_state_value(&key3)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
             500
         );
     }
