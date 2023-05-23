@@ -153,7 +153,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (write_set, delta_change_set, events) = change_set.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -261,7 +261,7 @@ pub fn encode_genesis_change_set(
     let cs2 = session.finish(&mut (), &configs).unwrap();
     let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (write_set, delta_change_set, events) = change_set.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not

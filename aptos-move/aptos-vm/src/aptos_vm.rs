@@ -341,16 +341,13 @@ impl AptosVM {
         let epilogue_change_set = session.finish(&mut (), change_set_configs)?;
         let change_set = user_txn_change_set.squash(epilogue_change_set, change_set_configs)?;
 
-        let (write_set, delta_change_set, events) = change_set.into_inner();
         let gas_used = txn_data
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount");
 
         let output = VMOutput::new(
-            write_set,
-            delta_change_set,
-            events,
+            change_set,
             gas_used.into(),
             TransactionStatus::Keep(ExecutionStatus::Success),
         );
@@ -1177,7 +1174,8 @@ impl AptosVM {
 
         match writeset_payload {
             WriteSetPayload::Direct(change_set) => {
-                let (write_set, events) = change_set.clone().into_inner();
+                let write_set = change_set.write_set().clone();
+                let events = change_set.events().to_vec();
                 VMChangeSet::new(
                     write_set,
                     DeltaChangeSet::empty(),
@@ -1270,17 +1268,10 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        let (write_set, delta_change_set, events) = change_set.into_inner();
-        self.read_writeset(resolver, &write_set)?;
+        self.read_writeset(resolver, change_set.write_set())?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = VMOutput::new(
-            write_set,
-            delta_change_set,
-            events,
-            0,
-            VMStatus::Executed.into(),
-        );
+        let output = VMOutput::new(change_set, 0, VMStatus::Executed.into());
         Ok((VMStatus::Executed, output))
     }
 
@@ -1336,6 +1327,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    /// Executes a SignedTransaction without performing signature verification.
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
@@ -1351,10 +1343,17 @@ impl AptosVM {
             &log_context,
             true,
         );
+
+        // Because simulation returns a VMOutput, it has both writes and deltas
+        // produced by the transaction. Conversion to TransactionOutput materializes
+        // deltas and merges them with the write set, and can fail (e.g. applying
+        // a delta led to integer overflow). It is important to catch the failing
+        // case and re-simulate the transaction without an aggregator, in order to
+        // obtain the precise location of abort and gas used.
         match vm_output.into_transaction_output(state_view) {
             Ok(output) => (vm_status, output),
             Err(_) => {
-                // Conversion to TransactionOutput failed, try to re-execute without aggregators.
+                // Conversion to TransactionOutput failed, re-simulate without aggregators.
                 let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
                     &state_view.as_move_resolver(),
                     txn,
@@ -1772,9 +1771,6 @@ impl AptosSimulationVM {
         )
     }
 
-    /*
-    Executes a SignedTransaction without performing signature verification
-     */
     fn simulate_signed_transaction(
         &self,
         resolver: &impl MoveResolverExt,

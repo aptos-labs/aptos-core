@@ -145,6 +145,6 @@ where
     // Genesis never produces the delta change set.
     assert!(change_set.delta_change_set().is_empty());
 
-    let (write_set, _delta_change_set, events) = change_set.into_inner();
+    let (write_set, _delta_change_set, events) = change_set.unpack();
     ChangeSet::new(write_set, events)
 }

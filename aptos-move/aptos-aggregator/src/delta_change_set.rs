@@ -332,14 +332,18 @@ impl DeltaChangeSet {
         self,
         state_view: &impl StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
-        let mut ret = Vec::with_capacity(self.delta_change_set.len());
+        // Converts every item of DeltaChangeSet into an item of a WriteSet. If
+        // conversion fails, error is returned.
+        let into_write_set_item =
+            |item: (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
+                let write_op = delta_op.try_into_write_op(state_view, &item.0)?;
+                Ok((item.0, write_op))
+            };
 
-        for (state_key, delta_op) in self.delta_change_set {
-            let write_op = delta_op.try_into_write_op(state_view, &state_key)?;
-            ret.push((state_key, write_op));
-        }
-
-        Ok(ret)
+        self.delta_change_set
+            .into_iter()
+            .map(into_write_set_item)
+            .collect()
     }
 
     /// Consumes the delta change set and tries to materialize it into a write set.
@@ -348,7 +352,6 @@ impl DeltaChangeSet {
         state_view: &impl StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
         let materialized_write_set = self.take_materialized(state_view)?;
-
         WriteSetMut::new(materialized_write_set)
             .freeze()
             .map_err(|_err| {

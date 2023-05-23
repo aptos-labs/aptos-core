@@ -649,7 +649,7 @@ impl FakeExecutor {
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (write_set, _delta_change_set, _events) = change_set.into_inner();
+            let (write_set, _delta_change_set, _events) = change_set.unpack();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -692,7 +692,7 @@ impl FakeExecutor {
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (write_set, _delta_change_set, _events) = change_set.into_inner();
+        let (write_set, _delta_change_set, _events) = change_set.unpack();
         Ok(write_set)
     }
 

@@ -3,6 +3,7 @@
 
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaChangeSet};
+use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
     write_set::{WriteOp, WriteSet},
@@ -21,19 +22,40 @@ pub struct VMChangeSet {
 }
 
 impl VMChangeSet {
+    /// Returns an empty change set.
+    pub fn empty() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            delta_change_set: DeltaChangeSet::empty(),
+            events: vec![],
+        }
+    }
+
+    /// Returns a new change set, and checks that it is well-formed.
     pub fn new(
         write_set: WriteSet,
         delta_change_set: DeltaChangeSet,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
+        // Check that writes and deltas have disjoint key set.
+        let disjoint = delta_change_set
+            .iter()
+            .all(|(k, _)| write_set.get(k).is_some());
+        if !disjoint {
+            return Err(VMStatus::Error(
+                StatusCode::DATA_FORMAT_ERROR,
+                Some("DeltaChangeSet and WriteSet are not disjoint.".to_string()),
+            ));
+        }
+
         let change_set = Self {
             write_set,
             delta_change_set,
             events,
         };
 
-        // Check the newly formed change set.
+        // Check the newly-formed change set.
         checker.check_change_set(&change_set)?;
         Ok(change_set)
     }
@@ -50,8 +72,38 @@ impl VMChangeSet {
         &self.events
     }
 
-    pub fn into_inner(self) -> (WriteSet, DeltaChangeSet, Vec<ContractEvent>) {
+    pub fn unpack(self) -> (WriteSet, DeltaChangeSet, Vec<ContractEvent>) {
         (self.write_set, self.delta_change_set, self.events)
+    }
+
+    /// Materializes this change set: all deltas are converted into writes and
+    /// are combined with existing write set. In case of materialization fails,
+    /// an error is returned.
+    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+        let (write_set, delta_change_set, events) = self.unpack();
+
+        // Try to materialize deltas and add them to the write set.
+        let mut write_set_mut = write_set.into_mut();
+        let delta_writes = delta_change_set.take_materialized(state_view)?;
+        delta_writes
+            .into_iter()
+            .for_each(|item| write_set_mut.insert(item));
+
+        let write_set = write_set_mut.freeze().map_err(|_| {
+            VMStatus::Error(
+                StatusCode::DATA_FORMAT_ERROR,
+                Some(
+                    "Failed to freeze write set when converting VMOutput to TransactionOutput"
+                        .to_string(),
+                ),
+            )
+        })?;
+
+        Ok(Self {
+            write_set,
+            delta_change_set: DeltaChangeSet::empty(),
+            events,
+        })
     }
 
     pub fn squash(
@@ -61,8 +113,8 @@ impl VMChangeSet {
     ) -> anyhow::Result<Self, VMStatus> {
         use WriteOp::*;
 
-        let (other_write_set, other_delta_change_set, other_events) = other.into_inner();
-        let (write_set, mut delta_change_set, mut events) = self.into_inner();
+        let (other_write_set, other_delta_change_set, other_events) = other.unpack();
+        let (write_set, mut delta_change_set, mut events) = self.unpack();
         let mut write_set_mut = write_set.into_mut();
 
         let delta_ops = delta_change_set.as_inner_mut();
@@ -110,6 +162,8 @@ impl VMChangeSet {
         for (key, write_op) in other_write_set.into_iter() {
             match write_ops.entry(key) {
                 Occupied(mut entry) => {
+                    // Squashing creation and deletion is a no-op. In that case, we
+                    // have to remove the old write op from the write set.
                     let noop = !WriteOp::squash(entry.get_mut(), write_op).map_err(|e| {
                         VMStatus::Error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
