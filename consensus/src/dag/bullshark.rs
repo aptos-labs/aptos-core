@@ -144,7 +144,7 @@ impl Bullshark {
         let mut ordered_history = Vec::new();
 
         while let Some(anchor) = anchor_stack.pop() {
-            ordered_history.extend(self.order_anchor_causal_history(anchor));
+            ordered_history.extend(self.order_anchor_causal_history(anchor).into_iter().rev());
         }
 
         ordered_history
@@ -220,9 +220,10 @@ impl Bullshark {
     async fn push_to_execution(&mut self, ordered_history: Vec<Node>) {
         let mut payload = Payload::empty(true);
         // let mut payload = ordered_history[0].maybe_payload().unwrap().clone();
-        let round = ordered_history[0].round();
-        let timestamp = ordered_history[0].timestamp();
-        let author = ordered_history[0].source();
+        let anchor = ordered_history.last().unwrap();
+        let round = anchor.round();
+        let timestamp = anchor.timestamp();
+        let author = anchor.source();
 
         let current_timestamp = aptos_infallible::duration_since_epoch();
         let duration = current_timestamp
