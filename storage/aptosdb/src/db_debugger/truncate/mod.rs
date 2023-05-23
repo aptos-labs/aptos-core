@@ -216,6 +216,7 @@ mod test {
 
         #[test]
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
+            aptos_logger::Logger::new().init();
             let tmp_dir = TempPath::new();
             let db = AptosDB::new_for_test(&tmp_dir);
             let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
