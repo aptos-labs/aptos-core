@@ -5,6 +5,10 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     models::{
+        coin_models::{
+            coin_activities::CoinActivity,
+            coin_infos::{CoinInfo, CoinInfoQuery},
+        },
         events::EventModel,
         token_models::token_utils::TypeInfo,
         transactions::{TransactionDetail, TransactionModel},
@@ -12,6 +16,7 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_api_types::Transaction;
+use aptos_types::APTOS_COIN_TYPE;
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
@@ -31,6 +36,8 @@ use redis::Commands;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+
+use super::coin_processor::insert_coin_infos;
 
 pub const NAME: &str = "econia_processor";
 
@@ -80,7 +87,7 @@ struct MarketRegistrationEvent {
     tick_size: String,
     min_size: String,
     underwriter_id: String,
-    time: String
+    time: String,
 }
 
 // TODO remove the unwraps and use TryFrom instead of From.
@@ -99,7 +106,7 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
             lot_size: e.lot_size.parse().unwrap(),
             tick_size: e.tick_size.parse().unwrap(),
             min_size: e.min_size.parse().unwrap(),
-            underwriter_id: e.underwriter_id.parse().unwrap()
+            underwriter_id: e.underwriter_id.parse().unwrap(),
         }
     }
 }
@@ -488,6 +495,7 @@ impl EconiaTransactionProcessor {
         &self,
         start_version: u64,
         end_version: u64,
+        coin_infos: Vec<CoinInfo>,
         events: Vec<EventModel>,
         block_to_time: HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<ProcessingResult, Error> {
@@ -498,17 +506,18 @@ impl EconiaTransactionProcessor {
             "Inserting to db",
         );
         if self
-            .insert_events_transaction(&events, &block_to_time)
+            .insert_data(&coin_infos, &events, &block_to_time)
             .is_err()
         {
             let events = clean_data_for_db(events, true);
-            self.insert_events_transaction(&events, &block_to_time)?;
+            self.insert_data(&coin_infos, &events, &block_to_time)?;
         }
         Ok(ProcessingResult::new(NAME, start_version, end_version))
     }
 
-    fn insert_events_transaction(
+    fn insert_data(
         &self,
+        coin_infos: &[CoinInfo],
         events: &[EventModel],
         block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<(), Error> {
@@ -516,6 +525,7 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
+                insert_coin_infos(pg_conn, coin_infos)?;
                 self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
@@ -771,6 +781,22 @@ impl TransactionProcessor for EconiaTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let maybe_aptos_coin_info = {
+            let mut conn = self.get_conn();
+            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap()
+        };
+
+        let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
+
+        for txn in &transactions {
+            let (_, _, coin_infos, _, _) =
+                CoinActivity::from_transaction(txn, maybe_aptos_coin_info);
+            for (key, value) in coin_infos {
+                all_coin_infos.entry(key).or_insert(value);
+            }
+        }
+        let all_coin_infos = all_coin_infos.into_values().collect::<Vec<CoinInfo>>();
+
         let (_, details, events, _, _) = TransactionModel::from_transactions(&transactions);
         let mut details_iter = details.iter();
         let (mut cur_block, mut cur_time) = Default::default();
@@ -793,15 +819,21 @@ impl TransactionProcessor for EconiaTransactionProcessor {
             filtered_events.push(e);
         }
 
-        self.insert_to_db(start_version, end_version, filtered_events, block_to_time)
-            .map_err(|err| {
-                TransactionProcessingError::TransactionCommitError((
-                    anyhow::Error::from(err),
-                    start_version,
-                    end_version,
-                    NAME,
-                ))
-            })
+        self.insert_to_db(
+            start_version,
+            end_version,
+            all_coin_infos,
+            filtered_events,
+            block_to_time,
+        )
+        .map_err(|err| {
+            TransactionProcessingError::TransactionCommitError((
+                anyhow::Error::from(err),
+                start_version,
+                end_version,
+                NAME,
+            ))
+        })
     }
 
     fn connection_pool(&self) -> &PgDbPool {
