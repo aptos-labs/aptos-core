@@ -328,6 +328,22 @@ const config = {
             to: "/nodes/full-node/run-a-fullnode-on-gcp",
             from: "/tutorials/run-a-fullnode-on-gcp",
           },
+          {
+            to: "/aptos-white-paper",
+            from: "/aptos-white-paper/aptos-white-paper-index/",
+          },
+          {
+            to: "/guides/system-integrators-guide",
+            from: "/guides/getting-started",
+          },
+          {
+            to: "/concepts/accounts",
+            from: "/basics/basics-accounts/",
+          },
+          {
+            to: "/move/move-on-aptos",
+            from: "/guides/move-guides/aptos-move-guides",
+          },
         ],
         createRedirects(existingPath) {
           if (existingPath.includes("/move")) {
