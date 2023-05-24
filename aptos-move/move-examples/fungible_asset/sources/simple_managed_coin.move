@@ -1,7 +1,7 @@
 /// A 2-in-1 module that combines managed_fungible_asset and coin_example into one module that when deployed, the
 /// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
-/// The address of the asset can be obtained via get_metadata().
-module fungible_asset_extension::managed_coin {
+/// The address of the asset can be obtained via get_metadata(). As a simple version, it only deal with primary stores.
+module example_addr::simple_managed_coin {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
@@ -50,7 +50,7 @@ module fungible_asset_extension::managed_coin {
     #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
     public fun get_metadata(): Object<Metadata> {
-        let asset_address = object::create_object_address(&@fungible_asset_extension, ASSET_SYMBOL);
+        let asset_address = object::create_object_address(&@example_addr, ASSET_SYMBOL);
         object::address_to_object<Metadata>(asset_address)
     }
 
@@ -67,7 +67,7 @@ module fungible_asset_extension::managed_coin {
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
@@ -76,7 +76,7 @@ module fungible_asset_extension::managed_coin {
     public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         fungible_asset::burn_from(burn_ref, from_wallet, amount);
     }
 
@@ -100,7 +100,7 @@ module fungible_asset_extension::managed_coin {
     public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
