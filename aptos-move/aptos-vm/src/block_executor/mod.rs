@@ -184,22 +184,26 @@ impl BlockAptosVM {
         } else {
             vec![None; transactions.len()]
         };
-        let mut seen_hashes = HashSet::new();
-        let mut num_duplicates = 0;
-        let duplicates: Vec<_> = hashes
-            .into_iter()
-            .map(|maybe_hash| match maybe_hash {
-                None => false,
-                Some(hash) => {
-                    if seen_hashes.insert(hash) {
-                        false
-                    } else {
-                        num_duplicates += 1;
-                        true
-                    }
-                },
-            })
-            .collect();
+        let mut num_duplicates: usize = 0;
+        let duplicates: Vec<_> = if is_possible_duplicate {
+            let mut seen_hashes = HashSet::new();
+            hashes
+                .into_iter()
+                .map(|maybe_hash| match maybe_hash {
+                    None => false,
+                    Some(hash) => {
+                        if seen_hashes.insert(hash) {
+                            false
+                        } else {
+                            num_duplicates += 1;
+                            true
+                        }
+                    },
+                })
+                .collect()
+        } else {
+            vec![false; transactions.len()]
+        };
 
         BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(duplicates_timer);
