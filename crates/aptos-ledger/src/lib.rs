@@ -16,6 +16,7 @@ use std::{
     collections::HashMap,
     fmt,
     fmt::{Debug, Display},
+    ops::Range,
     str,
     string::ToString,
 };
@@ -148,22 +149,29 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
 ///
 /// # Arguments
 ///
-/// * `start_index` - The index to start fetch for accounts
-/// * `end_index` - The last index to fetch the accounts
+/// * `index_range` - The range of the accounts in index, that you want to fetch, if None default to 0-20
 pub fn fetch_batch_accounts(
-    start_index: u32,
-    end_index: u32,
+    index_range: Option<Range<u32>>,
 ) -> Result<HashMap<String, AccountAddress>, AptosLedgerError> {
+    let range = if let Some(range) = index_range {
+        range
+    } else {
+        0..20
+    };
+
     // Make sure start_index and end_index is valid
-    if start_index > end_index || end_index - start_index > 20 {
-        return Err(AptosLedgerError::UnexpectedError("Unexpected Error: Incorrect start and end index, make sure the range is less than or equal to 20".to_string(), None));
+    if range.end - range.start > 20 {
+        return Err(AptosLedgerError::UnexpectedError(
+            "Unexpected Error: Make sure the range is less than or equal to 20".to_string(),
+            None,
+        ));
     }
 
     // Open connection to ledger
     let transport = open_ledger_transport()?;
 
     let mut accounts = HashMap::new();
-    for i in start_index..end_index {
+    for i in range {
         let path = DERIVATIVE_PATH.replace("{index}", &i.to_string());
         let cdata = serialize_bip32(&path);
 
@@ -190,7 +198,10 @@ pub fn fetch_batch_accounts(
                     let hex_string = encode(pub_key_buffer);
                     let public_key = match Ed25519PublicKey::from_encoded_string(&hex_string) {
                         Ok(pk) => Ok(pk),
-                        Err(err) => Err(AptosLedgerError::UnexpectedError(err.to_string(), None)),
+                        Err(err) => Err(AptosLedgerError::UnexpectedError(
+                            err.to_string(),
+                            Some(response.retcode()),
+                        )),
                     };
                     let account = account_address_from_public_key(&public_key?);
                     accounts.insert(path, account);
