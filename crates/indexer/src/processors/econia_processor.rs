@@ -76,13 +76,14 @@ struct MarketRegistrationEvent {
     base_type: TypeInfo,
     base_name_generic: String,
     quote_type: TypeInfo,
-    lot_size: u64,
-    tick_size: u64,
-    min_size: u64,
+    lot_size: String,
+    tick_size: String,
+    min_size: String,
     underwriter_id: u64,
     time: DateTime<Utc>,
 }
 
+// TODO remove the unwraps and use TryFrom instead of From.
 impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
     fn from(e: MarketRegistrationEvent) -> Self {
         Self {
@@ -95,9 +96,9 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
             quote_account_address: e.quote_type.account_address,
             quote_module_name: e.quote_type.module_name,
             quote_struct_name: e.quote_type.struct_name,
-            lot_size: e.lot_size.into(),
-            tick_size: e.tick_size.into(),
-            min_size: e.min_size.into(),
+            lot_size: e.lot_size.parse().unwrap(),
+            tick_size: e.tick_size.parse().unwrap(),
+            min_size: e.min_size.parse().unwrap(),
             underwriter_id: e.underwriter_id.into(),
         }
     }
