@@ -152,6 +152,12 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     // if the function require signer, we check senders number same as signers
     // and then combine senders with txn args.
     let mut combined_args = if signer_param_cnt == 0 {
+        if senders.len() != 1 {
+            return Err(VMStatus::Error(
+                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+                None,
+            ));
+        }
         args
     } else {
         // the number of txn senders should be the same number of signers

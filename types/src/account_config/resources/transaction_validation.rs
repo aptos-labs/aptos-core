@@ -18,11 +18,11 @@ use serde::{Deserialize, Serialize};
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
         module_addr: CORE_CODE_ADDRESS,
-        module_name: Identifier::new("transaction_validation").unwrap(),
-        script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        module_prologue_name: Identifier::new("module_prologue").unwrap(),
-        multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
-        user_epilogue_name: Identifier::new("epilogue").unwrap(),
+        module_name: Identifier::from(ident_str!("transaction_validation")),
+        script_prologue_name: Identifier::from(ident_str!("script_prologue")),
+        module_prologue_name: Identifier::from(ident_str!("module_prologue")),
+        multi_agent_prologue_name: Identifier::from(ident_str!("multi_agent_script_prologue")),
+        user_epilogue_name: Identifier::from(ident_str!("epilogue")),
     });
 
 /// A Rust representation of chain-specific account information
