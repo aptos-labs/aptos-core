@@ -72,23 +72,23 @@ static EVENT_TYPES: Lazy<Vec<String>> = Lazy::new(|| {
 
 #[derive(Debug, Deserialize, Clone)]
 struct MarketRegistrationEvent {
-    market_id: u64,
+    market_id: String,
     base_type: TypeInfo,
     base_name_generic: String,
     quote_type: TypeInfo,
     lot_size: String,
     tick_size: String,
     min_size: String,
-    underwriter_id: u64,
-    time: DateTime<Utc>,
+    underwriter_id: String,
+    time: String
 }
 
 // TODO remove the unwraps and use TryFrom instead of From.
 impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
     fn from(e: MarketRegistrationEvent) -> Self {
         Self {
-            market_id: e.market_id.into(),
-            time: e.time,
+            market_id: e.market_id.parse().unwrap(),
+            time: e.time.parse().unwrap(),
             base_account_address: Some(e.base_type.account_address),
             base_module_name: Some(e.base_type.module_name),
             base_struct_name: Some(e.base_type.struct_name),
@@ -99,7 +99,7 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
             lot_size: e.lot_size.parse().unwrap(),
             tick_size: e.tick_size.parse().unwrap(),
             min_size: e.min_size.parse().unwrap(),
-            underwriter_id: e.underwriter_id.into(),
+            underwriter_id: e.underwriter_id.parse().unwrap()
         }
     }
 }
