@@ -23,7 +23,6 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -35,10 +34,7 @@ use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -149,81 +145,36 @@ impl BlockAptosVM {
         maybe_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-
-        let duplicates_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
-
-        let mut seen = HashMap::new();
-        let mut is_possible_duplicate = false;
-        let mut possible_duplicates = vec![false; transactions.len()];
-        for (i, txn) in transactions.iter().enumerate() {
-            if let Transaction::UserTransaction(ref inner) = txn {
-                match seen.get(&(inner.sender(), inner.sequence_number())) {
-                    None => {
-                        seen.insert((inner.sender(), inner.sequence_number()), i);
-                    },
-                    Some(first_index) => {
-                        is_possible_duplicate = true;
-                        possible_duplicates[*first_index] = true;
-                        possible_duplicates[i] = true;
-                    },
-                }
-            }
-        }
-        let hashes: Vec<_> = if is_possible_duplicate {
-            executor_thread_pool.install(|| {
-                possible_duplicates
-                    .into_par_iter()
-                    .zip(&transactions)
-                    .with_min_len(25)
-                    .map(|(need_hash, txn)| match need_hash {
-                        true => Some(txn.hash()),
-                        false => None,
-                    })
-                    .collect()
-            })
-        } else {
-            vec![None; transactions.len()]
-        };
-        let mut seen_hashes = HashSet::new();
-        let mut num_duplicates = 0;
-        let duplicates: Vec<_> = hashes
-            .into_iter()
-            .map(|maybe_hash| match maybe_hash {
-                None => false,
-                Some(hash) => {
-                    if seen_hashes.insert(hash) {
-                        false
-                    } else {
-                        num_duplicates += 1;
-                        true
-                    }
-                },
-            })
-            .collect();
-
-        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
-        drop(duplicates_timer);
-
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            executor_thread_pool.install(|| {
+        let mut signature_verified_block: Vec<PreprocessedTransaction> = executor_thread_pool
+            .install(|| {
                 transactions
                     .into_par_iter()
-                    .zip(duplicates)
                     .with_min_len(25)
-                    .map(|(txn, is_duplicate)| match is_duplicate {
-                        true => PreprocessedTransaction::Duplicate,
-                        false => preprocess_transaction::<AptosVM>(txn),
-                    })
+                    .map(preprocess_transaction::<AptosVM>)
                     .collect()
             });
-
         drop(signature_verification_timer);
+
+        // The signatures are already verified, so we just have to filter out duplicated
+        // (sender, sequence_number).
+        let duplicates_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
+        let mut seen = HashSet::new();
+        let mut num_duplicates: usize = 0;
+        for txn in &mut signature_verified_block {
+            if let PreprocessedTransaction::UserTransaction(inner) = txn {
+                if !seen.insert((inner.sender(), inner.sequence_number())) {
+                    *txn = PreprocessedTransaction::Duplicate;
+                    num_duplicates += 1;
+                }
+            }
+        }
+        BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
+        drop(duplicates_timer);
 
         let num_txns = signature_verified_block.len();
         init_speculative_logs(num_txns);
