@@ -7,13 +7,6 @@ import remarkGfm from "remark-gfm";
 
 import ExecutionEnvironment from "@docusaurus/ExecutionEnvironment";
 
-if (ExecutionEnvironment.canUseViewport) {
-  const shiftWindow = function () {
-    scrollBy(0, -65);
-  };
-  window.addEventListener("hashchange", shiftWindow);
-}
-
 const root = "https://raw.githubusercontent.com/aptos-labs/aptos-core/";
 const url_root = "/reference/move";
 
@@ -129,7 +122,7 @@ const Content = ({ branch, page }: ContentProps) => {
       const response = await fetch(page_path);
       const raw_content = await response.text();
 
-      const regex_major = /href="([\w\-\/]*(\/[\w\-]+\/doc\/))?([\w\-]+.md.*)"/g;
+      const regex_major = /href="([\w\-\/\.]*(\/[\w\-]+\/doc\/))?([\w\-]+.md.*)"/g;
       const regex_local = /href="([\w\-]+\.md)/g;
       const regex_minor = /page=([\w\-]+\.md)/g;
       const regex_markdown = /\(([\w\-]+\.md.*)\)/g;
@@ -147,10 +140,6 @@ const Content = ({ branch, page }: ContentProps) => {
             remarkRehypeOptions={{ allowDangerousHtml: true }}
           />,
         );
-      }
-      if (window.location.hash) {
-        window.location.href = window.location;
-        shiftWindow();
       }
     };
 

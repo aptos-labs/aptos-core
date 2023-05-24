@@ -52,6 +52,7 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 proptest = { workspace = true }
 
