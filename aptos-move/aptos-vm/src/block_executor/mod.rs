@@ -161,18 +161,23 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         // The signatures are already verified, so we just have to filter out duplicated
-        // (sender, sequence_number).
+        // raw transactions.
         let duplicates_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
         let mut seen = HashSet::new();
         let mut num_duplicates: usize = 0;
-        for txn in &mut signature_verified_block {
+        let mut duplicate_indices = vec![];
+        for (i, txn) in signature_verified_block.iter().enumerate() {
             if let PreprocessedTransaction::UserTransaction(inner) = txn {
-                if !seen.insert((inner.sender(), inner.sequence_number())) {
-                    *txn = PreprocessedTransaction::Duplicate;
+                if !seen.insert(inner.raw_transaction()) {
+                    duplicate_indices.push(i);
                     num_duplicates += 1;
                 }
             }
         }
+        for i in duplicate_indices {
+            signature_verified_block[i] = PreprocessedTransaction::Duplicate;
+        }
+
         BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(duplicates_timer);
 
