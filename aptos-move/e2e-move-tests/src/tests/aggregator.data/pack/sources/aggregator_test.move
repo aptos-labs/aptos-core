@@ -42,11 +42,25 @@ module 0x1::aggregator_test {
         table::add(aggregators, i, aggregator);
     }
 
+    public entry fun try_add(account: &signer, i: u64, value: u128): bool acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow_mut(aggregators, i);
+        aggregator::try_add(aggregator, value)
+    }
+
     public entry fun add(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
         aggregator::add(aggregator, value);
+    }
+
+    public entry fun try_sub(account: &signer, i: u64, value: u128): bool acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow_mut(aggregators, i);
+        aggregator::try_sub(aggregator, value)
     }
 
     public entry fun sub(account: &signer, i: u64, value: u128) acquires AggregatorStore {

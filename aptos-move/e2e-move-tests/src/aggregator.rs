@@ -53,6 +53,23 @@ pub fn new(
     )
 }
 
+pub fn try_add(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+    value: u128,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_test::try_add").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&index).unwrap(),
+            bcs::to_bytes(&value).unwrap(),
+        ],
+    )
+}
+
 pub fn add(
     harness: &mut MoveHarness,
     account: &Account,
@@ -62,6 +79,23 @@ pub fn add(
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::add").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&index).unwrap(),
+            bcs::to_bytes(&value).unwrap(),
+        ],
+    )
+}
+
+pub fn try_sub(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+    value: u128,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_test::try_sub").unwrap(),
         vec![],
         vec![
             bcs::to_bytes(&index).unwrap(),
