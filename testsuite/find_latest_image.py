@@ -9,10 +9,10 @@ import sys
 # 2. If the IMAGE_TAG environment variable is not set, it will find the latest image tag from git history,
 #    assuming images are tagged with the git commit hash.
 
-from applogging import logger, init_logging
+from test_framework.logging import init_logging, log
 from forge import find_recent_images, image_exists
-from forge_wrapper_core.shell import LocalShell
-from forge_wrapper_core.git import Git
+from test_framework.shell import LocalShell
+from test_framework.git import Git
 
 # gh output logic from determinator
 from determinator import GithubOutput, write_github_output
@@ -23,7 +23,6 @@ IMAGE_TAG_ENV = "IMAGE_TAG"
 GH_OUTPUT_KEY = "IMAGE_TAG"
 
 
-@logger
 def main() -> None:
     init_logging(logger=log)
 
