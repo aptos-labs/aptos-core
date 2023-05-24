@@ -835,6 +835,7 @@ impl TransactionStatus {
 
     pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
+        // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
         match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
