@@ -8,6 +8,7 @@ use crate::{
     success_criteria::SuccessCriteria,
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
 };
+use anyhow::{bail, format_err, Error, Result};
 use aptos_framework::ReleaseBundle;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
@@ -15,12 +16,16 @@ use std::{
     io::{self, Write},
     num::NonZeroUsize,
     process,
+    str::FromStr,
     sync::Arc,
     time::Duration,
 };
 use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
+
+const KUBERNETES_SERVICE_HOST: &str = "KUBERNETES_SERVICE_HOST";
+pub const FORGE_RUNNER_MODE: &str = "FORGE_RUNNER_MODE";
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Forged in Fire")]
@@ -244,11 +249,40 @@ impl<'cfg> ForgeConfig<'cfg> {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ForgeRunnerMode {
+    Local,
+    K8s,
+}
+
+impl FromStr for ForgeRunnerMode {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "local" => Ok(ForgeRunnerMode::Local),
+            "k8s" => Ok(ForgeRunnerMode::K8s),
+            _ => Err(format_err!("Invalid runner mode: {}", s)),
+        }
+    }
+}
+
+impl ForgeRunnerMode {
+    pub fn try_from_env() -> Result<ForgeRunnerMode> {
+        if let Ok(runner_mode) = std::env::var(FORGE_RUNNER_MODE) {
+            Ok(ForgeRunnerMode::from_str(&runner_mode)?)
+        } else if std::env::var(KUBERNETES_SERVICE_HOST).is_ok() {
+            Ok(ForgeRunnerMode::K8s)
+        } else {
+            Ok(ForgeRunnerMode::Local)
+        }
+    }
+}
+
 impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
-        let forge_run_mode =
-            std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
-        let success_criteria = if forge_run_mode.eq("local") {
+        let forge_run_mode = ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
+        let success_criteria = if forge_run_mode == ForgeRunnerMode::Local {
             SuccessCriteria::new(600).add_no_restarts()
         } else {
             SuccessCriteria::new(3500)
@@ -414,7 +448,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         if summary.success() {
             Ok(report)
         } else {
-            Err(anyhow::anyhow!("Tests Failed"))
+            bail!("Tests Failed")
         }
     }
 
@@ -569,5 +603,62 @@ impl TestSummary {
 
     fn success(&self) -> bool {
         self.failed.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_forge_runner_mode_from_env() {
+        // HACK we really should not be setting env variables in test
+
+        // Store the env variables before we mutate them
+        let original_forge_runner_mode = std::env::var(FORGE_RUNNER_MODE);
+        let original_kubernetes_service_host = std::env::var(KUBERNETES_SERVICE_HOST);
+
+        // Test the default locally
+        std::env::remove_var(FORGE_RUNNER_MODE);
+        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        let default_local_runner_mode = ForgeRunnerMode::try_from_env();
+
+        std::env::remove_var(FORGE_RUNNER_MODE);
+        std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1");
+        let default_kubernetes_runner_mode = ForgeRunnerMode::try_from_env();
+
+        std::env::set_var(FORGE_RUNNER_MODE, "local");
+        std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1");
+        let local_runner_mode = ForgeRunnerMode::try_from_env();
+
+        std::env::set_var(FORGE_RUNNER_MODE, "k8s");
+        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        let k8s_runner_mode = ForgeRunnerMode::try_from_env();
+
+        std::env::set_var(FORGE_RUNNER_MODE, "durian");
+        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        let invalid_runner_mode = ForgeRunnerMode::try_from_env();
+
+        // Reset the env variables after running
+        match original_forge_runner_mode {
+            Ok(mode) => std::env::set_var(FORGE_RUNNER_MODE, mode),
+            Err(_) => std::env::remove_var(FORGE_RUNNER_MODE),
+        }
+        match original_kubernetes_service_host {
+            Ok(service_host) => std::env::set_var(KUBERNETES_SERVICE_HOST, service_host),
+            Err(_) => std::env::remove_var(KUBERNETES_SERVICE_HOST),
+        }
+
+        assert_eq!(default_local_runner_mode.unwrap(), ForgeRunnerMode::Local);
+        assert_eq!(
+            default_kubernetes_runner_mode.unwrap(),
+            ForgeRunnerMode::K8s
+        );
+        assert_eq!(local_runner_mode.unwrap(), ForgeRunnerMode::Local);
+        assert_eq!(k8s_runner_mode.unwrap(), ForgeRunnerMode::K8s);
+        assert_eq!(
+            invalid_runner_mode.unwrap_err().to_string(),
+            "Invalid runner mode: durian"
+        );
     }
 }
