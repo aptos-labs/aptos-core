@@ -6,6 +6,7 @@ use crate::{block_executor::BlockAptosVM, sharded_block_executor::ExecutorShardC
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::TransactionOutput;
+use aptos_vm_logging::disable_speculative_logging;
 use move_core_types::vm_status::VMStatus;
 use std::sync::{
     mpsc::{Receiver, Sender},
@@ -24,6 +25,7 @@ pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
 
 impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
     pub fn new(
+        num_executor_shards: usize,
         shard_id: usize,
         num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
@@ -36,6 +38,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                 .build()
                 .unwrap(),
         );
+
+        if num_executor_shards > 1 {
+            // todo: speculative logging is not yet compatible with sharded block executor.
+            disable_speculative_logging();
+        }
 
         Self {
             shard_id,
