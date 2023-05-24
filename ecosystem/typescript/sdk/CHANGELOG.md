@@ -6,6 +6,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.9.1 (2023-05-24)
+
+- Add `x-aptos-client` header to `AptosClient` requests
+
 ## 1.9.0 (2023-05-17)
 
 - Fix get number of delegators Indexer query

@@ -1243,6 +1243,10 @@ html[data-theme='dark'] .sidebar-divider {
   width: 80%;
 }
 
+.move-content a[name] {
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 0.5rem);
+}
+
 .move-sidebar {
   float: left;
   height: 100%; /* 100% Full-height */
