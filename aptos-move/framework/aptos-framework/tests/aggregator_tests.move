@@ -39,14 +39,27 @@ module aptos_framework::aggregator_tests {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 0x020002, location = aptos_framework::aggregator)]
+    fun test_try_overflow(account: signer) {
+        aggregator_factory::initialize_aggregator_factory_for_test(&account);
+        let aggregator = aggregator_factory::create_aggregator(&account, 10);
+        assert!(aggregator::try_add(&mut aggregator, 5) == true, 0);
+        assert!(aggregator::try_sub(&mut aggregator, 3) == true, 1);
+
+        // Overflow!
+        assert!(aggregator::try_add(&mut aggregator, 9) == false, 2);
+
+        aggregator::destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
     fun test_underflow(account: signer) {
         aggregator_factory::initialize_aggregator_factory_for_test(&account);
         let aggregator = aggregator_factory::create_aggregator(&account, 10);
+        assert!(aggregator::try_add(&mut aggregator, 5) == true, 0);
+        assert!(aggregator::try_sub(&mut aggregator, 3) == true, 1);
 
         // Underflow!
-        aggregator::sub(&mut aggregator, 100);
-        aggregator::add(&mut aggregator, 100);
+        assert!(aggregator::try_sub(&mut aggregator, 4) == false, 2);
 
         aggregator::destroy(aggregator);
     }
