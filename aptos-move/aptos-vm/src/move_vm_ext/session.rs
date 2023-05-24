@@ -33,12 +33,11 @@ use move_core_types::{
         Op as MoveStorageOp,
     },
     language_storage::{ModuleId, StructTag},
-    value::MoveTypeLayout,
+    value::MoveValue,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -191,7 +190,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn MoveResolverExt,
-        change_set: Changes<Vec<u8>, (Value, MoveTypeLayout)>,
+        change_set: Changes<Vec<u8>, MoveValue>,
     ) -> VMResult<(MoveChangeSet, MoveChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
@@ -214,8 +213,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 });
 
                 // Also serialize all resources.
-                let blob_op = resource_op.and_then(|(value, layout)| {
-                    value.simple_serialize(&layout).ok_or_else(|| {
+                let blob_op = resource_op.and_then(|value| {
+                    value.simple_serialize().ok_or_else(|| {
                         PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                             .with_message(format!("Error when serializing resource {}.", value))
                             .finish(Location::Undefined)

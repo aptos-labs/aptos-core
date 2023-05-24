@@ -12,7 +12,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
     resolver::MoveResolver,
-    value::MoveTypeLayout,
+    value::{MoveTypeLayout, MoveValue},
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -72,7 +72,7 @@ impl<'r> TransactionDataCache<'r> {
     pub(crate) fn into_effects(
         self,
         loader: &Loader,
-    ) -> PartialVMResult<(Changes<Vec<u8>, (Value, MoveTypeLayout)>, Vec<Event>)> {
+    ) -> PartialVMResult<(Changes<Vec<u8>, MoveValue>, Vec<Event>)> {
         let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -96,7 +96,10 @@ impl<'r> TransactionDataCache<'r> {
                     TypeTag::Struct(struct_tag) => *struct_tag,
                     _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                 };
-                resources.insert(struct_tag, op);
+                resources.insert(
+                    struct_tag,
+                    op.map(|(value, layout)| value.as_move_value(&layout)),
+                );
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set

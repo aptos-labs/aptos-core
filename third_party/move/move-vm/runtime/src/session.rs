@@ -17,7 +17,7 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::{MoveTypeLayout, MoveValue},
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -27,7 +27,7 @@ use move_vm_types::{
 };
 use std::{borrow::Borrow, sync::Arc};
 
-fn serialize_changes(changes: Changes<Vec<u8>, (Value, MoveTypeLayout)>) -> VMResult<ChangeSet> {
+fn serialize_changes(changes: Changes<Vec<u8>, MoveValue>) -> VMResult<ChangeSet> {
     let mut serialized_change_set = ChangeSet::new();
     for (addr, account_change_set) in changes.into_inner() {
         let mut serialized_account_change_set = AccountChangeSet::new();
@@ -40,10 +40,10 @@ fn serialize_changes(changes: Changes<Vec<u8>, (Value, MoveTypeLayout)>) -> VMRe
                 .expect("All identifiers are unique.");
         }
 
-        // Resource stored as (value, layout) pairs. Serialize them as well.
+        // Serialize all resources.
         for (tag, resource_op) in resources {
-            let blob_op = resource_op.and_then(|(value, layout)| {
-                value.simple_serialize(&layout).ok_or_else(|| {
+            let blob_op = resource_op.and_then(|value| {
+                value.simple_serialize().ok_or_else(|| {
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                         .with_message(format!("Error when serializing resource {}.", value))
                         .finish(Location::Undefined)
@@ -292,7 +292,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
     pub fn finish_without_serialization(
         self,
-    ) -> VMResult<(Changes<Vec<u8>, (Value, MoveTypeLayout)>, Vec<Event>)> {
+    ) -> VMResult<(Changes<Vec<u8>, MoveValue>, Vec<Event>)> {
         self.data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -310,7 +310,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn finish_without_serialization_with_extensions(
         self,
     ) -> VMResult<(
-        Changes<Vec<u8>, (Value, MoveTypeLayout)>,
+        Changes<Vec<u8>, MoveValue>,
         Vec<Event>,
         NativeContextExtensions<'r>,
     )> {
