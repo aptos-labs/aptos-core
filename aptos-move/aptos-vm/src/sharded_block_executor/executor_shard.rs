@@ -37,7 +37,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                 .build()
                 .unwrap(),
         );
-        disable_speculative_logging();
+        // disable_speculative_logging();
 
         Self {
             shard_id,
