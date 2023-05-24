@@ -2,17 +2,20 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loader::Loader;
+use crate::{
+    effect_converter::{EffectConverter, StandardEffectConverter},
+    loader::Loader,
+};
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, Changes, Event, Op},
+    effects::{AccountChanges, ChangeSet, Changes, Event, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     metadata::Metadata,
     resolver::MoveResolver,
-    value::{MoveTypeLayout, MoveValue},
+    value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -69,10 +72,18 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(
+    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
+        let effect_converter = StandardEffectConverter;
+        self.into_custom_effects(&effect_converter, loader)
+    }
+
+    /// Same like `into_effects`, but also allows clients to select the format of
+    /// produced effects.
+    pub(crate) fn into_custom_effects<R>(
         self,
+        effect_converter: &impl EffectConverter<R>,
         loader: &Loader,
-    ) -> PartialVMResult<(Changes<Vec<u8>, MoveValue>, Vec<Event>)> {
+    ) -> PartialVMResult<(Changes<Vec<u8>, R>, Vec<Event>)> {
         let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -98,7 +109,9 @@ impl<'r> TransactionDataCache<'r> {
                 };
                 resources.insert(
                     struct_tag,
-                    op.map(|(value, layout)| value.as_move_value(&layout)),
+                    op.and_then(|(value, layout)| {
+                        effect_converter.convert_resource(value, layout)
+                    })?,
                 );
             }
             if !modules.is_empty() || !resources.is_empty() {

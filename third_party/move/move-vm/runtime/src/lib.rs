@@ -11,6 +11,7 @@
 //! soon.
 
 pub mod data_cache;
+pub mod effect_converter;
 mod interpreter;
 mod loader;
 pub mod logging;
