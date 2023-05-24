@@ -3,8 +3,8 @@
 
 use crate::{
     aggregator::{
-        add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
-        materialize_and_sub, new, sub, sub_add, sub_and_materialize,
+        try_add, add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
+        materialize_and_sub, new, try_sub, sub, sub_add, sub_and_materialize,
     },
     assert_abort, assert_success,
     tests::common,
@@ -124,6 +124,19 @@ fn test_aggregator_underflow() {
 }
 
 #[test]
+fn test_aggregator_try_underflow() {
+    let (mut h, acc) = setup();
+
+    let txn1 = new(&mut h, &acc, 0, 600);
+    let txn2 = add(&mut h, &acc, 0, 400);
+    let txn3 = try_sub(&mut h, &acc, 0, 500);
+
+    assert_success!(h.run(txn1));
+    assert_success!(h.run(txn2));
+    assert_success!(h.run(txn3));
+}
+
+#[test]
 fn test_aggregator_materialize_underflow() {
     let (mut h, acc) = setup();
 
@@ -148,6 +161,19 @@ fn test_aggregator_overflow() {
 
     // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
     assert_abort!(h.run(txn3), 131073);
+}
+
+#[test]
+fn test_aggregator_try_overflow() {
+    let (mut h, acc) = setup();
+
+    let txn1 = new(&mut h, &acc, 0, 600);
+    let txn2 = add(&mut h, &acc, 0, 400);
+    let txn3 = try_add(&mut h, &acc, 0, 201);
+
+    assert_success!(h.run(txn1));
+    assert_success!(h.run(txn2));
+    assert_success!(h.run(txn3));
 }
 
 #[test]
