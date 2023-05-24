@@ -41,7 +41,7 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
+    vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -1671,9 +1671,7 @@ impl VMAdapter for AptosVM {
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
-                if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
-                    vm_status.clone().keep_or_discard()
-                {
+                if let StatusType::InvariantViolation = vm_status.status_type() {
                     error!(
                         *log_context,
                         "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
