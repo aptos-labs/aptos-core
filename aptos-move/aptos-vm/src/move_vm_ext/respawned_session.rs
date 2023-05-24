@@ -78,7 +78,10 @@ struct ChangeSetStateView<'r> {
 }
 
 impl<'r> ChangeSetStateView<'r> {
-    pub fn new(base: &'r dyn StateView<Key = StateKey>, change_set: ChangeSetExt) -> Result<Self, VMStatus> {
+    pub fn new(
+        base: &'r dyn StateView<Key = StateKey>,
+        change_set: ChangeSetExt,
+    ) -> Result<Self, VMStatus> {
         Ok(Self { base, change_set })
     }
 }
