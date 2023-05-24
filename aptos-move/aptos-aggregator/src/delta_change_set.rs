@@ -299,6 +299,10 @@ impl DeltaChangeSet {
         }
     }
 
+    pub fn get(&self, key: &StateKey) -> Option<&DeltaOp> {
+        self.delta_change_set.get(key)
+    }
+
     pub fn insert(&mut self, delta: (StateKey, DeltaOp)) {
         self.delta_change_set.insert(delta.0, delta.1);
     }
