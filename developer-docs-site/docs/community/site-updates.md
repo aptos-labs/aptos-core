@@ -63,8 +63,7 @@ To update [Aptos.dev](http://Aptos.dev) directly:
 9. Receive and address *all feedback*.
 10. Get approval from at least two verified reviewers.
 11. Merge in the change.
-12. Announce the update in [See What’s New.](https://aptos.dev/whats-new-in-docs)
-13. Monitor builds at: [https://app.netlify.com/sites/aptos-developer-docs/overview](https://app.netlify.com/sites/aptos-developer-docs/overview)
+12. Monitor builds at: [https://app.netlify.com/sites/aptos-developer-docs/overview](https://app.netlify.com/sites/aptos-developer-docs/overview)
 
 ## Request docs changes
 

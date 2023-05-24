@@ -25,6 +25,7 @@ pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
 
 impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
     pub fn new(
+        num_executor_shards: usize,
         shard_id: usize,
         num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
@@ -37,7 +38,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                 .build()
                 .unwrap(),
         );
-        disable_speculative_logging();
+
+        if num_executor_shards > 1 {
+            // todo: speculative logging is not yet compatible with sharded block executor.
+            disable_speculative_logging();
+        }
 
         Self {
             shard_id,
