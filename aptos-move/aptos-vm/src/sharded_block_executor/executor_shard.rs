@@ -6,7 +6,6 @@ use crate::{block_executor::BlockAptosVM, sharded_block_executor::ExecutorShardC
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::TransactionOutput;
-use aptos_vm_logging::disable_speculative_logging;
 use move_core_types::vm_status::VMStatus;
 use std::sync::{
     mpsc::{Receiver, Sender},
@@ -37,7 +36,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                 .build()
                 .unwrap(),
         );
-        // disable_speculative_logging();
 
         Self {
             shard_id,
