@@ -47,9 +47,10 @@ For developing and testing locally, it might be easier to use a local filestore.
 Create a local directory to store the filestore: `mkdir test_indexer_grpc_filestore`
 
 Then in your config:
-```
+```yaml
 ...
-file_store:
-  file_store_type: LocalFileStore
-  local_file_store_path: test_indexer_grpc_filestore
+server_config:
+    file_store_config:
+      file_store_type: LocalFileStore
+      gcs_file_store_bucket_name: test_indexer_grpc_filestore
 ```
