@@ -33,6 +33,7 @@ module fungible_asset_extension::managed_fungible_asset {
         symbol: String,
         decimals: u8,
         icon_uri: String,
+        project_uri: String,
     ) {
         let supply = if (maximum_supply != 0) {
             option::some(maximum_supply)
@@ -46,6 +47,7 @@ module fungible_asset_extension::managed_fungible_asset {
             symbol,
             decimals,
             icon_uri,
+            project_uri,
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -169,6 +171,7 @@ module fungible_asset_extension::managed_fungible_asset {
             utf8(b"APT"), /* symbol */
             8, /* decimals */
             utf8(b"http://example.com/favicon.ico"), /* icon */
+            utf8(b"http://example.com"), /* project */
         );
         object_from_constructor_ref<Metadata>(constructor_ref)
     }

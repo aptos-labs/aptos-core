@@ -78,7 +78,7 @@
       }
     ],
     "id": "0x4e9016838657edfae09cb9a71eb219025c4c87a67c4aaa86f20ac0aa792bc121",
-    "epoch": "0",
+    "epoch": "1",
     "round": "1",
     "events": [
       {
@@ -89,7 +89,7 @@
         "sequence_number": "1",
         "type": "0x1::block::NewBlockEvent",
         "data": {
-          "epoch": "0",
+          "epoch": "1",
           "failed_proposer_indices": [],
           "hash": "",
           "height": "1",

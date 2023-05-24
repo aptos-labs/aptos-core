@@ -53,6 +53,15 @@ resource "google_container_cluster" "aptos" {
     provider = "CALICO"
   }
 
+  node_config {
+    gcfs_config {
+      enabled = var.gke_cluster_enable_gcfs
+    }
+    gvnic {
+      enabled = var.gke_cluster_enable_gvnic
+    }
+  }
+
   cluster_autoscaling {
     enabled = var.gke_enable_node_autoprovisioning
 

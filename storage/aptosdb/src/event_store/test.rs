@@ -26,7 +26,7 @@ use std::collections::HashMap;
 fn save(store: &EventStore, version: Version, events: &[ContractEvent]) -> HashValue {
     let batch = SchemaBatch::new();
     let root_hash = store.put_events(version, events, &batch).unwrap();
-    store.db.write_schemas(batch).unwrap();
+    store.event_db.write_schemas(batch).unwrap();
 
     root_hash
 }
@@ -182,7 +182,7 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
     event_batches.iter().enumerate().for_each(|(ver, events)| {
         store.put_events(ver as u64, events, &batch).unwrap();
     });
-    store.db.write_schemas(batch);
+    store.event_db.write_schemas(batch);
     let ledger_version_plus_one = event_batches.len() as u64;
 
     assert_eq!(
@@ -305,7 +305,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     new_block_events.iter().for_each(|(ver, event)| {
         store.put_events(*ver, &[event.clone()], &batch).unwrap();
     });
-    store.db.write_schemas(batch);
+    store.event_db.write_schemas(batch);
 
     let ledger_version = new_block_events.last().unwrap().0;
 

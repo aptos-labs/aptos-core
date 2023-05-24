@@ -37,14 +37,15 @@ impl ModulePath for StateKey {
 /// For the executor to manage memory consumption, executables should provide size.
 /// Note: explore finer-grained eviction mechanisms, e.g. LRU-based, or having
 /// different ownership for the arena / memory.
-pub trait Executable {
-    fn size(&self) -> usize;
+pub trait Executable: Clone {
+    fn size_bytes(&self) -> usize;
 }
 
+#[derive(Clone)]
 pub struct ExecutableTestType(());
 
 impl Executable for ExecutableTestType {
-    fn size(&self) -> usize {
+    fn size_bytes(&self) -> usize {
         0
     }
 }

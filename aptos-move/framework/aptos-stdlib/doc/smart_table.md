@@ -1117,7 +1117,8 @@ Update <code>target_bucket_size</code>.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
 <b>aborts_if</b> <a href="table.md#0x1_table">table</a>.size == 0;
 <b>aborts_if</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="table.md#0x1_table">table</a>.buckets, <a href="smart_table.md#0x1_smart_table_get_index">get_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, key))) == 0;
 <b>aborts_if</b> <b>forall</b> i in 0..<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="table.md#0x1_table">table</a>.buckets, <a href="smart_table.md#0x1_smart_table_get_index">get_index</a>(<a href="table.md#0x1_table">table</a>.level, <a href="table.md#0x1_table">table</a>.num_buckets, key))):

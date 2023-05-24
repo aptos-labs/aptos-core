@@ -7,6 +7,7 @@
 
 use crate::{
     errors::AptosDbError,
+    ledger_db::LedgerDb,
     schema::{
         epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
@@ -20,7 +21,7 @@ use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher},
     HashValue,
 };
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
@@ -36,7 +37,7 @@ use std::{ops::Deref, sync::Arc};
 
 #[derive(Debug)]
 pub struct LedgerStore {
-    db: Arc<DB>,
+    pub ledger_db: Arc<LedgerDb>,
 
     /// We almost always need the latest ledger info and signatures to serve read requests, so we
     /// cache it in memory in order to avoid reading DB and deserializing the object frequently. It
@@ -45,10 +46,11 @@ pub struct LedgerStore {
 }
 
 impl LedgerStore {
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(ledger_db: Arc<LedgerDb>) -> Self {
         // Upon restart, read the latest ledger info and signatures and cache them in memory.
         let ledger_info = {
-            let mut iter = db
+            let mut iter = ledger_db
+                .metadata_db()
                 .iter::<LedgerInfoSchema>(ReadOptions::default())
                 .expect("Constructing iterator should work.");
             iter.seek_to_last();
@@ -59,14 +61,15 @@ impl LedgerStore {
         };
 
         Self {
-            db,
+            ledger_db,
             latest_ledger_info: ArcSwap::from(Arc::new(ledger_info)),
         }
     }
 
     pub fn get_epoch(&self, version: Version) -> Result<u64> {
         let mut iter = self
-            .db
+            .ledger_db
+            .metadata_db()
             .iter::<EpochByVersionSchema>(ReadOptions::default())?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&version)?;
@@ -102,7 +105,8 @@ impl LedgerStore {
     ) -> Result<LedgerInfoWithSignatures> {
         let epoch = self.get_epoch(version)?;
         let li = self
-            .db
+            .ledger_db
+            .metadata_db()
             .get::<LedgerInfoSchema>(&epoch)?
             .ok_or_else(|| AptosDbError::NotFound(format!("LedgerInfo for epoch {}.", epoch)))?;
         ensure!(
@@ -135,20 +139,24 @@ impl LedgerStore {
     }
 
     pub fn get_latest_ledger_info_in_epoch(&self, epoch: u64) -> Result<LedgerInfoWithSignatures> {
-        self.db.get::<LedgerInfoSchema>(&epoch)?.ok_or_else(|| {
-            AptosDbError::NotFound(format!("Last LedgerInfo of epoch {}", epoch)).into()
-        })
+        self.ledger_db
+            .metadata_db()
+            .get::<LedgerInfoSchema>(&epoch)?
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!("Last LedgerInfo of epoch {}", epoch)).into()
+            })
     }
 
     pub fn get_epoch_state(&self, epoch: u64) -> Result<EpochState> {
         ensure!(epoch > 0, "EpochState only queryable for epoch >= 1.",);
 
-        let ledger_info_with_sigs =
-            self.db
-                .get::<LedgerInfoSchema>(&(epoch - 1))?
-                .ok_or_else(|| {
-                    AptosDbError::NotFound(format!("Last LedgerInfo of epoch {}", epoch - 1))
-                })?;
+        let ledger_info_with_sigs = self
+            .ledger_db
+            .metadata_db()
+            .get::<LedgerInfoSchema>(&(epoch - 1))?
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!("Last LedgerInfo of epoch {}", epoch - 1))
+            })?;
         let latest_epoch_state = ledger_info_with_sigs
             .ledger_info()
             .next_epoch_state()
@@ -163,14 +171,16 @@ impl LedgerStore {
 
     /// Get transaction info given `version`
     pub fn get_transaction_info(&self, version: Version) -> Result<TransactionInfo> {
-        self.db
+        self.ledger_db
+            .transaction_info_db()
             .get::<TransactionInfoSchema>(&version)?
             .ok_or_else(|| format_err!("No TransactionInfo at version {}", version))
     }
 
     pub fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
         let mut iter = self
-            .db
+            .ledger_db
+            .transaction_info_db()
             .iter::<TransactionInfoSchema>(ReadOptions::default())?;
         iter.seek_to_last();
         iter.next().transpose()
@@ -191,7 +201,8 @@ impl LedgerStore {
         num_transaction_infos: usize,
     ) -> Result<impl Iterator<Item = Result<TransactionInfo>> + '_> {
         let mut iter = self
-            .db
+            .ledger_db
+            .transaction_info_db()
             .iter::<TransactionInfoSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transaction_infos)
@@ -204,13 +215,17 @@ impl LedgerStore {
         start_epoch: u64,
         end_epoch: u64,
     ) -> Result<EpochEndingLedgerInfoIter> {
-        let mut iter = self.db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
+        let mut iter = self
+            .ledger_db
+            .metadata_db()
+            .iter::<LedgerInfoSchema>(ReadOptions::default())?;
         iter.seek(&start_epoch)?;
         Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))
     }
 
     pub fn ensure_epoch_ending(&self, version: Version) -> Result<()> {
-        self.db
+        self.ledger_db
+            .metadata_db()
             .get::<EpochByVersionSchema>(&version)?
             .ok_or_else(|| format_err!("Version {} is not epoch ending.", version))?;
         Ok(())
@@ -319,7 +334,8 @@ pub(crate) type Accumulator = MerkleAccumulator<LedgerStore, TransactionAccumula
 
 impl HashReader for LedgerStore {
     fn get(&self, position: Position) -> Result<HashValue> {
-        self.db
+        self.ledger_db
+            .transaction_accumulator_db()
             .get::<TransactionAccumulatorSchema>(&position)?
             .ok_or_else(|| format_err!("{} does not exist.", position))
     }

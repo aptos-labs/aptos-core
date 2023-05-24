@@ -11,13 +11,13 @@ import platform
 THRESHOLDS = {
     "1k_8": 11000,
     "1k_16": 13000,
-    "1k_32": 13000,
-    "10k_8": 22000,
-    "10k_16": 32000,
-    "10k_32": 43000,
-    "50k_8": 49000,
-    "50k_16": 64000,
-    "50k_32": 86000,
+    "1k_32": 15000,
+    "10k_8": 23000,
+    "10k_16": 37000,
+    "10k_32": 48000,
+    "50k_8": 43000,
+    "50k_16": 72000,
+    "50k_32": 93000,
 }
 
 SPEEDUPS = {
@@ -26,10 +26,10 @@ SPEEDUPS = {
     "1k_32": 4,
     "10k_8": 5,
     "10k_16": 8,
-    "10k_32": 10,
-    "50k_8": 5,
+    "10k_32": 11,
+    "50k_8": 6,
     "50k_16": 9,
-    "50k_32": 10,
+    "50k_32": 12,
 }
 
 THRESHOLDS_NOISE = 0.20
@@ -55,7 +55,7 @@ for threads in THREADS:
     output = subprocess.check_output(
         command, shell=True, text=True, cwd=target_directory
     )
-    print(output)
+    # print(output)
 
     for i, block_size in enumerate(BLOCK_SIZES):
         tps_index = i * 2
@@ -73,15 +73,26 @@ for threads in THREADS:
             )
             fail = True
 
-        for speedup_threshold, noise, above in (
-            (SPEEDUPS[key], SPEEDUPS_NOISE_BELOW, False),
-            (SPEEDUPS[key], SPEEDUPS_NOISE_ABOVE, True),
+        if (
+            SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW
+            or speedups - SPEEDUPS[key] > SPEEDUPS_NOISE_ABOVE
         ):
-            if abs((diff := speedups - speedup_threshold) / speedup_threshold) > noise:
-                print(
-                    f"Parallel SPEEDUPS {speedups} {'below' if not above else 'above'} the threshold {speedup_threshold} by {noise} for {block_size} block size with {threads} threads!  Please {'optimize' if not above else 'increase the hard-coded speedup threshold since you improved'} the execution performance. :)\n"
-                )
-                fail = True
+            direction = (
+                "below" if SPEEDUPS[key] - speedups > SPEEDUPS_NOISE_BELOW else "above"
+            )
+            noise = (
+                SPEEDUPS_NOISE_BELOW if direction == "below" else SPEEDUPS_NOISE_ABOVE
+            )
+            action = (
+                "optimize the execution performance"
+                if direction == "below"
+                else "increase the hard-coded speedup threshold since you improved the execution performance"
+            )
+            print(
+                f"Parallel SPEEDUPS {speedups} {direction} the threshold {SPEEDUPS[key]} by {noise} for {block_size} block size with {threads} threads! Please {action}. :)\n"
+            )
+            fail = True
+
 
 for block_size in BLOCK_SIZES:
     for threads in THREADS:

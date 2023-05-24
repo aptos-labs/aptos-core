@@ -1,12 +1,11 @@
 ---
 remote_endpoint: ~
+name: "v1.5"
 proposals:
   - name: upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
       description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, quorum store, and transaction shuffling will be enabled in separate proposals."
-      source_code_url: "TBD"
-      discussion_url: "TBD"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
@@ -17,7 +16,6 @@ proposals:
     metadata:
       title: "Enable bls12381"
       description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      source_code_url: "TBD"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
     execution_mode: MultiStep
     update_sequence:
@@ -29,7 +27,6 @@ proposals:
     metadata:
       title: "Enable Quorum Store"
       description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
-      source_code_url: "TBD"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
     execution_mode: MultiStep
     update_sequence:

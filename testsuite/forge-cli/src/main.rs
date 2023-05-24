@@ -5,6 +5,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::ConsensusConfig;
 use aptos_forge::{
+    args::TransactionTypeArg,
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
@@ -19,7 +20,7 @@ use aptos_testcases::{
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
-    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
+    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
     multi_region_simulation_test::MultiRegionMultiCloudSimulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
@@ -39,6 +40,7 @@ use aptos_testcases::{
     validator_reboot_stress_test::ValidatorRebootStressTest,
     CompositeNetworkTest,
 };
+use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use std::{
     env,
     num::NonZeroUsize,
@@ -84,30 +86,40 @@ struct Args {
 
 #[derive(StructOpt, Debug)]
 enum CliCommand {
+    /// Subcommands to run forge tests
     Test(TestCommand),
+    /// Subcommands to set up or manage running forge networks
     Operator(OperatorCommand),
 }
 
 #[derive(StructOpt, Debug)]
 enum TestCommand {
+    /// Run tests using the local swarm backend
     LocalSwarm(LocalSwarm),
+    /// Run tests in cluster using the remote kubernetes backend
     K8sSwarm(K8sSwarm),
 }
 
 #[derive(StructOpt, Debug)]
 enum OperatorCommand {
+    /// Set the image tag for a node in the cluster
     SetNodeImageTag(SetNodeImageTag),
+    /// Clean up an existing cluster
     CleanUp(CleanUp),
+    /// Resize an existing cluster
     Resize(Resize),
 }
 
 #[derive(StructOpt, Debug)]
-struct LocalSwarm {}
+struct LocalSwarm {
+    #[structopt(long, help = "directory to build local swarm under")]
+    swarmdir: Option<String>,
+}
 
 #[derive(StructOpt, Debug)]
 struct K8sSwarm {
     #[structopt(long, help = "The kubernetes namespace to use for test")]
-    namespace: String,
+    namespace: Option<String>,
     #[structopt(
         long,
         help = "The image tag currently is used for validators",
@@ -199,6 +211,17 @@ struct Resize {
     enable_haproxy: bool,
 }
 
+/// Make an easy to remember random namespace for your testnet
+fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<String> {
+    // Pick four random words
+    let random_words = dictionary
+        .choose_multiple(rng, 4)
+        .into_iter()
+        .cloned()
+        .collect::<Vec<String>>();
+    Ok(format!("forge-{}", random_words.join("-")))
+}
+
 fn main() -> Result<()> {
     let mut logger = aptos_logger::Logger::new();
     logger.channel_size(1000).is_async(false).level(Level::Info);
@@ -238,7 +261,7 @@ fn main() -> Result<()> {
 
             // Run the test suite
             match test_cmd {
-                TestCommand::LocalSwarm(..) => {
+                TestCommand::LocalSwarm(local_cfg) => {
                     // Loosen all criteria for local runs
                     test_suite.get_success_criteria_mut().avg_tps = 400;
                     let previous_emit_job = test_suite.get_emit_job().clone();
@@ -246,11 +269,11 @@ fn main() -> Result<()> {
                         test_suite.with_emit_job(previous_emit_job.mode(EmitJobMode::MaxLoad {
                             mempool_backlog: 5000,
                         }));
-
+                    let swarm_dir = local_cfg.swarmdir.clone();
                     run_forge(
                         duration,
                         test_suite,
-                        LocalFactory::from_workspace()?,
+                        LocalFactory::from_workspace(swarm_dir)?,
                         &args.options,
                         args.changelog.clone(),
                     )
@@ -259,11 +282,28 @@ fn main() -> Result<()> {
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
+                    let namespace = if k8s.namespace.is_none() {
+                        let mut rng: ThreadRng = rand::thread_rng();
+                        // Lets pick some four letter words ;)
+                        let words = random_word::all_len(4)
+                            .ok_or_else(|| {
+                                format_err!(
+                                    "Failed to get namespace, rerun with --namespace <namespace>"
+                                )
+                            })?
+                            .to_vec()
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<String>>();
+                        random_namespace(words, &mut rng)?
+                    } else {
+                        k8s.namespace.clone().unwrap()
+                    };
                     run_forge(
                         duration,
                         test_suite,
                         K8sFactory::new(
-                            k8s.namespace.clone(),
+                            namespace,
                             k8s.image_tag.clone(),
                             k8s.upgrade_image_tag.clone(),
                             k8s.port_forward,
@@ -765,15 +805,46 @@ fn workload_vs_perf_benchmark(config: ForgeConfig) -> ForgeConfig {
         .with_network_tests(vec![&LoadVsPerfBenchmark {
             test: &PerformanceBenchmark,
             workloads: Workloads::TRANSACTIONS(&[
-                TransactinWorkload::NoOp,
-                TransactinWorkload::NoOpUnique,
-                TransactinWorkload::CoinTransfer,
-                TransactinWorkload::CoinTransferUnique,
-                TransactinWorkload::WriteResourceSmall,
-                TransactinWorkload::WriteResourceBig,
-                TransactinWorkload::LargeModuleWorkingSet,
-                TransactinWorkload::PublishPackages,
-                // TransactinWorkload::NftMint,
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1,
+                    unique_senders: false,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::NoOp,
+                    num_modules: 1000,
+                    unique_senders: false,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::CoinTransfer,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::AccountResource32B,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::AccountResource1KB,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
+                TransactionWorkload {
+                    transaction_type: TransactionTypeArg::PublishPackage,
+                    num_modules: 1,
+                    unique_senders: true,
+                },
             ]),
         }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -804,7 +875,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
             inner_tps: 15000,
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             inner_init_gas_price_multiplier: 20,
-            // because it is static, cannot use ::default_coin_transfer() method
+            // because it is static, cannot use TransactionTypeArg::materialize method
             inner_transaction_type: TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool: false,
@@ -858,7 +929,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
                 inner_tps: 15000,
                 inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
                 inner_init_gas_price_multiplier: 20,
-                // Cannot use default_coin_transfer(), as this needs to be static
+                // Cannot use TransactionTypeArg::materialize, as this needs to be static
                 inner_transaction_type: TransactionType::CoinTransfer {
                     invalid_transaction_ratio: 0,
                     sender_use_account_pool: false,
@@ -937,16 +1008,11 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
                 ])
             } else {
                 job.transaction_type(match test_name.as_str() {
-                    "account_creation" => TransactionType::default_account_generation(),
-                    "nft_mint" => TransactionType::NftMintAndTransfer,
-                    "publishing" => TransactionType::PublishPackage {
-                        use_account_pool: false,
+                    "account_creation" => {
+                        TransactionTypeArg::AccountGeneration.materialize_default()
                     },
-                    "module_loading" => TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::Nop,
-                        num_modules: 1000,
-                        use_account_pool: false,
-                    },
+                    "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
+                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
                     _ => unreachable!("{}", test_name),
                 })
             },
@@ -954,7 +1020,6 @@ fn individual_workload_tests(test_name: String, config: ForgeConfig) -> ForgeCon
         .with_success_criteria(
             SuccessCriteria::new(match test_name.as_str() {
                 "account_creation" => 3600,
-                "nft_mint" => 1000,
                 "publishing" => 60,
                 "write_new_resource" => 3700,
                 "module_loading" => 1800,
@@ -1004,7 +1069,7 @@ fn single_vfn_perf(config: ForgeConfig) -> ForgeConfig {
         .with_initial_fullnode_count(1)
         .with_network_tests(vec![&PerformanceBenchmark])
         .with_success_criteria(
-            SuccessCriteria::new(4250)
+            SuccessCriteria::new(5000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240),
         )
@@ -1182,7 +1247,7 @@ fn state_sync_perf_fullnodes_fast_sync(forge_config: ForgeConfig<'static>) -> Fo
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 30000,
                 })
-                .transaction_type(TransactionType::default_account_generation()), // Create many state values
+                .transaction_type(TransactionTypeArg::AccountGeneration.materialize_default()), // Create many state values
         )
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["fullnode"]["config"]["state_sync"]["state_sync_driver"]
@@ -1282,7 +1347,7 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(3250)
+            SuccessCriteria::new(3500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1416,8 +1481,11 @@ fn changing_working_quorum_test_helper(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::default_coin_transfer(), 80),
-                    (TransactionType::default_account_generation(), 20),
+                    (TransactionTypeArg::CoinTransfer.materialize_default(), 80),
+                    (
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+                        20,
+                    ),
                 ]),
         )
         .with_success_criteria(
@@ -1467,9 +1535,16 @@ fn large_db_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: target_tps })
                 .transaction_mix(vec![
-                    (TransactionType::default_coin_transfer(), 75),
-                    (TransactionType::default_account_generation(), 20),
-                    (TransactionType::NftMintAndTransfer, 5),
+                    (TransactionTypeArg::CoinTransfer.materialize_default(), 75),
+                    (
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+                        20,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
+                            .materialize_default(),
+                        5,
+                    ),
                 ]),
         )
         .with_success_criteria(
@@ -1550,9 +1625,6 @@ fn multiregion_benchmark_test(config: ForgeConfig<'static>) -> ForgeConfig<'stat
             helm_values["service"]["validator"]["internal"]["headless"] = true.into();
             helm_values["service"]["fullnode"]["internal"]["type"] = "ClusterIP".into();
             helm_values["service"]["fullnode"]["internal"]["headless"] = true.into();
-
-            // Disable pyroscope. Need to ensure secrets are created/propogated before enabling.
-            helm_values["pyroscope"]["enabled"] = false.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(4500)
@@ -1735,5 +1807,22 @@ impl NetworkTest for EmitTransaction {
             .report_txn_stats(self.name().to_string(), &stats, duration);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_random_namespace() {
+        let mut rng = rand::rngs::mock::StepRng::new(100, 1);
+        let words = ["apple", "banana", "carrot", "durian", "eggplant", "fig"]
+            .to_vec()
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+        let namespace = random_namespace(words, &mut rng).unwrap();
+        assert_eq!(namespace, "forge-durian-eggplant-fig-apple");
     }
 }

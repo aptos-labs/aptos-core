@@ -10,9 +10,7 @@ use anyhow::{Context, Result};
 use aptos_crypto::HashValue;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
-use aptos_transaction_generator_lib::{
-    CounterState, TransactionExecutor as GenInitTransactionExecutor,
-};
+use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
 use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
@@ -26,13 +24,13 @@ use std::{
     time::Duration,
 };
 
-pub struct DbGenInitTransactionExecutor {
+pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
     pub block_sender: mpsc::SyncSender<Vec<BenchmarkTransaction>>,
 }
 
 #[async_trait]
-impl GenInitTransactionExecutor for DbGenInitTransactionExecutor {
+impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
         let db_state_view = self.db.reader.latest_state_checkpoint_view().unwrap();
         let sender_coin_store_key = DbAccessUtil::new_state_key_aptos_coin(account_address);
