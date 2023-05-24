@@ -4,8 +4,8 @@ name: "v1.5"
 proposals:
   - name: upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, quorum store, and transaction shuffling will be enabled in separate proposals."
+      title: "Multi-step proposal to upgrade mainnet framework to v1.5.0"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.5.0. Generic cryptography algebra, ed25519 returns false if wrong length will be enabled in separate proposals."
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
