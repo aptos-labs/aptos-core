@@ -591,7 +591,6 @@ impl Dag {
         return if self.current_round % 2 == 0 {
             maybe_anchor_node_meta_data.is_some()
         } else {
-            return true;
             // TODO: since commit rule is f+1 we do not need to timeout on odd rounds. Verify!
             if let Some(anchor_node_meta_data) = maybe_anchor_node_meta_data {
                 let voting_peers = self
