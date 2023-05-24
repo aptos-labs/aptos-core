@@ -9,7 +9,8 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_DUPLICATES_FILTERED,
-        BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS, BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
+        BLOCK_EXECUTOR_DUPLICATES_SECONDS, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
     },
     AptosVM,
 };
@@ -149,13 +150,7 @@ impl BlockAptosVM {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
 
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        let signature_verification_timer =
-            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-
-        let duplicates_timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+        let duplicates_timer = BLOCK_EXECUTOR_DUPLICATES_SECONDS.start_timer();
 
         let mut seen = HashMap::new();
         let mut is_possible_duplicate = false;
@@ -208,6 +203,12 @@ impl BlockAptosVM {
 
         BLOCK_EXECUTOR_DUPLICATES_FILTERED.observe(num_duplicates as f64);
         drop(duplicates_timer);
+
+        // Verify the signatures of all the transactions in parallel.
+        // This is time consuming so don't wait and do the checking
+        // sequentially while executing the transactions.
+        let signature_verification_timer =
+            BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
 
         let signature_verified_block: Vec<PreprocessedTransaction> =
             executor_thread_pool.install(|| {
