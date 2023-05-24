@@ -3,8 +3,8 @@
 
 use crate::{
     aggregator::{
-        try_add, add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
-        materialize_and_sub, new, try_sub, sub, sub_add, sub_and_materialize,
+        add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
+        materialize_and_sub, new, sub, sub_add, sub_and_materialize, try_add, try_sub,
     },
     assert_abort, assert_success,
     tests::common,

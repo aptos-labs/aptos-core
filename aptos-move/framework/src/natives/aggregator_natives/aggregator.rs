@@ -28,53 +28,8 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct TryAddGasParameters {
-    pub base: InternalGas,
-}
 
-fn native_try_add(
-    gas_params: &TryAddGasParameters,
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert_eq!(args.len(), 2);
-
-    context.charge(gas_params.base)?;
-
-    // Get aggregator information and a value to add.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
-
-    // Get aggregator.
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(
-        id,
-        limit,
-        aggregator_context.resolver,
-        aggregator_context.aggregator_enabled,
-    )?;
-
-    match aggregator.add(value) {
-        Ok(_) => Ok(smallvec![Value::bool(true)]),
-        Err(_) => Ok(smallvec![Value::bool(false)]),
-    }
-}
-
-/***************************************************************************************************
- * native fun add(aggregator: &mut Aggregator, value: u128);
- *
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct AddGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_add(
+fn try_add(
     gas_params: &AddGasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
@@ -101,6 +56,44 @@ fn native_add(
     aggregator.add(value)?;
 
     Ok(smallvec![])
+}
+
+fn native_try_add(
+    gas_params: &AddGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match try_add(gas_params, context, _ty_args, args) {
+        Ok(_) => {
+            println!("try_add succeeded");
+            Ok(smallvec![Value::bool(true)])
+        },
+        Err(_) => {
+            println!("try_add failed");
+            Ok(smallvec![Value::bool(false)])
+        },
+    }
+}
+
+/***************************************************************************************************
+ * native fun add(aggregator: &mut Aggregator, value: u128);
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct AddGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_add(
+    gas_params: &AddGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    try_add(gas_params, context, _ty_args, args)
 }
 
 /***************************************************************************************************
@@ -148,53 +141,7 @@ fn native_read(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct TrySubGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_try_sub(
-    gas_params: &TrySubGasParameters,
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    mut args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert_eq!(args.len(), 2);
-
-    context.charge(gas_params.base)?;
-
-    // Get aggregator information and a value to subtract.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
-
-    // Get aggregator.
-    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(
-        id,
-        limit,
-        aggregator_context.resolver,
-        aggregator_context.aggregator_enabled,
-    )?;
-
-    match aggregator.sub(value) {
-        Ok(_) => Ok(smallvec![Value::bool(true)]),
-        Err(_) => Ok(smallvec![Value::bool(false)]),
-    }
-}
-
-/***************************************************************************************************
- * native fun sub(aggregator: &mut Aggregator, value: u128);
- *
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct SubGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_sub(
+fn try_sub(
     gas_params: &SubGasParameters,
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
@@ -221,6 +168,38 @@ fn native_sub(
     aggregator.sub(value)?;
 
     Ok(smallvec![])
+}
+
+fn native_try_sub(
+    gas_params: &SubGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    match try_sub(gas_params, context, _ty_args, args) {
+        Ok(_) => Ok(smallvec![Value::bool(true)]),
+        Err(_) => Ok(smallvec![Value::bool(false)]),
+    }
+}
+
+/***************************************************************************************************
+ * native fun sub(aggregator: &mut Aggregator, value: u128);
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct SubGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_sub(
+    gas_params: &SubGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    try_sub(gas_params, context, _ty_args, args)
 }
 
 /***************************************************************************************************
@@ -265,10 +244,10 @@ fn native_destroy(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub try_add: TryAddGasParameters,
+    pub try_add: AddGasParameters,
     pub add: AddGasParameters,
     pub read: ReadGasParameters,
-    pub try_sub: TrySubGasParameters,
+    pub try_sub: SubGasParameters,
     pub sub: SubGasParameters,
     pub destroy: DestroyGasParameters,
 }
