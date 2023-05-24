@@ -257,7 +257,7 @@ impl AptosVM {
     ) -> (VMStatus, TransactionOutputExt) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), true);
+            .new_session(resolver, SessionId::txn_meta(txn_data), false);
 
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
@@ -1175,6 +1175,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
+        aggregator_enabled: bool,
     ) -> Result<ChangeSetExt, VMStatus> {
         let mut gas_meter = UnmeteredGasMeter;
         let change_set_configs =
@@ -1187,7 +1188,7 @@ impl AptosVM {
                 Arc::new(change_set_configs),
             )),
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.0.new_session(resolver, session_id, true);
+                let mut tmp_session = self.0.new_session(resolver, session_id, aggregator_enabled);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1260,6 +1261,7 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         writeset_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
@@ -1268,6 +1270,7 @@ impl AptosVM {
             &writeset_payload,
             Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
+            aggregator_enabled,
         )?;
 
         let (delta_change_set, change_set) = change_set_ext.into_inner();
@@ -1288,6 +1291,7 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
@@ -1302,9 +1306,11 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
-            self.0
-                .new_session(resolver, SessionId::block_meta(&block_metadata), true);
+        let mut session = self.0.new_session(
+            resolver,
+            SessionId::block_meta(&block_metadata),
+            aggregator_enabled,
+        );
 
         let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
@@ -1362,7 +1368,7 @@ impl AptosVM {
             gas_budget,
         );
         let resolver = &state_view.as_move_resolver();
-        let mut session = vm.new_session(resolver, SessionId::Void);
+        let mut session = vm.new_session(resolver, SessionId::Void, true);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
@@ -1567,7 +1573,7 @@ impl VMValidator for AptosVM {
         };
 
         let resolver = &state_view.as_move_resolver();
-        let mut session = self.new_session(resolver, SessionId::txn(&txn));
+        let mut session = self.new_session(resolver, SessionId::txn(&txn), false);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
             resolver,
@@ -1601,8 +1607,9 @@ impl VMAdapter for AptosVM {
         &self,
         resolver: &'r impl MoveResolverExt,
         session_id: SessionId,
+        aggregator_enabled: bool,
     ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id, true)
+        self.0.new_session(resolver, session_id, aggregator_enabled)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -1656,8 +1663,12 @@ impl VMAdapter for AptosVM {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
+                let (vm_status, output) = self.process_block_prologue(
+                    resolver,
+                    block_metadata.clone(),
+                    log_context,
+                    aggregator_enabled,
+                )?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
@@ -1665,6 +1676,7 @@ impl VMAdapter for AptosVM {
                     resolver,
                     write_set_payload.clone(),
                     log_context,
+                    aggregator_enabled,
                 )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             },
@@ -1769,7 +1781,9 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::txn_meta(&txn_data), false);
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
