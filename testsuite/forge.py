@@ -7,7 +7,6 @@ import logging
 import os
 import random
 import re
-import requests
 import resource
 import sys
 import textwrap
@@ -347,26 +346,6 @@ def get_dashboard_link(
         f"{GRAFANA_BASE_URL}&var-namespace={forge_namespace}&var-metrics_source=All"
         f"&var-chain_name={forge_chain_name}{grafana_time_filter}"
     )
-
-
-def shorten_link(link: str) -> str:
-    headers = {
-        "x-api-key": os.getenv("SHORTENER_API_KEY"),
-        "Content-Type": "application/json",
-    }
-    body = json.dumps(
-        {
-            "longUrl": link,
-        }
-    )
-    try:
-        response = requests.post(
-            "https://api.aws3.link/shorten", headers=headers, data=body
-        )
-        return f"https://{response.json()['shortUrl']}"
-    # Dont fail if we fail to shorten
-    except Exception:
-        return link
 
 
 def milliseconds(timestamp: datetime) -> int:
@@ -1085,8 +1064,8 @@ async def run_multiple(
 
     for suite in forge_test_suites:
         new_namespace = f"{forge_namespace}-{suite}"
-        short_link = shorten_link(get_humio_forge_link(new_namespace, True))
-        pending_comment.append(f"Running {suite}: [Runner logs]({short_link})")
+        link = get_humio_forge_link(new_namespace, True)
+        pending_comment.append(f"Running {suite}: [Runner logs]({link})")
         if forge_runner_mode != "pre-forge":
             pending_results.append(
                 context.shell.gen_run(
@@ -1119,9 +1098,6 @@ async def run_multiple(
         failed = False
         for i, result in enumerate(results):
             suite, namespace = pending_suites[i]
-            short_link = shorten_link(
-                get_humio_forge_link(namespace, (start_time, stop_time))
-            )
             if result.succeeded():
                 final_forge_comment.append(f"{suite} succeeded")
             else:
