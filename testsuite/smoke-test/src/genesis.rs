@@ -233,7 +233,7 @@ async fn test_genesis_transaction_flow() {
         (response.inner().epoch, response.inner().version)
     };
 
-    let (backup_path, snapshot_ver) = db_backup(
+    let (backup_path, _) = db_backup(
         env.validators()
             .next()
             .unwrap()
@@ -272,7 +272,7 @@ async fn test_genesis_transaction_flow() {
         db_dir.as_path(),
         &[waypoint],
         node.config().storage.rocksdb_configs.use_state_kv_db,
-        Some(snapshot_ver),
+        None,
     );
 
     node.start().unwrap();
