@@ -521,7 +521,7 @@ module aptos_framework::multisig_account {
     }
 
     /// Add owners then update number of signatures required, in a single operation.
-    entry fun add_owners_update_signatures_required(
+    entry fun add_owners_and_update_signatures_required(
         multisig_account: &signer,
         new_owners: vector<address>,
         new_num_signatures_required: u64
@@ -578,7 +578,7 @@ module aptos_framework::multisig_account {
     }
 
     /// Update the number of signatures required then remove owners, in a single operation.
-    entry fun remove_owners_update_signatures_required(
+    entry fun remove_owners_and_update_signatures_required(
         multisig_account: &signer,
         owners_to_remove: vector<address>,
         new_num_signatures_required: u64
