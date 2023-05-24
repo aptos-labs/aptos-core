@@ -2,10 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    effect_converter::{EffectConverter, StandardEffectConverter},
-    loader::Loader,
-};
+use crate::loader::Loader;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
@@ -73,15 +70,21 @@ impl<'r> TransactionDataCache<'r> {
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<(ChangeSet, Vec<Event>)> {
-        let effect_converter = StandardEffectConverter;
-        self.into_custom_effects(&effect_converter, loader)
+        let resource_converter =
+            |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Vec<u8>> {
+                value.simple_serialize(&layout).ok_or_else(|| {
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("Error when serializing resource {}.", value))
+                })
+            };
+        self.into_custom_effects(&resource_converter, loader)
     }
 
     /// Same like `into_effects`, but also allows clients to select the format of
-    /// produced effects.
+    /// produced effects for resources.
     pub(crate) fn into_custom_effects<R>(
         self,
-        effect_converter: &impl EffectConverter<R>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
         loader: &Loader,
     ) -> PartialVMResult<(Changes<Vec<u8>, R>, Vec<Event>)> {
         let mut change_set = Changes::new();
@@ -109,9 +112,7 @@ impl<'r> TransactionDataCache<'r> {
                 };
                 resources.insert(
                     struct_tag,
-                    op.and_then(|(value, layout)| {
-                        effect_converter.convert_resource(value, layout)
-                    })?,
+                    op.and_then(|(value, layout)| resource_converter(value, layout))?,
                 );
             }
             if !modules.is_empty() || !resources.is_empty() {

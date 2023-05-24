@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, effect_converter::EffectConverter, loader::LoadedFunction,
-    move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVM,
+    native_extensions::NativeContextExtensions,
 };
 use move_binary_format::{
     compatibility::Compatibility,
@@ -22,7 +22,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    values::GlobalValue,
+    values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
 
@@ -264,10 +264,10 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn finish_with_custom_effects<R>(
         self,
-        effect_converter: &impl EffectConverter<R>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
     ) -> VMResult<(Changes<Vec<u8>, R>, Vec<Event>)> {
         self.data_cache
-            .into_custom_effects(effect_converter, self.move_vm.runtime.loader())
+            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
     }
 
@@ -288,7 +288,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn finish_with_extensions_with_custom_effects<R>(
         self,
-        effect_converter: &impl EffectConverter<R>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
     ) -> VMResult<(Changes<Vec<u8>, R>, Vec<Event>, NativeContextExtensions<'r>)> {
         let Session {
             data_cache,
@@ -296,7 +296,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ..
         } = self;
         let (change_set, events) = data_cache
-            .into_custom_effects(effect_converter, self.move_vm.runtime.loader())
+            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, events, native_extensions))
     }
