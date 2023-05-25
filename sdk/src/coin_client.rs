@@ -21,6 +21,9 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_api_types::X_APTOS_CLIENT;
+
+const X_APTOS_SDK_HEADER_VALUE: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 
 #[derive(Clone, Debug)]
 pub struct CoinClient<'a> {

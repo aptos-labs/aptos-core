@@ -21,13 +21,7 @@ use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
-use aptos_api_types::{
-    deserialize_from_string,
-    mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
-    AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
-    TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent, ViewRequest,
-};
+use aptos_api_types::{deserialize_from_string, mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON}, AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction, VersionedEvent, ViewRequest, X_APTOS_CLIENT};
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
 use aptos_types::{
@@ -38,19 +32,17 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use move_core_types::language_storage::StructTag;
-use reqwest::{
-    header::{ACCEPT, CONTENT_TYPE},
-    Client as ReqwestClient, StatusCode,
-};
+use reqwest::{header::{HeaderMap, ACCEPT, CONTENT_TYPE}, Client as ReqwestClient, StatusCode, ClientBuilder as ReqwestClientBuilder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 pub use state::State;
 use std::{collections::BTreeMap, future::Future, time::Duration};
+use std::str::FromStr;
+use reqwest::header::{HeaderName, HeaderValue};
 use tokio::time::Instant;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
 
-pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
 const DEFAULT_MAX_WAIT_MS: u64 = 60000;
 const DEFAULT_INTERVAL_MS: u64 = 1000;
@@ -59,8 +51,27 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 const DEFAULT_MAX_SERVER_LAG_WAIT_DURATION: Duration = Duration::from_secs(60);
 const RESOURCES_PER_CALL_PAGINATION: u64 = 9999;
 const MODULES_PER_CALL_PAGINATION: u64 = 1000;
+const X_APTOS_SDK_HEADER_VALUE: &str = concat!("aptos-rust-sdk/", env!("CARGO_PKG_VERSION"));
 
 type AptosResult<T> = Result<T, RestError>;
+
+pub enum AptosBaseUrl {
+    Mainnet,
+    Devnet,
+    Testnet,
+    Custom(Url),
+}
+
+impl AptosBaseUrl {
+    pub fn to_url(&self) -> Url {
+        match self {
+            AptosBaseUrl::Mainnet => Url::from_str("https://fullnode.mainnet.aptoslabs.com").unwrap(),
+            AptosBaseUrl::Devnet => Url::from_str("https://fullnode.devnet.aptoslabs.com").unwrap(),
+            AptosBaseUrl::Testnet => Url::from_str("https://fullnode.testnet.aptoslabs.com").unwrap(),
+            AptosBaseUrl::Custom(url) => url.to_owned(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -69,46 +80,80 @@ pub struct Client {
     version_path_base: String,
 }
 
-impl Client {
-    pub fn new_with_timeout(base_url: Url, timeout: Duration) -> Self {
-        Client::new_with_timeout_and_user_agent(base_url, timeout, USER_AGENT)
+pub struct ClientBuilder {
+    reqwestBuilder: ReqwestClientBuilder,
+    version_path_base: String,
+    base_url: Url,
+    timeout: Option<Duration>, // Default to 10 seconds if None
+    headers: HeaderMap,
+}
+
+impl ClientBuilder {
+    pub fn new(aptos_base_url: AptosBaseUrl) -> Result<Self> {
+        let mut headers = HeaderMap::new();
+        headers.insert(X_APTOS_CLIENT, HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE));
+
+        Ok(Self {
+            reqwestBuilder: ReqwestClient::builder(),
+            base_url: aptos_base_url.to_url(),
+            version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
+            timeout: Some(Duration::from_secs(10)), // Default to 10 seconds
+            headers,
+        })
     }
 
-    pub fn new_with_timeout_and_user_agent(
-        base_url: Url,
-        timeout: Duration,
-        user_agent: &str,
-    ) -> Self {
+    pub fn base_url(mut self, base_url: Url) -> Self {
+        self.base_url = base_url;
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn header(mut self, header_key: &str, header_val: &str) -> Result<Self> {
+        self.headers.insert(HeaderName::from_str(header_key)?, HeaderValue::from_str(header_val)?);
+        Ok(self)
+    }
+
+    pub fn version_path_base(mut self, version_path_base: String) -> Self {
+        self.version_path_base = version_path_base;
+        self
+    }
+
+    pub fn build(self) -> Client {
+        let timeout = self.timeout.unwrap_or_else(|| Duration::from_secs(10));
+        let version_path_base = get_version_path_with_base(self.base_url.clone());
+
+        Client {
+            inner: self.reqwestBuilder.default_headers(self.headers).timeout(timeout).cookie_store(true).build().unwrap(),
+            base_url: self.base_url,
+            version_path_base,
+        }
+    }
+}
+
+
+impl Client {
+    pub fn builder(aptos_base_url: AptosBaseUrl) -> ClientBuilder {
+        ClientBuilder::new(aptos_base_url).unwrap()
+    }
+
+    pub fn new(base_url: Url) -> Self {
+        let mut headerMap = HeaderMap::new();
+        headerMap.insert(HeaderName::from_static(X_APTOS_CLIENT), HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE));
+
         let inner = ReqwestClient::builder()
-            .timeout(timeout)
-            .user_agent(user_agent)
+            .timeout(Duration::from_secs(10)) // Default to 10 seconds
+            .default_headers(headerMap)
             .cookie_store(true)
             .build()
             .unwrap();
 
-        // If the user provided no version in the path, use the default. If the
-        // provided version has no trailing slash, add it, otherwise url.join
-        // will ignore the version path base.
-        let version_path_base = match base_url.path() {
-            "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
-            path => {
-                if !path.ends_with('/') {
-                    format!("{}/", path)
-                } else {
-                    path.to_string()
-                }
-            },
-        };
-
         Self {
-            inner,
-            base_url,
-            version_path_base,
-        }
-    }
 
-    pub fn new(base_url: Url) -> Self {
-        Self::new_with_timeout(base_url, Duration::from_secs(10))
+        }
     }
 
     pub fn path_prefix_string(&self) -> String {
@@ -1580,6 +1625,19 @@ impl Client {
                 result.extend(response.into_inner());
             }
         }
+    }
+}
+
+pub fn get_version_path_with_base(base_url: Url) -> String {
+    match base_url.path() {
+        "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
+        path => {
+            if !path.ends_with('/') {
+                format!("{}/", path)
+            } else {
+                path.to_string()
+            }
+        },
     }
 }
 

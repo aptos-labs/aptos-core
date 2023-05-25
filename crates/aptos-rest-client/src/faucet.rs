@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::FaucetClientError, Client, Result};
+use crate::{error::FaucetClientError, Client, Result, AptosBaseUrl};
 use aptos_types::transaction::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
 use reqwest::{Client as ReqwestClient, Url};
@@ -22,7 +22,7 @@ impl FaucetClient {
                 .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap(),
-            rest_client: Client::new(rest_url),
+            rest_client: Client::new(AptosBaseUrl::Custom(rest_url)),
         }
     }
 
@@ -33,7 +33,7 @@ impl FaucetClient {
                 .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap(),
-            rest_client: Client::new(rest_url)
+            rest_client: Client::new(AptosBaseUrl::Custom(rest_url))
                 // By default the path is prefixed with the version, e.g. `v1`.
                 // The fake API used in the faucet tests doesn't have a
                 // versioned API however, so we just set it to `/`.

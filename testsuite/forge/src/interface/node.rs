@@ -144,7 +144,7 @@ pub trait NodeExt: Node {
 
     /// Return REST API client of this Node
     fn rest_client_with_timeout(&self, timeout: Duration) -> RestClient {
-        RestClient::new_with_timeout(self.rest_api_endpoint(), timeout)
+        RestClient::builder().timeout(timeout).base_url(self.rest_api_endpoint()).build();
     }
 
     /// Return an InspectionClient for this Node
