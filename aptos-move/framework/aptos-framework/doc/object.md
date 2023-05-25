@@ -226,7 +226,7 @@ This is a one time ability given to the creator to configure the object as neces
 </dt>
 <dd>
  Set to true so long as deleting the object is possible. For example, the object was
- created via create_named_object.
+ created via create_object_from_guid.
 </dd>
 </dl>
 
