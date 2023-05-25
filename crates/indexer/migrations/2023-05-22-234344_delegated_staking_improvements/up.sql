@@ -37,3 +37,10 @@ FROM current_delegator_balances
 WHERE shares > 0
 GROUP BY 1,
   2;
+-- new query for wallet
+CREATE OR REPLACE VIEW address_events_summary AS
+SELECT account_address,
+  min(transaction_block_height) AS min_block_height,
+  count(DISTINCT transaction_version) AS num_distinct_versions
+FROM events
+GROUP BY 1
