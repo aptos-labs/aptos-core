@@ -13,7 +13,10 @@ use aptos_build_info::build_information;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
+use aptos_rest_client::{
+    aptos_api_types::{HashValue, HexEncodedBytes},
+    Account, Client, State,
+};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{
     account_address::create_multisig_account_address,
@@ -481,9 +484,19 @@ pub fn parse_json_file<T: for<'a> Deserialize<'a>>(path_ref: &Path) -> CliTypedR
     })
 }
 
-/// Return reference to inner option vector for view function JSON field known to have option.
+/// Convert a view function JSON field, known to have optional hex, into a bytes vector.
 ///
-/// View functions represent an option as a JSON array titled `vec`.
-pub fn get_view_json_option_vec_ref(value_ref: &serde_json::Value) -> &Vec<serde_json::Value> {
-    value_ref["vec"].as_array().unwrap()
+/// A view function return represents an option via an inner JSON array titled `vec`.
+pub fn view_json_option_hex_as_bytes(option_ref: &serde_json::Value) -> CliTypedResult<Vec<u8>> {
+    let option_vec_ref = option_ref["vec"].as_array().unwrap();
+    if option_vec_ref.is_empty() {
+        Ok(vec![])
+    } else {
+        Ok(option_vec_ref[0]
+            .as_str()
+            .unwrap()
+            .parse::<HexEncodedBytes>()?
+            .inner()
+            .to_vec())
+    }
 }

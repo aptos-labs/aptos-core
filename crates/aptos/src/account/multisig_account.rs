@@ -6,12 +6,12 @@ use crate::common::{
         CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
         MultisigAccountWithSequenceNumber, TransactionOptions, TransactionSummary,
     },
-    utils::get_view_json_option_vec_ref,
+    utils::view_json_option_hex_as_bytes,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
 use aptos_rest_client::{
-    aptos_api_types::{HexEncodedBytes, ViewRequest, WriteResource, WriteSetChange},
+    aptos_api_types::{ViewRequest, WriteResource, WriteSetChange},
     Transaction,
 };
 use aptos_types::{
@@ -183,41 +183,33 @@ impl CliCommand<serde_json::Value> for CheckTransaction {
                 ],
             })
             .await?[0];
-        // Get reference to inner payload option from multisig transaction.
-        let multisig_payload_option_ref =
-            get_view_json_option_vec_ref(&multisig_transaction["payload"]);
-        // Get expected multisig transaction payload bytes from provided entry function.
-        let expected_multisig_transaction_payload_bytes =
-            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
-        // If only storing payload hash on-chain, get expected hash bytes and actual hash hex:
-        let (expected_bytes, actual_value_hex_option_ref) =
-            if multisig_payload_option_ref.is_empty() {
-                (
-                    HashValue::sha3_256_of(&expected_multisig_transaction_payload_bytes).to_vec(),
-                    get_view_json_option_vec_ref(&multisig_transaction["payload_hash"]),
-                )
-            // If full payload stored on-chain, get expected payload bytes and actual payload hex:
-            } else {
-                (
-                    expected_multisig_transaction_payload_bytes,
-                    multisig_payload_option_ref,
-                )
-            };
-        // If expected bytes matches actual hex from view function:
-        if expected_bytes.eq(&actual_value_hex_option_ref[0]
-            .as_str()
-            .unwrap()
-            .parse::<HexEncodedBytes>()?
-            .inner())
-        {
-            // Return success message.
+        // Get expected multisig transaction payload hash bytes from provided entry function.
+        let expected_payload_hash_bytes =
+            HashValue::sha3_256_of(&to_bytes::<MultisigTransactionPayload>(
+                &self.entry_function_args.try_into()?,
+            )?)
+            .to_vec();
+        // Get actual multisig payload hash field stored on-chain, as bytes.
+        let mut actual_payload_hash_bytes =
+            view_json_option_hex_as_bytes(&multisig_transaction["payload_hash"])?;
+        // If payload hash not stored on-chain, get actual payload hash from on-chain payload.
+        if actual_payload_hash_bytes.is_empty() {
+            actual_payload_hash_bytes = HashValue::sha3_256_of(&view_json_option_hex_as_bytes(
+                &multisig_transaction["payload"],
+            )?)
+            .to_vec();
+        }
+        // If a match between expected payload hash and actual payload hash, return success message.
+        if expected_payload_hash_bytes.eq(&actual_payload_hash_bytes) {
             Ok(json!({
                 "Status": "Transaction match",
                 "Multisig transaction": multisig_transaction
             }))
+        // If a mismatch between expected payload hash and actual payload hash, error out.
         } else {
-            // If a mismatch between expected bytes and actual hex, error out.
-            Err(CliError::UnexpectedError("Payload mismatch".to_string()))
+            Err(CliError::UnexpectedError(
+                "Transaction mismatch".to_string(),
+            ))
         }
     }
 }
