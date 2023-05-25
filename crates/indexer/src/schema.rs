@@ -187,11 +187,15 @@ diesel::table! {
         total_shares -> Numeric,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
+        operator_address -> Nullable<Varchar>,
+        operator_commission_percentage -> Numeric,
+        inactive_table_handle -> Varchar,
+        active_table_handle -> Varchar,
     }
 }
 
 diesel::table! {
-    current_delegator_balances (delegator_address, pool_address, pool_type) {
+    current_delegator_balances (delegator_address, pool_address, pool_type, table_handle) {
         delegator_address -> Varchar,
         pool_address -> Varchar,
         pool_type -> Varchar,
@@ -199,6 +203,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
         shares -> Numeric,
+        parent_table_handle -> Varchar,
     }
 }
 
@@ -303,7 +308,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    current_token_ownerships_v2 (token_data_id, property_version_v1, owner_address, storage_id) {
+    current_token_ownerships_v2 (token_data_id, property_version_v1, owner_address, storage_id, amount) {
         token_data_id -> Varchar,
         property_version_v1 -> Numeric,
         owner_address -> Varchar,
@@ -359,6 +364,10 @@ diesel::table! {
         total_coins -> Numeric,
         total_shares -> Numeric,
         inserted_at -> Timestamp,
+        operator_address -> Nullable<Varchar>,
+        operator_commission_percentage -> Numeric,
+        inactive_table_handle -> Varchar,
+        active_table_handle -> Varchar,
     }
 }
 
