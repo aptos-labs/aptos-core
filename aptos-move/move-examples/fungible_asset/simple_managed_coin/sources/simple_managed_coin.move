@@ -1,20 +1,19 @@
-/// An example combining fungible assets with token as fungible token. In this example, a token object is used as
-/// metadata to create fungible units, aka, fungible tokens.
-module fungible_token::managed_fungible_token {
+/// A 2-in-1 module that combines managed_fungible_asset and coin_example into one module that when deployed, the
+/// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
+/// The address of the asset can be obtained via get_metadata(). As a simple version, it only deal with primary stores.
+module example_addr::simple_managed_coin {
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
     use aptos_framework::object::{Self, Object};
     use aptos_framework::primary_fungible_store;
     use std::error;
     use std::signer;
-    use std::string::{utf8, String};
+    use std::string::utf8;
     use std::option;
-    use aptos_token_objects::token::{create_named_token, create_token_seed};
-    use aptos_token_objects::collection::create_fixed_collection;
 
     /// Only fungible asset metadata owner can make changes.
     const ENOT_OWNER: u64 = 1;
 
-    const ASSET_SYMBOL: vector<u8> = b"TEST";
+    const ASSET_SYMBOL: vector<u8> = b"LBR";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
@@ -26,32 +25,15 @@ module fungible_token::managed_fungible_token {
 
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
-        let collection_name: String = utf8(b"test collection name");
-        let token_name: String = utf8(b"test token name");
-        create_fixed_collection(
-            admin,
-            utf8(b"test collection description"),
-            1,
-            collection_name,
-            option::none(),
-            utf8(b"http://aptoslabs.com/collection"),
-        );
-        let constructor_ref = &create_named_token(admin,
-            collection_name,
-            utf8(b"test token description"),
-            token_name,
-            option::none(),
-            utf8(b"http://aptoslabs.com/token"),
-        );
-
+        let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             constructor_ref,
             option::none(),
-            utf8(b"test fungible asset name"), /* name */
+            utf8(b"Libra Coin"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
-            2, /* decimals */
-            utf8(b"http://aptoslabs.com/favicon.ico"),
-            utf8(b"http://aptoslabs.com/")
+            8, /* decimals */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
+            utf8(b"http://example.com"), /* project */
         );
 
         // Create mint/burn/transfer refs to allow creator to manage the fungible asset.
@@ -68,12 +50,7 @@ module fungible_token::managed_fungible_token {
     #[view]
     /// Return the address of the managed fungible asset that's created when this module is deployed.
     public fun get_metadata(): Object<Metadata> {
-        let collection_name: String = utf8(b"test collection name");
-        let token_name: String = utf8(b"test token name");
-        let asset_address = object::create_object_address(
-            &@fungible_token,
-            create_token_seed(&collection_name, &token_name)
-        );
+        let asset_address = object::create_object_address(&@example_addr, ASSET_SYMBOL);
         object::address_to_object<Metadata>(asset_address)
     }
 
@@ -86,11 +63,11 @@ module fungible_token::managed_fungible_token {
         fungible_asset::deposit_with_ref(&managed_fungible_asset.transfer_ref, to_wallet, fa);
     }
 
-    /// Transfer as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Transfer as the owner of metadata object ignoring `frozen` field.
     public entry fun transfer(admin: &signer, from: address, to: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         let to_wallet = primary_fungible_store::ensure_primary_store_exists(to, asset);
         fungible_asset::transfer_with_ref(transfer_ref, from_wallet, to_wallet, amount);
     }
@@ -99,7 +76,7 @@ module fungible_token::managed_fungible_token {
     public entry fun burn(admin: &signer, from: address, amount: u64) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let burn_ref = &authorized_borrow_refs(admin, asset).burn_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         fungible_asset::burn_from(burn_ref, from_wallet, amount);
     }
 
@@ -119,15 +96,15 @@ module fungible_token::managed_fungible_token {
         fungible_asset::set_frozen_flag(transfer_ref, wallet, false);
     }
 
-    /// Withdraw as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Withdraw as the owner of metadata object ignoring `frozen` field.
     public fun withdraw(admin: &signer, amount: u64, from: address): FungibleAsset acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
-        let from_wallet = primary_fungible_store::ensure_primary_store_exists(from, asset);
+        let from_wallet = primary_fungible_store::primary_store(from, asset);
         fungible_asset::withdraw_with_ref(transfer_ref, from_wallet, amount)
     }
 
-    /// Deposit as the owner of metadata object ignoring `allow_ungated_transfer` field.
+    /// Deposit as the owner of metadata object ignoring `frozen` field.
     public fun deposit(admin: &signer, to: address, fa: FungibleAsset) acquires ManagedFungibleAsset {
         let asset = get_metadata();
         let transfer_ref = &authorized_borrow_refs(admin, asset).transfer_ref;
@@ -145,7 +122,7 @@ module fungible_token::managed_fungible_token {
         borrow_global<ManagedFungibleAsset>(object::object_address(&asset))
     }
 
-    #[test(creator = @fungible_token)]
+    #[test(creator = @example_addr)]
     fun test_basic_flow(
         creator: &signer,
     ) acquires ManagedFungibleAsset {
@@ -166,7 +143,7 @@ module fungible_token::managed_fungible_token {
         burn(creator, creator_address, 90);
     }
 
-    #[test(creator = @fungible_token, aaron = @0xface)]
+    #[test(creator = @example_addr, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50001, location = Self)]
     fun test_permission_denied(
         creator: &signer,

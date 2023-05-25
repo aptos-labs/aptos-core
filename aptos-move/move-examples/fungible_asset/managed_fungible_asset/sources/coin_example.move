@@ -1,8 +1,8 @@
 /// A coin example using managed_fungible_asset to create a fungible "coin" and helper functions to only interact with
-/// primary fungible stores.
+/// primary fungible stores only.
 module example_addr::coin_example {
     use aptos_framework::object;
-    use aptos_framework::fungible_asset::{Metadata, FungibleAsset};
+    use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
     use aptos_framework::object::Object;
     use example_addr::managed_fungible_asset;
     use std::string::utf8;
@@ -83,9 +83,8 @@ module example_addr::coin_example {
     use aptos_framework::primary_fungible_store;
     #[test_only]
     use std::signer;
-    use aptos_framework::fungible_asset;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @example_addr)]
     fun test_basic_flow(creator: &signer) {
         init_module(creator);
         let creator_address = signer::address_of(creator);
@@ -104,7 +103,7 @@ module example_addr::coin_example {
         burn(creator, creator_address, 90);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @example_addr, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50001, location = example_addr::managed_fungible_asset)]
     fun test_permission_denied(creator: &signer, aaron: &signer) {
         init_module(creator);
