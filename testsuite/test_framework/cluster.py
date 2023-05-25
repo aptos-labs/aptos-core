@@ -1,3 +1,5 @@
+# Cluster abstraction for the forge test framework
+
 from __future__ import annotations
 
 from dataclasses import dataclass

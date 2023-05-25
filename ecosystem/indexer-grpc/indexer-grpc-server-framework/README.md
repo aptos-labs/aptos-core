@@ -17,7 +17,7 @@ impl RunnableConfig for ExampleConfig {
         Ok(())
     }
     fn get_server_name(&self) -> String {
-        self.name.clone()
+        "srv_exp".to_string()
     }
 }
 
