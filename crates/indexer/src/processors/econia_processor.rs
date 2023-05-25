@@ -586,11 +586,11 @@ impl EconiaTransactionProcessor {
         }
 
         // update markets cache
-        // self.insert_markets_in_cache(&market_registration);
+        self.insert_markets_in_cache(&market_registration);
         self.insert_market_registration_events(conn, market_registration)?;
-        // self.insert_recognized_market_events(conn, recognized_market)?;
-        // self.insert_maker_events(conn, maker)?;
-        // self.insert_taker_events(conn, taker)?;
+        self.insert_recognized_market_events(conn, recognized_market)?;
+        self.insert_maker_events(conn, maker)?;
+        self.insert_taker_events(conn, taker)?;
 
         Ok(())
     }
