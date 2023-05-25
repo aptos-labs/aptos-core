@@ -299,6 +299,8 @@ fn main() -> Result<()> {
                     } else {
                         k8s.namespace.clone().unwrap()
                     };
+                    let forge_runner_mode =
+                        ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
                     run_forge(
                         duration,
                         test_suite,
@@ -306,7 +308,8 @@ fn main() -> Result<()> {
                             namespace,
                             k8s.image_tag.clone(),
                             k8s.upgrade_image_tag.clone(),
-                            k8s.port_forward,
+                            // We want to port forward if we're running locally because local means we're not in cluster
+                            k8s.port_forward || forge_runner_mode == ForgeRunnerMode::Local,
                             k8s.reuse,
                             k8s.keep,
                             k8s.enable_haproxy,

@@ -1,7 +1,7 @@
 # This is a template yaml for the indexer-grpc parser.
-indexer_grpc_address: the.grpc.hostname:50050
-postgres_connection_string: postgres://dev:xxxxxxxx@the.postgres.host.name:5432/indexer_grpc
-number_concurrent_processing_tasks: 20
-processor_name: default_processor
-health_check_port: 8080
-indexer_grpc_auth_token: AUTH_TOKEN
+health_check_port: 8084
+server_config:
+    processor_name: default_processor
+    postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
+    indexer_grpc_data_service_addresss: 127.0.0.1:50051:50051
+    auth_token: AUTH_TOKEN
