@@ -41,7 +41,7 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{AbortLocation, DiscardedVMStatus, StatusCode, VMStatus},
+    vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -259,7 +259,12 @@ impl AptosVM {
             .0
             .new_session(resolver, SessionId::txn_meta(txn_data), true);
 
-        match TransactionStatus::from(error_code.clone()) {
+        match TransactionStatus::from_vm_status(
+            error_code.clone(),
+            self.0
+                .get_features()
+                .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+        ) {
             TransactionStatus::Keep(status) => {
                 // Inject abort info if available.
                 let status = match status {
@@ -1098,7 +1103,12 @@ impl AptosVM {
                     );
                 }
 
-                let txn_status = TransactionStatus::from(err.clone());
+                let txn_status = TransactionStatus::from_vm_status(
+                    err.clone(),
+                    self.0
+                        .get_features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                );
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
                 } else {
@@ -1661,9 +1671,7 @@ impl VMAdapter for AptosVM {
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
-                if let Err(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR) =
-                    vm_status.clone().keep_or_discard()
-                {
+                if let StatusType::InvariantViolation = vm_status.status_type() {
                     error!(
                         *log_context,
                         "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
@@ -1857,7 +1865,13 @@ impl AptosSimulationVM {
                 if new_published_modules_loaded {
                     self.0 .0.mark_loader_cache_as_invalid();
                 };
-                let txn_status = TransactionStatus::from(err.clone());
+                let txn_status = TransactionStatus::from_vm_status(
+                    err.clone(),
+                    self.0
+                         .0
+                        .get_features()
+                        .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+                );
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
                 } else {
