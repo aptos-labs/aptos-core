@@ -14,7 +14,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::{TransactionWrite, WriteSet},
+    write_set::TransactionWrite,
 };
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
@@ -75,28 +75,11 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 struct ChangeSetStateView<'r> {
     base: &'r dyn StateView,
     change_set: ChangeSetExt,
-    materialized_delta_change_set: WriteSet,
 }
 
 impl<'r> ChangeSetStateView<'r> {
     pub fn new(base: &'r dyn StateView, change_set: ChangeSetExt) -> Result<Self, VMStatus> {
-        // TODO: at this point we know that delta application failed
-        // (and it should have occurred in user transaction in general).
-        // We need to rerun the epilogue and charge gas. Currently, the use
-        // case of an aggregator is for gas fees (which are computed in
-        // the epilogue), and therefore this should never happen.
-        // Also, it is worth mentioning that current VM error handling is
-        // rather ugly and has a lot of legacy code. This makes proper error
-        // handling quite challenging.
-        let materialized_delta_change_set = change_set
-            .delta_change_set
-            .clone()
-            .try_into_write_set(base)?;
-        Ok(Self {
-            base,
-            change_set,
-            materialized_delta_change_set,
-        })
+        Ok(Self { base, change_set })
     }
 }
 
@@ -108,12 +91,14 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
     }
 
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>> {
-        if let Some(write_op) = self.materialized_delta_change_set.get(state_key) {
-            Ok(write_op.as_state_value())
-        } else if let Some(write_op) = self.change_set.write_set().get(state_key) {
-            Ok(write_op.as_state_value())
-        } else {
-            self.base.get_state_value(state_key)
+        match self.change_set.delta_change_set().get(state_key) {
+            Some(delta_op) => Ok(delta_op
+                .try_into_write_op(self.base, state_key)?
+                .as_state_value()),
+            None => match self.change_set.write_set().get(state_key) {
+                Some(write_op) => Ok(write_op.as_state_value()),
+                None => self.base.get_state_value(state_key),
+            },
         }
     }
 
@@ -123,5 +108,86 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         bail!("Unexpected access to get_usage()")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::ChangeSetStateView;
+    use aptos_aggregator::{
+        delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet},
+        transaction::ChangeSetExt,
+    };
+    use aptos_language_e2e_tests::data_store::FakeDataStore;
+    use aptos_state_view::TStateView;
+    use aptos_types::{
+        state_store::{state_key::StateKey, table::TableHandle},
+        transaction::{ChangeSet, NoOpChangeSetChecker},
+        write_set::{WriteOp, WriteSetMut},
+    };
+    use move_core_types::account_address::AccountAddress;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_change_set_state_view() {
+        let key1 = StateKey::table_item(
+            TableHandle(AccountAddress::ZERO),
+            String::from("test-key1").into_bytes(),
+        );
+        let key2 = StateKey::table_item(
+            TableHandle(AccountAddress::ZERO),
+            String::from("test-key2").into_bytes(),
+        );
+        let key3 = StateKey::raw(String::from("test-key3").into_bytes());
+
+        let mut base_view = FakeDataStore::default();
+        base_view.set_legacy(key1.clone(), serialize(&150));
+        base_view.set_legacy(key2.clone(), serialize(&300));
+        base_view.set_legacy(key3.clone(), serialize(&500));
+
+        let delta_op = delta_add(5, 500);
+        let mut delta_change_set = DeltaChangeSet::empty();
+        delta_change_set.insert((key1.clone(), delta_op));
+
+        let write_set_ops = [(key2.clone(), WriteOp::Modification(serialize(&400)))];
+        let write_set = WriteSetMut::new(write_set_ops.into_iter())
+            .freeze()
+            .unwrap();
+        let change_set = ChangeSet::new(write_set, vec![], &NoOpChangeSetChecker).unwrap();
+
+        let change_set_ext =
+            ChangeSetExt::new(delta_change_set, change_set, Arc::new(NoOpChangeSetChecker));
+        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set_ext).unwrap();
+
+        assert_eq!(
+            deserialize(
+                change_set_state_view
+                    .get_state_value(&key1)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
+            155
+        );
+        assert_eq!(
+            deserialize(
+                change_set_state_view
+                    .get_state_value(&key2)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
+            400
+        );
+        assert_eq!(
+            deserialize(
+                change_set_state_view
+                    .get_state_value(&key3)
+                    .unwrap()
+                    .unwrap()
+                    .bytes()
+            ),
+            500
+        );
     }
 }

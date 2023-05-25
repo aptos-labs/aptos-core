@@ -1,3 +1,5 @@
+# A wrapper around fetching time information
+
 from datetime import datetime, timezone
 
 
@@ -12,3 +14,13 @@ class Time:
 class SystemTime(Time):
     def now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+
+class FakeTime(Time):
+    _now: int = 1659078000
+
+    def now(self) -> datetime:
+        return datetime.fromtimestamp(self._now, timezone.utc)
+
+    def epoch(self) -> str:
+        return str(self._now)

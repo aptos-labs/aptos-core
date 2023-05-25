@@ -4,9 +4,9 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
-    Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
-    FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, Create, ForgeRunnerMode, GenesisConfigFn, K8sApi,
+    K8sNode, NodeConfigFn, Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME,
+    DEFAULT_ROOT_KEY, FORGE_KEY_SEED, FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX,
     GENESIS_HELM_CHART_PATH, GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN,
     MANAGEMENT_CONFIGMAP_PREFIX, NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS,
     VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
@@ -409,12 +409,13 @@ fn generate_new_era() -> String {
 }
 
 fn get_node_default_helm_path() -> String {
-    let forge_run_mode = std::env::var("FORGE_RUNNER_MODE").unwrap_or_else(|_| "k8s".to_string());
-    if forge_run_mode.eq("local") {
-        "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml".to_string()
-    } else {
-        "/aptos/terraform/aptos-node-default-values.yaml".to_string()
+    match ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s) {
+        ForgeRunnerMode::Local => {
+            "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml"
+        },
+        ForgeRunnerMode::K8s => "/aptos/terraform/aptos-node-default-values.yaml",
     }
+    .to_string()
 }
 
 pub async fn reset_persistent_volumes(kube_client: &K8sClient) -> Result<()> {

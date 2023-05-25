@@ -1,3 +1,5 @@
+# A wrapper around git operations
+
 from dataclasses import dataclass
 from typing import Generator
 from .shell import Shell, RunResult
