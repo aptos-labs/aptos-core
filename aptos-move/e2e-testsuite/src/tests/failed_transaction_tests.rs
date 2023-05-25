@@ -54,6 +54,7 @@ fn failed_transaction_cleanup_test() {
         &data_cache,
         &log_context,
         &change_set_configs,
+        true,
     );
     assert!(!out1.txn_output().write_set().is_empty());
     assert_eq!(out1.txn_output().gas_used(), 90_000);
@@ -72,6 +73,7 @@ fn failed_transaction_cleanup_test() {
         &data_cache,
         &log_context,
         &change_set_configs,
+        true,
     );
     assert!(out2.txn_output().gas_used() != 0);
     assert!(!out2.txn_output().status().is_discarded());

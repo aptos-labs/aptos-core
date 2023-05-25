@@ -234,6 +234,7 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> TransactionOutputExt {
         self.failed_transaction_cleanup_and_keep_vm_status(
             error_code,
@@ -242,6 +243,7 @@ impl AptosVM {
             resolver,
             log_context,
             change_set_configs,
+            aggregator_enabled,
         )
         .1
     }
@@ -254,11 +256,11 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-        aggregator_enabled: bool
+        aggregator_enabled: bool,
     ) -> (VMStatus, TransactionOutputExt) {
-        let mut session = self
-            .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), aggregator_enabled);
+        let mut session =
+            self.0
+                .new_session(resolver, SessionId::txn_meta(txn_data), aggregator_enabled);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -1142,7 +1144,7 @@ impl AptosVM {
                         resolver,
                         log_context,
                         &storage_gas_params.change_set_configs,
-                        aggregator_enabled
+                        aggregator_enabled,
                     )
                 }
             },
@@ -1932,7 +1934,7 @@ impl AptosSimulationVM {
                         resolver,
                         log_context,
                         &storage_gas_params.change_set_configs,
-                        false
+                        false,
                     );
                     (vm_status, output)
                 }
