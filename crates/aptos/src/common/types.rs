@@ -23,6 +23,7 @@ use aptos_debugger::AptosDebugger;
 use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
+use aptos_logger::Level;
 use aptos_rest_client::{
     aptos_api_types::{HashValue, MoveType, ViewRequest},
     error::RestError,
@@ -1066,8 +1067,14 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 
     /// Executes the command, and serializes it to the common JSON output type
     async fn execute_serialized(self) -> CliResult {
+        self.execute_serialized_with_logging_level(Level::Warn)
+            .await
+    }
+
+    /// Execute the command with customized logging level
+    async fn execute_serialized_with_logging_level(self, level: Level) -> CliResult {
         let command_name = self.command_name();
-        start_logger();
+        start_logger(level);
         let start_time = Instant::now();
         to_common_result(command_name, start_time, self.execute().await).await
     }
@@ -1081,7 +1088,7 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 
     /// Executes the command, and throws away Ok(result) for the string Success
     async fn execute_serialized_success(self) -> CliResult {
-        start_logger();
+        start_logger(Level::Warn);
         let command_name = self.command_name();
         let start_time = Instant::now();
         to_common_success_result(command_name, start_time, self.execute().await).await
