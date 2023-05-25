@@ -95,6 +95,7 @@ services:
       - '/opt/aptos/data-service-config.yaml'
     ports:
       - "50052:50052" # GRPC
+      - "18084:8084" # health
     depends_on:
       - indexer-grpc-cache-worker
       - redis-replica

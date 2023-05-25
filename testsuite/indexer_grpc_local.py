@@ -8,9 +8,12 @@ import os
 import argparse
 import logging
 from dataclasses import dataclass
-from applogging import init_logging, logger
-from forge_wrapper_core.shell import Shell, LocalShell
-from forge_wrapper_core.reqwest import SimpleHttpClient, HttpClient
+from typing import List
+from test_framework.logging import init_logging, log
+from test_framework.shell import Shell, LocalShell
+from test_framework.reqwest import SimpleHttpClient, HttpClient
+
+GRPCURL_PATH = os.environ.get("GRPCURL_PATH", "grpcurl")
 
 INDEXER_GRPC_DOCKER_COMPOSE_FILE = "docker/compose/indexer-grpc/docker-compose.yaml"
 VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE = (
@@ -18,12 +21,14 @@ VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE = (
 )
 
 INDEXER_FULLNODE_REST_API_URL = "http://localhost:8080"
+INDEXER_DATA_SERVICE_READINESS_URL = "http://localhost:18084/readiness"
 GRPC_INDEXER_FULLNODE_URL = "localhost:50051"
 GRPC_DATA_SERVICE_URL = "localhost:50052"
 
 SHARED_DOCKER_VOLUME_NAMES = ["aptos-shared", "indexer-grpc-file-store"]
 
 WAIT_TESTNET_START_TIMEOUT_SECS = 60
+WAIT_INDEXER_GRPC_START_TIMEOUT_SECS = 60
 GRPC_PROGRESS_THRESHOLD_SECS = 10
 
 
@@ -44,6 +49,14 @@ class Subcommand(Enum):
     WIPE = "wipe"
 
 
+class StartSubcommand(Enum):
+    NO_INDEXER_GRPC = "no-indexer-grpc"
+
+
+def normalize_var_name(var_name: str) -> str:
+    return var_name.replace("-", "_").upper()
+
+
 # set envs based on platform, if it's not already overriden
 if not os.environ.get("REDIS_IMAGE_REPO"):
     if platform.system() == "Darwin":
@@ -57,7 +70,10 @@ class DockerComposeError(Exception):
 
 
 def run_docker_compose(
-    shell: Shell, compose_file_path: str, compose_action: DockerComposeAction
+    shell: Shell,
+    compose_file_path: str,
+    compose_action: DockerComposeAction,
+    extra_args: List[str] = [],
 ):
     log.info(f"Running docker-compose {compose_action.value} on {compose_file_path}")
     try:
@@ -68,7 +84,8 @@ def run_docker_compose(
                 compose_file_path,
                 compose_action.value,
             ]
-            + (["--detach"] if compose_action == DockerComposeAction.UP else []),
+            + (["--detach"] if compose_action == DockerComposeAction.UP else [])
+            + extra_args,
             stream_output=True,
         )
     except Exception as e:
@@ -84,8 +101,24 @@ def start_single_validator_testnet(shell: Shell):
     )
 
 
-def start_indexer_grpc(shell: Shell):
-    run_docker_compose(shell, INDEXER_GRPC_DOCKER_COMPOSE_FILE, DockerComposeAction.UP)
+def start_indexer_grpc(shell: Shell, redis_only: bool = False):
+    extra_indexer_grpc_docker_args = []
+    if redis_only:
+        extra_indexer_grpc_docker_args = [
+            "--scale",
+            "indexer-grpc-cache-worker=0",
+            "--scale",
+            "indexer-grpc-file-store=0",
+            "--scale",
+            "indexer-grpc-data-service=0",
+        ]
+
+    run_docker_compose(
+        shell,
+        INDEXER_GRPC_DOCKER_COMPOSE_FILE,
+        DockerComposeAction.UP,
+        extra_args=extra_indexer_grpc_docker_args,
+    )
 
 
 def stop_single_validator_testnet(shell: Shell):
@@ -117,54 +150,85 @@ def wait_for_testnet_progress(client: HttpClient) -> int:
             log.info(f"Key not found: {e}")
         except Exception as e:
             log.info(f"Exception: {e}")
-        time.sleep(1)
+        time.sleep(5)
 
     raise Exception("Testnet failed to start within timeout period")
 
 
 def wait_for_indexer_grpc_progress(shell: Shell, client: HttpClient):
-    log.info(f"Streaming from indexer grpc for {GRPC_PROGRESS_THRESHOLD_SECS}s")
-    res = shell.run(
-        [
-            "timeout",
-            f"{GRPC_PROGRESS_THRESHOLD_SECS}s",
-            "grpcurl",
-            "-max-msg-sz",
-            "10000000",
-            "-d",
-            '{ "starting_version": 0 }',
-            "-H",
-            "x-aptos-data-authorization:dummy_token",
-            "-import-path",
-            "crates/aptos-protos/proto",
-            "-proto",
-            "aptos/indexer/v1/raw_data.proto",
-            "-plaintext",
-            GRPC_DATA_SERVICE_URL,
-            "aptos.indexer.v1.RawData/GetTransactions",
-        ],
+    """Wait for the indexer grpc to start and try streaming from it"""
+    log.info(
+        f"Waiting for indexer grpc to start for {WAIT_INDEXER_GRPC_START_TIMEOUT_SECS}s"
     )
-    succ = (
-        res.exit_code == 124
-    )  # timeout exits with 124 if it reaches the end of the timeout
-    if not succ:
+    indexer_grpc_healthcheck_up = False
+    retry_secs = 5
+    for _ in range(WAIT_INDEXER_GRPC_START_TIMEOUT_SECS // retry_secs):
+        try:
+            r = client.get(INDEXER_DATA_SERVICE_READINESS_URL)
+            if r.status_code == 200:
+                log.info("Indexer grpc data service is up")
+                indexer_grpc_healthcheck_up = True
+                break
+        except Exception as e:
+            log.info(f"Exception: {e}")
+        time.sleep(retry_secs)
+
+    if not indexer_grpc_healthcheck_up:
+        raise Exception("Indexer grpc failed to start within timeout period")
+
+    indexer_grpc_data_service_up = False
+    log.info(
+        f"Attempting to stream from indexer grpc for {GRPC_PROGRESS_THRESHOLD_SECS}s"
+    )
+    res = None
+    for _ in range(GRPC_PROGRESS_THRESHOLD_SECS // retry_secs):
+        res = shell.run(
+            [
+                "timeout",
+                f"{GRPC_PROGRESS_THRESHOLD_SECS}s",
+                GRPCURL_PATH,
+                "-max-msg-sz",
+                "10000000",
+                "-d",
+                '{ "starting_version": 0 }',
+                "-H",
+                "x-aptos-data-authorization:dummy_token",
+                "-import-path",
+                "crates/aptos-protos/proto",
+                "-proto",
+                "aptos/indexer/v1/raw_data.proto",
+                "-plaintext",
+                GRPC_DATA_SERVICE_URL,
+                "aptos.indexer.v1.RawData/GetTransactions",
+            ],
+        )
+        if (
+            res.exit_code == 124
+        ):  # timeout exits with 124 if it reaches the end of the timeout
+            indexer_grpc_data_service_up = True
+            break
+        time.sleep(retry_secs)
+
+    if not indexer_grpc_data_service_up:
+        if res:
+            log.info(f"Stream output: {res.unwrap().decode()}")
         raise Exception(
             "Stream interrupted before reaching the end of the timeout. There might be something wrong"
         )
     log.info("Stream finished successfully")
 
 
-def start(context: SystemContext):
+def start(context: SystemContext, no_indexer_grpc: bool = False):
     start_single_validator_testnet(context.shell)
 
     # wait for progress
     latest_version = wait_for_testnet_progress(context.http_client)
     log.info(f"TESTNET STARTED: latest version @ {latest_version}")
 
-    start_indexer_grpc(context.shell)
+    start_indexer_grpc(context.shell, redis_only=no_indexer_grpc)
 
-    # run grpcurl
-    wait_for_indexer_grpc_progress(context.shell, context.http_client)
+    if not no_indexer_grpc:
+        wait_for_indexer_grpc_progress(context.shell, context.http_client)
 
 
 def stop(context: SystemContext):
@@ -177,7 +241,6 @@ def wipe(context: SystemContext):
     context.shell.run(["docker", "volume", "rm"] + SHARED_DOCKER_VOLUME_NAMES)
 
 
-@logger
 def main():
     parser = argparse.ArgumentParser(
         prog="Indexer GRPC Local",
@@ -185,15 +248,23 @@ def main():
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     subparser = parser.add_subparsers(dest="subcommand", required=True)
-    subparser.add_parser(Subcommand.START.value, help="Start the indexer GRPC setup")
+    start_parser = subparser.add_parser(
+        Subcommand.START.value, help="Start the indexer GRPC setup"
+    )
+    start_parser.add_argument(
+        f"--{StartSubcommand.NO_INDEXER_GRPC.value}",
+        dest="no_indexer_grpc",
+        action="store_true",
+    )
     subparser.add_parser(Subcommand.STOP.value, help="Stop the indexer GRPC setup")
     subparser.add_parser(Subcommand.WIPE.value, help="Completely wipe the storage")
     args = parser.parse_args()
-
     # init logging
     init_logging(logger=log, print_metadata=True)
     if args.verbose:
         log.setLevel(logging.DEBUG)
+
+    log.debug(f"args: {args}")
 
     context = SystemContext(
         shell=LocalShell(),
@@ -202,15 +273,17 @@ def main():
 
     subcommand = Subcommand(args.subcommand)
 
-    match subcommand:
-        case Subcommand.START:
-            start(context)
-        case Subcommand.STOP:
-            stop(context)
-            log.info("To wipe all data, run: $ ./testsuite/indexer_grpc_local.py wipe")
-            log.info("To start again, run: $ ./testsuite/indexer_grpc_local.py start")
-        case Subcommand.WIPE:
-            wipe(context)
+    if subcommand == Subcommand.START:
+        start(
+            context,
+            args.no_indexer_grpc,
+        )
+    elif subcommand == Subcommand.STOP:
+        stop(context)
+        log.info("To wipe all data, run: $ ./testsuite/indexer_grpc_local.py wipe")
+        log.info("To start again, run: $ ./testsuite/indexer_grpc_local.py start")
+    elif subcommand == Subcommand.WIPE:
+        wipe(context)
 
 
 if __name__ == "__main__":

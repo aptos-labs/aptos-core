@@ -18,6 +18,7 @@ pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
     emit_args: &EmitArgs,
 ) -> Result<TxnStats> {
+    println!("Emitting transactions...");
     if emit_args.coordination_delay_between_instances.is_none() {
         let cluster = Cluster::try_from_cluster_args(cluster_args)
             .await
@@ -173,6 +174,8 @@ pub async fn emit_transactions_with_cluster(
     if !cluster.coin_source_is_root {
         emit_job_request = emit_job_request.prompt_before_spending();
     }
+
+    println!("Start emitting....");
     let stats = emitter
         .emit_txn_for_with_stats(
             &mut coin_source_account,

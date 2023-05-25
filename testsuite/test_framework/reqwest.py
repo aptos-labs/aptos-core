@@ -8,12 +8,12 @@ import logging
 
 
 class HttpClient:
-    def get(self, url: str, headers: dict = None) -> requests.Response:
+    def get(self, url: str, headers: dict = {}) -> requests.Response:
         raise NotImplementedError()
 
 
-class SimpleHttpClient:
+class SimpleHttpClient(HttpClient):
     logger: logging.Logger = logging.getLogger("")
 
-    def get(self, url: str, headers: dict = None) -> requests.Response:
+    def get(self, url: str, headers: dict = {}) -> requests.Response:
         return requests.get(url, headers=headers)

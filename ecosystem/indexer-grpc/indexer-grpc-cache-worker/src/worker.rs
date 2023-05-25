@@ -21,12 +21,10 @@ use aptos_protos::internal::fullnode::v1::{
 };
 use futures::{self, StreamExt};
 use prost::Message;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 type ChainID = u32;
 type StartingVersion = u64;
-
-const WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS: u64 = 60;
 
 pub struct Worker {
     /// Redis client.
@@ -103,22 +101,12 @@ impl Worker {
             };
 
             file_store_operator.verify_storage_bucket_existence().await;
-            let mut starting_version = 0;
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            let starting_version = file_store_operator
+                .get_starting_version()
+                .await
+                .unwrap_or(0);
 
-            if let Some(metadata) = file_store_metadata {
-                info!("[Indexer Cache] File store metadata: {:?}", metadata);
-                starting_version = metadata.version;
-            } else {
-                error!("[Indexer Cache] File store is empty. Exit after 1 minute.");
-                tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS,
-                    ))
-                    .await;
-                    std::process::exit(1);
-                });
-            }
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
             // 2. Start streaming RPC.
             let request = tonic::Request::new(GetTransactionsFromNodeRequest {
@@ -294,7 +282,7 @@ async fn process_streaming_response(
                     PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
                     LATEST_PROCESSED_VERSION.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    info!(
+                    debug!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] Data chunk received.",
@@ -312,7 +300,7 @@ async fn process_streaming_response(
                     start_version,
                     num_of_transactions,
                 } => {
-                    info!(
+                    debug!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] End signal received for current batch.",
@@ -333,7 +321,7 @@ async fn process_streaming_response(
                         .await
                         .unwrap();
                     transaction_count = 0;
-                    info!(
+                    debug!(
                         current_version = current_version,
                         chain_id = fullnode_chain_id,
                         tps = (tps_calculator.avg() * 1000.0) as u64,
