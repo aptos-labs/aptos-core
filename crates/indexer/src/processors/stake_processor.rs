@@ -269,13 +269,7 @@ fn insert_delegator_pool_balances(
             diesel::insert_into(schema::delegated_staking_pool_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, staking_pool_address))
-                .do_update()
-                .set((
-                    inserted_at.eq(excluded(inserted_at)),
-                    operator_commission_percentage.eq(excluded(operator_commission_percentage)),
-                    inactive_table_handle.eq(excluded(inactive_table_handle)),
-                    active_table_handle.eq(excluded(active_table_handle)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
