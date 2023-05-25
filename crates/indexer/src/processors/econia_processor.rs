@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
+use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable, coin::Coin};
 use econia_types::{
     book::{OrderBook, PriceLevelWithId},
     events::{MakerEvent, TakerEvent},
@@ -36,8 +36,6 @@ use redis::Commands;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-
-use super::coin_processor::insert_coin_infos;
 
 pub const NAME: &str = "econia_processor";
 
@@ -495,7 +493,7 @@ impl EconiaTransactionProcessor {
         &self,
         start_version: u64,
         end_version: u64,
-        coin_infos: Vec<CoinInfo>,
+        coins: Vec<Coin>,
         events: Vec<EventModel>,
         block_to_time: HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<ProcessingResult, Error> {
@@ -506,18 +504,18 @@ impl EconiaTransactionProcessor {
             "Inserting to db",
         );
         if self
-            .insert_data(&coin_infos, &events, &block_to_time)
+            .insert_data(&coins, &events, &block_to_time)
             .is_err()
         {
             let events = clean_data_for_db(events, true);
-            self.insert_data(&coin_infos, &events, &block_to_time)?;
+            self.insert_data(&coins, &events, &block_to_time)?;
         }
         Ok(ProcessingResult::new(NAME, start_version, end_version))
     }
 
     fn insert_data(
         &self,
-        coin_infos: &[CoinInfo],
+        coins: &[Coin],
         events: &[EventModel],
         block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<(), Error> {
@@ -525,11 +523,19 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                insert_coin_infos(pg_conn, coin_infos)?;
+                // self.insert_coins(pg_conn, coins)?;
                 self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
         Ok(())
+    }
+
+    fn insert_coins(
+        &self,
+        conn: &mut PgConnection,
+        coins: &[Coin],
+    ) -> Result<(), Error> {
+        todo!()
     }
 
     fn insert_events(
@@ -769,6 +775,20 @@ fn get_next_block_time<'a>(
     }
 }
 
+fn coin_info_to_coin(
+    info: CoinInfo,
+) -> Coin {
+    let mut split_type = info.coin_type.splitn(3, "::").map(|s| s.to_string()).collect::<Vec<String>>();
+    Coin {
+        account_address: std::mem::take(split_type.get_mut(0).unwrap()),
+        module_name: std::mem::take(split_type.get_mut(1).unwrap()),
+        struct_name: std::mem::take(split_type.get_mut(2).unwrap()),
+        symbol: info.symbol,
+        name: info.name,
+        decimals: info.decimals.try_into().unwrap()
+    }
+}
+
 #[async_trait]
 impl TransactionProcessor for EconiaTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -795,7 +815,8 @@ impl TransactionProcessor for EconiaTransactionProcessor {
                 all_coin_infos.entry(key).or_insert(value);
             }
         }
-        let all_coin_infos = all_coin_infos.into_values().collect::<Vec<CoinInfo>>();
+
+        let all_coins = all_coin_infos.into_values().map(coin_info_to_coin).collect::<Vec<Coin>>();
 
         let (_, details, events, _, _) = TransactionModel::from_transactions(&transactions);
         let mut details_iter = details.iter();
@@ -822,7 +843,7 @@ impl TransactionProcessor for EconiaTransactionProcessor {
         self.insert_to_db(
             start_version,
             end_version,
-            all_coin_infos,
+            all_coins,
             filtered_events,
             block_to_time,
         )
