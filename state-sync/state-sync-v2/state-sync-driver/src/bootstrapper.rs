@@ -333,9 +333,10 @@ impl<
         storage_synchronizer: StorageSyncer,
     ) -> Self {
         // Load the latest epoch state from storage
-        let latest_epoch_state = utils::fetch_latest_epoch_state(storage.clone())
-            .expect("Unable to fetch latest epoch state!");
-        let verified_epoch_states = VerifiedEpochStates::new(latest_epoch_state);
+        // TODO(bowu): special handling for fast_sync when the DB is empty
+        // let latest_epoch_state = utils::fetch_latest_epoch_state(storage.clone()).expect("Unable to fetch latest epoch state!");
+        // let verified_epoch_states = VerifiedEpochStates::new(latest_epoch_state);
+        let verified_epoch_states = VerifiedEpochStates::new(EpochState::empty());
 
         Self {
             state_value_syncer: StateValueSyncer::new(),
@@ -450,6 +451,7 @@ impl<
     ) -> Result<(), Error> {
         // Reset the chunk executor to flush any invalid state currently held in-memory
         self.storage_synchronizer.reset_chunk_executor()?;
+        //TODO(bowu): Having a special logic to bootstrap with a snapshot before any syncing
 
         // Always fetch the new epoch ending ledger infos first
         if self.should_fetch_epoch_ending_ledger_infos() {
@@ -478,6 +480,7 @@ impl<
         // Bootstrap according to the mode
         match self.get_bootstrapping_mode() {
             BootstrappingMode::DownloadLatestStates => {
+                // TODO(bowu): here is where we start doing fast sync
                 self.fetch_missing_state_snapshot_data(
                     highest_synced_version,
                     highest_known_ledger_info,
@@ -676,6 +679,7 @@ impl<
             // Fetch the missing state values
             self.state_value_syncer
                 .update_next_state_index_to_process(next_state_index_to_process);
+            //TODO(bowu): get state values
             self.streaming_client
                 .get_all_state_values(
                     target_ledger_info_version,

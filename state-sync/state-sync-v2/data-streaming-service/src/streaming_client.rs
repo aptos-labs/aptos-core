@@ -345,6 +345,7 @@ impl DataStreamingClient for StreamingServiceClient {
             version,
             start_index,
         });
+        //TODO(bowu): actual place fetching the data
         self.send_request_and_await_response(client_request).await
     }
 

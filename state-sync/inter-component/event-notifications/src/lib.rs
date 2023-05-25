@@ -258,6 +258,14 @@ impl EventSubscriptionService {
         Ok(())
     }
 
+    /// This notify the genesis validator sets when the DB is empty.
+    pub fn notify_initial_validator_set_from_genesis(&mut self, config: OnChainConfigPayload) -> Result<(), Error> {
+        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
+            reconfig_subscription.notify_subscriber_of_configs(0, config.clone())?;
+        }
+        Ok(())
+    }
+
     /// Fetches the configs on-chain at the specified version.
     /// Note: We cannot assume that all configs will exist on-chain. As such, we
     /// must fetch each resource one at a time. Reconfig subscribers must be able

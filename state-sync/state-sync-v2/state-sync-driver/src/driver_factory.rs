@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashMap;
 use crate::{
     driver::{DriverConfiguration, StateSyncDriver},
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
@@ -26,6 +27,8 @@ use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use futures::{channel::mpsc, executor::block_on};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
+use aptos_logger::info;
+use aptos_types::on_chain_config::OnChainConfigPayload;
 
 /// Creates a new state sync driver and client
 pub struct DriverFactory {
@@ -57,6 +60,7 @@ impl DriverFactory {
         match (&*storage.reader).fetch_latest_state_checkpoint_version() {
             Ok(synced_version) => {
                 if let Err(error) =
+                    // TODO(bowu): notify the on-chain config, This also notify the subscribers of the validator sets
                     event_subscription_service.notify_initial_configs(synced_version)
                 {
                     panic!(
@@ -65,7 +69,16 @@ impl DriverFactory {
                     )
                 }
             },
-            Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
+            Err(error) => {
+                    // TODO(bowu): check if there is anything to notify if the nothing in the storage
+                    // pass the initial validator set to the node for state sync
+                    // put in some dummy config
+                    let config = OnChainConfigPayload::new(0, Arc::new(HashMap::new()));
+
+                    if let Err(err) = event_subscription_service.notify_initial_validator_set_from_genesis(config) {
+                        panic!("Failed to fetch the initial synced version: {:?}", error);
+                    }
+            },
         }
 
         // Create the notification handlers
@@ -95,6 +108,8 @@ impl DriverFactory {
 
         // Create the storage synchronizer
         let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));
+
+        // TODO(bowu): also use the ess to notify the reconfiguration events
         let (storage_synchronizer, _, _) = StorageSynchronizer::new(
             node_config.state_sync.state_sync_driver,
             chunk_executor,
@@ -115,6 +130,7 @@ impl DriverFactory {
         );
 
         // Create the state sync driver
+        //TODO(bowu): similarly used for handling the txn commit reconfiguration events
         let state_sync_driver = StateSyncDriver::new(
             client_notification_listener,
             commit_notification_listener,
@@ -132,6 +148,7 @@ impl DriverFactory {
         );
 
         // Spawn the driver
+        // TODO(bowu): this is where state-sync start kicking in
         if let Some(driver_runtime) = &driver_runtime {
             driver_runtime.spawn(state_sync_driver.start_driver());
         } else {

@@ -205,6 +205,7 @@ impl<
         );
 
         // Spawn the committer that commits executed (but pending) chunks
+        // TODO(bowu): also try to notify the reconfiguration event
         let committer_handle = spawn_committer(
             chunk_executor.clone(),
             committer_listener,
@@ -216,9 +217,11 @@ impl<
             storage.reader.clone(),
         );
 
-        // Initialize the metric gauges
+        // TODO(bowu): Initialize the metric gauges after bootstrap.
+        /*
         utils::initialize_sync_gauges(storage.reader.clone())
             .expect("Failed to initialize the metric gauges!");
+         */
 
         let storage_synchronizer = Self {
             chunk_executor,

@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
+use aptos_config::config::NodeConfig;
 use aptos_db::AptosDB;
-use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_types::waypoint::Waypoint;
-use aptos_vm::AptosVM;
 use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
+use aptos_config::utils::get_genesis_txn;
+use aptos_executor::db_bootstrapper::maybe_bootstrap;
+use aptos_vm::AptosVM;
 
 #[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn bootstrap_db(
@@ -110,14 +111,19 @@ pub fn initialize_database_and_checkpoints(
         bootstrap_db(aptos_db, node_config.storage.backup_service_address);
 
     // TODO: handle non-genesis waypoints for state sync!
+    // TODO(bowu): not applying genesis txn for now, only apply genesis txn if we want to apply txn continuously
     // If there's a genesis txn and waypoint, commit it if the result matches.
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
+    // if the boostrap mode is download, we directly restore DB from the latest snapshot
+    // TODO(bowu): genesis txn applied here
+
     if let Some(genesis) = get_genesis_txn(node_config) {
         maybe_bootstrap::<AptosVM>(&db_rw, genesis, genesis_waypoint)
             .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
     } else {
         info!("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
     }
+
 
     // Log the duration to open storage
     debug!(

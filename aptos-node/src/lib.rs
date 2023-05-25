@@ -18,14 +18,22 @@ mod tests;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, NetworkConfig, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{
+    access_path::AccessPath,
+    account_config::{ChainIdResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
+    state_store::state_key::StateKey,
+    transaction::{Transaction::GenesisTransaction, WriteSetPayload::Direct},
+    write_set::TransactionWrite,
+};
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::FromHex;
+use move_core_types::move_resource::MoveResource;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fs,
@@ -38,6 +46,8 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
+use aptos_config::utils::get_genesis_txn;
+use aptos_types::on_chain_config::{access_path_for_config, OnChainConfig, ValidatorSet};
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -459,7 +469,6 @@ pub fn setup_environment_and_start_node(
     // Start the node inspection service
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
-
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -468,7 +477,51 @@ pub fn setup_environment_and_start_node(
     utils::set_aptos_vm_configurations(&node_config);
 
     // Obtain the chain_id from the DB
-    let chain_id = utils::fetch_chain_id(&db_rw)?;
+    // TODO(bowu): place referring to DB
+    // let chain_id = utils::fetch_chain_id(&db_rw)?;
+    let mut chain_id = ChainId::default();
+    if let Some(GenesisTransaction(Direct(changeset))) = get_genesis_txn(&node_config) {
+        let ws = changeset.write_set().clone();
+        let chain_id_key = StateKey::access_path(AccessPath::new(
+            CORE_CODE_ADDRESS,
+            ChainIdResource::resource_path(),
+        ));
+        chain_id = ws.clone()
+            .into_mut()
+            .get(&chain_id_key)
+            .unwrap()
+            .as_state_value()
+            .map(|sv| {
+                let bytes = sv.into_bytes();
+                bcs::from_bytes::<ChainId>(&bytes)
+            })
+            .transpose()?
+            .ok_or_else(|| anyhow!("ChainId not found in genesis block"))?;
+        // TODO(bowu): overwrite the peer id fields of node config if the fast sync in enabled
+        let validator_config_key = StateKey::access_path(access_path_for_config(ValidatorSet::CONFIG_ID)?);
+        let genesis_validators = ws
+            .into_mut()
+            .get(&validator_config_key)
+            .unwrap()
+            .as_state_value()
+            .map(|sv| {
+                let bytes = sv.into_bytes();
+                bcs::from_bytes::<ValidatorSet>(&bytes)
+            })
+            .transpose()?
+            .ok_or_else(|| anyhow!("ChainId not found in genesis block"))?;
+
+
+        for validator in genesis_validators {
+            peers_and_metadata.insert_connection_metadata(
+                validator.account_address(),
+                ConnectionMetadata::new(validator.config().validator_network_address.clone()),
+            );
+        }
+    };
+
+
+
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
@@ -482,6 +535,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Create an event subscription service (and reconfig subscriptions for consensus and mempool)
+    // TODO(bowu): event_subscription_service read on-chain config from DB
     let (
         mut event_subscription_service,
         mempool_reconfig_subscription,
@@ -489,6 +543,7 @@ pub fn setup_environment_and_start_node(
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
+    // TODO(bowu): network build uses the peer_id from on-chain config in event_subscription_service
     let (
         network_runtimes,
         consensus_network_interfaces,
@@ -498,18 +553,12 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
-        peers_and_metadata,
+        peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
-
-    // Start the peer monitoring service
-    let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
-        &node_config,
-        peer_monitoring_service_network_interfaces,
-        db_rw.reader.clone(),
-    );
-
+    info!("bowu gets here 1 peers {:?}", peers_and_metadata.clone().get_all_peers());
     // Start state sync and get the notification endpoints for mempool and consensus
+    // TODO(bowu): use state_sync
     let (state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
@@ -518,6 +567,15 @@ pub fn setup_environment_and_start_node(
             event_subscription_service,
             db_rw.clone(),
         )?;
+
+    // Start the peer monitoring service
+    // TODO(bowu): DB is used to find the node info, not related to genesis's information https://github.com/aptos-labs/aptos-core/blob/82760ef8a432e1ef7ca33343497134c04bc0a89d/network/peer-monitoring-service/server/src/lib.rs#L269
+    // can we put an empty DB here?
+    let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
+        &node_config,
+        peer_monitoring_service_network_interfaces,
+        db_rw.reader.clone(),
+    );
 
     // Bootstrap the API and indexer
     let (mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc_runtime) =

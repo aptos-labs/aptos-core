@@ -64,6 +64,7 @@ fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 maplit = { workspace = true }
+move-core-types = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

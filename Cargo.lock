@@ -2345,6 +2345,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "maplit",
+ "move-core-types",
  "rand 0.7.3",
  "rayon",
  "serde 1.0.149",

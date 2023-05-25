@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_single_node_test_config, network};
+use crate::{create_single_node_test_config, network, start};
 use aptos_config::config::{NodeConfig, WaypointConfig};
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::RwLock;
@@ -11,6 +11,7 @@ use aptos_types::{
     chain_id::ChainId, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use std::{fs, sync::Arc};
+use aptos_logger::info;
 
 /// A mock database implementing DbReader and DbWriter
 pub struct MockDatabase;
@@ -103,4 +104,13 @@ fn test_create_single_node_test_config() {
             .state_sync_driver
             .bootstrapping_mode
     );
+}
+
+#[test]
+fn test_node_starts() {
+    let test_dir = TempPath::new().as_ref().to_path_buf();
+    info!("test_dir: {:?}", test_dir);
+    let mut node_config = NodeConfig::load_from_path("/opt/aptos/fullnode.yaml").unwrap();
+    node_config.set_data_dir(test_dir);
+    start(node_config, None, true).expect("Node should start correctly");
 }
