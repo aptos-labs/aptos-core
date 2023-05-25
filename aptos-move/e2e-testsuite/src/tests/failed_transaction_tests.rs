@@ -105,3 +105,69 @@ fn non_existent_sender() {
         Err(StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST),
     );
 }
+
+#[test]
+fn block_with_duplicates() {
+    let mut executor = FakeExecutor::from_head_genesis();
+
+    // create and publish a sender with 3_000_000 coins and a receiver with 3_000_000 coins
+    let sender = executor.create_raw_account_data(3_000_000, 10);
+    let receiver = executor.create_raw_account_data(3_000_000, 10);
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    let transfer_amount = 1_000;
+
+    let txns: Vec<_> = vec![
+        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 12, transfer_amount, 0),
+    ];
+    let txns_len = txns.len();
+    let output = executor.execute_block(txns).unwrap();
+    assert_eq!(output.len(), txns_len);
+    assert!(!output[0].status().is_discarded());
+    assert!(!output[1].status().is_discarded());
+    assert!(output[2].status().is_discarded());
+    assert!(output[3].status().is_discarded());
+    assert!(!output[4].status().is_discarded());
+}
+
+#[test]
+fn block_with_bad_txn_and_repeated_sequence_number() {
+    let mut executor = FakeExecutor::from_head_genesis();
+
+    // create and publish a sender with 3_000_000 coins and a receiver with 3_000_000 coins
+    let sender = executor.create_raw_account_data(3_000_000, 10);
+    let receiver = executor.create_raw_account_data(3_000_000, 10);
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    let transfer_amount = 1_000;
+
+    let raw_txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0)
+        .into_raw_transaction();
+    let bad_signer = receiver.account().clone();
+    let bad_txn = raw_txn
+        .sign(&bad_signer.privkey, bad_signer.pubkey)
+        .unwrap()
+        .into_inner();
+
+    let txns: Vec<_> = vec![
+        bad_txn,
+        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0),
+        peer_to_peer_txn(sender.account(), receiver.account(), 11, transfer_amount, 0),
+    ];
+    let txns_len = txns.len();
+    let output = executor.execute_block(txns).unwrap();
+    assert_eq!(output.len(), txns_len);
+    assert!(output[0].status().is_discarded());
+    // The previous bad transaction should not result in the good transaction being discarded
+    assert!(!output[1].status().is_discarded());
+    // The good transaction repeated should be discarded
+    assert!(output[2].status().is_discarded());
+    assert!(!output[3].status().is_discarded());
+}
