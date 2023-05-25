@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import { AnyNumber } from "../bcs/types";
-import { HexString, MaybeHexString } from "../utils";
+import { HexString, MaybeHexString, getCustomRequestHeader } from "../utils";
 import {
   GetAccountTokensCountQuery,
   GetAccountCoinsDataQuery,
@@ -40,7 +40,6 @@ import {
   GetTokenOwnedFromCollection,
   GetCollectionData,
 } from "../indexer/generated/queries";
-import { getCustomRequestHeader } from "../utils";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.

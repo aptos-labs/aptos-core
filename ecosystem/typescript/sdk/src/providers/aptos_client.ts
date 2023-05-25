@@ -13,6 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
+  getCustomRequestHeader,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -35,7 +36,6 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
-import { getCustomRequestHeader } from "../utils";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
