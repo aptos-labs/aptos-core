@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::{models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable, coin::Coin}, register_market};
+use econia_db::{models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable, coin::Coin}, register_market, create_coin};
 use econia_types::{
     book::{OrderBook, PriceLevelWithId},
     events::{MakerEvent, TakerEvent},
@@ -523,7 +523,7 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
-                // self.insert_coins(pg_conn, coins)?;
+                self.insert_coins(pg_conn, coins)?;
                 self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
@@ -535,13 +535,17 @@ impl EconiaTransactionProcessor {
         conn: &mut PgConnection,
         coins: &[Coin],
     ) -> Result<(), Error> {
-        todo!()
+        for c in coins.iter() {
+            let insertable = c.into_insertable();
+            create_coin(conn, &insertable).unwrap();
+        }
+        Ok(())
     }
 
     fn insert_events(
         &self,
         conn: &mut PgConnection,
-        ev: &[EventModel],
+        events: &[EventModel],
         block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<(), Error> {
         let mut maker = vec![];
@@ -549,14 +553,14 @@ impl EconiaTransactionProcessor {
         let mut market_registration = vec![];
         let mut recognized_market = vec![];
 
-        for e in ev.iter() {
+        for event in events.iter() {
             let current_time = block_to_time
-                .get(&e.transaction_block_height)
+                .get(&event.transaction_block_height)
                 .expect("block height not found in block_to_time map");
 
             let utc_time = chrono::TimeZone::from_utc_datetime(&Utc, current_time);
 
-            let mut event_wrapper = serde_json::from_value::<Value>(e.data.clone())
+            let mut event_wrapper = serde_json::from_value::<Value>(event.data.clone())
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
             let obj_map = event_wrapper.as_object_mut().unwrap();
             obj_map.insert("time".to_string(), json!(utc_time));
@@ -644,13 +648,9 @@ impl EconiaTransactionProcessor {
         conn: &mut PgConnection,
         ev: Vec<MarketRegistrationEvent>,
     ) -> Result<(), Error> {
-        let ev = ev
-            .into_iter()
-            .map(models::market::MarketRegistrationEvent::from)
-            .collect::<Vec<_>>();
-        
-        for e in ev.iter() {
-            let insertable = e.into_insertable();
+        for e in ev.into_iter() {
+            let model = models::market::MarketRegistrationEvent::from(e);
+            let insertable = model.into_insertable();
             register_market(conn, &insertable).unwrap();
         }
         // let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
