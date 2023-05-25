@@ -226,19 +226,6 @@ def find_forge_cluster(
     return clusters[name].set_kubeconf(kubeconf)
 
 
-def find_forge_cluster(
-    shell: Shell, cloud: Cloud, name: str, kubeconf: str
-) -> ForgeCluster:
-    clusters: Dict[str, ForgeCluster] = {}
-    if cloud == Cloud.AWS:
-        clusters = list_eks_clusters(shell)
-    else:
-        clusters = list_gke_clusters(shell)
-    if name not in clusters:
-        raise Exception(f"Cluster {name} not found")
-    return clusters[name].set_kubeconf(kubeconf)
-
-
 @dataclass
 class ForgeJob:
     name: str
