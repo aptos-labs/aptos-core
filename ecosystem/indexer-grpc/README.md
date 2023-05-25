@@ -9,7 +9,7 @@ In production, Indexer GRPC currently requires access to a GCS bucket for cold s
 
 ### Requirements
 
-* Redis with at least 50 GB of memory.
+* Redis with at least 75 GB of memory.
 * If using the GCS File Operator, you also need Google Cloud Storage with one bucket and one service account JSON, which should be assigned as `Object Owner` and `Bucket Owner`.
   * `Object Owner` is to raed and write to each file.
   * `Bucket Owner` is to verify the bucket existence.

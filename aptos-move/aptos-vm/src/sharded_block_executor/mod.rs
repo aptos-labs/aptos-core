@@ -56,6 +56,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             command_txs.push(transactions_tx);
             result_rxs.push(result_rx);
             shard_join_handles.push(spawn_executor_shard(
+                num_executor_shards,
                 i,
                 executor_threads_per_shard,
                 transactions_rx,
@@ -129,6 +130,7 @@ impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
 }
 
 fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
+    num_executor_shards: usize,
     shard_id: usize,
     concurrency_level: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
@@ -140,6 +142,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
         .name(format!("executor-shard-{}", shard_id))
         .spawn(move || {
             let executor_shard = ExecutorShard::new(
+                num_executor_shards,
                 shard_id,
                 concurrency_level,
                 command_rx,
