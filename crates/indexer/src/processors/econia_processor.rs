@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable, coin::Coin};
+use econia_db::{models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable, coin::Coin}, register_market};
 use econia_types::{
     book::{OrderBook, PriceLevelWithId},
     events::{MakerEvent, TakerEvent},
@@ -581,14 +581,13 @@ impl EconiaTransactionProcessor {
             }
         }
 
-        self.insert_maker_events(conn, maker)?;
-        self.insert_taker_events(conn, taker)?;
-
         // update markets cache
-        self.insert_markets_in_cache(&market_registration);
-
+        // self.insert_markets_in_cache(&market_registration);
         self.insert_market_registration_events(conn, market_registration)?;
-        self.insert_recognized_market_events(conn, recognized_market)?;
+        // self.insert_recognized_market_events(conn, recognized_market)?;
+        // self.insert_maker_events(conn, maker)?;
+        // self.insert_taker_events(conn, taker)?;
+
         Ok(())
     }
 
@@ -649,21 +648,26 @@ impl EconiaTransactionProcessor {
             .into_iter()
             .map(models::market::MarketRegistrationEvent::from)
             .collect::<Vec<_>>();
-        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
-        let chunks = get_chunks(
-            ev.len(),
-            models::market::NewMarketRegistrationEvent::field_count(),
-        );
-        let table = econia_db::schema::market_registration_events::table;
-        for (start_ind, end_ind) in chunks {
-            execute_with_better_error(
-                conn,
-                diesel::insert_into(table)
-                    .values(&insertable[start_ind..end_ind])
-                    .on_conflict_do_nothing(),
-                None,
-            )?;
+        
+        for e in ev.iter() {
+            let insertable = e.into_insertable();
+            register_market(conn, &insertable).unwrap();
         }
+        // let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
+        // let chunks = get_chunks(
+        //     ev.len(),
+        //     models::market::NewMarketRegistrationEvent::field_count(),
+        // );
+        // let table = econia_db::schema::market_registration_events::table;
+        // for (start_ind, end_ind) in chunks {
+        //     execute_with_better_error(
+        //         conn,
+        //         diesel::insert_into(table)
+        //             .values(&insertable[start_ind..end_ind])
+        //             .on_conflict_do_nothing(),
+        //         None,
+        //     )?;
+        // }
         Ok(())
     }
 
