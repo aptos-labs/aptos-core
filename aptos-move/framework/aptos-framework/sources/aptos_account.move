@@ -81,7 +81,7 @@ module aptos_framework::aptos_account {
                 assume amounts[i] == 0;
             };
             i = i + 1;
-        };   
+        };
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
