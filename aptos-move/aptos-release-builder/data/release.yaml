@@ -5,7 +5,7 @@ proposals:
   - name: upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, quorum store, and transaction shuffling will be enabled in separate proposals."
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, and transaction shuffling will be enabled in separate proposals."
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
@@ -23,30 +23,6 @@ proposals:
         enabled:
           - cryptography_algebra_natives
           - bls12381_structures
-  - name: enable_quorum_store
-    metadata:
-      title: "Enable Quorum Store"
-      description: "AIP-26: Quorum Store is a production-optimized implementation of Narwhal [1], that improves consensus throughput."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/108"
-    execution_mode: MultiStep
-    update_sequence:
-    - Consensus:
-        V2:
-          decoupled_execution: true
-          back_pressure_limit: 10
-          exclude_round: 40
-          proposer_election_type:
-            leader_reputation:
-              proposer_and_voter_v2:
-                active_weight: 1000
-                inactive_weight: 10
-                failed_weight: 1
-                failure_threshold_percent: 10
-                proposer_window_num_validators_multiplier: 10
-                voter_window_num_validators_multiplier: 1
-                weight_by_voting_power: true
-                use_history_from_previous_epoch_max_count: 5
-          max_failed_authors_to_store: 10
   - name: enable_charge_invariant_violation
     metadata:
       title: "Enable charge_invariant_violation"
