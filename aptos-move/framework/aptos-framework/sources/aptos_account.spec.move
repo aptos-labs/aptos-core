@@ -1,6 +1,6 @@
 spec aptos_framework::aptos_account {
     spec module {
-        pragma verify = true;
+        pragma verify=true;
         pragma aborts_if_is_strict;
     }
 
@@ -28,6 +28,32 @@ spec aptos_framework::aptos_account {
 
     spec transfer(source: &signer, to: address, amount: u64) {
         pragma verify = false;
+        
+        let account_addr_source = signer::address_of(source);
+        let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
+        let balance_source = coin_store_source.coin.value;
+        let coin_store_to = global<coin::CoinStore<AptosCoin>>(to);
+
+        //The 'from' addr is implictly not equal to 'to' addr
+        requires account_addr_source != to;
+
+        //Create account properties
+        aborts_if !account::exists_at(to) && length_judgment(to);
+        aborts_if !account::exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
+
+        //coin::withdraw properties
+        aborts_if !exists<coin::CoinStore<AptosCoin>>(account_addr_source);
+        aborts_if coin_store_source.frozen;
+        aborts_if balance_source < amount;
+
+        //Guid properties
+        let acc = global<account::Account>(to);
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<AptosCoin>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<AptosCoin>>(to) && acc.guid_creation_num + 2 > MAX_U64;
+
+        //coin::deposit properties
+        aborts_if exists<coin::CoinStore<AptosCoin>>(to) && global<coin::CoinStore<AptosCoin>>(to).frozen;
+
     }
 
     spec assert_account_exists(addr: address) {
@@ -47,8 +73,47 @@ spec aptos_framework::aptos_account {
     }
 
     spec batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        pragma verify=true;
+        let account_addr_source = signer::address_of(source);
+        let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
+        let balance_source = coin_store_source.coin.value;
+
+        requires forall i in 0..len(recipients):
+            recipients[i] != account_addr_source;
+
+        requires exists i in 0..len(recipients):
+            amounts[i] > 0;
+
+        aborts_if len(recipients) != len(amounts);
+
+        aborts_if exists i in 0..len(recipients):
+                !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+                
+        aborts_if exists i in 0..len(recipients):
+                !account::exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
+
+        ensures forall i in 0..len(recipients):
+                (!account::exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
+                    (!account::exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
+
+        //coin::withdraw properties
+        aborts_if exists i in 0..len(recipients):
+            !exists<coin::CoinStore<AptosCoin>>(account_addr_source);
+        aborts_if exists i in 0..len(recipients):
+            coin_store_source.frozen;
+        aborts_if exists i in 0..len(recipients):
+            global<coin::CoinStore<AptosCoin>>(account_addr_source).coin.value < amounts[i];
+
+        // deposit properties
+        aborts_if exists i in 0..len(recipients): 
+            exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<coin::CoinStore<AptosCoin>>(recipients[i]).frozen;
+
+        // guid properties
+        aborts_if exists i in 0..len(recipients):  
+            account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if exists i in 0..len(recipients):  
+            account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+
     }
 
     spec can_receive_direct_coin_transfers(account: address): bool {
@@ -60,17 +125,121 @@ spec aptos_framework::aptos_account {
     }
 
     spec batch_transfer_coins<CoinType>(from: &signer, recipients: vector<address>, amounts: vector<u64>) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        use aptos_std::type_info;
+        pragma verify=true;
+        let account_addr_source = signer::address_of(from);
+        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        let balance_source = coin_store_source.coin.value;
+
+        requires forall i in 0..len(recipients):
+            recipients[i] != account_addr_source;
+
+        requires exists i in 0..len(recipients):
+            amounts[i] > 0;
+
+        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // meanwhile, aptoscoin has already been proved in normal tranfer
+        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+
+        aborts_if len(recipients) != len(amounts);
+
+        aborts_if exists i in 0..len(recipients):
+                !account::exists_at(recipients[i]) && length_judgment(recipients[i]);
+                
+        aborts_if exists i in 0..len(recipients):
+                !account::exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
+
+        ensures forall i in 0..len(recipients):
+                (!account::exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
+                    (!account::exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
+
+        //coin::withdraw properties
+        aborts_if exists i in 0..len(recipients):
+            !exists<coin::CoinStore<CoinType>>(account_addr_source);
+        aborts_if exists i in 0..len(recipients):
+            coin_store_source.frozen;
+        aborts_if exists i in 0..len(recipients):
+            global<coin::CoinStore<CoinType>>(account_addr_source).coin.value < amounts[i];
+
+        // deposit properties
+        aborts_if exists i in 0..len(recipients): 
+            exists<coin::CoinStore<CoinType>>(recipients[i]) && global<coin::CoinStore<CoinType>>(recipients[i]).frozen;
+
+        // guid properties
+        aborts_if exists i in 0..len(recipients):  
+            account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if exists i in 0..len(recipients):  
+            account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
+
+        // register_coin properties
+        aborts_if exists i in 0..len(recipients):  
+            !coin::is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
+        aborts_if exists i in 0..len(recipients):  
+            !coin::is_account_registered<CoinType>(recipients[i]) && !can_receive_direct_coin_transfers(recipients[i]);
+
     }
 
     spec deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        use aptos_std::type_info;
+        pragma verify=true;
+
+        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // meanwhile, aptoscoin has already been proved in normal tranfer
+        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+
+        // create_account AbortsIf
+        aborts_if !account::exists_at(to) && length_judgment(to);
+        aborts_if !account::exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
+  
+        // deposit properties
+        aborts_if exists<coin::CoinStore<CoinType>>(to) && global<coin::CoinStore<CoinType>>(to).frozen;
+
+        // guid properties
+        let acc = global<account::Account>(to);
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 > MAX_U64;
+
+        // register_coin properties
+        aborts_if !coin::is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();    
+        aborts_if !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
+
     }
 
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
-        // TODO: missing aborts_if spec
-        pragma verify=false;
+        use aptos_std::type_info;
+        pragma verify=true;
+
+        let account_addr_source = signer::address_of(from);
+        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
+        let balance_source = coin_store_source.coin.value;
+        let coin_store_to = global<coin::CoinStore<CoinType>>(to);
+
+        //The 'from' addr is implictly not equal to 'to' addr
+        requires account_addr_source != to;
+
+        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // meanwhile, aptoscoin has already been proved in normal tranfer
+        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+
+        // create_account AbortsIf
+        aborts_if !account::exists_at(to) && length_judgment(to);
+        aborts_if !account::exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
+  
+        // withdraw properties
+        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr_source);
+        aborts_if coin_store_source.frozen;
+        aborts_if balance_source < amount;
+
+        // deposit properties
+        aborts_if exists<coin::CoinStore<CoinType>>(to) && global<coin::CoinStore<CoinType>>(to).frozen;
+
+        // guid properties
+        let acc = global<account::Account>(to);
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if account::exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 > MAX_U64;
+
+        // register_coin properties
+        aborts_if !coin::is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();
+        aborts_if !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
     }
 }
