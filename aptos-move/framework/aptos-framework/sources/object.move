@@ -109,7 +109,7 @@ module aptos_framework::object {
     struct ConstructorRef has drop {
         self: address,
         /// Set to true so long as deleting the object is possible. For example, the object was
-        /// created via create_named_object.
+        /// created via create_object_from_guid.
         can_delete: bool,
     }
 
