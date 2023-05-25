@@ -19,7 +19,7 @@
 
 ## Creating a pull request
 
-You are welcome to create a pull reuqest against the main branch.
+You are welcome to create a pull request against the main branch.
 
 Before creating a PR,
 
@@ -42,7 +42,7 @@ This project keeps a changelog. If a pull request created needs to bump a packag
 
 To release a new version of the SDK do the following.
 
-1. Check that the commit you're deploying from (likely just the latest commit of `main`) is green ln CI. Go to GitHub and make sure there is a green tick, specifically for the `sdk-release` release CI step. This ensures that the all tests, formatters, and linters passed, including server / client compatibility tests (within that commit) and tests to ensure the API, API spec, and client were all generated and match up.
+1. Check that the commit you're deploying from (likely just the latest commit of `main`) is green in CI. Go to GitHub and make sure there is a green tick, specifically for the `sdk-release` release CI step. This ensures that the all tests, formatters, and linters passed, including server / client compatibility tests (within that commit) and tests to ensure the API, API spec, and client were all generated and match up.
 2. Bump the version in `package.json` according to [semver](https://semver.org/).
 3. Bump the version in `version.ts`.
 4. Add an entry in the CHANGELOG for the version. We adhere to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Generally this means changing the "Unreleased" section to a version and then making a new "Unreleased" section.
