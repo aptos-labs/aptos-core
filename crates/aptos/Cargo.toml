@@ -76,8 +76,6 @@ self_update = { version = "0.34.0", features = ["archive-zip", "compression-zip-
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-sha2 = { workspace = true }
-sha3 = { workspace = true }
 shadow-rs = { workspace = true }
 tempfile = { workspace = true }
 termcolor = { workspace = true }

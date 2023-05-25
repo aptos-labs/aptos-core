@@ -202,8 +202,6 @@ dependencies = [
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
- "sha2 0.9.9",
- "sha3 0.9.1",
  "shadow-rs",
  "tempfile",
  "termcolor",

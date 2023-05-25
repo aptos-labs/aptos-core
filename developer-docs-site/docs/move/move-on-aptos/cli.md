@@ -2,6 +2,8 @@
 title: "Aptos Move CLI"
 ---
 
+import CodeBlock from '@theme/CodeBlock';
+
 # Use the Aptos Move CLI
 
 The `aptos` tool is a command line interface (CLI) for developing on the Aptos blockchain, debugging, and for node operations. This document describes how to use the `aptos` CLI tool. To download or build the CLI, follow [Install Aptos CLI](../../tools/install-cli/index.md).
@@ -437,16 +439,104 @@ $ aptos move run --function-id default::message::set_message --args string:hello
 
 ## Arguments in JSON
 
-### Background
+### Package info
 
 This section references the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args), which contains the following manifest:
 
+import move_toml from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/Move.toml';
 
-```toml title="Move.toml"
-:!: static/move-examples/cli_args/Move.toml manifest
-```
+<CodeBlock language="toml" title="Move.toml">{move_toml}</CodeBlock>
 
 Here, the package is deployed under the named address `test_account`.
+
+:::tip
+Set your working directory to [`aptos-move/move-examples/cli_args`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args) to follow along:
+
+```bash
+cd <aptos-core-parent-directory>/aptos-core/aptos-move/move-examples/cli_args
+```
+:::
+
+### Deploying the package
+
+Start by mining a vanity address for Ace, who will deploy the package:
+
+
+```bash title=Command
+aptos key generate \
+    --vanity-prefix 0xace \
+    --output-file ace.key
+```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "PublicKey Path": "ace.key.pub",
+    "PrivateKey Path": "ace.key",
+    "Account Address:": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
+  }
+}
+```
+
+</details>
+
+:::tip
+The exact account address should vary for each run, though the vanity prefix should not.
+:::
+
+Store Ace's address in a shell variable so you can call it inline later on:
+
+```bash
+# Your exact address should vary
+ace_addr=0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2
+```
+
+Fund Ace's account with the faucet (either devnet or testnet):
+
+```bash title=Command
+aptos account fund-with-faucet --account $ace_addr
+```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": "Added 100000000 Octas to account ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
+}
+```
+
+</details>
+
+Now publish the package under Ace's account:
+
+```bash title=Command
+aptos move publish \
+    --named-addresses test_account=$ace_addr \
+    --private-key-file ace.key \
+    --assume-yes
+```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "transaction_hash": "0x78e53928ec853a1c34d0e44aa6dd0ecc8234bdc0ab3d0634da171a6ac5d1b23c",
+    "gas_used": 1294,
+    "gas_unit_price": 100,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 0,
+    "success": true,
+    "timestamp_us": 1684977028870268,
+    "version": 527676489,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+</details>
 
 ### Entry functions
 
@@ -464,40 +554,81 @@ A public entry function with multi-nested vectors can be used to set the fields:
 
 After the package has been published, `aptos move run` can be used to call `set_vals()`:
 
-```zsh title="Running function with nested vector arguments from CLI"
+:::tip
+To pass vectors (including nested vectors) as arguments from the command line, use JSON syntax escaped with quotes!
+:::
+
+```bash title="Running function with nested vector arguments from CLI"
 aptos move run \
-    --function-id <test_account>::cli_args::set_vals \
-    --private-key-file <test_account.key> \
+    --function-id $ace_addr::cli_args::set_vals \
     --type-args \
         0x1::account::Account \
         0x1::chain_id::ChainId \
     --args \
         u8:123 \
         "bool:[false, true, false, false]" \
-        'address:[["0xace", "0xbee"], ["0xcad"], []]'
+        'address:[["0xace", "0xbee"], ["0xcad"], []]' \
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
-:::tip
-To pass vectors (including nested vectors) as arguments from the command line, use JSON syntax escaped with quotes!
-:::
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "transaction_hash": "0x975e7026532aa6e14c97a27001efb2062c30a0c28e9a18b8b174333d88809c82",
+    "gas_used": 504,
+    "gas_unit_price": 100,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 1,
+    "success": true,
+    "timestamp_us": 1684977491248278,
+    "version": 527679877,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+</details>
 
 The function ID, type arguments, and arguments can alternatively be specified in a JSON file:
 
-import CodeBlock from '@theme/CodeBlock';
 import entry_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/entry_function_arguments.json';
 
 <CodeBlock language="json" title="entry_function_arguments.json">{entry_json_file}</CodeBlock>
 
 Here, the call to `aptos move run` looks like:
 
-```zsh
+```bash title="Running function with JSON input file"
 aptos move run \
-    --private-key-file <test_account.key> \
-    --json-file entry_function_arguments.json
+    --json-file entry_function_arguments.json \
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "transaction_hash": "0x44349fb8c8a78598f3f6af50177ee232228581a3dcc04220cbb2c91ec0e01a73",
+    "gas_used": 3,
+    "gas_unit_price": 100,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 2,
+    "success": true,
+    "timestamp_us": 1684977758608985,
+    "version": 527681864,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+</details>
+
 :::tip
-If you are trying to run the example yourself don't forget to substitute `<test_account>` with an appropriate address in the JSON file from the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args)!
+If you are trying to run the example yourself don't forget to substitute Ace's actual address for `<test_account>` in `entry_function_arguments.json`!
 :::
 
 ### View functions
@@ -510,45 +641,51 @@ Once the values in a `Holder` have been set, the `reveal()` view function can be
 
 This view function can be called with arguments specified either from the CLI or from a JSON file:
 
-```zsh title="Arguments via CLI"
+```bash title="Arguments via CLI"
 aptos move view \
-    --function-id <test_account>::cli_args::reveal \
+    --function-id $ace_addr::cli_args::reveal \
     --type-args \
         0x1::account::Account \
         0x1::account::Account \
-    --args address:<test_account>
+    --args address:$ace_addr
 ```
 
-```zsh title="Arguments via JSON file"
+```bash title="Arguments via JSON file"
 aptos move view --json-file view_function_arguments.json
 ```
+
+:::tip
+If you are trying to run the example yourself don't forget to substitute Ace's actual address for `<test_account>` in `view_function_arguments.json` (twice)!
+:::
 
 import view_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/view_function_arguments.json';
 
 <CodeBlock language="json" title="view_function_arguments.json">{view_json_file}</CodeBlock>
 
-```zsh title="Output"
+```bash title="Output"
 {
   "Result": [
-    123,
-    [
-      false,
-      true,
-      false,
-      false
-    ],
-    [
-      [
-        "0xace",
-        "0xbee"
+    {
+      "address_vec_vec": [
+        [
+          "0xace",
+          "0xbee"
+        ],
+        [
+          "0xcad"
+        ],
+        []
       ],
-      [
-        "0xcad"
+      "bool_vec": [
+        false,
+        true,
+        false,
+        false
       ],
-      []
-    ],
-    true,
-    false
+      "type_info_1_match": true,
+      "type_info_2_match": false,
+      "u8_solo": 123
+    }
   ]
 }
 ```
@@ -566,30 +703,72 @@ Here, `aptos move run-script` is run from inside the [`cli_args` package directo
 :::tip
 Before trying out the below examples, compile the package with the correct named address via:
 
-```zsh
-aptos move compile --named-addresses test_account=<test_account>
+```bash
+aptos move compile --named-addresses test_account=$ace_addr
 ```
 :::
 
-```zsh title="Arguments via CLI"
+```bash title="Arguments via CLI"
 aptos move run-script \
     --compiled-script-path build/CliArgs/bytecode_scripts/set_vals.mv \
-    --private-key-file <test_account.key> \
     --type-args \
         0x1::account::Account \
         0x1::chain_id::ChainId \
     --args \
         u8:123 \
         "u8:[122, 123, 124, 125]" \
-        address:"0xace"
+        address:"0xace" \
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
-```zsh title="Arguments via JSON file"
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "transaction_hash": "0x375d653ecd0e3e00852eefbbe72435479eae9d5e84acd7cc8c7b7f1bc2f2da96",
+    "gas_used": 3,
+    "gas_unit_price": 100,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 3,
+    "success": true,
+    "timestamp_us": 1684978341019604,
+    "version": 527686516,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+</details>
+
+```bash title="Arguments via JSON file"
 aptos move run-script \
     --compiled-script-path build/CliArgs/bytecode_scripts/set_vals.mv \
-    --private-key-file <test_account.key> \
-    --json-file script_function_arguments.json
+    --json-file script_function_arguments.json \
+    --private-key-file ace.key \
+    --assume-yes
 ```
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": {
+    "transaction_hash": "0x2bab4af9064c34e2b1ea756a44a893c8fb1580bf8af95ba2f454721e422748e9",
+    "gas_used": 3,
+    "gas_unit_price": 100,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 4,
+    "success": true,
+    "timestamp_us": 1684978420803742,
+    "version": 527687139,
+    "vm_status": "Executed successfully"
+  }
+}
+```
+
+</details>
 
 import script_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cli_args/script_function_arguments.json';
 
@@ -597,32 +776,34 @@ import script_json_file from '!!raw-loader!../../../../aptos-move/move-examples/
 
 Both such script function invocations result in the following `reveal()` view function output:
 
-```zsh title="View function call"
+```bash title="View function call"
 aptos move view \
-    --function-id <test_account>::cli_args::reveal \
+    --function-id $ace_addr::cli_args::reveal \
     --type-args \
         0x1::account::Account \
         0x1::chain_id::ChainId \
-    --args address:<test_account>
+    --args address:$ace_addr
 ```
 
 ```json title="View function output"
 {
   "Result": [
-    123,
-    [
-      false,
-      false,
-      true,
-      true
-    ],
-    [
-      [
-        "0xace"
-      ]
-    ],
-    true,
-    true
+    {
+      "address_vec_vec": [
+        [
+          "0xace"
+        ]
+      ],
+      "bool_vec": [
+        false,
+        false,
+        true,
+        true
+      ],
+      "type_info_1_match": true,
+      "type_info_2_match": true,
+      "u8_solo": 123
+    }
   ]
 }
 ```
@@ -638,12 +819,9 @@ As of the time of this writing, the `aptos` CLI only supports script function ar
 
 This section builds upon the [Arguments in JSON](#arguments-in-json) section, and likewise references the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args).
 
-:::tip
-Set your working directory to [`aptos-move/move-examples/cli_args`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args) to follow along:
 
-```bash
-cd <aptos-core-parent-directory>/aptos-core/aptos-move/move-examples/cli_args
-```
+:::tip
+If you would like to follow along, start by completing the [Arguments in JSON](#arguments-in-json) tutorial steps!
 :::
 
 
@@ -651,33 +829,7 @@ For this example, Ace and Bee will conduct governance operations from a 2-of-2 m
 
 ### Account creation
 
-Start by mining a vanity address for both signatories:
-
-```bash title=Command
-aptos key generate \
-    --vanity-prefix 0xace \
-    --output-file ace.key
-```
-
-<details><summary>Output</summary>
-
-```bash
-{
-  "Result": {
-    "PublicKey Path": "ace.key.pub",
-    "Account Address:": "{
-  "Result": {
-    "PublicKey Path": "bee.key.pub",
-    "PrivateKey Path": "bee.key",
-    "Account Address:": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4"
-  }
-}",
-    "PrivateKey Path": "ace.key"
-  }
-}
-```
-
-</details>
+Since Ace's account was created during the [Arguments in JSON](#arguments-in-json) tutorial, start by mining a vanity address account for Bee too:
 
 ```bash title=Command
 aptos key generate \
@@ -692,7 +844,7 @@ aptos key generate \
   "Result": {
     "PublicKey Path": "bee.key.pub",
     "PrivateKey Path": "bee.key",
-    "Account Address:": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4"
+    "Account Address:": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218"
   }
 }
 ```
@@ -703,29 +855,14 @@ aptos key generate \
 The exact account address should vary for each run, though the vanity prefix should not.
 :::
 
-Store Ace and Bee's addresses in shell variables so you can call them inline later on:
+Store Bee's address in a shell variable so you can call it inline later on:
 
 ```bash
-# Your exact addresses should vary
-ace_addr=0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4
-bee_addr=0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4
+# Your exact address should vary
+bee_addr=0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218
 ```
 
-Now fund Ace's and Bee's accounts using the faucet:
-
-```bash title=Command
-aptos account fund-with-faucet --account $ace_addr
-```
-
-<details><summary>Output</summary>
-
-```bash
-{
-  "Result": "Added 100000000 Octas to account acee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4"
-}
-```
-
-</details>
+Fund Bee's account using the faucet:
 
 ```bash title=Command
 aptos account fund-with-faucet --account $bee_addr
@@ -735,7 +872,7 @@ aptos account fund-with-faucet --account $bee_addr
 
 ```bash
 {
-  "Result": "Added 100000000 Octas to account bee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4"
+  "Result": "Added 100000000 Octas to account bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218"
 }
 ```
 
@@ -747,7 +884,8 @@ Ace can now create a multisig account:
 aptos multisig create \
     --additional-owners $bee_addr \
     --num-signatures-required 2 \
-    --private-key-file ace.key
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -755,15 +893,15 @@ aptos multisig create \
 ```bash
 {
   "Result": {
-    "multisig_address": "2dc9b2fdba8ace3b9f96e5d3bb7ea04d39b1640020c8697eb0f1f4b33cad0d77",
-    "transaction_hash": "0x9b566b9357c1cda768948f6aaf951c6d5e5c3e1749c2fb3147b5eed371e962ee",
+    "multisig_address": "50e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d0",
+    "transaction_hash": "0x696e1d7782bb80546825690c097426afa7f484a08b3ae8a004154aa877d572ed",
     "gas_used": 1524,
     "gas_unit_price": 100,
-    "sender": "acee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
-    "sequence_number": 0,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 5,
     "success": true,
-    "timestamp_us": 1684644958857234,
-    "version": 525304840,
+    "timestamp_us": 1684978792488964,
+    "version": 527690158,
     "vm_status": "Executed successfully"
   }
 }
@@ -775,7 +913,7 @@ Store the multisig address in a shell variable:
 
 ```bash
 # Your address should vary
-multisig_addr=2dc9b2fdba8ace3b9f96e5d3bb7ea04d39b1640020c8697eb0f1f4b33cad0d77
+multisig_addr=0x50e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d0
 ```
 
 ### Inspect the multisig
@@ -814,8 +952,8 @@ aptos move view \
 {
   "Result": [
     [
-      "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
-      "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4"
+      "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+      "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
     ]
   ]
 }
@@ -891,8 +1029,9 @@ Now have Ace propose publication of the package from the multisig account, stori
 aptos multisig create-transaction \
     --multisig-address $multisig_addr \
     --json-file publication.json \
-    --hash-only \
-    --private-key-file ace.key
+    --store-hash-only \
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -900,14 +1039,14 @@ aptos multisig create-transaction \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0xde5dfd2ca09cf2b3ca040386633de5c1c8aee5842d49303c757eb14819e20a3f",
+    "transaction_hash": "0x84a1932d91fdf31899bb430d723db26ae0919ece94c3c529d4d7efa4762954db",
     "gas_used": 510,
     "gas_unit_price": 100,
-    "sender": "acee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
-    "sequence_number": 1,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 6,
     "success": true,
-    "timestamp_us": 1684645051403399,
-    "version": 525305517,
+    "timestamp_us": 1684978951763370,
+    "version": 527691441,
     "vm_status": "Executed successfully"
   }
 }
@@ -973,20 +1112,20 @@ aptos move view \
 {
   "Result": [
     {
-      "creation_time_secs": "1684645051",
-      "creator": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+      "creation_time_secs": "1684978951",
+      "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
       "payload": {
         "vec": []
       },
       "payload_hash": {
         "vec": [
-          "0xce31dac5c29fd54c643119b4011a4991bd96141a21be10100d75336230417e89"
+          "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
         ]
       },
       "votes": {
         "data": [
           {
-            "key": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+            "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
             "value": true
           }
         ]
@@ -1015,8 +1154,8 @@ aptos multisig create-transaction \
         u8:123 \
         "bool:[false, true, false, false]" \
         'address:[["0xace", "0xbee"], ["0xcad"], []]' \
-    --private-key-file bee.key
-
+    --private-key-file bee.key \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -1024,14 +1163,14 @@ aptos multisig create-transaction \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x92c7f7c103f2f7409ec0ede1325ce69c9357dc07423d1801d2c49eeee74d91ae",
+    "transaction_hash": "0xbd353d2e4ef9d49482f02defeaedcaf4c2f1fc957eac57472690ab17dee70988",
     "gas_used": 511,
     "gas_unit_price": 100,
-    "sender": "bee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+    "sender": "bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
     "sequence_number": 0,
     "success": true,
-    "timestamp_us": 1684645156069617,
-    "version": 525306308,
+    "timestamp_us": 1684979030036513,
+    "version": 527692060,
     "vm_status": "Executed successfully"
   }
 }
@@ -1076,31 +1215,31 @@ aptos move view \
   "Result": [
     [
       {
-        "creation_time_secs": "1684645051",
-        "creator": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+        "creation_time_secs": "1684978951",
+        "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
         "payload": {
           "vec": []
         },
         "payload_hash": {
           "vec": [
-            "0xce31dac5c29fd54c643119b4011a4991bd96141a21be10100d75336230417e89"
+            "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
           ]
         },
         "votes": {
           "data": [
             {
-              "key": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+              "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
               "value": true
             }
           ]
         }
       },
       {
-        "creation_time_secs": "1684645156",
-        "creator": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+        "creation_time_secs": "1684979030",
+        "creator": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
         "payload": {
           "vec": [
-            "0x002dc9b2fdba8ace3b9f96e5d3bb7ea04d39b1640020c8697eb0f1f4b33cad0d7708636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
+            "0x0050e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d008636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
           ]
         },
         "payload_hash": {
@@ -1109,15 +1248,14 @@ aptos move view \
         "votes": {
           "data": [
             {
-              "key": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+              "key": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
               "value": true
             }
           ]
         }
       }
     ]
-  ]
-}
+
 ```
 
 </details>
@@ -1162,20 +1300,20 @@ aptos multisig check-transaction \
   "Result": {
     "Status": "Transaction match",
     "Multisig transaction": {
-      "creation_time_secs": "1684645051",
-      "creator": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+      "creation_time_secs": "1684978951",
+      "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
       "payload": {
         "vec": []
       },
       "payload_hash": {
         "vec": [
-          "0xce31dac5c29fd54c643119b4011a4991bd96141a21be10100d75336230417e89"
+          "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
         ]
       },
       "votes": {
         "data": [
           {
-            "key": "0xacee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
+            "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
             "value": true
           }
         ]
@@ -1194,7 +1332,8 @@ Since Bee has verified that the on-chain payload hash checks out against her loc
 aptos multisig approve \
     --multisig-address $multisig_addr \
     --sequence-number 1 \
-    --private-key-file bee.key
+    --private-key-file bee.key \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -1202,14 +1341,14 @@ aptos multisig approve \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x24a12b1839b2dd114780289ec6e36a4a33b1ab2a4c3f22dd9512873aed65723a",
+    "transaction_hash": "0x9b80286a6f1ab70b4b2759193810b7f618451aa0fefcba1095b0ed74607aa684",
     "gas_used": 6,
     "gas_unit_price": 100,
-    "sender": "bee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+    "sender": "bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
     "sequence_number": 1,
     "success": true,
-    "timestamp_us": 1684645251141034,
-    "version": 525307001,
+    "timestamp_us": 1684979137080773,
+    "version": 527692937,
     "vm_status": "Executed successfully"
   }
 }
@@ -1246,7 +1385,8 @@ aptos multisig execute \
     --multisig-address $multisig_addr \
     --json-file publication.json \
     --private-key-file bee.key \
-    --max-gas 10000
+    --max-gas 10000 \
+    --assume-yes
 ```
 
 :::tip
@@ -1306,11 +1446,11 @@ aptos multisig check-transaction \
   "Result": {
     "Status": "Transaction match",
     "Multisig transaction": {
-      "creation_time_secs": "1684645156",
-      "creator": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+      "creation_time_secs": "1684979030",
+      "creator": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
       "payload": {
         "vec": [
-          "0x002dc9b2fdba8ace3b9f96e5d3bb7ea04d39b1640020c8697eb0f1f4b33cad0d7708636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
+          "0x0050e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d008636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
         ]
       },
       "payload_hash": {
@@ -1319,7 +1459,7 @@ aptos multisig check-transaction \
       "votes": {
         "data": [
           {
-            "key": "0xbee090156aa0efa1fd6242d194400ef46471e2eca80dcd654532319c8b0355d4",
+            "key": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
             "value": true
           }
         ]
@@ -1363,7 +1503,8 @@ Ace approves the transaction:
 aptos multisig approve \
     --multisig-address $multisig_addr \
     --sequence-number 2 \
-    --private-key-file ace.key
+    --private-key-file ace.key \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -1371,14 +1512,14 @@ aptos multisig approve \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x5cdc4fd171d7b2ae3676b0c4a9a3fa1523ca46fde205ec17cc0ef7c0c92108d5",
+    "transaction_hash": "0x3b443492c885f7338931e640a36d8d225a4f53ff17198cd2e3087b3a0887fcd2",
     "gas_used": 6,
     "gas_unit_price": 100,
-    "sender": "acee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
-    "sequence_number": 2,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 7,
     "success": true,
-    "timestamp_us": 1684646050747796,
-    "version": 525312861,
+    "timestamp_us": 1684979313218098,
+    "version": 527694405,
     "vm_status": "Executed successfully"
   }
 }
@@ -1392,7 +1533,8 @@ Since the payload was stored on-chain, it is not required to execute the pending
 aptos multisig execute \
     --multisig-address $multisig_addr \
     --private-key-file ace.key \
-    --max-gas 10000
+    --max-gas 10000 \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
@@ -1400,14 +1542,14 @@ aptos multisig execute \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x2cc091926460ac37e0bff280d5cc6a3a225838ff8f13dc224be6cd5be6725fea",
+    "transaction_hash": "0x20c0c1a2d8699cde1d70e07a77eae62b27acd900521efa641eb251dafabcd324",
     "gas_used": 505,
     "gas_unit_price": 100,
-    "sender": "acee3447860cd5f14801badcbf69dbdb98a0c315999ded339bb9d3606ac4faa4",
-    "sequence_number": 3,
+    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sequence_number": 8,
     "success": true,
-    "timestamp_us": 1684646121523835,
-    "version": 525313412,
+    "timestamp_us": 1684979342858131,
+    "version": 527694637,
     "vm_status": "Executed successfully"
   }
 }

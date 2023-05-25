@@ -4,11 +4,12 @@
 use crate::common::{
     types::{
         CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
-        TransactionOptions, TransactionSummary,
+        MultisigAccountWithSequenceNumber, TransactionOptions, TransactionSummary,
     },
     utils::get_view_json_option_vec_ref,
 };
 use aptos_cached_packages::aptos_stdlib;
+use aptos_crypto::HashValue;
 use aptos_rest_client::{
     aptos_api_types::{HexEncodedBytes, ViewRequest, WriteResource, WriteSetChange},
     Transaction,
@@ -22,8 +23,6 @@ use bcs::to_bytes;
 use clap::Parser;
 use serde::Serialize;
 use serde_json::json;
-use sha2::Digest;
-use sha3::Sha3_256;
 
 /// Create a new multisig account (v2) on-chain.
 ///
@@ -115,7 +114,7 @@ pub struct CreateTransaction {
     pub(crate) entry_function_args: EntryFunctionArguments,
     /// Pass this flag if only storing transaction hash on-chain. Else full payload is stored
     #[clap(long)]
-    pub(crate) hash_only: bool,
+    pub(crate) store_hash_only: bool,
 }
 
 #[async_trait]
@@ -127,10 +126,10 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let multisig_transaction_payload_bytes =
             to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
-        let transaction_payload = if self.hash_only {
+        let transaction_payload = if self.store_hash_only {
             aptos_stdlib::multisig_account_create_transaction_with_hash(
                 self.multisig_account.multisig_address,
-                Sha3_256::digest(&multisig_transaction_payload_bytes).to_vec(),
+                HashValue::sha3_256_of(&multisig_transaction_payload_bytes).to_vec(),
             )
         } else {
             aptos_stdlib::multisig_account_create_transaction(
@@ -149,14 +148,11 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
 #[derive(Debug, Parser)]
 pub struct CheckTransaction {
     #[clap(flatten)]
-    pub(crate) multisig_account: MultisigAccount,
+    pub(crate) multisig_account_with_sequence_number: MultisigAccountWithSequenceNumber,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) entry_function_args: EntryFunctionArguments,
-    /// Sequence number of multisig transaction to check
-    #[clap(long)]
-    pub(crate) sequence_number: u64,
 }
 
 #[async_trait]
@@ -174,9 +170,16 @@ impl CliCommand<serde_json::Value> for CheckTransaction {
                 type_arguments: vec![],
                 arguments: vec![
                     serde_json::Value::String(String::from(
-                        &self.multisig_account.multisig_address,
+                        &self
+                            .multisig_account_with_sequence_number
+                            .multisig_account
+                            .multisig_address,
                     )),
-                    serde_json::Value::String(self.sequence_number.to_string()),
+                    serde_json::Value::String(
+                        self.multisig_account_with_sequence_number
+                            .sequence_number
+                            .to_string(),
+                    ),
                 ],
             })
             .await?[0];
@@ -186,18 +189,18 @@ impl CliCommand<serde_json::Value> for CheckTransaction {
         // Get expected multisig transaction payload bytes from provided entry function.
         let expected_multisig_transaction_payload_bytes =
             to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
-        // If full payload stored on-chain, get expected bytes and reference to actual hex option:
+        // If only storing payload hash on-chain, get expected hash bytes and actual hash hex:
         let (expected_bytes, actual_value_hex_option_ref) =
-            if !multisig_payload_option_ref.is_empty() {
+            if multisig_payload_option_ref.is_empty() {
+                (
+                    HashValue::sha3_256_of(&expected_multisig_transaction_payload_bytes).to_vec(),
+                    get_view_json_option_vec_ref(&multisig_transaction["payload_hash"]),
+                )
+            // If full payload stored on-chain, get expected payload bytes and actual payload hex:
+            } else {
                 (
                     expected_multisig_transaction_payload_bytes,
                     multisig_payload_option_ref,
-                )
-            // If only payload hash on-chain, get different compare values:
-            } else {
-                (
-                    Sha3_256::digest(&expected_multisig_transaction_payload_bytes).to_vec(),
-                    get_view_json_option_vec_ref(&multisig_transaction["payload_hash"]),
                 )
             };
         // If expected bytes matches actual hex from view function:
@@ -227,11 +230,7 @@ impl CliCommand<serde_json::Value> for CheckTransaction {
 #[derive(Debug, Parser)]
 pub struct Approve {
     #[clap(flatten)]
-    pub(crate) multisig_account: MultisigAccount,
-    /// The sequence number of the multisig transaction to approve. The sequence number increments
-    /// for every new multisig transaction.
-    #[clap(long)]
-    pub(crate) sequence_number: u64,
+    pub(crate) multisig_account_with_sequence_number: MultisigAccountWithSequenceNumber,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -245,8 +244,10 @@ impl CliCommand<TransactionSummary> for Approve {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::multisig_account_approve_transaction(
-                self.multisig_account.multisig_address,
-                self.sequence_number,
+                self.multisig_account_with_sequence_number
+                    .multisig_account
+                    .multisig_address,
+                self.multisig_account_with_sequence_number.sequence_number,
             ))
             .await
             .map(|inner| inner.into())
@@ -261,11 +262,7 @@ impl CliCommand<TransactionSummary> for Approve {
 #[derive(Debug, Parser)]
 pub struct Reject {
     #[clap(flatten)]
-    pub(crate) multisig_account: MultisigAccount,
-    /// The sequence number of the multisig transaction to reject. The sequence number increments
-    /// for every new multisig transaction.
-    #[clap(long)]
-    pub(crate) sequence_number: u64,
+    pub(crate) multisig_account_with_sequence_number: MultisigAccountWithSequenceNumber,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 }
@@ -279,8 +276,10 @@ impl CliCommand<TransactionSummary> for Reject {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::multisig_account_reject_transaction(
-                self.multisig_account.multisig_address,
-                self.sequence_number,
+                self.multisig_account_with_sequence_number
+                    .multisig_account
+                    .multisig_address,
+                self.multisig_account_with_sequence_number.sequence_number,
             ))
             .await
             .map(|inner| inner.into())

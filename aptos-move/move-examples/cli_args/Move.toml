@@ -1,4 +1,3 @@
-# :!:>manifest
 [package]
 name = "CliArgs"
 version = "0.1.0"
@@ -8,4 +7,4 @@ upgrade_policy = "compatible"
 test_account = "_"
 
 [dependencies.AptosFramework]
-local = "../../framework/aptos-framework" # <:!:manifest
+local = "../../framework/aptos-framework"

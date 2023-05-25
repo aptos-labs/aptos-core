@@ -13,15 +13,7 @@ script {
         u8_vec: vector<u8>,
         address_solo: address,
     ) {
-        let bool_vec = vector[];
-        let i = 0;
-        while (i < vector::length(&u8_vec)) {
-            vector::push_back(
-                &mut bool_vec,
-                *vector::borrow(&u8_vec, i) > u8_solo
-            );
-            i = i + 1;
-        };
+        let bool_vec = vector::map_ref(&u8_vec, |e_ref| *e_ref > u8_solo);
         let addr_vec_vec = vector[vector[address_solo]];
         cli_args::set_vals<T1, T2>(account, u8_solo, bool_vec, addr_vec_vec);
     }
