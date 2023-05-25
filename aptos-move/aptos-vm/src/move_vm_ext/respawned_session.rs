@@ -115,20 +115,24 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 
 #[cfg(test)]
 mod test {
-    use super::ChangeSetStateView;
-    use aptos_aggregator::{
-        delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet},
-        transaction::ChangeSetExt,
-    };
+    use super::*;
+    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_state_view::TStateView;
     use aptos_types::{
-        state_store::{state_key::StateKey, table::TableHandle},
-        transaction::{ChangeSet, NoOpChangeSetChecker},
+        state_store::table::TableHandle,
         write_set::{WriteOp, WriteSetMut},
     };
+    use aptos_vm_types::check_change_set::CheckChangeSet;
     use move_core_types::account_address::AccountAddress;
-    use std::sync::Arc;
+
+    /// A mock for testing. Always succeeds on checking a change set.
+    struct NoOpChangeSetChecker;
+
+    impl CheckChangeSet for NoOpChangeSetChecker {
+        fn check_change_set(&self, _change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_change_set_state_view() {
@@ -155,11 +159,9 @@ mod test {
         let write_set = WriteSetMut::new(write_set_ops.into_iter())
             .freeze()
             .unwrap();
-        let change_set = ChangeSet::new(write_set, vec![], &NoOpChangeSetChecker).unwrap();
-
-        let change_set_ext =
-            ChangeSetExt::new(delta_change_set, change_set, Arc::new(NoOpChangeSetChecker));
-        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set_ext).unwrap();
+        let change_set =
+            VMChangeSet::new(write_set, delta_change_set, vec![], &NoOpChangeSetChecker).unwrap();
+        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set).unwrap();
 
         assert_eq!(
             deserialize(

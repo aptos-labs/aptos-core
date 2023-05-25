@@ -3395,6 +3395,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-state-view",
  "aptos-types",
+ "claims",
  "move-binary-format",
  "move-core-types",
 ]

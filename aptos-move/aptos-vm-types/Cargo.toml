@@ -19,3 +19,6 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
