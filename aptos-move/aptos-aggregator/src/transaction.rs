@@ -48,6 +48,14 @@ impl ChangeSetExt {
         }
     }
 
+    pub fn empty(checker: Arc<dyn CheckChangeSet>) -> Self {
+        ChangeSetExt {
+            delta_change_set: DeltaChangeSet::empty(),
+            change_set: ChangeSet::empty(),
+            checker,
+        }
+    }
+
     pub fn change_set(&self) -> &ChangeSet {
         &self.change_set
     }

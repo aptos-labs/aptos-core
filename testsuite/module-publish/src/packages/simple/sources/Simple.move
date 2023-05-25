@@ -14,6 +14,7 @@ module 0xABCD::simple {
     use std::vector;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::account;
+    use aptos_std::table::{Self, Table};
 
     // Through the constant pool it will be possible to change this
     // constant to be as big or as small as desired.
@@ -411,6 +412,25 @@ module 0xABCD::simple {
         }
     }
 
+    struct TableStore has key {
+        table_entries: Table<u64, u64>
+    }
+
+    fun make_or_change_table(owner: &signer, offset: u64, count: u64) acquires TableStore {
+        let owner_address = signer::address_of(owner);
+        if (!exists<TableStore>(owner_address)) {
+            move_to<TableStore>(owner, TableStore {
+                table_entries: table::new()
+            })
+        };
+        let table_entries = &mut borrow_global_mut<TableStore>(owner_address).table_entries;
+
+        while (count > 0) {
+            count = count - 1;
+            let table_entry = table::borrow_mut_with_default(table_entries, offset+count, 0);
+            *table_entry = *table_entry + 1;
+        }
+    }
 
 
     struct SimpleEvent has drop, store {

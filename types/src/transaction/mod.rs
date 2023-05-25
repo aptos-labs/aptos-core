@@ -832,11 +832,10 @@ impl TransactionStatus {
             _ => Err(format_err!("Not Keep.")),
         }
     }
-}
 
-impl From<VMStatus> for TransactionStatus {
-    fn from(vm_status: VMStatus) -> Self {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
+        // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
         match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
@@ -844,8 +843,22 @@ impl From<VMStatus> for TransactionStatus {
                 },
                 _ => TransactionStatus::Keep(recorded.into()),
             },
-            Err(code) => TransactionStatus::Discard(code),
+            Err(code) => {
+                if code.status_type() == StatusType::InvariantViolation
+                    && charge_invariant_violation
+                {
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+                } else {
+                    TransactionStatus::Discard(code)
+                }
+            },
         }
+    }
+}
+
+impl From<VMStatus> for TransactionStatus {
+    fn from(vm_status: VMStatus) -> Self {
+        TransactionStatus::from_vm_status(vm_status, true)
     }
 }
 

@@ -51,13 +51,14 @@ jobs:
       FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - uses: snok/install-poetry@v1
+
+      - uses: ./.github/actions/python-setup
         with:
-          version: 1.2.2
+          pyproject_directory: ecosystem/python/sdk
 
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: py-example-test
         with:
           max_attempts: 5
           timeout_minutes: 20
-          command: cd ./ecosystem/python/sdk && poetry install && make test && make examples
+          command: cd ./ecosystem/python/sdk && make test && make examples
