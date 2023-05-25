@@ -168,7 +168,7 @@ impl BlockAptosVM {
         let mut duplicate_indices = vec![];
         for (i, txn) in signature_verified_block.iter().enumerate() {
             if let PreprocessedTransaction::UserTransaction(inner) = txn {
-                if !seen.insert(inner.raw_transaction()) {
+                if !seen.insert((inner.raw_transaction_ref(), inner.authenticator_ref())) {
                     duplicate_indices.push(i);
                     num_duplicates += 1;
                 }

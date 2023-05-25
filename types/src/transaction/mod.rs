@@ -563,8 +563,12 @@ impl SignedTransaction {
         self.raw_txn
     }
 
-    pub fn raw_transaction(&self) -> &RawTransaction {
+    pub fn raw_transaction_ref(&self) -> &RawTransaction {
         &self.raw_txn
+    }
+
+    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
+        &self.authenticator
     }
 
     pub fn sequence_number(&self) -> u64 {
