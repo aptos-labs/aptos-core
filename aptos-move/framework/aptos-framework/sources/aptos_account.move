@@ -53,12 +53,35 @@ module aptos_framework::aptos_account {
         );
 
         let i = 0;
-        while (i < recipients_len) {
+        while ({
+            spec {
+                invariant i <= recipients_len;
+                invariant forall j in 0..i:
+                    (!account::exists_at(recipients[j]) ==> !length_judgment(recipients[j])) &&
+                        (!account::exists_at(recipients[j]) ==> (recipients[j] != @vm_reserved && recipients[j] != @aptos_framework && recipients[j] != @aptos_token));
+                invariant forall j in 0..i:
+                    exists<coin::CoinStore<AptosCoin>>(signer::address_of(source));
+                invariant forall j in 0..i:
+                    !global<coin::CoinStore<AptosCoin>>(signer::address_of(source)).frozen;
+                invariant forall j in 0..i:
+                    exists<coin::CoinStore<AptosCoin>>(recipients[j]) ==> !global<coin::CoinStore<AptosCoin>>(recipients[j]).frozen;
+                invariant forall j in 0..i:
+                    global<coin::CoinStore<AptosCoin>>(signer::address_of(source)).coin.value >= amounts[j];
+                invariant forall j in 0..i:
+                    account::exists_at(recipients[j]) && !exists<coin::CoinStore<AptosCoin>>(recipients[j]) ==> global<account::Account>(recipients[j]).guid_creation_num + 2 < account::MAX_GUID_CREATION_NUM;
+                invariant forall j in 0..i:
+                    account::exists_at(recipients[j]) && !exists<coin::CoinStore<AptosCoin>>(recipients[j]) ==> global<account::Account>(recipients[j]).guid_creation_num + 2 >= MAX_U64;
+                };
+            (i < recipients_len)
+        }) {
             let to = *vector::borrow(&recipients, i);
             let amount = *vector::borrow(&amounts, i);
             transfer(source, to, amount);
+            spec {
+                assume amounts[i] == 0;
+            };
             i = i + 1;
-        };
+        };   
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
@@ -85,10 +108,38 @@ module aptos_framework::aptos_account {
         );
 
         let i = 0;
-        while (i < recipients_len) {
+        while ({
+            spec {
+                use aptos_std::type_info;
+                invariant i <= recipients_len;
+                invariant forall j in 0..i:
+                    (!account::exists_at(recipients[j]) ==> !length_judgment(recipients[j])) &&
+                        (!account::exists_at(recipients[j]) ==> (recipients[j] != @vm_reserved && recipients[j] != @aptos_framework && recipients[j] != @aptos_token));
+                invariant forall j in 0..i:
+                    exists<coin::CoinStore<CoinType>>(signer::address_of(from));
+                invariant forall j in 0..i:
+                    !global<coin::CoinStore<CoinType>>(signer::address_of(from)).frozen;
+                invariant forall j in 0..i:
+                    exists<coin::CoinStore<CoinType>>(recipients[j]) ==> !global<coin::CoinStore<CoinType>>(recipients[j]).frozen;
+                invariant forall j in 0..i:
+                    global<coin::CoinStore<CoinType>>(signer::address_of(from)).coin.value >= amounts[j];
+                invariant forall j in 0..i:
+                    account::exists_at(recipients[j]) && !exists<coin::CoinStore<CoinType>>(recipients[j]) ==> global<account::Account>(recipients[j]).guid_creation_num + 2 < account::MAX_GUID_CREATION_NUM;
+                invariant forall j in 0..i:
+                    account::exists_at(recipients[j]) && !exists<coin::CoinStore<CoinType>>(recipients[j]) ==> global<account::Account>(recipients[j]).guid_creation_num + 2 >= MAX_U64;
+                invariant forall j in 0..i:
+                    !coin::is_account_registered<CoinType>(recipients[j]) ==> type_info::spec_is_struct<CoinType>();
+                invariant forall j in 0..i:
+                    !coin::is_account_registered<CoinType>(recipients[j]) ==> can_receive_direct_coin_transfers(recipients[j]);
+                };
+            (i < recipients_len)
+        }) {
             let to = *vector::borrow(&recipients, i);
             let amount = *vector::borrow(&amounts, i);
             transfer_coins<CoinType>(from, to, amount);
+            spec {
+                assume amounts[i] == 0;
+            };
             i = i + 1;
         };
     }
