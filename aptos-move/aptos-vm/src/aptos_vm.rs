@@ -391,6 +391,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
@@ -398,7 +399,6 @@ impl AptosVM {
                 None,
             ))
         });
-
         // Run the execution logic
         {
             gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
@@ -428,7 +428,6 @@ impl AptosVM {
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
-
                     senders.extend(txn_data.secondary_signers());
                     self.validate_and_execute_entry_function(
                         &mut session,
@@ -450,15 +449,14 @@ impl AptosVM {
                 gas_meter,
                 new_published_modules_loaded,
             )?;
-
             let respawned_session = self.charge_change_set_and_respawn_session(
                 session,
                 resolver,
                 gas_meter,
                 change_set_configs,
                 txn_data,
+                aggregator_enabled,
             )?;
-
             self.success_transaction_cleanup(
                 respawned_session,
                 gas_meter,
@@ -476,6 +474,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
+        aggregator_enabled: bool,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let change_set_ext = session.finish(&mut (), change_set_configs)?;
         gas_meter.charge_io_gas_for_write_set(change_set_ext.write_set().iter())?;
@@ -488,7 +487,13 @@ impl AptosVM {
 
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::txn_meta(txn_data);
-        RespawnedSession::spawn(&self.0, session_id, resolver, change_set_ext)
+        RespawnedSession::spawn(
+            &self.0,
+            session_id,
+            resolver,
+            change_set_ext,
+            aggregator_enabled,
+        )
     }
 
     // Execute a multisig transaction:
@@ -508,6 +513,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::Error(
@@ -605,6 +611,7 @@ impl AptosVM {
                 txn_data,
                 cleanup_args,
                 change_set_configs,
+                aggregator_enabled,
             )?
         } else {
             self.success_multisig_payload_cleanup(
@@ -614,6 +621,7 @@ impl AptosVM {
                 txn_data,
                 cleanup_args,
                 change_set_configs,
+                aggregator_enabled,
             )?
         };
 
@@ -658,6 +666,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         // Charge gas for writeset before we do cleanup. This ensures we don't charge gas for
         // cleanup writeset changes, which is consistent with outer-level success cleanup
@@ -668,6 +677,7 @@ impl AptosVM {
             gas_meter,
             change_set_configs,
             txn_data,
+            aggregator_enabled,
         )?;
         respawned_session.execute(|session| {
             session.execute_function_bypass_visibility(
@@ -688,6 +698,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
@@ -696,6 +707,7 @@ impl AptosVM {
             SessionId::txn_meta(txn_data),
             resolver,
             ChangeSetExt::empty(Arc::new(change_set_configs.clone())),
+            aggregator_enabled,
         )?;
 
         let execution_error = ExecutionError::try_from(execution_error)
@@ -825,6 +837,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
             return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING, None));
@@ -869,6 +882,7 @@ impl AptosVM {
             gas_meter,
             change_set_configs,
             txn_data,
+            aggregator_enabled,
         )?;
 
         self.success_transaction_cleanup(
@@ -1058,6 +1072,7 @@ impl AptosVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
+                    aggregator_enabled,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_multisig_transaction(
                 resolver,
@@ -1068,6 +1083,7 @@ impl AptosVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 &storage_gas_params.change_set_configs,
+                aggregator_enabled,
             ),
 
             // Deprecated. Will be removed in the future.
@@ -1080,6 +1096,7 @@ impl AptosVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 &storage_gas_params.change_set_configs,
+                aggregator_enabled,
             ),
         };
 
@@ -1827,6 +1844,7 @@ impl AptosSimulationVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
+                    true,
                 )
             },
             TransactionPayload::Multisig(multisig) => {
@@ -1852,6 +1870,7 @@ impl AptosSimulationVM {
                                         &mut gas_meter,
                                         &storage_gas_params.change_set_configs,
                                         &txn_data,
+                                        true,
                                     )?;
 
                                 self.0.success_transaction_cleanup(
@@ -1879,6 +1898,7 @@ impl AptosSimulationVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 &storage_gas_params.change_set_configs,
+                false,
             ),
         };
 

@@ -39,13 +39,16 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
         previous_session_change_set: ChangeSetExt,
+        aggregator_enabled: bool,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
 
         Ok(RespawnedSessionBuilder {
             state_view,
             resolver_builder: |state_view| state_view.as_move_resolver(),
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id, true)),
+            session_builder: |resolver| {
+                Some(vm.new_session(resolver, session_id, aggregator_enabled))
+            },
         }
         .build())
     }
