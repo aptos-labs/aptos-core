@@ -56,8 +56,6 @@ Aptos blockchain node deployment
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |
 | numValidators | int | `1` | Number of validators to deploy |
 | overrideNodeConfig | bool | `false` | Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart. |
-| pyroscope.enabled | bool | `false` | Enable Pyroscope profiling |
-| pyroscope.secretName | string | `"pyroscope"` | Secret which contains the Pyroscope API key and other configuration |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
 | service.fullnode.enableMetricsPort | bool | `true` | Enable the metrics port on fullnodes |
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |

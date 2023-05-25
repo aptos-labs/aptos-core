@@ -106,6 +106,39 @@ jobs:
       - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
       - name: Install python deps
         run: pip3 install click==8.1.3 psutil==5.9.1
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        id: docker-setup
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          # action/docker-setup logs in to GCP under project "aptos-ci", but this workflow
+          # runs kubectl under project "aptos-forge-gcp-0", to which the service account
+          # of "aptos-ci" has delegated access. The exported environment variables will
+          # still refer to "aptos-ci", which confuses the gcloud CLI, so we need to keep
+          # them out of the environment. That's ok, because gcloud will take configuration
+          # from the file-system anyway.
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: "Install GCloud SDK"
+        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: "Export GCloud auth token"
+        id: gcloud-auth
+        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
+        shell: bash
+
+      - name: "Setup GCloud project"
+        shell: bash
+        run: gcloud config set project aptos-forge-gcp-0
+
       - name: Run pre-Forge checks
         shell: bash
         env:

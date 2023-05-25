@@ -1,10 +1,12 @@
+# Cluster abstraction for the forge test framework
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 import json
 import os
-from typing import List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 from .shell import Shell
 
@@ -44,48 +46,26 @@ class GetPodsResult(TypedDict):
     items: List[GetPodsItem]
 
 
-def list_eks_clusters(shell: Shell) -> List[str]:
-    cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
-    # This type annotation is not enforced, just helpful
-    try:
-        cluster_result: AwsListClusterResult = json.loads(cluster_json.decode())
-        clusters = []
-        for cluster_name in cluster_result["clusters"]:
-            if cluster_name.startswith("aptos-forge-"):
-                clusters.append(cluster_name)
-        return clusters
-    except Exception as e:
-        raise AwsError("Failed to list eks clusters") from e
-
-
-def list_gke_clusters(shell: Shell) -> List[str]:
-    cluster_json = shell.run(
-        ["gcloud", "container", "clusters", "list", "--format=json"]
-    ).unwrap()
-    try:
-        cluster_result = json.loads(cluster_json.decode())
-        clusters = []
-        for cluster_config in cluster_result:
-            cluster_name = cluster_config["name"]
-            if cluster_name.startswith("aptos-forge-"):
-                clusters.append(cluster_name)
-        return clusters
-    except Exception as e:
-        raise GcpError("Failed to list eks clusters") from e
-
-
 @dataclass
 class ForgeCluster:
     name: str
-    kubeconf: str
     cloud: Cloud = Cloud.AWS
     region: Optional[str] = "us-west-2"
-    zone: Optional[str] = None
+    kubeconf: Optional[str] = None
+
+    def __repr__(self) -> str:
+        return f"{self.cloud}/{self.region}/{self.name}"
+
+    def set_kubeconf(self, kubeconf: str) -> ForgeCluster:
+        self.kubeconf = kubeconf
+        return self
 
     async def write(self, shell: Shell) -> None:
+        assert self.kubeconf is not None, "kubeconf must be set"
         await self.write_cluster_config(shell, self.name, self.kubeconf)
 
     async def get_jobs(self, shell: Shell) -> List[ForgeJob]:
+        assert self.kubeconf is not None, "kubeconf must be set"
         pod_result = (
             (
                 await shell.gen_run(
@@ -181,6 +161,7 @@ class ForgeCluster:
         elif self.cloud == Cloud.GCP:
             # set the KUBE_CONFIG to temp so the resulting kubeconfig is written to it
             os.environ["KUBECONFIG"] = temp
+            # The project must already be set via: gcloud config set project <project>
             cmd = [
                 "gcloud",
                 "container",
@@ -188,13 +169,61 @@ class ForgeCluster:
                 "get-credentials",
                 cluster_name,
                 "--zone",
-                # The default zone for now.
-                # The project must already be set via: gcloud config set project <project>
-                "us-central1-c",
+                self.region,
             ]
         else:
             raise Exception("Unsupported cloud type")
         (await shell.gen_run(cmd)).unwrap()
+
+
+def list_eks_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
+    cluster_json = shell.run(["aws", "eks", "list-clusters"]).unwrap()
+    # This type annotation is not enforced, just helpful
+    try:
+        cluster_result: AwsListClusterResult = json.loads(cluster_json.decode())
+        clusters: Dict[str, ForgeCluster] = {}
+        for cluster_name in cluster_result["clusters"]:
+            if cluster_name.startswith("aptos-forge-"):
+                clusters[cluster_name] = ForgeCluster(
+                    cloud=Cloud.AWS,
+                    name=cluster_name,
+                )
+        return clusters
+    except Exception as e:
+        raise AwsError("Failed to list EKS clusters") from e
+
+
+def list_gke_clusters(shell: Shell) -> Dict[str, ForgeCluster]:
+    cluster_json = shell.run(
+        ["gcloud", "container", "clusters", "list", "--format=json"]
+    ).unwrap()
+    try:
+        cluster_result = json.loads(cluster_json.decode())
+        clusters: Dict[str, ForgeCluster] = {}
+        for cluster_config in cluster_result:
+            cluster_name = cluster_config["name"]
+            if cluster_name.startswith("aptos-forge-"):
+                clusters[cluster_name] = ForgeCluster(
+                    cloud=Cloud.GCP,
+                    name=cluster_name,
+                    region=cluster_config["location"],
+                )
+        return clusters
+    except Exception as e:
+        raise GcpError("Failed to list GKE clusters") from e
+
+
+def find_forge_cluster(
+    shell: Shell, cloud: Cloud, name: str, kubeconf: str
+) -> ForgeCluster:
+    clusters: Dict[str, ForgeCluster] = {}
+    if cloud == Cloud.AWS:
+        clusters = list_eks_clusters(shell)
+    else:
+        clusters = list_gke_clusters(shell)
+    if name not in clusters:
+        raise Exception(f"Cluster {name} not found")
+    return clusters[name].set_kubeconf(kubeconf)
 
 
 @dataclass

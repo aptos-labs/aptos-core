@@ -13,7 +13,7 @@ if "GITHUB_OUTPUT" not in os.environ:
         prefix="determinator_github_output_"
     )
     os.environ["GITHUB_OUTPUT"] = temp_github_output.name
-print("GITHUB_OUTPUT set to", os.environ["GITHUB_OUTPUT"])
+print(f"{__file__}: GITHUB_OUTPUT set to {os.environ['GITHUB_OUTPUT']}")
 
 
 class ChangedFilesPredicateTestCase(unittest.TestCase):

@@ -30,14 +30,14 @@ from typing import (
     Union,
 )
 from urllib.parse import ParseResult, urlunparse, urlencode
-from applogging import logger, init_logging
-from forge_wrapper_core.filesystem import Filesystem, LocalFilesystem
-from forge_wrapper_core.git import Git
-from forge_wrapper_core.process import Processes, SystemProcesses
+from test_framework.logging import init_logging, log
+from test_framework.filesystem import Filesystem, LocalFilesystem
+from test_framework.git import Git
+from test_framework.process import Processes, SystemProcesses
 
-from forge_wrapper_core.shell import LocalShell, Shell
-from forge_wrapper_core.time import SystemTime, Time
-from forge_wrapper_core.cluster import Cloud, ForgeCluster, ForgeJob
+from test_framework.shell import LocalShell, Shell
+from test_framework.time import SystemTime, Time
+from test_framework.cluster import Cloud, ForgeCluster, ForgeJob, find_forge_cluster
 
 # map of build variant (e.g. cargo profile and feature flags)
 BUILD_VARIANT_TAG_PREFIX_MAP = {
@@ -53,6 +53,8 @@ FORGE_IMAGE_NAME = "aptos/forge"
 
 DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
+
+FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 
 @dataclass
@@ -104,12 +106,8 @@ except ImportError:
     "--log-metadata/--no-log-metadata",
     default=True,
 )
-@logger
 def main(log_metadata: bool) -> None:
     init_logging(logger=log, print_metadata=log_metadata)
-    # Check that the current directory is the root of the repository.
-    if not os.path.exists(".git"):
-        log.fatal("This script must be run from the root of the repository.")
 
 
 def envoption(name: str, default: Optional[Any] = None) -> Any:
@@ -122,7 +120,6 @@ def envoption(name: str, default: Optional[Any] = None) -> Any:
 
 # o11y resources
 GRAFANA_BASE_URL = "https://aptoslabs.grafana.net/d/overview/overview?orgId=1&refresh=10s&var-Datasource=VictoriaMetrics%20Global%20%28Non-mainnet%29&var-BigQuery=Google%20BigQuery"
-PYROSCOPE_BASE_URL = "https://pyroscope.o11y.aptosdev.com"
 
 # helm chart default override values
 HELM_CHARTS = ["aptos-node", "aptos-genesis"]
@@ -351,28 +348,6 @@ def get_dashboard_link(
     )
 
 
-def shorten_link(link: str) -> str:
-    headers = {
-        "x-api-key": os.getenv("SHORTENER_API_KEY"),
-        "Content-Type": "application/json",
-    }
-    body = json.dumps(
-        {
-            "longUrl": link,
-        }
-    )
-    try:
-        import requests
-
-        response = requests.post(
-            "https://api.aws3.link/shorten", headers=headers, data=body
-        )
-        return f"https://{response.json()['shortUrl']}"
-    # Dont fail if we fail to shorten
-    except Exception:
-        return link
-
-
 def milliseconds(timestamp: datetime) -> int:
     return int(timestamp.timestamp()) * 1000
 
@@ -496,13 +471,6 @@ def get_humio_logs_link(
     )
 
 
-def get_pyroscope_profiling_link(
-    forge_namespace: str,
-) -> str:
-    """Get a link to the pyroscope profiling for a given test run in a given namespace. Note that there is no time filtering yet"""
-    return f'{PYROSCOPE_BASE_URL}/?query=aptos-node.cpu%7Bnamespace%3D"{forge_namespace}"%7D&from=now-24h'
-
-
 def format_github_info(context: ForgeContext) -> str:
     if not context.github_job_url:
         return ""
@@ -537,7 +505,6 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_namespace,
         True,
     )
-    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     return (
         textwrap.dedent(
@@ -545,7 +512,6 @@ def format_pre_comment(context: ForgeContext) -> str:
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
-            * [Pyroscope Profiling]({pyroscope_profiling_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -562,7 +528,6 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         context.forge_namespace,
         (result.start_time, result.end_time),
     )
-    pyroscope_profiling_link = get_pyroscope_profiling_link(context.forge_namespace)
 
     if result.state == ForgeState.PASS:
         forge_comment_header = f"### :white_check_mark: Forge suite `{context.forge_test_suite}` success on {get_testsuite_images(context)}"
@@ -586,7 +551,6 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
-        * [Pyroscope Profiling]({pyroscope_profiling_link})
         """
         )
         + format_github_info(context)
@@ -601,9 +565,10 @@ class ForgeRunner:
 def dump_forge_state(
     shell: Shell,
     forge_namespace: str,
-    kubeconf: str,
+    kubeconf: Optional[str] = None,
 ) -> str:
     try:
+        assert kubeconf is not None, "kubeconf is required"
         output = (
             shell.run(
                 [
@@ -670,6 +635,7 @@ class K8sForgeRunner(ForgeRunner):
         forge_pod_name = sanitize_forge_resource_name(
             f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}"
         )
+        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
         context.shell.run(
             [
                 "kubectl",
@@ -698,7 +664,12 @@ class K8sForgeRunner(ForgeRunner):
                 f"forge-namespace={context.forge_namespace}",
             ]
         )
-        template = context.filesystem.read("testsuite/forge-test-runner-template.yaml")
+        if context.filesystem.exists(FORGE_TEST_RUNNER_TEMPLATE_PATH):
+            template = context.filesystem.read(FORGE_TEST_RUNNER_TEMPLATE_PATH)
+        else:
+            template = context.filesystem.read(
+                os.path.join("testsuite", FORGE_TEST_RUNNER_TEMPLATE_PATH)
+            )
         forge_triggered_by = "github-actions" if context.github_actions else "other"
 
         assert context.aws_account_num is not None, "AWS account number is required"
@@ -909,7 +880,7 @@ def find_recent_images(
     git: Git,
     num_images: int,
     image_name: str,
-    image_tag_prefixes: Sequence[str] = [""],
+    image_tag_prefixes: List[str] = [""],
     commit_threshold: int = 100,
 ) -> Sequence[str]:
     """
@@ -1093,8 +1064,8 @@ async def run_multiple(
 
     for suite in forge_test_suites:
         new_namespace = f"{forge_namespace}-{suite}"
-        short_link = shorten_link(get_humio_forge_link(new_namespace, True))
-        pending_comment.append(f"Running {suite}: [Runner logs]({short_link})")
+        link = get_humio_forge_link(new_namespace, True)
+        pending_comment.append(f"Running {suite}: [Runner logs]({link})")
         if forge_runner_mode != "pre-forge":
             pending_results.append(
                 context.shell.gen_run(
@@ -1127,9 +1098,6 @@ async def run_multiple(
         failed = False
         for i, result in enumerate(results):
             suite, namespace = pending_suites[i]
-            short_link = shorten_link(
-                get_humio_forge_link(namespace, (start_time, stop_time))
-            )
             if result.succeeded():
                 final_forge_comment.append(f"{suite} succeeded")
             else:
@@ -1331,9 +1299,11 @@ def test(
     else:
         cloud_enum = Cloud.GCP
 
-    log.info(f"Using cluster: {forge_cluster_name} in cloud: {cloud_enum.value}")
-    temp = context.filesystem.mkstemp()
-    forge_cluster = ForgeCluster(forge_cluster_name, temp, cloud=cloud_enum)
+    log.info(f"Looking for cluster {forge_cluster_name} in cloud {cloud_enum.value}")
+    forge_cluster = find_forge_cluster(
+        context.shell, cloud_enum, forge_cluster_name, context.filesystem.mkstemp()
+    )
+    log.info(f"Found cluster: {forge_cluster}")
     asyncio.run(forge_cluster.write(context.shell))
 
     # These features and profile flags are set as strings
@@ -1605,6 +1575,7 @@ def tail(
     elif len(found_jobs) > 1:
         raise Exception(f"Found multiple jobs for name {job_name}")
     job = found_jobs[0]
+    assert job.cluster.kubeconf is not None, "kubeconf is required"
     shell.run(
         [
             "kubectl",

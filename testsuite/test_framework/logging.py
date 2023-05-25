@@ -3,11 +3,8 @@
 import logging
 import sys
 
-
-# Decorator that injects the global "log" into a function scope.
-def logger(func):
-    func.__globals__["log"] = logging.getLogger("")
-    return func
+# just define a global logger
+log = logging.getLogger("")
 
 
 def init_logging(

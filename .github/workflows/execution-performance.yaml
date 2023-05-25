@@ -4,7 +4,7 @@ on:
 
 jobs:
   execution-performance:
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@main
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@aptos-release-v1.4 # pin at the release branch because we do not need the single-node-performance benchmark that has since been added 
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
