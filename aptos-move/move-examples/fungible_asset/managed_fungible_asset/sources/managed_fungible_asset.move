@@ -361,7 +361,7 @@ module example_addr::managed_fungible_asset {
         object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @example_addr)]
     fun test_basic_flow(
         creator: &signer,
     ) acquires ManagingRefs {
@@ -406,7 +406,7 @@ module example_addr::managed_fungible_asset {
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 0, 11);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @example_addr, aaron = @0xface)]
     #[expected_failure(abort_code = 0x50001, location = Self)]
     fun test_permission_denied(
         creator: &signer,
