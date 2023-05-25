@@ -52,5 +52,5 @@ Then in your config:
 server_config:
     file_store_config:
       file_store_type: LocalFileStore
-      gcs_file_store_bucket_name: test_indexer_grpc_filestore
+      local_file_store_path: test_indexer_grpc_filestore
 ```
