@@ -1,13 +1,13 @@
 -- Your SQL goes here
 -- adding new fields to staking pool balances for display and handling inactive pools
 ALTER TABLE current_delegated_staking_pool_balances
-  ADD COLUMN IF NOT EXISTS operator_commission_percentage NUMERIC NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS operator_commission_percentage NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS inactive_table_handle VARCHAR(66) NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS active_table_handle VARCHAR(66) NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS cdspb_inactive_index ON current_delegated_staking_pool_balances (inactive_table_handle);
 -- adding new fields to staking pool balances for display and handling inactive pools
 ALTER TABLE delegated_staking_pool_balances
-  ADD COLUMN IF NOT EXISTS operator_commission_percentage NUMERIC NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS operator_commission_percentage NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS inactive_table_handle VARCHAR(66) NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS active_table_handle VARCHAR(66) NOT NULL DEFAULT '';
 -- add new field to composite primary key because technically a user could have inactive pools
@@ -29,3 +29,11 @@ FROM current_delegator_balances
 WHERE shares > 0
   AND pool_type = 'active_shares'
 GROUP BY 1;
+-- need this for delegation staking
+CREATE OR REPLACE VIEW delegator_distinct_pool AS
+SELECT delegator_address,
+  pool_address
+FROM current_delegator_balances
+WHERE shares > 0
+GROUP BY 1,
+  2;

@@ -20,3 +20,4 @@ SELECT pool_address,
 FROM current_delegator_balances
 WHERE shares > 0
 GROUP BY 1;
+DROP VIEW IF EXISTS delegator_distinct_pool;
