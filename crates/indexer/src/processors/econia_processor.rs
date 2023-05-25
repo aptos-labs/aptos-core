@@ -35,7 +35,7 @@ use once_cell::sync::Lazy;
 use redis::Commands;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 
 pub const NAME: &str = "econia_processor";
 
@@ -94,10 +94,10 @@ impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
         Self {
             market_id: e.market_id.parse().unwrap(),
             time: e.time.parse().unwrap(),
-            base_account_address: Some(e.base_type.account_address),
-            base_module_name: Some(e.base_type.module_name),
-            base_struct_name: Some(e.base_type.struct_name),
-            base_name_generic: Some(e.base_name_generic),
+            base_account_address: e.base_type.account_address.is_empty().not().then(|| e.base_type.account_address),
+            base_module_name: e.base_type.module_name.is_empty().not().then(|| e.base_type.module_name),
+            base_struct_name: e.base_type.struct_name.is_empty().not().then(|| e.base_type.struct_name),
+            base_name_generic: e.base_name_generic.is_empty().not().then(|| e.base_name_generic),
             quote_account_address: e.quote_type.account_address,
             quote_module_name: e.quote_type.module_name,
             quote_struct_name: e.quote_type.struct_name,
