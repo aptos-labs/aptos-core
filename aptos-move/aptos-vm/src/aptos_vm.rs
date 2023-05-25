@@ -254,10 +254,11 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        aggregator_enabled: bool
     ) -> (VMStatus, TransactionOutputExt) {
         let mut session = self
             .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), false);
+            .new_session(resolver, SessionId::txn_meta(txn_data), aggregator_enabled);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -1141,6 +1142,7 @@ impl AptosVM {
                         resolver,
                         log_context,
                         &storage_gas_params.change_set_configs,
+                        aggregator_enabled
                     )
                 }
             },
@@ -1844,7 +1846,7 @@ impl AptosSimulationVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
-                    true,
+                    false,
                 )
             },
             TransactionPayload::Multisig(multisig) => {
@@ -1870,7 +1872,7 @@ impl AptosSimulationVM {
                                         &mut gas_meter,
                                         &storage_gas_params.change_set_configs,
                                         &txn_data,
-                                        true,
+                                        false,
                                     )?;
 
                                 self.0.success_transaction_cleanup(
@@ -1930,6 +1932,7 @@ impl AptosSimulationVM {
                         resolver,
                         log_context,
                         &storage_gas_params.change_set_configs,
+                        false
                     );
                     (vm_status, output)
                 }
