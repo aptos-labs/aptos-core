@@ -40,7 +40,7 @@ import {
   GetTokenOwnedFromCollection,
   GetCollectionData,
 } from "../indexer/generated/queries";
-import { VERSION } from "../version";
+import { getCustomRequestHeader } from "../utils";
 
 /**
  * Controls the number of results that are returned and the starting position of those results.
@@ -94,7 +94,7 @@ export class IndexerClient {
    */
   async queryIndexer<T>(graphqlQuery: GraphqlQuery): Promise<T> {
     const { data } = await axios.post(this.endpoint, graphqlQuery, {
-      headers: { "x-aptos-client": `aptos-ts-sdk/${VERSION}` },
+      headers: getCustomRequestHeader(),
     });
     if (data.errors) {
       throw new Error(`Indexer data error ${JSON.stringify(data.errors, null, " ")}`);
