@@ -45,8 +45,9 @@ impl OnChainExecutionConfig {
 
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainExecutionConfig {
+    // TODO: revert after testing
     fn default() -> Self {
-        OnChainExecutionConfig::V1(ExecutionConfigV1::default())
+        OnChainExecutionConfig::V3(ExecutionConfigV3::default())
     }
 }
 
