@@ -16,10 +16,10 @@ how you can configure the pruning behavior.
 
 :::note
 By default the ledger pruner keeps 150 million recent transactions. Unless 
-bootstrapped from the genesis and configured otherwise, the node doesn't 
-carry the entirety of the ledger history. Majority of the nodes on both 
-the testnet and mainnet has a partial history of 150 million transactions
-according to this configuration.
+bootstrapped from the genesis and configured to disable the pruner or a long 
+prune window, the node doesn't carry the entirety of the ledger history. 
+Majority of the nodes on both the testnet and mainnet have a partial 
+history of 150 million transactions according to this configuration.
 :::
 
 
