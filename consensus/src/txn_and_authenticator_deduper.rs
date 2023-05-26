@@ -9,9 +9,9 @@ use aptos_types::transaction::SignedTransaction;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-pub struct TxnAndAuthenticatorDeduper {}
+pub struct TxnHashAndAuthenticatorDeduper {}
 
-impl TransactionDeduper for TxnAndAuthenticatorDeduper {
+impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
     fn dedup(&self, transactions: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         let _timer = TXN_DEDUP_SECONDS.start_timer();
         let mut seen = HashMap::new();
@@ -30,6 +30,7 @@ impl TransactionDeduper for TxnAndAuthenticatorDeduper {
             }
         }
         if !is_possible_duplicate {
+            TXN_DEDUP_FILTERED.observe(0 as f64);
             return transactions;
         }
 
@@ -58,11 +59,12 @@ impl TransactionDeduper for TxnAndAuthenticatorDeduper {
                 },
             })
             .collect();
-        TXN_DEDUP_FILTERED.observe(num_duplicates as f64);
         if num_duplicates == 0 {
+            TXN_DEDUP_FILTERED.observe(0 as f64);
             return transactions;
         }
 
+        TXN_DEDUP_FILTERED.observe(num_duplicates as f64);
         transactions
             .into_iter()
             .zip(duplicates)
@@ -71,7 +73,7 @@ impl TransactionDeduper for TxnAndAuthenticatorDeduper {
     }
 }
 
-impl TxnAndAuthenticatorDeduper {
+impl TxnHashAndAuthenticatorDeduper {
     pub fn new() -> Self {
         Self {}
     }
@@ -79,6 +81,264 @@ impl TxnAndAuthenticatorDeduper {
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        transaction_deduper::TransactionDeduper,
+        txn_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper,
+    };
+    use aptos_cached_packages::aptos_stdlib;
+    use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+    use aptos_keygen::KeyGen;
+    use aptos_types::{
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    };
+    use move_core_types::account_address::AccountAddress;
+    use std::time::Instant;
+
+    struct Account {
+        addr: AccountAddress,
+        /// The current private key for this account.
+        pub privkey: Ed25519PrivateKey,
+        /// The current public key for this account.
+        pub pubkey: Ed25519PublicKey,
+    }
+
+    impl Account {
+        pub fn new() -> Self {
+            let (privkey, pubkey) = KeyGen::from_os_rng().generate_ed25519_keypair();
+            Self::with_keypair(privkey, pubkey)
+        }
+
+        pub fn with_keypair(privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) -> Self {
+            let addr = aptos_types::account_address::from_public_key(&pubkey);
+            Account {
+                addr,
+                privkey,
+                pubkey,
+            }
+        }
+    }
+
+    fn raw_txn(
+        payload: TransactionPayload,
+        sender: AccountAddress,
+        seq_num: u64,
+        gas_unit_price: u64,
+    ) -> RawTransaction {
+        RawTransaction::new(
+            sender,
+            seq_num,
+            payload,
+            500_000,
+            gas_unit_price,
+            0,
+            ChainId::new(10),
+        )
+    }
+
+    fn empty_txn(sender: AccountAddress, seq_num: u64, gas_unit_price: u64) -> RawTransaction {
+        let payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+        raw_txn(payload, sender, seq_num, gas_unit_price)
+    }
+
+    fn peer_to_peer_txn(
+        sender: AccountAddress,
+        receiver: AccountAddress,
+        seq_num: u64,
+        gas_unit_price: u64,
+    ) -> RawTransaction {
+        let payload = aptos_stdlib::aptos_coin_transfer(receiver, 1);
+        raw_txn(payload, sender, seq_num, gas_unit_price)
+    }
+
+    fn block(refs: Vec<&SignedTransaction>) -> Vec<SignedTransaction> {
+        refs.into_iter().cloned().collect()
+    }
+
     #[test]
-    fn test_dummy() {}
+    fn test_single_txn() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let txn = empty_txn(sender.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey)
+            .unwrap()
+            .into_inner();
+        let txns = vec![txn];
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(txns.len(), deduped_txns.len());
+        assert_eq!(txns, deduped_txns);
+    }
+
+    #[test]
+    fn test_single_duplicate() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let txn = empty_txn(sender.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey)
+            .unwrap()
+            .into_inner();
+        let txns = block(vec![&txn, &txn]);
+        let expected = block(vec![&txn]);
+        let deduped_txns = deduper.dedup(txns);
+        assert_eq!(expected.len(), deduped_txns.len());
+        assert_eq!(expected, deduped_txns);
+    }
+
+    #[test]
+    fn test_repeated_sequence_number() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let receiver = Account::new();
+
+        let txn_0a = empty_txn(sender.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey.clone())
+            .unwrap()
+            .into_inner();
+        // Different txn, same sender and sequence number. Should not be filtered.
+        let txn_0b = peer_to_peer_txn(sender.addr, receiver.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey)
+            .unwrap()
+            .into_inner();
+        let txns = block(vec![&txn_0a, &txn_0b, &txn_0a]);
+        let expected = block(vec![&txn_0a, &txn_0b]);
+        let deduped_txns = deduper.dedup(txns);
+        assert_eq!(expected.len(), deduped_txns.len());
+        assert_eq!(expected, deduped_txns);
+    }
+
+    #[test]
+    fn test_bad_signer() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let bad_signer = Account::new();
+
+        // Txn signed by a bad signer (not the sender)
+        let txn_0a = empty_txn(sender.addr, 0, 100)
+            .sign(&bad_signer.privkey, bad_signer.pubkey.clone())
+            .unwrap()
+            .into_inner();
+        // Same txn, but signed by the correct signer (sender). Should not be filtered.
+        let txn_0b = empty_txn(sender.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey.clone())
+            .unwrap()
+            .into_inner();
+        let txns = block(vec![&txn_0a, &txn_0b]);
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(txns.len(), deduped_txns.len());
+        assert_eq!(txns, deduped_txns);
+    }
+
+    // The perf tests are simple micro-benchmarks and just output results without checking for regressions
+    static PERF_TXN_PER_BLOCK: usize = 10_000;
+
+    fn measure_dedupe_time(
+        deduper: TxnHashAndAuthenticatorDeduper,
+        txns: Vec<SignedTransaction>,
+    ) -> f64 {
+        let start = Instant::now();
+        let mut iterations = 0;
+        loop {
+            deduper.dedup(txns.clone());
+            iterations += 1;
+            if iterations % 100 == 0 && start.elapsed().as_millis() > 2000 {
+                break;
+            }
+        }
+        let elapsed = start.elapsed();
+        println!(
+            "elapsed: {}, iterations: {}, time per iteration: {}",
+            elapsed.as_secs_f64(),
+            iterations,
+            elapsed.as_secs_f64() / iterations as f64,
+        );
+        elapsed.as_secs_f64() / iterations as f64
+    }
+
+    #[test]
+    fn test_performance_unique_empty_txns() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let txns: Vec<_> = (0..PERF_TXN_PER_BLOCK)
+            .into_iter()
+            .map(|i| {
+                empty_txn(sender.addr, i as u64, 100)
+                    .sign(&sender.privkey, sender.pubkey.clone())
+                    .unwrap()
+                    .into_inner()
+            })
+            .collect();
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(txns.len(), deduped_txns.len());
+        assert_eq!(txns, deduped_txns);
+
+        measure_dedupe_time(deduper, txns);
+    }
+
+    #[test]
+    fn test_performance_duplicate_empty_txns() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let txn = empty_txn(sender.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey)
+            .unwrap()
+            .into_inner();
+        let txns: Vec<_> = std::iter::repeat(txn.clone())
+            .take(PERF_TXN_PER_BLOCK)
+            .collect();
+        let expected = block(vec![&txn]);
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(expected.len(), deduped_txns.len());
+        assert_eq!(expected, deduped_txns);
+
+        measure_dedupe_time(deduper, txns);
+    }
+
+    #[test]
+    fn test_performance_unique_p2p_txns() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let receiver = Account::new();
+        let txns: Vec<_> = (0..PERF_TXN_PER_BLOCK)
+            .into_iter()
+            .map(|i| {
+                peer_to_peer_txn(sender.addr, receiver.addr, i as u64, 100)
+                    .sign(&sender.privkey, sender.pubkey.clone())
+                    .unwrap()
+                    .into_inner()
+            })
+            .collect();
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(txns.len(), deduped_txns.len());
+        assert_eq!(txns, deduped_txns);
+
+        measure_dedupe_time(deduper, txns);
+    }
+
+    #[test]
+    fn test_performance_duplicate_p2p_txns() {
+        let deduper = TxnHashAndAuthenticatorDeduper::new();
+
+        let sender = Account::new();
+        let receiver = Account::new();
+        let txn = peer_to_peer_txn(sender.addr, receiver.addr, 0, 100)
+            .sign(&sender.privkey, sender.pubkey)
+            .unwrap()
+            .into_inner();
+        let txns: Vec<_> = std::iter::repeat(txn.clone())
+            .take(PERF_TXN_PER_BLOCK)
+            .collect();
+        let expected = block(vec![&txn]);
+        let deduped_txns = deduper.dedup(txns.clone());
+        assert_eq!(expected.len(), deduped_txns.len());
+        assert_eq!(expected, deduped_txns);
+
+        measure_dedupe_time(deduper, txns);
+    }
 }

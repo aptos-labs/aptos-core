@@ -110,7 +110,7 @@ impl Default for ExecutionConfigV3 {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
             block_gas_limit: None,
             // TODO: revert after testing
-            transaction_deduper_type: TransactionDeduperType::TxnAndAuthenticatorV1,
+            transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         }
     }
 }
@@ -126,7 +126,7 @@ pub enum TransactionShufflerType {
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionDeduperType {
     NoDedup,
-    TxnAndAuthenticatorV1,
+    TxnHashAndAuthenticatorV1,
 }
 
 #[cfg(test)]
