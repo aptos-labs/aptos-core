@@ -26,7 +26,7 @@ If you are a node operator, [update your nodes with the new release](../nodes/fu
 2. Open the **Watch** menu and select **Custom**.
 3. Select the **Releases** checkbox and click **Apply**.
 
-### Subscribe via [Aptos Discord](https://discord.gg/aptoslabs)
+### Subscribe via [Aptos Discord](https://discord.gg/aptosnetwork)
 Join the Aptos Discord server to interact with us and our community. We also post upcoming releases in these channels.
 
   * [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349)
