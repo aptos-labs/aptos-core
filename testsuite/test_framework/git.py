@@ -1,7 +1,7 @@
 # A wrapper around git operations
 
 from dataclasses import dataclass
-from typing import Generator
+from typing import Generator, Sequence
 from .shell import Shell, RunResult
 
 
@@ -9,7 +9,7 @@ from .shell import Shell, RunResult
 class Git:
     shell: Shell
 
-    def run(self, command) -> RunResult:
+    def run(self, command: Sequence[str]) -> RunResult:
         return self.shell.run(["git", *command])
 
     def last(self, limit: int = 1) -> Generator[str, None, None]:

@@ -8,8 +8,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import unittest
 from dataclasses import dataclass
-from typing import Sequence, Union
+from typing import Sequence, Union, List
 
 
 @dataclass
@@ -133,9 +134,9 @@ class SpyShell(FakeShell):
         expected_command_list: Sequence[FakeCommand],
         strict: bool = False,
     ) -> None:
-        self.expected_command_list = expected_command_list
-        self.commands = []
-        self.strict = strict
+        self.expected_command_list: Sequence[FakeCommand] = expected_command_list
+        self.commands: List[str] = []
+        self.strict: bool = strict
 
     def get_fake_commands(self) -> Sequence[str]:
         """Get the list of commands that are expected to be run"""
@@ -144,11 +145,6 @@ class SpyShell(FakeShell):
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
         """Mock a command run by adding it to a list of commands and returning the result"""
         rendered_command = " ".join(command)
-        default = (
-            Exception(f"Command not mocked: {rendered_command}")
-            if self.strict
-            else super().run(command)
-        )
         # get how many times it's been called before, and use that to index into the expected command list
         # XXX: could be optimized, since it does N^2 scans of the command list
         times_called_before = self.commands.count(rendered_command)
@@ -179,6 +175,6 @@ class SpyShell(FakeShell):
     ) -> RunResult:
         return self.run(command, stream_output)
 
-    def assert_commands(self, testcase) -> None:
+    def assert_commands(self, testcase: unittest.TestCase) -> None:
         """Compare the list of commands that were run to the list of expected commands"""
         testcase.assertEqual(self.get_fake_commands(), self.commands)

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import (
     Callable,
     Generator,
+    List,
 )
 
 
@@ -75,7 +76,7 @@ class FakeProcess(Process):
 
 class FakeProcesses(Processes):
     def __init__(self) -> None:
-        self.exit_callbacks = []
+        self.exit_callbacks: List[Callable[[], None]] = []
 
     def processes(self) -> Generator[Process, None, None]:
         yield FakeProcess("concensus", 1)

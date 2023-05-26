@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import resource
 import tempfile
+import unittest
 from typing import Dict, List, Optional
 
 
@@ -81,10 +82,10 @@ class SpyFilesystem(FakeFilesystem):
         self.expected_writes = expected_writes
         self.expected_reads = expected_reads
         self.expected_unlinks = expected_unlinks or []
-        self.writes = {}
-        self.reads = []
+        self.writes: Dict[str, bytes] = {}
+        self.reads: List[str] = []
         self.temp_count = 1
-        self.unlinks = []
+        self.unlinks: List[str] = []
 
     def write(self, filename: str, contents: bytes) -> None:
         self.writes[filename] = contents
@@ -96,7 +97,7 @@ class SpyFilesystem(FakeFilesystem):
         self.reads.append(filename)
         return self.expected_reads.get(filename, b"")
 
-    def assert_writes(self, testcase) -> None:
+    def assert_writes(self, testcase: unittest.TestCase) -> None:
         for filename, contents in self.expected_writes.items():
             testcase.assertIn(
                 filename, self.writes, f"{filename} was not written: {self.writes}"
@@ -107,8 +108,8 @@ class SpyFilesystem(FakeFilesystem):
                 f"{filename} did not match expected contents",
             )
 
-    def assert_reads(self, testcase) -> None:
-        for filename, content in self.expected_reads.items():
+    def assert_reads(self, testcase: unittest.TestCase) -> None:
+        for filename, _content in self.expected_reads.items():
             # if content == FILE_NOT_FOUND:
             #     testcase.assertNotIn(
             #         filename, self.reads, f"{filename} was not expected to be read"
@@ -130,7 +131,7 @@ class SpyFilesystem(FakeFilesystem):
     def unlink(self, filename: str) -> None:
         self.unlinks.append(filename)
 
-    def assert_unlinks(self, testcase) -> None:
+    def assert_unlinks(self, testcase: unittest.TestCase) -> None:
         for filename in self.expected_unlinks:
             testcase.assertIn(filename, self.unlinks, f"{filename} was not unlinked")
 

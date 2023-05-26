@@ -30,7 +30,7 @@ class GcpError(Exception):
 
 class GetPodsItemMetadata(TypedDict):
     name: str
-    labels: dict
+    labels: Dict[str, str]
 
 
 class GetPodsItemStatus(TypedDict):
@@ -87,7 +87,7 @@ class ForgeCluster:
         )
         pods_result: GetPodsResult = json.loads(pod_result)
         pods = pods_result["items"]
-        forge_jobs = []
+        forge_jobs: List[ForgeJob] = []
 
         # For each forge test runner pod, get the forge namespace and get the pods in that namespace
         # to infer the number of validators and fullnodes for each job
@@ -175,6 +175,8 @@ class ForgeCluster:
         elif self.cloud == Cloud.GCP:
             # set the KUBE_CONFIG to temp so the resulting kubeconfig is written to it
             os.environ["KUBECONFIG"] = temp
+            if self.region is None:
+                raise Exception("GCP region must be set")
             # The project must already be set via: gcloud config set project <project>
             cmd = [
                 "gcloud",
