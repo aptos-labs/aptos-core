@@ -5,7 +5,7 @@ use crate::{
     error::Error,
     handler::Handler,
     metrics,
-    metrics::{increment_counter, SUBSCRIPTION_EVENT_EXPIRE},
+    metrics::{increment_counter, OPTIMISTIC_FETCH_EXPIRE},
     moderator::RequestModerator,
     network::ResponseSender,
     storage::StorageReaderInterface,
@@ -28,16 +28,16 @@ use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use lru::LruCache;
 use std::{cmp::min, collections::HashMap, sync::Arc, time::Instant};
 
-/// A subscription for data received by a client
-pub struct DataSubscriptionRequest {
+/// An optimistic fetch request from a peer
+pub struct OptimisticFetchRequest {
     protocol: ProtocolId,
     request: StorageServiceRequest,
     response_sender: ResponseSender,
-    subscription_start_time: Instant,
+    fetch_start_time: Instant,
     time_service: TimeService,
 }
 
-impl DataSubscriptionRequest {
+impl OptimisticFetchRequest {
     pub fn new(
         protocol: ProtocolId,
         request: StorageServiceRequest,
@@ -48,12 +48,12 @@ impl DataSubscriptionRequest {
             protocol,
             request,
             response_sender,
-            subscription_start_time: time_service.now(),
+            fetch_start_time: time_service.now(),
             time_service,
         }
     }
 
-    /// Creates a new storage service request to satisfy the subscription
+    /// Creates a new storage service request to satisfy the optimistic fetch
     /// using the new data at the specified `target_ledger_info`.
     fn get_storage_request_for_missing_data(
         &self,
@@ -114,7 +114,7 @@ impl DataSubscriptionRequest {
                     },
                 )
             },
-            request => unreachable!("Unexpected subscription request: {:?}", request),
+            request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         };
         let storage_request =
             StorageServiceRequest::new(data_request, self.request.use_compression);
@@ -127,7 +127,7 @@ impl DataSubscriptionRequest {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_version,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_version,
             DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_version,
-            request => unreachable!("Unexpected subscription request: {:?}", request),
+            request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }
     }
 
@@ -137,7 +137,7 @@ impl DataSubscriptionRequest {
             DataRequest::GetNewTransactionOutputsWithProof(request) => request.known_epoch,
             DataRequest::GetNewTransactionsWithProof(request) => request.known_epoch,
             DataRequest::GetNewTransactionsOrOutputsWithProof(request) => request.known_epoch,
-            request => unreachable!("Unexpected subscription request: {:?}", request),
+            request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }
     }
 
@@ -152,59 +152,59 @@ impl DataSubscriptionRequest {
             DataRequest::GetNewTransactionsOrOutputsWithProof(_) => {
                 config.max_transaction_output_chunk_size
             },
-            request => unreachable!("Unexpected subscription request: {:?}", request),
+            request => unreachable!("Unexpected optimistic fetch request: {:?}", request),
         }
     }
 
-    /// Returns true iff the subscription has expired
+    /// Returns true iff the optimistic fetch has expired
     fn is_expired(&self, timeout_ms: u64) -> bool {
         let current_time = self.time_service.now();
         let elapsed_time = current_time
-            .duration_since(self.subscription_start_time)
+            .duration_since(self.fetch_start_time)
             .as_millis();
         elapsed_time > timeout_ms as u128
     }
 }
 
-/// Handles ready (and expired) data subscriptions
-pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
+/// Handles ready (and expired) optimistic fetches
+pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
 ) -> Result<(), Error> {
-    // Remove all expired subscriptions
-    remove_expired_data_subscriptions(config, data_subscriptions.clone());
+    // Remove all expired optimistic fetches
+    remove_expired_optimistic_fetches(config, optimistic_fetches.clone());
 
-    // Identify the peers with ready subscriptions
-    let peers_with_ready_subscriptions = get_peers_with_ready_subscriptions(
+    // Identify the peers with ready optimistic fetches
+    let peers_with_ready_optimistic_fetches = get_peers_with_ready_optimistic_fetches(
         cached_storage_server_summary.clone(),
-        data_subscriptions.clone(),
+        optimistic_fetches.clone(),
         lru_response_cache.clone(),
         request_moderator.clone(),
         storage.clone(),
         time_service.clone(),
     )?;
 
-    // Remove and handle the ready subscriptions
-    for (peer, target_ledger_info) in peers_with_ready_subscriptions {
-        if let Some(data_subscription) = data_subscriptions.clone().lock().remove(&peer) {
+    // Remove and handle the ready optimistic fetches
+    for (peer, target_ledger_info) in peers_with_ready_optimistic_fetches {
+        if let Some(optimistic_fetch) = optimistic_fetches.clone().lock().remove(&peer) {
             if let Err(error) = notify_peer_of_new_data(
                 cached_storage_server_summary.clone(),
                 config,
-                data_subscriptions.clone(),
+                optimistic_fetches.clone(),
                 lru_response_cache.clone(),
                 request_moderator.clone(),
                 storage.clone(),
                 time_service.clone(),
                 &peer,
-                data_subscription,
+                optimistic_fetch,
                 target_ledger_info,
             ) {
-                warn!(LogSchema::new(LogEntry::SubscriptionResponse)
+                warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
                     .error(&Error::UnexpectedErrorEncountered(error.to_string())));
             }
         }
@@ -213,12 +213,12 @@ pub(crate) fn handle_active_data_subscriptions<T: StorageReaderInterface>(
     Ok(())
 }
 
-/// Identifies the data subscriptions that can be handled now.
-/// Returns the list of peers that made those subscriptions
+/// Identifies the optimistic fetches that can be handled now.
+/// Returns the list of peers that made those optimistic fetches
 /// alongside the ledger info at the target version for the peer.
-pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
+pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
@@ -233,60 +233,60 @@ pub(crate) fn get_peers_with_ready_subscriptions<T: StorageReaderInterface>(
     let highest_synced_version = highest_synced_ledger_info.ledger_info().version();
     let highest_synced_epoch = highest_synced_ledger_info.ledger_info().epoch();
 
-    // Identify the peers with ready subscriptions
-    let mut ready_subscriptions = vec![];
-    let mut invalid_peer_subscriptions = vec![];
-    for (peer, data_subscription) in data_subscriptions.lock().iter() {
-        let highest_known_version = data_subscription.highest_known_version();
+    // Identify the peers with ready optimistic fetches
+    let mut ready_optimistic_fetches = vec![];
+    let mut invalid_peer_optimistic_fetches = vec![];
+    for (peer, optimistic_fetch) in optimistic_fetches.lock().iter() {
+        let highest_known_version = optimistic_fetch.highest_known_version();
         if highest_known_version < highest_synced_version {
-            let highest_known_epoch = data_subscription.highest_known_epoch();
+            let highest_known_epoch = optimistic_fetch.highest_known_epoch();
             if highest_known_epoch < highest_synced_epoch {
                 // The peer needs to sync to their epoch ending ledger info
                 let epoch_ending_ledger_info = get_epoch_ending_ledger_info(
                     cached_storage_server_summary.clone(),
-                    data_subscriptions.clone(),
+                    optimistic_fetches.clone(),
                     highest_known_epoch,
                     lru_response_cache.clone(),
                     request_moderator.clone(),
                     peer,
-                    data_subscription.protocol,
+                    optimistic_fetch.protocol,
                     storage.clone(),
                     time_service.clone(),
                 )?;
 
-                // Check that we haven't been sent an invalid subscription request
+                // Check that we haven't been sent an invalid optimistic fetch request
                 // (i.e., a request that does not respect an epoch boundary).
                 if epoch_ending_ledger_info.ledger_info().version() <= highest_known_version {
-                    invalid_peer_subscriptions.push(*peer);
+                    invalid_peer_optimistic_fetches.push(*peer);
                 } else {
-                    ready_subscriptions.push((*peer, epoch_ending_ledger_info));
+                    ready_optimistic_fetches.push((*peer, epoch_ending_ledger_info));
                 }
             } else {
-                ready_subscriptions.push((*peer, highest_synced_ledger_info.clone()));
+                ready_optimistic_fetches.push((*peer, highest_synced_ledger_info.clone()));
             };
         }
     }
 
-    // Remove the invalid subscriptions
-    for peer in invalid_peer_subscriptions {
-        if let Some(data_subscription) = data_subscriptions.lock().remove(&peer) {
-            warn!(LogSchema::new(LogEntry::SubscriptionRefresh)
+    // Remove the invalid optimistic fetches
+    for peer in invalid_peer_optimistic_fetches {
+        if let Some(optimistic_fetch) = optimistic_fetches.lock().remove(&peer) {
+            warn!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
                 .error(&Error::InvalidRequest(
                     "Mismatch between known version and epoch!".into()
                 ))
-                .request(&data_subscription.request)
-                .message("Dropping invalid subscription request!"));
+                .request(&optimistic_fetch.request)
+                .message("Dropping invalid optimistic fetch request!"));
         }
     }
 
-    // Return the ready subscriptions
-    Ok(ready_subscriptions)
+    // Return the ready optimistic fetches
+    Ok(ready_optimistic_fetches)
 }
 
 /// Gets the epoch ending ledger info at the given epoch
 fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     epoch: u64,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
@@ -308,7 +308,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     // Process the request
     let handler = Handler::new(
         cached_storage_server_summary,
-        data_subscriptions,
+        optimistic_fetches,
         lru_response_cache,
         request_moderator,
         storage,
@@ -341,30 +341,30 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     }
 }
 
-/// Notifies a subscriber of new data according to the target ledger info.
+/// Notifies a peer of new data according to the target ledger info.
 ///
-/// Note: we don't need to check the size of the subscription response
+/// Note: we don't need to check the size of the optimistic fetch response
 /// because: (i) each sub-part should already be checked; and (ii)
-/// subscription responses are best effort.
+/// optimistic fetch responses are best effort.
 fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     config: StorageServiceConfig,
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
     peer_network_id: &PeerNetworkId,
-    subscription: DataSubscriptionRequest,
+    optimistic_fetch: OptimisticFetchRequest,
     target_ledger_info: LedgerInfoWithSignatures,
 ) -> aptos_storage_service_types::Result<(), Error> {
-    match subscription.get_storage_request_for_missing_data(config, &target_ledger_info) {
+    match optimistic_fetch.get_storage_request_for_missing_data(config, &target_ledger_info) {
         Ok(storage_request) => {
             // Handle the storage service request to fetch the missing data
             let use_compression = storage_request.use_compression;
             let handler = Handler::new(
                 cached_storage_server_summary,
-                data_subscriptions,
+                optimistic_fetches,
                 lru_response_cache,
                 request_moderator,
                 storage,
@@ -372,12 +372,12 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
             );
             let storage_response = handler.process_request(
                 peer_network_id,
-                subscription.protocol,
+                optimistic_fetch.protocol,
                 storage_request.clone(),
                 true,
             );
 
-            // Transform the missing data into a subscription response
+            // Transform the missing data into an optimistic fetch response
             let transformed_data_response = match storage_response {
                 Ok(storage_response) => match storage_response.get_data_response() {
                     Ok(DataResponse::TransactionsWithProof(transactions_with_proof)) => {
@@ -441,7 +441,7 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
             handler.send_response(
                 storage_request,
                 Ok(storage_response),
-                subscription.response_sender,
+                optimistic_fetch.response_sender,
             );
             Ok(())
         },
@@ -449,23 +449,23 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
     }
 }
 
-/// Removes all expired data subscriptions
-pub(crate) fn remove_expired_data_subscriptions(
+/// Removes all expired optimistic fetches
+pub(crate) fn remove_expired_optimistic_fetches(
     config: StorageServiceConfig,
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
 ) {
-    data_subscriptions.lock().retain(|_, data_subscription| {
-        // Update the expired subscription metrics
-        if data_subscription.is_expired(config.max_subscription_period_ms) {
-            let protocol = data_subscription.protocol;
+    optimistic_fetches.lock().retain(|_, optimistic_fetch| {
+        // Update the expired optimistic fetch metrics
+        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+            let protocol = optimistic_fetch.protocol;
             increment_counter(
-                &metrics::SUBSCRIPTION_EVENT,
+                &metrics::OPTIMISTIC_FETCH_EVENTS,
                 protocol,
-                SUBSCRIPTION_EVENT_EXPIRE.into(),
+                OPTIMISTIC_FETCH_EXPIRE.into(),
             );
         }
 
-        // Only retain non-expired subscriptions
-        !data_subscription.is_expired(config.max_subscription_period_ms)
+        // Only retain non-expired optimistic fetches
+        !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
     });
 }
