@@ -1,9 +1,10 @@
 # Aptos CLI Changelog
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-## [1.0.14] - TBD
+## [1.0.14] - 2023/05/26
 ### Added
-* update DB boostrap command with new db restore features
+- Add nested vector arg support
+- Updated DB bootstrap command with new DB restore features
 
 ## [1.0.13] - 2023/04/27
 ### Fixed
