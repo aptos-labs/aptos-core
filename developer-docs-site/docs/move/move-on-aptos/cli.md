@@ -1498,12 +1498,7 @@ aptos multisig verify-proposal \
 
 ```bash
 {
-  "Result": {
-    "Status": "Transaction mismatch",
-    "Provided payload hash": "0xe494b0072d6f940317344967cf0e818c80082375833708c773b0275f3ad07e51",
-    "On-chain payload hash": "0x070ed7c3f812f25f585461305d507b96a4e756f784e01c8c59901871267a1580",
-    "For more information": "https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
-  }
+  "Error": "Unexpected error: Transaction mismatch: The transaction you provided has a payload hash of 0xe494b0072d6f940317344967cf0e818c80082375833708c773b0275f3ad07e51, but the on-chain transaction proposal you specified has a payload hash of 0x070ed7c3f812f25f585461305d507b96a4e756f784e01c8c59901871267a1580. For more info, see https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
 }
 ```
 

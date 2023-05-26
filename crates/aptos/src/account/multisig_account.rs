@@ -209,20 +209,19 @@ impl CliCommand<serde_json::Value> for VerifyProposal {
                 )?
             };
         // Get verification result based on if expected and actual payload hashes match.
-        let result = if expected_payload_hash.eq(&actual_payload_hash) {
-            json!({
+        if expected_payload_hash.eq(&actual_payload_hash) {
+            Ok(json!({
                 "Status": "Transaction match",
                 "Multisig transaction": multisig_transaction
-            })
+            }))
         } else {
-            json!({
-                "Status": "Transaction mismatch",
-                "Provided payload hash": expected_payload_hash,
-                "On-chain payload hash": actual_payload_hash,
-                "For more information": "https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
-            })
-        };
-        Ok(result)
+            Err(CliError::UnexpectedError(format!(
+                "Transaction mismatch: The transaction you provided has a payload hash of \
+                {expected_payload_hash}, but the on-chain transaction proposal you specified has \
+                a payload hash of {actual_payload_hash}. For more info, see \
+                https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
+            )))
+        }
     }
 }
 
