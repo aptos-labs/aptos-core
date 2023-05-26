@@ -9,7 +9,9 @@ interface RequestOptions {
 
 export class Http2Client {
   private endpoint: string;
+
   private requestCounter = 0; // Counter for pending requests
+
   private session: any;
 
   constructor(endpoint: string) {
@@ -17,11 +19,11 @@ export class Http2Client {
   }
 
   incrementCounter() {
-    this.requestCounter++;
+    this.requestCounter += 1;
   }
 
   decrementCounter() {
-    this.requestCounter--;
+    this.requestCounter -= 1;
     if (this.requestCounter === 0) {
       // Close the session when all requests are completed
       this.session.close();
