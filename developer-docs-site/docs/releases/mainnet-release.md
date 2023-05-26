@@ -5,7 +5,7 @@ slug: "mainnet-release"
 
 # Latest Mainnet Release
 
-The table below contains latest release information for each Aptos component in the mainnet network. We also suggest you monitor the [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) channel of [Aptos Discord](https://discord.gg/aptoslabs) for ongoing updates.
+The table below contains latest release information for each Aptos component in the mainnet network. We also suggest you monitor the [#mainnet-release](https://discord.com/channels/945856774056083548/1042502400507916349) channel of [Aptos Discord](https://discord.gg/aptosnetwork) for ongoing updates.
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 
