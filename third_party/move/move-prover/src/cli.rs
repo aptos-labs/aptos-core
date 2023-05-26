@@ -10,7 +10,7 @@ use anyhow::anyhow;
 use clap::{Arg, Command};
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
-use move_abigen::AbigenOptions;
+use move_abigen::{AbigenOptions, StructAbigenOptions};
 use move_compiler::shared::NumericalAddress;
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
@@ -50,6 +50,8 @@ pub struct Options {
     pub run_docgen: bool,
     /// Whether to run the ABI generator instead of the prover.
     pub run_abigen: bool,
+    /// Whether to run the struct ABI generator instead of the prover.
+    pub run_struct_abigen: bool,
     /// Whether to run the error map generator instead of the prover.
     pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
@@ -75,6 +77,8 @@ pub struct Options {
     pub backend: BoogieOptions,
     /// Options for the ABI generator.
     pub abigen: AbigenOptions,
+    /// Options for the struct ABI generator.
+    pub struct_abigen: StructAbigenOptions,
     /// Options for the error map generator.
     /// TODO: this currently create errors during deserialization, so skip them for this.
     #[serde(skip_serializing)]
@@ -87,6 +91,7 @@ impl Default for Options {
             output_path: "output.bpl".to_string(),
             run_docgen: false,
             run_abigen: false,
+            run_struct_abigen: false,
             run_errmapgen: false,
             run_read_write_set: false,
             verbosity_level: LevelFilter::Info,
@@ -98,6 +103,7 @@ impl Default for Options {
             backend: BoogieOptions::default(),
             docgen: DocgenOptions::default(),
             abigen: AbigenOptions::default(),
+            struct_abigen: StructAbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
         }
@@ -289,6 +295,12 @@ impl Options {
                     .long("abigen")
                     .help("runs the ABI generator instead of the prover. \
                     Generated ABIs will be written into the directory `./abi` unless configured otherwise via toml"),
+            )
+            .arg(
+                Arg::new("struct-abigen")
+                    .long("struct-abigen")
+                    .help("runs the struct ABI generator instead of the prover. \
+                    Generated ABIs will be written into the file `abi.yaml` unless configured otherwise via toml"),
             )
             .arg(
                 Arg::new("errmapgen")
@@ -663,6 +675,9 @@ impl Options {
         }
         if matches.is_present("abigen") {
             options.run_abigen = true;
+        }
+        if matches.is_present("struct-abigen") {
+            options.run_struct_abigen = true;
         }
         if matches.is_present("errmapgen") {
             options.run_errmapgen = true;

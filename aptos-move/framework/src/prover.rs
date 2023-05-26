@@ -186,6 +186,7 @@ impl ProverOptions {
                 loop_unroll: self.loop_unroll,
                 ..Default::default()
             },
+            run_struct_abigen: true,
             ..Default::default()
         };
         if self.for_test {

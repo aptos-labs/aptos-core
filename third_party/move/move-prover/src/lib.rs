@@ -9,7 +9,7 @@ use anyhow::anyhow;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-use move_abigen::Abigen;
+use move_abigen::{Abigen, StructAbigen};
 use move_compiler::shared::PackagePaths;
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
@@ -111,6 +111,10 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     // Same for ABI generator.
     if options.run_abigen {
         return run_abigen(env, &options, now);
+    }
+    // Same for struct ABI generator.
+    if options.run_struct_abigen {
+        return run_struct_abigen(env, &options, now);
     }
     // Same for the error map generator
     if options.run_errmapgen {
@@ -332,4 +336,24 @@ fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
         checking_elapsed.as_secs_f64(),
         (generating_elapsed - checking_elapsed).as_secs_f64()
     );
+}
+
+fn run_struct_abigen(env: &GlobalEnv, options: &Options, now: Instant) -> anyhow::Result<()> {
+    let mut generator = StructAbigen::new(env, &options.struct_abigen);
+    let checking_elapsed = now.elapsed();
+    info!("generating ABI files");
+    generator.gen()?;
+
+    fs::write(
+        PathBuf::from(&options.struct_abigen.output_path).as_path(),
+        &serde_yaml::to_vec(&generator.into_result())?,
+    )
+    .unwrap();
+    let generating_elapsed = now.elapsed();
+    info!(
+        "{:.3}s checking, {:.3}s generating",
+        checking_elapsed.as_secs_f64(),
+        (generating_elapsed - checking_elapsed).as_secs_f64()
+    );
+    Ok(())
 }

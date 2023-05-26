@@ -7883,6 +7883,7 @@ dependencies = [
  "move-prover",
  "move-prover-test-utils",
  "serde 1.0.149",
+ "serde-reflection",
  "tempfile",
 ]
 
@@ -8399,6 +8400,7 @@ dependencies = [
  "rand 0.8.5",
  "serde 1.0.149",
  "serde_json",
+ "serde_yaml 0.8.26",
  "shell-words",
  "simplelog",
  "tempfile",

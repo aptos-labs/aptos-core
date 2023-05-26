@@ -7,5 +7,7 @@
 extern crate core;
 
 mod abigen;
+mod structgen;
 
 pub use crate::abigen::*;
+pub use crate::structgen::*;
