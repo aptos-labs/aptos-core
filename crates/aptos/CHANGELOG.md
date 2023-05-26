@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [1.0.14] - 2023/05/26
 ### Added
 - Add nested vector arg support
-- update DB boostrap command with new db restore features
+- Updated DB bootstrap command with new DB restore features
 
 ## [1.0.13] - 2023/04/27
 ### Fixed
