@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::txn_and_authenticator_deduper::TxnAndAuthenticatorDeduper;
+use crate::txn_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper;
 use aptos_logger::info;
 use aptos_types::{on_chain_config::TransactionDeduperType, transaction::SignedTransaction};
 use std::sync::Arc;
@@ -25,9 +25,9 @@ pub fn create_transaction_deduper(
 ) -> Arc<dyn TransactionDeduper> {
     match deduper_type {
         TransactionDeduperType::NoDedup => Arc::new(NoOpDeduper {}),
-        TransactionDeduperType::TxnAndAuthenticatorV1 => {
+        TransactionDeduperType::TxnHashAndAuthenticatorV1 => {
             info!("Using simple hash set transaction deduper");
-            Arc::new(TxnAndAuthenticatorDeduper::new())
+            Arc::new(TxnHashAndAuthenticatorDeduper::new())
         },
     }
 }

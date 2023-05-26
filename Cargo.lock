@@ -570,6 +570,7 @@ dependencies = [
  "anyhow",
  "aptos-bitvec",
  "aptos-bounded-executor",
+ "aptos-cached-packages",
  "aptos-channels",
  "aptos-config",
  "aptos-consensus-notifications",
