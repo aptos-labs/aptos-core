@@ -13,7 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
-  getCustomRequestHeader,
+  customHeader,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -86,7 +86,7 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
-    conf.HEADERS = { ...conf.HEADERS, ...getCustomRequestHeader() };
+    conf.HEADERS = { ...conf.HEADERS, ...customHeader };
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 

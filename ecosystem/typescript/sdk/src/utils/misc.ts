@@ -33,6 +33,7 @@ export const DEFAULT_TXN_EXP_SEC_FROM_NOW = 20;
 export const DEFAULT_TXN_TIMEOUT_SEC = 20;
 export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
 
-export function getCustomRequestHeader() {
-  return { "x-aptos-client": `aptos-ts-sdk/${VERSION}` };
-}
+export const customHeader = { "x-aptos-client": `aptos-ts-sdk/${VERSION}` };
+// export function getCustomRequestHeader() {
+//   return { "x-aptos-client": `aptos-ts-sdk/${VERSION}` };
+//}
