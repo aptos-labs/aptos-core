@@ -1,0 +1,231 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 5,
+      "panels": [],
+      "title": "Aggregations",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 1 },
+      "id": 7,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "This section contains queries that aggregate across all clients. This means the `source_client` variable above doesn't do anything.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "title": "Explanation",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+      "description": "This shows the most popular clients.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 4 },
+      "id": 1,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+          "editorMode": "builder",
+          "expr": "count by(request_source_client) (label_replace(aptos_api_request_source_client, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\"))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by client",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+      "description": "This shows the most popular clients. There is a separate entry per client + client version.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 4 },
+      "id": 8,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+          "editorMode": "builder",
+          "expr": "count by(request_source_client) (aptos_api_request_source_client)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Requests by client + version",
+      "type": "piechart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "id": 4,
+      "panels": [],
+      "repeat": "source_client",
+      "repeatDirection": "h",
+      "title": "Per client",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 20 },
+      "id": 6,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "This section contains queries that show data for a specific client. To select which client to view metrics for, select one in the `source_client` variable dropdown above.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "title": "Explanation",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+      "description": "This shows what are the top 5 most common endpoints called by users of this client.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 23 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+          "editorMode": "code",
+          "expr": "topk(5, count by(operation_id) (aptos_api_request_source_client{request_source_client=\"$source_client\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 endpoints",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+      "description": "If we see a client is making requests to a particular endpoint and getting lots of 400s, it could indicate an issue with the client. It could also just indicate bad requests by the user, so we need to take this with a pinch of salt.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 23 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+          "editorMode": "builder",
+          "expr": "topk(5, count by(operation_id) (aptos_api_request_source_client{status=\"400\", request_source_client=\"$source_client\"}))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Top 5 endpoints where the response is a 400",
+      "type": "piechart"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "unknown", "value": "unknown" },
+        "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+        "definition": "label_values(aptos_api_request_source_client,request_source_client)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "source_client",
+        "options": [],
+        "query": {
+          "query": "label_values(aptos_api_request_source_client,request_source_client)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Developer Platform Client Metrics",
+  "uid": "be847ea3-c7cc-4048-b783-eb2fdb4f1abd",
+  "version": 27,
+  "weekStart": ""
+}
