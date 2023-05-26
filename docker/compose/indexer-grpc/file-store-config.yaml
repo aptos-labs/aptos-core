@@ -1,0 +1,7 @@
+health_check_port: 8083
+
+server_config:
+  redis_main_instance_address: 172.16.1.12:6379
+  file_store_config:
+    file_store_type: LocalFileStore
+    local_file_store_path: /opt/aptos/file-store

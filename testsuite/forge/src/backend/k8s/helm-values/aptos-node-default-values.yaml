@@ -36,6 +36,3 @@ service:
 loadTestGenesis: false
 # always run forge in privileged mode for extra testing capability
 enablePrivilegedMode: true
-# always run forge with profiling enabled
-pyroscope:
-  enabled: true

@@ -15,7 +15,7 @@ use crate::{
     schema::coin_activities,
     utils::util::{get_entry_function_from_user_request, standardize_address},
 };
-use aptos_protos::transaction::testing1::v1::{
+use aptos_protos::transaction::v1::{
     transaction::TxnData, write_set_change::Change as WriteSetChangeEnum, Event as EventPB,
     Transaction as TransactionPB, TransactionInfo, UserTransactionRequest,
 };

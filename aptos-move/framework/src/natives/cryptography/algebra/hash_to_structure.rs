@@ -5,7 +5,7 @@ use crate::{
     natives::{
         cryptography::algebra::{
             gas::HashToGasParameters, AlgebraContext, HashToStructureSuite, Structure,
-            MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
     },
@@ -107,7 +107,7 @@ pub fn hash_to_internal(
             >::new(dst)
             .unwrap();
             let new_element = <ark_bls12_381::G1Projective>::from(mapper.hash(msg).unwrap());
-            let new_handle = store_element!(context, new_element);
+            let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         (Some(Structure::BLS12381G2), Some(HashToStructureSuite::Bls12381g2XmdSha256SswuRo)) => {
@@ -128,7 +128,7 @@ pub fn hash_to_internal(
             >::new(dst)
             .unwrap();
             let new_element = <ark_bls12_381::G2Projective>::from(mapper.hash(msg).unwrap());
-            let new_handle = store_element!(context, new_element);
+            let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort {

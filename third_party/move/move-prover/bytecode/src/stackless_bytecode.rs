@@ -8,12 +8,12 @@ use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::u256;
 use move_model::{
-    ast::{Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
+    ast,
+    ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
 };
-use num::BigUint;
 use std::{collections::BTreeMap, fmt, fmt::Formatter};
 
 /// A label for a branch destination.
@@ -91,9 +91,9 @@ pub enum Constant {
     U8(u8),
     U64(u64),
     U128(u128),
-    Address(BigUint),
+    Address(Address),
     ByteArray(Vec<u8>),
-    AddressArray(Vec<BigUint>), // TODO: merge AddressArray to Vector type in the futureq
+    AddressArray(Vec<Address>), // TODO: merge AddressArray to Vector type in the future
     Vector(Vec<Constant>),
     U16(u16),
     U32(u32),
@@ -853,7 +853,7 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                     f,
                     "@{} := save_spec_var({}::{})",
                     label.as_usize(),
-                    module_env.get_name().display(env.symbol_pool()),
+                    module_env.get_name().display(env),
                     spec_var.name.display(env.symbol_pool())
                 )?;
             },
@@ -947,7 +947,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                     func_env
                         .module_env
                         .get_name()
-                        .display(func_env.symbol_pool()),
+                        .display(func_env.module_env.env),
                     func_env.get_name().display(func_env.symbol_pool()),
                 )?;
                 self.fmt_type_args(f, targs)?;
@@ -1124,10 +1124,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
 impl<'env> OperationDisplay<'env> {
     fn fmt_type_args(&self, f: &mut Formatter<'_>, targs: &[Type]) -> fmt::Result {
         if !targs.is_empty() {
-            let tctx = TypeDisplayContext::WithEnv {
-                env: self.func_target.global_env(),
-                type_param_names: None,
-            };
+            let tctx = TypeDisplayContext::new(self.func_target.global_env());
             write!(f, "<")?;
             for (i, ty) in targs.iter().enumerate() {
                 if i > 0 {
@@ -1142,10 +1139,7 @@ impl<'env> OperationDisplay<'env> {
 
     fn struct_str(&self, mid: ModuleId, sid: StructId, targs: &[Type]) -> String {
         let ty = Type::Struct(mid, sid, targs.to_vec());
-        let tctx = TypeDisplayContext::WithEnv {
-            env: self.func_target.global_env(),
-            type_param_names: None,
-        };
+        let tctx = TypeDisplayContext::new(self.func_target.global_env());
         format!("{}", ty.display(&tctx))
     }
 }
@@ -1159,20 +1153,23 @@ impl fmt::Display for Constant {
             U64(x) => write!(f, "{}", x)?,
             U128(x) => write!(f, "{}", x)?,
             U256(x) => write!(f, "{}", x)?,
-            Address(x) => write!(f, "0x{}", x.to_str_radix(16))?,
+            Address(x) => write!(f, "{}", address_to_string(x))?,
             ByteArray(x) => write!(f, "{:?}", x)?,
-            AddressArray(x) => write!(
-                f,
-                "{:?}",
-                x.iter()
-                    .map(|v| format!("0x{}", v.to_str_radix(16)))
-                    .collect_vec()
-            )?,
+            AddressArray(x) => write!(f, "{:?}", x.iter().map(address_to_string).collect_vec())?,
             Vector(x) => write!(f, "{:?}", x.iter().map(|v| format!("{}", v)).collect_vec())?,
             U16(x) => write!(f, "{}", x)?,
             U32(x) => write!(f, "{}", x)?,
         }
         Ok(())
+    }
+}
+
+/// We currently cannot print symbolic addresses, so we print their debug string. Since
+/// the output is not for end users, this should be OK.
+fn address_to_string(addr: &ast::Address) -> String {
+    match addr {
+        Address::Numerical(a) => format!("0x{}", a.short_str_lossless()),
+        Address::Symbolic(s) => format!("sym-{:?}", s),
     }
 }
 
@@ -1201,10 +1198,7 @@ impl<'env> fmt::Display for BorrowNodeDisplay<'env> {
         match self.node {
             GlobalRoot(s) => {
                 let ty = Type::Struct(s.module_id, s.id, s.inst.to_owned());
-                let tctx = TypeDisplayContext::WithEnv {
-                    env: self.func_target.global_env(),
-                    type_param_names: None,
-                };
+                let tctx = TypeDisplayContext::new(self.func_target.global_env());
                 write!(f, "{}", ty.display(&tctx))?;
             },
             LocalRoot(idx) => {
@@ -1234,10 +1228,7 @@ pub struct BorrowEdgeDisplay<'a> {
 impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use BorrowEdge::*;
-        let tctx = TypeDisplayContext::WithEnv {
-            env: self.env,
-            type_param_names: None,
-        };
+        let tctx = TypeDisplayContext::new(self.env);
         match self.edge {
             Field(qid, field) => {
                 let struct_env = self.env.get_struct(qid.to_qualified_id());

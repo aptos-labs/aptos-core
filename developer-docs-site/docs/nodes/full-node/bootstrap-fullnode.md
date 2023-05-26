@@ -19,7 +19,7 @@ There are a number of fullnode snapshots that can be downloaded from different A
 - Polkachu (Mainnet): [Polkachu Aptos Node Snapshots](https://polkachu.com/aptos_snapshots/aptos)
 
 :::tip Questions about snapshot data
-Depending on how the snapshot is constructed and compressed, the snapshot files may be different sizes. If you have any questions about the snapshot data, or run into any issues, please reach out to the Aptos community members directly via the [#node-support](https://discord.com/channels/945856774056083548/953421979136962560) channel in [Aptos Discord](https://discord.gg/aptoslabs).
+Depending on how the snapshot is constructed and compressed, the snapshot files may be different sizes. If you have any questions about the snapshot data, or run into any issues, please reach out to the Aptos community members directly via the [#node-support](https://discord.com/channels/945856774056083548/953421979136962560) channel in [Aptos Discord](https://discord.gg/aptosnetwork).
 :::
 
 ## Use an existing fullnode snapshot

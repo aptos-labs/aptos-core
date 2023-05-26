@@ -74,8 +74,10 @@ and implement the governance voting logic on top.
 -  [Function `create_with_owners_internal`](#0x1_multisig_account_create_with_owners_internal)
 -  [Function `add_owner`](#0x1_multisig_account_add_owner)
 -  [Function `add_owners`](#0x1_multisig_account_add_owners)
+-  [Function `add_owners_and_update_signatures_required`](#0x1_multisig_account_add_owners_and_update_signatures_required)
 -  [Function `remove_owner`](#0x1_multisig_account_remove_owner)
 -  [Function `remove_owners`](#0x1_multisig_account_remove_owners)
+-  [Function `remove_owners_and_update_signatures_required`](#0x1_multisig_account_remove_owners_and_update_signatures_required)
 -  [Function `update_signatures_required`](#0x1_multisig_account_update_signatures_required)
 -  [Function `update_metadata`](#0x1_multisig_account_update_metadata)
 -  [Function `update_metadata_internal`](#0x1_multisig_account_update_metadata_internal)
@@ -1531,6 +1533,36 @@ maliciously alter the owners list.
 
 </details>
 
+<a name="0x1_multisig_account_add_owners_and_update_signatures_required"></a>
+
+## Function `add_owners_and_update_signatures_required`
+
+Add owners then update number of signatures required, in a single operation.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owners_and_update_signatures_required">add_owners_and_update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_num_signatures_required: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owners_and_update_signatures_required">add_owners_and_update_signatures_required</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_num_signatures_required: u64
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_add_owners">add_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_owners);
+    <a href="multisig_account.md#0x1_multisig_account_update_signatures_required">update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_num_signatures_required);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_multisig_account_remove_owner"></a>
 
 ## Function `remove_owner`
@@ -1593,7 +1625,7 @@ maliciously alter the owners list.
 
     <b>let</b> owners = &<b>mut</b> multisig_account_resource.owners;
     <b>let</b> owners_removed = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;<b>address</b>&gt;();
-    vector::for_each_ref(&owners_to_remove, |owner_to_remove| {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&owners_to_remove, |owner_to_remove| {
         <b>let</b> owner_to_remove = *owner_to_remove;
         <b>let</b> (found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(owners, &owner_to_remove);
         // Only remove an owner <b>if</b> they're present in the owners list.
@@ -1611,6 +1643,36 @@ maliciously alter the owners list.
     );
 
     emit_event(&<b>mut</b> multisig_account_resource.remove_owners_events, <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_multisig_account_remove_owners_and_update_signatures_required"></a>
+
+## Function `remove_owners_and_update_signatures_required`
+
+Update the number of signatures required then remove owners, in a single operation.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owners_and_update_signatures_required">remove_owners_and_update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_num_signatures_required: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owners_and_update_signatures_required">remove_owners_and_update_signatures_required</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_num_signatures_required: u64
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_update_signatures_required">update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_num_signatures_required);
+    <a href="multisig_account.md#0x1_multisig_account_remove_owners">remove_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, owners_to_remove);
 }
 </code></pre>
 
@@ -2286,7 +2348,7 @@ This function is private so no other code can call this beside the VM itself as 
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_validate_owners">validate_owners</a>(owners: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>) {
     <b>let</b> distinct_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    vector::for_each_ref(owners, |owner| {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(owners, |owner| {
         <b>let</b> owner = *owner;
         <b>assert</b>!(owner != <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF">EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF</a>));
         <b>let</b> (found, _) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_index_of">vector::index_of</a>(&distinct_owners, &owner);
@@ -2347,7 +2409,7 @@ This function is private so no other code can call this beside the VM itself as 
     <b>let</b> num_rejections = 0;
 
     <b>let</b> votes = &transaction.votes;
-    vector::for_each_ref(owners, |owner| {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(owners, |owner| {
         <b>if</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(votes, owner)) {
             <b>if</b> (*<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(votes, owner)) {
                 num_approvals = num_approvals + 1;

@@ -13,13 +13,13 @@
 //! Set env REGENERATE_GOLDENFILES to update the golden files when running tests..
 
 mod account_universe;
-mod back_edges;
 mod create_account;
 mod data_store;
 mod execution_strategies;
 mod failed_transaction_tests;
 mod genesis;
 mod genesis_initializations;
+mod invariant_violation;
 mod mint;
 mod module_publishing;
 mod on_chain_configs;

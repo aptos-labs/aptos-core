@@ -119,45 +119,44 @@ impl Distribution<InvalidTransactionType> for Standard {
 impl TransactionGenerator for P2PTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        accounts: Vec<&mut LocalAccount>,
-        transactions_per_account: usize,
+        account: &mut LocalAccount,
+        num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
+        let mut requests = Vec::with_capacity(num_to_create);
         let invalid_size = if self.invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch
-            max(1, accounts.len() * self.invalid_transaction_ratio / 100)
+            max(1, self.invalid_transaction_ratio / 100)
         } else {
             0
         };
-        let mut num_valid_tx = transactions_per_account * (accounts.len() - invalid_size);
-        for sender in accounts {
-            let receivers = self
-                .all_addresses
-                .read()
-                .choose_multiple(&mut self.rng, transactions_per_account)
-                .cloned()
-                .collect::<Vec<_>>();
-            assert!(
-                receivers.len() >= transactions_per_account,
-                "failed: {} >= {}",
-                receivers.len(),
-                transactions_per_account
-            );
-            for i in 0..transactions_per_account {
-                let receiver = receivers.get(i).expect("all_addresses can't be empty");
-                let request = if num_valid_tx > 0 {
-                    num_valid_tx -= 1;
-                    self.gen_single_txn(sender, receiver, self.send_amount, &self.txn_factory)
-                } else {
-                    self.generate_invalid_transaction(
-                        &mut self.rng.clone(),
-                        sender,
-                        receiver,
-                        &requests,
-                    )
-                };
-                requests.push(request);
-            }
+        let mut num_valid_tx = num_to_create * (1 - invalid_size);
+
+        let receivers = self
+            .all_addresses
+            .read()
+            .choose_multiple(&mut self.rng, num_to_create)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(
+            receivers.len() >= num_to_create,
+            "failed: {} >= {}",
+            receivers.len(),
+            num_to_create
+        );
+        for i in 0..num_to_create {
+            let receiver = receivers.get(i).expect("all_addresses can't be empty");
+            let request = if num_valid_tx > 0 {
+                num_valid_tx -= 1;
+                self.gen_single_txn(account, receiver, self.send_amount, &self.txn_factory)
+            } else {
+                self.generate_invalid_transaction(
+                    &mut self.rng.clone(),
+                    account,
+                    receiver,
+                    &requests,
+                )
+            };
+            requests.push(request);
         }
         requests
     }

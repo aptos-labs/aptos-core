@@ -34,7 +34,7 @@ pub(crate) fn generate_abi_move_metadata(ctx: &Context, receive: bool, fallback:
     for (key, (solidity_sig, attr)) in ctx.callable_function_map.borrow().iter() {
         let fun = ctx.env.get_function(key.to_qualified_id());
         let abi_sig = from_solidity_sig(solidity_sig, Some(*attr), "function");
-        func_map.insert(fun.get_identifier().to_string(), abi_sig);
+        func_map.insert(fun.get_identifier().unwrap().to_string(), abi_sig);
     }
 
     let mut constructor = None;

@@ -75,6 +75,11 @@ impl PeerMetadata {
         self.connection_metadata.application_protocols.clone()
     }
 
+    /// Returns the connection state
+    pub fn get_connection_state(&self) -> ConnectionState {
+        self.connection_state
+    }
+
     /// Returns a copy of the connection metadata
     pub fn get_connection_metadata(&self) -> ConnectionMetadata {
         self.connection_metadata.clone()

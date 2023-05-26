@@ -1306,7 +1306,7 @@ pub struct GasEstimationBcs {
 }
 
 /// Struct holding the outputs of the estimate gas API
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct GasEstimation {
     /// The deprioritized estimate for the gas unit price
     pub deprioritized_gas_estimate: Option<u64>,

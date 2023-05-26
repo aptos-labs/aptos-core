@@ -19,7 +19,8 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use rand::Rng;
+use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -28,6 +29,7 @@ fn run_transactions<K, V>(
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
     module_access: (bool, bool),
+    maybe_gas_limit: Option<u64>,
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
@@ -50,12 +52,23 @@ fn run_transactions<K, V>(
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
-        >::new(num_cpus::get())
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
@@ -63,7 +76,7 @@ fn run_transactions<K, V>(
             continue;
         }
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
         baseline.assert_output(&output);
     }
 }
@@ -77,7 +90,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -87,7 +100,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -97,7 +110,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -107,7 +120,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 
     #[test]
@@ -117,12 +130,11 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false));
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), None);
     }
 }
 
-#[test]
-fn dynamic_read_writes() {
+fn dynamic_read_writes_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 100)
@@ -131,7 +143,7 @@ fn dynamic_read_writes() {
         .current();
     let transaction_gen = vec(
         any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        3000,
+        num_txns,
     )
     .new_tree(&mut runner)
     .expect("creating a new value should succeed")
@@ -144,13 +156,12 @@ fn dynamic_read_writes() {
         vec![],
         100,
         (false, false),
+        maybe_gas_limit,
     );
 }
 
-#[test]
-fn deltas_writes_mixed() {
+fn deltas_writes_mixed_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
-    let num_txns = 1000;
 
     let universe = vec(any::<[u8; 32]>(), 50)
         .new_tree(&mut runner)
@@ -174,23 +185,32 @@ fn deltas_writes_mixed() {
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None);
+        let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
         baseline.assert_output(&output);
     }
 }
 
-#[test]
-fn deltas_resolver() {
+fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
-    let num_txns = 1000;
 
     let universe = vec(any::<[u8; 32]>(), 50)
         .new_tree(&mut runner)
@@ -214,12 +234,23 @@ fn deltas_resolver() {
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            maybe_gas_limit,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         let delta_writes = output
@@ -229,13 +260,13 @@ fn deltas_resolver() {
             .map(|out| out.delta_writes())
             .collect();
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, Some(delta_writes));
+        let baseline =
+            ExpectedOutput::generate_baseline(&transactions, Some(delta_writes), maybe_gas_limit);
         baseline.assert_output(&output);
     }
 }
 
-#[test]
-fn dynamic_read_writes_contended() {
+fn dynamic_read_writes_contended_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 10)
@@ -245,7 +276,7 @@ fn dynamic_read_writes_contended() {
 
     let transaction_gen = vec(
         any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        1000,
+        num_txns,
     )
     .new_tree(&mut runner)
     .expect("creating a new value should succeed")
@@ -258,11 +289,11 @@ fn dynamic_read_writes_contended() {
         vec![],
         100,
         (false, false),
+        maybe_gas_limit,
     );
 }
 
-#[test]
-fn module_publishing_fallback() {
+fn module_publishing_fallback_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 100)
@@ -271,7 +302,7 @@ fn module_publishing_fallback() {
         .current();
     let transaction_gen = vec(
         any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
-        3000,
+        num_txns,
     )
     .new_tree(&mut runner)
     .expect("creating a new value should succeed")
@@ -284,6 +315,7 @@ fn module_publishing_fallback() {
         vec![],
         2,
         (false, true),
+        maybe_gas_limit,
     );
     run_transactions(
         &universe,
@@ -292,13 +324,21 @@ fn module_publishing_fallback() {
         vec![],
         2,
         (false, true),
+        maybe_gas_limit,
     );
-    run_transactions(&universe, transaction_gen, vec![], vec![], 2, (true, true));
+    run_transactions(
+        &universe,
+        transaction_gen,
+        vec![],
+        vec![],
+        2,
+        (true, true),
+        maybe_gas_limit,
+    );
 }
 
-fn publishing_fixed_params() {
+fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
-    let num_txns = 300;
 
     let universe = vec(any::<[u8; 32]>(), 50)
         .new_tree(&mut runner)
@@ -355,12 +395,19 @@ fn publishing_fixed_params() {
         phantom: PhantomData,
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     // Confirm still no intersection
     let output = BlockExecutor::<
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get())
+    >::new(num_cpus::get(), executor_thread_pool, maybe_gas_limit)
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
@@ -391,12 +438,23 @@ fn publishing_fixed_params() {
         },
     };
 
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+
     for _ in 0..200 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        >::new(num_cpus::get())
+        >::new(
+            num_cpus::get(),
+            executor_thread_pool.clone(),
+            Some(max(w_index, r_index) as u64 + 1),
+        ) // Ensure enough gas limit to commit the module txns
         .execute_transactions_parallel((), &transactions, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -404,10 +462,137 @@ fn publishing_fixed_params() {
 }
 
 #[test]
+fn dynamic_read_writes() {
+    dynamic_read_writes_with_gas_limit(3000, None);
+}
+
+#[test]
+fn deltas_writes_mixed() {
+    deltas_writes_mixed_with_gas_limit(1000, None);
+}
+
+#[test]
+fn deltas_resolver() {
+    deltas_resolver_with_gas_limit(1000, None);
+}
+
+#[test]
+fn dynamic_read_writes_contended() {
+    dynamic_read_writes_contended_with_gas_limit(1000, None);
+}
+
+#[test]
+fn module_publishing_fallback() {
+    module_publishing_fallback_with_gas_limit(3000, None);
+}
+
+#[test]
 // Test a single transaction intersection interleaves with a lot of dependencies and
 // not overlapping module r/w keys.
 fn module_publishing_races() {
     for _ in 0..5 {
-        publishing_fixed_params();
+        publishing_fixed_params_with_gas_limit(300, None);
+    }
+}
+
+// The following set of tests are the same tests as above with per-block gas limit.
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+    #[test]
+    fn no_early_termination_with_block_gas_limit(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+    }
+
+    #[test]
+    fn abort_only_with_block_gas_limit(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 10).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 0),
+    ) {
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 10) as u64));
+    }
+
+    #[test]
+    fn skip_rest_only_with_block_gas_limit(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 0),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+    }
+
+    #[test]
+    fn mixed_transactions_with_block_gas_limit(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 5),
+        skip_rest_transactions in vec(any::<Index>(), 5),
+    ) {
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+    }
+
+    #[test]
+    fn dynamic_read_writes_mixed_with_block_gas_limit(
+        universe in vec(any::<[u8; 32]>(), 100),
+        transaction_gen in vec(any_with::<TransactionGen<[u8;32]>>(TransactionGenParams::new_dynamic()), 5000).no_shrink(),
+        abort_transactions in vec(any::<Index>(), 3),
+        skip_rest_transactions in vec(any::<Index>(), 3),
+    ) {
+        run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false), Some(rand::thread_rng().gen_range(0, 5000) as u64));
+    }
+}
+
+#[test]
+fn dynamic_read_writes_with_block_gas_limit() {
+    dynamic_read_writes_with_gas_limit(3000, Some(rand::thread_rng().gen_range(0, 3000) as u64));
+    dynamic_read_writes_with_gas_limit(3000, Some(0));
+}
+
+#[test]
+fn deltas_writes_mixed_with_block_gas_limit() {
+    deltas_writes_mixed_with_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
+    deltas_writes_mixed_with_gas_limit(1000, Some(0));
+}
+
+#[test]
+fn deltas_resolver_with_block_gas_limit() {
+    deltas_resolver_with_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
+    deltas_resolver_with_gas_limit(1000, Some(0));
+}
+
+#[test]
+fn dynamic_read_writes_contended_with_block_gas_limit() {
+    dynamic_read_writes_contended_with_gas_limit(
+        1000,
+        Some(rand::thread_rng().gen_range(0, 1000) as u64),
+    );
+    dynamic_read_writes_contended_with_gas_limit(1000, Some(0));
+}
+
+#[test]
+fn module_publishing_fallback_with_block_gas_limit() {
+    module_publishing_fallback_with_gas_limit(
+        3000,
+        // Need to execute at least 2 txns to trigger module publishing fallback
+        Some(rand::thread_rng().gen_range(1, 3000) as u64),
+    );
+}
+
+#[test]
+// Test a single transaction intersection interleaves with a lot of dependencies and
+// not overlapping module r/w keys.
+fn module_publishing_races_with_block_gas_limit() {
+    for _ in 0..5 {
+        publishing_fixed_params_with_gas_limit(
+            300,
+            Some(rand::thread_rng().gen_range(0, 300) as u64),
+        );
     }
 }

@@ -613,7 +613,7 @@ impl<'a> FunctionGenerator<'a> {
                 format!("{}", v)
             },
             Constant::Address(a) => {
-                format!("0x{}", a.to_str_radix(16))
+                format!("0x{}", a.expect_numerical().short_str_lossless())
             },
             Constant::ByteArray(_) => "".to_string(),
             Constant::AddressArray(_) => "".to_string(),

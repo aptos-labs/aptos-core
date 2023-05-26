@@ -5,6 +5,7 @@
 
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    ledger_db::LedgerDb,
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -35,12 +36,12 @@ use std::{
     },
 };
 
-pub(crate) fn get_overall_commit_progress(ledger_db: &DB) -> Result<Option<Version>> {
-    get_commit_progress(ledger_db, &DbMetadataKey::OverallCommitProgress)
+pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
+    get_commit_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
 }
 
-pub(crate) fn get_ledger_commit_progress(ledger_db: &DB) -> Result<Option<Version>> {
-    get_commit_progress(ledger_db, &DbMetadataKey::LedgerCommitProgress)
+pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
+    get_commit_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
 }
 
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
@@ -72,14 +73,14 @@ fn get_commit_progress(db: &DB, progress_key: &DbMetadataKey) -> Result<Option<V
 }
 
 pub(crate) fn truncate_ledger_db(
-    ledger_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
     current_version: Version,
     target_version: Version,
     batch_size: usize,
 ) -> Result<()> {
     let status = StatusLine::new(Progress::new(target_version));
 
-    let event_store = EventStore::new(Arc::clone(&ledger_db));
+    let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let mut current_version = current_version;
@@ -87,8 +88,9 @@ pub(crate) fn truncate_ledger_db(
         let start_version =
             std::cmp::max(current_version - batch_size as u64 + 1, target_version + 1);
         let end_version = current_version + 1;
+        // TODO(grao): Support splitted ledger DBs here.
         truncate_ledger_db_single_batch(
-            &ledger_db,
+            ledger_db.metadata_db(),
             &event_store,
             &transaction_store,
             start_version,

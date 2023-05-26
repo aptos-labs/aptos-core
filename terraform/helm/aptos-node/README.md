@@ -19,7 +19,7 @@ Aptos blockchain node deployment
 | chain.name | string | `"testnet"` | Internal: name of the testnet to connect to |
 | enablePrivilegedMode | bool | `false` | TEST ONLY: Enable running as root for profiling |
 | fullnode.affinity | object | `{}` |  |
-| fullnode.config | object | `{"full_node_networks":[{"max_inbound_connections":100,"network_id":"public","seeds":{}}],"mempool":{"default_failovers":0,"max_broadcasts_per_peer":4,"shared_mempool_batch_size":200,"shared_mempool_max_concurrent_inbound_syncs":16,"shared_mempool_tick_interval_ms":10}}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
+| fullnode.config | object | `{"full_node_networks":[{"network_id":"public","seeds":{}}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
 | fullnode.force_enable_telemetry | bool | `false` | Flag to force enable telemetry service (useful for forge tests) |
 | fullnode.groups | list | `[{"name":"fullnode","replicas":1}]` | Specify fullnode groups by `name` and number of `replicas` |
 | fullnode.nodeSelector | object | `{}` |  |
@@ -53,22 +53,23 @@ Aptos blockchain node deployment
 | labels | string | `nil` |  |
 | loadTestGenesis | bool | `false` | Load test-data for starting a test network |
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
+| multicluster | object | `{"enabled":false,"targetClusters":["cluster1","cluster2","cluster3"]}` | Options for multicluster mode. This is *experimental only*. |
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |
 | numValidators | int | `1` | Number of validators to deploy |
 | overrideNodeConfig | bool | `false` | Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart. |
-| pyroscope.enabled | bool | `false` | Enable Pyroscope profiling |
-| pyroscope.secretName | string | `"pyroscope"` | Secret which contains the Pyroscope API key and other configuration |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
 | service.fullnode.enableMetricsPort | bool | `true` | Enable the metrics port on fullnodes |
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |
 | service.fullnode.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for fullnodes' HAProxy |
 | service.fullnode.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the fullnode service |
+| service.fullnode.internal.headless | bool | `false` |  |
 | service.fullnode.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for fullnodes |
 | service.fullnode.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs |
 | service.validator.enableMetricsPort | bool | `true` | Enable the metrics port on the validator |
 | service.validator.enableRestApi | bool | `true` | Enable the REST API on the validator |
 | service.validator.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for validator's HAProxy |
 | service.validator.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the validator service |
+| service.validator.internal.headless | bool | `false` |  |
 | service.validator.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for validator |
 | service.validator.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
@@ -125,6 +126,10 @@ ServiceAccounts:
 * [optional] `<RELEASE_NAME>` - The default service account
 * `<RELEASE_NAME>-validator` - The validator service account
 * `<RELEASE_NAME>-fullnode` - The fullnode service account
+
+[optional] PodSecurityPolicy:
+* `<RELEASE_NAME>` - The default PodSecurityPolicy for validators and fullnodes
+* `<RELEASE_NAME>-haproxy` - The PodSecurityPolicy for HAProxy
 
 ## Common Operations
 

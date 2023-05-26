@@ -8,7 +8,7 @@ slug: "run-validator-node-using-gcp"
 This is a step-by-step guide to install an Aptos node on Google GCP. Follow these steps to configure a validator node and a validator fullnode on separate machines. 
 
 :::caution Did you set up your GCP account and create a project?
-This guide assumes you already have a Google Cloud Platform (GCP) account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), review the [Prerequisites](https://aptos.dev/tutorials/run-a-fullnode-on-gcp#prerequisites) section for GCP account setup.
+This guide assumes you already have a Google Cloud Platform (GCP) account setup, and have created a new project for deploying Aptos node. If you are not familiar with GCP (Google Cloud Platform), review the [Prerequisites](../../../full-node/run-a-fullnode-on-gcp#prerequisites) section for GCP account setup.
 :::
 
 :::danger Do you have stale volumes after bumping your deployment's era?
@@ -19,7 +19,7 @@ This guide assumes you already have a Google Cloud Platform (GCP) account setup,
 
 Make sure the following are setup for your environment:
   - **GCP account**: hhttps://cloud.google.com/
-  - **Aptos CLI**: https://aptos.dev/tools/install-cli/index
+  - **Aptos CLI**: https://aptos.dev/tools/install-cli/
   - **Terraform 1.3.6**: https://www.terraform.io/downloads.html
   - **Kubernetes CLI**: https://kubernetes.io/docs/tasks/tools/
   - **Google Cloud CLI**: https://cloud.google.com/sdk/docs/install-sdk

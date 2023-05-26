@@ -6,7 +6,11 @@ TBD architecture diagram. Also link to dev docs
 
 ## Local testing
 ### 1) Run the fullnode
-* Follow instructions on how to get genesis, waypoint, and fullnode.yaml. 
+
+#### Against an existing network
+
+Follow instructions on how to run a fullnode against an existing network.
+* Get genesis, waypoint, and fullnode.yaml
 * Add following to fullnode.yaml
   * ```
     storage:
@@ -22,12 +26,4 @@ TBD architecture diagram. Also link to dev docs
 
 ### 2) Test with GCURL
 * Install grpcurl (https://github.com/fullstorydev/grpcurl#installation)
-* From the aptos-core (base folder), test with grpcurl
-`grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0, "chain_id": 1}' -import-path crates/aptos-protos/proto -proto aptos/datastream/v1/datastream.proto  -plaintext 127.0.0.1:50051 aptos.datastream.v1.IndexerStream/RawDatastream`
-
-### 3) Test with rust client
-TBD
-
-## Deployment
-### Docker
-
+* From the aptos-core (base folder), test with grpcurl: `grpcurl  -max-msg-sz 10000000 -d '{ "starting_version": 0 }' -import-path crates/aptos-protos/proto -proto aptos/internal/fullnode/v1/fullnode_data.proto  -plaintext 127.0.0.1:50051 aptos.internal.fullnode.v1.FullnodeData/GetTransactionsFromNode`

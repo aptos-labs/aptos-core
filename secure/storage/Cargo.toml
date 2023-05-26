@@ -15,10 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-github-client = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-schemadb = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-vault-client = { workspace = true }
@@ -34,7 +32,6 @@ thiserror = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-crypto-derive = { workspace = true }
-aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }
 
 [features]

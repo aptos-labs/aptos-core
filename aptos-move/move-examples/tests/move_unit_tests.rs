@@ -76,6 +76,11 @@ fn test_resource_account_common(pkg: &str) {
 }
 
 #[test]
+fn test_common_account() {
+    test_common("common_account");
+}
+
+#[test]
 fn test_data_structures() {
     test_common("data_structures");
 }
@@ -103,6 +108,15 @@ fn test_marketplace() {
 #[test]
 fn test_message_board() {
     test_common("message_board");
+}
+
+#[test]
+fn test_fungible_asset() {
+    let named_address = BTreeMap::from([(
+        String::from("fungible_asset_extension"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("fungible_asset", named_address);
 }
 
 #[test]

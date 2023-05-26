@@ -88,9 +88,9 @@ OPTIONS:
         --named-addresses <NAMED_ADDRESSES>
             Named addresses for the move binary
 
-            Example: alice=0x1234, bob=0x5678
+            Example: alice=0x1234,bob=0x5678
 
-            Note: This will fail if there are duplicates in the Move.toml file remove those first.
+            Note: This will fail if there are duplicates in the Move.toml file remove those first. Also make sure there's no space in between named addresses if more than one is provided.
 
             [default: ]
 
@@ -756,7 +756,7 @@ Move examples can be found in the [Move section](../../move/move-on-aptos/cli).
 
 This section summarizes how to run a local testnet with Aptos CLI. See [Run a Local Testnet with Aptos CLI](../../nodes/local-testnet/using-cli-to-run-a-local-testnet.md) for more details.
 
-For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/owner/index.md) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
+For Aptos CLI commands applicable to validator nodes, see the [Owner](../../nodes/validator-node/operator/staking-pool-operations.md#owner-operations-with-cli) and [Voter](../../nodes/validator-node/voter/index.md#steps-using-aptos-cli) instructions.
 
 ### Running a local testnet
 

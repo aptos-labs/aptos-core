@@ -92,12 +92,17 @@ fn generate_first_two_messages() -> (Vec<u8>, Vec<u8>) {
 
     // perform the handshake
     let (initiator_session, responder_session) = block_on(join(
-        initiator.upgrade_outbound(initiator_socket, responder_public_key, fake_timestamp),
+        initiator.upgrade_outbound(
+            initiator_socket,
+            responder_network_context.peer_id(),
+            responder_public_key,
+            fake_timestamp,
+        ),
         responder.upgrade_inbound(responder_socket),
     ));
 
     // take result
-    let initiator_session = initiator_session.unwrap();
+    let (initiator_session, _) = initiator_session.unwrap();
     let (responder_session, peer_id, _) = responder_session.unwrap();
 
     // some sanity checks
@@ -135,8 +140,10 @@ fn fake_timestamp() -> [u8; AntiReplayTimestamps::TIMESTAMP_SIZE] {
 /// Fuzz a client during the handshake
 pub fn fuzz_initiator(data: &[u8]) {
     // setup initiator
-    let ((initiator_private_key, _, initiator_network_context), (_, responder_public_key, _)) =
-        KEYPAIRS.clone();
+    let (
+        (initiator_private_key, _, initiator_network_context),
+        (_, responder_public_key, responder_network_context),
+    ) = KEYPAIRS.clone();
     let initiator = NoiseUpgrader::new(
         initiator_network_context,
         initiator_private_key,
@@ -148,7 +155,12 @@ pub fn fuzz_initiator(data: &[u8]) {
     fake_socket.set_trailing();
 
     // send a message, then read fuzz data
-    let _ = block_on(initiator.upgrade_outbound(fake_socket, responder_public_key, fake_timestamp));
+    let _ = block_on(initiator.upgrade_outbound(
+        fake_socket,
+        responder_network_context.peer_id(),
+        responder_public_key,
+        fake_timestamp,
+    ));
 }
 
 /// Fuzz a server during the handshake

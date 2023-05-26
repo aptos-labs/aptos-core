@@ -66,11 +66,11 @@
 //!
 //! // perform the handshake
 //! let (client_session, server_session) = executor::block_on(future::join(
-//!    client.upgrade_outbound(dialer_socket, server_public, AntiReplayTimestamps::now),
+//!    client.upgrade_outbound(dialer_socket, server_peer_id, server_public, AntiReplayTimestamps::now),
 //!    server.upgrade_inbound(listener_socket),
 //! ));
 //!
-//! let mut client_session = client_session
+//! let (mut client_session, _) = client_session
 //!     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 //! let (mut server_session, _client_peer_id, _trust_level) = server_session
 //!     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;

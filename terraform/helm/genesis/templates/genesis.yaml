@@ -130,6 +130,12 @@ spec:
           value: {{ .Values.genesis.validator.num_validators_with_larger_stake | quote }}
         - name: LARGER_STAKE_AMOUNT
           value: {{ .Values.genesis.validator.larger_stake_amount | quote }}
+        - name: NAMESPACE
+          value: {{ .Release.Namespace | quote }}
+        - name: ENABLE_MULTICLUSTER_DOMAIN_SUFFIX
+          value: {{ .Values.genesis.multicluster.enabled | quote }}
+        - name: MULTICLUSTER_DOMAIN_SUFFIXES_STRING
+          value: {{ .Values.genesis.multicluster.domain_suffixes | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml

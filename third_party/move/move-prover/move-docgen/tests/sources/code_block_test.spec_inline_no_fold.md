@@ -1,11 +1,11 @@
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_main"></a>
+<a name="0x1_main"></a>
 
-# Module `0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff::main`
+# Module `0x1::main`
 
 
 
--  [Function `main`](#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_main_main)
+-  [Function `main`](#0x1_main_main)
     -  [Explanation of the algorithm](#@Explanation_of_the_algorithm_0)
 
 
@@ -13,7 +13,7 @@
 
 
 
-<a name="0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_main_main"></a>
+<a name="0x1_main_main"></a>
 
 ## Function `main`
 
@@ -28,7 +28,7 @@ code block
 then <code>inline code</code>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="code_block_test.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_main">main</a>()
+<pre><code><b>fun</b> <a href="code_block_test.md#0x1_main">main</a>()
 </code></pre>
 
 
@@ -36,5 +36,5 @@ then <code>inline code</code>
 ##### Implementation
 
 
-<pre><code><b>fun</b> <a href="code_block_test.md#0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff_main">main</a>() { }
+<pre><code><b>fun</b> <a href="code_block_test.md#0x1_main">main</a>() { }
 </code></pre>

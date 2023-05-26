@@ -23,3 +23,10 @@ resource "google_service_account_iam_binding" "backup" {
   role               = "roles/iam.workloadIdentityUser"
   members            = [for i in range(var.num_fullnodes) : "serviceAccount:${google_container_cluster.aptos.workload_identity_config[0].workload_pool}[${var.k8s_namespace}/pfn${i}-aptos-fullnode]"]
 }
+
+# backup public access
+resource "google_storage_bucket_iam_member" "public" {
+  bucket = google_storage_bucket.backup.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}

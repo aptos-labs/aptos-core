@@ -46,12 +46,16 @@ pub enum LogEntry {
     NodeInfoRequest,
     PeerMonitorLoop,
     SendRequest,
+
+    #[cfg(feature = "network-perf-test")] // Disabled by default
+    PerformanceMonitoringRequest,
 }
 
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogEvent {
     InvalidResponse,
+    LogAllPeerStates,
     PeerPingError,
     ResponseError,
     ResponseSuccess,

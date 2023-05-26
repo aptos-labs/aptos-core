@@ -451,9 +451,9 @@ pub async fn wait_for_transactions(
     Ok(())
 }
 
-pub fn start_logger() {
+pub fn start_logger(level: Level) {
     let mut logger = aptos_logger::Logger::new();
-    logger.channel_size(1000).is_async(false).level(Level::Warn);
+    logger.channel_size(1000).is_async(false).level(level);
     logger.build();
 }
 

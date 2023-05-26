@@ -23,10 +23,8 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
-    config::IndexerGrpcProcessorConfig, constants::BLOB_STORAGE_SIZE,
-    time_diff_since_pb_timestamp_in_secs,
+    constants::BLOB_STORAGE_SIZE, time_diff_since_pb_timestamp_in_secs,
 };
-use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::indexer::v1::{
     raw_data_client::RawDataClient, GetTransactionsRequest, TransactionsResponse,
@@ -38,6 +36,7 @@ use diesel::{
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use futures::StreamExt;
 use std::sync::Arc;
+use tracing::{error, info};
 
 pub type PgPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type PgDbPool = Arc<PgPool>;
@@ -46,42 +45,62 @@ pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub struct Worker {
     pub db_pool: PgDbPool,
-    pub config: IndexerGrpcProcessorConfig,
+    pub processor_name: String,
+    pub postgres_connection_string: String,
+    pub indexer_grpc_data_service_addresss: String,
+    pub auth_token: String,
+    pub starting_version: Option<u64>,
+    pub number_concurrent_processing_tasks: usize,
+    pub ans_address: Option<String>,
 }
 
 impl Worker {
-    pub async fn new(config: IndexerGrpcProcessorConfig) -> Self {
-        let processor_name = config.processor_name.clone();
+    pub async fn new(
+        processor_name: String,
+        postgres_connection_string: String,
+        indexer_grpc_data_service_addresss: String,
+        auth_token: String,
+        starting_version: Option<u64>,
+        number_concurrent_processing_tasks: Option<usize>,
+        ans_address: Option<String>,
+    ) -> Self {
         info!(processor_name = processor_name, "[Parser] Kicking off");
 
-        let postgres_uri = config.postgres_connection_string.clone();
         info!(
             processor_name = processor_name,
             "[Parser] Creating connection pool"
         );
-        let conn_pool = new_db_pool(&postgres_uri).expect("Failed to create connection pool");
+        let conn_pool =
+            new_db_pool(&postgres_connection_string).expect("Failed to create connection pool");
         info!(
             processor_name = processor_name,
             "[Parser] Finish creating the connection pool"
         );
+        let number_concurrent_processing_tasks = number_concurrent_processing_tasks.unwrap_or(10);
         Self {
             db_pool: conn_pool,
-            config,
+            processor_name,
+            postgres_connection_string,
+            indexer_grpc_data_service_addresss,
+            starting_version,
+            auth_token,
+            number_concurrent_processing_tasks,
+            ans_address,
         }
     }
 
     pub async fn run(&self) {
-        let processor_name = self.config.processor_name.clone();
+        let processor_name = self.processor_name.clone();
 
         info!(
             processor_name = processor_name,
-            stream_address = self.config.indexer_grpc_address.clone(),
+            stream_address = self.indexer_grpc_data_service_addresss.clone(),
             "[Parser] Connecting to GRPC endpoint",
         );
 
         let mut rpc_client = match RawDataClient::connect(format!(
             "http://{}",
-            self.config.indexer_grpc_address.clone()
+            self.indexer_grpc_data_service_addresss.clone()
         ))
         .await
         {
@@ -89,7 +108,7 @@ impl Worker {
             Err(e) => {
                 error!(
                     processor_name = processor_name,
-                    stream_address = self.config.indexer_grpc_address.clone(),
+                    stream_address = self.indexer_grpc_data_service_addresss.clone(),
                     error = ?e,
                     "[Parser] Error connecting to grpc_stream"
                 );
@@ -98,7 +117,7 @@ impl Worker {
         };
         info!(
             processor_name = processor_name,
-            stream_address = self.config.indexer_grpc_address.clone(),
+            stream_address = self.indexer_grpc_data_service_addresss.clone(),
             "[Parser] Connected to GRPC endpoint",
         );
 
@@ -123,24 +142,24 @@ impl Worker {
                 0
             });
 
-        let starting_version = match self.config.starting_version {
+        let starting_version = match self.starting_version {
             None => starting_version_from_db,
             Some(version) => version,
         };
 
         info!(
             processor_name = processor_name,
-            stream_address = self.config.indexer_grpc_address.clone(),
+            stream_address = self.indexer_grpc_data_service_addresss.clone(),
             final_start_version = starting_version,
-            start_version_from_config = self.config.starting_version,
+            start_version_from_config = self.starting_version,
             start_version_from_db = starting_version_from_db,
             "[Parser] Making request to GRPC endpoint",
         );
 
         let request = grpc_request_builder(
             starting_version,
-            self.config.indexer_grpc_auth_token.clone(),
-            self.config.processor_name.clone(),
+            self.auth_token.clone(),
+            self.processor_name.clone(),
         );
 
         let mut resp_stream = rpc_client
@@ -149,10 +168,10 @@ impl Worker {
             .expect("Failed to get grpc response. Is the server running?")
             .into_inner();
 
-        let concurrent_tasks = self.config.number_concurrent_processing_tasks;
+        let concurrent_tasks = self.number_concurrent_processing_tasks;
         info!(
             processor_name = processor_name,
-            stream_address = self.config.indexer_grpc_address.clone(),
+            stream_address = self.indexer_grpc_data_service_addresss.clone(),
             starting_version = starting_version,
             concurrent_tasks = concurrent_tasks,
             "[Parser] Successfully connected to GRPC endpoint. Now instantiating processor",
@@ -169,7 +188,7 @@ impl Worker {
             },
             Processor::TokenProcessor => Arc::new(TokenTransactionProcessor::new(
                 self.db_pool.clone(),
-                self.config.ans_address.clone(),
+                self.ans_address.clone(),
             )),
             Processor::StakeProcessor => {
                 Arc::new(StakeTransactionProcessor::new(self.db_pool.clone()))
@@ -209,8 +228,8 @@ impl Worker {
                         // If we get an error, we need to reconnect to the stream.
                         let request = grpc_request_builder(
                             batch_start_version,
-                            self.config.indexer_grpc_auth_token.clone(),
-                            self.config.processor_name.clone(),
+                            self.auth_token.clone(),
+                            self.processor_name.clone(),
                         );
                         resp_stream = rpc_client
                             .get_transactions(request)
@@ -242,7 +261,7 @@ impl Worker {
             let mut tasks = vec![];
             for transactions in transactions_batches {
                 let processor_clone = processor.clone();
-                let auth_token = self.config.indexer_grpc_auth_token.clone();
+                let auth_token = self.auth_token.clone();
                 let task = tokio::spawn(async move {
                     let start_version = transactions.as_slice().first().unwrap().version;
                     let end_version = transactions.as_slice().last().unwrap().version;
@@ -291,7 +310,7 @@ impl Worker {
                     Err(e) => {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.config.indexer_grpc_address.clone(),
+                            stream_address = self.indexer_grpc_data_service_addresss.clone(),
                             error = ?e,
                             "[Parser] Error processing transactions"
                         );
@@ -317,8 +336,12 @@ impl Worker {
                     if prev_end.unwrap() + 1 != start {
                         error!(
                             processor_name = processor_name,
-                            stream_address = self.config.indexer_grpc_address.clone(),
-                            processed_versions = processed_versions_sorted,
+                            stream_address = self.indexer_grpc_data_service_addresss.clone(),
+                            processed_versions = processed_versions_sorted
+                                .iter()
+                                .map(|(s, e)| format!("{}-{}", s, e))
+                                .collect::<Vec<_>>()
+                                .join(", "),
                             "[Parser] Gaps in processing stream"
                         );
                         panic!();
@@ -364,7 +387,7 @@ impl Worker {
     pub fn get_start_version(&self) -> anyhow::Result<Option<u64>> {
         let mut conn = self.db_pool.get()?;
 
-        match ProcessorStatusQuery::get_by_processor(&self.config.processor_name, &mut conn)? {
+        match ProcessorStatusQuery::get_by_processor(&self.processor_name, &mut conn)? {
             Some(status) => Ok(Some(status.last_success_version as u64 + 1)),
             None => Ok(None),
         }
@@ -373,7 +396,7 @@ impl Worker {
     /// Verify the chain id from GRPC against the database.
     pub async fn check_or_update_chain_id(&self, grpc_chain_id: i64) -> anyhow::Result<u64> {
         info!(
-            processor_name = self.config.processor_name.as_str(),
+            processor_name = self.processor_name.as_str(),
             "Checking if chain id is correct"
         );
         let mut conn = self.db_pool.get()?;
@@ -384,7 +407,7 @@ impl Worker {
             Some(chain_id) => {
                 anyhow::ensure!(chain_id == grpc_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", grpc_chain_id, chain_id);
                 info!(
-                    processor_name = self.config.processor_name.as_str(),
+                    processor_name = self.processor_name.as_str(),
                     chain_id = chain_id,
                     "Chain id matches! Continue to index...",
                 );
@@ -392,7 +415,7 @@ impl Worker {
             },
             None => {
                 info!(
-                    processor_name = self.config.processor_name.as_str(),
+                    processor_name = self.processor_name.as_str(),
                     chain_id = grpc_chain_id,
                     "Adding chain id to db, continue to index.."
                 );
@@ -429,7 +452,7 @@ pub fn grpc_request_builder(
 ) -> tonic::Request<GetTransactionsRequest> {
     let mut request = tonic::Request::new(GetTransactionsRequest {
         starting_version: Some(starting_version),
-        transactions_count: None,
+        ..GetTransactionsRequest::default()
     });
     request.metadata_mut().insert(
         aptos_indexer_grpc_utils::constants::GRPC_AUTH_TOKEN_HEADER,
