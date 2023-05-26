@@ -5,6 +5,7 @@
 
 
 
+-  [Function `create_guid`](#0x1_transaction_context_create_guid)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Specification](#@Specification_0)
     -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
@@ -13,6 +14,29 @@
 <pre><code></code></pre>
 
 
+
+<a name="0x1_transaction_context_create_guid"></a>
+
+## Function `create_guid`
+
+Return a globally unique identifier
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_guid">create_guid</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_guid">create_guid</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_transaction_context_get_script_hash"></a>
 

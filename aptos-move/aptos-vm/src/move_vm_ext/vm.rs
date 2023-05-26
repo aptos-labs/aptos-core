@@ -112,7 +112,11 @@ impl MoveVmExt {
             _ => vec![],
         };
 
-        extensions.add(NativeTransactionContext::new(script_hash, self.chain_id));
+        extensions.add(NativeTransactionContext::new(
+            txn_hash.to_vec(),
+            script_hash,
+            self.chain_id,
+        ));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(remote));
 
