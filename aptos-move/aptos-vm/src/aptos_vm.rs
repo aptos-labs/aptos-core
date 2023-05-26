@@ -1672,13 +1672,16 @@ impl VMAdapter for AptosVM {
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
-                    error!(
-                        *log_context,
-                        "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                        bcs::to_bytes::<SignedTransaction>(&**txn),
-                        vm_status,
-                    );
-                    TRANSACTIONS_INVARIANT_VIOLATION.inc();
+                    // Only log down the non-storage error case as storage error can be resulted from speculative execution.
+                    if vm_status.status_code() != StatusCode::STORAGE_ERROR {
+                        error!(
+                            *log_context,
+                            "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                            bcs::to_bytes::<SignedTransaction>(&**txn),
+                            vm_status,
+                        );
+                        TRANSACTIONS_INVARIANT_VIOLATION.inc();
+                    }
                 }
 
                 // Increment the counter for user transactions executed.
