@@ -4,6 +4,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+- Add `x-aptos-client` header to `IndexerClient` requests
+
 ## 1.9.1 (2023-05-24)
 
 - Add `x-aptos-client` header to `AptosClient` requests
