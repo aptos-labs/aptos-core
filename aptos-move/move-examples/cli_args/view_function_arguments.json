@@ -6,8 +6,8 @@
     ],
     "args": [
         {
-            "arg_type": "address",
-            "arg_value": "<test_account>"
+            "type": "address",
+            "value": "<test_account>"
         }
     ]
 }

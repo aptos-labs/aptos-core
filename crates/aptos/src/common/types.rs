@@ -16,6 +16,7 @@ use crate::{
     genesis::git::from_yaml,
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
+use anyhow::Context;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
@@ -1750,7 +1751,7 @@ impl TryFrom<&Vec<ArgWithTypeJSON>> for ArgWithTypeVec {
         let mut args = vec![];
         for arg_json_ref in value {
             let function_arg_type = FunctionArgType::from_str(&arg_json_ref.arg_type)?;
-            args.push(function_arg_type.parse_arg_json(&arg_json_ref.arg_value)?);
+            args.push(function_arg_type.parse_arg_json(&arg_json_ref.value)?);
         }
         Ok(ArgWithTypeVec { args })
     }
@@ -1762,7 +1763,12 @@ impl TryInto<Vec<TransactionArgument>> for ArgWithTypeVec {
     fn try_into(self) -> Result<Vec<TransactionArgument>, Self::Error> {
         let mut args = vec![];
         for arg in self.args {
-            args.push(arg.try_into()?);
+            args.push(
+                (&arg)
+                    .try_into()
+                    .context(format!("Failed to parse arg {:?}", arg))
+                    .map_err(|err| CliError::CommandArgumentError(err.to_string()))?,
+            );
         }
         Ok(args)
     }
@@ -1798,7 +1804,7 @@ pub struct EntryFunctionArguments {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long)]
+    #[clap(long, required_unless_present = "json-file")]
     pub function_id: Option<MemberId>,
 
     #[clap(flatten)]
@@ -1814,23 +1820,10 @@ pub struct EntryFunctionArguments {
 impl EntryFunctionArguments {
     /// Get instance as if all fields passed from command line, parsing JSON input file if needed.
     fn check_input_style(self) -> CliTypedResult<EntryFunctionArguments> {
-        if self.json_file.is_none() {
-            if self.function_id.is_none() {
-                Err(CliError::CommandArgumentError(
-                    "Must provide either function ID or JSON input file".to_string(),
-                ))
-            } else {
-                Ok(self)
-            }
+        if let Some(json_path) = self.json_file {
+            Ok(parse_json_file::<EntryFunctionArgumentsJSON>(&json_path)?.try_into()?)
         } else {
-            let json =
-                parse_json_file::<EntryFunctionArgumentsJSON>(self.json_file.as_ref().unwrap())?;
-            Ok(EntryFunctionArguments {
-                function_id: Some(MemberId::from_str(&json.function_id)?),
-                type_arg_vec: TypeArgVec::try_from(&json.type_args)?,
-                arg_vec: ArgWithTypeVec::try_from(&json.args)?,
-                json_file: None,
-            })
+            Ok(self)
         }
     }
 }
@@ -1840,7 +1833,7 @@ impl TryInto<EntryFunction> for EntryFunctionArguments {
 
     fn try_into(self) -> Result<EntryFunction, Self::Error> {
         let entry_function_args = self.check_input_style()?;
-        let function_id = entry_function_args.function_id.unwrap();
+        let function_id: MemberId = (&entry_function_args).try_into()?;
         Ok(EntryFunction::new(
             function_id.module_id,
             function_id.member_id,
@@ -1858,15 +1851,15 @@ impl TryInto<MultisigTransactionPayload> for EntryFunctionArguments {
     }
 }
 
-impl TryInto<Option<MultisigTransactionPayload>> for EntryFunctionArguments {
+impl TryInto<MemberId> for &EntryFunctionArguments {
     type Error = CliError;
 
-    fn try_into(self) -> Result<Option<MultisigTransactionPayload>, Self::Error> {
-        if self.function_id.is_none() && self.json_file.is_none() {
-            Ok(None)
-        } else {
-            Ok(Some(self.try_into()?))
-        }
+    fn try_into(self) -> Result<MemberId, Self::Error> {
+        self.function_id
+            .clone()
+            .ok_or(CliError::CommandArgumentError(
+                "No function ID provided".to_string(),
+            ))
     }
 }
 
@@ -1875,7 +1868,7 @@ impl TryInto<ViewRequest> for EntryFunctionArguments {
 
     fn try_into(self) -> Result<ViewRequest, Self::Error> {
         let entry_function_args = self.check_input_style()?;
-        let function_id = entry_function_args.function_id.unwrap();
+        let function_id: MemberId = (&entry_function_args).try_into()?;
         Ok(ViewRequest {
             function: EntryFunctionId {
                 module: function_id.module_id.into(),
@@ -1903,16 +1896,10 @@ pub struct ScriptFunctionArguments {
 impl ScriptFunctionArguments {
     /// Get instance as if all fields passed from command line, parsing JSON input file if needed.
     fn check_input_style(self) -> CliTypedResult<ScriptFunctionArguments> {
-        if self.json_file.is_none() {
-            Ok(self)
+        if let Some(json_path) = self.json_file {
+            Ok(parse_json_file::<ScriptFunctionArgumentsJSON>(&json_path)?.try_into()?)
         } else {
-            let json =
-                parse_json_file::<ScriptFunctionArgumentsJSON>(self.json_file.as_ref().unwrap())?;
-            Ok(ScriptFunctionArguments {
-                type_arg_vec: TypeArgVec::try_from(&json.type_args)?,
-                arg_vec: ArgWithTypeVec::try_from(&json.args)?,
-                json_file: None,
-            })
+            Ok(self)
         }
     }
 
@@ -1929,8 +1916,9 @@ impl ScriptFunctionArguments {
 #[derive(Deserialize, Serialize)]
 /// JSON file format for function arguments.
 pub struct ArgWithTypeJSON {
+    #[serde(rename = "type")]
     pub(crate) arg_type: String,
-    pub(crate) arg_value: serde_json::Value,
+    pub(crate) value: serde_json::Value,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1941,9 +1929,34 @@ pub struct EntryFunctionArgumentsJSON {
     pub(crate) args: Vec<ArgWithTypeJSON>,
 }
 
+impl TryInto<EntryFunctionArguments> for EntryFunctionArgumentsJSON {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<EntryFunctionArguments, Self::Error> {
+        Ok(EntryFunctionArguments {
+            function_id: Some(MemberId::from_str(&self.function_id)?),
+            type_arg_vec: TypeArgVec::try_from(&self.type_args)?,
+            arg_vec: ArgWithTypeVec::try_from(&self.args)?,
+            json_file: None,
+        })
+    }
+}
+
 #[derive(Deserialize)]
 /// JSON file format for script function arguments.
 struct ScriptFunctionArgumentsJSON {
     type_args: Vec<String>,
     args: Vec<ArgWithTypeJSON>,
+}
+
+impl TryInto<ScriptFunctionArguments> for ScriptFunctionArgumentsJSON {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<ScriptFunctionArguments, Self::Error> {
+        Ok(ScriptFunctionArguments {
+            type_arg_vec: TypeArgVec::try_from(&self.type_args)?,
+            arg_vec: ArgWithTypeVec::try_from(&self.args)?,
+            json_file: None,
+        })
+    }
 }

@@ -868,7 +868,6 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
-            json_output_file: None,
         }
         .execute()
         .await

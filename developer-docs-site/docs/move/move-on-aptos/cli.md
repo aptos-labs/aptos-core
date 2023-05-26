@@ -473,9 +473,9 @@ aptos key generate \
 ```bash
 {
   "Result": {
+    "Account Address:": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "PublicKey Path": "ace.key.pub",
-    "PrivateKey Path": "ace.key",
-    "Account Address:": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
+    "PrivateKey Path": "ace.key"
   }
 }
 ```
@@ -490,7 +490,7 @@ Store Ace's address in a shell variable so you can call it inline later on:
 
 ```bash
 # Your exact address should vary
-ace_addr=0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2
+ace_addr=0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46
 ```
 
 Fund Ace's account with the faucet (either devnet or testnet):
@@ -503,7 +503,7 @@ aptos account fund-with-faucet --account $ace_addr
 
 ```bash
 {
-  "Result": "Added 100000000 Octas to account ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
+  "Result": "Added 100000000 Octas to account acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46"
 }
 ```
 
@@ -523,14 +523,14 @@ aptos move publish \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x78e53928ec853a1c34d0e44aa6dd0ecc8234bdc0ab3d0634da171a6ac5d1b23c",
+    "transaction_hash": "0x1d7b074dd95724c5459a1c30fe4cb3875e7b0478cc90c87c8e3f21381625bec1",
     "gas_used": 1294,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 0,
     "success": true,
-    "timestamp_us": 1684977028870268,
-    "version": 527676489,
+    "timestamp_us": 1685077849297587,
+    "version": 528422121,
     "vm_status": "Executed successfully"
   }
 }
@@ -577,14 +577,14 @@ aptos move run \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x975e7026532aa6e14c97a27001efb2062c30a0c28e9a18b8b174333d88809c82",
+    "transaction_hash": "0x5e141dc6c28e86fa9f5594de93d07a014264ebadfb99be6db922a929eb1da24f",
     "gas_used": 504,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 1,
     "success": true,
-    "timestamp_us": 1684977491248278,
-    "version": 527679877,
+    "timestamp_us": 1685077888820037,
+    "version": 528422422,
     "vm_status": "Executed successfully"
   }
 }
@@ -612,14 +612,14 @@ aptos move run \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x44349fb8c8a78598f3f6af50177ee232228581a3dcc04220cbb2c91ec0e01a73",
+    "transaction_hash": "0x60a32315bb48bf6d31629332f6b1a3471dd0cb016fdee8d0bb7dcd0be9833e60",
     "gas_used": 3,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 2,
     "success": true,
-    "timestamp_us": 1684977758608985,
-    "version": 527681864,
+    "timestamp_us": 1685077961499641,
+    "version": 528422965,
     "vm_status": "Executed successfully"
   }
 }
@@ -698,15 +698,25 @@ The package also contains a script, `set_vals.move`, which is a wrapper for the 
 :!: static/move-examples/cli_args/scripts/set_vals.move script
 ```
 
-Here, `aptos move run-script` is run from inside the [`cli_args` package directory](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args):
+First compile the package (this will compile the script):
 
-:::tip
-Before trying out the below examples, compile the package with the correct named address via:
-
-```bash
+```bash title=Compilation
 aptos move compile --named-addresses test_account=$ace_addr
 ```
-:::
+
+<details><summary>Output</summary>
+
+```bash
+{
+  "Result": [
+    "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46::cli_args"
+  ]
+}
+```
+
+</details>
+
+Next, run `aptos move run-script`:
 
 ```bash title="Arguments via CLI"
 aptos move run-script \
@@ -727,14 +737,14 @@ aptos move run-script \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x375d653ecd0e3e00852eefbbe72435479eae9d5e84acd7cc8c7b7f1bc2f2da96",
+    "transaction_hash": "0x1d644eba8187843cc43919469112339bc2c435a49a733ac813b7bc6c79770152",
     "gas_used": 3,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 3,
     "success": true,
-    "timestamp_us": 1684978341019604,
-    "version": 527686516,
+    "timestamp_us": 1685078415935612,
+    "version": 528426413,
     "vm_status": "Executed successfully"
   }
 }
@@ -755,14 +765,14 @@ aptos move run-script \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x2bab4af9064c34e2b1ea756a44a893c8fb1580bf8af95ba2f454721e422748e9",
+    "transaction_hash": "0x840e2d6a5ab80d5a570effb3665f775f1755e0fd8d76e52bfa7241aaade883d7",
     "gas_used": 3,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 4,
     "success": true,
-    "timestamp_us": 1684978420803742,
-    "version": 527687139,
+    "timestamp_us": 1685078516832128,
+    "version": 528427132,
     "vm_status": "Executed successfully"
   }
 }
@@ -819,13 +829,11 @@ As of the time of this writing, the `aptos` CLI only supports script function ar
 
 This section builds upon the [Arguments in JSON](#arguments-in-json) section, and likewise references the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args).
 
-
 :::tip
 If you would like to follow along, start by completing the [Arguments in JSON](#arguments-in-json) tutorial steps!
 :::
 
-
-For this example, Ace and Bee will conduct governance operations from a 2-of-2 multisig account.
+For this example, Ace and Bee will conduct governance operations from a 2-of-2 "multisig v2" account (an on-chain multisig account per [`multisig_account.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/multisig_account.move))
 
 ### Account creation
 
@@ -844,7 +852,7 @@ aptos key generate \
   "Result": {
     "PublicKey Path": "bee.key.pub",
     "PrivateKey Path": "bee.key",
-    "Account Address:": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218"
+    "Account Address:": "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc"
   }
 }
 ```
@@ -859,7 +867,7 @@ Store Bee's address in a shell variable so you can call it inline later on:
 
 ```bash
 # Your exact address should vary
-bee_addr=0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218
+bee_addr=0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc
 ```
 
 Fund Bee's account using the faucet:
@@ -872,7 +880,7 @@ aptos account fund-with-faucet --account $bee_addr
 
 ```bash
 {
-  "Result": "Added 100000000 Octas to account bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218"
+  "Result": "Added 100000000 Octas to account beec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc"
 }
 ```
 
@@ -893,15 +901,15 @@ aptos multisig create \
 ```bash
 {
   "Result": {
-    "multisig_address": "50e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d0",
-    "transaction_hash": "0x696e1d7782bb80546825690c097426afa7f484a08b3ae8a004154aa877d572ed",
+    "multisig_address": "57478da34604655c68b1dcb89e4f4a9124b6c0ecc1c59a0931d58cc4e60ac5c5",
+    "transaction_hash": "0x849cc756de2d3b57210f5d32ae4b5e7d1f80e5d376233885944b6f3cc2124a05",
     "gas_used": 1524,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 5,
     "success": true,
-    "timestamp_us": 1684978792488964,
-    "version": 527690158,
+    "timestamp_us": 1685078644186194,
+    "version": 528428043,
     "vm_status": "Executed successfully"
   }
 }
@@ -913,7 +921,7 @@ Store the multisig address in a shell variable:
 
 ```bash
 # Your address should vary
-multisig_addr=0x50e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d0
+multisig_addr=0x57478da34604655c68b1dcb89e4f4a9124b6c0ecc1c59a0931d58cc4e60ac5c5
 ```
 
 ### Inspect the multisig
@@ -952,8 +960,8 @@ aptos move view \
 {
   "Result": [
     [
-      "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
-      "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2"
+      "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
+      "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46"
     ]
   ]
 }
@@ -1002,22 +1010,20 @@ aptos move view \
 ### Enqueue a publication transaction
 
 The first multisig transaction enqueued will be a transaction for publication of the [`CliArgs` example package](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/cli_args).
-First, generate a publication entry function JSON file:
+First, generate a publication payload entry function JSON file:
 
 ```bash title="Command"
-aptos move publish \
+aptos move build-publish-payload \
     --named-addresses test_account=$multisig_addr \
-    --json-output-file publication.json
+    --json-output-file publication.json \
+    --assume-yes
 ```
 
 <details><summary>Output</summary>
 
 ```bash
 {
-  "Result": {
-    "transaction_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "vm_status": "Publication entry function JSON file saved to publication.json"
-  }
+  "Result": "Publication payload entry function JSON file saved to publication.json"
 }
 ```
 
@@ -1039,14 +1045,14 @@ aptos multisig create-transaction \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x84a1932d91fdf31899bb430d723db26ae0919ece94c3c529d4d7efa4762954db",
+    "transaction_hash": "0x70c75903f8e1b1c0069f1e84ef9583ad8000f24124b33a746c88d2b031f7fe2c",
     "gas_used": 510,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 6,
     "success": true,
-    "timestamp_us": 1684978951763370,
-    "version": 527691441,
+    "timestamp_us": 1685078836492390,
+    "version": 528429447,
     "vm_status": "Executed successfully"
   }
 }
@@ -1112,20 +1118,20 @@ aptos move view \
 {
   "Result": [
     {
-      "creation_time_secs": "1684978951",
-      "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+      "creation_time_secs": "1685078836",
+      "creator": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
       "payload": {
         "vec": []
       },
       "payload_hash": {
         "vec": [
-          "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
+          "0x62b91159c1428c1ef488c7290771de458464bd665691d9653d195bc28e0d2080"
         ]
       },
       "votes": {
         "data": [
           {
-            "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+            "key": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
             "value": true
           }
         ]
@@ -1163,14 +1169,14 @@ aptos multisig create-transaction \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0xbd353d2e4ef9d49482f02defeaedcaf4c2f1fc957eac57472690ab17dee70988",
+    "transaction_hash": "0xd0a348072d5bfc5a2e5d444f92f0ecc10b978dad720b174303bc6d91342f27ec",
     "gas_used": 511,
     "gas_unit_price": 100,
-    "sender": "bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+    "sender": "beec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
     "sequence_number": 0,
     "success": true,
-    "timestamp_us": 1684979030036513,
-    "version": 527692060,
+    "timestamp_us": 1685078954841650,
+    "version": 528430315,
     "vm_status": "Executed successfully"
   }
 }
@@ -1215,31 +1221,31 @@ aptos move view \
   "Result": [
     [
       {
-        "creation_time_secs": "1684978951",
-        "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+        "creation_time_secs": "1685078836",
+        "creator": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
         "payload": {
           "vec": []
         },
         "payload_hash": {
           "vec": [
-            "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
+            "0x62b91159c1428c1ef488c7290771de458464bd665691d9653d195bc28e0d2080"
           ]
         },
         "votes": {
           "data": [
             {
-              "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+              "key": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
               "value": true
             }
           ]
         }
       },
       {
-        "creation_time_secs": "1684979030",
-        "creator": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+        "creation_time_secs": "1685078954",
+        "creator": "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
         "payload": {
           "vec": [
-            "0x0050e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d008636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
+            "0x0057478da34604655c68b1dcb89e4f4a9124b6c0ecc1c59a0931d58cc4e60ac5c508636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
           ]
         },
         "payload_hash": {
@@ -1248,14 +1254,15 @@ aptos move view \
         "votes": {
           "data": [
             {
-              "key": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+              "key": "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
               "value": true
             }
           ]
         }
       }
     ]
-
+  ]
+}
 ```
 
 </details>
@@ -1284,10 +1291,10 @@ aptos move view \
 
 </details>
 
-Before Bee votes, however, she checks that the payload hash stored on-chain matches the publication entry function JSON file:
+Before Bee votes, however, she verifies that the payload hash stored on-chain matches the publication entry function JSON file:
 
-```bash title="Checking transaction"
-aptos multisig check-transaction \
+```bash title="Verifying transaction proposal"
+aptos multisig verify-proposal \
     --multisig-address $multisig_addr \
     --json-file publication.json \
     --sequence-number 1
@@ -1300,20 +1307,20 @@ aptos multisig check-transaction \
   "Result": {
     "Status": "Transaction match",
     "Multisig transaction": {
-      "creation_time_secs": "1684978951",
-      "creator": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+      "creation_time_secs": "1685078836",
+      "creator": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
       "payload": {
         "vec": []
       },
       "payload_hash": {
         "vec": [
-          "0x04bcaa228189c3603c23e8ba3a91924f8c30528fc91a1f60b88f1000518f99e1"
+          "0x62b91159c1428c1ef488c7290771de458464bd665691d9653d195bc28e0d2080"
         ]
       },
       "votes": {
         "data": [
           {
-            "key": "0xace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+            "key": "0xacef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
             "value": true
           }
         ]
@@ -1341,14 +1348,14 @@ aptos multisig approve \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x9b80286a6f1ab70b4b2759193810b7f618451aa0fefcba1095b0ed74607aa684",
+    "transaction_hash": "0xa5fb49f1077de6aa6d976e6bcc05e4c50c6cd061f1c87e8f1ea74e7a04a06bd1",
     "gas_used": 6,
     "gas_unit_price": 100,
-    "sender": "bee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+    "sender": "beec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
     "sequence_number": 1,
     "success": true,
-    "timestamp_us": 1684979137080773,
-    "version": 527692937,
+    "timestamp_us": 1685079892130861,
+    "version": 528437204,
     "vm_status": "Executed successfully"
   }
 }
@@ -1381,7 +1388,7 @@ aptos move view \
 Now either Ace or Bee can invoke the publication transaction from the multisig account, passing the full transaction payload since only the hash was stored on-chain:
 
 ```bash title="Publication"
-aptos multisig execute \
+aptos multisig execute-with-payload \
     --multisig-address $multisig_addr \
     --json-file publication.json \
     --private-key-file bee.key \
@@ -1423,10 +1430,10 @@ aptos move view \
 
 </details>
 
-Before Ace votes, however, he checks that the payload stored on-chain matches the function arguments he expects:
+Before Ace votes, however, he verifies that the payload stored on-chain matches the function arguments he expects:
 
-```bash title="Checking transaction"
-aptos multisig check-transaction \
+```bash title="Verifying transaction proposal"
+aptos multisig verify-proposal \
     --multisig-address $multisig_addr \
     --function-id $multisig_addr::cli_args::set_vals \
     --type-args \
@@ -1446,11 +1453,11 @@ aptos multisig check-transaction \
   "Result": {
     "Status": "Transaction match",
     "Multisig transaction": {
-      "creation_time_secs": "1684979030",
-      "creator": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+      "creation_time_secs": "1685078954",
+      "creator": "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
       "payload": {
         "vec": [
-          "0x0050e382f5670c093a84d97d91427389a08717e2aa1b2f8e60efb92fe57cb682d008636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
+          "0x0057478da34604655c68b1dcb89e4f4a9124b6c0ecc1c59a0931d58cc4e60ac5c508636c695f61726773087365745f76616c7302070000000000000000000000000000000000000000000000000000000000000001076163636f756e74074163636f756e740007000000000000000000000000000000000000000000000000000000000000000108636861696e5f696407436861696e49640003017b0504000100006403020000000000000000000000000000000000000000000000000000000000000ace0000000000000000000000000000000000000000000000000000000000000bee010000000000000000000000000000000000000000000000000000000000000cad00"
         ]
       },
       "payload_hash": {
@@ -1459,7 +1466,7 @@ aptos multisig check-transaction \
       "votes": {
         "data": [
           {
-            "key": "0xbee5ec8d0b63bce492047dc71aeb5c28094d462bafc890b57d3b091d71cad218",
+            "key": "0xbeec980219d246581cef5166dc6ba5fb1e090c7a7786a5176d111a9029b16ddc",
             "value": true
           }
         ]
@@ -1471,10 +1478,10 @@ aptos multisig check-transaction \
 
 </details>
 
-Note that the check fails if he modifies even a single argument:
+Note that the verification fails if he modifies even a single argument:
 
-```bash title="Checking transaction with modified u8"
-aptos multisig check-transaction \
+```bash title="Failed transaction verification with modified u8"
+aptos multisig verify-proposal \
     --multisig-address $multisig_addr \
     --function-id $multisig_addr::cli_args::set_vals \
     --type-args \
@@ -1491,7 +1498,12 @@ aptos multisig check-transaction \
 
 ```bash
 {
-  "Error": "Unexpected error: Payload mismatch"
+  "Result": {
+    "Status": "Transaction mismatch",
+    "Provided payload hash": "0xe494b0072d6f940317344967cf0e818c80082375833708c773b0275f3ad07e51",
+    "On-chain payload hash": "0x070ed7c3f812f25f585461305d507b96a4e756f784e01c8c59901871267a1580",
+    "For more information": "https://aptos.dev/move/move-on-aptos/cli#multisig-governance"
+  }
 }
 ```
 
@@ -1512,14 +1524,14 @@ aptos multisig approve \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x3b443492c885f7338931e640a36d8d225a4f53ff17198cd2e3087b3a0887fcd2",
+    "transaction_hash": "0x233427d95832234fa13dddad5e0b225d40168b4c2c6b84f5255eecc3e68401bf",
     "gas_used": 6,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 7,
     "success": true,
-    "timestamp_us": 1684979313218098,
-    "version": 527694405,
+    "timestamp_us": 1685080266378400,
+    "version": 528439883,
     "vm_status": "Executed successfully"
   }
 }
@@ -1529,7 +1541,7 @@ aptos multisig approve \
 
 Since the payload was stored on-chain, it is not required to execute the pending transaction:
 
-```bash title="Publication"
+```bash title="Execution"
 aptos multisig execute \
     --multisig-address $multisig_addr \
     --private-key-file ace.key \
@@ -1542,17 +1554,16 @@ aptos multisig execute \
 ```bash
 {
   "Result": {
-    "transaction_hash": "0x20c0c1a2d8699cde1d70e07a77eae62b27acd900521efa641eb251dafabcd324",
+    "transaction_hash": "0xbc99f929708a1058b223aa880d04607a78ebe503367ec4dab23af4a3bdb541b2",
     "gas_used": 505,
     "gas_unit_price": 100,
-    "sender": "ace93c3bdeef22d10a8482ca9d70dcdb4f654511db3ec531397944e42ad77ec2",
+    "sender": "acef1b9b7d4ab208b99fed60746d18dcd74865edb7eb3c3f1428233988e4ba46",
     "sequence_number": 8,
     "success": true,
-    "timestamp_us": 1684979342858131,
-    "version": 527694637,
+    "timestamp_us": 1685080344045461,
+    "version": 528440423,
     "vm_status": "Executed successfully"
-  }
-}
+
 ```
 
 </details>

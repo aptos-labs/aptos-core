@@ -136,7 +136,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.13"
+version = "1.0.14"
 dependencies = [
  "anyhow",
  "aptos-backup-cli",
@@ -195,6 +195,7 @@ dependencies = [
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
+ "once_cell",
  "rand 0.7.3",
  "regex",
  "reqwest",

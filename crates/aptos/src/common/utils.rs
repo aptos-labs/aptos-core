@@ -13,10 +13,7 @@ use aptos_build_info::build_information;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keygen::KeyGen;
 use aptos_logger::{debug, Level};
-use aptos_rest_client::{
-    aptos_api_types::{HashValue, HexEncodedBytes},
-    Account, Client, State,
-};
+use aptos_rest_client::{aptos_api_types::HashValue, Account, Client, State};
 use aptos_telemetry::service::telemetry_is_disabled;
 use aptos_types::{
     account_address::create_multisig_account_address,
@@ -484,19 +481,40 @@ pub fn parse_json_file<T: for<'a> Deserialize<'a>>(path_ref: &Path) -> CliTypedR
     })
 }
 
-/// Convert a view function JSON field, known to have optional hex, into a bytes vector.
+/// Convert a view function JSON field into a string option.
 ///
-/// A view function return represents an option via an inner JSON array titled `vec`.
-pub fn view_json_option_hex_as_bytes(option_ref: &serde_json::Value) -> CliTypedResult<Vec<u8>> {
-    let option_vec_ref = option_ref["vec"].as_array().unwrap();
-    if option_vec_ref.is_empty() {
-        Ok(vec![])
+/// A view function JSON return represents an option via an inner JSON array titled `vec`.
+pub fn view_json_option_str(option_ref: &serde_json::Value) -> CliTypedResult<Option<String>> {
+    if let Some(vec_field) = option_ref.get("vec") {
+        if let Some(vec_array) = vec_field.as_array() {
+            if vec_array.is_empty() {
+                Ok(None)
+            } else if vec_array.len() > 1 {
+                Err(CliError::UnexpectedError(format!(
+                    "JSON `vec` array has more than one element: {:?}",
+                    vec_array
+                )))
+            } else {
+                let option_val_ref = &vec_array[0];
+                if let Some(inner_str) = option_val_ref.as_str() {
+                    Ok(Some(inner_str.to_string()))
+                } else {
+                    Err(CliError::UnexpectedError(format!(
+                        "JSON option is not a string: {}",
+                        option_val_ref
+                    )))
+                }
+            }
+        } else {
+            Err(CliError::UnexpectedError(format!(
+                "JSON `vec` field is not an array: {}",
+                vec_field
+            )))
+        }
     } else {
-        Ok(option_vec_ref[0]
-            .as_str()
-            .unwrap()
-            .parse::<HexEncodedBytes>()?
-            .inner()
-            .to_vec())
+        Err(CliError::UnexpectedError(format!(
+            "JSON field does not have an inner `vec` field: {}",
+            option_ref
+        )))
     }
 }
