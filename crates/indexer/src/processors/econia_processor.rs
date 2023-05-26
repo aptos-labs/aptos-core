@@ -560,7 +560,7 @@ impl EconiaTransactionProcessor {
     fn insert_coins(&self, conn: &mut PgConnection, coins: &[Coin]) -> Result<(), Error> {
         for c in coins.iter() {
             let insertable = c.to_insertable();
-            create_coin(conn, &insertable).unwrap();
+            let _ = create_coin(conn, &insertable);
         }
         Ok(())
     }
