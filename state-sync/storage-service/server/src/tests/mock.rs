@@ -347,8 +347,8 @@ mock! {
     }
 }
 
-/// Creates a mock db with the basic expectations required to handle subscription requests
-pub fn create_mock_db_for_subscription(
+/// Creates a mock db with the basic expectations required to handle optimistic fetch requests
+pub fn create_mock_db_for_optimistic_fetch(
     highest_ledger_info_clone: LedgerInfoWithSignatures,
     lowest_version: Version,
 ) -> MockDatabaseReader {
