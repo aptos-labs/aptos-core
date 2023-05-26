@@ -84,4 +84,4 @@ If you found a bug or would like to request a feature, please file an [issue](ht
 [npm-image-downloads]: https://img.shields.io/npm/dm/aptos.svg
 [npm-url]: https://npmjs.org/package/aptos
 [discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
-[discord-url]: https://discord.gg/aptoslabs
+[discord-url]: https://discord.gg/aptosnetwork
