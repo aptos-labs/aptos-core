@@ -15,12 +15,13 @@
 //! use aptos_network::noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader};
 //! use futures::{executor, future, io::{AsyncReadExt, AsyncWriteExt}};
 //! use aptos_memsocket::MemorySocket;
-//! use aptos_config::{config::{Peer, PeerRole, RoleType}, network_id::{NetworkContext, NetworkId}};
+//! use aptos_config::{config::{Peer, PeerRole}, network_id::{NetworkContext, NetworkId}};
 //! use aptos_crypto::{x25519, ed25519, Uniform, PrivateKey, test_utils::TEST_SEED};
 //! use aptos_infallible::RwLock;
 //! use rand::{rngs::StdRng, SeedableRng};
 //! use aptos_types::PeerId;
 //! use std::{collections::{HashSet, HashMap}, io, sync::Arc};
+//! use aptos_config::config::RoleType;
 //! use aptos_network::application::storage::PeersAndMetadata;
 //!
 //! fn example() -> io::Result<()> {
@@ -65,11 +66,11 @@
 //!
 //! // perform the handshake
 //! let (client_session, server_session) = executor::block_on(future::join(
-//!    client.upgrade_outbound(dialer_socket, server_public, AntiReplayTimestamps::now),
+//!    client.upgrade_outbound(dialer_socket, server_peer_id, server_public, AntiReplayTimestamps::now),
 //!    server.upgrade_inbound(listener_socket),
 //! ));
 //!
-//! let mut client_session = client_session
+//! let (mut client_session, _) = client_session
 //!     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 //! let (mut server_session, _client_peer_id, _trust_level) = server_session
 //!     .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;

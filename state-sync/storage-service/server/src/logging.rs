@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::Error;
+use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::Schema;
 use aptos_storage_service_types::requests::StorageServiceRequest;
 use serde::Serialize;
@@ -12,8 +13,10 @@ pub struct LogSchema<'a> {
     name: LogEntry,
     error: Option<&'a Error>,
     message: Option<&'a str>,
+    peer_network_id: Option<&'a PeerNetworkId>,
     response: Option<&'a str>,
     request: Option<&'a StorageServiceRequest>,
+    subscription_related: Option<bool>,
 }
 
 impl<'a> LogSchema<'a> {
@@ -22,8 +25,10 @@ impl<'a> LogSchema<'a> {
             name,
             error: None,
             message: None,
+            peer_network_id: None,
             response: None,
             request: None,
+            subscription_related: None,
         }
     }
 }
@@ -32,9 +37,12 @@ impl<'a> LogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     ReceivedStorageRequest,
+    RequestModeratorIgnoredPeer,
+    RequestModeratorRefresh,
     SentStorageResponse,
     StorageServiceError,
     StorageSummaryRefresh,
     SubscriptionRefresh,
     SubscriptionResponse,
+    SubscriptionRequest,
 }

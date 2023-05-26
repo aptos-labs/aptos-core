@@ -605,7 +605,7 @@ Create property map directly from key and property value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x3_property_map_borrow_value">borrow_value</a>(property: &<a href="property_map.md#0x3_property_map_PropertyValue">PropertyValue</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    *&property.value
+    property.value
 }
 </code></pre>
 
@@ -629,7 +629,7 @@ Create property map directly from key and property value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="property_map.md#0x3_property_map_borrow_type">borrow_type</a>(property: &<a href="property_map.md#0x3_property_map_PropertyValue">PropertyValue</a>): String {
-    *&property.type
+    property.type
 }
 </code></pre>
 

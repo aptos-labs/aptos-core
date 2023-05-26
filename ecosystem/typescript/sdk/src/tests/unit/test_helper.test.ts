@@ -1,10 +1,16 @@
 import { FaucetClient } from "../../plugins/faucet_client";
 import { OpenAPIConfig } from "../../generated";
+import { CustomEndpoints } from "../../utils/api-endpoints";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
 export const FAUCET_URL = process.env.APTOS_FAUCET_URL!;
 export const API_TOKEN = process.env.API_TOKEN!;
 export const FAUCET_AUTH_TOKEN = process.env.FAUCET_AUTH_TOKEN!;
+export const PROVIDER_LOCAL_NETWORK_CONFIG: CustomEndpoints = { fullnodeUrl: NODE_URL, indexerUrl: NODE_URL };
+
+// account to use for ANS tests, this account matches the one in sdk-release.yaml
+export const ANS_OWNER_ADDRESS = "0x585fc9f0f0c54183b039ffc770ca282ebd87307916c215a3e692f2f8e4305e82";
+export const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a17e13ba163e20221";
 
 /**
  * Returns an instance of a FaucetClient with NODE_URL and FAUCET_URL from the
@@ -26,4 +32,4 @@ test("noop", () => {
   // 2. Prevent jest from exploding when it finds a file with no tests in it
 });
 
-export const longTestTimeout = 80 * 1000;
+export const longTestTimeout = 120 * 1000;

@@ -28,7 +28,7 @@ async fn test_gen_object() {
     let named_addresses = vec![("token_objects".to_string(), user_addr)];
     let txn = futures::executor::block_on(async move {
         let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("../aptos-move/move-examples/token_objects");
+            .join("../aptos-move/move-examples/token_objects/hero");
         TestContext::build_package(path, named_addresses)
     });
     context.publish_package(&mut user, txn).await;
@@ -51,7 +51,16 @@ async fn test_gen_object() {
         )
         .await;
     let collection1 = context.gen_all_resources(&collection_addr).await;
-    assert_eq!(collection0, collection1);
+    let collection0_obj = to_object(collection0);
+    let collection1_obj = to_object(collection1);
+    assert_eq!(
+        collection0_obj["0x1::object::ObjectCore"],
+        collection1_obj["0x1::object::ObjectCore"]
+    );
+    assert_eq!(
+        collection0_obj["0x4::collection::Collection"],
+        collection1_obj["0x4::collection::Collection"]
+    );
 
     let hero = context.gen_all_resources(&token_addr).await;
     let hero_map = to_object(hero);

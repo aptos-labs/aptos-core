@@ -11,7 +11,7 @@ This page links to third-party contents. Aptos neither endorses nor supports the
 
 This page contains links to external resources supplied by the Aptos community. These may be useful, technical posts to the [Aptos Forum](https://forum.aptoslabs.com/) or links to Aptos-related technologies documented elsewhere.
 
-To add your own resource, click **Edit this page** at the bottom, add your resource in Markdown, and create a pull request for review. To instead [contribute](./index.md) to Aptos directly, see the [Community Highlights](./contributions/index.md) list.
+To add your own resource, click **Edit this page** at the bottom, add your resource in Markdown, and create a pull request for review.
 
 ## Tools
 

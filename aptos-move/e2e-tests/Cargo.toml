@@ -39,4 +39,5 @@ once_cell = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }

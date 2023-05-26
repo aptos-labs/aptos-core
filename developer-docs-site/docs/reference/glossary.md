@@ -28,7 +28,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 
 ### API
 
-- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../guides/aptos-apis.md) for more details.
+- An **Application Programming Interface (API)(** is a set of protocols and tools that allow users to interact with Aptos blockchain nodes and client networks via external applications. Aptos offers a REST API for this purpose. See the [Aptos API reference](https://aptos.dev/nodes/aptos-api-spec#/) documentation and [Use the Aptos API](../integration/aptos-apis.md) for more details.
 
 ### APT
 
@@ -41,7 +41,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### AptosBFT
 
 - **AptosBFT** is the Aptos protocol's BFT consensus algorithm.
-- AptosBFT is based on HotStuff.
+- AptosBFT is based on Jolteon.
 
 ### Aptos Blockchain
 
@@ -66,7 +66,7 @@ See [Accounts](../concepts/accounts.md) for more information.
 ### Aptos Explorer
 
 - The **[Aptos Explorer](https://explorer.aptoslabs.com/)** is an interface that helps users examine details of the Aptos blockchain, including account information, validators, and transactions.
-- The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/use-aptos-explorer.md).
+- The Aptos Explorer help users validate their work in Aptos wallets and other tools in the blockchain. Find more details at [Use the Aptos Explorer](../guides/explore-aptos.md).
 
 ### Aptos Framework
 The **Aptos Framework** defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
@@ -102,7 +102,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 ### Byzantine Fault Tolerance (BFT)
 
 - **Byzantine Fault Tolerance** (BFT) is the ability of a distributed system to provide safety and liveness guarantees in the presence of faulty, or “[Byzantine](#byzantine-validator),” validators below a certain threshold.
-- The Aptos blockchain uses AptosBFT, a consensus protocol based on [HotStuff](#hotstuff).
+- The Aptos blockchain uses AptosBFT, a consensus protocol based on [Jolteon](#Jolteon).
 - BFT algorithms typically operate with a number of entities, collectively holding N votes (which are called “validators” in the Aptos network’s application of the system).
 - N is chosen to withstand some number of validators holding f votes, which might be malicious.
 - In this configuration, N is typically set to 3f+1. Validators holding up to f votes will be allowed to be faulty &mdash; offline, malicious, slow, etc. As long as 2f+1 votes are held by [honest](#honest-validator) validators, they will be able to reach consensus on consistent decisions.
@@ -112,7 +112,7 @@ An **Aptos node** is a peer entity of the Aptos network that tracks the state of
 
 ### CLI
 
-- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../cli-tools/aptos-cli-tool/use-aptos-cli.md). 
+- **Command line interface** refers to the Aptos CLI used for developing on the Aptos blockchain, operating nodes, and debugging issues. Find out more at [Use the Aptos CLI](../tools/aptos-cli-tool/use-aptos-cli.md). 
 
 ### Client
 
@@ -207,17 +207,17 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Honesty** means a validator that faithfully executes the consensus protocol and is not Byzantine.
 
-### HotStuff
+### Jolteon
 
-- **HotStuff** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
-- AptosBFT, the Aptos network's consensus algorithm, is based on HotStuff.
-- It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols.
+- **Jolteon** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
+- AptosBFT, the Aptos network's consensus algorithm, is based on Jolteon.
+- It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols. In particular, it reduces latency by 33% compared to HotStuff.
 
 ## I
 
 ### Indexer
 
-- **[Indexer](../guides/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
+- **[Indexer](../integration/indexing.md)** is the component of Aptos that retrieves, processes, and efficiently stores raw data in the database to provide speedy access to the Aptos blockchain state.
 
 ## L
 
@@ -267,7 +267,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Move** is a new programming language that implements all the transactions on the Aptos blockchain.
 - It has two different kinds of code &mdash; [transaction scripts](#transaction-script) and [Move modules](#move-module).
-- Move is a safe and secure programming language for web3 that emphasizes access control and scarcity. It is the programming language used to build the Aptos blockchain. You can read more about it in [Move on Aptos](../guides/move-guides/move-on-aptos.md).
+- Move is a safe and secure programming language for web3 that emphasizes access control and scarcity. It is the programming language used to build the Aptos blockchain. You can read more about it in [Move on Aptos](../move/move-on-aptos.md).
 
 ### Move Bytecode
 
@@ -328,7 +328,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - The contract itself does not require a signer post initialization. A resource account gives you the means for the module to provide a signer to other modules and sign transactions on behalf of the module.
 
-See [Resource accounts](../guides/resource-accounts.md) for instructions on use.
+See [Resource accounts](../move/move-on-aptos/resource-accounts.md) for instructions on use.
 
 ### REST Service
 
@@ -413,7 +413,7 @@ See [`table.move`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
 
-To see example uses of transaction scripts, follow [Move scripts](../guides/move-guides/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
+To see example uses of transaction scripts, follow [Move scripts](../move/move-on-aptos/move-scripts.md) and the [Your First Multisig](../tutorials/first-multisig.md) tutorial.
 
 ## V
 

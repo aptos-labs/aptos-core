@@ -9,13 +9,11 @@ core.workflow(
         url = moveUrl,
         ref = "aptos-main",
     ),
-    destination = git.github_pr_destination(
-       url = aptosUrl,
-       destination_ref = "main",
-       draft = True,
-       title = "Changes from move-language",
-       pr_branch = "from_move",
-       integrates = []
+    destination = git.destination(
+        url = "NOT_SET", # use --git-destination-url to set this
+        fetch = "from_move",
+        push = "from_move",
+        integrates = [],
     ),
     mode = "ITERATIVE",
     origin_files = glob(["language/**"]),
@@ -26,8 +24,6 @@ core.workflow(
     ],
 )
 
-
-
 # Workflow to push from Aptos to Move. This directly pushes without PR.
 core.workflow(
     name = "push_move",
@@ -35,13 +31,11 @@ core.workflow(
         url = aptosUrl,
         ref = "main",
     ),
-    destination = git.github_pr_destination(
-        url = moveUrl,
-        destination_ref = "aptos-main",
-        draft = True,
-        title = "Changes from aptos-core",
-        pr_branch = "from_aptos",
-        integrates = []
+    destination = git.destination(
+        url = "NOT_SET", # use --git-destination-url to set this
+        fetch = "aptos-main",
+        push = "to_move",
+        integrates = [],
     ),
     mode = "ITERATIVE",
     origin_files = glob(["third_party/move/**"]),

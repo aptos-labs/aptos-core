@@ -164,7 +164,7 @@ module aptos_framework::code {
         };
 
         // Assign the upgrade counter.
-        *&mut pack.upgrade_number = upgrade_number;
+        pack.upgrade_number = upgrade_number;
 
         // Update registry
         let policy = pack.upgrade_policy;

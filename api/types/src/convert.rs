@@ -37,7 +37,9 @@ use aptos_types::{
 use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
-    identifier::Identifier,
+    account_address::AccountAddress,
+    ident_str,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveStructLayout, MoveTypeLayout},
 };
@@ -49,6 +51,9 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
+
+const OBJECT_MODULE: &IdentStr = ident_str!("object");
+const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 
 /// The Move converter for converting Move types to JSON
 ///
@@ -188,7 +193,8 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
                     .inner
-                    .view_function_arguments(&module, &function, &args);
+                    .view_function_arguments(&module, &function, &ty_args, &args);
+
                 let json_args = match func_args {
                     Ok(values) => values
                         .into_iter()
@@ -218,7 +224,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                             let (module, function, ty_args, args) = entry_function.into_inner();
                             let func_args = self
                                 .inner
-                                .view_function_arguments(&module, &function, &args);
+                                .view_function_arguments(&module, &function, &ty_args, &args);
                             let json_args = match func_args {
                                 Ok(values) => values
                                     .into_iter()
@@ -753,7 +759,22 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         type_tag: &TypeTag,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let layout = self.inner.get_type_layout_with_types(type_tag)?;
+        let layout = match type_tag {
+            TypeTag::Struct(boxed_struct) => {
+                // The current framework can't handle generics, so we handle this here
+                if boxed_struct.address == AccountAddress::ONE
+                    && boxed_struct.module.as_ident_str() == OBJECT_MODULE
+                    && boxed_struct.name.as_ident_str() == OBJECT_STRUCT
+                {
+                    // Objects are just laid out as an address
+                    MoveTypeLayout::Address
+                } else {
+                    // For all other structs, use their set layout
+                    self.inner.get_type_layout_with_types(type_tag)?
+                }
+            },
+            _ => self.inner.get_type_layout_with_types(type_tag)?,
+        };
 
         self.try_into_vm_value_from_layout(&layout, val)
     }

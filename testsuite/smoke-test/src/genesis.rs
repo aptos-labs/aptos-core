@@ -13,7 +13,7 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::anyhow;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{InitialSafetyRulesConfig, NodeConfig};
 use aptos_forge::{get_highest_synced_version, LocalNode, Node, NodeExt, SwarmExt, Validator};
 use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
@@ -31,7 +31,7 @@ use std::{
 fn update_node_config_restart(validator: &mut LocalNode, mut config: NodeConfig) {
     validator.stop();
     let node_path = validator.config_path();
-    config.save(node_path).unwrap();
+    config.save_to_path(node_path).unwrap();
     validator.start().unwrap();
 }
 
@@ -117,7 +117,13 @@ async fn test_genesis_transaction_flow() {
         node.stop();
     }
 
-    let first_validator_address = env.validators().nth(4).unwrap().config().peer_id().unwrap();
+    let first_validator_address = env
+        .validators()
+        .nth(4)
+        .unwrap()
+        .config()
+        .get_peer_id()
+        .unwrap();
 
     let script = format!(
         r#"
@@ -200,6 +206,10 @@ async fn test_genesis_transaction_flow() {
     for (expected_to_connect, node) in env.validators_mut().take(3).enumerate() {
         let mut node_config = node.config().clone();
         insert_waypoint(&mut node_config, waypoint);
+        node_config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config = InitialSafetyRulesConfig::None;
         node_config.execution.genesis = Some(genesis_transaction.clone());
         // reset the sync_only flag to false
         node_config.consensus.sync_only = false;
@@ -223,7 +233,7 @@ async fn test_genesis_transaction_flow() {
         (response.inner().epoch, response.inner().version)
     };
 
-    let backup_path = db_backup(
+    let (backup_path, snapshot_ver) = db_backup(
         env.validators()
             .next()
             .unwrap()
@@ -253,7 +263,7 @@ async fn test_genesis_transaction_flow() {
     node.stop();
     let mut node_config = node.config().clone();
     node_config.consensus.sync_only = false;
-    node_config.save(node.config_path()).unwrap();
+    node_config.save_to_path(node.config_path()).unwrap();
 
     let db_dir = node.config().storage.dir();
     fs::remove_dir_all(&db_dir).unwrap();
@@ -262,6 +272,7 @@ async fn test_genesis_transaction_flow() {
         db_dir.as_path(),
         &[waypoint],
         node.config().storage.rocksdb_configs.use_state_kv_db,
+        Some(snapshot_ver),
     );
 
     node.start().unwrap();

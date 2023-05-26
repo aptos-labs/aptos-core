@@ -1,0 +1,57 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.internal.fullnode.v1;
+
+import "aptos/transaction/v1/transaction.proto";
+
+// Transaction data is transferred via 1 stream with batches until terminated.
+// One stream consists:
+//  StreamStatus: INIT with version x
+//  loop k:
+//    TransactionOutput data(size n)
+//    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
+
+message TransactionsOutput {
+  repeated aptos.transaction.v1.Transaction transactions  = 1;
+}
+
+message StreamStatus {
+  enum StatusType {
+    STATUS_TYPE_UNSPECIFIED = 0;
+    // Signal for the start of the stream.
+    STATUS_TYPE_INIT = 1;
+    // Signal for the end of the batch.
+    STATUS_TYPE_BATCH_END = 2;
+  }
+  StatusType type = 1;
+  // Required. Start version of current batch/stream, inclusive.
+  uint64 start_version = 2;
+  // End version of current *batch*, inclusive.
+  optional uint64 end_version = 3 [jstype = JS_STRING];
+}
+
+message GetTransactionsFromNodeRequest {
+  // Required; start version of current stream.
+  // If not set will panic somewhere
+  optional uint64 starting_version = 1 [jstype = JS_STRING];
+
+  // Optional; number of transactions to return in current stream.
+  // If not set, response streams infinitely.
+  optional uint64 transactions_count = 2 [jstype = JS_STRING];
+}
+
+message TransactionsFromNodeResponse {
+  oneof response {
+    StreamStatus status = 1;
+    TransactionsOutput data = 2;
+  }
+  // Making sure that all the responses include a chain id
+  uint32 chain_id = 3;
+}
+
+service FullnodeData {
+    rpc GetTransactionsFromNode(GetTransactionsFromNodeRequest) returns (stream TransactionsFromNodeResponse);
+}

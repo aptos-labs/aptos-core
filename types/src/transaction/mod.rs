@@ -11,6 +11,7 @@ use crate::{
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
+    state_store::ShardedStateUpdates,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
@@ -29,7 +30,6 @@ use move_core_types::transaction_argument::convert_txn_args;
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     convert::TryFrom,
     fmt,
     fmt::{Debug, Display, Formatter},
@@ -42,7 +42,6 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-use crate::state_store::{state_key::StateKey, state_value::StateValue};
 #[cfg(any(test, feature = "fuzzing"))]
 pub use change_set::NoOpChangeSetChecker;
 pub use change_set::{ChangeSet, CheckChangeSet};
@@ -141,8 +140,6 @@ impl RawTransaction {
     }
 
     /// Create a new `RawTransaction` with an entry function.
-    ///
-    /// A script transaction contains only code to execute. No publishing is allowed in scripts.
     pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,
@@ -185,9 +182,6 @@ impl RawTransaction {
     }
 
     /// Create a new `RawTransaction` with a module to publish.
-    ///
-    /// A module transaction is the only way to publish code. Only one module per transaction
-    /// can be published.
     pub fn new_module(
         sender: AccountAddress,
         sequence_number: u64,
@@ -210,8 +204,7 @@ impl RawTransaction {
 
     /// Create a new `RawTransaction` with a list of modules to publish.
     ///
-    /// A module transaction is the only way to publish code. Multiple modules per transaction
-    /// can be published.
+    /// Multiple modules per transaction can be published.
     pub fn new_module_bundle(
         sender: AccountAddress,
         sequence_number: u64,
@@ -825,6 +818,14 @@ impl TransactionStatus {
         }
     }
 
+    pub fn is_retry(&self) -> bool {
+        match self {
+            TransactionStatus::Discard(_) => false,
+            TransactionStatus::Keep(_) => false,
+            TransactionStatus::Retry => true,
+        }
+    }
+
     pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
             TransactionStatus::Keep(s) => Ok(s.clone()),
@@ -1176,7 +1177,7 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
-    state_updates: HashMap<StateKey, Option<StateValue>>,
+    state_updates: ShardedStateUpdates,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
     is_reconfig: bool,
@@ -1186,7 +1187,7 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: HashMap<StateKey, Option<StateValue>>,
+        state_updates: ShardedStateUpdates,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1218,7 +1219,7 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
+    pub fn state_updates(&self) -> &ShardedStateUpdates {
         &self.state_updates
     }
 

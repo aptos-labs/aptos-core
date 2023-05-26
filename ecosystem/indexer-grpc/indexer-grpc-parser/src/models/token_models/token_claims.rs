@@ -7,7 +7,7 @@
 
 use super::{token_utils::TokenWriteSet, tokens::TableHandleToOwner};
 use crate::{schema::current_token_pending_claims, utils::util::standardize_address};
-use aptos_protos::transaction::testing1::v1::{DeleteTableItem, WriteTableItem};
+use aptos_protos::transaction::v1::{DeleteTableItem, WriteTableItem};
 use bigdecimal::{BigDecimal, Zero};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -86,7 +86,7 @@ impl CurrentTokenPendingClaim {
                         last_transaction_timestamp: txn_timestamp,
                     }));
                 } else {
-                    aptos_logger::warn!(
+                    tracing::warn!(
                         transaction_version = txn_version,
                         table_handle = table_handle,
                         "Missing table handle metadata for TokenClaim. {:?}",
@@ -94,7 +94,7 @@ impl CurrentTokenPendingClaim {
                     );
                 }
             } else {
-                aptos_logger::warn!(
+                tracing::warn!(
                     transaction_version = txn_version,
                     value_type = table_item_data.value_type,
                     value = table_item_data.value,

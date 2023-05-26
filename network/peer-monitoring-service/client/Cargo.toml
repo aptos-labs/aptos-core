@@ -29,13 +29,19 @@ futures = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+aptos-build-info = { workspace = true }
+aptos-config = { workspace = true }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-peer-monitoring-service-server = { workspace = true }
 bcs = { workspace = true }
 maplit = { workspace = true }
 tokio-stream = { workspace = true }
+
+[features]
+network-perf-test = ["aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]

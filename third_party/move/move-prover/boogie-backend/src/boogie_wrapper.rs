@@ -271,7 +271,9 @@ impl<'env> BoogieWrapper<'env> {
                 // avoiding producing them, because of the step of converting locations to line
                 // numbers.
                 let display_str = format!("    {}{}", loc.display_line_only(self.env), info);
-                if display.is_empty() || display[display.len() - 1] != display_str {
+                if (display.is_empty() || display[display.len() - 1] != display_str)
+                    && !display_str.contains("<internal>")
+                {
                     display.push(display_str);
                 }
                 *last_loc = loc.clone();
@@ -332,7 +334,7 @@ impl<'env> BoogieWrapper<'env> {
                             };
                             let ty = fun_target.get_return_type(*idx);
                             let pretty =
-                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), ty);
+                                value.pretty_or_raw(self, error.model.as_ref().unwrap(), &ty);
                             display.extend(self.make_trace_entry(var_name, pretty));
                         }
                     },
@@ -444,6 +446,7 @@ impl<'env> BoogieWrapper<'env> {
                 display.append(&mut trace_display)
             }
 
+            display.dedup();
             diag = diag.with_notes(display);
         }
         self.env.add_diag(diag);
@@ -1503,7 +1506,7 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
-        let entries = if struct_env.is_native_or_intrinsic() {
+        let entries = if struct_env.is_intrinsic() {
             let mut rep = self.extract_literal()?.to_string();
             if rep.starts_with("T@") {
                 if let Some(i) = rep.rfind('!') {

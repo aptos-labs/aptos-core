@@ -36,10 +36,7 @@ fn define_empty_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &Qualifi
     // by a pointer to its data. We need to implement a hash algorithm for structs and vectors before
     // allowing using structs and vectors as table keys.
     if ctx.type_allocates_memory(key_type) {
-        let ty_ctx = &TypeDisplayContext::WithEnv {
-            env: ctx.env,
-            type_param_names: None,
-        };
+        let ty_ctx = &TypeDisplayContext::new(ctx.env);
         ctx.env.error(
             &gen.parent.contract_loc,
             &format!(

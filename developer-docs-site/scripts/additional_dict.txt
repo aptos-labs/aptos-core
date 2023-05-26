@@ -12,6 +12,7 @@ APIs
 APT
 APT's
 APTs
+APY
 AUTH
 AWS
 Ait
@@ -24,6 +25,7 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosRelease
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -55,6 +57,8 @@ DECL
 DM
 DNS
 Dapps
+Delegator
+Delegators
 Deref
 Deref
 Destructuring
@@ -63,6 +67,9 @@ DevEx
 Devnet
 DoS
 DocGen
+delegator
+delegators
+dropdown
 EACCOUNT
 EALREADY
 EBS
@@ -99,6 +106,7 @@ EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+ExternalMarkdown
 FAQ
 FLAC
 FT
@@ -132,12 +140,14 @@ Integrators
 JPG
 JSON
 Jetbrains
+Jolteon
 Kubernetes
 LLVM
 Labs's
 Leaderboard
 Liveness
 MOV
+MSL
 MSVC
 MVM
 Mainnet
@@ -148,6 +158,7 @@ MiB
 Modularity
 Monterey
 MoonCoin
+MoveReference
 MoveVM
 MultiEd
 Multinode
@@ -176,6 +187,7 @@ Paymagic
 Petra
 PoS
 Pontem
+Postcondition
 Postgres
 PowerShell
 PropertyMap
@@ -210,6 +222,7 @@ SignedTransaction
 SignerCap
 Skylake
 Solana
+Staker
 StateCheckpointTransaction
 Subtyping
 TCP
@@ -290,6 +303,7 @@ boolean
 broadcasted
 bytecode
 cAdvisor
+callee
 cancelled
 cfg
 changeset
@@ -345,6 +359,7 @@ haproxy
 hardcoded
 hippospace
 hotfix
+hotfixes
 hotstuff
 href
 http
@@ -369,15 +384,18 @@ jsx
 kickstart
 korean
 kubernetes
+lang
 leaderboard
 lexically
 libclang
 libpq
 libssl
 lifecycle
+linter
 liveness
 localhost
 loopwise
+lt
 macOS
 mainnet
 md
@@ -389,6 +407,7 @@ monorepo
 multinode
 multisig
 multisignature
+multisigner
 namespace
 natively
 nestable
@@ -420,6 +439,7 @@ pipelined
 png
 polymorphism
 powershell
+pragmas
 pre
 prebuilt
 precompiled
@@ -441,6 +461,7 @@ rpc
 ruleset
 runtime
 sandboxed
+satisfiable
 scalability
 scalable
 schema
@@ -518,3 +539,17 @@ withdrawable
 xlarge
 yaml
 yamls
+mintAptosName
+getAddressByName
+getPrimaryNameByAddress
+acount
+fundAccount
+extensibility
+MultiSig
+IndexerClient
+Hasura
+AptosClient
+ANSClient
+FaucetClient
+CoinClient
+RESTful

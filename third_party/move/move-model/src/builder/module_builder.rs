@@ -9,16 +9,15 @@ use crate::{
         SpecBlockTarget, SpecFunDecl, SpecVarDecl, Value,
     },
     builder::{
-        exp_translator::ExpTranslator,
+        exp_builder::ExpTranslator,
         model_builder::{ConstEntry, FunEntry, LocalVarEntry, ModelBuilder, SpecFunEntry},
     },
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     model::{
-        AbilityConstraint, FieldId, FunId, FunctionData, FunctionVisibility, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, QualifiedId, QualifiedInstId,
-        SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
-        SCRIPT_BYTECODE_FUN_NAME,
+        FieldData, FieldId, FunId, FunctionData, Loc, ModuleId, MoveIrLoc, NamedConstantData,
+        NamedConstantId, NodeId, Parameter, QualifiedId, QualifiedInstId, SchemaId, SpecFunId,
+        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -26,7 +25,6 @@ use crate::{
         CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_INJECTED_PROP,
         OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
-    project_1st,
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
 };
@@ -34,8 +32,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{AbilitySet, Constant, FunctionDefinitionIndex, StructDefinitionIndex},
-    views::{FunctionHandleView, StructHandleView},
+    file_format::{Ability, AbilitySet, Constant, Visibility},
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
@@ -48,6 +45,7 @@ use move_compiler::{
 use move_ir_types::{ast::ConstantName, location::Spanned};
 use regex::Regex;
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     default::Default,
     fmt,
@@ -69,6 +67,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub spec_vars: Vec<SpecVarDecl>,
     /// Translated function specifications.
     pub fun_specs: BTreeMap<Symbol, Spec>,
+    /// Translated function definitions, if we are compiling Move code
+    pub fun_defs: BTreeMap<Symbol, Exp>,
     /// Translated struct specifications.
     pub struct_specs: BTreeMap<Symbol, Spec>,
     /// Translated module spec
@@ -78,6 +78,19 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
+    /// Whether during model building, we actuallly compile the full Move source. If this is not
+    /// set, we assume a compiled bytecode module as input. We still need the AST of the spec
+    /// language part.
+    pub compile_move: bool,
+}
+
+/// Represents information about a module already compiled into bytecode by the legacy
+/// Move compiler.
+#[derive(Debug)]
+pub(crate) struct BytecodeModule {
+    pub compiled_module: CompiledModule,
+    pub source_map: SourceMap,
+    pub function_infos: UniqueMap<PA::FunctionName, FunctionInfo>,
 }
 
 /// A value which we pass in to spec block analyzers, describing the resolved target of the spec
@@ -113,6 +126,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         module_id: ModuleId,
         module_name: ModuleName,
     ) -> Self {
+        let compile_move = parent
+            .env
+            .get_extension::<ModelBuilderOptions>()
+            .map(|o| o.compile_via_model)
+            .unwrap_or_default();
         Self {
             parent,
             module_id,
@@ -121,18 +139,23 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             spec_fun_index: 0,
             spec_vars: vec![],
             fun_specs: BTreeMap::new(),
+            fun_defs: BTreeMap::new(),
             struct_specs: BTreeMap::new(),
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
             spec_block_lets: BTreeMap::new(),
+            compile_move,
         }
     }
 
     /// Translates the given module definition from the Move compiler's expansion phase,
-    /// combined with a compiled module (bytecode) and a source map, and enters it into
+    /// optionally combined with a compiled module (bytecode) and a source map, and enters it into
     /// this global environment. Any type check or others errors encountered will be collected
     /// in the environment for later processing. Dependencies of this module are guaranteed to
     /// have been analyzed and being already part of the environment.
+    ///
+    /// If no `BytecodeModule` is provided, the Move function definitions will be translated
+    /// as well.
     ///
     /// Translation happens in three phases:
     ///
@@ -149,15 +172,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         loc: Loc,
         module_def: EA::ModuleDefinition,
-        compiled_module: CompiledModule,
-        source_map: SourceMap,
-        function_infos: UniqueMap<PA::FunctionName, FunctionInfo>,
+        compiled_module: Option<BytecodeModule>,
     ) {
-        self.decl_ana(&module_def, &compiled_module, &source_map);
-        self.def_ana(&module_def, &function_infos);
+        self.decl_ana(&module_def, &compiled_module);
+        self.def_ana(&module_def, &compiled_module);
         self.collect_spec_block_infos(&module_def);
         let attrs = self.translate_attributes(&module_def.attributes);
-        self.populate_env_from_result(loc, attrs, compiled_module, source_map);
+        self.populate_and_finalize_env(loc, attrs, compiled_module);
     }
 }
 
@@ -241,6 +262,27 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             },
             EA::SpecBlockTarget_::Module => Some(SpecBlockContext::Module),
         }
+    }
+}
+
+/// # Abilitity Analysis
+
+impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    pub(crate) fn translate_abilities(&self, set: &EA::AbilitySet) -> AbilitySet {
+        let mut abilities = AbilitySet::EMPTY;
+        if set.has_ability_(PA::Ability_::Key) {
+            abilities = abilities.add(Ability::Key)
+        }
+        if set.has_ability_(PA::Ability_::Store) {
+            abilities = abilities.add(Ability::Store)
+        }
+        if set.has_ability_(PA::Ability_::Copy) {
+            abilities = abilities.add(Ability::Copy)
+        }
+        if set.has_ability_(PA::Ability_::Drop) {
+            abilities = abilities.add(Ability::Drop)
+        }
+        abilities
     }
 }
 
@@ -337,8 +379,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn decl_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
-        compiled_module: &CompiledModule,
-        source_map: &SourceMap,
+        compiled_module: &Option<BytecodeModule>,
     ) {
         for (name, struct_def) in module_def.structs.key_cloned_iter() {
             self.decl_ana_struct(&name, struct_def);
@@ -347,7 +388,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.decl_ana_fun(&name, fun_def);
         }
         for (name, const_def) in module_def.constants.key_cloned_iter() {
-            self.decl_ana_const(&name, const_def, compiled_module, source_map);
+            self.decl_ana_const(&name, const_def, compiled_module);
         }
         for spec in &module_def.specs {
             self.decl_ana_spec_block(spec);
@@ -358,23 +399,51 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         name: &PA::ConstantName,
         def: &EA::Constant,
-        compiled_module: &CompiledModule,
-        source_map: &SourceMap,
+        compiled_module: &Option<BytecodeModule>,
     ) {
         let qsym = self.qualified_by_module_from_name(&name.0);
+        if self.parent.const_table.contains_key(&qsym) {
+            self.parent.env.error(
+                &self.parent.to_loc(&name.loc()),
+                &format!("duplicate declaration of `{}`", &name.value()),
+            )
+        }
         let name = qsym.symbol;
         let const_name = ConstantName(self.symbol_pool().string(name).to_string().into());
-        let const_idx = source_map
-            .constant_map
-            .get(&const_name)
-            .expect("constant not in source map");
-        let move_value =
-            Constant::deserialize_constant(&compiled_module.constant_pool()[*const_idx as usize])
-                .unwrap();
         let mut et = ExpTranslator::new(self);
         let loc = et.to_loc(&def.loc);
         let ty = et.translate_type(&def.signature);
-        let value = et.translate_from_move_value(&loc, &ty, &move_value);
+        let value = if let Some(BytecodeModule {
+            compiled_module,
+            source_map,
+            ..
+        }) = compiled_module
+        {
+            // Get the already assigned constant index.
+            let const_idx = source_map
+                .constant_map
+                .get(&const_name)
+                .expect("constant not in source map");
+            let move_value = Constant::deserialize_constant(
+                &compiled_module.constant_pool()[*const_idx as usize],
+            )
+            .unwrap();
+            et.translate_from_move_value(&loc, &ty, &move_value)
+        } else {
+            // Type check the constant.
+            let exp = et.translate_exp(&def.value, &ty);
+            if let ExpData::Value(_, value) = exp {
+                value
+            } else {
+                et.error(
+                    &et.parent.parent.env.get_node_loc(exp.node_id()),
+                    "expected a constant expression",
+                );
+                // Use dummy value. It does not matter its not matching the type, we never
+                // continue after type checking.
+                Value::Bool(false)
+            }
+        };
         et.parent
             .parent
             .define_const(qsym, ConstEntry { loc, ty, value });
@@ -382,24 +451,28 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
+        if self.parent.struct_table.contains_key(&qsym) {
+            self.parent.env.error(
+                &self.parent.to_loc(&name.loc()),
+                &format!("duplicate declaration of `{}`", &name.value()),
+            )
+        }
         let struct_id = StructId::new(qsym.symbol);
         let attrs = self.translate_attributes(&def.attributes);
-        let is_resource =
-            // TODO migrate to abilities
-            def.abilities.has_ability_(PA::Ability_::Key) || (
-                !def.abilities.has_ability_(PA::Ability_::Copy) &&
-                    !def.abilities.has_ability_(PA::Ability_::Drop)
-            );
+        let abilities = self.translate_abilities(&def.abilities);
         let mut et = ExpTranslator::new(self);
-        let type_params =
-            et.analyze_and_add_type_params(def.type_parameters.iter().map(|param| &param.name));
+        let type_params = et.analyze_and_add_type_params(
+            def.type_parameters
+                .iter()
+                .map(|s| (&s.name, &s.constraints)),
+        );
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
             attrs,
             qsym,
             et.parent.module_id,
             struct_id,
-            is_resource,
+            abilities,
             type_params,
             None, // will be filled in during definition analysis
         );
@@ -407,23 +480,29 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
     fn decl_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function) {
         let qsym = self.qualified_by_module_from_name(&name.0);
+        if self.parent.fun_table.contains_key(&qsym) {
+            self.parent.env.error(
+                &self.parent.to_loc(&name.loc()),
+                &format!("duplicate declaration of `{}`", &name.value()),
+            )
+        }
         let fun_id = FunId::new(qsym.symbol);
         let attrs = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
-        let type_params = et.analyze_and_add_type_params(
-            def.signature.type_parameters.iter().map(|(name, _)| name),
-        );
+        let type_params = et
+            .analyze_and_add_type_params(def.signature.type_parameters.iter().map(|(n, a)| (n, a)));
         et.enter_scope();
         let params = et.analyze_and_add_params(&def.signature.parameters, true);
         let result_type = et.translate_type(&def.signature.return_type);
         let is_entry = def.entry.is_some();
         let is_inline = def.inline;
         let visibility = match def.visibility {
-            EA::Visibility::Public(_) => FunctionVisibility::Public,
-            EA::Visibility::Friend(_) => FunctionVisibility::Friend,
-            EA::Visibility::Internal => FunctionVisibility::Private,
+            EA::Visibility::Public(_) => Visibility::Public,
+            EA::Visibility::Friend(_) => Visibility::Friend,
+            EA::Visibility::Internal => Visibility::Private,
         };
+        let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
         let loc = et.to_loc(&def.loc);
         et.parent.parent.define_fun(
             loc.clone(),
@@ -432,6 +511,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             et.parent.module_id,
             fun_id,
             visibility,
+            is_native,
             is_entry,
             is_inline,
             type_params.clone(),
@@ -445,8 +525,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         self.parent.define_spec_fun(qsym, SpecFunEntry {
             loc: loc.clone(),
             oper: Operation::Function(self.module_id, spec_fun_id, None),
-            type_params: type_params.iter().map(|(_, ty)| ty.clone()).collect(),
-            arg_types: params.iter().map(|(_, ty)| ty.clone()).collect(),
+            type_params: type_params.clone(),
+            params: params.clone(),
             result_type: result_type.clone(),
         });
 
@@ -479,7 +559,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         // If this is a schema spec block, process its declaration.
         if let EA::SpecBlockTarget_::Schema(name, type_params) = &block.value.target.value {
-            self.decl_ana_schema(block, name, type_params.iter().map(|(name, _)| name));
+            self.decl_ana_schema(block, name, type_params.iter().map(|(n, a)| (n, a)));
         }
     }
 
@@ -503,7 +583,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             } => self.decl_ana_global_var(
                 &loc,
                 name,
-                type_parameters.iter().map(|(name, _)| name),
+                type_parameters.iter().map(|(n, a)| (n, a)),
                 type_,
             ),
             _ => {},
@@ -526,8 +606,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .define_spec_fun(self.qualified_by_module(name), SpecFunEntry {
                 loc: loc.clone(),
                 oper: Operation::Function(self.module_id, fun_id, None),
-                type_params: type_params.iter().map(|(_, ty)| ty.clone()).collect(),
-                arg_types: params.iter().map(|(_, ty)| ty.clone()).collect(),
+                type_params: type_params.clone(),
+                params: params.clone(),
                 result_type: result_type.clone(),
             });
 
@@ -555,10 +635,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         signature: &EA::FunctionSignature,
         for_move_fun: bool,
-    ) -> (Vec<(Symbol, Type)>, Vec<(Symbol, Type)>, Type) {
+    ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
         let type_params =
-            et.analyze_and_add_type_params(signature.type_parameters.iter().map(|(name, _)| name));
+            et.analyze_and_add_type_params(signature.type_parameters.iter().map(|(n, a)| (n, a)));
         et.enter_scope();
         let params = et.analyze_and_add_params(&signature.parameters, for_move_fun);
         let result_type = et.translate_type(&signature.return_type);
@@ -573,7 +653,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         type_params: I,
         type_: &EA::Type,
     ) where
-        I: IntoIterator<Item = &'a Name>,
+        I: IntoIterator<Item = (&'a Name, &'a EA::AbilitySet)>,
     {
         let name = self.symbol_pool().make(name.value.as_str());
         let (type_params, type_) = {
@@ -614,7 +694,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
     fn decl_ana_schema<'a, I>(&mut self, block: &EA::SpecBlock, name: &Name, type_params: I)
     where
-        I: IntoIterator<Item = &'a Name>,
+        I: IntoIterator<Item = (&'a Name, &'a EA::AbilitySet)>,
     {
         let qsym = self.qualified_by_module_from_name(name);
         let mut et = ExpTranslator::new(self);
@@ -639,7 +719,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
                 let name = et.symbol_pool().make(&name.value);
                 let type_ = et.translate_type(type_);
-                vars.push((name, type_));
+                vars.push(Parameter(name, type_));
             }
         }
         // Add schema declaration prototype to the symbol table.
@@ -655,7 +735,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn def_ana(
         &mut self,
         module_def: &EA::ModuleDefinition,
-        function_infos: &UniqueMap<PA::FunctionName, FunctionInfo>,
+        compiled_module: &Option<BytecodeModule>,
     ) {
         // Analyze all structs.
         for (name, def) in module_def.structs.key_cloned_iter() {
@@ -775,7 +855,28 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
         }
 
-        // Analyze in-function spec blocks.
+        // If we compile from bytecode, analyze in-function spec blocks.
+        if let Some(compiled_module) = compiled_module {
+            self.def_ana_code_specs(module_def, compiled_module);
+        }
+
+        // Perform post analyzes of state usage in spec functions.
+        self.compute_state_usage();
+
+        // Perform post reduction of module invariants.
+        self.process_module_invariants();
+
+        // Apply tweaks after all specs are analyzed
+        self.apply_tweaks(module_def);
+    }
+
+    /// Analyze specifications embedded in code, for the case we do not compile the code ourselves,
+    /// but have it provided from bytecode.
+    fn def_ana_code_specs(
+        &mut self,
+        module_def: &EA::ModuleDefinition,
+        compiled_module: &BytecodeModule,
+    ) {
         for (name, fun_def) in module_def.functions.key_cloned_iter() {
             // TODO: to be revisited once we have full support for high order function
             if fun_def.inline {
@@ -783,7 +884,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             }
 
             let fun_name_loc = self.parent.to_loc(&name.loc());
-            let fun_spec_info = &function_infos.get(&name).unwrap().spec_info;
+            let fun_spec_info = &compiled_module.function_infos.get(&name).unwrap().spec_info;
 
             for spec_info in fun_spec_info.values() {
                 // locate the spec block
@@ -862,15 +963,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 }
             }
         }
-
-        // Perform post analyzes of state usage in spec functions.
-        self.compute_state_usage();
-
-        // Perform post reduction of module invariants.
-        self.process_module_invariants();
-
-        // Apply tweaks after all specs are analyzed
-        self.apply_tweaks(module_def);
     }
 
     /// Validates whether a function signature provided with a spec block target matches the
@@ -915,9 +1007,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .clone();
         let mut et = ExpTranslator::new(self);
         let loc = et.to_loc(&name.0.loc);
-        for (name, ty) in type_params {
-            et.define_type_param(&loc, name, ty);
-        }
+        et.define_type_params(&loc, &type_params);
         let fields = match &def.fields {
             EA::StructFields::Defined(fields) => {
                 let mut field_map = BTreeMap::new();
@@ -925,6 +1015,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let field_sym = et.symbol_pool().make(field_name_);
                     let field_ty = et.translate_type(ty);
                     field_map.insert(field_sym, (*idx, field_ty));
+                }
+                if field_map.is_empty() {
+                    // The legacy Move compiler inserts a `dummy_field: bool` here, we need to
+                    // simulate this behavior for now, as that is what we find in the bytecode
+                    // generated by the compiler.
+                    let field_sym = et.parent.dummy_field_name();
+                    let field_ty = Type::new_prim(PrimitiveType::Bool);
+                    field_map.insert(field_sym, (0, field_ty));
                 }
                 Some(field_map)
             },
@@ -936,6 +1034,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .expect("struct invalid")
             .fields = fields;
     }
+
+    /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.
+    pub(crate) fn dummy_field_name(&self) -> Symbol {
+        self.symbol_pool().make("dummy_field")
+    }
 }
 
 /// ## Move Function Definition Analysis
@@ -943,6 +1046,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Definition analysis for Move functions.
     /// If the function is pure, we translate its body.
+    /// If we are operating as a Move compiler, we also translate its body.
     fn def_ana_fun(&mut self, name: &PA::FunctionName, body: &EA::FunctionBody, fun_idx: usize) {
         if let EA::FunctionBody_::Defined(seq) = &body.value {
             let full_name = self.qualified_by_module_from_name(&name.0);
@@ -954,19 +1058,29 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let type_params = entry.type_params.clone();
             let params = entry.params.clone();
             let result_type = entry.result_type.clone();
+
+            let body_translator = |et: &mut ExpTranslator, as_spec_fun: bool| {
+                if as_spec_fun {
+                    et.translate_fun_as_spec_fun()
+                } else {
+                    et.translate_move_fun()
+                }
+                let loc = et.to_loc(&body.loc);
+                for (pos, TypeParameter(name, _)) in type_params.iter().enumerate() {
+                    et.define_type_param(&loc, *name, Type::new_param(pos));
+                }
+                et.enter_scope();
+                for (idx, Parameter(n, ty)) in params.iter().enumerate() {
+                    et.define_local(&loc, *n, ty.clone(), None, Some(idx));
+                }
+                let result = et.translate_seq(&loc, seq, &result_type);
+                et.finalize_types();
+                result
+            };
+
+            // Attempt to translate as specification function
             let mut et = ExpTranslator::new(self);
-            et.translate_fun_as_spec_fun();
-            let loc = et.to_loc(&body.loc);
-            for (n, ty) in &type_params {
-                et.define_type_param(&loc, *n, ty.clone());
-            }
-            et.enter_scope();
-            for (idx, (n, ty)) in params.iter().enumerate() {
-                et.define_local(&loc, *n, ty.clone(), None, Some(idx));
-            }
-            let translated = et.translate_seq(&loc, seq, &result_type);
-            et.finalize_types();
-            // If no errors were generated, then the function is considered pure.
+            let translated = body_translator(&mut et, true);
             if !*et.errors_generated.borrow() {
                 // Rewrite all type annotations in expressions to skip references.
                 for node_id in translated.node_ids() {
@@ -981,8 +1095,18 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 });
                 self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
             }
+
+            if self.compile_move {
+                // Also translate as regular Move function
+                let mut et = ExpTranslator::new(self);
+                let translated = body_translator(&mut et, false);
+                assert!(self
+                    .fun_defs
+                    .insert(full_name.symbol, translated.into_exp())
+                    .is_none());
+            }
         }
-        self.spec_fun_index += 1;
+        self.spec_fun_index += 1; // TODO: why is this at the end? Document or move close to use
     }
 
     /// Propagate the impurity of Move functions from callees to callers so
@@ -1012,7 +1136,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let no_mut_ref_param = self.spec_funs[spec_fun_idx]
                 .params
                 .iter()
-                .map(|(_, ty)| !ty.is_mutable_reference())
+                .map(|Parameter(_, ty)| !ty.is_mutable_reference())
                 .all(|b| b); // `no_mut_ref_param` if none of the types are mut refs.
             return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
         };
@@ -1044,15 +1168,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn deref_move_fun_types(&mut self, full_name: QualifiedSymbol, spec_fun_idx: usize) {
         self.parent.spec_fun_table.entry(full_name).and_modify(|e| {
             assert!(e.len() == 1);
-            e[0].arg_types = e[0]
-                .arg_types
+            e[0].params = e[0]
+                .params
                 .iter()
-                .map(|ty| ty.skip_reference().clone())
-                .collect_vec();
-            e[0].type_params = e[0]
-                .type_params
-                .iter()
-                .map(|ty| ty.skip_reference().clone())
+                .map(|Parameter(n, ty)| Parameter(*n, ty.skip_reference().clone()))
                 .collect_vec();
             e[0].result_type = e[0].result_type.skip_reference().clone();
         });
@@ -1061,12 +1180,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         spec_fun_decl.params = spec_fun_decl
             .params
             .iter()
-            .map(|(s, ty)| (*s, ty.skip_reference().clone()))
-            .collect_vec();
-        spec_fun_decl.type_params = spec_fun_decl
-            .type_params
-            .iter()
-            .map(|(s, ty)| (*s, ty.skip_reference().clone()))
+            .map(|Parameter(s, ty)| Parameter(*s, ty.skip_reference().clone()))
             .collect_vec();
         spec_fun_decl.result_type = spec_fun_decl.result_type.skip_reference().clone();
     }
@@ -1368,12 +1482,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (n, ty) in &entry.type_params {
-                    et.define_type_param(loc, *n, ty.clone());
+                for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos));
                 }
 
                 et.enter_scope();
-                for (idx, (n, ty)) in entry.params.iter().enumerate() {
+                for (idx, Parameter(n, ty)) in entry.params.iter().enumerate() {
                     et.define_local(loc, *n, ty.clone(), None, Some(idx));
                 }
                 // Define the placeholders for the result values of a function if this is an
@@ -1403,8 +1517,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (n, ty) in &entry.type_params {
-                    et.define_type_param(loc, *n, ty.clone());
+                for (pos, TypeParameter(name, _)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos));
                 }
 
                 et.enter_scope();
@@ -1451,10 +1565,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .clone();
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (n, ty) in &entry.type_params {
-                    et.define_type_param(loc, *n, ty.clone());
-                }
-
+                et.define_type_params(loc, &entry.type_params);
                 if let Some(fields) = &entry.fields {
                     et.enter_scope();
                     for (n, (_, ty)) in fields {
@@ -1481,9 +1592,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 match kind {
                     ConditionKind::GlobalInvariant(ty_params)
                     | ConditionKind::GlobalInvariantUpdate(ty_params) => {
-                        for (i, name) in ty_params.iter().enumerate() {
-                            et.define_type_param(loc, *name, Type::TypeParameter(i as u16));
-                        }
+                        et.define_type_params(loc, &TypeParameter::from_symbols(ty_params.iter()))
                     },
                     _ => (),
                 }
@@ -1501,10 +1610,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let type_params = entry.type_params.clone();
                 let all_vars = entry.all_vars.clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (n, ty) in type_params {
-                    et.define_type_param(loc, n, ty);
-                }
-
+                et.define_type_params(loc, &type_params);
                 et.enter_scope();
                 for (n, entry) in all_vars {
                     et.define_local(loc, n, entry.type_, None, None);
@@ -1845,9 +1951,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 (first.into_exp(), exps)
             },
             ConditionKind::Axiom(ref type_params) => {
-                for (i, sym) in type_params.iter().enumerate() {
-                    et.define_type_param(loc, *sym, Type::TypeParameter(i as u16))
-                }
+                et.define_type_params(loc, &TypeParameter::from_symbols(type_params.iter()));
                 (et.translate_exp(exp, &expected_type).into_exp(), vec![])
             },
             _ => {
@@ -2005,11 +2109,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 let result_type = entry.result_type.clone();
                 let mut et = ExpTranslator::new(self);
                 let loc = et.to_loc(&body.loc);
-                for (n, ty) in type_params {
-                    et.define_type_param(&loc, n, ty);
-                }
+                et.define_type_params(&loc, &type_params);
                 et.enter_scope();
-                for (n, ty) in params {
+                for Parameter(n, ty) in params {
                     et.define_local(&loc, n, ty, None, None);
                 }
                 let translated = et.translate_seq(&loc, seq, &result_type);
@@ -2041,9 +2143,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .expect("spec var defined")
                 .clone();
             let mut et = ExpTranslator::new(self);
-            for (n, ty) in &entry.type_params {
-                et.define_type_param(loc, *n, ty.clone());
-            }
+            et.define_type_params(loc, &entry.type_params);
             let translated = et.translate_exp(exp, &entry.type_);
             et.finalize_types();
             // Store the translated init expression into the declaration.
@@ -2133,9 +2233,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             "cyclic schema dependency: {} -> {}",
                             visiting
                                 .iter()
-                                .map(|name| format!("{}", name.display_simple(self.symbol_pool())))
+                                .map(|name| format!("{}", name.display_simple(self.parent.env)))
                                 .join(" -> "),
-                            included_name.display_simple(self.symbol_pool())
+                            included_name.display_simple(self.parent.env)
                         ),
                     )
                 } else if let Some(included_block) = schema_defs.get(&included_name) {
@@ -2171,7 +2271,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut all_vars: BTreeMap<Symbol, LocalVarEntry> = entry
             .vars
             .iter()
-            .map(|(n, ty)| {
+            .map(|Parameter(n, ty)| {
                 (*n, LocalVarEntry {
                     loc: loc.clone(),
                     type_: ty.clone(),
@@ -2310,7 +2410,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// leading to a Move "pack" expression which is interpreted as a schema reference.
     fn def_ana_schema_exp(
         &mut self,
-        context_type_params: &[(Symbol, Type)],
+        context_type_params: &[TypeParameter],
         vars: &mut BTreeMap<Symbol, LocalVarEntry>,
         spec: &mut Spec,
         allow_new_vars: bool,
@@ -2332,7 +2432,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// and continues recursively.
     fn def_ana_schema_exp_oper(
         &mut self,
-        context_type_params: &[(Symbol, Type)],
+        context_type_params: &[TypeParameter],
         vars: &mut BTreeMap<Symbol, LocalVarEntry>,
         spec: &mut Spec,
         allow_new_vars: bool,
@@ -2452,7 +2552,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Analyzes a schema leaf expression.
     fn def_ana_schema_exp_leaf(
         &mut self,
-        context_type_params: &[(Symbol, Type)],
+        context_type_params: &[TypeParameter],
         vars: &mut BTreeMap<Symbol, LocalVarEntry>,
         spec: &mut Spec,
         allow_new_vars: bool,
@@ -2477,7 +2577,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 loc,
                 &format!(
                     "schema `{}` undeclared",
-                    schema_name.display(self.symbol_pool())
+                    schema_name.display(self.parent.env)
                 ),
             );
             return;
@@ -2646,6 +2746,27 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 exp,
                 additional_exps,
             });
+
+            // If a formal argument is bound to an expression that contains a name
+            // that conflicts with variables defined in the condition, return an error
+            for bound_expr in argument_map.values() {
+                let exp_loc = self.parent.env.get_node_loc(bound_expr.node_id());
+                for loc_sym in bound_expr.free_local_vars_with_node_id().keys() {
+                    match kind {
+                        ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
+                            if name == loc_sym {
+                                self.parent.error(
+                                    &exp_loc,
+                                    &format!("Variable `{}` conflicts with a specification variable in the schema {}", name.display(self.symbol_pool()),
+                                             schema_name.display(self.parent.env))
+                                );
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+            }
+
             match kind {
                 ConditionKind::LetPost(name) | ConditionKind::LetPre(name) => {
                     // If a let name is introduced by this condition, remove it from argument_map
@@ -2675,13 +2796,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn exp_translator_for_schema<'module_translator>(
         &'module_translator mut self,
         loc: &Loc,
-        context_type_params: &[(Symbol, Type)],
+        context_type_params: &[TypeParameter],
         vars: &mut BTreeMap<Symbol, LocalVarEntry>,
     ) -> ExpTranslator<'env, 'translator, 'module_translator> {
         let mut et = ExpTranslator::new_with_old(self, true);
-        for (n, ty) in context_type_params {
-            et.define_type_param(loc, *n, ty.clone())
-        }
+        et.define_type_params(loc, context_type_params);
         et.enter_scope();
         for (n, entry) in vars.iter() {
             et.define_local(
@@ -2728,7 +2847,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         &mut self,
         loc: &Loc,
         context: &SpecBlockContext,
-        alt_context_type_params: Option<&[(Symbol, Type)]>,
+        alt_context_type_params: Option<&[TypeParameter]>,
         context_properties: PropertyBag,
         exp: &EA::Exp,
     ) {
@@ -2755,6 +2874,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
         // Analyze the schema inclusion. This will instantiate conditions for
         // this block.
+        let context_type_params = context_type_params
+            .iter()
+            .map(|(n, _)| TypeParameter(*n, TypeParameterKind::default()))
+            .collect::<Vec<_>>();
         self.def_ana_schema_exp(
             if let Some(type_params) = alt_context_type_params {
                 type_params
@@ -2802,7 +2925,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 // Not a function from this module
                 continue;
             }
-            let is_public = matches!(entry.visibility, FunctionVisibility::Public);
+            let is_public = matches!(entry.visibility, Visibility::Public);
             let type_arg_count = entry.type_params.len();
             let is_excluded = exclusion_patterns.iter().any(|p| {
                 self.apply_pattern_matches(fun_name.symbol, is_public, type_arg_count, true, p)
@@ -2817,10 +2940,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 // This is a match, so apply this schema to this function.
                 let type_params = {
                     let mut et = ExpTranslator::new(self);
+                    let ability_set = EA::AbilitySet::empty();
                     et.analyze_and_add_type_params(
-                        matched.value.type_parameters.iter().map(|(name, _)| name),
+                        matched
+                            .value
+                            .type_parameters
+                            .iter()
+                            .map(|(n, _)| (n, &ability_set)),
                     );
-                    et.get_type_params_with_name()
+                    et.get_type_params()
                 };
                 // Create a property marking this as injected.
                 let context_properties =
@@ -3092,13 +3220,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     SpecBlockTarget::Schema(
                         self.module_id,
                         SchemaId::new(qsym.symbol),
-                        entry
-                            .type_params
-                            .iter()
-                            .map(|(name, _)| {
-                                TypeParameter(*name, AbilityConstraint(AbilitySet::EMPTY))
-                            })
-                            .collect_vec(),
+                        entry.type_params.clone(),
                     )
                 },
                 None => {
@@ -3181,12 +3303,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let fun_entry = self.parent.fun_table.get(&fun_name).unwrap_or_else(|| {
                         panic!(
                             "Unable to find function `{}`",
-                            fun_name.display(env.symbol_pool())
+                            fun_name.display(self.parent.env)
                         )
                     });
                     let has_unknown_caller =
-                        matches!(fun_entry.visibility, FunctionVisibility::Public)
-                            || fun_entry.is_entry;
+                        matches!(fun_entry.visibility, Visibility::Public) || fun_entry.is_entry;
                     if has_unknown_caller && options.ignore_pragma_opaque_internal_only {
                         continue;
                     }
@@ -3200,113 +3321,99 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
-/// # Environment Population
+/// # Environment Population and finalization
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    fn populate_env_from_result(
+    fn populate_and_finalize_env(
         &mut self,
         loc: Loc,
         attributes: Vec<Attribute>,
-        module: CompiledModule,
-        source_map: SourceMap,
+        compiled_module: Option<BytecodeModule>,
     ) {
-        let struct_data: BTreeMap<StructId, StructData> = (0..module.struct_defs().len())
-            .filter_map(|idx| {
-                let def_idx = StructDefinitionIndex(idx as u16);
-                let handle_idx = module.struct_def_at(def_idx).struct_handle;
-                let handle = module.struct_handle_at(handle_idx);
-                let view = StructHandleView::new(&module, handle);
-                let name = self.symbol_pool().make(view.name().as_str());
-                if let Some(entry) = self
-                    .parent
-                    .struct_table
-                    .get(&self.qualified_by_module(name))
-                {
-                    let struct_spec = self
-                        .struct_specs
-                        .remove(&name)
-                        .unwrap_or_default();
-                    Some((
-                        StructId::new(name),
-                        self.parent.env.create_move_struct_data(
-                            &module,
-                            def_idx,
-                            name,
-                            entry.loc.clone(),
-                            entry.attributes.clone(),
-                            struct_spec,
-                        ),
-                    ))
-                } else {
-                    self.parent.error(
-                        &self.parent.env.internal_loc(),
-                        &format!("[internal] bytecode does not match AST: `{}` in bytecode but not in AST", name.display(self.symbol_pool())));
-                    None
-                }
-            })
-            .collect();
-        let function_data: BTreeMap<FunId, FunctionData> = (0..module.function_defs().len())
-            .filter_map(|idx| {
-                let def_idx = FunctionDefinitionIndex(idx as u16);
-                let handle_idx = module.function_def_at(def_idx).function;
-                let handle = module.function_handle_at(handle_idx);
-                let view = FunctionHandleView::new(&module, handle);
-                let name_str = view.name().as_str();
-                let name = if name_str == SCRIPT_BYTECODE_FUN_NAME {
-                    // This is a pseudo script module, which has exactly one function. Determine
-                    // the name of this function.
-                    self.parent.fun_table.iter().filter_map(|(k, _)| {
-                        if k.module_name == self.module_name
-                        { Some(k.symbol) } else { None }
-                    }).next().expect("unexpected script with multiple or no functions")
-                } else {
-                    self.symbol_pool().make(name_str)
-                };
-                let fun_spec = self.fun_specs.remove(&name).unwrap_or_default();
-                if let Some(entry) = self.parent.fun_table.get(&self.qualified_by_module(name)) {
-                    let arg_names = project_1st(&entry.params);
-                    let type_arg_names = project_1st(&entry.type_params);
-                    Some((FunId::new(name), self.parent.env.create_function_data(
-                        &module,
-                        def_idx,
-                        name,
-                        entry.loc.clone(),
-                        entry.attributes.clone(),
-                        arg_names,
-                        type_arg_names,
-                        fun_spec,
-                    )))
-                } else {
-                    let funs = self.parent.fun_table.keys().map(|k| {
-                        format!("{}", k.display_full(self.symbol_pool()))
-                    }).join(", ");
-                    self.parent.error(
-                        &self.parent.env.internal_loc(),
-                        &format!("[internal] bytecode does not match AST: `{}` in bytecode but not in AST (available in AST: {})", name.display(self.symbol_pool()), funs));
-                    None
-                }
-            })
-            .collect();
-        let named_constants: BTreeMap<NamedConstantId, NamedConstantData> = self
-            .parent
-            .const_table
-            .iter()
-            .filter(|(name, _)| name.module_name == self.module_name)
-            .map(|(name, const_entry)| {
-                let ConstEntry { loc, value, ty } = const_entry.clone();
-                (
-                    NamedConstantId::new(name.symbol),
-                    self.parent
-                        .env
-                        .create_named_constant_data(name.symbol, loc, ty, value),
-                )
-            })
-            .collect();
-        self.parent.env.add(
+        let mut struct_data: BTreeMap<StructId, StructData> = Default::default();
+        for (name, entry) in &self.parent.struct_table {
+            if name.module_name != self.module_name {
+                continue;
+            }
+            // New struct in this module
+            let spec = self.struct_specs.remove(&name.symbol).unwrap_or_default();
+            let field_data = if let Some(fields) = &entry.fields {
+                fields
+                    .iter()
+                    .map(|(name, (offset, ty))| {
+                        (FieldId::new(*name), FieldData {
+                            name: *name,
+                            offset: *offset,
+                            ty: ty.clone(),
+                        })
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            } else {
+                BTreeMap::new()
+            };
+            let data = StructData {
+                name: name.symbol,
+                loc: entry.loc.clone(),
+                def_idx: None,
+                attributes: entry.attributes.clone(),
+                type_params: entry.type_params.clone(),
+                abilities: entry.abilities,
+                spec_var_opt: None,
+                field_data,
+                spec,
+            };
+            struct_data.insert(StructId::new(name.symbol), data);
+        }
+        let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
+        for (name, entry) in &self.parent.fun_table {
+            if name.module_name != self.module_name {
+                continue;
+            }
+            // New function
+            let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
+            let def = self.fun_defs.remove(&name.symbol);
+            let data = FunctionData {
+                name: name.symbol,
+                loc: entry.loc.clone(),
+                def_idx: None,
+                handle_idx: None,
+                visibility: entry.visibility,
+                is_native: entry.is_native,
+                is_entry: entry.is_entry,
+                is_inline: entry.is_inline,
+                attributes: entry.attributes.clone(),
+                type_params: entry.type_params.clone(),
+                params: entry.params.clone(),
+                result_type: entry.result_type.clone(),
+                spec: spec.into(),
+                def,
+                called_funs: None,
+                calling_funs: RefCell::default(),
+                transitive_closure_of_called_funs: RefCell::default(),
+            };
+            function_data.insert(FunId::new(name.symbol), data);
+        }
+
+        let mut named_constants: BTreeMap<NamedConstantId, NamedConstantData> = Default::default();
+        for (name, const_entry) in &self.parent.const_table {
+            if name.module_name != self.module_name {
+                continue;
+            }
+            // New constant
+            let ConstEntry { loc, value, ty } = const_entry.clone();
+            let data = NamedConstantData {
+                name: name.symbol,
+                loc,
+                type_: ty,
+                value,
+            };
+            named_constants.insert(NamedConstantId::new(name.symbol), data);
+        }
+
+        let module_id = self.parent.env.add(
             loc,
+            self.module_name.clone(),
             attributes,
-            module,
-            source_map,
             named_constants,
             struct_data,
             function_data,
@@ -3315,6 +3422,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             std::mem::take(&mut self.module_spec),
             std::mem::take(&mut self.spec_block_infos),
         );
+
+        if let Some(BytecodeModule {
+            compiled_module,
+            source_map,
+            ..
+        }) = compiled_module
+        {
+            self.parent
+                .env
+                .attach_compiled_module(module_id, compiled_module, source_map)
+        }
     }
 }
 

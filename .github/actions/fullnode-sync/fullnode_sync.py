@@ -183,12 +183,12 @@ def get_public_and_target_version(network):
   return (public_version, target_version)
 
 
-def spawn_fullnode(branch, network, bootstrapping_mode, continuous_syncing_mode, node_log_file_path):
+def spawn_fullnode(git_ref, network, bootstrapping_mode, continuous_syncing_mode, node_log_file_path):
   """Spawns the fullnode"""
   # Display the fullnode setup
-  print("Starting the fullnode using branch: {branch}, for network: {network}, " \
+  print("Starting the fullnode using git ref: {git_ref}, for network: {network}, " \
         "with bootstrapping mode: {bootstrapping_mode} and continuous syncing " \
-        "mode: {continuous_syncing_mode}!".format(branch=branch, network=network,
+        "mode: {continuous_syncing_mode}!".format(git_ref=git_ref, network=network,
                                                   bootstrapping_mode=bootstrapping_mode,
                                                   continuous_syncing_mode=continuous_syncing_mode))
 
@@ -239,17 +239,17 @@ def get_genesis_and_waypoint(network):
   subprocess.run(["curl", "-s", "-O", waypoint_file_path])
 
 
-def checkout_git_branch(branch):
-  """Checkout the specified git branch. This assumes the working directory is aptos-core"""
+def checkout_git_ref(git_ref):
+  """Checkout the specified git ref. This assumes the working directory is aptos-core"""
   subprocess.run(["git", "fetch"])
-  subprocess.run(["git", "checkout", branch])
+  subprocess.run(["git", "checkout", git_ref])
   subprocess.run(["git", "log", "-1"]) # Display the git commit we're running on
 
 
 def main():
   # Ensure we have all required environment variables
   REQUIRED_ENVS = [
-    "BRANCH",
+    "GIT_REF",
     "NETWORK",
     "BOOTSTRAPPING_MODE",
     "CONTINUOUS_SYNCING_MODE",
@@ -260,15 +260,15 @@ def main():
     raise Exception("Missing required ENV variables!")
 
   # Fetch each of the environment variables
-  BRANCH = os.environ["BRANCH"]
+  GIT_REF = os.environ["GIT_REF"]
   NETWORK = os.environ["NETWORK"]
   BOOTSTRAPPING_MODE = os.environ["BOOTSTRAPPING_MODE"]
   CONTINUOUS_SYNCING_MODE = os.environ["CONTINUOUS_SYNCING_MODE"]
   DATA_DIR_FILE_PATH = os.environ["DATA_DIR_FILE_PATH"]
   NODE_LOG_FILE_PATH = os.environ["NODE_LOG_FILE_PATH"]
 
-  # Check out the correct git branch
-  checkout_git_branch(BRANCH)
+  # Check out the correct git ref (branch or commit hash)
+  checkout_git_ref(GIT_REF)
 
   # Get the genesis blob and waypoint
   get_genesis_and_waypoint(NETWORK)
@@ -280,7 +280,7 @@ def main():
   (public_version, target_version) = get_public_and_target_version(NETWORK)
 
   # Spawn the fullnode
-  fullnode_process_handle = spawn_fullnode(BRANCH, NETWORK, BOOTSTRAPPING_MODE, CONTINUOUS_SYNCING_MODE, NODE_LOG_FILE_PATH)
+  fullnode_process_handle = spawn_fullnode(GIT_REF, NETWORK, BOOTSTRAPPING_MODE, CONTINUOUS_SYNCING_MODE, NODE_LOG_FILE_PATH)
 
   # Wait for the fullnode to come up
   wait_for_fullnode_to_start(fullnode_process_handle)

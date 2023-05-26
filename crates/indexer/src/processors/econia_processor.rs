@@ -5,6 +5,10 @@ use crate::{
         transaction_processor::TransactionProcessor,
     },
     models::{
+        coin_models::{
+            coin_activities::CoinActivity,
+            coin_infos::{CoinInfo, CoinInfoQuery},
+        },
         events::EventModel,
         token_models::token_utils::TypeInfo,
         transactions::{TransactionDetail, TransactionModel},
@@ -12,15 +16,27 @@ use crate::{
 };
 use anyhow::Context;
 use aptos_api_types::Transaction;
+use aptos_types::APTOS_COIN_TYPE;
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, Utc};
 use crossbeam::channel;
 use dashmap::DashMap;
 use diesel::{result::Error, PgConnection};
-use econia_db::models::{self, events::MakerEventType, market::MarketEventType, IntoInsertable};
+use econia_db::{
+    add_maker_event, add_taker_event, create_coin,
+    error::DbError,
+    models::{
+        self,
+        coin::Coin,
+        events::MakerEventType,
+        market::MarketEventType,
+        ToInsertable,
+    },
+    register_market,
+};
 use econia_types::{
-    book::{OrderBook, PriceLevel},
+    book::{OrderBook, PriceLevelWithId},
     events::{MakerEvent, TakerEvent},
     message::Update,
     order::{Fill, Order, OrderState, Side},
@@ -30,7 +46,7 @@ use once_cell::sync::Lazy;
 use redis::Commands;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 
 pub const NAME: &str = "econia_processor";
 
@@ -72,33 +88,53 @@ static EVENT_TYPES: Lazy<Vec<String>> = Lazy::new(|| {
 
 #[derive(Debug, Deserialize, Clone)]
 struct MarketRegistrationEvent {
-    market_id: u64,
+    market_id: String,
     base_type: TypeInfo,
     base_name_generic: String,
     quote_type: TypeInfo,
-    lot_size: u64,
-    tick_size: u64,
-    min_size: u64,
-    underwriter_id: u64,
-    time: DateTime<Utc>,
+    lot_size: String,
+    tick_size: String,
+    min_size: String,
+    underwriter_id: String,
+    time: String,
 }
 
+// TODO remove the unwraps and use TryFrom instead of From.
 impl From<MarketRegistrationEvent> for models::market::MarketRegistrationEvent {
     fn from(e: MarketRegistrationEvent) -> Self {
         Self {
-            market_id: e.market_id.into(),
-            time: e.time,
-            base_account_address: Some(e.base_type.account_address),
-            base_module_name: Some(e.base_type.module_name),
-            base_struct_name: Some(e.base_type.struct_name),
-            base_name_generic: Some(e.base_name_generic),
+            market_id: e.market_id.parse().unwrap(),
+            time: e.time.parse().unwrap(),
+            base_account_address: e
+                .base_type
+                .account_address
+                .is_empty()
+                .not()
+                .then_some(e.base_type.account_address),
+            base_module_name: e
+                .base_type
+                .module_name
+                .is_empty()
+                .not()
+                .then_some(e.base_type.module_name),
+            base_struct_name: e
+                .base_type
+                .struct_name
+                .is_empty()
+                .not()
+                .then_some(e.base_type.struct_name),
+            base_name_generic: e
+                .base_name_generic
+                .is_empty()
+                .not()
+                .then_some(e.base_name_generic),
             quote_account_address: e.quote_type.account_address,
             quote_module_name: e.quote_type.module_name,
             quote_struct_name: e.quote_type.struct_name,
-            lot_size: e.lot_size.into(),
-            tick_size: e.tick_size.into(),
-            min_size: e.min_size.into(),
-            underwriter_id: e.underwriter_id.into(),
+            lot_size: e.lot_size.parse().unwrap(),
+            tick_size: e.tick_size.parse().unwrap(),
+            min_size: e.min_size.parse().unwrap(),
+            underwriter_id: e.underwriter_id.parse().unwrap(),
         }
     }
 }
@@ -259,7 +295,7 @@ impl EconiaRedisCacher {
             .get(&price)
             .map_or(0, |v| v.iter().fold(0, |i, s: &Order| i + s.size));
         let channel_name = format!("{}:{}", &self.config.book_prefix, mkt_id);
-        let update = Update::PriceLevels(PriceLevel {
+        let update = Update::PriceLevels(PriceLevelWithId {
             market_id: mkt_id,
             price,
             size: cum_size,
@@ -487,6 +523,7 @@ impl EconiaTransactionProcessor {
         &self,
         start_version: u64,
         end_version: u64,
+        coins: Vec<Coin>,
         events: Vec<EventModel>,
         block_to_time: HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<ProcessingResult, Error> {
@@ -496,18 +533,16 @@ impl EconiaTransactionProcessor {
             end_version = end_version,
             "Inserting to db",
         );
-        if self
-            .insert_events_transaction(&events, &block_to_time)
-            .is_err()
-        {
+        if self.insert_data(&coins, &events, &block_to_time).is_err() {
             let events = clean_data_for_db(events, true);
-            self.insert_events_transaction(&events, &block_to_time)?;
+            self.insert_data(&coins, &events, &block_to_time)?;
         }
         Ok(ProcessingResult::new(NAME, start_version, end_version))
     }
 
-    fn insert_events_transaction(
+    fn insert_data(
         &self,
+        coins: &[Coin],
         events: &[EventModel],
         block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<(), Error> {
@@ -515,16 +550,25 @@ impl EconiaTransactionProcessor {
         conn.build_transaction()
             .read_write()
             .run::<_, Error, _>(|pg_conn| {
+                self.insert_coins(pg_conn, coins)?;
                 self.insert_events(pg_conn, events, block_to_time)?;
                 Ok(())
             })?;
         Ok(())
     }
 
+    fn insert_coins(&self, conn: &mut PgConnection, coins: &[Coin]) -> Result<(), Error> {
+        for c in coins.iter() {
+            let insertable = c.to_insertable();
+            let _ = create_coin(conn, &insertable);
+        }
+        Ok(())
+    }
+
     fn insert_events(
         &self,
         conn: &mut PgConnection,
-        ev: &[EventModel],
+        events: &[EventModel],
         block_to_time: &HashMap<i64, chrono::NaiveDateTime>,
     ) -> Result<(), Error> {
         let mut maker = vec![];
@@ -532,14 +576,14 @@ impl EconiaTransactionProcessor {
         let mut market_registration = vec![];
         let mut recognized_market = vec![];
 
-        for e in ev.iter() {
+        for event in events.iter() {
             let current_time = block_to_time
-                .get(&e.transaction_block_height)
+                .get(&event.transaction_block_height)
                 .expect("block height not found in block_to_time map");
 
             let utc_time = chrono::TimeZone::from_utc_datetime(&Utc, current_time);
 
-            let mut event_wrapper = serde_json::from_value::<Value>(e.data.clone())
+            let mut event_wrapper = serde_json::from_value::<Value>(event.data.clone())
                 .map_err(|e| Error::DeserializationError(Box::new(e)))?;
             let obj_map = event_wrapper.as_object_mut().unwrap();
             obj_map.insert("time".to_string(), json!(utc_time));
@@ -564,88 +608,37 @@ impl EconiaTransactionProcessor {
             }
         }
 
-        self.insert_maker_events(conn, maker)?;
-        self.insert_taker_events(conn, taker)?;
-
         // update markets cache
         self.insert_markets_in_cache(&market_registration);
 
-        self.insert_market_registration_events(conn, market_registration)?;
+        // insert events
+        self.insert_event_types::<_, models::market::MarketRegistrationEvent, _>(
+            conn,
+            market_registration,
+            register_market,
+        )?;
         self.insert_recognized_market_events(conn, recognized_market)?;
+        self.insert_event_types::<_, models::events::MakerEvent, _>(conn, maker, add_maker_event)?;
+        self.insert_event_types::<_, models::events::TakerEvent, _>(conn, taker, add_taker_event)?;
+
         Ok(())
     }
 
-    fn insert_maker_events(
+    fn insert_event_types<E, M, F>(
         &self,
         conn: &mut PgConnection,
-        ev: Vec<MakerEvent>,
-    ) -> Result<(), Error> {
-        let ev = ev
-            .into_iter()
-            .map(models::events::MakerEvent::from)
-            .collect::<Vec<_>>();
-        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
-        let chunks = get_chunks(ev.len(), models::events::NewMakerEvent::field_count());
-        let table = econia_db::schema::maker_events::table;
-        for (start_ind, end_ind) in chunks {
-            execute_with_better_error(
-                conn,
-                diesel::insert_into(table)
-                    .values(&insertable[start_ind..end_ind])
-                    .on_conflict_do_nothing(),
-                None,
-            )?;
-        }
-        Ok(())
-    }
-
-    fn insert_taker_events(
-        &self,
-        conn: &mut PgConnection,
-        ev: Vec<TakerEvent>,
-    ) -> Result<(), Error> {
-        let ev = ev
-            .into_iter()
-            .map(models::events::TakerEvent::from)
-            .collect::<Vec<_>>();
-        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
-        let chunks = get_chunks(ev.len(), models::events::NewTakerEvent::field_count());
-        let table = econia_db::schema::taker_events::table;
-        for (start_ind, end_ind) in chunks {
-            execute_with_better_error(
-                conn,
-                diesel::insert_into(table)
-                    .values(&insertable[start_ind..end_ind])
-                    .on_conflict_do_nothing(),
-                None,
-            )?;
-        }
-        Ok(())
-    }
-
-    fn insert_market_registration_events(
-        &self,
-        conn: &mut PgConnection,
-        ev: Vec<MarketRegistrationEvent>,
-    ) -> Result<(), Error> {
-        let ev = ev
-            .into_iter()
-            .map(models::market::MarketRegistrationEvent::from)
-            .collect::<Vec<_>>();
-        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
-        let chunks = get_chunks(
-            ev.len(),
-            models::market::NewMarketRegistrationEvent::field_count(),
-        );
-        let table = econia_db::schema::market_registration_events::table;
-        for (start_ind, end_ind) in chunks {
-            execute_with_better_error(
-                conn,
-                diesel::insert_into(table)
-                    .values(&insertable[start_ind..end_ind])
-                    .on_conflict_do_nothing(),
-                None,
-            )?;
+        ev: Vec<E>,
+        insert_func: F,
+    ) -> Result<(), Error>
+    where
+        M: From<E> + ToInsertable,
+        F: Fn(&mut PgConnection, &<M as ToInsertable>::Insertable<'_>) -> Result<M, DbError>,
+    {
+        for e in ev.into_iter() {
+            let model = M::from(e);
+            let insertable = model.to_insertable();
+            // TODO remove unwrap here
+            insert_func(conn, &insertable).unwrap();
         }
         Ok(())
     }
@@ -711,7 +704,7 @@ impl EconiaTransactionProcessor {
         ev: Vec<RecognizedMarketEvent>,
     ) -> Result<(), Error> {
         let ev = self.convert_recognized_market_events_to_db(ev)?;
-        let insertable = ev.iter().map(|e| e.into_insertable()).collect::<Vec<_>>();
+        let insertable = ev.iter().map(|e| e.to_insertable()).collect::<Vec<_>>();
         let chunks = get_chunks(
             ev.len(),
             models::market::NewRecognizedMarketEvent::field_count(),
@@ -758,6 +751,22 @@ fn get_next_block_time<'a>(
     }
 }
 
+fn coin_info_to_coin(info: CoinInfo) -> Coin {
+    let mut split_type = info
+        .coin_type
+        .splitn(3, "::")
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+    Coin {
+        account_address: std::mem::take(split_type.get_mut(0).unwrap()),
+        module_name: std::mem::take(split_type.get_mut(1).unwrap()),
+        struct_name: std::mem::take(split_type.get_mut(2).unwrap()),
+        symbol: info.symbol,
+        name: info.name,
+        decimals: info.decimals.try_into().unwrap(),
+    }
+}
+
 #[async_trait]
 impl TransactionProcessor for EconiaTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -770,6 +779,26 @@ impl TransactionProcessor for EconiaTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let maybe_aptos_coin_info = {
+            let mut conn = self.get_conn();
+            &CoinInfoQuery::get_by_coin_type(APTOS_COIN_TYPE.to_string(), &mut conn).unwrap()
+        };
+
+        let mut all_coin_infos: HashMap<String, CoinInfo> = HashMap::new();
+
+        for txn in &transactions {
+            let (_, _, coin_infos, _, _) =
+                CoinActivity::from_transaction(txn, maybe_aptos_coin_info);
+            for (key, value) in coin_infos {
+                all_coin_infos.entry(key).or_insert(value);
+            }
+        }
+
+        let all_coins = all_coin_infos
+            .into_values()
+            .map(coin_info_to_coin)
+            .collect::<Vec<Coin>>();
+
         let (_, details, events, _, _) = TransactionModel::from_transactions(&transactions);
         let mut details_iter = details.iter();
         let (mut cur_block, mut cur_time) = Default::default();
@@ -792,15 +821,21 @@ impl TransactionProcessor for EconiaTransactionProcessor {
             filtered_events.push(e);
         }
 
-        self.insert_to_db(start_version, end_version, filtered_events, block_to_time)
-            .map_err(|err| {
-                TransactionProcessingError::TransactionCommitError((
-                    anyhow::Error::from(err),
-                    start_version,
-                    end_version,
-                    NAME,
-                ))
-            })
+        self.insert_to_db(
+            start_version,
+            end_version,
+            all_coins,
+            filtered_events,
+            block_to_time,
+        )
+        .map_err(|err| {
+            TransactionProcessingError::TransactionCommitError((
+                anyhow::Error::from(err),
+                start_version,
+                end_version,
+                NAME,
+            ))
+        })
     }
 
     fn connection_pool(&self) -> &PgDbPool {

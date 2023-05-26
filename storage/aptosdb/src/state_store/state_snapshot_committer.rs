@@ -75,11 +75,19 @@ impl StateSnapshotCommitter {
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
 
-                    let (batch, root_hash) = self
+                    let (top_levels_batch, sharded_batch, root_hash) = self
                         .state_db
                         .state_merkle_db
+                        // TODO(grao): Provide a sharded version of this function.
                         .merklize_value_set(
-                            jmt_update_refs(&jmt_updates(&delta_to_commit.updates_since_base)),
+                            jmt_update_refs(&jmt_updates(
+                                &delta_to_commit
+                                    .updates_since_base
+                                    .iter()
+                                    .flatten()
+                                    .map(|(k, v)| (k, v.as_ref()))
+                                    .collect(),
+                            )),
                             Some(&node_hashes),
                             version,
                             base_version,
@@ -91,7 +99,8 @@ impl StateSnapshotCommitter {
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
-                            batch,
+                            top_levels_batch,
+                            sharded_batch,
                             root_hash,
                             state_delta: delta_to_commit,
                         }))

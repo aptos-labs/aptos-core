@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    metrics,
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
     Error, LogEntry, LogEvent, LogSchema,
 };
@@ -13,11 +14,16 @@ use aptos_infallible::RwLock;
 use aptos_logger::warn;
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
-    NetworkInformationResponse, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    request::PeerMonitoringServiceRequest,
+    response::{NetworkInformationResponse, PeerMonitoringServiceResponse},
     MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::TimeService;
-use std::sync::Arc;
+use std::{
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 /// A simple container that holds a single peer's network info
 #[derive(Clone, Debug)]
@@ -124,18 +130,13 @@ impl StateValueInterface for NetworkInfoState {
                 let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
                 let peer_has_correct_network = match self.base_config.role {
                     RoleType::Validator => network_id.is_vfn_network(), // We're a validator
-                    RoleType::FullNode => network_id.is_public_network(), // We're a PFN
+                    RoleType::FullNode => network_id.is_public_network(), // We're a VFN or PFN
                 };
                 peer_is_vfn && peer_has_correct_network
             },
             distance_from_validators => {
-                // The peer should not be a validator, or a VFN, and the
-                // depth must be less than or equal to the max.
-                let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
-                let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
-                !peer_is_validator
-                    && !peer_is_vfn
-                    && distance_from_validators <= MAX_DISTANCE_FROM_VALIDATORS
+                // The distance must be less than or equal to the max
+                distance_from_validators <= MAX_DISTANCE_FROM_VALIDATORS
             },
         };
 
@@ -157,7 +158,7 @@ impl StateValueInterface for NetworkInfoState {
     }
 
     fn handle_monitoring_service_response_error(
-        &self,
+        &mut self,
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
@@ -170,6 +171,36 @@ impl StateValueInterface for NetworkInfoState {
             .message("Error encountered when requesting network information from the peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+
+    fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId) {
+        if let Some(network_info_response) = self.get_latest_network_info_response() {
+            // Update the distance from the validators metric
+            let distance_from_validators = network_info_response.distance_from_validators;
+            metrics::observe_value(
+                &metrics::DISTANCE_FROM_VALIDATORS,
+                peer_network_id,
+                distance_from_validators as f64,
+            );
+
+            // Update the number of connected peers metric
+            let num_connected_peers = network_info_response.connected_peers.len();
+            metrics::observe_value(
+                &metrics::NUM_CONNECTED_PEERS,
+                peer_network_id,
+                num_connected_peers as f64,
+            );
+        }
+    }
+}
+
+impl Display for NetworkInfoState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NetworkInfoState {{ recorded_network_info_response: {:?} }}",
+            self.recorded_network_info_response
+        )
     }
 }
 
@@ -187,7 +218,8 @@ mod test {
         transport::{ConnectionId, ConnectionMetadata},
     };
     use aptos_peer_monitoring_service_types::{
-        NetworkInformationResponse, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+        request::PeerMonitoringServiceRequest,
+        response::{NetworkInformationResponse, PeerMonitoringServiceResponse},
     };
     use aptos_time_service::TimeService;
     use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -202,55 +234,67 @@ mod test {
         let mut network_info_state = create_network_info_state(RoleType::Validator);
 
         // Verify there is no latest network info response
-        verify_empty_network_response(&mut network_info_state);
+        verify_empty_network_response(&network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 0 (the peer is a VFN, not a validator).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Vfn,
             PeerRole::ValidatorFullNode,
             0,
+            None,
         );
-
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 1 (the peer is a validator, not a VFN).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Validator,
             PeerRole::Validator,
             1,
+            None,
         );
 
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
+        // Attempt to store a network response with a valid depth of
+        // 3 (the peer is a validator that is disconnected from the set).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Validator,
+            PeerRole::Validator,
+            3,
+            Some(3),
+        );
 
-        // Attempt to store a network response with an invalid depth of
-        // 10 (the peer is a VFN).
-        handle_monitoring_service_response(
+        // Attempt to store a network response with a valid depth of
+        // 10 (the peer is a VFN that has poor connections).
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Vfn,
             PeerRole::ValidatorFullNode,
             10,
+            Some(10),
         );
-
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
 
         // Attempt to store a network response with a valid depth of
         // 1 (the peer is a VFN).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Vfn,
             PeerRole::ValidatorFullNode,
             1,
+            Some(1),
         );
 
-        // Verify the latest stored distance is correct
-        verify_network_response_distance(&mut network_info_state, 1);
+        // Attempt to store a network response with a valid depth of
+        // 0 (the peer is a validator).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Validator,
+            PeerRole::Validator,
+            0,
+            Some(0),
+        );
     }
 
     #[test]
@@ -259,55 +303,67 @@ mod test {
         let mut network_info_state = create_network_info_state(RoleType::FullNode);
 
         // Verify there is no latest network info response
-        verify_empty_network_response(&mut network_info_state);
+        verify_empty_network_response(&network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 1 (the peer is a validator).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Validator,
             PeerRole::Validator,
             1,
+            None,
         );
-
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 0 (the peer is a PFN, not a validator).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Public,
             PeerRole::Unknown,
             0,
+            None,
         );
-
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 1 (the peer is a VFN, but VFNs can't connect to other VFN networks).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Vfn,
             PeerRole::ValidatorFullNode,
             1,
+            None,
         );
 
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
-
         // Attempt to store a network response with a valid depth of
-        // 2 (the peer is a public fullnode).
-        handle_monitoring_service_response(
+        // 3 (the peer is a PFN).
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Public,
             PeerRole::Unknown,
-            2,
+            3,
+            Some(3),
         );
 
-        // Verify the latest stored distance is correct
-        verify_network_response_distance(&mut network_info_state, 2);
+        // Attempt to store a network response with a valid depth of
+        // 2 (the peer is a validator that is disconnected from the set).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::Validator,
+            2,
+            Some(2),
+        );
+
+        // Attempt to store a network response with a valid depth of
+        // 0 (the peer is a validator).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Vfn,
+            PeerRole::Validator,
+            0,
+            Some(0),
+        );
     }
 
     #[test]
@@ -316,57 +372,57 @@ mod test {
         let mut network_info_state = create_network_info_state(RoleType::FullNode);
 
         // Verify there is no latest network info response
-        verify_empty_network_response(&mut network_info_state);
+        verify_empty_network_response(&network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 0 (the peer is a PFN, not a validator).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Public,
             PeerRole::Unknown,
             0,
+            None,
         );
-
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
 
         // Attempt to store a network response with an invalid depth of
         // 1 (the peer is a PFN, not a VFN).
-        handle_monitoring_service_response(
+        handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Public,
             PeerRole::PreferredUpstream,
             1,
+            None,
         );
 
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
-
-        // Attempt to store a network response with an invalid depth of
-        // 2 (the peer is a VFN).
-        handle_monitoring_service_response(
+        // Attempt to store a network response with a valid depth of
+        // 2 (the peer is a VFN that has no validator connection).
+        handle_response_and_verify_distance(
             &mut network_info_state,
-            NetworkId::Vfn,
+            NetworkId::Public,
             PeerRole::ValidatorFullNode,
             2,
+            Some(2),
         );
 
-        // Verify there is still no latest network info response
-        verify_empty_network_response(&mut network_info_state);
+        // Attempt to store a network response with a valid depth of
+        // 1 (the peer is a VFN).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Public,
+            PeerRole::ValidatorFullNode,
+            1,
+            Some(1),
+        );
 
-        // Handle two correct responses
+        // Handle two valid responses from a PFN
         for distance_from_validators in [2, 3] {
-            // Attempt to store a network response with a valid depth
-            // (the peer is a PFN).
-            handle_monitoring_service_response(
+            handle_response_and_verify_distance(
                 &mut network_info_state,
                 NetworkId::Public,
                 PeerRole::Unknown,
                 distance_from_validators,
+                Some(distance_from_validators),
             );
-
-            // Verify the latest stored distance is correct
-            verify_network_response_distance(&mut network_info_state, distance_from_validators);
         }
     }
 
@@ -380,6 +436,34 @@ mod test {
             ..Default::default()
         };
         NetworkInfoState::new(node_config, TimeService::mock())
+    }
+
+    /// Handles a monitoring service response from a peer
+    /// and verifies the latest stored distance.
+    fn handle_response_and_verify_distance(
+        network_info_state: &mut NetworkInfoState,
+        network_id: NetworkId,
+        peer_role: PeerRole,
+        distance_from_validators: u64,
+        latest_stored_distance: Option<u64>,
+    ) {
+        // Handle the monitoring service response
+        handle_monitoring_service_response(
+            network_info_state,
+            network_id,
+            peer_role,
+            distance_from_validators,
+        );
+
+        // Verify that the latest stored distance is correct
+        match latest_stored_distance {
+            Some(latest_stored_distance) => {
+                verify_network_response_distance(network_info_state, latest_stored_distance);
+            },
+            None => {
+                verify_empty_network_response(network_info_state);
+            },
+        }
     }
 
     /// Handles a monitoring service response from a peer
@@ -420,7 +504,7 @@ mod test {
     }
 
     /// Verifies that there is no latest network info response stored
-    fn verify_empty_network_response(network_info_state: &mut NetworkInfoState) {
+    fn verify_empty_network_response(network_info_state: &NetworkInfoState) {
         assert!(network_info_state
             .get_latest_network_info_response()
             .is_none());
@@ -428,7 +512,7 @@ mod test {
 
     /// Verifies that the latest network info response has a valid distance
     fn verify_network_response_distance(
-        network_info_state: &mut NetworkInfoState,
+        network_info_state: &NetworkInfoState,
         distance_from_validators: u64,
     ) {
         let network_info_response = network_info_state

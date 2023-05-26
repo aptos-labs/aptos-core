@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    metrics,
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
     Error, LogEntry, LogEvent, LogSchema,
 };
@@ -10,10 +11,16 @@ use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
-    LatencyPingRequest, PeerMonitoringServiceRequest, PeerMonitoringServiceResponse,
+    request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+    response::PeerMonitoringServiceResponse,
 };
 use aptos_time_service::TimeService;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    fmt::{Display, Formatter},
+    sync::Arc,
+};
 
 /// A simple container that holds a peer's latency info
 #[derive(Clone, Debug)]
@@ -180,7 +187,7 @@ impl StateValueInterface for LatencyInfoState {
     }
 
     fn handle_monitoring_service_response_error(
-        &self,
+        &mut self,
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
@@ -193,6 +200,27 @@ impl StateValueInterface for LatencyInfoState {
             .message("Error encountered when pinging peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+
+    fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId) {
+        if let Some(average_latency_ping_secs) = self.get_average_latency_ping_secs() {
+            // Update the average ping latency metric
+            metrics::observe_value(
+                &metrics::AVERAGE_PING_LATENCIES,
+                peer_network_id,
+                average_latency_ping_secs,
+            );
+        }
+    }
+}
+
+impl Display for LatencyInfoState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LatencyInfoState {{ latency_ping_counter, {:?}, recorded_latency_ping_durations_secs: {:?} }}",
+            self.latency_ping_counter, self.recorded_latency_ping_durations_secs,
+        )
     }
 }
 
@@ -210,8 +238,8 @@ mod test {
         transport::{ConnectionId, ConnectionMetadata},
     };
     use aptos_peer_monitoring_service_types::{
-        LatencyPingRequest, LatencyPingResponse, PeerMonitoringServiceRequest,
-        PeerMonitoringServiceResponse,
+        request::{LatencyPingRequest, PeerMonitoringServiceRequest},
+        response::{LatencyPingResponse, PeerMonitoringServiceResponse},
     };
     use aptos_time_service::TimeService;
     use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -226,8 +254,7 @@ mod test {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
         let time_service = TimeService::mock();
-        let mut latency_info_state =
-            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);
@@ -273,8 +300,7 @@ mod test {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
         let time_service = TimeService::mock();
-        let mut latency_info_state =
-            LatencyInfoState::new(latency_monitoring_config.clone(), time_service);
+        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);

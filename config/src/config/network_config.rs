@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{Error, IdentityBlob, SecureBackend},
-    keys::ConfigKey,
+    config::{
+        identity_config::{Identity, IdentityFromStorage},
+        Error, IdentityBlob,
+    },
     network_id::NetworkId,
     utils,
 };
@@ -41,7 +43,7 @@ pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
-pub const MAX_INBOUND_CONNECTIONS: usize = 30; /* At 5k TPS this could easily hit ~50MiB a second */
+pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -59,59 +61,63 @@ pub const OUTBOUND_TCP_TX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB use a bigger sp
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
-    // Maximum backoff delay for connecting outbound to peers
+    /// Maximum backoff delay for connecting outbound to peers
     pub max_connection_delay_ms: u64,
-    // Base for outbound connection backoff
+    /// Base for outbound connection backoff
     pub connection_backoff_base: u64,
-    // Rate to check connectivity to connected peers
+    /// Rate to check connectivity to connected peers
     pub connectivity_check_interval_ms: u64,
-    // Size of all network channels
+    /// Size of all network channels
     pub network_channel_size: usize,
-    // Maximum number of concurrent network requests
+    /// Maximum number of concurrent network requests
     pub max_concurrent_network_reqs: usize,
-    // Choose a protocol to discover and dial out to other peers on this network.
-    // `DiscoveryMethod::None` disables discovery and dialing out (unless you have
-    // seed peers configured).
+    /// Choose a protocol to discover and dial out to other peers on this network.
+    /// `DiscoveryMethod::None` disables discovery and dialing out (unless you have
+    /// seed peers configured).
     pub discovery_method: DiscoveryMethod,
+    /// Same as `discovery_method` but allows for multiple
     pub discovery_methods: Vec<DiscoveryMethod>,
+    /// Identity of this network
     pub identity: Identity,
     // TODO: Add support for multiple listen/advertised addresses in config.
-    // The address that this node is listening on for new connections.
+    /// The address that this node is listening on for new connections.
     pub listen_address: NetworkAddress,
-    // Select this to enforce that both peers should authenticate each other, otherwise
-    // authentication only occurs for outgoing connections.
+    /// Select this to enforce that both peers should authenticate each other, otherwise
+    /// authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
+    /// ID of the network to differentiate between networks
     pub network_id: NetworkId,
+    /// Number of threads to run for networking
     pub runtime_threads: Option<usize>,
     pub inbound_rx_buffer_size_bytes: Option<u32>,
     pub inbound_tx_buffer_size_bytes: Option<u32>,
     pub outbound_rx_buffer_size_bytes: Option<u32>,
     pub outbound_tx_buffer_size_bytes: Option<u32>,
-    // Addresses of initial peers to connect to. In a mutual_authentication network,
-    // we will extract the public keys from these addresses to set our initial
-    // trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
+    /// Addresses of initial peers to connect to. In a mutual_authentication network,
+    /// we will extract the public keys from these addresses to set our initial
+    /// trusted peers set.  TODO: Replace usage in configs with `seeds` this is for backwards compatibility
     pub seed_addrs: HashMap<PeerId, Vec<NetworkAddress>>,
-    // The initial peers to connect to prior to onchain discovery
+    /// The initial peers to connect to prior to onchain discovery
     pub seeds: PeerSet,
-    // The maximum size of an inbound or outbound request frame
+    /// The maximum size of an inbound or outbound request frame
     pub max_frame_size: usize,
-    // Enables proxy protocol on incoming connections to get original source addresses
+    /// Enables proxy protocol on incoming connections to get original source addresses
     pub enable_proxy_protocol: bool,
-    // Interval to send healthcheck pings to peers
+    /// Interval to send healthcheck pings to peers
     pub ping_interval_ms: u64,
-    // Timeout until a healthcheck ping is rejected
+    /// Timeout until a healthcheck ping is rejected
     pub ping_timeout_ms: u64,
-    // Number of failed healthcheck pings until a peer is marked unhealthy
+    /// Number of failed healthcheck pings until a peer is marked unhealthy
     pub ping_failures_tolerated: u64,
-    // Maximum number of outbound connections, limited by ConnectivityManager
+    /// Maximum number of outbound connections, limited by ConnectivityManager
     pub max_outbound_connections: usize,
-    // Maximum number of outbound connections, limited by PeerManager
+    /// Maximum number of outbound connections, limited by PeerManager
     pub max_inbound_connections: usize,
-    // Inbound rate limiting configuration, if not specified, no rate limiting
+    /// Inbound rate limiting configuration, if not specified, no rate limiting
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
-    // Outbound rate limiting configuration, if not specified, no rate limiting
+    /// Outbound rate limiting configuration, if not specified, no rate limiting
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
-    // The maximum size of an inbound or outbound message (it may be divided into multiple frame)
+    /// The maximum size of an inbound or outbound message (it may be divided into multiple frame)
     pub max_message_size: usize,
 }
 
@@ -157,9 +163,7 @@ impl NetworkConfig {
         config.prepare_identity();
         config
     }
-}
 
-impl NetworkConfig {
     pub fn identity_key(&self) -> x25519::PrivateKey {
         let key = match &self.identity {
             Identity::FromConfig(config) => Some(config.key.private_key()),
@@ -203,29 +207,17 @@ impl NetworkConfig {
         }
     }
 
-    /// Per convenience, so that NetworkId isn't needed to be specified for `validator_networks`
-    pub fn load_validator_network(&mut self) -> Result<(), Error> {
-        self.network_id = NetworkId::Validator;
-        self.load()
-    }
-
-    pub fn load_fullnode_network(&mut self) -> Result<(), Error> {
-        if self.network_id.is_validator_network() {
-            return Err(Error::InvariantViolation(format!(
-                "Set {} network for a non-validator network",
-                self.network_id
-            )));
-        }
-        self.load()
-    }
-
-    fn load(&mut self) -> Result<(), Error> {
+    pub fn set_listen_address_and_prepare_identity(&mut self) -> Result<(), Error> {
+        // Set the listen address to the local IP if it is not specified
         if self.listen_address.to_string().is_empty() {
-            self.listen_address = utils::get_local_ip()
-                .ok_or_else(|| Error::InvariantViolation("No local IP".to_string()))?;
+            self.listen_address = utils::get_local_ip().ok_or_else(|| {
+                Error::InvariantViolation("Failed to get the Local IP".to_string())
+            })?;
         }
 
+        // Prepare the identity
         self.prepare_identity();
+
         Ok(())
     }
 
@@ -292,14 +284,15 @@ impl NetworkConfig {
     }
 
     fn verify_address(peer_id: &PeerId, addr: &NetworkAddress) -> Result<(), Error> {
-        crate::config::invariant(
-            addr.is_aptosnet_addr(),
-            format!(
+        if !addr.is_aptosnet_addr() {
+            return Err(Error::InvariantViolation(format!(
                 "Unexpected seed peer address format: peer_id: {}, addr: '{}'",
                 peer_id.short_str(),
                 addr,
-            ),
-        )
+            )));
+        }
+
+        Ok(())
     }
 
     // Verifies both the `seed_addrs` and `seeds` before they're merged
@@ -316,76 +309,14 @@ impl NetworkConfig {
             }
 
             // Require there to be a pubkey somewhere, either in the address (assumed by `is_aptosnet_addr`)
-            crate::config::invariant(
-                !seed.keys.is_empty() || !seed.addresses.is_empty(),
-                format!("Seed peer {} has no pubkeys", peer_id.short_str()),
-            )?;
+            if seed.keys.is_empty() && seed.addresses.is_empty() {
+                return Err(Error::InvariantViolation(format!(
+                    "Seed peer {} has no pubkeys",
+                    peer_id.short_str(),
+                )));
+            }
         }
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct PeerMonitoringServiceConfig {
-    pub enable_peer_monitoring_client: bool, // Whether or not to spawn the monitoring client
-    pub latency_monitoring: LatencyMonitoringConfig,
-    pub max_concurrent_requests: u64, // Max num of concurrent server tasks
-    pub max_network_channel_size: u64, // Max num of pending network messages
-    pub max_request_jitter_ms: u64, // Max amount of jitter (ms) that a request will be delayed for
-    pub metadata_update_interval_ms: u64, // The interval (ms) between metadata updates
-    pub network_monitoring: NetworkMonitoringConfig,
-    pub peer_monitor_interval_ms: u64, // The interval (ms) between peer monitor executions
-}
-
-impl Default for PeerMonitoringServiceConfig {
-    fn default() -> Self {
-        Self {
-            enable_peer_monitoring_client: false,
-            latency_monitoring: LatencyMonitoringConfig::default(),
-            max_concurrent_requests: 1000,
-            max_network_channel_size: 1000,
-            max_request_jitter_ms: 1000, // Monitoring requests are very infrequent
-            metadata_update_interval_ms: 5000,
-            network_monitoring: NetworkMonitoringConfig::default(),
-            peer_monitor_interval_ms: 1000,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct LatencyMonitoringConfig {
-    pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
-    pub latency_ping_timeout_ms: u64,  // The timeout (ms) for each latency ping
-    pub max_latency_ping_failures: u64, // Max ping failures before the peer connection fails
-    pub max_num_latency_pings_to_retain: usize, // The max latency pings to retain per peer
-}
-
-impl Default for LatencyMonitoringConfig {
-    fn default() -> Self {
-        Self {
-            latency_ping_interval_ms: 30_000, // 30 seconds
-            latency_ping_timeout_ms: 20_000,  // 20 seconds
-            max_latency_ping_failures: 3,
-            max_num_latency_pings_to_retain: 10,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct NetworkMonitoringConfig {
-    pub network_info_request_interval_ms: u64, // The interval (ms) between network info requests
-    pub network_info_request_timeout_ms: u64,  // The timeout (ms) for each network info request
-}
-
-impl Default for NetworkMonitoringConfig {
-    fn default() -> Self {
-        Self {
-            network_info_request_interval_ms: 60_000, // 1 minute
-            network_info_request_timeout_ms: 10_000,  // 10 seconds
-        }
     }
 }
 
@@ -412,59 +343,7 @@ pub struct RestDiscovery {
     pub interval_secs: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "type")]
-pub enum Identity {
-    FromConfig(IdentityFromConfig),
-    FromStorage(IdentityFromStorage),
-    FromFile(IdentityFromFile),
-    None,
-}
-
-impl Identity {
-    pub fn from_config(key: x25519::PrivateKey, peer_id: PeerId) -> Self {
-        let key = ConfigKey::new(key);
-        Identity::FromConfig(IdentityFromConfig { key, peer_id })
-    }
-
-    pub fn from_storage(key_name: String, peer_id_name: String, backend: SecureBackend) -> Self {
-        Identity::FromStorage(IdentityFromStorage {
-            backend,
-            key_name,
-            peer_id_name,
-        })
-    }
-
-    pub fn from_file(path: PathBuf) -> Self {
-        Identity::FromFile(IdentityFromFile { path })
-    }
-}
-
-/// The identity is stored within the config.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromConfig {
-    #[serde(flatten)]
-    pub key: ConfigKey<x25519::PrivateKey>,
-    pub peer_id: PeerId,
-}
-
-/// This represents an identity in a secure-storage as defined in NodeConfig::secure.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromStorage {
-    pub backend: SecureBackend,
-    pub key_name: String,
-    pub peer_id_name: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct IdentityFromFile {
-    pub path: PathBuf,
-}
-
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RateLimitConfig {
     /// Maximum number of bytes/s for an IP
@@ -585,13 +464,12 @@ impl Peer {
     /// Combines two `Peer`.  Note: Does not merge duplicate addresses
     /// TODO: Instead of rejecting, maybe pick one of the roles?
     pub fn extend(&mut self, other: Peer) -> Result<(), Error> {
-        crate::config::invariant(
-            self.role != other.role,
-            format!(
+        if self.role == other.role {
+            return Err(Error::InvariantViolation(format!(
                 "Roles don't match self {:?} vs other {:?}",
                 self.role, other.role
-            ),
-        )?;
+            )));
+        }
         self.addresses.extend(other.addresses);
         self.keys.extend(other.keys);
         Ok(())

@@ -6,23 +6,25 @@ pub mod config;
 pub mod constants;
 pub mod file_store_operator;
 
-use aptos_protos::datastream::v1::indexer_stream_client::IndexerStreamClient;
+use aptos_protos::{
+    internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, util::timestamp::Timestamp,
+};
 
-pub type GrpcClientType = IndexerStreamClient<tonic::transport::Channel>;
+pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: String) -> GrpcClientType {
     backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
-        match IndexerStreamClient::connect(address.clone()).await {
+        match FullnodeDataClient::connect(address.clone()).await {
             Ok(client) => {
-                aptos_logger::info!(
+                tracing::info!(
                     address = address.clone(),
                     "[Indexer Cache] Connected to indexer gRPC server."
                 );
                 Ok(client)
             },
             Err(e) => {
-                aptos_logger::error!(
+                tracing::error!(
                     address = address.clone(),
                     "[Indexer Cache] Failed to connect to indexer gRPC server: {}",
                     e
@@ -48,4 +50,13 @@ pub fn build_protobuf_encoded_transaction_wrappers(
         .enumerate()
         .map(|(ind, encoded_transaction)| (encoded_transaction, starting_version + ind as u64))
         .collect()
+}
+
+pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
+    let current_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("SystemTime before UNIX EPOCH!")
+        .as_secs_f64();
+    let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
+    current_timestamp - transaction_time
 }

@@ -1,0 +1,39 @@
+//# publish
+
+module 0x1.Test {
+	struct K { x: u64 }
+
+	public t() {
+		let hot_potato: Self.K;
+		let z: u64;
+		let p: u64;
+
+		// block start -> {loop_head}
+		label start:
+		z = 0;
+
+		// block loop_head -> {stloc_block, done}
+		label loop_head:
+		jump_if (copy(z) == 2) done;
+
+		// block stloc_block:
+		// NOTE: the verifier should realize that this block can be reached with `hot_potato` assigned
+		//       and reject the module
+		hot_potato = K { x: 100 }; // stloc should not work on second loop iteration
+		jump loop_back;
+
+		// block two_back_edges -> loop_back, loop_head
+		label two_back_edges:
+		p=1; // intentionally cause a change in state
+		jump_if (true) loop_head;
+
+		// block loop_back -> two_back_edges
+		label loop_back:
+		z = copy(z) + 1;
+		jump two_back_edges;
+
+		label done:
+		return;
+
+	}
+}

@@ -38,7 +38,7 @@ module aptos_framework::guid {
 
     /// Get the non-privileged ID associated with a GUID
     public fun id(guid: &GUID): ID {
-        *&guid.id
+        guid.id
     }
 
     /// Return the account address that created the GUID

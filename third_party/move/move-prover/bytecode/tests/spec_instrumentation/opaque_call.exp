@@ -80,7 +80,7 @@ fun Test::get_and_incr($t0|addr: address): u64 {
      var $t10: u64
      var $t11: u64
      var $t12: &mut u64
-  0: assume Neq<address>($t0, 0)
+  0: assume Neq<address>($t0, 0x0)
   1: assume CanModify<Test::R>($t0)
   2: @0 := save_mem(Test::R)
   3: $t3 := exists<Test::R>($t0)
@@ -133,7 +133,7 @@ fun Test::incr_twice() {
   0: @1 := save_mem(Test::R)
   1: $t0 := 0x1
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
-  2: assert Neq<address>($t0, 0)
+  2: assert Neq<address>($t0, 0x0)
   3: $t1 := opaque begin: Test::get_and_incr($t0)
   4: assume Identical($t2, Or(Not(exists<Test::R>($t0)), Ge(Add(select Test::R.v(global<Test::R>($t0)), 1), 18446744073709551615)))
   5: if ($t2) goto 6 else goto 10
@@ -151,7 +151,7 @@ fun Test::incr_twice() {
  17: destroy($t1)
  18: $t4 := 0x1
      # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
- 19: assert Neq<address>($t4, 0)
+ 19: assert Neq<address>($t4, 0x0)
  20: $t5 := opaque begin: Test::get_and_incr($t4)
  21: assume Identical($t6, Or(Not(exists<Test::R>($t4)), Ge(Add(select Test::R.v(global<Test::R>($t4)), 1), 18446744073709551615)))
  22: if ($t6) goto 23 else goto 27
@@ -169,15 +169,15 @@ fun Test::incr_twice() {
  34: destroy($t5)
  35: label L1
      # VC: function does not abort under this condition at tests/spec_instrumentation/opaque_call.move:28:6+35
- 36: assert Not(Not(exists[@1]<Test::R>(1)))
+ 36: assert Not(Not(exists[@1]<Test::R>(0x1)))
      # VC: post-condition does not hold at tests/spec_instrumentation/opaque_call.move:29:6+56
- 37: assert Eq<u64>(select Test::R.v(global<Test::R>(1)), Add(select Test::R.v(global[@1]<Test::R>(1)), 2))
+ 37: assert Eq<u64>(select Test::R.v(global<Test::R>(0x1)), Add(select Test::R.v(global[@1]<Test::R>(0x1)), 2))
  38: return ()
  39: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/opaque_call.move:27:2+123
- 40: assert Not(exists[@1]<Test::R>(1))
+ 40: assert Not(exists[@1]<Test::R>(0x1))
      # VC: abort code not covered by any of the `aborts_if` or `aborts_with` clauses at tests/spec_instrumentation/opaque_call.move:27:2+123
- 41: assert And(Not(exists[@1]<Test::R>(1)), Eq(33, $t3))
+ 41: assert And(Not(exists[@1]<Test::R>(0x1)), Eq(33, $t3))
  42: abort($t3)
 }
 
@@ -187,7 +187,7 @@ fun Test::incr_twice() {
 
 fun Test::get_and_incr[baseline]
 spec {
-  requires Neq<address>($t0, 0);
+  requires Neq<address>($t0, 0x0);
   aborts_if Not(exists<Test::R>($t0));
   aborts_if Ge(Add(select Test::R.v(global<Test::R>($t0)), 1), 18446744073709551615);
   modifies global<Test::R>($t0);
@@ -197,7 +197,7 @@ spec {
 
 fun Test::get_and_incr[verification]
 spec {
-  requires Neq<address>($t0, 0);
+  requires Neq<address>($t0, 0x0);
   aborts_if Not(exists<Test::R>($t0));
   aborts_if Ge(Add(select Test::R.v(global<Test::R>($t0)), 1), 18446744073709551615);
   modifies global<Test::R>($t0);
@@ -207,12 +207,12 @@ spec {
 
 fun Test::incr_twice[baseline]
 spec {
-  aborts_if Not(exists<Test::R>(1));
-  ensures Eq<u64>(select Test::R.v(global<Test::R>(1)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(1))), 2));
+  aborts_if Not(exists<Test::R>(0x1));
+  ensures Eq<u64>(select Test::R.v(global<Test::R>(0x1)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0x1))), 2));
 }
 
 fun Test::incr_twice[verification]
 spec {
-  aborts_if Not(exists<Test::R>(1));
-  ensures Eq<u64>(select Test::R.v(global<Test::R>(1)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(1))), 2));
+  aborts_if Not(exists<Test::R>(0x1));
+  ensures Eq<u64>(select Test::R.v(global<Test::R>(0x1)), Add(select Test::R.v(Old<Test::R>(global<Test::R>(0x1))), 2));
 }

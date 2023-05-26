@@ -16,22 +16,24 @@ use crate::{
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_block_executor::{
     errors::Error,
-    executor::{BlockExecutor, RAYON_EXEC_POOL},
+    executor::BlockExecutor,
     task::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
 };
+use aptos_infallible::Mutex;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSet},
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use move_core_types::vm_status::VMStatus;
-use rayon::prelude::*;
-use std::time::Instant;
+use once_cell::sync::OnceCell;
+use rayon::{prelude::*, ThreadPool};
+use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -39,24 +41,53 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 }
 
 // Wrapper to avoid orphan rule
-#[derive(PartialEq, Debug)]
-pub(crate) struct AptosTransactionOutput(TransactionOutputExt);
+#[derive(Debug)]
+pub(crate) struct AptosTransactionOutput {
+    output_ext: Mutex<Option<TransactionOutputExt>>,
+    committed_output: OnceCell<TransactionOutput>,
+}
 
 impl AptosTransactionOutput {
-    pub fn new(output: TransactionOutputExt) -> Self {
-        Self(output)
+    pub(crate) fn new(output: TransactionOutputExt) -> Self {
+        Self {
+            output_ext: Mutex::new(Some(output)),
+            committed_output: OnceCell::new(),
+        }
     }
 
-    pub fn into(self) -> TransactionOutputExt {
-        self.0
+    fn take_output(mut self) -> TransactionOutput {
+        match self.committed_output.take() {
+            Some(output) => output,
+            None => self
+                .output_ext
+                .lock()
+                .take()
+                .expect("Output must be set")
+                .output_with_delta_writes(vec![]),
+        }
     }
 }
 
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = PreprocessedTransaction;
 
+    /// Execution output for transactions that comes after SkipRest signal.
+    fn skip_output() -> Self {
+        Self::new(TransactionOutputExt::from(TransactionOutput::new(
+            WriteSet::default(),
+            vec![],
+            0,
+            TransactionStatus::Retry,
+        )))
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it will consume
+    /// output_ext to prepare an output with deltas.
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.0
+        self.output_ext
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
             .txn_output()
             .write_set()
             .iter()
@@ -64,22 +95,41 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
+    /// Should never be called after incorporate_delta_writes, as it will consume
+    /// output_ext to prepare an output with deltas.
     fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
-        self.0
+        self.output_ext
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get deltas")
             .delta_change_set()
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()
     }
 
-    /// Execution output for transactions that comes after SkipRest signal.
-    fn skip_output() -> Self {
-        Self(TransactionOutputExt::from(TransactionOutput::new(
-            WriteSet::default(),
-            vec![],
-            0,
-            TransactionStatus::Retry,
-        )))
+    /// Can be called (at most) once after transaction is committed to internally
+    /// include the delta outputs with the transaction outputs.
+    fn incorporate_delta_writes(&self, delta_writes: Vec<(StateKey, WriteOp)>) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.output_ext
+                        .lock()
+                        .take()
+                        .expect("Output must be set to combine with deltas")
+                        .output_with_delta_writes(delta_writes),
+                )
+                .is_ok(),
+            "Could not combine TransactionOutputExt with deltas"
+        );
+    }
+
+    /// Return the amount of gas consumed by the transaction.
+    fn gas_used(&self) -> u64 {
+        self.committed_output
+            .get()
+            .map_or(0, |output| output.gas_used())
     }
 }
 
@@ -87,9 +137,11 @@ pub struct BlockAptosVM();
 
 impl BlockAptosVM {
     pub fn execute_block<S: StateView + Sync>(
+        executor_thread_pool: Arc<ThreadPool>,
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
+        maybe_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -98,7 +150,7 @@ impl BlockAptosVM {
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
-            RAYON_EXEC_POOL.install(|| {
+            executor_thread_pool.install(|| {
                 transactions
                     .into_par_iter()
                     .with_min_len(25)
@@ -107,105 +159,36 @@ impl BlockAptosVM {
             });
         drop(signature_verification_timer);
 
-        init_speculative_logs(signature_verified_block.len());
+        let num_txns = signature_verified_block.len();
+        init_speculative_logs(num_txns);
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
             concurrency_level,
+            executor_thread_pool,
+            maybe_gas_limit,
         );
 
-        let ret = executor
-            .execute_block(state_view, signature_verified_block, state_view)
-            .map(|results| {
-                // Process the outputs in parallel, combining delta writes with other writes.
-                RAYON_EXEC_POOL.install(|| {
-                    results
-                        .into_par_iter()
-                        .map(|(output, delta_writes)| {
-                            output      // AptosTransactionOutput
-                            .into()     // TransactionOutputExt
-                            .output_with_delta_writes(WriteSetMut::new(delta_writes))
-                        })
-                        .collect()
-                })
-            });
-
-        flush_speculative_logs();
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
 
         match ret {
-            Ok(outputs) => Ok(outputs),
+            Ok(outputs) => {
+                let output_vec: Vec<TransactionOutput> = outputs
+                    .into_iter()
+                    .map(|output| output.take_output())
+                    .collect();
+
+                // Flush the speculative logs of the committed transactions.
+                let pos = output_vec.partition_point(|o| !o.status().is_retry());
+
+                flush_speculative_logs(pos);
+
+                Ok(output_vec)
+            },
             Err(Error::ModulePathReadWrite) => {
                 unreachable!("[Execution]: Must be handled by sequential fallback")
             },
             Err(Error::UserError(err)) => Err(err),
         }
-    }
-
-    pub fn execute_block_benchmark<S: StateView + Sync>(
-        transactions: Vec<Transaction>,
-        state_view: &S,
-        concurrency_level: usize,
-    ) -> (usize, usize) {
-        // Verify the signatures of all the transactions in parallel.
-        // This is time consuming so don't wait and do the checking
-        // sequentially while executing the transactions.
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            RAYON_EXEC_POOL.install(|| {
-                transactions
-                    .clone()
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
-        let signature_verified_block_for_seq: Vec<PreprocessedTransaction> = RAYON_EXEC_POOL
-            .install(|| {
-                transactions
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
-        let block_size = signature_verified_block.len();
-
-        init_speculative_logs(signature_verified_block.len());
-
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
-            concurrency_level,
-        );
-        println!("Parallel execution starts...");
-        let timer = Instant::now();
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
-        let exec_t = timer.elapsed();
-        println!(
-            "Parallel execution finishes, TPS = {}",
-            block_size * 1000 / exec_t.as_millis() as usize
-        );
-
-        flush_speculative_logs();
-
-        // sequentially execute the block and check if the results match
-        let seq_executor =
-            BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(1);
-        println!("Sequential execution starts...");
-        let seq_timer = Instant::now();
-        let seq_ret =
-            seq_executor.execute_block(state_view, signature_verified_block_for_seq, state_view);
-        let seq_exec_t = seq_timer.elapsed();
-        println!(
-            "Sequential execution finishes, TPS = {}",
-            block_size * 1000 / seq_exec_t.as_millis() as usize
-        );
-
-        assert_eq!(ret, seq_ret);
-
-        drop(ret);
-        drop(seq_ret);
-
-        (
-            block_size * 1000 / exec_t.as_millis() as usize,
-            block_size * 1000 / seq_exec_t.as_millis() as usize,
-        )
     }
 }

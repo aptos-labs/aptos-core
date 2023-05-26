@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    data_cache::TransactionDataCache,
     loader::{Function, Loader, Resolver},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -20,7 +21,6 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::{GasMeter, SimpleInstruction},
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -31,7 +31,6 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
-use tracing::error;
 
 macro_rules! debug_write {
     ($($toks: tt)*) => {
@@ -89,7 +88,7 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
         args: Vec<Value>,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -113,7 +112,7 @@ impl Interpreter {
     fn execute_main(
         mut self,
         loader: &Loader,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -123,7 +122,13 @@ impl Interpreter {
         let mut locals = Locals::new(function.local_count());
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(i, value)
+                .store_loc(
+                    i,
+                    value,
+                    loader
+                        .vm_config()
+                        .enable_invariant_violation_check_in_swap_loc,
+                )
                 .map_err(|e| self.set_location(e))?;
         }
 
@@ -276,7 +281,13 @@ impl Interpreter {
         let arg_count = func.arg_count();
         let is_generic = !ty_args.is_empty();
         for i in 0..arg_count {
-            locals.store_loc(arg_count - i - 1, self.operand_stack.pop()?)?;
+            locals.store_loc(
+                arg_count - i - 1,
+                self.operand_stack.pop()?,
+                loader
+                    .vm_config()
+                    .enable_invariant_violation_check_in_swap_loc,
+            )?;
 
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
@@ -331,7 +342,7 @@ impl Interpreter {
     fn call_native(
         &mut self,
         resolver: &Resolver,
-        data_store: &mut dyn DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -361,7 +372,7 @@ impl Interpreter {
     fn call_native_impl(
         &mut self,
         resolver: &Resolver,
-        data_store: &mut dyn DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -524,14 +535,14 @@ impl Interpreter {
     }
 
     /// Loads a resource from the data store and return the number of bytes read from the storage.
-    fn load_resource<'b>(
+    fn load_resource<'c>(
         loader: &Loader,
+        data_store: &'c mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &'b mut impl DataStore,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<&'b mut GlobalValue> {
-        match data_store.load_resource(addr, ty) {
+    ) -> PartialVMResult<&'c mut GlobalValue> {
+        match data_store.load_resource(loader, addr, ty) {
             Ok((gv, load_res)) => {
                 if let Some(loaded) = load_res {
                     let opt = match loaded {
@@ -551,13 +562,7 @@ impl Interpreter {
                 }
                 Ok(gv)
             },
-            Err(e) => {
-                error!(
-                    "[VM] error loading resource at ({}, {:?}): {:?} from data store",
-                    addr, ty, e
-                );
-                Err(e)
-            },
+            Err(e) => Err(e),
         }
     }
 
@@ -567,12 +572,12 @@ impl Interpreter {
         is_mut: bool,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let res = Self::load_resource(loader, gas_meter, data_store, addr, ty)?.borrow_global();
+        let res = Self::load_resource(loader, data_store, gas_meter, addr, ty)?.borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -588,12 +593,12 @@ impl Interpreter {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, gas_meter, data_store, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
         self.operand_stack.push(Value::bool(exists))?;
@@ -605,13 +610,13 @@ impl Interpreter {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
         let resource =
-            match Self::load_resource(loader, gas_meter, data_store, addr, ty)?.move_from() {
+            match Self::load_resource(loader, data_store, gas_meter, addr, ty)?.move_from() {
                 Ok(resource) => {
                     gas_meter.charge_move_from(
                         is_generic,
@@ -635,13 +640,13 @@ impl Interpreter {
         &mut self,
         is_generic: bool,
         loader: &Loader,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
-        data_store: &mut impl DataStore,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, gas_meter, data_store, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -674,7 +679,6 @@ impl Interpreter {
     fn maybe_core_dump(&self, mut err: VMError, current_frame: &Frame) -> VMError {
         // a verification error cannot happen at runtime so change it into an invariant violation.
         if err.status_type() == StatusType::Verification {
-            error!("Verification error during runtime: {:?}", err);
             let new_err = PartialVMError::new(StatusCode::VERIFICATION_ERROR);
             let new_err = match err.message() {
                 None => new_err,
@@ -682,13 +686,18 @@ impl Interpreter {
             };
             err = new_err.finish(err.location().clone())
         }
-        if err.status_type() == StatusType::InvariantViolation {
+        if err.status_type() == StatusType::InvariantViolation
+            && err.major_status() != StatusCode::STORAGE_ERROR
+        {
+            let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
-
-            error!(
-                "Error: {:?}\nCORE DUMP: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n",
-                err, state,
-            );
+            err = err
+                .to_partial()
+                .append_message_with_separator(
+                    '\n',
+                    format!("CORE DUMP: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n", state),
+                )
+                .finish(location);
         }
         err
     }
@@ -1035,7 +1044,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut Interpreter,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
         self.execute_code_impl(resolver, interpreter, data_store, gas_meter)
@@ -1654,7 +1663,7 @@ impl Frame {
         &mut self,
         resolver: &Resolver,
         interpreter: &mut Interpreter,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
@@ -1795,7 +1804,13 @@ impl Frame {
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(*idx as usize)?;
+                        let local = self.locals.move_loc(
+                            *idx as usize,
+                            resolver
+                                .loader()
+                                .vm_config()
+                                .enable_invariant_violation_check_in_swap_loc,
+                        )?;
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
@@ -1803,7 +1818,14 @@ impl Frame {
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(*idx as usize, value_to_store)?;
+                        self.locals.store_loc(
+                            *idx as usize,
+                            value_to_store,
+                            resolver
+                                .loader()
+                                .vm_config()
+                                .enable_invariant_violation_check_in_swap_loc,
+                        )?;
                     },
                     Bytecode::Call(idx) => {
                         return Ok(ExitCode::Call(*idx));
@@ -2054,8 +2076,8 @@ impl Frame {
                             is_mut,
                             false,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2069,8 +2091,8 @@ impl Frame {
                             is_mut,
                             true,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2081,8 +2103,8 @@ impl Frame {
                         interpreter.exists(
                             false,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2093,8 +2115,8 @@ impl Frame {
                         interpreter.exists(
                             true,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2105,8 +2127,8 @@ impl Frame {
                         interpreter.move_from(
                             false,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2117,8 +2139,8 @@ impl Frame {
                         interpreter.move_from(
                             true,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                         )?;
@@ -2136,8 +2158,8 @@ impl Frame {
                         interpreter.move_to(
                             false,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                             resource,
@@ -2155,8 +2177,8 @@ impl Frame {
                         interpreter.move_to(
                             true,
                             resolver.loader(),
-                            gas_meter,
                             data_store,
+                            gas_meter,
                             addr,
                             &ty,
                             resource,

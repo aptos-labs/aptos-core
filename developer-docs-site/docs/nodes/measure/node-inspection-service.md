@@ -109,7 +109,7 @@ All other metrics should be considered unstable and may be changed/removed witho
 ### Consensus
 
 If you are running a validator node, the following
-[consensus](../../guides/basics-life-of-txn.md#consensus) metrics are important:
+[consensus](../../concepts/blockchain.md#consensus) metrics are important:
 1. `aptos_consensus_proposals_count`: Counts the number of times the node sent a block
 proposal to the network. The count will increase only when the validator is chosen to be a proposer,
 which depends on the node's stake and leader election reputation. You should expect this metric to
@@ -169,7 +169,7 @@ your node has connected to another node (e.g., connected to a validator fullnode
 
 ### Mempool
 
-The following [mempool](../../guides/basics-life-of-txn.md#mempool) metrics are important:
+The following [mempool](../../concepts/blockchain.md#mempool) metrics are important:
 1. `core_mempool_index_size{index="system_ttl"`: This metric displays the number of transactions currently sitting in
 the mempool of the node and waiting to be committed to the blockchain:
    1. If your node is a fullnode, it's highly unlikely that this metric will be `> 0`, unless transactions are actively

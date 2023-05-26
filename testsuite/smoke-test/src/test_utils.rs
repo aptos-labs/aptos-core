@@ -85,18 +85,12 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 /// node swarm, or a public full node swarm.
 #[cfg(test)]
 pub mod swarm_utils {
-    use aptos_config::config::{
-        InitialSafetyRulesConfig, NodeConfig, SecureBackend, WaypointConfig,
-    };
+    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
     use aptos_secure_storage::{KVStorage, Storage};
     use aptos_types::waypoint::Waypoint;
 
     pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
         node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
-        node_config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config = InitialSafetyRulesConfig::None;
 
         let f = |backend: &SecureBackend| {
             let mut storage: Storage = backend.into();

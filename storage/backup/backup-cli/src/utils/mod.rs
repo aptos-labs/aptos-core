@@ -8,7 +8,7 @@ pub mod read_record_bytes;
 pub mod storage_ext;
 pub(crate) mod stream;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
@@ -20,7 +20,8 @@ use aptos_crypto::HashValue;
 use aptos_db::{
     backup::restore_handler::RestoreHandler,
     state_restore::{
-        StateSnapshotProgress, StateSnapshotRestore, StateValueBatch, StateValueWriter,
+        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
+        StateValueWriter,
     },
     AptosDB, GetRestoreHandler,
 };
@@ -66,6 +67,8 @@ pub struct RocksdbOpt {
     #[clap(long, hidden(true), default_value = "1073741824")] // 1GB
     state_merkle_db_max_total_wal_size: u64,
     #[clap(long, hidden(true))]
+    split_ledger_db: bool,
+    #[clap(long, hidden(true))]
     use_state_kv_db: bool,
     #[clap(long, hidden(true))]
     use_sharded_state_merkle_db: bool,
@@ -96,6 +99,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },
+            split_ledger_db: opt.split_ledger_db,
             use_state_kv_db: opt.use_state_kv_db,
             use_sharded_state_merkle_db: opt.use_sharded_state_merkle_db,
             state_kv_db_config: RocksdbConfig {
@@ -204,11 +208,14 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
+        restore_mode: StateSnapshotRestoreMode,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
-            Self::Restore { restore_handler } => {
-                restore_handler.get_state_restore_receiver(version, expected_root_hash)
-            },
+            Self::Restore { restore_handler } => restore_handler.get_state_restore_receiver(
+                version,
+                expected_root_hash,
+                restore_mode,
+            ),
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
                 StateSnapshotRestore::new_overwrite(
@@ -216,6 +223,7 @@ impl RestoreRunMode {
                     &mock_store,
                     version,
                     expected_root_hash,
+                    restore_mode,
                 )
             },
         }
@@ -242,10 +250,19 @@ impl RestoreRunMode {
         }
     }
 
-    pub fn get_in_progress_state_snapshot(&self) -> Result<Option<Version>> {
+    pub fn get_state_snapshot_before(&self, version: Version) -> Option<(Version, HashValue)> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => restore_handler
+                .get_state_snapshot_before(version)
+                .unwrap_or(None),
+            RestoreRunMode::Verify => None,
+        }
+    }
+
+    pub fn get_in_progress_state_kv_snapshot(&self) -> Result<Option<Version>> {
         match self {
             RestoreRunMode::Restore { restore_handler } => {
-                restore_handler.get_in_progress_state_snapshot_version()
+                restore_handler.get_in_progress_state_kv_snapshot_version()
             },
             RestoreRunMode::Verify => Ok(None),
         }
@@ -269,16 +286,18 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
-            let restore_handler = Arc::new(AptosDB::open(
+            // for restore, we can always start state store with empty buffered_state since we will restore
+            let restore_handler = Arc::new(AptosDB::open_kv_only(
                 db_dir,
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
-                opt.rocksdb_opt.into(),
+                opt.rocksdb_opt.clone().into(),
                 false,
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )?)
             .get_restore_handler();
+
             RestoreRunMode::Restore { restore_handler }
         } else {
             RestoreRunMode::Verify

@@ -167,10 +167,12 @@ impl MockMonitoringServer {
         let peer_manager_request_receiver = self.get_request_receiver(network_id);
 
         // Verify that there is no request pending
-        assert!(peer_manager_request_receiver
+        let pending_request = peer_manager_request_receiver
             .select_next_some()
-            .now_or_never()
-            .is_none());
+            .now_or_never();
+        if let Some(pending_request) = pending_request {
+            panic!("Unexpected pending request: {:?}", pending_request);
+        }
     }
 
     /// Gets the request receiver for the specified network

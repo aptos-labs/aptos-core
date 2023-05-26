@@ -15,6 +15,7 @@ export enum AptosErrorCode {
     TRANSACTION_NOT_FOUND = 'transaction_not_found',
     TABLE_ITEM_NOT_FOUND = 'table_item_not_found',
     BLOCK_NOT_FOUND = 'block_not_found',
+    STATE_VALUE_NOT_FOUND = 'state_value_not_found',
     VERSION_PRUNED = 'version_pruned',
     BLOCK_PRUNED = 'block_pruned',
     INVALID_INPUT = 'invalid_input',

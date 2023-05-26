@@ -73,6 +73,11 @@ pub enum VMStatus {
     },
 }
 
+/// Helper function to return `Some(s.into::<String>())` to fit in `ExecutionFailure::message`.
+pub fn err_msg<S: Into<String>>(s: S) -> Option<String> {
+    Some(s.into())
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
+    HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use aptos_network::ProtocolId;
 use once_cell::sync::Lazy;
@@ -11,6 +12,18 @@ use once_cell::sync::Lazy;
 /// Useful metric constants for the storage service
 pub const LRU_CACHE_HIT: &str = "lru_cache_hit";
 pub const LRU_CACHE_PROBE: &str = "lru_cache_probe";
+pub const SUBSCRIPTION_EVENT_ADD: &str = "subscription_event_add";
+pub const SUBSCRIPTION_EVENT_EXPIRE: &str = "subscription_event_expire";
+
+/// Gauge for tracking the number of actively ignored peers
+pub static IGNORED_PEER_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_storage_service_server_ignored_peer_count",
+        "Gauge for tracking the number of actively ignored peers",
+        &["network_id"]
+    )
+    .unwrap()
+});
 
 /// Counter for lru cache events in the storage service (server-side)
 pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -83,6 +96,16 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
+/// Counter for subscription request events
+pub static SUBSCRIPTION_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_subscription_event",
+        "Counters related to subscription events",
+        &["protocol", "event"]
+    )
+    .unwrap()
+});
+
 /// Increments the network frame overflow counter for the given response
 pub fn increment_network_frame_overflow(response_type: &str) {
     NETWORK_FRAME_OVERFLOW
@@ -95,6 +118,11 @@ pub fn increment_counter(counter: &Lazy<IntCounterVec>, protocol: ProtocolId, la
     counter
         .with_label_values(&[protocol.as_str(), &label])
         .inc();
+}
+
+/// Sets the gauge with the specific label and value
+pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: &str, value: u64) {
+    counter.with_label_values(&[label]).set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.

@@ -44,14 +44,7 @@ Follow the below detailed steps:
     
     **Using Aptos-core source code**
     
-    Clone the [aptos-labs/aptos-core](https://github.com/aptos-labs/aptos-core) repo. For example:
-
-    ```bash
-    git clone https://github.com/aptos-labs/aptos-core.git
-    cd aptos-core
-    ./scripts/dev_setup.sh
-    source ~/.cargo/env
-    ```
+    See [Building Aptos From Source](../../guides/building-from-source.md)
 
     **Using Docker**
 
@@ -68,7 +61,7 @@ Follow the below detailed steps:
 
   **Using Aptos-core source code**
   
-  Run the [Aptos CLI](../../cli-tools/aptos-cli-tool/use-aptos-cli.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
+  Run the [Aptos CLI](../../tools/aptos-cli-tool/use-aptos-cli.md) `aptos` to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
 
   :::tip
 

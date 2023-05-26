@@ -88,7 +88,11 @@ impl ApiSpecificConfig {
     }
 }
 
-pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestContext {
+pub fn new_test_context(
+    test_name: String,
+    node_config: NodeConfig,
+    use_db_with_indexer: bool,
+) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -128,8 +132,6 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     assert!(ret);
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
-
-    let node_config = NodeConfig::default();
 
     let context = Context::new(
         ChainId::test(),
@@ -229,8 +231,8 @@ impl TestContext {
         self.context.last_updated_gas_schedule()
     }
 
-    pub fn last_updated_gas_estimation(&self) -> Option<u64> {
-        self.context.last_updated_gas_estimation()
+    pub fn last_updated_gas_estimation_cache_size(&self) -> usize {
+        self.context.last_updated_gas_estimation_cache_size()
     }
 
     /// Prune well-known excessively large entries from a resource array response.
@@ -954,7 +956,7 @@ impl TestContext {
         self.fake_time_usecs += (Duration::from_millis(500).as_micros()) as u64;
         BlockMetadata::new(
             id,
-            0,
+            1,
             round,
             self.validator_owner,
             vec![0],

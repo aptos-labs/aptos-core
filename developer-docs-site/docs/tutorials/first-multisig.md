@@ -124,7 +124,7 @@ Bob:   0x6305101f8f3ad5a75254a8fa74b0d9866756abbf359f9e4f2b54247917caf8c52798a36
 
 ### Step 6.2: Submit the multisig transaction
 
-Next generate a [multisig authenticator](../guides/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
+Next generate a [multisig authenticator](../integration/sign-a-transaction.md#multisignature-transactions) and submit the transaction:
 
 
 ```python title="multisig.py snippet"

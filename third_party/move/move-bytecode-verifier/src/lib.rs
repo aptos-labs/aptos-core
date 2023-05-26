@@ -23,6 +23,7 @@ pub mod limits;
 pub mod loop_summary;
 pub mod script_signature;
 pub mod signature;
+pub mod signature_v2;
 pub mod struct_defs;
 pub mod verifier;
 

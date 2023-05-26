@@ -20,7 +20,8 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
-        pragma verify = false; // TODO: set to false because of timeout (property proved).
+        // Not verified when verify_duration_estimate > vc_timeout
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
         include StakingContractExistsAbortsIf;

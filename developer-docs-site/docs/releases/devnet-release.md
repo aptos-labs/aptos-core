@@ -11,16 +11,16 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos SDK
 
-Aptos SDK Release v1.7.2
+Aptos SDK Release v1.8.5
 
 ## Aptos CLI
 
 |Release | Git Tag | Commit Hash|
 |---|---|---|
-|[Aptos CLI Release v1.0.9](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.9)| `aptos-cli-v1.0.9` | `f7eae8b477e6fa9cf7dc036739755c3d82138136` |
+|[Aptos CLI Release v1.0.13](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-cli-v1.0.13)| `aptos-cli-v1.0.13` | `7f864d4af722bf538f1a904e321130a261e92b3a` |
 
 ## Aptos Node
 
 |Devnet Branch Commit | Docker Image Tag | Docker Image Digest | genesis.blob SHA-256 | Waypoint | Chain ID|
 |---|---|---|---|---|---|
-|`d952a8e53cba95c6afac010e46dbe456f054d9a0`| `devnet_d952a8e53cba95c6afac010e46dbe456f054d9a0` | `sha256:f952dc702ca74310f4b353a1f48924e62dc47d7ae39bdfdf87b507bacad38edc` | `sha256: 6e4c484222b94c52b6cc20bad2c40c4be7c8fac14d50f9cfb105e739abeebfe4`| `0:20a7f404fbbd5de647e28c967f5fc95b9547a25f57f949261f8157efea81ed3c` | 49 |
+|`57f8b499aead5adf38276acb585cd2c0de398568`| `devnet_57f8b499aead5adf38276acb585cd2c0de398568` | `sha256:d1e9adefdf8b7308008cea9d7cb5a791ac1936ba10363c14ca2cb18368078a1c` | `sha256: 3e71b9694e165b2f193d737c4b0eeb71129effa8338aa78f33be59daf8830a9a`| `0:5b7611a645bd3de8f884d41f60203a80f2fdc7f51f04558a12b71eb5e36c4ca8` | 58 |

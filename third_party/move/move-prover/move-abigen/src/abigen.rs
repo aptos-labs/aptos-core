@@ -2,11 +2,11 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use heck::SnakeCase;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
-use move_binary_format::file_format::Ability;
+use move_binary_format::{file_format::Ability, CompiledModule};
 use move_bytecode_verifier::script_signature;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
@@ -15,6 +15,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
 };
 use move_model::{
+    ast::Address,
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
     ty,
 };
@@ -123,10 +124,10 @@ impl<'env> Abigen<'env> {
         let script_iter: Vec<_> = if module_env.is_script_module() {
             module_env.get_functions().collect()
         } else {
+            let module = Self::get_compiled_module(module_env)?;
             module_env
                 .get_functions()
                 .filter(|func| {
-                    let module = module_env.get_verified_module();
                     let func_name = module_env.symbol_pool().string(func.get_name());
                     let func_ident = IdentStr::new(&func_name).unwrap();
                     // only pick up script functions that also have a script-callable signature.
@@ -177,7 +178,7 @@ impl<'env> Abigen<'env> {
         let name = symbol_pool.string(func.get_name()).to_string();
         let doc = func.get_doc().to_string();
         let ty_args = func
-            .get_named_type_parameters()
+            .get_type_parameters()
             .iter()
             .map(|ty_param| {
                 TypeArgumentABI::new(symbol_pool.string(ty_param.0).to_string().to_snake_case())
@@ -215,9 +216,10 @@ impl<'env> Abigen<'env> {
             )))
         } else {
             // This is a script function, so no code. But we need to include the module ID
+            let module = Self::get_compiled_module(module_env)?;
             Ok(ScriptABI::ScriptFunction(ScriptFunctionABI::new(
                 name,
-                module_env.get_verified_module().self_id(),
+                module.self_id(),
                 doc,
                 ty_args,
                 args,
@@ -297,9 +299,16 @@ impl<'env> Abigen<'env> {
                         };
                         type_params.push(type_param);
                     }
+                    let address = if let Address::Numerical(a) = &struct_module_env.self_address() {
+                        *a
+                    } else {
+                        bail!("expected no symbolic addresses")
+                    };
                     TypeTag::Struct(Box::new(StructTag {
-                        address: *struct_module_env.self_address(),
-                        module: struct_module_env.get_identifier(),
+                        address,
+                        module: struct_module_env
+                            .get_identifier()
+                            .ok_or_else(|| anyhow!("expected compiled module"))?,
                         name: struct_module_env
                             .get_struct(*struct_id)
                             .get_identifier()
@@ -322,5 +331,13 @@ impl<'env> Abigen<'env> {
             | Reference(_, _) => return Ok(None),
         };
         Ok(Some(tag))
+    }
+
+    fn get_compiled_module<'a>(
+        module_env: &'a ModuleEnv<'a>,
+    ) -> anyhow::Result<&'a CompiledModule> {
+        module_env
+            .get_verified_module()
+            .ok_or_else(|| anyhow!("no attached compiled module"))
     }
 }

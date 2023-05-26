@@ -143,7 +143,7 @@ fn insert_coin_activities(
     Ok(())
 }
 
-fn insert_coin_infos(
+pub fn insert_coin_infos(
     conn: &mut PgConnection,
     item_to_insert: &[CoinInfo],
 ) -> Result<(), diesel::result::Error> {

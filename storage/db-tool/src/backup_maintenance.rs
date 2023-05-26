@@ -32,7 +32,14 @@ pub struct CompactionOpt {
     #[clap(flatten)]
     pub storage: DBToolStorageOpt,
     #[clap(flatten)]
-    concurrent_downloads: ConcurrentDownloadsOpt,
+    pub concurrent_downloads: ConcurrentDownloadsOpt,
+    /// Specify how many seconds to keep compacted metadata file before moving them to backup folder
+    #[clap(
+        long,
+        default_value = "86400",
+        help = "Remove metadata files replaced by compaction after specified seconds. They were not replaced right away after compaction in case they are being read then."
+    )]
+    pub remove_compacted_file_after: u64,
 }
 
 #[derive(Parser)]
@@ -52,6 +59,7 @@ impl Command {
                     opt.metadata_cache_opt,
                     opt.storage.init_storage().await?,
                     opt.concurrent_downloads.get(),
+                    opt.remove_compacted_file_after,
                 );
                 compactor.run().await?
             },

@@ -14,9 +14,7 @@ use move_abigen::AbigenOptions;
 use move_compiler::shared::NumericalAddress;
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
-use move_model::{
-    model::VerificationScope, options::ModelBuilderOptions, simplifier::SimplificationPass,
-};
+use move_model::{model::VerificationScope, options::ModelBuilderOptions};
 use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
 use move_stackless_bytecode::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
@@ -26,7 +24,6 @@ use simplelog::{
 };
 use std::{
     collections::BTreeMap,
-    str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -57,8 +54,6 @@ pub struct Options {
     pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
-    /// Whether to run the internal reference escape analysis instead of the prover
-    pub run_escape: bool,
     /// The paths to the Move sources.
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
@@ -68,8 +63,6 @@ pub struct Options {
     pub move_named_address_values: Vec<String>,
     /// Whether to run experimental pipeline
     pub experimental_pipeline: bool,
-    /// Options for printing out modules and functions reachable by script functions
-    pub script_reach: bool,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
@@ -96,7 +89,6 @@ impl Default for Options {
             run_abigen: false,
             run_errmapgen: false,
             run_read_write_set: false,
-            run_escape: false,
             verbosity_level: LevelFilter::Info,
             move_sources: vec![],
             move_deps: vec![],
@@ -108,7 +100,6 @@ impl Default for Options {
             abigen: AbigenOptions::default(),
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
-            script_reach: false,
         }
     }
 }
@@ -660,13 +651,6 @@ impl Options {
         if matches.is_present("ignore-pragma-opaque-internal-only") {
             options.model_builder.ignore_pragma_opaque_internal_only = true;
         }
-        if matches.occurrences_of("simplification-pipeline") > 0 {
-            for name in get_vec("simplification-pipeline") {
-                let pass = SimplificationPass::from_str(&name)
-                    .map_err(|e| anyhow!("Unknown simplification pass: {}", e))?;
-                options.model_builder.simplification_pipeline.push(pass);
-            }
-        }
         if matches.is_present("docgen") {
             options.run_docgen = true;
         }
@@ -685,9 +669,6 @@ impl Options {
         }
         if matches.is_present("read-write-set") {
             options.run_read_write_set = true;
-        }
-        if matches.is_present("escape") {
-            options.run_escape = true;
         }
         if matches.is_present("trace") {
             options.prover.auto_trace_level = AutoTraceLevel::VerifiedFunction;
@@ -772,10 +753,6 @@ impl Options {
                 fun_name = &fun_name[i + 2..];
             }
             options.backend.z3_trace_file = Some(format!("{}.z3log", fun_name));
-        }
-
-        if matches.is_present("script-reach") {
-            options.script_reach = true;
         }
 
         if matches.is_present("ban-int-2-bv") {

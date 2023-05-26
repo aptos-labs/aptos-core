@@ -12,10 +12,9 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Token {
     collection: AccountAddress,
-    collection_id: u64,
+    index: u64,
     description: String,
     name: String,
-    creation_name: Option<String>,
     uri: String,
     mutation_events: EventHandle,
 }
@@ -42,7 +41,7 @@ fn test_basic_token() {
 
     let result = h.publish_package_with_options(
         &account,
-        &common::test_dir_path("../../../move-examples/token_objects"),
+        &common::test_dir_path("../../../move-examples/token_objects/hero"),
         build_options,
     );
     assert_success!(result);

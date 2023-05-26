@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::{
-    new_sharded_schema_batch,
+    new_sharded_kv_schema_batch,
     state_restore::StateSnapshotRestore,
     test_helper::{arb_state_kv_sets, update_store},
     AptosDB,
@@ -18,6 +18,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
 use proptest::{collection::hash_map, prelude::*};
+use std::collections::HashMap;
 
 fn put_value_set(
     state_store: &StateStore,
@@ -25,9 +26,13 @@ fn put_value_set(
     version: Version,
     base_version: Option<Version>,
 ) -> HashValue {
+    let mut sharded_value_set = arr![HashMap::new(); 16];
     let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(key, value)| (key.clone(), Some(value.clone())))
+        .map(|(key, value)| {
+            sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
+            (key, Some(value))
+        })
         .collect();
     let jmt_updates = jmt_updates(&value_set);
 
@@ -35,12 +40,13 @@ fn put_value_set(
         .merklize_value_set(jmt_update_refs(&jmt_updates), None, version, base_version)
         .unwrap();
     let ledger_batch = SchemaBatch::new();
-    let sharded_state_kv_batches = new_sharded_schema_batch();
+    let sharded_state_kv_batches = new_sharded_kv_schema_batch();
     state_store
         .put_value_sets(
-            vec![&value_set],
+            vec![&sharded_value_set],
             version,
             StateStorageUsage::new_untracked(),
+            None,
             &ledger_batch,
             &sharded_state_kv_batches,
         )
@@ -332,7 +338,7 @@ proptest! {
         let store2 = &db2.state_store;
 
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
@@ -430,12 +436,11 @@ proptest! {
         let store2 = &db2.state_store;
         let max_hash = HashValue::new([0xff; HashValue::LENGTH]);
         let mut restore =
-            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */).unwrap();
+            StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
 
         let dummy_state_key = StateKey::raw(vec![]);
-        let (batch, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
-        // TODO(grao): Support sharding here.
-        store2.state_merkle_db.metadata_db().write_schemas(batch).unwrap();
+        let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], None, 0, None, None).unwrap();
+        store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());
 
         let mut ordered_input: Vec<_> = input

@@ -11,15 +11,17 @@ use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::interface::NetworkClientInterface;
+use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_peer_monitoring_service_server::{
-    network::PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer,
+    network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
+    PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
+use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
-use std::{sync::Arc, thread, time::Instant};
+use std::{sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -128,17 +130,18 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
 }
 
 /// Spawns a new thread for the node inspection service
-pub fn start_node_inspection_service(node_config: &NodeConfig) {
-    let node_config = node_config.clone();
-    thread::spawn(move || {
-        aptos_inspection_service::inspection_service::start_inspection_service(node_config)
-    });
+pub fn start_node_inspection_service(
+    node_config: &NodeConfig,
+    peers_and_metadata: Arc<PeersAndMetadata>,
+) {
+    aptos_inspection_service::start_inspection_service(node_config.clone(), peers_and_metadata)
 }
 
 /// Starts the peer monitoring service and returns the runtime
 pub fn start_peer_monitoring_service(
     node_config: &NodeConfig,
     network_interfaces: ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
+    db_reader: Arc<dyn DbReader>,
 ) -> Runtime {
     // Get the network client and events
     let network_client = network_interfaces.network_client;
@@ -156,6 +159,8 @@ pub fn start_peer_monitoring_service(
         peer_monitoring_service_runtime.handle().clone(),
         peer_monitoring_network_events,
         network_client.get_peers_and_metadata(),
+        StorageReader::new(db_reader),
+        TimeService::real(),
     );
     peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
 

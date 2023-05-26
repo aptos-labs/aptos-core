@@ -5,11 +5,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    ast::{ModuleName, Spec},
-    builder::model_builder::ModelBuilder,
-    model::{FunId, FunctionData, GlobalEnv, Loc, ModuleData, ModuleId, StructId},
+    ast::ModuleName,
+    builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
+    model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
     options::ModelBuilderOptions,
-    simplifier::{SpecRewriter, SpecRewriterPipeline},
 };
 use builder::module_builder::ModuleBuilder;
 use codespan::ByteIndex;
@@ -18,20 +17,18 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::warn;
 use move_binary_format::{
-    access::ModuleAccess,
     check_bounds::BoundsChecker,
     file_format::{
         self_module_name, AddressIdentifierIndex, CompiledModule, CompiledScript,
-        FunctionDefinition, FunctionDefinitionIndex, FunctionHandle, FunctionHandleIndex,
-        IdentifierIndex, ModuleHandle, ModuleHandleIndex, Signature, SignatureIndex,
-        StructDefinitionIndex, Visibility,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
+        ModuleHandleIndex, Signature, SignatureIndex, Visibility,
     },
 };
 use move_compiler::{
     self,
     compiled_unit::{self, AnnotatedCompiledScript, AnnotatedCompiledUnit},
     diagnostics::Diagnostics,
-    expansion::ast::{self as E, Address, ModuleIdent, ModuleIdent_},
+    expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
     parser::ast::{self as P, ModuleName as ParserModuleName},
     shared::{
@@ -44,7 +41,6 @@ use move_compiler::{
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::location::sp;
 use move_symbol_pool::Symbol as MoveSymbol;
-use num::{BigUint, Num};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     rc::Rc,
@@ -59,7 +55,6 @@ pub mod intrinsics;
 pub mod model;
 pub mod options;
 pub mod pragmas;
-pub mod simplifier;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -270,6 +265,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     }
 
     // Step 5: Run the compiler from instrumented expansion AST fully to the compiled units
+
     let units = match compiler
         .at_expansion(expansion_ast.clone())
         .run::<PASS_COMPILATION>()
@@ -299,7 +295,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Now that it is known that the program has no errors, run the spec checker on verified units
     // plus expanded AST. This will populate the environment including any errors.
-    run_spec_checker(&mut env, units, expansion_ast);
+    run_model_compiler(&mut env, units, expansion_ast);
     Ok(env)
 }
 
@@ -316,54 +312,6 @@ fn collect_related_modules_recursive<'a>(
     for (_, next_mident, _) in &mdef.immediate_neighbors {
         collect_related_modules_recursive(next_mident, modules, visited_modules);
     }
-}
-
-/// Build a `GlobalEnv` from a collection of `CompiledModule`'s. The `modules` list must be
-/// topologically sorted by the dependency relation (i.e., a child node in the dependency graph
-/// should appear earlier in the vector than its parents).
-pub fn run_bytecode_model_builder<'a>(
-    modules: impl IntoIterator<Item = &'a CompiledModule>,
-) -> anyhow::Result<GlobalEnv> {
-    let mut env = GlobalEnv::new();
-    for (i, m) in modules.into_iter().enumerate() {
-        let id = m.self_id();
-        let addr = addr_to_big_uint(id.address());
-        let module_name = ModuleName::new(addr, env.symbol_pool().make(id.name().as_str()));
-        let module_id = ModuleId::new(i);
-        let mut module_data = ModuleData::stub(module_name.clone(), module_id, m.clone());
-
-        // add functions
-        for (i, def) in m.function_defs().iter().enumerate() {
-            let def_idx = FunctionDefinitionIndex(i as u16);
-            let name = m.identifier_at(m.function_handle_at(def.function).name);
-            let symbol = env.symbol_pool().make(name.as_str());
-            let fun_id = FunId::new(symbol);
-            let data = FunctionData::stub(symbol, def_idx, def.function);
-            module_data.function_data.insert(fun_id, data);
-            module_data.function_idx_to_id.insert(def_idx, fun_id);
-        }
-
-        // add structs
-        for (i, def) in m.struct_defs().iter().enumerate() {
-            let def_idx = StructDefinitionIndex(i as u16);
-            let name = m.identifier_at(m.struct_handle_at(def.struct_handle).name);
-            let symbol = env.symbol_pool().make(name.as_str());
-            let struct_id = StructId::new(symbol);
-            let data = env.create_move_struct_data(
-                m,
-                def_idx,
-                symbol,
-                Loc::default(),
-                Vec::default(),
-                Spec::default(),
-            );
-            module_data.struct_data.insert(struct_id, data);
-            module_data.struct_idx_to_id.insert(def_idx, struct_id);
-        }
-
-        env.module_data.push(module_data);
-    }
-    Ok(env)
 }
 
 fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
@@ -504,7 +452,11 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
 }
 
 #[allow(deprecated)]
-fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut eprog: E::Program) {
+fn run_model_compiler(
+    env: &mut GlobalEnv,
+    units: Vec<AnnotatedCompiledUnit>,
+    mut eprog: E::Program,
+) {
     let mut builder = ModelBuilder::new(env);
 
     // Merge the compiled units with source ASTs, preserving the order of the compiled
@@ -555,7 +507,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                 };
 
                 // Convert the script into a module.
-                let address = Address::Numerical(
+                let address = E::Address::Numerical(
                     None,
                     sp(expanded_script.loc, NumericalAddress::DEFAULT_ERROR_ADDRESS),
                 );
@@ -595,13 +547,12 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
         );
         let module_id = ModuleId::new(module_count);
         let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
-        module_translator.translate(
-            loc,
-            expanded_module,
+        let compiled_module = BytecodeModule {
             compiled_module,
             source_map,
             function_infos,
-        );
+        };
+        module_translator.translate(loc, expanded_module, Some(compiled_module));
     }
 
     // Populate GlobalEnv with model-level information
@@ -609,19 +560,6 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
 
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
-
-    // Apply simplification passes
-    run_spec_simplifier(env);
-}
-
-fn run_spec_simplifier(env: &mut GlobalEnv) {
-    let options = env
-        .get_extension::<ModelBuilderOptions>()
-        .expect("options for model builder");
-    let mut rewriter = SpecRewriterPipeline::new(&options.simplification_pipeline);
-    rewriter
-        .override_with_rewrite(env)
-        .unwrap_or_else(|e| panic!("Failed to run spec simplification: {}", e))
 }
 
 fn retrospective_lambda_lifting(
@@ -699,18 +637,6 @@ fn retrospective_lambda_lifting(
 
 // =================================================================================================
 // Helpers
-
-/// Converts an address identifier to a number representing the address.
-pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
-    BigUint::from_str_radix(&addr.to_string(), 16).unwrap()
-}
-
-/// Converts a biguint into an account address
-pub fn big_uint_to_addr(i: &BigUint) -> AccountAddress {
-    // TODO: do this in more efficient way (e.g., i.to_le_bytes() and pad out the resulting Vec<u8>
-    // to ADDRESS_LENGTH
-    AccountAddress::from_hex_literal(&format!("{:#x}", i)).unwrap()
-}
 
 pub fn parse_addresses_from_options(
     named_addr_strings: Vec<String>,
@@ -1185,17 +1111,4 @@ fn downgrade_sequence_inlining_to_expansion(seq: &T::Sequence) -> E::Sequence {
         rewritten_seq.push_back(sp(stmt.loc, rewritten_stmt));
     }
     rewritten_seq
-}
-
-// =================================================================================================
-// Crate Helpers
-
-/// Helper to project the 1st element from a vector of pairs.
-pub(crate) fn project_1st<T: Clone, R>(v: &[(T, R)]) -> Vec<T> {
-    v.iter().map(|(x, _)| x.clone()).collect()
-}
-
-/// Helper to project the 2nd element from a vector of pairs.
-pub(crate) fn project_2nd<T, R: Clone>(v: &[(T, R)]) -> Vec<R> {
-    v.iter().map(|(_, x)| x.clone()).collect()
 }

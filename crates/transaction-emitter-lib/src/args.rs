@@ -6,7 +6,8 @@ use aptos::common::types::EncodingType;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::chain_id::ChainId;
-use clap::{ArgEnum, ArgGroup, Parser};
+use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -102,24 +103,6 @@ impl ClusterArgs {
     }
 }
 
-#[derive(Debug, Copy, Clone, ArgEnum, Deserialize, Parser, Serialize)]
-pub enum TransactionTypeArg {
-    CoinTransfer,
-    AccountGeneration,
-    AccountGenerationLargePool,
-    NftMintAndTransfer,
-    PublishPackage,
-    CustomFunctionLargeModuleWorkingSet,
-    CreateNewResource,
-    NoOp,
-}
-
-impl Default for TransactionTypeArg {
-    fn default() -> Self {
-        TransactionTypeArg::CoinTransfer
-    }
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 #[clap(group(
     ArgGroup::new("mode")
@@ -145,9 +128,6 @@ pub struct EmitArgs {
     #[clap(long, default_value = "60")]
     pub duration: u64,
 
-    #[clap(long, help = "Percentage of invalid txs", default_value = "0")]
-    pub invalid_tx: usize,
-
     #[clap(
         long,
         arg_enum,
@@ -156,6 +136,21 @@ pub struct EmitArgs {
         ignore_case = true
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
+
+    /// Number of copies of the modules that will be published,
+    /// under separate accounts, creating independent contracts,
+    /// removing contention.
+    /// For example for NFT minting, setting to 1 will be equivalent
+    /// to minting from single collection,
+    /// setting to 20 means minting from 20 collections in parallel.
+    #[clap(long)]
+    pub module_working_set_size: Option<usize>,
+
+    /// Whether to use burner accounts for the sender.
+    /// For example when transaction can only be done once per account.
+    /// (pool needs to be populated by account-creation transactions)
+    #[clap(long)]
+    pub sender_use_account_pool: Option<bool>,
 
     #[clap(long, min_values = 0)]
     pub transaction_weights: Vec<usize>,

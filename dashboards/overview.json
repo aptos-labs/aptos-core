@@ -97,7 +97,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -155,7 +155,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -213,7 +213,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -236,7 +236,7 @@
     {
       "colorBackground": false,
       "colorValue": false,
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "decimals": 0,
       "editable": false,
       "error": false,
@@ -272,12 +272,12 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "location": "US",
@@ -335,7 +335,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -388,7 +388,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -447,7 +447,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -470,7 +470,7 @@
     {
       "colorBackground": false,
       "colorValue": false,
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "decimals": 0,
       "editable": false,
       "error": false,
@@ -504,12 +504,12 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "location": "US",
@@ -567,7 +567,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -588,7 +588,7 @@
       "valueName": ""
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "continuous-GrYlRd" },
@@ -612,12 +612,13 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 0,
           "location": "US",
@@ -673,7 +674,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -696,7 +697,7 @@
       "valueName": ""
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "continuous-GrYlRd" },
@@ -721,12 +722,13 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "limit": 10, "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "location": "US",
@@ -745,7 +747,7 @@
       "type": "bargauge"
     },
     {
-      "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+      "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
       "description": "Almost accurate number of running public full nodes.",
       "fieldConfig": {
         "defaults": {
@@ -765,16 +767,16 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
-          "datasource": { "type": "grafana-bigquery-datasource", "uid": "P67060240DC0051B8" },
+          "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
           "editorMode": "code",
           "format": 1,
           "location": "US",
           "project": "analytics-test-345723",
           "rawQuery": true,
-          "rawSql": "SELECT count(DISTINCT peer_id) as unique_connected_pfns FROM `analytics-test-345723.aptos_node_telemetry.custom_events` WHERE $__timeFilter(event_timestamp) and (role_type = \"Unknown\" or role_type = \"PublicFullNode\");",
+          "rawSql": "SELECT count(DISTINCT peer_id) as unique_connected_pfns \nFROM `analytics-test-345723.aptos_node_telemetry.custom_events` \nWHERE $__timeFilter(event_timestamp) and (role_type in (\"Unknown\", \"PublicFullNode\",\"UnknownFullNode\"))\nand if(chain_id='1','mainnet',if(chain_id='2','testnet',null)) = \"$chain_name\";",
           "refId": "A",
           "sql": {
             "columns": [{ "parameters": [], "type": "function" }],
@@ -817,7 +819,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -877,7 +879,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -925,7 +927,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -967,7 +969,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -990,7 +992,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
         },
@@ -999,8 +1001,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 11, "y": 10 },
       "id": 72,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1066,7 +1072,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1092,7 +1098,7 @@
       "error": false,
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1107,8 +1113,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 19, "y": 10 },
       "id": 142,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1146,7 +1156,7 @@
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "none"
@@ -1357,7 +1367,7 @@
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
               "unit": "none"
@@ -1402,7 +1412,7 @@
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false },
+              "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
               "mappings": [],
               "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] }
             },
@@ -1496,7 +1506,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.2-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1712,7 +1722,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1778,7 +1788,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1965,7 +1975,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2030,7 +2040,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2094,7 +2104,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2179,7 +2189,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2254,7 +2264,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2319,7 +2329,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2383,7 +2393,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2468,7 +2478,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.0-cloud.5.a016665c",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2904,7 +2914,13 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
@@ -2920,7 +2936,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "p50",
@@ -2930,7 +2946,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p90",
           "range": true,
@@ -2939,7 +2955,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p99",
           "range": true,
@@ -3540,8 +3556,8 @@
       "type": "barchart"
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 37,
+  "refresh": false,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
@@ -3549,7 +3565,11 @@
       {
         "allFormat": "",
         "allValue": "",
-        "current": { "selected": false, "text": "VictoriaMetrics Global", "value": "VictoriaMetrics Global" },
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -3566,10 +3586,23 @@
         "type": "datasource"
       },
       {
+        "description": "BigQuery data source",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "BigQuery",
+        "options": [],
+        "query": "grafana-bigquery-datasource",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "allFormat": "",
         "allValue": ".*",
         "current": { "selected": false, "text": "vmagent", "value": "vmagent" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -3615,7 +3648,7 @@
         "allFormat": "",
         "allValue": ".*",
         "current": { "selected": false, "text": "All", "value": "$__all" },
-        "datasource": { "type": "prometheus", "uid": "Zu4MxH4Vk" },
+        "datasource": { "type": "prometheus", "uid": "${Datasource}" },
         "definition": "",
         "hide": 0,
         "includeAll": true,
@@ -3685,8 +3718,8 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": { "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"] },
   "timezone": "",
-  "title": "Overview",
+  "title": "overview",
   "uid": "overview",
-  "version": 288,
+  "version": 14,
   "weekStart": ""
 }
