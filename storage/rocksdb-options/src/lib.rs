@@ -13,6 +13,7 @@ pub fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
     db_opts.set_max_open_files(config.max_open_files);
     db_opts.set_max_total_wal_size(config.max_total_wal_size);
     db_opts.set_max_background_jobs(config.max_background_jobs);
+    db_opts.set_table_cache_num_shard_bits(8);
     if !readonly {
         db_opts.create_if_missing(true);
         db_opts.create_missing_column_families(true);
