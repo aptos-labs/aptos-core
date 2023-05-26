@@ -53,7 +53,7 @@ To start developing smart contracts on the Aptos blockchain, we recommend the fo
 
 - [Aptos Move Examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples)
 - [End-to-End Aptos Move Tests](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/e2e-move-tests/src/tests)
-- [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptoslabs).
+- [Move language channel](https://discord.com/channels/945856774056083548/955573698868432896) in [Aptos Discord](https://discord.gg/aptosnetwork).
 - [Aptos Move Framework](../reference/move.md).
 
 There are several IDE plugins available for Aptos and the Move language:
