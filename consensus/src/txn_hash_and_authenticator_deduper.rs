@@ -83,7 +83,7 @@ impl TxnHashAndAuthenticatorDeduper {
 mod tests {
     use crate::{
         transaction_deduper::TransactionDeduper,
-        txn_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper,
+        txn_hash_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper,
     };
     use aptos_cached_packages::aptos_stdlib;
     use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
