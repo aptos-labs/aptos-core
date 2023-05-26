@@ -418,14 +418,14 @@ pub async fn wait_for_storage_to_refresh(
     }
 }
 
-/// Advances enough time that the subscription service is able to refresh
-pub async fn wait_for_subscription_service_to_refresh(
+/// Advances enough time that the optimistic fetch service is able to refresh
+pub async fn wait_for_optimistic_fetch_service_to_refresh(
     mock_client: &mut MockClient,
     mock_time: &MockTimeService,
 ) {
     // Elapse enough time to force storage to be updated
     wait_for_storage_to_refresh(mock_client, mock_time).await;
 
-    // Elapse enough time to force the subscription thread to work
+    // Elapse enough time to force the optimistic fetch thread to work
     advance_storage_refresh_time(mock_time).await;
 }

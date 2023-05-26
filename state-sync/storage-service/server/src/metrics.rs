@@ -12,8 +12,8 @@ use once_cell::sync::Lazy;
 /// Useful metric constants for the storage service
 pub const LRU_CACHE_HIT: &str = "lru_cache_hit";
 pub const LRU_CACHE_PROBE: &str = "lru_cache_probe";
-pub const SUBSCRIPTION_EVENT_ADD: &str = "subscription_event_add";
-pub const SUBSCRIPTION_EVENT_EXPIRE: &str = "subscription_event_expire";
+pub const OPTIMISTIC_FETCH_ADD: &str = "optimistic_fetch_add";
+pub const OPTIMISTIC_FETCH_EXPIRE: &str = "optimistic_fetch_expire";
 
 /// Gauge for tracking the number of actively ignored peers
 pub static IGNORED_PEER_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -96,11 +96,11 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-/// Counter for subscription request events
-pub static SUBSCRIPTION_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
+/// Counter for optimistic fetch request events
+pub static OPTIMISTIC_FETCH_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "aptos_storage_service_server_subscription_event",
-        "Counters related to subscription events",
+        "aptos_storage_service_server_optimistic_fetch_event",
+        "Counters related to optimistic fetch events",
         &["protocol", "event"]
     )
     .unwrap()
