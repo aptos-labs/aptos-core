@@ -63,7 +63,10 @@ fn native_create_guid(
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     transaction_context.guid_counter += 1;
+    const OBJECT_FROM_TRANSACTION_GUID_ADDRESS_SCHEME: u8 = 0xFB;
+
     let mut hash_arg = Vec::new();
+    hash_arg.push(OBJECT_FROM_TRANSACTION_GUID_ADDRESS_SCHEME);
     hash_arg.extend(transaction_context.txn_hash.clone());
     hash_arg.extend(transaction_context.guid_counter.to_le_bytes().to_vec());
     let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
