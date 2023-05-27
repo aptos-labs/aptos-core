@@ -6,7 +6,7 @@ use crate::{
     metadata_storage::PersistentMetadataStorage,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
-        ErrorNotificationListener, MempoolNotificationHandler,
+        ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     storage_synchronizer::{StorageSynchronizer, StorageSynchronizerInterface},
     tests::{
@@ -515,6 +515,12 @@ fn create_storage_synchronizer(
         StateSyncDriverConfig::default().mempool_commit_ack_timeout_ms,
     );
 
+    // Create the storage service handler
+    let (storage_service_notifier, _storage_service_listener) =
+        aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+    let storage_service_notification_handler =
+        StorageServiceNotificationHandler::new(storage_service_notifier);
+
     // Create the metadata storage
     let db_path = aptos_temppath::TempPath::new();
     let metadata_storage = PersistentMetadataStorage::new(db_path.path());
@@ -527,6 +533,7 @@ fn create_storage_synchronizer(
         error_notification_sender,
         event_subscription_service.clone(),
         mempool_notification_handler,
+        storage_service_notification_handler,
         metadata_storage,
         mock_reader_writer,
         None,

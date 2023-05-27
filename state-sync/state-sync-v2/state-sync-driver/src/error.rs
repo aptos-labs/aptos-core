@@ -31,6 +31,8 @@ pub enum Error {
     InvalidPayload(String),
     #[error("Failed to notify mempool of the new commit: {0}")]
     NotifyMempoolError(String),
+    #[error("Failed to notify the storage service of the new commit: {0}")]
+    NotifyStorageServiceError(String),
     #[error("Received an old sync request for version {0}, but our committed version is: {1}")]
     OldSyncRequest(Version, Version),
     #[error("Received oneshot::canceled. The sender of a channel was dropped: {0}")]
@@ -60,6 +62,7 @@ impl Error {
             Error::IntegerOverflow(_) => "integer_overflow",
             Error::InvalidPayload(_) => "invalid_payload",
             Error::NotifyMempoolError(_) => "notify_mempool_error",
+            Error::NotifyStorageServiceError(_) => "notify_storage_service_error",
             Error::OldSyncRequest(_, _) => "old_sync_request",
             Error::SenderDroppedError(_) => "sender_dropped_error",
             Error::StorageError(_) => "storage_error",

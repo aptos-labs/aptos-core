@@ -99,6 +99,10 @@ impl MockClient {
         let storage_service_network_events =
             StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
 
+        // Create the storage service notifier and listener
+        let (_storage_service_notifier, storage_service_listener) =
+            aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
+
         // Create the storage service
         let peers_and_metadata = create_peers_and_metadata(network_ids);
         let executor = tokio::runtime::Handle::current();
@@ -110,6 +114,7 @@ impl MockClient {
             mock_time_service.clone(),
             peers_and_metadata.clone(),
             storage_service_network_events,
+            storage_service_listener,
         );
 
         // Return the client and service
