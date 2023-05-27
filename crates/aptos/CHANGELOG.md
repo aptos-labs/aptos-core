@@ -6,6 +6,14 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Add nested vector arg support
 - Updated DB bootstrap command with new DB restore features
 
+## [1.0.14] - 2023/05/25
+
+### Added
+- Recursive nested vector parsing
+- Multisig v2 governance support
+- JSON support for both input files and CLI argument input
+    - **Breaking change**: You can no longer pass in a vector like this: `--arg vector<address>:0x1,0x2`, you must do it like this: `--arg 'address:["0x1", "0x2"]'`
+
 ## [1.0.13] - 2023/04/27
 ### Fixed
 * Previously `--skip-fetch-latest-git-deps` would not actually do anything when used with `aptos move test`. This has been fixed.
