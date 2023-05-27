@@ -4,6 +4,7 @@
 pub mod aggregator;
 pub mod harness;
 pub mod stake;
+pub mod transaction_context;
 pub mod transaction_fee;
 
 use anyhow::bail;
