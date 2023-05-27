@@ -7,19 +7,16 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
-use rand::{
-    distributions::{Distribution, Standard},
-    prelude::SliceRandom,
-    rngs::StdRng,
-    Rng, RngCore, SeedableRng,
-};
+use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng, thread_rng};
 use std::{cmp::max, sync::Arc};
+use std::borrow::BorrowMut;
 
 pub struct P2PTransactionGenerator {
     rng: StdRng,
     send_amount: u64,
     txn_factory: TransactionFactory,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    accounts: Vec<Arc<RwLock<LocalAccount>>>,
     invalid_transaction_ratio: usize,
 }
 
@@ -28,6 +25,7 @@ impl P2PTransactionGenerator {
         rng: StdRng,
         send_amount: u64,
         txn_factory: TransactionFactory,
+        accounts: Vec<Arc<RwLock<LocalAccount>>>,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         invalid_transaction_ratio: usize,
     ) -> Self {
@@ -36,6 +34,7 @@ impl P2PTransactionGenerator {
             send_amount,
             txn_factory,
             all_addresses,
+            accounts,
             invalid_transaction_ratio,
         }
     }
@@ -89,6 +88,38 @@ impl P2PTransactionGenerator {
                     reqs[random_index].clone()
                 }
             },
+        }
+    }
+
+    /// Generate a given number (`num_txns`) of transactions that satisfies some constraints.
+    pub fn generate_block(&mut self, num_txns: usize, transfer_amount: u64, no_rw_conflict: bool, num_txns_per_sender: usize) -> Vec<(SignedTransaction, AccountAddress)> {
+        let num_accounts = self.accounts().len();
+        if no_rw_conflict {
+            // We need `num_txns` distinct senders and `num_txns` distinct recipients.
+            assert!(num_accounts >= num_txns * 2);
+            let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), num_txns * 2);
+            let txns = (0..num_txns).map(|i| {
+                let sender = self.accounts[indices.index(i)].write().borrow_mut();
+                let recipient = self.accounts[indices.index(num_txns + i)].read().address();
+                let txn = self.gen_single_txn(sender, &recipient, transfer_amount, &self.txn_factory);
+                (txn, recipient)
+            }).collect();
+            txns
+        } else {
+            assert_eq!(0, num_txns % num_txns_per_sender);
+            let num_senders = num_txns / num_txns_per_sender;
+            assert!(num_accounts >= num_senders);
+            let txns = (0..num_senders).flat_map(|_| {
+                let sender_idx = self.rng.gen_range(0, num_accounts);
+                let sender = self.accounts[sender_idx].write().borrow_mut();
+                (0..num_txns_per_sender).map(||{
+                    let recipient_idx = self.rng.gen_range(0, num_accounts);
+                    let recipient = self.accounts[recipient_idx].read().address();
+                    let txn = self.gen_single_txn(sender, &recipient, transfer_amount, &self.txn_factory);
+                    (txn, recipient)
+                })
+            }).collect();
+            txns
         }
     }
 }
@@ -191,6 +222,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             StdRng::from_entropy(),
             self.amount,
             self.txn_factory.clone(),
+            vec![],
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
         ))

@@ -32,6 +32,12 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
+use std::ops::Deref;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use aptos_infallible::RwLock;
+use aptos_transaction_generator_lib::p2p_transaction_generator::{P2PTransactionGenerator, P2PTransactionGeneratorCreator};
+use aptos_types::test_helpers::transaction_test_helpers::block;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -440,49 +446,29 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
         non_conflicting_txns: bool,
     ) {
+        let transfer_amount = 1;
+        let all_signers = self.main_signer_accounts.as_ref().unwrap().accounts().iter().map(|account| account.clone()).collect::<Vec<_>>();
+        let mut txn_gen = P2PTransactionGenerator::new(StdRng::from_entropy(), transfer_amount, self.transaction_factory.clone(), all_signers, Arc::new(RwLock::new(vec![])), 0);
         for _ in 0..num_blocks {
-            // TODO: handle when block_size isn't divisible by transactions_per_sender
-            let mut random_account_generator: Box<dyn RandomAccountGenerator> =
-                if non_conflicting_txns {
-                    let generator = Box::new(NoConflictsAccountCache::new(
-                        self.main_signer_accounts.as_ref().unwrap(),
-                    ));
-                    assert!(
-                        generator.len() > block_size,
-                        "Not enough accounts to generate non-conflicting transactions."
-                    );
-                    generator
-                } else {
-                    Box::new(self.main_signer_accounts.as_mut().unwrap())
-                };
-            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
-                .into_iter()
-                .flat_map(|_| {
-                    let (sender, receivers) =
-                        random_account_generator.get_random_transfer_batch(transactions_per_sender);
-                    receivers
-                        .into_iter()
-                        .map(|receiver| {
-                            let amount = 1;
-                            let mut sender = sender.write();
-                            let txn = sender.sign_with_transaction_builder(
-                                self.transaction_factory.transfer(receiver, amount),
-                            );
-                            BenchmarkTransaction::new(
-                                Transaction::UserTransaction(txn),
-                                ExtraInfo::TransferInfo(TransferInfo::new(
-                                    sender.address(),
-                                    receiver,
-                                    amount,
-                                )),
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
-                .collect();
+            let transactions: Vec<BenchmarkTransaction> =
+                txn_gen.generate_block(block_size, transfer_amount, non_conflicting_txns, transactions_per_sender)
+                    .into_iter()
+                    .map(|(txn, receiver)| {
+                        let sender = txn.sender();
+                        BenchmarkTransaction::new(
+                            Transaction::UserTransaction(txn),
+                            ExtraInfo::TransferInfo(TransferInfo::new(
+                                sender,
+                                receiver,
+                                transfer_amount,
+                            )),
+                        )
+                    })
+                    .chain(once(
+                        Transaction::StateCheckpoint(HashValue::random()).into(),
+                    ))
+                    .collect();
+
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {

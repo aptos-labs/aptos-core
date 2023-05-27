@@ -28,7 +28,7 @@ mod batch_transfer;
 mod call_custom_modules;
 mod entry_points;
 mod nft_mint_and_transfer;
-mod p2p_transaction_generator;
+pub mod p2p_transaction_generator;
 pub mod publish_modules;
 mod publishing;
 mod transaction_mix_generator;
@@ -120,6 +120,11 @@ pub trait TransactionGenerator: Sync + Send {
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
 }
+
+pub trait BlockGenerator {
+    fn generate_transactions(&mut self, block_size: usize, no_rw_conflict: bool) -> Vec<SignedTransaction>;
+}
+
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
