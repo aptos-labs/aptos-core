@@ -175,8 +175,10 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.state_storage.get_usage.base_cost, "state_storage.get_usage.base", 500 * MUL],
 
+    [.aggregator.add.base, "aggregator.try_add.base", 300 * MUL],
     [.aggregator.add.base, "aggregator.add.base", 300 * MUL],
     [.aggregator.read.base, "aggregator.read.base", 300 * MUL],
+    [.aggregator.sub.base, "aggregator.try_sub.base", 300 * MUL],
     [.aggregator.sub.base, "aggregator.sub.base", 300 * MUL],
     [.aggregator.destroy.base, "aggregator.destroy.base", 500 * MUL],
     [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 500 * MUL],
