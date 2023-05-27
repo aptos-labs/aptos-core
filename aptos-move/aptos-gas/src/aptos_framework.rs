@@ -166,7 +166,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.transaction_context.get_script_hash.base, "transaction_context.get_script_hash.base", 200 * MUL],
     // Using SHA2-256's cost
     [.transaction_context.create_guid.base, "transaction_context.create_guid.base", 3000 * MUL],
-    [.transaction_context.create_guid.per_byte, { 4.. => "transaction_context.create_guid.per_byte" }, 50],
 
     [.code.request_publish.base, "code.request_publish.base", 500 * MUL],
     [.code.request_publish.per_byte, "code.request_publish.per_byte", 2 * MUL],
