@@ -201,6 +201,7 @@ dependencies = [
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
+ "once_cell",
  "rand 0.7.3",
  "regex",
  "reqwest",
