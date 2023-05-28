@@ -1105,7 +1105,7 @@ Returns the address associated with the constructor
 
 ## Function `object_from_constructor_ref`
 
-Returns an Object<T> from within a DeleteRef
+Returns an Object<T> from within a ConstructorRef
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_object_from_constructor_ref">object_from_constructor_ref</a>&lt;T: key&gt;(ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
