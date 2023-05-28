@@ -7,6 +7,7 @@ import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "a
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { aptosCoinStore, FAUCET_URL, NODE_URL } from "./common";
 import assert from "assert";
+import * as Gen from "../../src/generated";
 
 const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, TransactionPayloadMultisig } =
   TxnBuilderTypes;
@@ -28,18 +29,18 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
 
   // Step 1: Setup a 2-of-3 multisig account
   // ===========================================================================================
+  const payload: Gen.ViewRequest = {
+    function: "0x1::multisig_account::get_next_multisig_account_address",
+    type_arguments: [],
+    arguments: [owner1.address().hex()],
+  };
+  const multisigAddress = (await client.view(payload))[0] as string;
   const createMultisig = await client.generateTransaction(owner1.address(), {
     function: "0x1::multisig_account::create_with_owners",
     type_arguments: [],
     arguments: [[owner2.address().hex(), owner3.address().hex()], 2, ["Shaka"], [BCS.bcsSerializeStr("Bruh")]],
   });
   await client.generateSignSubmitWaitForTransaction(owner1, createMultisig.payload);
-  // Find the multisig account address.
-  let ownedMultisigAccounts = await client.getAccountResource(
-    owner1.address(),
-    "0x1::multisig_account::OwnedMultisigAccounts",
-  );
-  const multisigAddress = (ownedMultisigAccounts?.data as any).multisig_accounts[0];
   assert((await getSignatureThreshold(client, multisigAddress)) == 2);
   assert((await getNumberOfOwners(client, multisigAddress)) == 3);
 
