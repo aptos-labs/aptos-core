@@ -18,6 +18,8 @@ module marketplace::listing {
 
     use marketplace::fee_schedule::FeeSchedule;
 
+    friend marketplace::coin_listing;
+
     /// There exists no listing.
     const ENO_LISTING: u64 = 1;
     /// The listing is not yet live.
@@ -80,7 +82,7 @@ module marketplace::listing {
 
     /// The listing has concluded, transfer the asset and delete the listing. Returns the seller
     /// for depositing any profit and the fee schedule for the marketplaces commission.
-    public(friend) fun close(
+    public(friend) fun complete(
         object: Object<Listing>,
         recipient: address,
     ): (address, Object<FeeSchedule>) acquires Listing {
