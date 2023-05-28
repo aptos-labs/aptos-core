@@ -285,7 +285,7 @@ module aptos_framework::object {
         ref.self
     }
 
-    /// Returns an Object<T> from within a DeleteRef
+    /// Returns an Object<T> from within a ConstructorRef
     public fun object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
         address_to_object<T>(ref.self)
     }
