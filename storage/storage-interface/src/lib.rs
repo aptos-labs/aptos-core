@@ -129,15 +129,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    fn get_gas_prices(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<u64>> {
-        unimplemented!()
-    }
-
     /// See [AptosDB::get_transaction_by_hash].
     ///
     /// [AptosDB::get_transaction_by_hash]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
@@ -737,11 +728,11 @@ impl SaveTransactionsRequest {
 }
 
 pub fn jmt_updates(
-    state_updates: &HashMap<StateKey, Option<StateValue>>,
+    state_updates: &HashMap<&StateKey, Option<&StateValue>>,
 ) -> Vec<(HashValue, Option<(HashValue, StateKey)>)> {
     state_updates
         .iter()
-        .map(|(k, v_opt)| (k.hash(), v_opt.as_ref().map(|v| (v.hash(), k.clone()))))
+        .map(|(k, v_opt)| (k.hash(), v_opt.as_ref().map(|v| (v.hash(), (*k).clone()))))
         .collect()
 }
 

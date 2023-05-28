@@ -5,7 +5,7 @@ slug: "devnet-release"
 
 # Latest Devnet Release
 
-The table below contains latest release information for each Aptos component in the devnet network. We also suggest you monitor the [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel of [Aptos Discord](https://discord.gg/aptoslabs) for ongoing updates.
+The table below contains latest release information for each Aptos component in the devnet network. We also suggest you monitor the [#devnet-release](https://discord.com/channels/945856774056083548/956692649430093904) channel of [Aptos Discord](https://discord.gg/aptosnetwork) for ongoing updates.
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 

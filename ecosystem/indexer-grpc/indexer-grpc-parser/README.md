@@ -7,29 +7,20 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 ## Tutorial
 ### Prerequisite
 * A running PostgreSQL instance, with a valid database. More tutorial can be found [here](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#postgres)
-  * For example,
-    * Hostname: `the.postgres.host.name`
-    * Port: `5432`
-    * User: `dev`
-    * Password: `xxxxxxxx`
-    * Database name: `indexer_grpc`
-* A remote GRPC endpoint
-  * For example,
-    * Hostname: `the.grpc.hostname`
-    * Port: `50050`
+
 * A config YAML file
   * For exmaple, `config.yaml`
   * 
-    ```
-    indexer_grpc_address: the.grpc.hostname:50050
-    postgres_connection_string: postgres://dev:xxxxxxxx@the.postgres.host.name:5432/indexer_grpc
-    number_concurrent_processing_tasks: 20
-    processor_name: default_processor
-    health_check_port: 8080
-    indexer_grpc_auth_token: AUTH_TOKEN
+    ```yaml
+    health_check_port: 8084
+    server_config:
+        processor_name: default_processor
+        postgres_connection_string: postgresql://postgres:@localhost:5432/postgres_v2
+        indexer_grpc_data_service_addresss: 127.0.0.1:50051
+        auth_token: AUTH_TOKEN
     ```
 
-### Use docker image for existing parsers(Only for Unix/Linux)
+### Use docker image for existing parsers(Only for **Unix/Linux**)
 * Use the provided `Dockerfile` and `config.yaml`(update accordingly)
   * Build: `cd ecosystem/indexer-grpc/indexer-grpc-parser && docker build . -t indexer-processor`
   * Run: `docker run indexer-processor:latest`
@@ -41,4 +32,4 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 
 
 ### Use a custom parser
-WIP
+* Check our [indexer processors](https://github.com/aptos-labs/aptos-indexer-processors)! 

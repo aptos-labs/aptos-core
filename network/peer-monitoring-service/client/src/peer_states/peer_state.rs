@@ -24,7 +24,14 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt,
+    fmt::{Display, Formatter},
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{runtime::Handle, task::JoinHandle, time::sleep};
 
 #[derive(Clone, Debug)]
@@ -144,7 +151,7 @@ impl PeerState {
             );
 
             // Update the latency ping metrics
-            metrics::observe_value(
+            metrics::observe_value_with_label(
                 &metrics::REQUEST_LATENCIES,
                 monitoring_service_request.get_label(),
                 &peer_network_id,
@@ -160,6 +167,20 @@ impl PeerState {
         };
 
         Ok(join_handle)
+    }
+
+    /// Updates the peer metrics for the given peer state key
+    pub fn update_peer_state_metrics(
+        &self,
+        peer_network_id: &PeerNetworkId,
+        peer_state_key: &PeerStateKey,
+    ) -> Result<(), Error> {
+        let peer_state_value = self.get_peer_state_value(peer_state_key)?;
+        peer_state_value
+            .read()
+            .update_peer_state_metrics(peer_network_id);
+
+        Ok(())
     }
 
     /// Extracts peer monitoring metadata from the overall peer state
@@ -285,6 +306,20 @@ impl PeerState {
                 ))
             })?;
         Ok(Some(client_state_string))
+    }
+}
+
+impl Display for PeerState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // Display format the monitoring metadata
+        let peer_monitoring_metadata = self.extract_peer_monitoring_metadata();
+        let output_string = match peer_monitoring_metadata {
+            Ok(peer_monitoring_metadata) => format!("{}", peer_monitoring_metadata),
+            Err(error) => format!("{:?}", error),
+        };
+
+        // Write the string to the formatter
+        write!(f, "PeerState {{ {} }}", output_string)
     }
 }
 

@@ -54,7 +54,7 @@ Each stake pool can be used to vote on each proposal exactly only one time.
 
 AIPs are proposals created by the Aptos community or the Aptos Labs team to improve the operations and development of the Aptos chain. 
 To submit an AIP, create an issue in [`Aptos Foundation's GitHub repository`](https://github.com/aptos-foundation/AIPs/issues) using the [template](https://github.com/aptos-foundation/AIPs/blob/main/TEMPLATE.md)
-To keep up with new AIPs, check the `#aip-announcements` channel on [Aptos' discord channel](https://discord.gg/aptoslabs). 
+To keep up with new AIPs, check the `#aip-announcements` channel on [Aptos' discord channel](https://discord.gg/aptosnetwork). 
 To view and vote on on-chain proposals, go to [`Aptos' Governance website`](https://governance.aptosfoundation.org/). 
 
 ## Technical Implementation of Aptos Governance

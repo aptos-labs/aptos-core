@@ -1092,6 +1092,122 @@ export type Current_Collection_Ownership_View_Stream_Cursor_Value_Input = {
   owner_address?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "current_collections_v2" */
+export type Current_Collections_V2 = {
+  __typename?: 'current_collections_v2';
+  collection_id: Scalars['String'];
+  collection_name: Scalars['String'];
+  creator_address: Scalars['String'];
+  current_supply: Scalars['numeric'];
+  description: Scalars['String'];
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  max_supply?: Maybe<Scalars['numeric']>;
+  mutable_description?: Maybe<Scalars['Boolean']>;
+  mutable_uri?: Maybe<Scalars['Boolean']>;
+  table_handle_v1?: Maybe<Scalars['String']>;
+  token_standard: Scalars['String'];
+  total_minted_v2?: Maybe<Scalars['numeric']>;
+  uri: Scalars['String'];
+};
+
+/** Boolean expression to filter rows from the table "current_collections_v2". All fields are combined with a logical 'AND'. */
+export type Current_Collections_V2_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Collections_V2_Bool_Exp>>;
+  _not?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Collections_V2_Bool_Exp>>;
+  collection_id?: InputMaybe<String_Comparison_Exp>;
+  collection_name?: InputMaybe<String_Comparison_Exp>;
+  creator_address?: InputMaybe<String_Comparison_Exp>;
+  current_supply?: InputMaybe<Numeric_Comparison_Exp>;
+  description?: InputMaybe<String_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  max_supply?: InputMaybe<Numeric_Comparison_Exp>;
+  mutable_description?: InputMaybe<Boolean_Comparison_Exp>;
+  mutable_uri?: InputMaybe<Boolean_Comparison_Exp>;
+  table_handle_v1?: InputMaybe<String_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+  total_minted_v2?: InputMaybe<Numeric_Comparison_Exp>;
+  uri?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "current_collections_v2". */
+export type Current_Collections_V2_Order_By = {
+  collection_id?: InputMaybe<Order_By>;
+  collection_name?: InputMaybe<Order_By>;
+  creator_address?: InputMaybe<Order_By>;
+  current_supply?: InputMaybe<Order_By>;
+  description?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  max_supply?: InputMaybe<Order_By>;
+  mutable_description?: InputMaybe<Order_By>;
+  mutable_uri?: InputMaybe<Order_By>;
+  table_handle_v1?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+  total_minted_v2?: InputMaybe<Order_By>;
+  uri?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_collections_v2" */
+export enum Current_Collections_V2_Select_Column {
+  /** column name */
+  CollectionId = 'collection_id',
+  /** column name */
+  CollectionName = 'collection_name',
+  /** column name */
+  CreatorAddress = 'creator_address',
+  /** column name */
+  CurrentSupply = 'current_supply',
+  /** column name */
+  Description = 'description',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  MaxSupply = 'max_supply',
+  /** column name */
+  MutableDescription = 'mutable_description',
+  /** column name */
+  MutableUri = 'mutable_uri',
+  /** column name */
+  TableHandleV1 = 'table_handle_v1',
+  /** column name */
+  TokenStandard = 'token_standard',
+  /** column name */
+  TotalMintedV2 = 'total_minted_v2',
+  /** column name */
+  Uri = 'uri'
+}
+
+/** Streaming cursor of the table "current_collections_v2" */
+export type Current_Collections_V2_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Collections_V2_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Collections_V2_Stream_Cursor_Value_Input = {
+  collection_id?: InputMaybe<Scalars['String']>;
+  collection_name?: InputMaybe<Scalars['String']>;
+  creator_address?: InputMaybe<Scalars['String']>;
+  current_supply?: InputMaybe<Scalars['numeric']>;
+  description?: InputMaybe<Scalars['String']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  max_supply?: InputMaybe<Scalars['numeric']>;
+  mutable_description?: InputMaybe<Scalars['Boolean']>;
+  mutable_uri?: InputMaybe<Scalars['Boolean']>;
+  table_handle_v1?: InputMaybe<Scalars['String']>;
+  token_standard?: InputMaybe<Scalars['String']>;
+  total_minted_v2?: InputMaybe<Scalars['numeric']>;
+  uri?: InputMaybe<Scalars['String']>;
+};
+
 /** columns and relationships of "current_delegator_balances" */
 export type Current_Delegator_Balances = {
   __typename?: 'current_delegator_balances';
@@ -1470,6 +1586,126 @@ export type Current_Token_Datas_Stream_Cursor_Value_Input = {
   uri_mutable?: InputMaybe<Scalars['Boolean']>;
 };
 
+/** columns and relationships of "current_token_datas_v2" */
+export type Current_Token_Datas_V2 = {
+  __typename?: 'current_token_datas_v2';
+  collection_id: Scalars['String'];
+  /** An object relationship */
+  current_collection?: Maybe<Current_Collections_V2>;
+  description: Scalars['String'];
+  is_fungible_v2?: Maybe<Scalars['Boolean']>;
+  largest_property_version_v1?: Maybe<Scalars['numeric']>;
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  maximum?: Maybe<Scalars['numeric']>;
+  supply: Scalars['numeric'];
+  token_data_id: Scalars['String'];
+  token_name: Scalars['String'];
+  token_properties: Scalars['jsonb'];
+  token_standard: Scalars['String'];
+  token_uri: Scalars['String'];
+};
+
+
+/** columns and relationships of "current_token_datas_v2" */
+export type Current_Token_Datas_V2Token_PropertiesArgs = {
+  path?: InputMaybe<Scalars['String']>;
+};
+
+/** Boolean expression to filter rows from the table "current_token_datas_v2". All fields are combined with a logical 'AND'. */
+export type Current_Token_Datas_V2_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Token_Datas_V2_Bool_Exp>>;
+  _not?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Token_Datas_V2_Bool_Exp>>;
+  collection_id?: InputMaybe<String_Comparison_Exp>;
+  current_collection?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+  description?: InputMaybe<String_Comparison_Exp>;
+  is_fungible_v2?: InputMaybe<Boolean_Comparison_Exp>;
+  largest_property_version_v1?: InputMaybe<Numeric_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  maximum?: InputMaybe<Numeric_Comparison_Exp>;
+  supply?: InputMaybe<Numeric_Comparison_Exp>;
+  token_data_id?: InputMaybe<String_Comparison_Exp>;
+  token_name?: InputMaybe<String_Comparison_Exp>;
+  token_properties?: InputMaybe<Jsonb_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+  token_uri?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "current_token_datas_v2". */
+export type Current_Token_Datas_V2_Order_By = {
+  collection_id?: InputMaybe<Order_By>;
+  current_collection?: InputMaybe<Current_Collections_V2_Order_By>;
+  description?: InputMaybe<Order_By>;
+  is_fungible_v2?: InputMaybe<Order_By>;
+  largest_property_version_v1?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  maximum?: InputMaybe<Order_By>;
+  supply?: InputMaybe<Order_By>;
+  token_data_id?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<Order_By>;
+  token_properties?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+  token_uri?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_token_datas_v2" */
+export enum Current_Token_Datas_V2_Select_Column {
+  /** column name */
+  CollectionId = 'collection_id',
+  /** column name */
+  Description = 'description',
+  /** column name */
+  IsFungibleV2 = 'is_fungible_v2',
+  /** column name */
+  LargestPropertyVersionV1 = 'largest_property_version_v1',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  Maximum = 'maximum',
+  /** column name */
+  Supply = 'supply',
+  /** column name */
+  TokenDataId = 'token_data_id',
+  /** column name */
+  TokenName = 'token_name',
+  /** column name */
+  TokenProperties = 'token_properties',
+  /** column name */
+  TokenStandard = 'token_standard',
+  /** column name */
+  TokenUri = 'token_uri'
+}
+
+/** Streaming cursor of the table "current_token_datas_v2" */
+export type Current_Token_Datas_V2_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Token_Datas_V2_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Token_Datas_V2_Stream_Cursor_Value_Input = {
+  collection_id?: InputMaybe<Scalars['String']>;
+  description?: InputMaybe<Scalars['String']>;
+  is_fungible_v2?: InputMaybe<Scalars['Boolean']>;
+  largest_property_version_v1?: InputMaybe<Scalars['numeric']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  maximum?: InputMaybe<Scalars['numeric']>;
+  supply?: InputMaybe<Scalars['numeric']>;
+  token_data_id?: InputMaybe<Scalars['String']>;
+  token_name?: InputMaybe<Scalars['String']>;
+  token_properties?: InputMaybe<Scalars['jsonb']>;
+  token_standard?: InputMaybe<Scalars['String']>;
+  token_uri?: InputMaybe<Scalars['String']>;
+};
+
 /** columns and relationships of "current_token_ownerships" */
 export type Current_Token_Ownerships = {
   __typename?: 'current_token_ownerships';
@@ -1772,6 +2008,242 @@ export type Current_Token_Ownerships_Sum_Order_By = {
   amount?: InputMaybe<Order_By>;
   last_transaction_version?: InputMaybe<Order_By>;
   property_version?: InputMaybe<Order_By>;
+};
+
+/** columns and relationships of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2 = {
+  __typename?: 'current_token_ownerships_v2';
+  amount: Scalars['numeric'];
+  /** An object relationship */
+  current_token_data?: Maybe<Current_Token_Datas_V2>;
+  is_fungible_v2?: Maybe<Scalars['Boolean']>;
+  is_soulbound_v2?: Maybe<Scalars['Boolean']>;
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  owner_address: Scalars['String'];
+  property_version_v1: Scalars['numeric'];
+  storage_id: Scalars['String'];
+  table_type_v1?: Maybe<Scalars['String']>;
+  token_data_id: Scalars['String'];
+  token_properties_mutated_v1?: Maybe<Scalars['jsonb']>;
+  token_standard: Scalars['String'];
+};
+
+
+/** columns and relationships of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2Token_Properties_Mutated_V1Args = {
+  path?: InputMaybe<Scalars['String']>;
+};
+
+/** aggregated selection of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Aggregate = {
+  __typename?: 'current_token_ownerships_v2_aggregate';
+  aggregate?: Maybe<Current_Token_Ownerships_V2_Aggregate_Fields>;
+  nodes: Array<Current_Token_Ownerships_V2>;
+};
+
+/** aggregate fields of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Aggregate_Fields = {
+  __typename?: 'current_token_ownerships_v2_aggregate_fields';
+  avg?: Maybe<Current_Token_Ownerships_V2_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Current_Token_Ownerships_V2_Max_Fields>;
+  min?: Maybe<Current_Token_Ownerships_V2_Min_Fields>;
+  stddev?: Maybe<Current_Token_Ownerships_V2_Stddev_Fields>;
+  stddev_pop?: Maybe<Current_Token_Ownerships_V2_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Current_Token_Ownerships_V2_Stddev_Samp_Fields>;
+  sum?: Maybe<Current_Token_Ownerships_V2_Sum_Fields>;
+  var_pop?: Maybe<Current_Token_Ownerships_V2_Var_Pop_Fields>;
+  var_samp?: Maybe<Current_Token_Ownerships_V2_Var_Samp_Fields>;
+  variance?: Maybe<Current_Token_Ownerships_V2_Variance_Fields>;
+};
+
+
+/** aggregate fields of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Current_Token_Ownerships_V2_Avg_Fields = {
+  __typename?: 'current_token_ownerships_v2_avg_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** Boolean expression to filter rows from the table "current_token_ownerships_v2". All fields are combined with a logical 'AND'. */
+export type Current_Token_Ownerships_V2_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Token_Ownerships_V2_Bool_Exp>>;
+  _not?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Token_Ownerships_V2_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
+  is_fungible_v2?: InputMaybe<Boolean_Comparison_Exp>;
+  is_soulbound_v2?: InputMaybe<Boolean_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  owner_address?: InputMaybe<String_Comparison_Exp>;
+  property_version_v1?: InputMaybe<Numeric_Comparison_Exp>;
+  storage_id?: InputMaybe<String_Comparison_Exp>;
+  table_type_v1?: InputMaybe<String_Comparison_Exp>;
+  token_data_id?: InputMaybe<String_Comparison_Exp>;
+  token_properties_mutated_v1?: InputMaybe<Jsonb_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Current_Token_Ownerships_V2_Max_Fields = {
+  __typename?: 'current_token_ownerships_v2_max_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  last_transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  property_version_v1?: Maybe<Scalars['numeric']>;
+  storage_id?: Maybe<Scalars['String']>;
+  table_type_v1?: Maybe<Scalars['String']>;
+  token_data_id?: Maybe<Scalars['String']>;
+  token_standard?: Maybe<Scalars['String']>;
+};
+
+/** aggregate min on columns */
+export type Current_Token_Ownerships_V2_Min_Fields = {
+  __typename?: 'current_token_ownerships_v2_min_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  last_transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  property_version_v1?: Maybe<Scalars['numeric']>;
+  storage_id?: Maybe<Scalars['String']>;
+  table_type_v1?: Maybe<Scalars['String']>;
+  token_data_id?: Maybe<Scalars['String']>;
+  token_standard?: Maybe<Scalars['String']>;
+};
+
+/** Ordering options when selecting data from "current_token_ownerships_v2". */
+export type Current_Token_Ownerships_V2_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
+  is_fungible_v2?: InputMaybe<Order_By>;
+  is_soulbound_v2?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  table_type_v1?: InputMaybe<Order_By>;
+  token_data_id?: InputMaybe<Order_By>;
+  token_properties_mutated_v1?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_token_ownerships_v2" */
+export enum Current_Token_Ownerships_V2_Select_Column {
+  /** column name */
+  Amount = 'amount',
+  /** column name */
+  IsFungibleV2 = 'is_fungible_v2',
+  /** column name */
+  IsSoulboundV2 = 'is_soulbound_v2',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  OwnerAddress = 'owner_address',
+  /** column name */
+  PropertyVersionV1 = 'property_version_v1',
+  /** column name */
+  StorageId = 'storage_id',
+  /** column name */
+  TableTypeV1 = 'table_type_v1',
+  /** column name */
+  TokenDataId = 'token_data_id',
+  /** column name */
+  TokenPropertiesMutatedV1 = 'token_properties_mutated_v1',
+  /** column name */
+  TokenStandard = 'token_standard'
+}
+
+/** aggregate stddev on columns */
+export type Current_Token_Ownerships_V2_Stddev_Fields = {
+  __typename?: 'current_token_ownerships_v2_stddev_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Current_Token_Ownerships_V2_Stddev_Pop_Fields = {
+  __typename?: 'current_token_ownerships_v2_stddev_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Current_Token_Ownerships_V2_Stddev_Samp_Fields = {
+  __typename?: 'current_token_ownerships_v2_stddev_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** Streaming cursor of the table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Token_Ownerships_V2_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Token_Ownerships_V2_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']>;
+  is_fungible_v2?: InputMaybe<Scalars['Boolean']>;
+  is_soulbound_v2?: InputMaybe<Scalars['Boolean']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  owner_address?: InputMaybe<Scalars['String']>;
+  property_version_v1?: InputMaybe<Scalars['numeric']>;
+  storage_id?: InputMaybe<Scalars['String']>;
+  table_type_v1?: InputMaybe<Scalars['String']>;
+  token_data_id?: InputMaybe<Scalars['String']>;
+  token_properties_mutated_v1?: InputMaybe<Scalars['jsonb']>;
+  token_standard?: InputMaybe<Scalars['String']>;
+};
+
+/** aggregate sum on columns */
+export type Current_Token_Ownerships_V2_Sum_Fields = {
+  __typename?: 'current_token_ownerships_v2_sum_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  property_version_v1?: Maybe<Scalars['numeric']>;
+};
+
+/** aggregate var_pop on columns */
+export type Current_Token_Ownerships_V2_Var_Pop_Fields = {
+  __typename?: 'current_token_ownerships_v2_var_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Current_Token_Ownerships_V2_Var_Samp_Fields = {
+  __typename?: 'current_token_ownerships_v2_var_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Current_Token_Ownerships_V2_Variance_Fields = {
+  __typename?: 'current_token_ownerships_v2_variance_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+  property_version_v1?: Maybe<Scalars['Float']>;
 };
 
 /** aggregate var_pop on columns */
@@ -2737,6 +3209,10 @@ export type Query_Root = {
   current_collection_datas_by_pk?: Maybe<Current_Collection_Datas>;
   /** fetch data from the table: "current_collection_ownership_view" */
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
+  /** fetch data from the table: "current_collections_v2" */
+  current_collections_v2: Array<Current_Collections_V2>;
+  /** fetch data from the table: "current_collections_v2" using primary key columns */
+  current_collections_v2_by_pk?: Maybe<Current_Collections_V2>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
@@ -2753,12 +3229,22 @@ export type Query_Root = {
   current_token_datas: Array<Current_Token_Datas>;
   /** fetch data from the table: "current_token_datas" using primary key columns */
   current_token_datas_by_pk?: Maybe<Current_Token_Datas>;
+  /** fetch data from the table: "current_token_datas_v2" */
+  current_token_datas_v2: Array<Current_Token_Datas_V2>;
+  /** fetch data from the table: "current_token_datas_v2" using primary key columns */
+  current_token_datas_v2_by_pk?: Maybe<Current_Token_Datas_V2>;
   /** fetch data from the table: "current_token_ownerships" */
   current_token_ownerships: Array<Current_Token_Ownerships>;
   /** fetch aggregated fields from the table: "current_token_ownerships" */
   current_token_ownerships_aggregate: Current_Token_Ownerships_Aggregate;
   /** fetch data from the table: "current_token_ownerships" using primary key columns */
   current_token_ownerships_by_pk?: Maybe<Current_Token_Ownerships>;
+  /** fetch data from the table: "current_token_ownerships_v2" */
+  current_token_ownerships_v2: Array<Current_Token_Ownerships_V2>;
+  /** fetch aggregated fields from the table: "current_token_ownerships_v2" */
+  current_token_ownerships_v2_aggregate: Current_Token_Ownerships_V2_Aggregate;
+  /** fetch data from the table: "current_token_ownerships_v2" using primary key columns */
+  current_token_ownerships_v2_by_pk?: Maybe<Current_Token_Ownerships_V2>;
   /** fetch data from the table: "current_token_pending_claims" */
   current_token_pending_claims: Array<Current_Token_Pending_Claims>;
   /** fetch data from the table: "current_token_pending_claims" using primary key columns */
@@ -2978,6 +3464,20 @@ export type Query_RootCurrent_Collection_Ownership_ViewArgs = {
 };
 
 
+export type Query_RootCurrent_Collections_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Collections_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collections_V2_Order_By>>;
+  where?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Collections_V2_By_PkArgs = {
+  collection_id: Scalars['String'];
+};
+
+
 export type Query_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3037,6 +3537,20 @@ export type Query_RootCurrent_Token_Datas_By_PkArgs = {
 };
 
 
+export type Query_RootCurrent_Token_Datas_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Token_Datas_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Datas_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Token_Datas_V2_By_PkArgs = {
+  token_data_id: Scalars['String'];
+};
+
+
 export type Query_RootCurrent_Token_OwnershipsArgs = {
   distinct_on?: InputMaybe<Array<Current_Token_Ownerships_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3059,6 +3573,32 @@ export type Query_RootCurrent_Token_Ownerships_By_PkArgs = {
   owner_address: Scalars['String'];
   property_version: Scalars['numeric'];
   token_data_id_hash: Scalars['String'];
+};
+
+
+export type Query_RootCurrent_Token_Ownerships_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Token_Ownerships_V2_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Token_Ownerships_V2_By_PkArgs = {
+  owner_address: Scalars['String'];
+  property_version_v1: Scalars['numeric'];
+  storage_id: Scalars['String'];
+  token_data_id: Scalars['String'];
 };
 
 
@@ -3395,6 +3935,12 @@ export type Subscription_Root = {
   current_collection_ownership_view: Array<Current_Collection_Ownership_View>;
   /** fetch data from the table in a streaming manner : "current_collection_ownership_view" */
   current_collection_ownership_view_stream: Array<Current_Collection_Ownership_View>;
+  /** fetch data from the table: "current_collections_v2" */
+  current_collections_v2: Array<Current_Collections_V2>;
+  /** fetch data from the table: "current_collections_v2" using primary key columns */
+  current_collections_v2_by_pk?: Maybe<Current_Collections_V2>;
+  /** fetch data from the table in a streaming manner : "current_collections_v2" */
+  current_collections_v2_stream: Array<Current_Collections_V2>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
@@ -3419,6 +3965,12 @@ export type Subscription_Root = {
   current_token_datas_by_pk?: Maybe<Current_Token_Datas>;
   /** fetch data from the table in a streaming manner : "current_token_datas" */
   current_token_datas_stream: Array<Current_Token_Datas>;
+  /** fetch data from the table: "current_token_datas_v2" */
+  current_token_datas_v2: Array<Current_Token_Datas_V2>;
+  /** fetch data from the table: "current_token_datas_v2" using primary key columns */
+  current_token_datas_v2_by_pk?: Maybe<Current_Token_Datas_V2>;
+  /** fetch data from the table in a streaming manner : "current_token_datas_v2" */
+  current_token_datas_v2_stream: Array<Current_Token_Datas_V2>;
   /** fetch data from the table: "current_token_ownerships" */
   current_token_ownerships: Array<Current_Token_Ownerships>;
   /** fetch aggregated fields from the table: "current_token_ownerships" */
@@ -3427,6 +3979,14 @@ export type Subscription_Root = {
   current_token_ownerships_by_pk?: Maybe<Current_Token_Ownerships>;
   /** fetch data from the table in a streaming manner : "current_token_ownerships" */
   current_token_ownerships_stream: Array<Current_Token_Ownerships>;
+  /** fetch data from the table: "current_token_ownerships_v2" */
+  current_token_ownerships_v2: Array<Current_Token_Ownerships_V2>;
+  /** fetch aggregated fields from the table: "current_token_ownerships_v2" */
+  current_token_ownerships_v2_aggregate: Current_Token_Ownerships_V2_Aggregate;
+  /** fetch data from the table: "current_token_ownerships_v2" using primary key columns */
+  current_token_ownerships_v2_by_pk?: Maybe<Current_Token_Ownerships_V2>;
+  /** fetch data from the table in a streaming manner : "current_token_ownerships_v2" */
+  current_token_ownerships_v2_stream: Array<Current_Token_Ownerships_V2>;
   /** fetch data from the table: "current_token_pending_claims" */
   current_token_pending_claims: Array<Current_Token_Pending_Claims>;
   /** fetch data from the table: "current_token_pending_claims" using primary key columns */
@@ -3757,6 +4317,27 @@ export type Subscription_RootCurrent_Collection_Ownership_View_StreamArgs = {
 };
 
 
+export type Subscription_RootCurrent_Collections_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Collections_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Collections_V2_Order_By>>;
+  where?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Collections_V2_By_PkArgs = {
+  collection_id: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Collections_V2_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Collections_V2_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Collections_V2_Bool_Exp>;
+};
+
+
 export type Subscription_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3844,6 +4425,27 @@ export type Subscription_RootCurrent_Token_Datas_StreamArgs = {
 };
 
 
+export type Subscription_RootCurrent_Token_Datas_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Token_Datas_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Datas_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Token_Datas_V2_By_PkArgs = {
+  token_data_id: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Token_Datas_V2_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Token_Datas_V2_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
+};
+
+
 export type Subscription_RootCurrent_Token_OwnershipsArgs = {
   distinct_on?: InputMaybe<Array<Current_Token_Ownerships_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3873,6 +4475,39 @@ export type Subscription_RootCurrent_Token_Ownerships_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Current_Token_Ownerships_Stream_Cursor_Input>>;
   where?: InputMaybe<Current_Token_Ownerships_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Token_Ownerships_V2Args = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Token_Ownerships_V2_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Token_Ownerships_V2_By_PkArgs = {
+  owner_address: Scalars['String'];
+  property_version_v1: Scalars['numeric'];
+  storage_id: Scalars['String'];
+  token_data_id: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Token_Ownerships_V2_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Token_Ownerships_V2_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
 };
 
 

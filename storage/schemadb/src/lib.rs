@@ -299,6 +299,12 @@ impl DB {
     }
 }
 
+impl Drop for DB {
+    fn drop(&mut self) {
+        info!(rocksdb_name = self.name, "Dropped RocksDB.");
+    }
+}
+
 /// For now we always use synchronous writes. This makes sure that once the operation returns
 /// `Ok(())` the data is persisted even if the machine crashes. In the future we might consider
 /// selectively turning this off for some non-critical writes to improve performance.

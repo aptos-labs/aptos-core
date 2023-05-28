@@ -35,7 +35,7 @@ proptest! {
         for (ver, ws) in write_sets.iter().enumerate() {
             store.put_write_set(ver as Version, ws, &batch).unwrap();
         }
-        store.db.write_schemas(batch).unwrap();
+        store.ledger_db.write_set_db().write_schemas(batch).unwrap();
         assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
 
         let ledger_version = txns.len() as Version - 1;
@@ -217,7 +217,11 @@ fn init_store(
     for (ver, txn) in txns.iter().enumerate() {
         store.put_transaction(ver as Version, txn, &batch).unwrap();
     }
-    store.db.write_schemas(batch).unwrap();
+    store
+        .ledger_db
+        .transaction_db()
+        .write_schemas(batch)
+        .unwrap();
 
     txns
 }

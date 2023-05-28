@@ -47,16 +47,18 @@ impl LocalVersion {
 
 pub struct LocalFactory {
     versions: Arc<HashMap<Version, LocalVersion>>,
+    swarm_dir: Option<String>,
 }
 
 impl LocalFactory {
-    pub fn new(versions: HashMap<Version, LocalVersion>) -> Self {
+    pub fn new(versions: HashMap<Version, LocalVersion>, swarm_dir: Option<String>) -> Self {
         Self {
             versions: Arc::new(versions),
+            swarm_dir,
         }
     }
 
-    pub fn from_workspace() -> Result<Self> {
+    pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
         let mut versions = HashMap::new();
         let new_version = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
             let version = Version::new(usize::max_value(), revision);
@@ -64,7 +66,7 @@ impl LocalFactory {
         })?;
 
         versions.insert(new_version.version.clone(), new_version);
-        Ok(Self::new(versions))
+        Ok(Self::new(versions, swarm_dir))
     }
 
     pub fn from_revision(revision: &str) -> Result<Self> {
@@ -76,7 +78,7 @@ impl LocalFactory {
             })?;
 
         versions.insert(new_version.version.clone(), new_version);
-        Ok(Self::new(versions))
+        Ok(Self::new(versions, None))
     }
 
     pub fn with_revision_and_workspace(revision: &str) -> Result<Self> {
@@ -93,7 +95,7 @@ impl LocalFactory {
         let mut versions = HashMap::new();
         versions.insert(workspace.version(), workspace);
         versions.insert(revision.version(), revision);
-        Ok(Self::new(versions))
+        Ok(Self::new(versions, None))
     }
 
     /// Create a LocalFactory with a aptos-node version built at the tip of upstream/main and the
@@ -126,6 +128,7 @@ impl LocalFactory {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
+        let swarmdir = self.swarm_dir.clone().map(|sd| PathBuf::from(sd.as_str()));
         // Build the swarm
         let mut swarm = LocalSwarm::build(
             rng,
@@ -134,7 +137,7 @@ impl LocalFactory {
             Some(version.clone()),
             init_config,
             init_genesis_config,
-            None,
+            swarmdir,
             genesis_framework,
             guard,
         )?;

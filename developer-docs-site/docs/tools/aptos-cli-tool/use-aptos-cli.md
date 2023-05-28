@@ -29,8 +29,10 @@ SUBCOMMANDS:
     init          Tool to initialize current directory for the aptos tool
     key           Tool for generating, inspecting, and interacting with keys
     move          Tool for Move related operations
+    multisig      Tool for interacting with multisig accounts
     node          Tool for operations related to nodes
-    stake         Tool for manipulating stake
+    stake         Tool for manipulating stake and stake pools
+    update        Update the CLI itself
 ```
 
 ### Command-specific help
@@ -749,54 +751,6 @@ The `peer_config.yaml` file will be created in your current working directory, w
 ## Move Examples
 
 Move examples can be found in the [Move section](../../move/move-on-aptos/cli).
-
-You can also pass multi-nested vector arguments, like in the `cli_args` example from [move-examples](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples):
-
-:::tip
-To pass vectors (including nested vectors) as arguments, use JSON syntax escaped with quotes!
-:::
-
-```zsh
-aptos move run \
-    --function-id <deployer_address>::cli_args::set_vals \
-    --private-key-file <your-key-file> \
-    --args \
-        u8:123 \
-        "bool:[false, true, false, false]" \
-        'address:[["0xace", "0xbee"], ["0xcad"], ["0xdee"], []]'
-```
-
-Then you can call the view function to see your arguments persisted on-chain!
-
-```zsh
-aptos move view \
-    --function-id <deployer_address>::cli_args::reveal \
-    --args address:<deployer_address>
-{
-  "Result": [
-    123,
-    [
-      false,
-      true,
-      false,
-      false
-    ],
-    [
-      [
-        "0xace",
-        "0xbee"
-      ],
-      [
-        "0xcad"
-      ],
-      [
-        "0xdee"
-      ],
-      []
-    ]
-  ]
-}
-```
 
 ## Node command examples
 

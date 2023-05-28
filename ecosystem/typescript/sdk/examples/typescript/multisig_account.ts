@@ -22,7 +22,6 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const owner1 = new AptosAccount();
   const owner2 = new AptosAccount();
   const owner3 = new AptosAccount();
-  const owner4 = new AptosAccount();
   await faucetClient.fundAccount(owner1.address(), 100_000_000);
   await faucetClient.fundAccount(owner2.address(), 100_000_000);
   await faucetClient.fundAccount(owner3.address(), 100_000_000);

@@ -146,6 +146,8 @@ pub struct StorageServiceConfig {
     pub max_concurrent_requests: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
+    /// Maximum number of invalid requests per peer
+    pub max_invalid_requests_per_peer: u64,
     /// Maximum number of items in the lru cache before eviction
     pub max_lru_cache_size: u64,
     /// Maximum number of pending network messages
@@ -160,6 +162,10 @@ pub struct StorageServiceConfig {
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
+    /// Minimum time (secs) to ignore peers after too many invalid requests
+    pub min_time_to_ignore_peers_secs: u64,
+    /// The interval (ms) to refresh the request moderator state
+    pub request_moderator_refresh_interval_ms: u64,
     /// The interval (ms) to refresh the storage summary
     pub storage_summary_refresh_interval_ms: u64,
 }
@@ -169,13 +175,16 @@ impl Default for StorageServiceConfig {
         Self {
             max_concurrent_requests: 4000,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
+            max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 5000,
+            max_subscription_period_ms: 5000, // 5 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            min_time_to_ignore_peers_secs: 300, // 5 minutes
+            request_moderator_refresh_interval_ms: 1000, // 1 second
             storage_summary_refresh_interval_ms: 50,
         }
     }

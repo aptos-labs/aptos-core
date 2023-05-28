@@ -6,7 +6,7 @@ mod account_generator;
 pub mod benchmark_transaction;
 pub mod db_access;
 pub mod db_generator;
-mod gen_executor;
+mod db_reliable_submitter;
 mod metrics;
 pub mod native_executor;
 pub mod pipeline;
@@ -37,7 +37,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
 };
 use aptos_vm::counters::TXN_GAS_USAGE;
-use gen_executor::DbGenInitTransactionExecutor;
+use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
 use std::{
     collections::HashMap,
@@ -291,14 +291,13 @@ where
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let phase = Arc::new(AtomicUsize::new(0));
 
-        let db_gen_init_transaction_executor = DbGenInitTransactionExecutor {
+        let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
             block_sender,
         };
 
         create_txn_generator_creator(
             &[vec![(transaction_type, 1)]],
-            1,
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -481,7 +480,7 @@ mod tests {
         super::run_benchmark::<E>(
             6, /* block_size */
             5, /* num_blocks */
-            transaction_type.map(|t| t.materialize(2)),
+            transaction_type.map(|t| t.materialize(2, false)),
             2,  /* transactions per sender */
             25, /* num_main_signer_accounts */
             30, /* num_dst_pool_accounts */
@@ -508,10 +507,7 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::TokenV1NFTMintAndTransferSequential),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
     }
 
     #[test]

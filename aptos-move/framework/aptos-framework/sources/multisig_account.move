@@ -520,6 +520,16 @@ module aptos_framework::multisig_account {
         });
     }
 
+    /// Add owners then update number of signatures required, in a single operation.
+    entry fun add_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        new_owners: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        add_owners(multisig_account, new_owners);
+        update_signatures_required(multisig_account, new_num_signatures_required);
+    }
+
     /// Similar to remove_owners, but only allow removing one owner.
     entry fun remove_owner(
         multisig_account: &signer, owner_to_remove: address) acquires MultisigAccount {
@@ -565,6 +575,16 @@ module aptos_framework::multisig_account {
         );
 
         emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+    }
+
+    /// Update the number of signatures required then remove owners, in a single operation.
+    entry fun remove_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        owners_to_remove: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        update_signatures_required(multisig_account, new_num_signatures_required);
+        remove_owners(multisig_account, owners_to_remove);
     }
 
     /// Update the number of signatures required to execute transaction in the specified multisig account.

@@ -27,7 +27,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-output-mainnet-main
-      BRANCH: main
+      GIT_REF: main
       NETWORK: mainnet
       BOOTSTRAPPING_MODE: ApplyTransactionOutputsFromGenesis
       CONTINUOUS_SYNCING_MODE: ApplyTransactionOutputs

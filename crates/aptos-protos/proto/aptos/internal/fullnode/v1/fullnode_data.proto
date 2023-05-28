@@ -5,7 +5,7 @@ syntax = "proto3";
 
 package aptos.internal.fullnode.v1;
 
-import "aptos/transaction/testing1/v1/transaction.proto";
+import "aptos/transaction/v1/transaction.proto";
 
 // Transaction data is transferred via 1 stream with batches until terminated.
 // One stream consists:
@@ -15,7 +15,7 @@ import "aptos/transaction/testing1/v1/transaction.proto";
 //    StreamStatus: BATCH_END with version x + (k + 1) * n - 1
 
 message TransactionsOutput {
-  repeated aptos.transaction.testing1.v1.Transaction transactions  = 1;
+  repeated aptos.transaction.v1.Transaction transactions  = 1;
 }
 
 message StreamStatus {

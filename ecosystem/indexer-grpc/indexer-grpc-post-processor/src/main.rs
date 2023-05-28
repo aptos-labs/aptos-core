@@ -11,7 +11,6 @@ use tracing::info;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcPostProcessorConfig {
-    pub server_name: String,
     pub file_store_bucket_name: String,
     pub verfied_backup_bucket_name: String,
     pub redis_main_instance_address: String,
@@ -28,7 +27,7 @@ impl RunnableConfig for IndexerGrpcPostProcessorConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxbg".to_string()
     }
 }
 

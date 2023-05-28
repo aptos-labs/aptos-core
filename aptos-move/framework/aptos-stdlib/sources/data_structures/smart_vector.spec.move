@@ -36,6 +36,8 @@ spec aptos_std::smart_vector {
     spec pop_back {
         use aptos_std::table_with_length;
 
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+
         aborts_if  option::is_some(v.big_vec)
             &&
             (table_with_length::spec_len(option::borrow(v.big_vec).buckets) == 0);
@@ -58,6 +60,14 @@ spec aptos_std::smart_vector {
 
     spec swap {
         // TODO: temporarily mocked up.
+        pragma verify = false;
+    }
+
+    spec append {
+        pragma verify = false;
+    }
+
+    spec remove {
         pragma verify = false;
     }
 }

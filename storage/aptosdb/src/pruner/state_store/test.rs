@@ -38,7 +38,7 @@ fn put_value_set(
         .iter()
         .map(|(key, value)| {
             sharded_value_set[key.get_shard_id() as usize].insert(key.clone(), Some(value.clone()));
-            (key.clone(), Some(value.clone()))
+            (key, Some(value))
         })
         .collect();
     let jmt_updates = jmt_updates(&value_set);
@@ -64,7 +64,11 @@ fn put_value_set(
             &sharded_state_kv_batches,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .ledger_db
+        .metadata_db()
+        .write_schemas(ledger_batch)
+        .unwrap();
     state_store
         .state_kv_db
         .commit(version, sharded_state_kv_batches)

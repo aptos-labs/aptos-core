@@ -337,6 +337,12 @@ pub enum EntryFunctionCall {
         new_owners: Vec<AccountAddress>,
     },
 
+    /// Add owners then update number of signatures required, in a single operation.
+    MultisigAccountAddOwnersAndUpdateSignaturesRequired {
+        new_owners: Vec<AccountAddress>,
+        new_num_signatures_required: u64,
+    },
+
     /// Approve a multisig transaction.
     MultisigAccountApproveTransaction {
         multisig_account: AccountAddress,
@@ -425,6 +431,12 @@ pub enum EntryFunctionCall {
     /// maliciously alter the owners list.
     MultisigAccountRemoveOwners {
         owners_to_remove: Vec<AccountAddress>,
+    },
+
+    /// Update the number of signatures required then remove owners, in a single operation.
+    MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
+        owners_to_remove: Vec<AccountAddress>,
+        new_num_signatures_required: u64,
     },
 
     /// Allow the multisig account to update its own metadata. Note that this overrides the entire existing metadata.
@@ -946,6 +958,13 @@ impl EntryFunctionCall {
             ManagedCoinRegister { coin_type } => managed_coin_register(coin_type),
             MultisigAccountAddOwner { new_owner } => multisig_account_add_owner(new_owner),
             MultisigAccountAddOwners { new_owners } => multisig_account_add_owners(new_owners),
+            MultisigAccountAddOwnersAndUpdateSignaturesRequired {
+                new_owners,
+                new_num_signatures_required,
+            } => multisig_account_add_owners_and_update_signatures_required(
+                new_owners,
+                new_num_signatures_required,
+            ),
             MultisigAccountApproveTransaction {
                 multisig_account,
                 sequence_number,
@@ -1006,6 +1025,13 @@ impl EntryFunctionCall {
             MultisigAccountRemoveOwners { owners_to_remove } => {
                 multisig_account_remove_owners(owners_to_remove)
             },
+            MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
+                owners_to_remove,
+                new_num_signatures_required,
+            } => multisig_account_remove_owners_and_update_signatures_required(
+                owners_to_remove,
+                new_num_signatures_required,
+            ),
             MultisigAccountUpdateMetadata { keys, values } => {
                 multisig_account_update_metadata(keys, values)
             },
@@ -2052,6 +2078,28 @@ pub fn multisig_account_add_owners(new_owners: Vec<AccountAddress>) -> Transacti
     ))
 }
 
+/// Add owners then update number of signatures required, in a single operation.
+pub fn multisig_account_add_owners_and_update_signatures_required(
+    new_owners: Vec<AccountAddress>,
+    new_num_signatures_required: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("add_owners_and_update_signatures_required").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&new_owners).unwrap(),
+            bcs::to_bytes(&new_num_signatures_required).unwrap(),
+        ],
+    ))
+}
+
 /// Approve a multisig transaction.
 pub fn multisig_account_approve_transaction(
     multisig_account: AccountAddress,
@@ -2295,6 +2343,28 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
         ident_str!("remove_owners").to_owned(),
         vec![],
         vec![bcs::to_bytes(&owners_to_remove).unwrap()],
+    ))
+}
+
+/// Update the number of signatures required then remove owners, in a single operation.
+pub fn multisig_account_remove_owners_and_update_signatures_required(
+    owners_to_remove: Vec<AccountAddress>,
+    new_num_signatures_required: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("remove_owners_and_update_signatures_required").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owners_to_remove).unwrap(),
+            bcs::to_bytes(&new_num_signatures_required).unwrap(),
+        ],
     ))
 }
 
@@ -3888,6 +3958,21 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_add_owners_and_update_signatures_required(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountAddOwnersAndUpdateSignaturesRequired {
+                    new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_approve_transaction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -4024,6 +4109,21 @@ mod decoder {
             Some(EntryFunctionCall::MultisigAccountRemoveOwners {
                 owners_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_remove_owners_and_update_signatures_required(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
+                    owners_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    new_num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -4856,6 +4956,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_add_owners),
         );
         map.insert(
+            "multisig_account_add_owners_and_update_signatures_required".to_string(),
+            Box::new(decoder::multisig_account_add_owners_and_update_signatures_required),
+        );
+        map.insert(
             "multisig_account_approve_transaction".to_string(),
             Box::new(decoder::multisig_account_approve_transaction),
         );
@@ -4894,6 +4998,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_remove_owners".to_string(),
             Box::new(decoder::multisig_account_remove_owners),
+        );
+        map.insert(
+            "multisig_account_remove_owners_and_update_signatures_required".to_string(),
+            Box::new(decoder::multisig_account_remove_owners_and_update_signatures_required),
         );
         map.insert(
             "multisig_account_update_metadata".to_string(),

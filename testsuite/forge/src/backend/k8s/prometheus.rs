@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 pub async fn get_prometheus_client() -> Result<PrometheusClient> {
     // read from the environment
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let secrets_api = Arc::new(K8sApi::<Secret>::from_client(
         kube_client,
         Some("default".to_string()),
@@ -230,7 +230,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_prometheus() {
-        let client = get_prometheus_client().await.unwrap();
+        let client_result = get_prometheus_client().await;
+
+        // Currently this test tries to connect to the internet... and doesnt
+        // require success so it is likely to be skipped
+        // We should come back with some abstractions to make this more testable
+        let client = if let Ok(client) = client_result {
+            client
+        } else {
+            println!("Skipping test. Failed to create prometheus client");
+            return;
+        };
 
         // try a simple instant query
         // if it fails to connect to a prometheus instance, skip the test

@@ -5,6 +5,7 @@ use crate::{
     natives::{
         cryptography::algebra::{
             abort_invariant_violated, gas::GasParameters, AlgebraContext, Structure,
+            E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
             MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         },
         helpers::{SafeNativeContext, SafeNativeError, SafeNativeResult},
@@ -97,7 +98,7 @@ pub fn multi_pairing_internal(
             )?;
             let new_element =
                 ark_bls12_381::Bls12_381::multi_pairing(g1_elements_affine, g2_elements_affine).0;
-            let new_handle = store_element!(context, new_element);
+            let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort {
@@ -142,7 +143,7 @@ pub fn pairing_internal(
             context.charge(gas_params.ark_bls12_381_pairing * NumArgs::one())?;
             let new_element =
                 ark_bls12_381::Bls12_381::pairing(g1_element_affine, g2_element_affine).0;
-            let new_handle = store_element!(context, new_element);
+            let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
         _ => Err(SafeNativeError::Abort {
