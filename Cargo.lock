@@ -145,6 +145,7 @@ name = "aptos"
 version = "1.0.14"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-build-info",
