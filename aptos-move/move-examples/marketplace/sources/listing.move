@@ -109,13 +109,17 @@ module marketplace::listing {
             token_property_version,
         );
         let token = tokenv1::withdraw_token(seller, token_id, 1);
+        create_tokenv1_container_with_token(seller, token)
+    }
+
+    public fun create_tokenv1_container_with_token(
+        seller: &signer,
+        token: TokenV1,
+    ): Object<TokenV1Container> {
         let constructor_ref = object::create_object_from_account(seller);
         let container_signer = object::generate_signer(&constructor_ref);
         let delete_ref = object::generate_delete_ref(&constructor_ref);
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
-        // this must be disabled otherwise the entity selling this token could remove it, while
-        // keep the listing active.
-        // object::disable_ungated_transfer(&transfer_ref);
 
         move_to(&container_signer, TokenV1Container { token, delete_ref, transfer_ref });
         object::object_from_constructor_ref(&constructor_ref)
