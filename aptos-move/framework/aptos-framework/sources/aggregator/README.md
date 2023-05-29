@@ -2,7 +2,7 @@
 
 ## Aggregators
 
-Aggregator is a parallel integer that supports addition and subtraction.
+Aggregator is a parallelizable integer that supports addition and subtraction.
 Unlike integer, aggregator has a user-defined `limit` which specifies when
 the value of aggregator overflows. Similarly to unsigned integers, the value
 of an aggregator underflows when going below zero.
