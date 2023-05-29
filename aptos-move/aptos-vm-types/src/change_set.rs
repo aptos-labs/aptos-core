@@ -103,18 +103,18 @@ impl VMChangeSet {
         })
     }
 
-    /// Squashes `other` change set on top of this change set. The squashed
+    /// Squashes `next` change set on top of this change set. The squashed
     /// change set is then checked using the `checker`.
     pub fn squash(
         self,
-        other: Self,
+        next: Self,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
         use WriteOp::*;
 
         // First, obtain write sets, delta change sets and events of this and other
         // change sets.
-        let (other_write_set, other_delta_change_set, other_events) = other.unpack();
+        let (next_write_set, next_delta_change_set, next_events) = next.unpack();
         let (write_set, mut delta_change_set, mut events) = self.unpack();
         let mut write_set_mut = write_set.into_mut();
 
@@ -123,7 +123,7 @@ impl VMChangeSet {
         let write_ops = write_set_mut.as_inner_mut();
 
         // First, squash incoming deltas.
-        for (key, mut delta_op) in other_delta_change_set.into_iter() {
+        for (key, next_delta_op) in next_delta_change_set.into_iter() {
             if let Some(write_op) = write_ops.get_mut(&key) {
                 // In this case, delta follows a write op.
                 match write_op {
@@ -133,7 +133,7 @@ impl VMChangeSet {
                     | ModificationWithMetadata { data, .. } => {
                         // Apply delta on top of creation or modification.
                         let base: u128 = deserialize(data);
-                        let value = delta_op
+                        let value = next_delta_op
                             .apply_to(base)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                         *data = serialize(&value);
@@ -155,27 +155,27 @@ impl VMChangeSet {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
-                        delta_op
-                            .merge_onto(*entry.get())
+                        entry
+                            .into_mut()
+                            .merge_with_next_delta(next_delta_op)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                        *entry.into_mut() = delta_op;
                     },
                     Vacant(entry) => {
                         // We see this delta for the first time, so simply add it
                         // to the set.
-                        entry.insert(delta_op);
+                        entry.insert(next_delta_op);
                     },
                 }
             }
         }
 
         // Next, squash write ops.
-        for (key, write_op) in other_write_set.into_iter() {
+        for (key, next_write_op) in next_write_set.into_iter() {
             match write_ops.entry(key) {
                 Occupied(mut entry) => {
                     // Squashing creation and deletion is a no-op. In that case, we
                     // have to remove the old write op from the write set.
-                    let noop = !WriteOp::squash(entry.get_mut(), write_op).map_err(|e| {
+                    let noop = !WriteOp::squash(entry.get_mut(), next_write_op).map_err(|e| {
                         VMStatus::Error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             err_msg(format!("Error while squashing two write ops: {}.", e)),
@@ -192,14 +192,14 @@ impl VMChangeSet {
                     let removed_delta = delta_change_set.remove(entry.key());
 
                     // We cannot create after modification with a delta!
-                    if removed_delta.is_some() && write_op.is_creation() {
+                    if removed_delta.is_some() && next_write_op.is_creation() {
                         return Err(VMStatus::Error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                             err_msg("Cannot create a resource after modification with a delta."),
                         ));
                     }
 
-                    entry.insert(write_op);
+                    entry.insert(next_write_op);
                 },
             }
         }
@@ -212,7 +212,7 @@ impl VMChangeSet {
         })?;
 
         // Squash events.
-        events.extend(other_events);
+        events.extend(next_events);
 
         Self::new(write_set, delta_change_set, events, checker)
     }
@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unsuccessful_squash_2() {
+    fn test_unsuccessful_squash_modify_create() {
         let mut write_set_1 = WriteSetMut::default();
         let mut write_set_2 = WriteSetMut::default();
 
@@ -489,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unsuccessful_squash_3() {
+    fn test_unsuccessful_squash_delete_modify() {
         let mut write_set_1 = WriteSetMut::default();
         let mut write_set_2 = WriteSetMut::default();
 
@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unsuccessful_squash_4() {
+    fn test_unsuccessful_squash_delete_delete() {
         let mut write_set_1 = WriteSetMut::default();
         let mut write_set_2 = WriteSetMut::default();
 
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unsuccessful_squash_5() {
+    fn test_unsuccessful_squash_delete_delta() {
         let mut write_set_1 = WriteSetMut::default();
         let mut delta_change_set_2 = DeltaChangeSet::empty();
 
@@ -559,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unsuccessful_squash_6() {
+    fn test_unsuccessful_squash_delta_create() {
         let mut write_set_2 = WriteSetMut::default();
         let mut delta_change_set_1 = DeltaChangeSet::empty();
 
