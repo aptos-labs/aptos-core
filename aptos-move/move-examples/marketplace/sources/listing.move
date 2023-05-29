@@ -9,10 +9,14 @@ module marketplace::listing {
     use std::error;
     use std::option;
     use std::signer;
+    use std::string::String;
 
-    use aptos_framework::object::{Self, ConstructorRef, DeleteRef, ExtendRef, Object, ObjectCore};
+    use aptos_std::math64;
+
+    use aptos_framework::object::{Self, ConstructorRef, DeleteRef, ExtendRef, Object, ObjectCore, TransferRef};
     use aptos_framework::timestamp;
 
+    use aptos_token::token::{Self as tokenv1, Token as TokenV1};
     use aptos_token_objects::token as tokenv2;
     use aptos_token_objects::royalty;
 
@@ -26,6 +30,8 @@ module marketplace::listing {
     const ELISTING_NOT_STARTED: u64 = 2;
     /// The entity is not the creator.
     const ENOT_CREATOR: u64 = 3;
+    /// The entity is not the owner of the wrapped token.
+    const ENOT_OWNER: u64 = 4;
 
     // Core data structures
 
@@ -46,6 +52,17 @@ module marketplace::listing {
         /// Used to create a signer to transfer the listed item, ideally the TransferRef would
         /// support this.
         extend_ref: ExtendRef,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Contains a tokenv1 as an object
+    struct TokenV1Container has key {
+        /// The stored token.
+        token: TokenV1,
+        /// Used to cleanup the object at the end
+        delete_ref: DeleteRef,
+        /// Used to transfer the tokenv1 at the conclusion of a purchase.
+        transfer_ref: TransferRef,
     }
 
     // Init functions
@@ -78,14 +95,83 @@ module marketplace::listing {
         (listing_signer, constructor_ref)
     }
 
+    public(friend) fun create_tokenv1_container(
+        seller: &signer,
+        token_creator: address,
+        token_collection: String,
+        token_name: String,
+        token_property_version: u64,
+    ): Object<TokenV1Container> {
+        let token_id = tokenv1::create_token_id_raw(
+            token_creator,
+            token_collection,
+            token_name,
+            token_property_version,
+        );
+        let token = tokenv1::withdraw_token(seller, token_id, 1);
+        let constructor_ref = object::create_object_from_account(seller);
+        let container_signer = object::generate_signer(&constructor_ref);
+        let delete_ref = object::generate_delete_ref(&constructor_ref);
+        let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        // this must be disabled otherwise the entity selling this token could remove it, while
+        // keep the listing active.
+        // object::disable_ungated_transfer(&transfer_ref);
+
+        move_to(&container_signer, TokenV1Container { token, delete_ref, transfer_ref });
+        object::object_from_constructor_ref(&constructor_ref)
+    }
+
     // Mutators
+
+    /// This should be called at the end of a listing.
+    public(friend) fun extract_or_transfer_tokenv1(
+        recipient: address,
+        object: Object<TokenV1Container>,
+    ) acquires TokenV1Container {
+        let direct_transfer_enabled = tokenv1::get_direct_transfer(recipient);
+        let object_addr = object::object_address(&object);
+        if (direct_transfer_enabled) {
+            let TokenV1Container {
+                token,
+                delete_ref,
+                transfer_ref: _,
+            } = move_from(object_addr);
+            tokenv1::direct_deposit_with_opt_in(recipient, token);
+            object::delete(delete_ref);
+        } else {
+            let tokenv1_container = borrow_global<TokenV1Container>(object_addr);
+            let linear_transfer_ref =
+                object::generate_linear_transfer_ref(&tokenv1_container.transfer_ref);
+            object::transfer_with_ref(linear_transfer_ref, recipient);
+        };
+    }
+
+    /// If the account did not have tokenv1 enabled, then it must call this after making the
+    /// purchase to extract the token.
+    public entry fun extract_tokenv1(
+        owner: &signer,
+        object: Object<TokenV1Container>,
+    ) acquires TokenV1Container {
+        let object_addr = object::object_address(&object);
+        assert!(
+            object::is_owner(object, signer::address_of(owner)),
+            error::permission_denied(ENOT_OWNER),
+        );
+        let TokenV1Container {
+            token,
+            delete_ref,
+            transfer_ref: _,
+        } = move_from(object_addr);
+        object::delete(delete_ref);
+        tokenv1::deposit_token(owner, token);
+    }
 
     /// The listing has concluded, transfer the asset and delete the listing. Returns the seller
     /// for depositing any profit and the fee schedule for the marketplaces commission.
-    public(friend) fun complete(
+    public(friend) fun close(
         object: Object<Listing>,
         recipient: address,
-    ): (address, Object<FeeSchedule>) acquires Listing {
+    ): (address, Object<FeeSchedule>) acquires Listing, TokenV1Container {
         let listing_addr = object::object_address(&object);
         let Listing {
             object,
@@ -97,7 +183,11 @@ module marketplace::listing {
         } = move_from<Listing>(listing_addr);
 
         let obj_signer = object::generate_signer_for_extending(&extend_ref);
-        object::transfer(&obj_signer, object, recipient);
+        if (exists<TokenV1Container>(object::object_address(&object))) {
+            extract_or_transfer_tokenv1(recipient, object::convert(object));
+        } else {
+            object::transfer(&obj_signer, object, recipient);
+        };
         object::delete(delete_ref);
 
         (seller, fee_schedule)
@@ -134,19 +224,39 @@ module marketplace::listing {
     }
 
     #[view]
-    public fun compute_royalty(object: Object<Listing>, amount: u64): (address, u64) acquires Listing {
+    /// Compute the royalty either from the internal TokenV1, TokenV2 if it exists, or return
+    /// no royalty.
+    public fun compute_royalty(
+        object: Object<Listing>,
+        amount: u64,
+    ): (address, u64) acquires Listing, TokenV1Container {
         let listing = borrow_listing(object);
-        let royalty = tokenv2::royalty(listing.object);
-        if (option::is_some(&royalty)) {
-            let royalty = option::destroy_some(royalty);
-            let payee_address = royalty::payee_address(&royalty);
-            let royalty_amount =
-                (amount as u128) *
-                (royalty::numerator(&royalty) as u128) /
-                (royalty::denominator(&royalty) as u128);
-            (payee_address, (royalty_amount as u64))
+        let obj_addr = object::object_address(&listing.object);
+        if (exists<TokenV1Container>(obj_addr)) {
+            let token_container = borrow_global<TokenV1Container>(obj_addr);
+            let token_id = tokenv1::get_token_id(&token_container.token);
+            let royalty = tokenv1::get_royalty(token_id);
+
+            let payee_address = tokenv1::get_royalty_payee(&royalty);
+            let numerator = tokenv1::get_royalty_numerator(&royalty);
+            let denominator = tokenv1::get_royalty_denominator(&royalty);
+
+            let royalty_amount = math64::mul_div(amount, numerator, denominator);
+            (payee_address, royalty_amount)
         } else {
-            (@0x0, 0)
+            let royalty = tokenv2::royalty(listing.object);
+            if (option::is_some(&royalty)) {
+                let royalty = option::destroy_some(royalty);
+                let payee_address = royalty::payee_address(&royalty);
+                let royalty_amount = math64::mul_div(
+                    amount,
+                    royalty::numerator(&royalty),
+                    royalty::denominator(&royalty)
+                );
+                (payee_address, royalty_amount)
+            } else {
+                (@0x0, 0)
+            }
         }
     }
 
