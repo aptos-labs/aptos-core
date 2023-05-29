@@ -684,8 +684,9 @@ pub fn generate_genesis_change_set_for_testing_with_count(
     genesis_options: GenesisOptions,
     count: u64,
 ) -> ChangeSet {
+    let head_release_bundle = aptos_cached_packages::head_release_bundle();
     let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
+        GenesisOptions::Head => &head_release_bundle,
         GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         GenesisOptions::Mainnet => {
             // We don't yet have mainnet, so returning testnet here
@@ -698,8 +699,9 @@ pub fn generate_genesis_change_set_for_testing_with_count(
 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
+    let head_release_bundle = aptos_cached_packages::head_release_bundle();
     let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
+        GenesisOptions::Head => &head_release_bundle,
         GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
         // We don't yet have mainnet, so returning testnet here
         GenesisOptions::Mainnet => aptos_framework::testnet_release_bundle(),
@@ -716,7 +718,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(aptos_cached_packages::head_release_bundle(), count)
+    generate_test_genesis(&aptos_cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
