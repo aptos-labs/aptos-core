@@ -75,7 +75,7 @@ module marketplace::fee_schedule {
 
     /// Create a marketplace with a fixed bidding and listing rate and a percentage commission.
     public entry fun init(
-        creator: &signer, 
+        creator: &signer,
         fee_address: address,
         bidding_fee: u64,
         listing_fee: u64,
@@ -94,7 +94,7 @@ module marketplace::fee_schedule {
 
 
     public fun init_internal(
-        creator: &signer, 
+        creator: &signer,
         fee_address: address,
         bidding_fee: u64,
         listing_fee: u64,
