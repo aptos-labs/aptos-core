@@ -14,7 +14,7 @@ use move_core_types::vm_status::VMStatus;
 
 /// Output produced by the VM. Before VMOutput is passed to storage backends,
 /// it must be converted to TransactionOutput.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VMOutput {
     change_set: VMChangeSet,
     gas_used: u64,

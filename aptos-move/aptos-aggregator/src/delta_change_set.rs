@@ -464,8 +464,8 @@ mod test {
         // because +4 > +2+1 and -3 < 0.
         let a = delta_add_with_history(2, 100, 4, 3);
         let mut b = delta_add(1, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -480,8 +480,8 @@ mod test {
         // with -3 < +3-4.
         let a = delta_add_with_history(2, 100, 4, 3);
         let mut b = delta_add_with_history(3, 100, 4, 4);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -495,8 +495,8 @@ mod test {
         // has to be updated with +5-10 < -3.
         let a = delta_add_with_history(5, 100, 90, 3);
         let mut b = delta_add_with_history(10, 100, 4, 10);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -509,8 +509,8 @@ mod test {
         // Explanation: value overflows because +51+50 > 100.
         let a = delta_add(51, 100);
         let mut b = delta_add(50, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_err!(c.merge_with_next_delta(d));
         assert_err!(b.merge_with_previous_delta(a));
@@ -520,8 +520,8 @@ mod test {
         // have happened.
         let a = delta_add_with_history(5, 100, 90, 3);
         let mut b = delta_add_with_history(10, 100, 96, 0);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_err!(c.merge_with_next_delta(d));
         assert_err!(b.merge_with_previous_delta(a));
@@ -532,8 +532,8 @@ mod test {
         // Explanation: +24-23 = +1
         let a = delta_add(24, 100);
         let mut b = delta_sub(23, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -544,8 +544,8 @@ mod test {
         // Explanation: +23-24 = -1
         let a = delta_add(23, 100);
         let mut b = delta_sub_with_history(24, 100, 20, 20);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -562,8 +562,8 @@ mod test {
         // because +1 > 0 and -40 <= -20-0.
         let a = delta_sub_with_history(20, 100, 1, 40);
         let mut b = delta_sub(20, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -577,8 +577,8 @@ mod test {
         // remains unchanged because -2-7 > -10.
         let a = delta_sub_with_history(2, 100, 4, 10);
         let mut b = delta_sub_with_history(3, 100, 7, 7);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -592,8 +592,8 @@ mod test {
         // For lower bound, we have to update it because -5-4 < -5.
         let a = delta_sub_with_history(5, 100, 90, 5);
         let mut b = delta_sub_with_history(10, 100, 95, 4);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -607,8 +607,8 @@ mod test {
         // never happened.
         let a = delta_sub(50, 100);
         let mut b = delta_sub(51, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_err!(c.merge_with_next_delta(d));
         assert_err!(b.merge_with_previous_delta(a));
@@ -617,8 +617,8 @@ mod test {
         // Explanation: the new lower bound would be -5-96 which clearly underflows.
         let a = delta_sub_with_history(5, 100, 0, 3);
         let mut b = delta_sub_with_history(10, 100, 0, 96);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_err!(c.merge_with_next_delta(d));
         assert_err!(b.merge_with_previous_delta(a));
@@ -627,8 +627,8 @@ mod test {
         // Explanation: -24+23 = -1.
         let a = delta_sub(24, 100);
         let mut b = delta_add(23, 100);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));
@@ -639,8 +639,8 @@ mod test {
         // Explanation: +23-24 = +1.
         let a = delta_add(23, 100);
         let mut b = delta_sub_with_history(24, 100, 20, 20);
-        let mut c = a.clone();
-        let d = b.clone();
+        let mut c = a;
+        let d = b;
 
         assert_ok!(b.merge_with_previous_delta(a));
         assert_ok!(c.merge_with_next_delta(d));

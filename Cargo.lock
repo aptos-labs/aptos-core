@@ -3393,6 +3393,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-language-e2e-tests",
  "aptos-state-view",
  "aptos-types",
  "claims",

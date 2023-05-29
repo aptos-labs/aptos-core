@@ -4,3 +4,6 @@
 pub mod change_set;
 pub mod check_change_set;
 pub mod output;
+
+#[cfg(test)]
+mod tests;
