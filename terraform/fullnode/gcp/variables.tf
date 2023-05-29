@@ -133,6 +133,12 @@ variable "enable_backup" {
   default     = false
 }
 
+variable "enable_public_backup" {
+  description = "provide data backups to the public"
+  default     = false
+}
+
+
 variable "backup_fullnode_index" {
   description = "index of fullnode to backup data from"
   default     = 0
