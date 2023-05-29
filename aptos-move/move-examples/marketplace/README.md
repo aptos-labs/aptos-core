@@ -17,6 +17,7 @@ All listings support:
 * Ability to specify a fixed purchase price
 * Define when purchasing may begin
 * Embed a fee schedule for the hosting marketplace
+* Holding container for tokenv1 if the recipient does not have direct deposit enabled
 
 Auctions support:
 * Buy-it-now
@@ -26,9 +27,7 @@ Auctions support:
 Fixed-price support:
 * Seller can end at any time.
 
-TODO:
-* Separation of listing into those that are independent of Coin and those that are not.
-* Our current indexer, requires cleaner events to designate TokenV1 and TokenV2 data.
-* Collection offers for Tokens.
+Collection offer:
+* Offerer can end at any time.
 
 This is intended as an exploration into the ideal marketplace framework. Please make pull requests to extend it and generalize our use cases. This may never actually be deployed on Mainnet unless the community rallies behind a common marketplace and harness.
