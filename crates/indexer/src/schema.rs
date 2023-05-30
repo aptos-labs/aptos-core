@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
@@ -187,7 +185,6 @@ diesel::table! {
         total_shares -> Numeric,
         last_transaction_version -> Int8,
         inserted_at -> Timestamp,
-        operator_address -> Nullable<Varchar>,
         operator_commission_percentage -> Numeric,
         inactive_table_handle -> Varchar,
         active_table_handle -> Varchar,
@@ -308,7 +305,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    current_token_ownerships_v2 (token_data_id, property_version_v1, owner_address, storage_id, amount) {
+    current_token_ownerships_v2 (token_data_id, property_version_v1, owner_address, storage_id) {
         token_data_id -> Varchar,
         property_version_v1 -> Numeric,
         owner_address -> Varchar,
@@ -364,7 +361,6 @@ diesel::table! {
         total_coins -> Numeric,
         total_shares -> Numeric,
         inserted_at -> Timestamp,
-        operator_address -> Nullable<Varchar>,
         operator_commission_percentage -> Numeric,
         inactive_table_handle -> Varchar,
         active_table_handle -> Varchar,
