@@ -41,7 +41,9 @@ module aptos_framework::aggregator {
     public native fun try_add(aggregator: &mut Aggregator, value: u128): bool;
 
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
-    public native fun add(aggregator: &mut Aggregator, value: u128);
+    public fun add(aggregator: &mut Aggregator, value: u128) {
+        assert!(try_add(aggregator, value), EAGGREGATOR_OVERFLOW);
+    }
 
     /// Subtracts `value` from aggregator. 
     /// Returns a bool flag indicating whether the operation is successful. 
@@ -50,7 +52,9 @@ module aptos_framework::aggregator {
     public native fun try_sub(aggregator: &mut Aggregator, value: u128): bool;
 
     /// Subtracts `value` from aggregator. Aborts on going below zero.
-    public native fun sub(aggregator: &mut Aggregator, value: u128);
+    public fun sub(aggregator: &mut Aggregator, value: u128) {
+        assert!(try_sub(aggregator, value), EAGGREGATOR_UNDERFLOW);
+    }
 
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;

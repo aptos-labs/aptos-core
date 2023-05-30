@@ -28,6 +28,10 @@ use std::{collections::VecDeque, sync::Arc};
  *   gas cost: base_cost
  *
  **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct AddGasParameters {
+    pub base: InternalGas,
+}
 
 fn try_add(
     gas_params: &AddGasParameters,
@@ -67,26 +71,6 @@ fn native_try_add(
     Ok(smallvec![Value::bool(
         try_add(gas_params, context, _ty_args, args).is_ok()
     )])
-}
-
-/***************************************************************************************************
- * native fun add(aggregator: &mut Aggregator, value: u128);
- *
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct AddGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_add(
-    gas_params: &AddGasParameters,
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    try_add(gas_params, context, _ty_args, args)
 }
 
 /***************************************************************************************************
@@ -134,6 +118,11 @@ fn native_read(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct SubGasParameters {
+    pub base: InternalGas,
+}
+
 fn try_sub(
     gas_params: &SubGasParameters,
     context: &mut SafeNativeContext,
@@ -172,26 +161,6 @@ fn native_try_sub(
     Ok(smallvec![Value::bool(
         try_sub(gas_params, context, _ty_args, args).is_ok()
     )])
-}
-
-/***************************************************************************************************
- * native fun sub(aggregator: &mut Aggregator, value: u128);
- *
- *   gas cost: base_cost
- *
- **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct SubGasParameters {
-    pub base: InternalGas,
-}
-
-fn native_sub(
-    gas_params: &SubGasParameters,
-    context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
-    args: VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    try_sub(gas_params, context, _ty_args, args)
 }
 
 /***************************************************************************************************
@@ -260,15 +229,6 @@ pub fn make_all(
             ),
         ),
         (
-            "add",
-            make_safe_native(
-                gas_params.add,
-                timed_features.clone(),
-                features.clone(),
-                native_add,
-            ),
-        ),
-        (
             "read",
             make_safe_native(
                 gas_params.read,
@@ -284,15 +244,6 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 native_try_sub,
-            ),
-        ),
-        (
-            "sub",
-            make_safe_native(
-                gas_params.sub,
-                timed_features.clone(),
-                features.clone(),
-                native_sub,
             ),
         ),
         (
