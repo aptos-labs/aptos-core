@@ -79,10 +79,7 @@ describe("fungible asset", () => {
     async () => {
       const fungibleAsset = new FungibleAssetClient(provider);
       // Alice has 5 amounts of the fungible asset
-      const aliceInitialBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        alice.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const aliceInitialBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceInitialBalance).toEqual(BigInt(5));
 
       // Alice transfers 2 amounts of the fungible asset to Bob
@@ -90,17 +87,11 @@ describe("fungible asset", () => {
       await provider.waitForTransaction(transactionHash);
 
       // Alice has 3 amounts of the fungible asset
-      const aliceCurrentBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        alice.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const aliceCurrentBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceCurrentBalance).toEqual(BigInt(3));
 
       // Bob has 2 amounts of the fungible asset
-      const bobBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        bob.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const bobBalance = await fungibleAsset.getBalance(bob.address(), fungibleAssetMetadataAddress);
       expect(bobBalance).toEqual(BigInt(2));
     },
     longTestTimeout,

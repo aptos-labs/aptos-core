@@ -106,7 +106,8 @@ export class CoinClient {
    * TS SDK supports fungible assets operations. For CoinClient
    * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
    * object where you can set the fungible asset address you wish to check balance for. This option
-   * uses the FungibleAssetClient class.
+   * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
+   * to use a different type, set the `coinType` to be the fungible asset type.
    *
    * @param account Account that you want to get the balance of.
    * @param extraArgs Extra args for checking the balance.
@@ -130,7 +131,7 @@ export class CoinClient {
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      const balance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
+      const balance = await fungibleAsset.getBalance(
         getAddressFromAccountOrAddress(account),
         extraArgs.fungibleAssetMetadataAddress,
       );
