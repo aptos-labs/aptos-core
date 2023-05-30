@@ -101,19 +101,16 @@ impl<'r> TransactionDataCache<'r> {
 
             let mut resources = BTreeMap::new();
             for (ty, (layout, gv)) in account_data_cache.data_map {
-                let op = match gv.into_effect_with_layout(layout) {
-                    Some(op) => op,
-                    None => continue,
-                };
-
-                let struct_tag = match loader.type_to_type_tag(&ty)? {
-                    TypeTag::Struct(struct_tag) => *struct_tag,
-                    _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
-                };
-                resources.insert(
-                    struct_tag,
-                    op.and_then(|(value, layout)| resource_converter(value, layout))?,
-                );
+                if let Some(op) = gv.into_effect_with_layout(layout) {
+                    let struct_tag = match loader.type_to_type_tag(&ty)? {
+                        TypeTag::Struct(struct_tag) => *struct_tag,
+                        _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
+                    };
+                    resources.insert(
+                        struct_tag,
+                        op.and_then(|(value, layout)| resource_converter(value, layout))?,
+                    );
+                }
             }
             if !modules.is_empty() || !resources.is_empty() {
                 change_set

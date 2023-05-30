@@ -32,6 +32,8 @@ impl<T> Op<T> {
         }
     }
 
+    /// Applies `f` on the op and returns the result. If function
+    /// application fails, an error is returned.
     pub fn and_then<U, E, F>(self, f: F) -> Result<Op<U>, E>
     where
         F: FnOnce(T) -> Result<U, E>,
@@ -196,7 +198,7 @@ impl<M, R> AccountChanges<M, R> {
     }
 }
 
-// TODO: ChangeSet does not have a canonical representation so the derived Ord is not sound.
+// TODO: Changes does not have a canonical representation so the derived Ord is not sound.
 
 /// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
 /// is guaranteed to be nonempty
