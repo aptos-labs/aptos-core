@@ -64,7 +64,11 @@ fn put_value_set(
             &sharded_state_kv_batches,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .ledger_db
+        .metadata_db()
+        .write_schemas(ledger_batch)
+        .unwrap();
     state_store
         .state_kv_db
         .commit(version, sharded_state_kv_batches)

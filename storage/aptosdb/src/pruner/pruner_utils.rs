@@ -4,6 +4,7 @@
 //! This module provides common utilities for the DB pruner.
 
 use crate::{
+    ledger_db::LedgerDb,
     pruner::{
         ledger_store::ledger_store_pruner::LedgerPruner,
         state_kv_pruner::StateKvPruner,
@@ -14,7 +15,7 @@ use crate::{
     EventStore, TransactionStore,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{schema::KeyCodec, DB};
+use aptos_schemadb::schema::KeyCodec;
 use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner
@@ -28,11 +29,11 @@ where
 }
 
 /// A utility function to instantiate the ledger pruner
-pub(crate) fn create_ledger_pruner(ledger_db: Arc<DB>) -> Arc<LedgerPruner> {
+pub(crate) fn create_ledger_pruner(ledger_db: Arc<LedgerDb>) -> Arc<LedgerPruner> {
     Arc::new(LedgerPruner::new(
-        Arc::clone(&ledger_db),
+        ledger_db.metadata_db_arc(),
         Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
-        Arc::new(EventStore::new(Arc::clone(&ledger_db))),
+        Arc::new(EventStore::new(ledger_db.event_db_arc())),
     ))
 }
 

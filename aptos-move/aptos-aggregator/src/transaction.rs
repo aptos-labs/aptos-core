@@ -48,6 +48,14 @@ impl ChangeSetExt {
         }
     }
 
+    pub fn empty(checker: Arc<dyn CheckChangeSet>) -> Self {
+        ChangeSetExt {
+            delta_change_set: DeltaChangeSet::empty(),
+            change_set: ChangeSet::empty(),
+            checker,
+        }
+    }
+
     pub fn change_set(&self) -> &ChangeSet {
         &self.change_set
     }
@@ -183,7 +191,7 @@ impl TransactionOutputExt {
 
     /// Similar to `into()` but tries to apply delta changes as well.
     /// TODO: ideally, we may want to expose this function to VM instead. Since
-    /// we do not care about rerunning the epilogue - it sufficies to have it
+    /// we do not care about rerunning the epilogue - it suffices to have it
     /// here for now.
     pub fn into_transaction_output(self, state_view: &impl StateView) -> TransactionOutput {
         let (delta_change_set, txn_output) = self.into();

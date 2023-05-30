@@ -13,9 +13,9 @@ Cache worker fetches data from fullnode GRPC and push data to Cache.
 * Yaml Example 
 ```yaml
 fullnode_grpc_address: 127.0.0.1:50051
-redis_address: larry.macos.network:6379
+redis_address: 127.0.0.1:6379
 health_check_port: 8081
 file_store:
     file_store_type: GcsFileStore
-    gcs_file_store_bucket_name: indexer-grpc-file-store-testnet 
+    gcs_file_store_bucket_name: indexer-grpc-file-store-bucketname 
 ```

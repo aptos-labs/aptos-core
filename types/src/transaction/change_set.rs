@@ -37,6 +37,13 @@ impl ChangeSet {
         Ok(myself)
     }
 
+    pub fn empty() -> Self {
+        Self {
+            write_set: WriteSet::default(),
+            events: vec![],
+        }
+    }
+
     pub fn into_inner(self) -> (WriteSet, Vec<ContractEvent>) {
         (self.write_set, self.events)
     }
