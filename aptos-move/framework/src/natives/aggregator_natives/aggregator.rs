@@ -66,11 +66,9 @@ fn native_try_add(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     match try_add(gas_params, context, _ty_args, args) {
         Ok(_) => {
-            println!("try_add succeeded");
             Ok(smallvec![Value::bool(true)])
         },
         Err(_) => {
-            println!("try_add failed");
             Ok(smallvec![Value::bool(false)])
         },
     }
