@@ -72,7 +72,7 @@ impl<T> Op<T> {
 
 /// A collection of resource and module operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AccountChanges<M, R> {
+pub struct AccountChanges<Module, Resource> {
     modules: BTreeMap<Identifier, Op<M>>,
     resources: BTreeMap<StructTag, Op<R>>,
 }
@@ -126,7 +126,7 @@ where
     Ok(())
 }
 
-impl<M, R> AccountChanges<M, R> {
+impl<Module, Resource> AccountChanges<Module, Resource> {
     pub fn from_modules_resources(
         modules: BTreeMap<Identifier, Op<M>>,
         resources: BTreeMap<StructTag, Op<R>>,
@@ -203,11 +203,11 @@ impl<M, R> AccountChanges<M, R> {
 /// A collection of changes to a Move state. Each AccountChangeSet in the domain of `accounts`
 /// is guaranteed to be nonempty
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Changes<M, R> {
-    accounts: BTreeMap<AccountAddress, AccountChanges<M, R>>,
+pub struct Changes<Module, Resource> {
+    accounts: BTreeMap<AccountAddress, AccountChanges<Module, Resource>>,
 }
 
-impl<M, R> Changes<M, R> {
+impl<Module, Resource> Changes<Module, Resource> {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -218,7 +218,7 @@ impl<M, R> Changes<M, R> {
     pub fn add_account_changeset(
         &mut self,
         addr: AccountAddress,
-        account_changeset: AccountChanges<M, R>,
+        account_changeset: AccountChanges<Module, Resource>,
     ) -> Result<()> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(_) => bail!(
@@ -233,18 +233,18 @@ impl<M, R> Changes<M, R> {
         Ok(())
     }
 
-    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChanges<M, R>> {
+    pub fn accounts(&self) -> &BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
         &self.accounts
     }
 
-    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChanges<M, R>> {
+    pub fn into_inner(self) -> BTreeMap<AccountAddress, AccountChanges<Module, Resource>> {
         self.accounts
     }
 
     fn get_or_insert_account_changeset(
         &mut self,
         addr: AccountAddress,
-    ) -> &mut AccountChanges<M, R> {
+    ) -> &mut AccountChanges<Module, Resource> {
         match self.accounts.entry(addr) {
             btree_map::Entry::Occupied(entry) => entry.into_mut(),
             btree_map::Entry::Vacant(entry) => entry.insert(AccountChanges::new()),

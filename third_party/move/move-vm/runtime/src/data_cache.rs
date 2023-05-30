@@ -82,11 +82,11 @@ impl<'r> TransactionDataCache<'r> {
 
     /// Same like `into_effects`, but also allows clients to select the format of
     /// produced effects for resources.
-    pub(crate) fn into_custom_effects<R>(
+    pub(crate) fn into_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
         loader: &Loader,
-    ) -> PartialVMResult<(Changes<Vec<u8>, R>, Vec<Event>)> {
+    ) -> PartialVMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
         let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();

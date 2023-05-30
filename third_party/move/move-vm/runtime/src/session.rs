@@ -262,10 +262,10 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    pub fn finish_with_custom_effects<R>(
+    pub fn finish_with_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
-    ) -> VMResult<(Changes<Vec<u8>, R>, Vec<Event>)> {
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+    ) -> VMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
         self.data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -286,10 +286,14 @@ impl<'r, 'l> Session<'r, 'l> {
         Ok((change_set, events, native_extensions))
     }
 
-    pub fn finish_with_extensions_with_custom_effects<R>(
+    pub fn finish_with_extensions_with_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
-    ) -> VMResult<(Changes<Vec<u8>, R>, Vec<Event>, NativeContextExtensions<'r>)> {
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+    ) -> VMResult<(
+        Changes<Vec<u8>, Resource>,
+        Vec<Event>,
+        NativeContextExtensions<'r>,
+    )> {
         let Session {
             data_cache,
             native_extensions,
