@@ -189,7 +189,7 @@ impl Client {
     }
 
     /// Simple wrapper around requests to add default parameters to the request
-    fn upgrade_request(&self, mut request: ureq::Request) -> ureq::Request {
+    pub fn upgrade_request(&self, mut request: ureq::Request) -> ureq::Request { //////// 0L ////////
         request
             .set("Authorization", &format!("token {}", self.token))
             .set(ACCEPT_HEADER, ACCEPT_VALUE)
