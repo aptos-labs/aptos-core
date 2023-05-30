@@ -1,0 +1,24 @@
+name: Check aptos-node cargo version against release branch
+on:
+  push:
+    branches:
+      - aptos-release-v*
+      - rustielin/check-aptos-node-version-v1.5 # canary
+    tags:
+      - aptos-node-v*
+
+jobs:
+  check-aptos-node-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+
+      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+        with:
+          python-version: "3.11" # 3.11 comes with tomllib
+
+      - name: Check aptos-node-version
+        uses: ./.github/actions/check-aptos-node-version
+        with:
+          APTOS_CORE_BRANCH: ${{ github.ref_name }}
+          APTOS_NODE_CARGO_TOML: aptos-node/Cargo.toml

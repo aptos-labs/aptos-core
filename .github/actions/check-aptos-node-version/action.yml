@@ -1,0 +1,21 @@
+name: "Check aptos-node cargo version"
+description: |
+  Checks the aptos-node cargo version against the aptos-core branch name.
+inputs:
+  APTOS_CORE_BRANCH:
+    description: "The aptos-core git ref to check for version number"
+    required: true
+  APTOS_NODE_CARGO_TOML:
+    description: "The path to the aptos-node Cargo.toml file"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check aptos-node-version
+      shell: bash
+      run: |
+        python3 ${{ github.action_path }}/check_aptos_node_version.py
+      env:
+        APTOS_CORE_BRANCH: ${{ inputs.APTOS_CORE_BRANCH }}
+        APTOS_NODE_CARGO_TOML: ${{ inputs.APTOS_NODE_CARGO_TOML }}
