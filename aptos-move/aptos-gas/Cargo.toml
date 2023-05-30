@@ -20,8 +20,8 @@ aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-package-builder = { workspace = true }
-aptos-vm-types = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 move-binary-format = { workspace = true }
