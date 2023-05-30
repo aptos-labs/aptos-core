@@ -50,17 +50,36 @@ export class FungibleAssetClient {
   }
 
   /**
-   * Get the balance of an account's fungible asset.
+   * Get the balance of an account's fungible asset from the account's primary fungible store.
    *
    * @param account Account that you want to get the balance of.
    * @param fungibleAssetMetadataAddress The fungible asset address you want to check the balance of
    * @returns Promise that resolves to the balance
    */
-  async getBalance(account: MaybeHexString, fungibleAssetMetadataAddress: MaybeHexString): Promise<bigint> {
+  async getBalanceFromPrimaryFungibleStore(
+    account: MaybeHexString,
+    fungibleAssetMetadataAddress: MaybeHexString,
+  ): Promise<bigint> {
     const payload: Gen.ViewRequest = {
       function: "0x1::primary_fungible_store::balance",
       type_arguments: [this.assetType],
       arguments: [HexString.ensure(account).hex(), HexString.ensure(fungibleAssetMetadataAddress).hex()],
+    };
+    const response = await this.provider.view(payload);
+    return BigInt((response as any)[0]);
+  }
+
+  /**
+   * Get the balance of a fungible asset from a fungible store.
+   *
+   * @param store The fungible asset store address you want to check the balance of
+   * @returns Promise that resolves to the balance
+   */
+  async getBalanceFromFungibleStore(store: MaybeHexString): Promise<bigint> {
+    const payload: Gen.ViewRequest = {
+      function: "0x1::fungible_store::balance",
+      type_arguments: [this.assetType],
+      arguments: [HexString.ensure(store).hex()],
     };
     const response = await this.provider.view(payload);
     return BigInt((response as any)[0]);
