@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
