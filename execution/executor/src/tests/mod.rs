@@ -42,6 +42,7 @@ use proptest::prelude::*;
 use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
+pub use chunk_executor_tests::BLOCK_GAS_LIMIT as BLOCK_GAS_LIMIT;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,
@@ -53,8 +54,9 @@ fn execute_and_commit_block(
 
     let output = executor
         .execute_block(
-            (id, block(vec![txn], executor.get_block_gas_limit())),
+            (id, block(vec![txn], BLOCK_GAS_LIMIT)),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let version = 2 * (txn_index + 1);
@@ -80,7 +82,6 @@ impl TestExecutor {
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
         let executor = BlockExecutor::new(db.clone());
-        executor.update_block_gas_limit(Some(1000)); // Can comment out this line to test without gas limit
 
         TestExecutor {
             _path: path,
@@ -154,9 +155,10 @@ fn test_executor_status() {
         .execute_block(
             (
                 block_id,
-                block(vec![txn0, txn1, txn2], executor.get_block_gas_limit()),
+                block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT),
             ),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
 
@@ -186,7 +188,7 @@ fn test_executor_status_consensus_only() {
         .execute_block(
             (
                 block_id,
-                block(vec![txn0, txn1, txn2], executor.get_block_gas_limit()),
+                block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT),
             ),
             parent_block_id,
         )
@@ -216,8 +218,9 @@ fn test_executor_one_block() {
         .collect::<Vec<_>>();
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let version = num_user_txns + 1;
@@ -263,18 +266,20 @@ fn test_executor_two_blocks_with_failed_txns() {
         .execute_block(
             (
                 block1_id,
-                block(block1_txns, executor.get_block_gas_limit()),
+                block(block1_txns, BLOCK_GAS_LIMIT),
             ),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let output2 = executor
         .execute_block(
             (
                 block2_id,
-                block(block2_txns, executor.get_block_gas_limit()),
+                block(block2_txns, BLOCK_GAS_LIMIT),
             ),
             block1_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
 
@@ -296,9 +301,10 @@ fn test_executor_commit_twice() {
         .execute_block(
             (
                 block1_id,
-                block(block1_txns, executor.get_block_gas_limit()),
+                block(block1_txns, BLOCK_GAS_LIMIT),
             ),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
@@ -328,9 +334,10 @@ fn test_executor_execute_same_block_multiple_times() {
             .execute_block(
                 (
                     block_id,
-                    block(txns.clone(), executor.get_block_gas_limit()),
+                    block(txns.clone(), BLOCK_GAS_LIMIT),
                 ),
                 parent_block_id,
+                BLOCK_GAS_LIMIT,
             )
             .unwrap();
         responses.push(output);
@@ -339,10 +346,10 @@ fn test_executor_execute_same_block_multiple_times() {
     assert_eq!(responses.len(), 1);
 }
 
-fn ledger_version_from_block_size(block_size: usize, maybe_gas_limit: Option<u64>) -> usize {
+fn ledger_version_from_block_size(block_size: usize, maybe_block_gas_limit: Option<u64>) -> usize {
     // With block gas limit, StateCheckpoint txn is inserted to block after execution.
     // So the ledger_info version needs to block_size + 1 with block gas limit.
-    block_size + maybe_gas_limit.map(|_| 1).unwrap_or(0)
+    block_size + maybe_block_gas_limit.map(|_| 1).unwrap_or(0)
 }
 
 /// Generates a list of `TransactionListWithProof`s according to the given ranges.
@@ -368,17 +375,17 @@ fn create_transaction_chunks(
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
     }
-    if executor.get_block_gas_limit().is_none() {
+    if BLOCK_GAS_LIMIT.is_none() {
         txns.push(Transaction::StateCheckpoint(HashValue::random()));
     }
     let id = gen_block_id(1);
 
     let output = executor
-        .execute_block((id, txns.clone()), executor.committed_block_id())
+        .execute_block((id, txns.clone()), executor.committed_block_id(), BLOCK_GAS_LIMIT)
         .unwrap();
 
     let ledger_version =
-        ledger_version_from_block_size(txns.len(), executor.get_block_gas_limit()) as u64;
+        ledger_version_from_block_size(txns.len(), BLOCK_GAS_LIMIT) as u64;
     let ledger_info = gen_ledger_info(ledger_version, output.root_hash(), id, 1);
     executor
         .commit_blocks(vec![id], ledger_info.clone())
@@ -411,12 +418,12 @@ fn test_noop_block_after_reconfiguration() {
     let first_txn = encode_reconfiguration_transaction();
     let first_block_id = gen_block_id(1);
     let output1 = executor
-        .execute_block((first_block_id, vec![first_txn]), parent_block_id)
+        .execute_block((first_block_id, vec![first_txn]), parent_block_id, BLOCK_GAS_LIMIT)
         .unwrap();
     parent_block_id = first_block_id;
-    let second_block = TestBlock::new(10, 10, gen_block_id(2), executor.get_block_gas_limit());
+    let second_block = TestBlock::new(10, 10, gen_block_id(2), BLOCK_GAS_LIMIT);
     let output2 = executor
-        .execute_block((second_block.id, second_block.txns), parent_block_id)
+        .execute_block((second_block.id, second_block.txns), parent_block_id, BLOCK_GAS_LIMIT)
         .unwrap();
     assert_eq!(output1.root_hash(), output2.root_hash());
 }
@@ -589,24 +596,24 @@ fn test_reconfig_suffix_empty_blocks() {
         db: _,
         executor,
     } = TestExecutor::new();
-    // add gas limit to be consistent with block executor that will add state checkpoint txn
-    let block_a = TestBlock::new(10000, 1, gen_block_id(1), Some(0));
+    let block_a = TestBlock::new(10000, 1, gen_block_id(1), BLOCK_GAS_LIMIT);
+    // add block gas limit to be consistent with block executor that will add state checkpoint txn
     let mut block_b = TestBlock::new(10000, 1, gen_block_id(2), Some(0));
-    let block_c = TestBlock::new(1, 1, gen_block_id(3), Some(0));
-    let block_d = TestBlock::new(1, 1, gen_block_id(4), Some(0));
+    let block_c = TestBlock::new(1, 1, gen_block_id(3), BLOCK_GAS_LIMIT);
+    let block_d = TestBlock::new(1, 1, gen_block_id(4), BLOCK_GAS_LIMIT);
     block_b.txns.push(encode_reconfiguration_transaction());
     let parent_block_id = executor.committed_block_id();
     executor
-        .execute_block((block_a.id, block_a.txns), parent_block_id)
+        .execute_block((block_a.id, block_a.txns), parent_block_id, BLOCK_GAS_LIMIT)
         .unwrap();
     let output = executor
-        .execute_block((block_b.id, block_b.txns), block_a.id)
+        .execute_block((block_b.id, block_b.txns), block_a.id, BLOCK_GAS_LIMIT)
         .unwrap();
     executor
-        .execute_block((block_c.id, block_c.txns), block_b.id)
+        .execute_block((block_c.id, block_c.txns), block_b.id, BLOCK_GAS_LIMIT)
         .unwrap();
     executor
-        .execute_block((block_d.id, block_d.txns), block_c.id)
+        .execute_block((block_d.id, block_d.txns), block_c.id, BLOCK_GAS_LIMIT)
         .unwrap();
 
     let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
@@ -624,7 +631,7 @@ struct TestBlock {
 }
 
 impl TestBlock {
-    fn new(num_user_txns: u64, amount: u32, id: HashValue, maybe_gas_limit: Option<u64>) -> Self {
+    fn new(num_user_txns: u64, amount: u32, id: HashValue, maybe_block_gas_limit: Option<u64>) -> Self {
         let txns = if num_user_txns == 0 {
             Vec::new()
         } else {
@@ -632,7 +639,7 @@ impl TestBlock {
                 (0..num_user_txns)
                     .map(|index| encode_mint_transaction(gen_address(index), u64::from(amount)))
                     .collect(),
-                maybe_gas_limit,
+                maybe_block_gas_limit,
             )
         };
         TestBlock { txns, id }
@@ -689,13 +696,13 @@ proptest! {
             let executor = TestExecutor::new();
 
             let block_id = gen_block_id(1);
-            let mut block = TestBlock::new(num_user_txns, 10, block_id, executor.get_block_gas_limit());
+            let mut block = TestBlock::new(num_user_txns, 10, block_id, BLOCK_GAS_LIMIT);
             let num_txns = block.txns.len() as LeafCount;
             block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction();
 
             let parent_block_id = executor.committed_block_id();
             let output = executor.execute_block(
-                (block_id, block.txns.clone()), parent_block_id
+                (block_id, block.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
 
             // assert: txns after the reconfiguration are with status "Retry"
@@ -714,11 +721,11 @@ proptest! {
             // retry txns after reconfiguration
             let retry_block_id = gen_block_id(2);
             let retry_output = executor.execute_block(
-                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()), parent_block_id
+                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
-            let ledger_version = ledger_version_from_block_size(num_txns as usize, executor.get_block_gas_limit()) as u64;
+            let ledger_version = ledger_version_from_block_size(num_txns as usize, BLOCK_GAS_LIMIT) as u64;
 
             // commit
             let ledger_info = gen_ledger_info(ledger_version, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
@@ -750,22 +757,20 @@ proptest! {
     fn test_executor_restart(a_size in 1..30u64, b_size in 1..30u64, amount in any::<u32>()) {
         let TestExecutor { _path, db, executor } = TestExecutor::new();
 
-        let block_a = TestBlock::new(a_size, amount, gen_block_id(1), executor.get_block_gas_limit());
-        let block_b = TestBlock::new(b_size, amount, gen_block_id(2), executor.get_block_gas_limit());
+        let block_a = TestBlock::new(a_size, amount, gen_block_id(1), BLOCK_GAS_LIMIT);
+        let block_b = TestBlock::new(b_size, amount, gen_block_id(2), BLOCK_GAS_LIMIT);
 
         let mut parent_block_id;
         let mut root_hash;
-
-        let maybe_gas_limit = executor.get_block_gas_limit();
 
         // First execute and commit one block, then destroy executor.
         {
             parent_block_id = executor.committed_block_id();
             let output_a = executor.execute_block(
-                (block_a.id, block_a.txns.clone()), parent_block_id
+                (block_a.id, block_a.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
             root_hash = output_a.root_hash();
-            let ledger_info = gen_ledger_info(ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) as u64, root_hash, block_a.id, 1);
+            let ledger_info = gen_ledger_info(ledger_version_from_block_size(block_a.txns.len(), BLOCK_GAS_LIMIT) as u64, root_hash, block_a.id, 1);
             executor.commit_blocks(vec![block_a.id], ledger_info).unwrap();
             parent_block_id = block_a.id;
         }
@@ -773,11 +778,10 @@ proptest! {
         // Now we construct a new executor and run one more block.
         {
             let executor = BlockExecutor::<MockVM, Transaction>::new(db);
-            executor.update_block_gas_limit(maybe_gas_limit);
-            let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
+            let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
-                (ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) + ledger_version_from_block_size(block_b.txns.len(), maybe_gas_limit)) as u64,
+                (ledger_version_from_block_size(block_a.txns.len(), BLOCK_GAS_LIMIT) + ledger_version_from_block_size(block_b.txns.len(), BLOCK_GAS_LIMIT)) as u64,
                 root_hash,
                 block_b.id,
                 2,
@@ -788,11 +792,11 @@ proptest! {
         let expected_root_hash = run_transactions_naive({
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
-            if executor.get_block_gas_limit().is_some() {
+            if BLOCK_GAS_LIMIT.is_some() {
                 txns.push(Transaction::StateCheckpoint(block_a.id));
             }
             txns.extend(block_b.txns.iter().cloned());
-            if executor.get_block_gas_limit().is_some() {
+            if BLOCK_GAS_LIMIT.is_some() {
                 txns.push(Transaction::StateCheckpoint(block_b.id));
             }
             txns
@@ -832,13 +836,13 @@ proptest! {
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(
             (first_block_id, first_block_txns),
-            parent_block_id
+            parent_block_id, BLOCK_GAS_LIMIT
         ).unwrap();
 
         let second_block_id = gen_block_id(2);
         let output2 = executor.execute_block(
-            (second_block_id, block(second_block_txns, executor.get_block_gas_limit())),
-            first_block_id,
+            (second_block_id, block(second_block_txns, BLOCK_GAS_LIMIT)),
+            first_block_id, BLOCK_GAS_LIMIT
         ).unwrap();
 
         let version = chunk_size + overlap_size + num_new_txns + 1;

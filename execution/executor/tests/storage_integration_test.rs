@@ -25,6 +25,10 @@ use aptos_types::{
 };
 use move_core_types::move_resource::MoveStructType;
 
+const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
+// const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
+// const BLOCK_GAS_LIMIT: Option<u64> = None;
+
 #[test]
 fn test_genesis() {
     let path = aptos_temppath::TempPath::new();
@@ -139,7 +143,7 @@ fn test_reconfiguration() {
     let txn_block = vec![txn1, txn2, txn3];
     let block_id = gen_block_id(1);
     let vm_output = executor
-        .execute_block((block_id, txn_block.clone()), parent_block_id)
+        .execute_block((block_id, txn_block.clone()), parent_block_id, BLOCK_GAS_LIMIT)
         .unwrap();
 
     // Make sure the execution result sees the reconfiguration

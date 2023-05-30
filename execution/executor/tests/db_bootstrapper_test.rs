@@ -45,6 +45,10 @@ use move_core_types::{
 };
 use rand::SeedableRng;
 
+const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
+// const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
+// const BLOCK_GAS_LIMIT: Option<u64> = None;
+
 #[test]
 fn test_empty_db() {
     let genesis = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -88,8 +92,9 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM, Transaction>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)),
             executor.committed_block_id(),
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);

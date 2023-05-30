@@ -41,7 +41,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn new(
         num_executor_shards: usize,
         executor_threads_per_shard: Option<usize>,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         assert!(num_executor_shards > 0, "num_executor_shards must be > 0");
         let executor_threads_per_shard = executor_threads_per_shard.unwrap_or_else(|| {
@@ -61,7 +61,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
                 executor_threads_per_shard,
                 transactions_rx,
                 result_tx,
-                maybe_gas_limit,
+                maybe_block_gas_limit,
             ));
         }
         info!(
@@ -135,7 +135,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     concurrency_level: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-    maybe_gas_limit: Option<u64>,
+    maybe_block_gas_limit: Option<u64>,
 ) -> thread::JoinHandle<()> {
     // create and start a new executor shard in a separate thread
     thread::Builder::new()
@@ -147,7 +147,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
                 concurrency_level,
                 command_rx,
                 result_tx,
-                maybe_gas_limit,
+                maybe_block_gas_limit,
             );
             executor_shard.start();
         })

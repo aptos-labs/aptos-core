@@ -21,6 +21,10 @@ use aptos_types::{
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
 use std::sync::Arc;
 
+pub const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
+// pub const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
+// pub const BLOCK_GAS_LIMIT: Option<u64> = None;
+
 fn create_test_executor() -> BlockExecutor<FakeVM, Transaction> {
     // setup fake db
     let fake_db = FakeDb {};
@@ -38,7 +42,7 @@ pub fn fuzz_execute_and_commit_blocks(
     let mut block_ids = vec![];
     for block in blocks {
         let block_id = block.0;
-        let _execution_results = executor.execute_block(block, parent_block_id);
+        let _execution_results = executor.execute_block(block, parent_block_id, BLOCK_GAS_LIMIT);
         parent_block_id = block_id;
         block_ids.push(block_id);
     }
@@ -56,15 +60,15 @@ impl TransactionBlockExecutor<Transaction> for FakeVM {
         ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
     }
 
-    fn execute_transaction_block_with_gas_limit(
+    fn execute_transaction_block_with_block_gas_limit(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_gas_limit::<FakeVM>(
+        ChunkOutput::by_transaction_execution_with_block_gas_limit::<FakeVM>(
             transactions,
             state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
     }
 }
@@ -85,10 +89,10 @@ impl VMExecutor for FakeVM {
         Ok(Vec::new())
     }
 
-    fn execute_block_with_gas_limit(
+    fn execute_block_with_block_gas_limit(
         _transactions: Vec<Transaction>,
         _state_view: &impl StateView,
-        _maybe_gas_limit: Option<u64>,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }

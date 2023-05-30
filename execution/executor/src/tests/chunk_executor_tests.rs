@@ -22,6 +22,9 @@ use aptos_types::{
 };
 use rand::Rng;
 
+// pub const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
+pub const BLOCK_GAS_LIMIT: Option<u64> = None;
+
 pub struct TestExecutor {
     _path: aptos_temppath::TempPath,
     pub db: DbReaderWriter,
@@ -274,15 +277,12 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
-                (block_id, block(txns, executor.get_block_gas_limit())),
+                (block_id, block(txns, BLOCK_GAS_LIMIT)),
                 parent_block_id,
+                BLOCK_GAS_LIMIT,
             )
             .unwrap();
-        // With no block gas limit, StateCheckpoint txn is inserted to block before execution.
-        // So the ledger_info version needs to + 1 with no block gas limit.
-        let maybe_gas_limit = executor.get_block_gas_limit();
-        let diff = maybe_gas_limit.map(|_| 0).unwrap_or(1);
-        let ledger_info = tests::gen_ledger_info(5 + diff, output.root_hash(), block_id, 1);
+        let ledger_info = tests::gen_ledger_info(5 + 1, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();
     }
 
