@@ -14,7 +14,6 @@ use crate::{
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::warn;
-use aptos_network::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest,
@@ -30,7 +29,6 @@ use std::{cmp::min, collections::HashMap, sync::Arc, time::Instant};
 
 /// An optimistic fetch request from a peer
 pub struct OptimisticFetchRequest {
-    protocol: ProtocolId,
     request: StorageServiceRequest,
     response_sender: ResponseSender,
     fetch_start_time: Instant,
@@ -39,13 +37,11 @@ pub struct OptimisticFetchRequest {
 
 impl OptimisticFetchRequest {
     pub fn new(
-        protocol: ProtocolId,
         request: StorageServiceRequest,
         response_sender: ResponseSender,
         time_service: TimeService,
     ) -> Self {
         Self {
-            protocol,
             request,
             response_sender,
             fetch_start_time: time_service.now(),
@@ -192,6 +188,10 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     // Remove and handle the ready optimistic fetches
     for (peer, target_ledger_info) in peers_with_ready_optimistic_fetches {
         if let Some(optimistic_fetch) = optimistic_fetches.clone().lock().remove(&peer) {
+            let optimistic_fetch_start_time = optimistic_fetch.fetch_start_time;
+            let optimistic_fetch_request = optimistic_fetch.request.clone();
+
+            // Notify the peer of the new data
             if let Err(error) = notify_peer_of_new_data(
                 cached_storage_server_summary.clone(),
                 config,
@@ -207,6 +207,17 @@ pub(crate) fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
                 warn!(LogSchema::new(LogEntry::OptimisticFetchResponse)
                     .error(&Error::UnexpectedErrorEncountered(error.to_string())));
             }
+
+            // Update the optimistic fetch latency metric
+            let optimistic_fetch_duration = time_service
+                .now()
+                .duration_since(optimistic_fetch_start_time);
+            metrics::observe_value_with_label(
+                &metrics::OPTIMISTIC_FETCH_LATENCIES,
+                peer.network_id(),
+                &optimistic_fetch_request.get_label(),
+                optimistic_fetch_duration.as_secs_f64(),
+            );
         }
     }
 
@@ -249,7 +260,6 @@ pub(crate) fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInterface>
                     lru_response_cache.clone(),
                     request_moderator.clone(),
                     peer,
-                    optimistic_fetch.protocol,
                     storage.clone(),
                     time_service.clone(),
                 )?;
@@ -291,7 +301,6 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     peer_network_id: &PeerNetworkId,
-    protocol: ProtocolId,
     storage: T,
     time_service: TimeService,
 ) -> aptos_storage_service_types::Result<LedgerInfoWithSignatures, Error> {
@@ -314,8 +323,7 @@ fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
         storage,
         time_service,
     );
-    let storage_response =
-        handler.process_request(peer_network_id, protocol, storage_request, true);
+    let storage_response = handler.process_request(peer_network_id, storage_request, true);
 
     // Verify the response
     match storage_response {
@@ -370,12 +378,8 @@ fn notify_peer_of_new_data<T: StorageReaderInterface>(
                 storage,
                 time_service,
             );
-            let storage_response = handler.process_request(
-                peer_network_id,
-                optimistic_fetch.protocol,
-                storage_request.clone(),
-                true,
-            );
+            let storage_response =
+                handler.process_request(peer_network_id, storage_request.clone(), true);
 
             // Transform the missing data into an optimistic fetch response
             let transformed_data_response = match storage_response {
@@ -454,18 +458,19 @@ pub(crate) fn remove_expired_optimistic_fetches(
     config: StorageServiceConfig,
     optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
 ) {
-    optimistic_fetches.lock().retain(|_, optimistic_fetch| {
-        // Update the expired optimistic fetch metrics
-        if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
-            let protocol = optimistic_fetch.protocol;
-            increment_counter(
-                &metrics::OPTIMISTIC_FETCH_EVENTS,
-                protocol,
-                OPTIMISTIC_FETCH_EXPIRE.into(),
-            );
-        }
+    optimistic_fetches
+        .lock()
+        .retain(|peer_network_id, optimistic_fetch| {
+            // Update the expired optimistic fetch metrics
+            if optimistic_fetch.is_expired(config.max_optimistic_fetch_period) {
+                increment_counter(
+                    &metrics::OPTIMISTIC_FETCH_EVENTS,
+                    peer_network_id.network_id(),
+                    OPTIMISTIC_FETCH_EXPIRE.into(),
+                );
+            }
 
-        // Only retain non-expired optimistic fetches
-        !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
-    });
+            // Only retain non-expired optimistic fetches
+            !optimistic_fetch.is_expired(config.max_optimistic_fetch_period)
+        });
 }
