@@ -146,7 +146,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 ## Function `try_add`
 
 Adds <code>value</code> to aggregator.
-Returns a bool flag indicating whether the operation is successfull.
+Returns a bool flag indicating whether the operation is successful.
 If the output is true, then there is no error in the operation.
 If the output is false, then there is overflow error.
 
@@ -195,7 +195,7 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 ## Function `try_sub`
 
 Subtracts <code>value</code> from aggregator.
-Returns a bool flag indicating whether the operation is successfull.
+Returns a bool flag indicating whether the operation is successful.
 If the output is true, then there is no error in the operation.
 If the output is false, then there is underflow error.
 
