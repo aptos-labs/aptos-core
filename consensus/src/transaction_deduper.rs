@@ -6,13 +6,13 @@ use aptos_logger::info;
 use aptos_types::{on_chain_config::TransactionDeduperType, transaction::SignedTransaction};
 use std::sync::Arc;
 
-/// Interface to dedup transactions
+/// Interface to dedup transactions. The dedup filters duplicate transactions within a block.
 pub trait TransactionDeduper: Send + Sync {
     fn dedup(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction>;
 }
 
 /// No Op Deduper to maintain backward compatibility
-pub struct NoOpDeduper {}
+struct NoOpDeduper {}
 
 impl TransactionDeduper for NoOpDeduper {
     fn dedup(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {

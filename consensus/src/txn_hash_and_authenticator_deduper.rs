@@ -9,7 +9,29 @@ use aptos_types::transaction::SignedTransaction;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-pub struct TxnHashAndAuthenticatorDeduper {}
+/// An implementation of TransactionDeduper. Duplicate filtering is done using the pair
+/// (raw_txn.hash(), authenticator). Both the hash and signature are required because dedup
+/// happens before signatures are verified and transaction prologue is checked. (So, e.g., a bad
+/// transaction could contain a txn and signature that are unrelated.) If the checks are done
+/// beforehand only one of the txn hash or signature would be required.
+///
+/// The implementation is written to avoid and/or parallelize the most expensive operations. Below
+/// are the steps:
+/// 1. Mark possible duplicates (sequential): Using a helper HashMap, mark transactions with 2+
+///    (sender, seq_no) pairs as possible duplicates. If no possible duplicates, return the original
+///    transactions.
+/// 2. Calculate txn hashes (parallel): For all possible duplicates, calculate the txn hash. This
+///    is an expensive operation.
+/// 3. Mark duplicates (sequential): Using a helper HashSet with the txn hashes calculated above and
+///    signatures, mark actual duplicate transactions.
+/// 4. Filter duplicates (sequential): Return a transaction vector with no duplicates.
+///
+/// Possible future optimizations:
+/// a. Note the possible duplicates in Step 1 are independent of each other, so they could be
+///    grouped independently and run in parallel in Step 3.
+/// b. Txn hashes are calculated at many places within a validator. A per-txn hash cache could speed
+///    up dedup or later operations.
+pub(crate) struct TxnHashAndAuthenticatorDeduper {}
 
 impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
     fn dedup(&self, transactions: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
@@ -43,6 +65,7 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
                 false => None,
             })
             .collect();
+        // TODO: Possibly parallelize. See struct comment.
         let mut seen_hashes = HashSet::new();
         let mut num_duplicates: usize = 0;
         let duplicates: Vec<_> = hash_and_authenticators
@@ -235,7 +258,7 @@ mod tests {
     // The perf tests are simple micro-benchmarks and just output results without checking for regressions
     static PERF_TXN_PER_BLOCK: usize = 10_000;
 
-    fn measure_dedupe_time(
+    fn measure_dedup_time(
         deduper: TxnHashAndAuthenticatorDeduper,
         txns: Vec<SignedTransaction>,
     ) -> f64 {
@@ -276,7 +299,7 @@ mod tests {
         assert_eq!(txns.len(), deduped_txns.len());
         assert_eq!(txns, deduped_txns);
 
-        measure_dedupe_time(deduper, txns);
+        measure_dedup_time(deduper, txns);
     }
 
     #[test]
@@ -296,7 +319,7 @@ mod tests {
         assert_eq!(expected.len(), deduped_txns.len());
         assert_eq!(expected, deduped_txns);
 
-        measure_dedupe_time(deduper, txns);
+        measure_dedup_time(deduper, txns);
     }
 
     #[test]
@@ -318,7 +341,7 @@ mod tests {
         assert_eq!(txns.len(), deduped_txns.len());
         assert_eq!(txns, deduped_txns);
 
-        measure_dedupe_time(deduper, txns);
+        measure_dedup_time(deduper, txns);
     }
 
     #[test]
@@ -339,6 +362,6 @@ mod tests {
         assert_eq!(expected.len(), deduped_txns.len());
         assert_eq!(expected, deduped_txns);
 
-        measure_dedupe_time(deduper, txns);
+        measure_dedup_time(deduper, txns);
     }
 }
