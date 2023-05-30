@@ -39,10 +39,32 @@ module aptos_framework::optional_aggregator {
         integer.value = integer.value + value;
     }
 
+    /// Tries to add `value` to integer.
+    /// Returns true if successful, and false if there is an overflow.
+    fun try_add_integer(integer: &mut Integer, value: u128): bool {
+        if (value <= (integer.limit - integer.value)) {
+            integer.value = integer.value + value;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Subtracts `value` from integer. Aborts on going below zero.
     fun sub_integer(integer: &mut Integer, value: u128) {
         assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
         integer.value = integer.value - value;
+    }
+     
+    /// Tries to subtract `value` from integer.
+    /// Returns true if successful, and false if there is an underflow.
+    fun try_sub_integer(integer: &mut Integer, value: u128): bool {
+        if (value <= integer.value) {
+            integer.value = integer.value - value;
+            true
+        } else {
+            false
+        }
     }
 
     /// Returns an overflow limit of integer.
@@ -160,12 +182,7 @@ module aptos_framework::optional_aggregator {
             aggregator::try_add(aggregator, value)
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
-            if (value <= (integer.limit - integer.value)) {
-                integer.value = integer.value + value;
-                true
-            } else {
-                false
-            }
+            try_add_integer(integer, value)
         }
     }
 
@@ -187,12 +204,7 @@ module aptos_framework::optional_aggregator {
             aggregator::try_sub(aggregator, value)
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
-            if (value <= integer.value) {
-                integer.value = integer.value - value;
-                true
-            } else {
-                false
-            }
+            try_sub_integer(integer, value)
         }
     }
 

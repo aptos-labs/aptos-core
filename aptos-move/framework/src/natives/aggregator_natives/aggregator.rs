@@ -64,7 +64,9 @@ fn native_try_add(
     _ty_args: Vec<Type>,
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    Ok(smallvec![Value::bool(try_add(gas_params, context, _ty_args, args).is_ok())])
+    Ok(smallvec![Value::bool(
+        try_add(gas_params, context, _ty_args, args).is_ok()
+    )])
 }
 
 /***************************************************************************************************
@@ -167,7 +169,9 @@ fn native_try_sub(
     _ty_args: Vec<Type>,
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    Ok(smallvec![Value::bool(try_sub(gas_params, context, _ty_args, args).is_ok())])
+    Ok(smallvec![Value::bool(
+        try_sub(gas_params, context, _ty_args, args).is_ok()
+    )])
 }
 
 /***************************************************************************************************

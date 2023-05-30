@@ -12,7 +12,9 @@ aggregator (parallelizable) or via normal integers.
 -  [Constants](#@Constants_0)
 -  [Function `new_integer`](#0x1_optional_aggregator_new_integer)
 -  [Function `add_integer`](#0x1_optional_aggregator_add_integer)
+-  [Function `try_add_integer`](#0x1_optional_aggregator_try_add_integer)
 -  [Function `sub_integer`](#0x1_optional_aggregator_sub_integer)
+-  [Function `try_sub_integer`](#0x1_optional_aggregator_try_sub_integer)
 -  [Function `limit`](#0x1_optional_aggregator_limit)
 -  [Function `read_integer`](#0x1_optional_aggregator_read_integer)
 -  [Function `destroy_integer`](#0x1_optional_aggregator_destroy_integer)
@@ -208,6 +210,37 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
 
 </details>
 
+<a name="0x1_optional_aggregator_try_add_integer"></a>
+
+## Function `try_add_integer`
+
+Tries to add <code>value</code> to integer.
+Returns true if successful, and false if there is an overflow.
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_try_add_integer">try_add_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_try_add_integer">try_add_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128): bool {
+    <b>if</b> (value &lt;= (integer.limit - integer.value)) {
+        integer.value = integer.value + value;
+        <b>true</b>
+    } <b>else</b> {
+        <b>false</b>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_optional_aggregator_sub_integer"></a>
 
 ## Function `sub_integer`
@@ -227,6 +260,37 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_sub_integer">sub_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128) {
     <b>assert</b>!(value &lt;= integer.value, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="optional_aggregator.md#0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));
     integer.value = integer.value - value;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_optional_aggregator_try_sub_integer"></a>
+
+## Function `try_sub_integer`
+
+Tries to subtract <code>value</code> from integer.
+Returns true if successful, and false if there is an underflow.
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_try_sub_integer">try_sub_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">optional_aggregator::Integer</a>, value: u128): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_try_sub_integer">try_sub_integer</a>(integer: &<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator_Integer">Integer</a>, value: u128): bool {
+    <b>if</b> (value &lt;= integer.value) {
+        integer.value = integer.value - value;
+        <b>true</b>
+    } <b>else</b> {
+        <b>false</b>
+    }
 }
 </code></pre>
 
@@ -576,12 +640,7 @@ Adds <code>value</code> to optional aggregator, returns <code><b>true</b></code>
         <a href="aggregator.md#0x1_aggregator_try_add">aggregator::try_add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value)
     } <b>else</b> {
         <b>let</b> integer = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);
-        <b>if</b> (value &lt;= (integer.limit - integer.value)) {
-            integer.value = integer.value + value;
-            <b>true</b>
-        } <b>else</b> {
-            <b>false</b>
-        }
+        <a href="optional_aggregator.md#0x1_optional_aggregator_try_add_integer">try_add_integer</a>(integer, value)
     }
 }
 </code></pre>
@@ -643,12 +702,7 @@ Subtracts <code>value</code> to optional aggregator, returns <code><b>true</b></
         <a href="aggregator.md#0x1_aggregator_try_sub">aggregator::try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value)
     } <b>else</b> {
         <b>let</b> integer = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(&<b>mut</b> <a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>.integer);
-        <b>if</b> (value &lt;= integer.value) {
-            integer.value = integer.value - value;
-            <b>true</b>
-        } <b>else</b> {
-            <b>false</b>
-        }
+        <a href="optional_aggregator.md#0x1_optional_aggregator_try_sub_integer">try_sub_integer</a>(integer, value)
     }
 }
 </code></pre>
