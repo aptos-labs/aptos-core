@@ -29,12 +29,16 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
 
   // Step 1: Setup a 2-of-3 multisig account
   // ===========================================================================================
+  // Get the next multisig account address. This will be the same as the account address of the multisig account we'll
+  // be creating.
   const payload: Gen.ViewRequest = {
     function: "0x1::multisig_account::get_next_multisig_account_address",
     type_arguments: [],
     arguments: [owner1.address().hex()],
   };
   const multisigAddress = (await client.view(payload))[0] as string;
+
+  // Create the multisig account with 3 owners and a signature threshold of 2.
   const createMultisig = await client.generateTransaction(owner1.address(), {
     function: "0x1::multisig_account::create_with_owners",
     type_arguments: [],
@@ -62,6 +66,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const multisigTxExecution = new TransactionPayloadMultisig(
     new MultiSig(AccountAddress.fromHex(multisigAddress), transferTxPayload),
   );
+  // We can simulate the transaction to see if it will succeed without having to create it on chain.
   const [simulationResp] = await client.simulateTransaction(
     owner2,
     await client.generateRawTransaction(owner2.address(), multisigTxExecution),
