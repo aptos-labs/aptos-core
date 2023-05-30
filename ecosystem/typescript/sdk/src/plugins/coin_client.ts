@@ -120,7 +120,7 @@ export class CoinClient {
     account: AptosAccount | MaybeHexString,
     extraArgs?: {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin.
-      // If you want to transfer a fungible asset, set this param to be the
+      // If you want to check the balance of a fungible asset, set this param to be the
       // fungible asset address
       coinType?: string;
     },
