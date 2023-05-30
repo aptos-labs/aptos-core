@@ -25,23 +25,27 @@ export class FungibleAssetClient {
    * Use this method to transfer any fungible asset including fungible token.
    *
    * @param sender The sender account
-   * @param assetAddress The fungible asset address.
+   * @param fungibleAssetMetadataAddress The fungible asset address.
    * For example if you’re transferring USDT this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
-   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns The hash of the transaction submitted to the API
    */
   async transfer(
     sender: AptosAccount,
-    assetAddress: MaybeHexString,
+    fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,
     amount: number | bigint,
-    assetType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const rawTxn = await this.generateTransfer(sender, assetAddress, recipient, amount, assetType, extraArgs);
-    const txnHash = await this.submit(sender, rawTxn);
+    const rawTransaction = await this.generateTransfer(
+      sender,
+      fungibleAssetMetadataAddress,
+      recipient,
+      amount,
+      extraArgs,
+    );
+    const txnHash = await this.provider.signAndSubmitTransaction(sender, rawTransaction);
     return txnHash;
   }
 
@@ -49,15 +53,14 @@ export class FungibleAssetClient {
    * Get the balance of an account's fungible asset.
    *
    * @param account Account that you want to get the balance of.
-   * @param assetAddress The fungible asset address you want to check the balance of
-   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
+   * @param fungibleAssetMetadataAddress The fungible asset address you want to check the balance of
    * @returns Promise that resolves to the balance
    */
-  async balance(account: MaybeHexString, assetAddress: MaybeHexString, assetType?: string): Promise<bigint> {
+  async getBalance(account: MaybeHexString, fungibleAssetMetadataAddress: MaybeHexString): Promise<bigint> {
     const payload: Gen.ViewRequest = {
       function: "0x1::primary_fungible_store::balance",
-      type_arguments: [assetType || this.assetType],
-      arguments: [HexString.ensure(account).hex(), HexString.ensure(assetAddress).hex()],
+      type_arguments: [this.assetType],
+      arguments: [HexString.ensure(account).hex(), HexString.ensure(fungibleAssetMetadataAddress).hex()],
     };
     const response = await this.provider.view(payload);
     return BigInt((response as any)[0]);
@@ -72,19 +75,17 @@ export class FungibleAssetClient {
    * first simulate the transaction and then sign and submit it.
    *
    * @param sender The sender account
-   * @param assetAddress The fungible asset address.
+   * @param fungibleAssetMetadataAddress The fungible asset address.
    * For example if you’re transferring USDT this would be the USDT address
    * @param recipient Recipient address
    * @param amount Number of assets to transfer
-   * @param assetType (optional) The fungible asset type - default to `0x1::fungible_asset::Metadata`
    * @returns Raw Transaction
    */
   async generateTransfer(
     sender: AptosAccount,
-    assetAddress: MaybeHexString,
+    fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,
     amount: number | bigint,
-    assetType?: string,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<RawTransaction> {
     const builder = new TransactionBuilderRemoteABI(this.provider, {
@@ -93,21 +94,9 @@ export class FungibleAssetClient {
     });
     const rawTxn = await builder.build(
       "0x1::primary_fungible_store::transfer",
-      [assetType || this.assetType],
-      [HexString.ensure(assetAddress).hex(), HexString.ensure(recipient).hex(), amount],
+      [this.assetType],
+      [HexString.ensure(fungibleAssetMetadataAddress).hex(), HexString.ensure(recipient).hex(), amount],
     );
     return rawTxn;
-  }
-
-  /**
-   * Submit a transaction to chain
-   *
-   * @param sender The sender account
-   * @param rawTransaction A generated raw transaction
-   * @returns The hash of the transaction submitted to the API
-   */
-  async submit(sender: AptosAccount, rawTransaction: RawTransaction): Promise<string> {
-    const txnHash = this.provider.signAndSubmitTransaction(sender, rawTransaction);
-    return txnHash;
   }
 }

@@ -14,11 +14,11 @@ const publisher = new AptosAccount(
 );
 const alice = new AptosAccount();
 const bob = new AptosAccount();
-let assetAddress = "";
+let fungibleAssetMetadataAddress = "";
 /**
  * Since there is no ready-to-use fungible asset contract/module on an aptos framework address
  * we pre compiled ../../../aptos-move/move-examples/fungible_token contract and publish
- * it here to local testnet so we can intercat with it to mint a fungible asset and then
+ * it here to local testnet so we can interact with it to mint a fungible asset and then
  * test FungibleAssetClient class
  */
 describe("fungible asset", () => {
@@ -68,7 +68,7 @@ describe("fungible asset", () => {
       arguments: [],
     };
     const metadata = await provider.view(viewPayload);
-    assetAddress = (metadata as any)[0].inner;
+    fungibleAssetMetadataAddress = (metadata as any)[0].inner;
   }, longTestTimeout);
 
   /**
@@ -78,21 +78,20 @@ describe("fungible asset", () => {
     "it trasfers amount of fungible asset and gets the correct balance",
     async () => {
       const fungibleAsset = new FungibleAssetClient(provider);
-
       // Alice has 5 amounts of the fungible asset
-      const aliceInitialBalance = await fungibleAsset.balance(alice.address(), assetAddress);
+      const aliceInitialBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceInitialBalance).toEqual(BigInt(5));
 
       // Alice transfers 2 amounts of the fungible asset to Bob
-      const transactionHash = await fungibleAsset.transfer(alice, assetAddress, bob.address(), 2);
+      const transactionHash = await fungibleAsset.transfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
       await provider.waitForTransaction(transactionHash);
 
       // Alice has 3 amounts of the fungible asset
-      const aliceCurrentBalance = await fungibleAsset.balance(alice.address(), assetAddress);
+      const aliceCurrentBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceCurrentBalance).toEqual(BigInt(3));
 
       // Bob has 2 amounts of the fungible asset
-      const bobBalance = await fungibleAsset.balance(bob.address(), assetAddress);
+      const bobBalance = await fungibleAsset.getBalance(bob.address(), fungibleAssetMetadataAddress);
       expect(bobBalance).toEqual(BigInt(2));
     },
     longTestTimeout,
@@ -108,21 +107,21 @@ describe("fungible asset", () => {
     // Alice transfers 2 more amount of fungible asset to Bob
     await provider.waitForTransaction(
       await coinClient.transfer(alice, bob, 2, {
-        assetAddress,
+        fungibleAssetMetadataAddress,
       }),
       { checkSuccess: true },
     );
     // Bob balance is now 4
     expect(
       await coinClient.checkBalance(bob, {
-        assetAddress,
+        fungibleAssetMetadataAddress,
       }),
     ).toEqual(BigInt(4));
   });
 
   test("it generates and returns a transfer raw transaction", async () => {
     const fungibleAsset = new FungibleAssetClient(provider);
-    const rawTxn = await fungibleAsset.generateTransfer(alice, assetAddress, bob.address(), 2);
+    const rawTxn = await fungibleAsset.generateTransfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
     expect(rawTxn instanceof RawTransaction).toBeTruthy();
     expect(rawTxn.sender.toHexString()).toEqual(alice.address().hex());
   });

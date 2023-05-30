@@ -33,11 +33,10 @@ export class CoinClient {
    * this to true, the transaction will fail if the receiver account does not
    * exist on-chain.
    *
-   * TS SDK supports fungible assets operations. For CoinClient
+   * The TS SDK supports fungible assets operations. For CoinClient
    * to support this feature, we add an optional `assetAddress` part of the `extraArgs`
    * object where you can set the fungible asset address you wish to transfer. This option
-   * uses the FungibleAssetClient class. By default the fungible asset type is `0x1::fungible_asset::Metadata`,
-   * to use a different type, set the `coinType` to be the fungible asset type.
+   * uses the FungibleAssetClient class.
    *
    * @param from Account sending the coins
    * @param to Account to receive the coins
@@ -62,12 +61,12 @@ export class CoinClient {
       // and this is set to false, the transaction would fail.
       createReceiverIfMissing?: boolean;
       // fungible asset address if you wish to transfer a fungible asset
-      assetAddress?: MaybeHexString;
+      fungibleAssetMetadataAddress?: MaybeHexString;
     },
   ): Promise<string> {
-    if (extraArgs?.assetAddress) {
+    if (extraArgs?.fungibleAssetMetadataAddress) {
       /* eslint-disable no-console */
-      console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for a better support");
+      console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
@@ -75,10 +74,9 @@ export class CoinClient {
       const fungibleAsset = new FungibleAssetClient(provider);
       const txnHash = await fungibleAsset.transfer(
         from,
-        extraArgs.assetAddress,
+        extraArgs.fungibleAssetMetadataAddress,
         getAddressFromAccountOrAddress(to),
         amount,
-        extraArgs.coinType,
       );
       return txnHash;
     }
@@ -122,21 +120,20 @@ export class CoinClient {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
       coinType?: string;
       // fungible asset address if you wish to transfer a fungible asset
-      assetAddress?: MaybeHexString;
+      fungibleAssetMetadataAddress?: MaybeHexString;
     },
   ): Promise<bigint> {
-    if (extraArgs?.assetAddress) {
+    if (extraArgs?.fungibleAssetMetadataAddress) {
       /* eslint-disable no-console */
-      console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for a better support");
+      console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({
         fullnodeUrl: this.aptosClient.nodeUrl,
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      const balance = await fungibleAsset.balance(
+      const balance = await fungibleAsset.getBalance(
         getAddressFromAccountOrAddress(account),
-        extraArgs.assetAddress,
-        extraArgs.coinType,
+        extraArgs.fungibleAssetMetadataAddress,
       );
       return balance;
     }
