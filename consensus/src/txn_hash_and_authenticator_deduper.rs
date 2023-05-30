@@ -22,9 +22,8 @@ use std::collections::{HashMap, HashSet};
 ///    transactions.
 /// 2. Calculate txn hashes (parallel): For all possible duplicates, calculate the txn hash. This
 ///    is an expensive operation.
-/// 3. Mark duplicates (sequential): Using a helper HashSet with the txn hashes calculated above and
-///    signatures, mark actual duplicate transactions.
-/// 4. Filter duplicates (sequential): Return a transaction vector with no duplicates.
+/// 3. Filter duplicates (sequential): Using a helper HashSet with the txn hashes calculated above
+///    and signatures, filter actual duplicate transactions.
 ///
 /// Possible future optimizations:
 /// a. Note the possible duplicates in Step 1 are independent of each other, so they could be
@@ -65,34 +64,28 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
                 false => None,
             })
             .collect();
+
         // TODO: Possibly parallelize. See struct comment.
         let mut seen_hashes = HashSet::new();
         let mut num_duplicates: usize = 0;
-        let duplicates: Vec<_> = hash_and_authenticators
+        let filtered: Vec<_> = hash_and_authenticators
             .into_iter()
-            .map(|maybe_hash| match maybe_hash {
-                None => false,
+            .zip(transactions)
+            .filter_map(|(maybe_hash, txn)| match maybe_hash {
+                None => None,
                 Some(hash_and_authenticator) => {
                     if seen_hashes.insert(hash_and_authenticator) {
-                        false
+                        None
                     } else {
                         num_duplicates += 1;
-                        true
+                        Some(txn)
                     }
                 },
             })
             .collect();
-        if num_duplicates == 0 {
-            TXN_DEDUP_FILTERED.observe(0 as f64);
-            return transactions;
-        }
 
         TXN_DEDUP_FILTERED.observe(num_duplicates as f64);
-        transactions
-            .into_iter()
-            .zip(duplicates)
-            .filter_map(|(txn, is_duplicate)| if is_duplicate { None } else { Some(txn) })
-            .collect()
+        filtered
     }
 }
 
