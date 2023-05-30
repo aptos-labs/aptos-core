@@ -422,8 +422,8 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
-diesel_migrations = { version = "2.0.0", features = ["postgres"] }
+diesel = { version = "2.1.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
@@ -520,7 +520,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
-rocksdb = { version = "0.20.1", features = ["lz4"] }
+rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 sha-1 = "0.10.0"

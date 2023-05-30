@@ -13,6 +13,7 @@ import {
   Memoize,
   sleep,
   APTOS_COIN,
+  CUSTOM_REQUEST_HEADER,
 } from "../utils";
 import { AptosAccount } from "../account/aptos_account";
 import * as Gen from "../generated/index";
@@ -35,7 +36,6 @@ import {
   AnyNumber,
 } from "../bcs";
 import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
-import { VERSION } from "../version";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -86,7 +86,7 @@ export class AptosClient {
     } else {
       conf.WITH_CREDENTIALS = true;
     }
-    conf.HEADERS = { ...conf.HEADERS, "x-aptos-client": `aptos-ts-sdk/${VERSION}` };
+    conf.HEADERS = { ...conf.HEADERS, ...CUSTOM_REQUEST_HEADER };
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 
