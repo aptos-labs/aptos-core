@@ -550,25 +550,25 @@ proptest! {
 }
 
 #[test]
-fn dynamic_read_writes_with_block_gas_limit() {
+fn dynamic_read_writes_with_block_gas_limit_test() {
     dynamic_read_writes_with_block_gas_limit(3000, Some(rand::thread_rng().gen_range(0, 3000) as u64));
     dynamic_read_writes_with_block_gas_limit(3000, Some(0));
 }
 
 #[test]
-fn deltas_writes_mixed_with_block_gas_limit() {
+fn deltas_writes_mixed_with_block_gas_limit_test() {
     deltas_writes_mixed_with_block_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
     deltas_writes_mixed_with_block_gas_limit(1000, Some(0));
 }
 
 #[test]
-fn deltas_resolver_with_block_gas_limit() {
+fn deltas_resolver_with_block_gas_limit_test() {
     deltas_resolver_with_block_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
     deltas_resolver_with_block_gas_limit(1000, Some(0));
 }
 
 #[test]
-fn dynamic_read_writes_contended_with_block_gas_limit() {
+fn dynamic_read_writes_contended_with_block_gas_limit_test() {
     dynamic_read_writes_contended_with_block_gas_limit(
         1000,
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
@@ -577,7 +577,7 @@ fn dynamic_read_writes_contended_with_block_gas_limit() {
 }
 
 #[test]
-fn module_publishing_fallback_with_block_gas_limit() {
+fn module_publishing_fallback_with_block_gas_limit_test() {
     module_publishing_fallback_with_block_gas_limit(
         3000,
         // Need to execute at least 2 txns to trigger module publishing fallback
@@ -588,7 +588,7 @@ fn module_publishing_fallback_with_block_gas_limit() {
 #[test]
 // Test a single transaction intersection interleaves with a lot of dependencies and
 // not overlapping module r/w keys.
-fn module_publishing_races_with_block_gas_limit() {
+fn module_publishing_races_with_block_gas_limit_test() {
     for _ in 0..5 {
         publishing_fixed_params_with_block_gas_limit(
             300,
