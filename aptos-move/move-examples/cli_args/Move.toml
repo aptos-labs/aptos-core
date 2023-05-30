@@ -4,9 +4,7 @@ version = "0.1.0"
 upgrade_policy = "compatible"
 
 [addresses]
-deploy_address = "_"
-std = "0x1"
-aptos_framework = "0x1"
+test_account = "_"
 
-[dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+[dependencies.AptosFramework]
+local = "../../framework/aptos-framework"

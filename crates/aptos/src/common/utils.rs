@@ -23,7 +23,7 @@ use aptos_types::{
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -471,5 +471,50 @@ pub async fn profile_or_submit(
             .submit_transaction(payload)
             .await
             .map(TransactionSummary::from)
+    }
+}
+
+/// Try parsing JSON in file at path into a specified type.
+pub fn parse_json_file<T: for<'a> Deserialize<'a>>(path_ref: &Path) -> CliTypedResult<T> {
+    serde_json::from_slice::<T>(&read_from_file(path_ref)?).map_err(|err| {
+        CliError::UnableToReadFile(format!("{}", path_ref.display()), err.to_string())
+    })
+}
+
+/// Convert a view function JSON field into a string option.
+///
+/// A view function JSON return represents an option via an inner JSON array titled `vec`.
+pub fn view_json_option_str(option_ref: &serde_json::Value) -> CliTypedResult<Option<String>> {
+    if let Some(vec_field) = option_ref.get("vec") {
+        if let Some(vec_array) = vec_field.as_array() {
+            if vec_array.is_empty() {
+                Ok(None)
+            } else if vec_array.len() > 1 {
+                Err(CliError::UnexpectedError(format!(
+                    "JSON `vec` array has more than one element: {:?}",
+                    vec_array
+                )))
+            } else {
+                let option_val_ref = &vec_array[0];
+                if let Some(inner_str) = option_val_ref.as_str() {
+                    Ok(Some(inner_str.to_string()))
+                } else {
+                    Err(CliError::UnexpectedError(format!(
+                        "JSON option is not a string: {}",
+                        option_val_ref
+                    )))
+                }
+            }
+        } else {
+            Err(CliError::UnexpectedError(format!(
+                "JSON `vec` field is not an array: {}",
+                vec_field
+            )))
+        }
+    } else {
+        Err(CliError::UnexpectedError(format!(
+            "JSON field does not have an inner `vec` field: {}",
+            option_ref
+        )))
     }
 }
