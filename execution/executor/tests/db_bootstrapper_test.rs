@@ -31,7 +31,7 @@ use aptos_types::{
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -44,10 +44,6 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-
-const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
-// const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
-// const BLOCK_GAS_LIMIT: Option<u64> = None;
 
 #[test]
 fn test_empty_db() {

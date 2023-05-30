@@ -17,13 +17,10 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
+    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
 use std::sync::Arc;
-
-pub const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
-// pub const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
-// pub const BLOCK_GAS_LIMIT: Option<u64> = None;
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db

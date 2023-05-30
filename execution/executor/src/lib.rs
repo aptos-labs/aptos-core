@@ -11,7 +11,7 @@ pub mod metrics;
 #[cfg(test)]
 mod mock_vm;
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
 pub mod block_executor;
 pub mod chunk_executor;

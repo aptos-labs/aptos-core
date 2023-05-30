@@ -21,7 +21,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
         Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
         WriteSetPayload,
@@ -32,10 +32,6 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
 use std::sync::Arc;
-
-const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
-// const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
-// const BLOCK_GAS_LIMIT: Option<u64> = None;
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     const B: u64 = 1_000_000_000;

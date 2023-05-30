@@ -22,12 +22,9 @@ use aptos_types::{
     transaction::{Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
+    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
 };
 use move_core_types::move_resource::MoveStructType;
-
-const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
-// const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
-// const BLOCK_GAS_LIMIT: Option<u64> = None;
 
 #[test]
 fn test_genesis() {

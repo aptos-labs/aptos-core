@@ -30,7 +30,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
@@ -42,7 +42,6 @@ use proptest::prelude::*;
 use std::{iter::once, sync::Arc};
 
 mod chunk_executor_tests;
-pub use chunk_executor_tests::BLOCK_GAS_LIMIT as BLOCK_GAS_LIMIT;
 
 fn execute_and_commit_block(
     executor: &TestExecutor,

@@ -15,6 +15,11 @@ use aptos_crypto::{ed25519::*, traits::*, HashValue};
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
 
+// The block gas limit parameter for executor tests
+pub const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
+// pub const BLOCK_GAS_LIMIT: Option<u64> = Some(0);
+// pub const BLOCK_GAS_LIMIT: Option<u64> = None;
+
 static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 
 // Create an expiration time 'seconds' after now

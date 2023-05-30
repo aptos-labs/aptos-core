@@ -17,13 +17,10 @@ use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use rand::Rng;
-
-// pub const BLOCK_GAS_LIMIT: Option<u64> = Some(1000);
-pub const BLOCK_GAS_LIMIT: Option<u64> = None;
 
 pub struct TestExecutor {
     _path: aptos_temppath::TempPath,
