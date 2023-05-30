@@ -48,9 +48,11 @@ pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
     }
 
     /////// 0L ///////// 
-    // e.g. ZAPATOS_BIN_PATH=/opt/zapatos/target/debug/ 
+    // e.g. ZAPATOS_BIN_PATH=/zapatos/target/release/
+    let zapatos_bin_path = std::env::var("ZAPATOS_BIN_PATH")
+        .expect("failed to read env.var. ZAPATOS_BIN_PATH");
     // let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
-    let bin_path = PathBuf::from(concat!(env!("ZAPATOS_BIN_PATH"), "/aptos-node"));
+    let bin_path = PathBuf::from(zapatos_bin_path + "/aptos-node");
 
     Ok((revision, bin_path))
 }
