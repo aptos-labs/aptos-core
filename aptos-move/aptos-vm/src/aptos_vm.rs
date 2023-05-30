@@ -1477,10 +1477,10 @@ impl VMExecutor for AptosVM {
         ret
     }
 
-    fn execute_block_with_gas_limit(
+    fn execute_block_with_block_gas_limit(
         transactions: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1502,7 +1502,7 @@ impl VMExecutor for AptosVM {
             transactions,
             state_view,
             Self::get_concurrency_level(),
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

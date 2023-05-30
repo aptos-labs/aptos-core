@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
@@ -37,10 +37,10 @@ pub trait TransactionBlockExecutor: Send + Sync {
         state_view: CachedStateView,
     ) -> Result<ChunkOutput>;
 
-    fn execute_transaction_block_with_gas_limit(
+    fn execute_transaction_block_with_block_gas_limit(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput>;
 }
 
@@ -52,15 +52,15 @@ impl TransactionBlockExecutor for AptosVM {
         ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
     }
 
-    fn execute_transaction_block_with_gas_limit(
+    fn execute_transaction_block_with_block_gas_limit(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_gas_limit::<AptosVM>(
+        ChunkOutput::by_transaction_execution_with_block_gas_limit::<AptosVM>(
             transactions,
             state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
     }
 }
@@ -101,24 +101,6 @@ impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
     V: TransactionBlockExecutor,
 {
-    fn get_block_gas_limit(&self) -> Option<u64> {
-        self.maybe_initialize().expect("Failed to initialize.");
-        self.inner
-            .read()
-            .as_ref()
-            .expect("BlockExecutor is not reset")
-            .get_block_gas_limit()
-    }
-
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>) {
-        self.maybe_initialize().expect("Failed to initialize.");
-        self.inner
-            .write()
-            .as_ref()
-            .expect("BlockExecutor is not reset")
-            .update_block_gas_limit(block_gas_limit);
-    }
-
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
         self.inner
@@ -137,13 +119,14 @@ where
         &self,
         block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_block(block, parent_block_id)
+            .execute_block(block, parent_block_id, maybe_block_gas_limit)
     }
 
     fn commit_blocks_ext(
@@ -168,7 +151,6 @@ struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
     phantom: PhantomData<V>,
-    block_gas_limit: Mutex<Option<u64>>,
 }
 
 impl<V> BlockExecutorInner<V>
@@ -181,7 +163,6 @@ where
             db,
             block_tree,
             phantom: PhantomData,
-            block_gas_limit: Mutex::new(None),
         })
     }
 
@@ -200,15 +181,6 @@ impl<V> BlockExecutorInner<V>
 where
     V: TransactionBlockExecutor,
 {
-    fn get_block_gas_limit(&self) -> Option<u64> {
-        self.block_gas_limit.lock().as_ref().copied()
-    }
-
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>) {
-        let mut gas_limit = self.block_gas_limit.lock();
-        *gas_limit = block_gas_limit;
-    }
-
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
@@ -217,6 +189,7 @@ where
         &self,
         block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
@@ -261,8 +234,6 @@ where
                 )?
             };
 
-            let maybe_gas_limit = self.get_block_gas_limit();
-
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
                 fail_point!("executor::vm_execute_block", |_| {
@@ -270,11 +241,11 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                if maybe_gas_limit.is_some() {
-                    V::execute_transaction_block_with_gas_limit(
+                if maybe_block_gas_limit.is_some() {
+                    V::execute_transaction_block_with_block_gas_limit(
                         transactions,
                         state_view,
-                        maybe_gas_limit,
+                        maybe_block_gas_limit,
                     )?
                 } else {
                     V::execute_transaction_block(transactions, state_view)?
@@ -287,7 +258,7 @@ where
                 .start_timer();
 
             let (output, _, _) = chunk_output
-                .apply_to_ledger_for_block(parent_view, maybe_gas_limit.map(|_| block_id))?;
+                .apply_to_ledger_for_block(parent_view, maybe_block_gas_limit.map(|_| block_id))?;
 
             output
         };

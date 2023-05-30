@@ -57,6 +57,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
+    maybe_block_gas_limit: Mutex<Option<u64>>
 }
 
 impl ExecutionProxy {
@@ -90,6 +91,7 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             payload_manager: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
+            maybe_block_gas_limit: Mutex::new(None),
         }
     }
 }
@@ -122,7 +124,7 @@ impl StateComputer for ExecutionProxy {
 
         let shuffled_txns = txn_shuffler.shuffle(txns);
 
-        let block_gas_limit = self.executor.get_block_gas_limit();
+        let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
@@ -136,7 +138,7 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
-                executor.execute_block((block_id, transactions_to_execute), parent_block_id)
+                executor.execute_block((block_id, transactions_to_execute), parent_block_id, block_gas_limit)
             })
             .await
         )
@@ -179,7 +181,7 @@ impl StateComputer for ExecutionProxy {
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
 
-        let block_gas_limit = self.executor.get_block_gas_limit();
+        let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
         for block in blocks {
             block_ids.push(block.id());
@@ -288,7 +290,7 @@ impl StateComputer for ExecutionProxy {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
-        _block_gas_limit: Option<u64>,
+        block_gas_limit: Option<u64>,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -298,9 +300,7 @@ impl StateComputer for ExecutionProxy {
         self.transaction_shuffler
             .lock()
             .replace(transaction_shuffler);
-        // TODO: Temporarily disable initializing block gas limit and leave it as default None,
-        // until there is a better way to handle the possible panic when executor is initialized.
-        // self.executor.update_block_gas_limit(block_gas_limit);
+        *self.maybe_block_gas_limit.lock() = block_gas_limit;
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -355,12 +355,6 @@ async fn test_commit_sync_race() {
         }
 
         fn finish(&self) {}
-
-        fn get_block_gas_limit(&self) -> Option<u64> {
-            None
-        }
-
-        fn update_block_gas_limit(&self, _block_gas_limit: Option<u64>) {}
     }
 
     #[async_trait::async_trait]

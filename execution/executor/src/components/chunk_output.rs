@@ -63,15 +63,15 @@ impl ChunkOutput {
         })
     }
 
-    pub fn by_transaction_execution_with_gas_limit<V: VMExecutor>(
+    pub fn by_transaction_execution_with_block_gas_limit<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block_with_gas_limit::<V>(
+        let transaction_outputs = Self::execute_block_with_block_gas_limit::<V>(
             transactions.clone(),
             &state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )?;
 
         // to print txn output for debugging, uncomment:
@@ -193,15 +193,15 @@ impl ChunkOutput {
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
-    fn execute_block_with_gas_limit<V: VMExecutor>(
+    fn execute_block_with_block_gas_limit<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_with_gas_limit(
+        Ok(V::execute_block_with_block_gas_limit(
             transactions,
             &state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )?)
     }
 
@@ -237,10 +237,10 @@ impl ChunkOutput {
 
     /// In consensus-only mode, we do not care about gas limits.
     #[cfg(feature = "consensus-only-perf-test")]
-    fn execute_block_with_gas_limit<V: VMExecutor>(
+    fn execute_block_with_block_gas_limit<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
-        _maybe_gas_limit: Option<u64>,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Self::execute_block::<V>(transactions, state_view)
     }
