@@ -119,7 +119,9 @@ export class CoinClient {
   async checkBalance(
     account: AptosAccount | MaybeHexString,
     extraArgs?: {
-      // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin
+      // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin.
+      // If you want to transfer a fungible asset, set this param to be the
+      // fungible asset address
       coinType?: string;
     },
   ): Promise<bigint> {
