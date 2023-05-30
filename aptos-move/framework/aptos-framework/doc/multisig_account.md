@@ -1833,9 +1833,6 @@ maliciously alter the number of signatures required.
 
 Create a multisig transaction, which will have one approval initially (from the creator).
 
-@param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-@param args Vector of BCS-encoded argument values to invoke the target function with.
-
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_transaction">create_transaction</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
@@ -1880,10 +1877,6 @@ Create a multisig transaction, which will have one approval initially (from the 
 Create a multisig transaction with a transaction hash instead of the full payload.
 This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
 to provide the full payload, which will be validated against the hash stored on-chain.
-
-@param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-@param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-function arguments.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_transaction_with_hash">create_transaction_with_hash</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, payload_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
