@@ -72,13 +72,13 @@ impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
             .into_iter()
             .zip(transactions)
             .filter_map(|(maybe_hash, txn)| match maybe_hash {
-                None => None,
+                None => Some(txn),
                 Some(hash_and_authenticator) => {
                     if seen_hashes.insert(hash_and_authenticator) {
-                        None
+                        Some(txn)
                     } else {
                         num_duplicates += 1;
-                        Some(txn)
+                        None
                     }
                 },
             })
