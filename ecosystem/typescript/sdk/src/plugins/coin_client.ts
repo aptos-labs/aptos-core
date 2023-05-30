@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { AptosAccount, getAddressFromAccountOrAddress } from "../account/aptos_account";
 import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client";
-import { MaybeHexString, APTOS_COIN, NetworkToIndexerAPI, NodeAPIToNetwork, HexString } from "../utils";
+import { MaybeHexString, APTOS_COIN, NetworkToIndexerAPI, NodeAPIToNetwork } from "../utils";
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { FungibleAssetClient } from "./fungible_asset_client";
 import { Provider } from "../providers";
