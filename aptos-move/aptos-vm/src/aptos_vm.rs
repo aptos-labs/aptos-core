@@ -1384,7 +1384,7 @@ impl AptosVM {
             gas_budget,
         );
         let resolver = &state_view.as_move_resolver();
-        let mut session = vm.0.new_session(resolver, SessionId::Void, true);
+        let mut session = vm.new_session(resolver, SessionId::Void, true);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);

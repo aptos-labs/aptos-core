@@ -84,7 +84,7 @@ impl VMChangeSet {
 
         // Try to materialize deltas and add them to the write set.
         let mut write_set_mut = write_set.into_mut();
-        let delta_writes = delta_change_set.take_materialized(state_view)?;
+        let delta_writes = delta_change_set.try_materialize(state_view)?;
         delta_writes
             .into_iter()
             .for_each(|item| write_set_mut.insert(item));

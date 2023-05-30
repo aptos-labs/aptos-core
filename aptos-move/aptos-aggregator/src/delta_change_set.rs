@@ -169,11 +169,12 @@ impl DeltaOp {
     /// Applies next delta on top of self, merging two deltas together. This is a reverse
     /// of `merge_with_previous_delta`.
     pub fn merge_with_next_delta(&mut self, next_delta: DeltaOp) -> PartialVMResult<()> {
-        // TODO: Revisit how merge_with_previous_delta is implemented and refactor to
-        // avoid copies/duplication.
-        let mut next_delta = next_delta;
-        next_delta.merge_with_previous_delta(*self)?;
-        *self = next_delta;
+        // Now self follows the other delta.
+        let mut previous_delta = next_delta;
+        std::mem::swap(self, &mut previous_delta);
+
+        // Perform the merge.
+        self.merge_with_previous_delta(previous_delta)?;
         Ok(())
     }
 
@@ -343,7 +344,7 @@ impl DeltaChangeSet {
 
     /// Converts deltas to a vector of write ops. In case conversion to a write op
     /// failed, the error is propagated to the caller.
-    pub fn take_materialized(
+    pub fn try_materialize(
         self,
         state_view: &dyn StateView,
     ) -> anyhow::Result<Vec<(StateKey, WriteOp)>, VMStatus> {
@@ -366,7 +367,7 @@ impl DeltaChangeSet {
         self,
         state_view: &dyn StateView,
     ) -> anyhow::Result<WriteSet, VMStatus> {
-        let materialized_write_set = self.take_materialized(state_view)?;
+        let materialized_write_set = self.try_materialize(state_view)?;
         WriteSetMut::new(materialized_write_set)
             .freeze()
             .map_err(|_err| {
