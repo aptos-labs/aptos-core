@@ -23,9 +23,19 @@ The [Coin module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/
 
 See [Aptos Coin >](./aptos-coin.md)
 
-### [Aptos Token](./aptos-token.md)
+### Aptos Token
 
-The [Token module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move), on the other hand:
+#### [Token V2](./aptos-token-v2.md)
+The new [Token v2 standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) allows:
+
+- Rich, flexible assets and collectibles.
+- Token v2 can be built up on easily to provide richer custom functionalities. An example of this is the [aptos_token module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/aptos_token.move)
+
+The v2 standard is recommended for any new collections or protocols that want to build NFT or semi-fungible tokens.
+See [Aptos Token v2 >](./aptos-token-v2.md)
+
+#### [Token V1](./aptos-token.md)
+The old existing [Token module](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move), on the other hand:
 
 - Encapsulates rich, flexible assets and collectibles. These assets are discrete (non-decimal) and can be fungible, semi-fungible, or nonfungible.
 - The token standard is in its own `AptosToken` package at the Address `0x3` to allow for rapid iteration based on feedback from the community.
