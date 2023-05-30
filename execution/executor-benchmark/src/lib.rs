@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
-pub mod benchmark_transaction;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -15,9 +14,8 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    benchmark_transaction::BenchmarkTransaction, pipeline::Pipeline,
-    transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
-    transaction_generator::TransactionGenerator,
+    pipeline::Pipeline, transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
@@ -48,11 +46,9 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
-pub fn init_db_and_executor<V>(
-    config: &NodeConfig,
-) -> (DbReaderWriter, BlockExecutor<V, BenchmarkTransaction>)
+pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
-    V: TransactionBlockExecutor<BenchmarkTransaction>,
+    V: TransactionBlockExecutor,
 {
     let db = DbReaderWriter::new(
         AptosDB::open(
@@ -103,7 +99,7 @@ pub fn run_benchmark<V>(
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     create_checkpoint(
         source_dir.as_ref(),
@@ -264,7 +260,7 @@ fn init_workload<V, P: AsRef<Path>>(
     pipeline_config: PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     let version = db.reader.get_latest_version().unwrap();
     let (pipeline, block_sender) = Pipeline::<V>::new(
@@ -325,7 +321,7 @@ pub fn add_accounts<V>(
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(
@@ -359,7 +355,7 @@ fn add_accounts_impl<V>(
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
-    V: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    V: TransactionBlockExecutor + 'static,
 {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
@@ -433,10 +429,7 @@ fn add_accounts_impl<V>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
-        pipeline::PipelineConfig,
-    };
+    use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
@@ -447,7 +440,7 @@ mod tests {
         transaction_type: Option<TransactionTypeArg>,
         verify_sequence_numbers: bool,
     ) where
-        E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+        E: TransactionBlockExecutor + 'static,
     {
         aptos_logger::Logger::new().init();
 
