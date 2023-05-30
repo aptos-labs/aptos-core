@@ -13,7 +13,7 @@ pub mod type_name;
 pub mod unit_test;
 pub mod vector;
 //////// 0L ////////
-pub mod ol_vdf;
+// pub mod ol_vdf; // todo v7
 
 mod helpers;
 
@@ -28,8 +28,8 @@ pub struct GasParameters {
     pub string: string::GasParameters,
     pub type_name: type_name::GasParameters,
     pub vector: vector::GasParameters,
-    //////// 0L ////////
-    pub ol_vdf: ol_vdf::GasParameters,
+    //////// 0L //////// // todo v7
+    // pub ol_vdf: ol_vdf::GasParameters,
 
     #[cfg(feature = "testing")]
     pub unit_test: unit_test::GasParameters,
@@ -102,15 +102,15 @@ impl GasParameters {
                     unit_cost: 0.into(),
                 },
             },
-            //////// 0L ////////
-            ol_vdf: ol_vdf::GasParameters {
-                verify: ol_vdf::VerifyGasParameters {
-                    base: 0.into(),
-                },
-                extract_address_from_challenge: ol_vdf::ExtractAddressFromChallengeGasParameters {
-                    base: 0.into(),
-                },
-            },            
+            //////// 0L //////// // todo v7
+            // ol_vdf: ol_vdf::GasParameters {
+            //     verify: ol_vdf::VerifyGasParameters {
+            //         base: 0.into(),
+            //     },
+            //     extract_address_from_challenge: ol_vdf::ExtractAddressFromChallengeGasParameters {
+            //         base: 0.into(),
+            //     },
+            // },            
         }
     }
 }
@@ -135,8 +135,8 @@ pub fn all_natives(
     add_natives!("string", string::make_all(gas_params.string));
     add_natives!("type_name", type_name::make_all(gas_params.type_name));
     add_natives!("vector", vector::make_all(gas_params.vector));
-    //////// 0L ////////
-    add_natives!("ol_vdf", ol_vdf::make_all(gas_params.ol_vdf));
+    //////// 0L //////// // todo v7
+    // add_natives!("ol_vdf", ol_vdf::make_all(gas_params.ol_vdf));
 
     #[cfg(feature = "testing")]
     {
