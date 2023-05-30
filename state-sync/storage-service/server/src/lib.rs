@@ -252,7 +252,6 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                     )
                     .process_request_and_respond(
                         peer_network_id,
-                        protocol_id,
                         storage_service_request,
                         network_request.response_sender,
                     );

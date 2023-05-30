@@ -11,7 +11,6 @@ use crate::{
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, NewTransactionOutputsWithProofRequest,
@@ -281,10 +280,5 @@ fn create_optimistic_fetch_request(
     let response_sender = ResponseSender::new(callback);
 
     // Create and return the optimistic fetch request
-    OptimisticFetchRequest::new(
-        ProtocolId::StorageServiceRpc,
-        storage_service_request,
-        response_sender,
-        time_service,
-    )
+    OptimisticFetchRequest::new(storage_service_request, response_sender, time_service)
 }
