@@ -13,7 +13,7 @@ use aptos_protos::{
     internal::fullnode::v1::{
         transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
     },
-    transaction::testing1::v1::Transaction as TransactionPB,
+    transaction::v1::Transaction as TransactionPB,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use std::{

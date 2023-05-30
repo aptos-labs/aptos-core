@@ -10,9 +10,12 @@ use crate::{
     storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::{BaseConfig, NodeConfig};
+use aptos_config::{
+    config::{BaseConfig, NodeConfig},
+    network_id::NetworkId,
+};
 use aptos_logger::prelude::*;
-use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
@@ -83,14 +86,13 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         while let Some(network_request) = self.network_requests.next().await {
             // Log the request
             let peer_network_id = network_request.peer_network_id;
-            let protocol_id = network_request.protocol_id;
             let peer_monitoring_service_request = network_request.peer_monitoring_service_request;
             let response_sender = network_request.response_sender;
             trace!(LogSchema::new(LogEntry::ReceivedPeerMonitoringRequest)
                 .request(&peer_monitoring_service_request)
                 .message(&format!(
-                    "Received peer monitoring request. Peer: {:?}, protocol: {:?}.",
-                    peer_network_id, protocol_id,
+                    "Received peer monitoring request. Peer: {:?}",
+                    peer_network_id,
                 )));
 
             // All handler methods are currently CPU-bound so we want
@@ -109,7 +111,10 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                         storage,
                         time_service,
                     )
-                    .call(protocol_id, peer_monitoring_service_request);
+                    .call(
+                        peer_network_id.network_id(),
+                        peer_monitoring_service_request,
+                    );
                     log_monitoring_service_response(&response);
                     response_sender.send(response);
                 })
@@ -149,20 +154,20 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     pub fn call(
         &self,
-        protocol: ProtocolId,
+        network_id: NetworkId,
         request: PeerMonitoringServiceRequest,
     ) -> Result<PeerMonitoringServiceResponse> {
         // Update the request count
         increment_counter(
             &metrics::PEER_MONITORING_REQUESTS_RECEIVED,
-            protocol,
+            network_id,
             request.get_label(),
         );
 
         // Time the request processing (the timer will stop when it's dropped)
         let _timer = start_timer(
             &metrics::PEER_MONITORING_REQUEST_PROCESSING_LATENCY,
-            protocol,
+            network_id,
             request.get_label(),
         );
 
@@ -187,7 +192,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 // Log the error and update the counters
                 increment_counter(
                     &metrics::PEER_MONITORING_ERRORS_ENCOUNTERED,
-                    protocol,
+                    network_id,
                     error.get_label(),
                 );
                 error!(LogSchema::new(LogEntry::PeerMonitoringServiceError)
@@ -206,7 +211,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 // The request was successful
                 increment_counter(
                     &metrics::PEER_MONITORING_RESPONSES_SENT,
-                    protocol,
+                    network_id,
                     response.get_label(),
                 );
                 Ok(response)

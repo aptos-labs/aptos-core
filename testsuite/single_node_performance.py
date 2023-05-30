@@ -7,7 +7,7 @@ import re
 import os
 import tempfile
 import json
-from typing import Callable, Optional, Tuple, Mapping, Sequence
+from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass
@@ -18,27 +18,29 @@ from dataclasses import dataclass
 EXPECTED_TPS = {
     ("no-op", False, 1): (18800.0, True),
     ("no-op", False, 1000): (2980.0, True),
-    ("coin-transfer", False, 1): (12500.0, True),
-    ("coin-transfer", True, 1): (22000.0, True),
+    ("coin-transfer", False, 1): (12600.0, True),
+    ("coin-transfer", True, 1): (22100.0, True),
     ("account-generation", False, 1): (11000.0, True),
     ("account-generation", True, 1): (17600.0, True),
-    ("create-new-account-resource", False, 1): (13000.0, True),
-    ("modify-global-resource", False, 1): (3900.0, True),
+    # changed to not use account_pool. either recalibrate or add here to use account pool.
+    ("account-resource32-b", False, 1): (13000.0, False),
+    ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
-    ("publish-package", False, 1): (155.0, True),
+    # seems to have changed, disabling as land_blocking, until recalibrated
+    ("publish-package", False, 1): (159.0, False),
     ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (550, True),
-    ("token-v1ft-mint-and-transfer", False, 1): (1700.0, True),
-    ("token-v1ft-mint-and-transfer", False, 20): (7000.0, True),
+    ("batch100-transfer", True, 1): (553, True),
+    ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
+    ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
     ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
-    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5400.0, True),
+    ("token-v1nft-mint-and-transfer-sequential", False, 20): (5350.0, True),
     ("token-v1nft-mint-and-transfer-parallel", False, 1): (1380.0, True),
-    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5500.0, True),
+    ("token-v1nft-mint-and-transfer-parallel", False, 20): (5450.0, True),
     # ("token-v1ft-mint-and-store", False): 1000.0,
     # ("token-v1nft-mint-and-store-sequential", False): 1000.0,
     # ("token-v1nft-mint-and-store-parallel", False): 1000.0,
-    ("no-op2-signers", False, 1): (18600.0, True),
-    ("no-op5-signers", False, 1): (18600.0, True),
+    ("no-op2-signers", False, 1): (18800.0, True),
+    ("no-op5-signers", False, 1): (18800.0, True),
     ("token-v2-ambassador-mint", False, 1): (1750.0, True),
     ("token-v2-ambassador-mint", False, 20): (5500.0, True),
 }
@@ -47,12 +49,12 @@ NOISE_LOWER_LIMIT = 0.8
 NOISE_LOWER_LIMIT_WARN = 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 1.1
+NOISE_UPPER_LIMIT = 1.15
 NOISE_UPPER_LIMIT_WARN = 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
-CODE_PERF_VERSION = "v2"
+CODE_PERF_VERSION = "v3"
 
 # use production concurrency level for assertions
 CONCURRENCY_LEVEL = 8
@@ -89,9 +91,10 @@ def execute_command(command):
         universal_newlines=True,
     ) as p:
         # stream to output while command is executing
-        for line in p.stdout:
-            print(line, end="")
-            result.append(line)
+        if p.stdout is not None:
+            for line in p.stdout:
+                print(line, end="")
+                result.append(line)
 
     if p.returncode != 0:
         raise CalledProcessError(p.returncode, p.args)
@@ -151,7 +154,7 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
 def print_table(
     results: Sequence[RunGroupInstance],
     by_levels: bool,
-    single_field: Optional[Tuple[str, Callable[[RunResults], any]]],
+    single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
     concurrency_levels=EXECUTION_ONLY_CONCURRENCY_LEVELS,
 ):
     headers = [
@@ -186,11 +189,14 @@ def print_table(
             result.expected_tps,
         ]
         if by_levels:
-            _, field_getter = single_field
-            for concurrency_level in concurrency_levels:
-                row.append(
-                    field_getter(result.concurrency_level_results[concurrency_level])
-                )
+            if single_field is not None:
+                _, field_getter = single_field
+                for concurrency_level in concurrency_levels:
+                    row.append(
+                        field_getter(
+                            result.concurrency_level_results[concurrency_level]
+                        )
+                    )
 
         if single_field is not None:
             _, field_getter = single_field

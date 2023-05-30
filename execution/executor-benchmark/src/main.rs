@@ -245,7 +245,7 @@ where
             aptos_executor_benchmark::run_benchmark::<E>(
                 opt.block_size,
                 blocks,
-                transaction_type.map(|t| t.materialize(module_working_set_size)),
+                transaction_type.map(|t| t.materialize(module_working_set_size, false)),
                 opt.transactions_per_sender,
                 main_signer_accounts,
                 additional_dst_pool_accounts,

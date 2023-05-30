@@ -52,9 +52,9 @@ pub(crate) fn update_store(
     use aptos_storage_interface::{jmt_update_refs, jmt_updates};
     let mut root_hash = *aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
-        let value_state_set = vec![(key.clone(), value.clone())].into_iter().collect();
+        let value_state_set = vec![(&key, value.as_ref())].into_iter().collect();
         let mut sharded_value_state_set = arr![HashMap::new(); 16];
-        sharded_value_state_set[key.get_shard_id() as usize].insert(key, value);
+        sharded_value_state_set[key.get_shard_id() as usize].insert(key.clone(), value.clone());
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         root_hash = store
@@ -77,7 +77,11 @@ pub(crate) fn update_store(
                 &sharded_state_kv_batches,
             )
             .unwrap();
-        store.ledger_db.write_schemas(ledger_batch).unwrap();
+        store
+            .ledger_db
+            .metadata_db()
+            .write_schemas(ledger_batch)
+            .unwrap();
         store
             .state_kv_db
             .commit(version, sharded_state_kv_batches)
@@ -94,7 +98,8 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             .iter()
             .flatten()
             .for_each(|(key, value)| {
-                state.updates_since_base.insert(key.clone(), value.clone());
+                state.updates_since_base[key.get_shard_id() as usize]
+                    .insert(key.clone(), value.clone());
             });
         next_version += 1;
         if txn_to_commit.is_state_checkpoint() {
@@ -106,6 +111,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     state
                         .updates_since_base
                         .iter()
+                        .flatten()
                         .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
                     StateStorageUsage::new_untracked(),
@@ -116,7 +122,9 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             state.current_version = next_version.checked_sub(1);
             state.base = state.current.clone();
             state.base_version = state.current_version;
-            state.updates_since_base.clear();
+            state.updates_since_base.iter_mut().for_each(|shard| {
+                shard.clear();
+            });
         }
     }
 
@@ -129,6 +137,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                 state
                     .updates_since_base
                     .iter()
+                    .flatten()
                     .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
                 StateStorageUsage::new_untracked(),
@@ -861,7 +870,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
     db.ledger_store
         .put_transaction_infos(version, &[txn_info.clone()], &batch)
         .unwrap();
-    db.ledger_db.write_schemas(batch).unwrap();
+    db.ledger_db.transaction_db().write_schemas(batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
@@ -873,7 +882,8 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     let smt = SparseMerkleTree::<StateValue>::default()
         .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
-    db.ledger_db
+    db.state_kv_db
+        .metadata_db()
         .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
     let mut in_memory_state = db
@@ -884,7 +894,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .clone();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updates_since_base.insert(key, Some(value));
+    in_memory_state.updates_since_base[key.get_shard_id() as usize].insert(key, Some(value));
     db.state_store
         .buffered_state()
         .lock()

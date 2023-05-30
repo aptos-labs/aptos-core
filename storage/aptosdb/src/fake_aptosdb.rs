@@ -107,9 +107,6 @@ impl FakeBufferedState {
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
-            self.state_after_checkpoint
-                .updates_since_base
-                .extend(updates_until_next_checkpoint_since_current);
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
             swap(
@@ -490,16 +487,6 @@ impl DbReader for FakeAptosDB {
                 ),
             ))
         })
-    }
-
-    fn get_gas_prices(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<u64>> {
-        self.inner
-            .get_gas_prices(start_version, limit, ledger_version)
     }
 
     fn get_transaction_by_hash(

@@ -55,6 +55,7 @@ pub enum LogEntry {
 #[serde(rename_all = "snake_case")]
 pub enum LogEvent {
     InvalidResponse,
+    LogAllPeerStates,
     PeerPingError,
     ResponseError,
     ResponseSuccess,

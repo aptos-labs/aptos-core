@@ -556,6 +556,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    token_activities_v2 (transaction_version, event_index) {
+        transaction_version -> Int8,
+        event_index -> Int8,
+        event_account_address -> Varchar,
+        token_data_id -> Varchar,
+        property_version_v1 -> Numeric,
+        #[sql_name = "type"]
+        type_ -> Varchar,
+        from_address -> Nullable<Varchar>,
+        to_address -> Nullable<Varchar>,
+        token_amount -> Numeric,
+        before_value -> Nullable<Text>,
+        after_value -> Nullable<Text>,
+        entry_function_id_str -> Nullable<Varchar>,
+        token_standard -> Varchar,
+        is_fungible_v2 -> Nullable<Bool>,
+        transaction_timestamp -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     token_datas (token_data_id_hash, transaction_version) {
         token_data_id_hash -> Varchar,
         transaction_version -> Int8,
@@ -745,6 +767,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     table_items,
     table_metadatas,
     token_activities,
+    token_activities_v2,
     token_datas,
     token_datas_v2,
     token_ownerships,

@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcProcessorConfig {
-    pub server_name: String,
     pub processor_name: String,
     pub postgres_connection_string: String,
     pub indexer_grpc_data_service_addresss: String,
@@ -38,7 +37,7 @@ impl RunnableConfig for IndexerGrpcProcessorConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxproc".to_string()
     }
 }
 

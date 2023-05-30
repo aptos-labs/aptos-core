@@ -23,11 +23,12 @@ aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+aptos-vm = { workspace = true, features = ['failpoints'] }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
+fail = { workspace = true, features = ['failpoints'] }
 itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }

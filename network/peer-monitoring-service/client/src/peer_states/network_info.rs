@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    metrics,
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
     Error, LogEntry, LogEvent, LogSchema,
 };
@@ -170,6 +171,26 @@ impl StateValueInterface for NetworkInfoState {
             .message("Error encountered when requesting network information from the peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+
+    fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId) {
+        if let Some(network_info_response) = self.get_latest_network_info_response() {
+            // Update the distance from the validators metric
+            let distance_from_validators = network_info_response.distance_from_validators;
+            metrics::observe_value(
+                &metrics::DISTANCE_FROM_VALIDATORS,
+                peer_network_id,
+                distance_from_validators as f64,
+            );
+
+            // Update the number of connected peers metric
+            let num_connected_peers = network_info_response.connected_peers.len();
+            metrics::observe_value(
+                &metrics::NUM_CONNECTED_PEERS,
+                peer_network_id,
+                num_connected_peers as f64,
+            );
+        }
     }
 }
 

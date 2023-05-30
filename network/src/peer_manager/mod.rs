@@ -335,7 +335,7 @@ where
     }
 
     /// Handles a new connection event
-    fn handle_new_connection_event(&mut self, mut conn: Connection<TSocket>) {
+    fn handle_new_connection_event(&mut self, conn: Connection<TSocket>) {
         // Get the trusted peers
         let trusted_peers = match self
             .peers_and_metadata
@@ -354,67 +354,46 @@ where
             },
         };
 
-        // Handle the new connection based on the connection origin
-        match conn.metadata.origin {
-            ConnectionOrigin::Outbound => {
-                // TODO: This is a hack around having to feed trusted peers deeper
-                // into the outbound path. Inbound ones are assigned at Noise handshake time.
-                let peer_role = match trusted_peers.read().get(&conn.metadata.remote_peer_id) {
-                    Some(trusted_peer) => trusted_peer.role,
-                    None => {
-                        // Return an unknown peer role
-                        warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .connection_metadata_with_address(&conn.metadata),
-                            "{} Outbound connection made with unknown peer role: {}",
-                            self.network_context,
-                            conn.metadata
-                        );
-                        PeerRole::Unknown
-                    },
-                };
-                conn.metadata.role = peer_role;
-            },
-            ConnectionOrigin::Inbound => {
-                // Everything below here is meant for unknown peers only, role comes from
-                // Noise handshake and if it's not `Unknown` it is trusted
-                if conn.metadata.role == PeerRole::Unknown {
-                    // TODO: Keep track of somewhere else to not take this hit in case of DDoS
-                    // Count unknown inbound connections
-                    let unknown_inbound_conns = self
-                        .active_peers
-                        .iter()
-                        .filter(|(peer_id, (metadata, _))| {
-                            metadata.origin == ConnectionOrigin::Inbound
-                                && trusted_peers
-                                    .read()
-                                    .get(peer_id)
-                                    .map_or(true, |peer| peer.role == PeerRole::Unknown)
-                        })
-                        .count();
+        // Verify that we have not reached the max connection limit for unknown inbound peers
+        if conn.metadata.origin == ConnectionOrigin::Inbound {
+            // Everything below here is meant for unknown peers only. The role comes from
+            // the Noise handshake and if it's not `Unknown` then it is trusted.
+            if conn.metadata.role == PeerRole::Unknown {
+                // TODO: Keep track of somewhere else to not take this hit in case of DDoS
+                // Count unknown inbound connections
+                let unknown_inbound_conns = self
+                    .active_peers
+                    .iter()
+                    .filter(|(peer_id, (metadata, _))| {
+                        metadata.origin == ConnectionOrigin::Inbound
+                            && trusted_peers
+                                .read()
+                                .get(peer_id)
+                                .map_or(true, |peer| peer.role == PeerRole::Unknown)
+                    })
+                    .count();
 
-                    // Reject excessive inbound connections made by unknown peers
-                    // We control outbound connections with Connectivity manager before we even send them
-                    // and we must allow connections that already exist to pass through tie breaking.
-                    if !self
-                        .active_peers
-                        .contains_key(&conn.metadata.remote_peer_id)
-                        && unknown_inbound_conns + 1 > self.inbound_connection_limit
-                    {
-                        info!(
-                            NetworkSchema::new(&self.network_context)
-                                .connection_metadata_with_address(&conn.metadata),
-                            "{} Connection rejected due to connection limit: {}",
-                            self.network_context,
-                            conn.metadata
-                        );
-                        counters::connections_rejected(&self.network_context, conn.metadata.origin)
-                            .inc();
-                        self.disconnect(conn);
-                        return;
-                    }
+                // Reject excessive inbound connections made by unknown peers
+                // We control outbound connections with Connectivity manager before we even send them
+                // and we must allow connections that already exist to pass through tie breaking.
+                if !self
+                    .active_peers
+                    .contains_key(&conn.metadata.remote_peer_id)
+                    && unknown_inbound_conns + 1 > self.inbound_connection_limit
+                {
+                    info!(
+                        NetworkSchema::new(&self.network_context)
+                            .connection_metadata_with_address(&conn.metadata),
+                        "{} Connection rejected due to connection limit: {}",
+                        self.network_context,
+                        conn.metadata
+                    );
+                    counters::connections_rejected(&self.network_context, conn.metadata.origin)
+                        .inc();
+                    self.disconnect(conn);
+                    return;
                 }
-            },
+            }
         }
 
         // Add the new peer and update the metric counters

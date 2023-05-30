@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    metrics,
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
     Error, LogEntry, LogEvent, LogSchema,
 };
@@ -199,6 +200,17 @@ impl StateValueInterface for LatencyInfoState {
             .message("Error encountered when pinging peer!")
             .peer(peer_network_id)
             .error(&error));
+    }
+
+    fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId) {
+        if let Some(average_latency_ping_secs) = self.get_average_latency_ping_secs() {
+            // Update the average ping latency metric
+            metrics::observe_value(
+                &metrics::AVERAGE_PING_LATENCIES,
+                peer_network_id,
+                average_latency_ping_secs,
+            );
+        }
     }
 }
 
