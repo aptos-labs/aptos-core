@@ -357,9 +357,6 @@ pub enum EntryFunctionCall {
     },
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
-    ///
-    /// @param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-    /// @param args Vector of BCS-encoded argument values to invoke the target function with.
     MultisigAccountCreateTransaction {
         multisig_account: AccountAddress,
         payload: Vec<u8>,
@@ -368,10 +365,6 @@ pub enum EntryFunctionCall {
     /// Create a multisig transaction with a transaction hash instead of the full payload.
     /// This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
     /// to provide the full payload, which will be validated against the hash stored on-chain.
-    ///
-    /// @param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-    /// @param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-    /// function arguments.
     MultisigAccountCreateTransactionWithHash {
         multisig_account: AccountAddress,
         payload_hash: Vec<u8>,
@@ -2147,9 +2140,6 @@ pub fn multisig_account_create(
 }
 
 /// Create a multisig transaction, which will have one approval initially (from the creator).
-///
-/// @param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-/// @param args Vector of BCS-encoded argument values to invoke the target function with.
 pub fn multisig_account_create_transaction(
     multisig_account: AccountAddress,
     payload: Vec<u8>,
@@ -2174,10 +2164,6 @@ pub fn multisig_account_create_transaction(
 /// Create a multisig transaction with a transaction hash instead of the full payload.
 /// This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
 /// to provide the full payload, which will be validated against the hash stored on-chain.
-///
-/// @param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-/// @param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-/// function arguments.
 pub fn multisig_account_create_transaction_with_hash(
     multisig_account: AccountAddress,
     payload_hash: Vec<u8>,
