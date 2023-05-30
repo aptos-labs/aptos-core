@@ -72,54 +72,68 @@ describe("fungible asset", () => {
   }, longTestTimeout);
 
   /**
-   * Test `transfer` and `balance` functions in FungibleAssetClient class
+   * Test `transferFromPrimaryFungibleStore` and `balance` functions in FungibleAssetClient class
    */
   test(
     "it trasfers amount of fungible asset and gets the correct balance",
     async () => {
       const fungibleAsset = new FungibleAssetClient(provider);
       // Alice has 5 amounts of the fungible asset
-      const aliceInitialBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
+      const aliceInitialBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
+        alice.address(),
+        fungibleAssetMetadataAddress,
+      );
       expect(aliceInitialBalance).toEqual(BigInt(5));
 
       // Alice transfers 2 amounts of the fungible asset to Bob
-      const transactionHash = await fungibleAsset.transfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
+      const transactionHash = await fungibleAsset.transferFromPrimaryFungibleStore(
+        alice,
+        fungibleAssetMetadataAddress,
+        bob.address(),
+        2,
+      );
       await provider.waitForTransaction(transactionHash);
 
       // Alice has 3 amounts of the fungible asset
-      const aliceCurrentBalance = await fungibleAsset.getBalance(alice.address(), fungibleAssetMetadataAddress);
+      const aliceCurrentBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
+        alice.address(),
+        fungibleAssetMetadataAddress,
+      );
       expect(aliceCurrentBalance).toEqual(BigInt(3));
 
       // Bob has 2 amounts of the fungible asset
-      const bobBalance = await fungibleAsset.getBalance(bob.address(), fungibleAssetMetadataAddress);
+      const bobBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
+        bob.address(),
+        fungibleAssetMetadataAddress,
+      );
       expect(bobBalance).toEqual(BigInt(2));
     },
     longTestTimeout,
   );
 
   /**
-   * Test `transfer` and `checkBalance` functions in CoinClient class
+   * Test `transferFromPrimaryFungibleStore` and `checkBalance` functions in CoinClient class
    */
   test("coin client supports fungible assets operations", async () => {
     const coinClient = new CoinClient(provider.aptosClient);
-    // Test `transfer` and `checkBalance`
+    // Test `transferFromPrimaryFungibleStore` and `checkBalance`
 
     // Alice transfers 2 more amount of fungible asset to Bob
     await provider.waitForTransaction(
       await coinClient.transfer(alice, bob, 2, {
-        fungibleAssetMetadataAddress,
+        coinType: fungibleAssetMetadataAddress,
       }),
       { checkSuccess: true },
     );
     // Bob balance is now 4
     expect(
       await coinClient.checkBalance(bob, {
-        fungibleAssetMetadataAddress,
+        coinType: fungibleAssetMetadataAddress,
       }),
     ).toEqual(BigInt(4));
   });
 
-  test("it generates and returns a transfer raw transaction", async () => {
+  test("it generates and returns a transferFromPrimaryFungibleStore raw transaction", async () => {
     const fungibleAsset = new FungibleAssetClient(provider);
     const rawTxn = await fungibleAsset.generateTransfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
     expect(rawTxn instanceof RawTransaction).toBeTruthy();
