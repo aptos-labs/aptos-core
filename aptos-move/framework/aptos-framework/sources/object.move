@@ -21,6 +21,7 @@ module aptos_framework::object {
     use std::signer;
     use std::vector;
 
+    use aptos_framework::account;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event;
     use aptos_framework::from_bcs;
