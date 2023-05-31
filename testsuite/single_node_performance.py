@@ -8,7 +8,7 @@ import os
 import tempfile
 import json
 from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
-# from tabulate import tabulate
+from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass
 
