@@ -140,7 +140,7 @@ pub fn run_benchmark<V>(
 
         let accounts_cache =
             TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
-        let (mut main_signer_accounts, burner_accounts) =
+        let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
         init_workload::<V>(

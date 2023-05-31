@@ -28,7 +28,7 @@ mod batch_transfer;
 mod call_custom_modules;
 mod entry_points;
 mod nft_mint_and_transfer;
-pub mod p2p_transaction_generator;
+mod p2p_transaction_generator;
 pub mod publish_modules;
 mod publishing;
 mod transaction_mix_generator;
@@ -119,10 +119,6 @@ pub trait TransactionGenerator: Sync + Send {
         account: &mut LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
-}
-
-pub trait BlockGenerator {
-    fn generate_transactions(&mut self, block_size: usize, no_rw_conflict: bool) -> Vec<SignedTransaction>;
 }
 
 
@@ -228,7 +224,6 @@ pub async fn create_txn_generator_creator(
             .map(|d| d.address())
             .collect::<Vec<_>>(),
     ));
-
     let accounts_pool = Arc::new(RwLock::new(initial_burner_accounts));
 
     let mut txn_generator_creator_mix_per_phase: Vec<
