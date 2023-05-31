@@ -19,6 +19,10 @@ jobs:
           node-version-file: .node-version
       - uses: pnpm/action-setup@v2
 
+      # Run package install. If install fails, it probably means the lockfile
+      # was not included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
+
       # Run indexer tests.
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: ts-sdk-indexer-test
