@@ -68,7 +68,7 @@ fn execute_and_commit_block(
 struct TestExecutor {
     _path: aptos_temppath::TempPath,
     db: DbReaderWriter,
-    executor: BlockExecutor<MockVM, Transaction>,
+    executor: BlockExecutor<MockVM>,
 }
 
 impl TestExecutor {
@@ -91,7 +91,7 @@ impl TestExecutor {
 }
 
 impl std::ops::Deref for TestExecutor {
-    type Target = BlockExecutor<MockVM, Transaction>;
+    type Target = BlockExecutor<MockVM>;
 
     fn deref(&self) -> &Self::Target {
         &self.executor
@@ -772,7 +772,7 @@ proptest! {
 
         // Now we construct a new executor and run one more block.
         {
-            let executor = BlockExecutor::<MockVM, Transaction>::new(db);
+            let executor = BlockExecutor::<MockVM>::new(db);
             executor.update_block_gas_limit(maybe_gas_limit);
             let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();

@@ -6,7 +6,7 @@ use aptos_indexer_grpc_data_service::service::RawDataServerWrapper;
 use aptos_indexer_grpc_server_framework::{RunnableConfig, ServerArgs};
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
 use aptos_protos::{
-    internal::fullnode::v1::FILE_DESCRIPTOR_SET as DATASTREAM_V1_FILE_DESCRIPTOR_SET,
+    indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
@@ -57,7 +57,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             // compilation will still succeed but reflection will fail at runtime.
             //
             // TODO: Add a test for this / something in build.rs, this is a big footgun.
-            .register_encoded_file_descriptor_set(DATASTREAM_V1_FILE_DESCRIPTOR_SET)
+            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
             .build()

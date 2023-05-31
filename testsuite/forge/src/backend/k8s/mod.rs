@@ -110,7 +110,7 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        let kube_client = create_k8s_client().await;
+        let kube_client = create_k8s_client().await?;
         let (validators, fullnodes) = if self.reuse {
             match collect_running_nodes(
                 &kube_client,

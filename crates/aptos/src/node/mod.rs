@@ -21,15 +21,15 @@ use crate::{
 };
 use aptos_backup_cli::{
     coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt},
-    metadata::cache::MetadataCacheOpt,
-    storage::command_adapter::{config::CommandAdapterConfig, CommandAdapter},
-    utils::{ConcurrentDownloadsOpt, GlobalRestoreOpt, ReplayConcurrencyLevelOpt, RocksdbOpt},
+    storage::DBToolStorageOpt,
+    utils::GlobalRestoreOpt,
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
+use aptos_logger::Level;
 use aptos_network_checker::args::{
     validate_address, CheckEndpointArgs, HandshakeArgs, NodeAddressArgs,
 };
@@ -60,7 +60,6 @@ use std::{
     convert::{TryFrom, TryInto},
     path::PathBuf,
     pin::Pin,
-    sync::Arc,
     thread,
     time::Duration,
 };
@@ -75,7 +74,7 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 #[derive(Parser)]
 pub enum NodeTool {
     AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
-    BootstrapDbFromBackup(BootstrapDbFromBackup),
+    BootstrapDb(BootstrapDb),
     CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
     GetStakePool(GetStakePool),
@@ -96,7 +95,10 @@ impl NodeTool {
         use NodeTool::*;
         match self {
             AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
-            BootstrapDbFromBackup(tool) => tool.execute_serialized().await,
+            BootstrapDb(tool) => {
+                tool.execute_serialized_with_logging_level(Level::Info)
+                    .await
+            },
             CheckNetworkConnectivity(tool) => tool.execute_serialized().await,
             GetPerformance(tool) => tool.execute_serialized().await,
             GetStakePool(tool) => tool.execute_serialized().await,
@@ -1486,65 +1488,31 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
 ///
 /// Enables users to load from a backup to catch their node's DB up to a known state.
 #[derive(Parser)]
-pub struct BootstrapDbFromBackup {
-    /// Config file for the source backup
-    ///
-    /// This file configures if we should use local files or cloud storage, and how to access
-    /// the backup.
-    #[clap(long, parse(from_os_str))]
-    config_path: PathBuf,
-
-    /// Target database directory
-    ///
-    /// The directory to create the AptosDB with snapshots and transactions from the backup.
-    /// The data folder can later be used to start an Aptos node. e.g. /opt/aptos/data/db
-    #[clap(long = "target-db-dir", parse(from_os_str))]
-    pub db_dir: PathBuf,
-
+pub struct BootstrapDb {
     #[clap(flatten)]
-    pub metadata_cache_opt: MetadataCacheOpt,
-
+    storage: DBToolStorageOpt,
     #[clap(flatten)]
-    pub concurrent_downloads: ConcurrentDownloadsOpt,
-
+    opt: RestoreCoordinatorOpt,
     #[clap(flatten)]
-    pub replay_concurrency_level: ReplayConcurrencyLevelOpt,
+    global: GlobalRestoreOpt,
 }
 
 #[async_trait]
-impl CliCommand<()> for BootstrapDbFromBackup {
+impl CliCommand<()> for BootstrapDb {
     fn command_name(&self) -> &'static str {
-        "BootstrapDbFromBackup"
+        "BootstrapDb"
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let opt = RestoreCoordinatorOpt {
-            metadata_cache_opt: self.metadata_cache_opt,
-            replay_all: false,
-            ledger_history_start_version: None,
-            skip_epoch_endings: false,
-        };
-        let global_opt = GlobalRestoreOpt {
-            dry_run: false,
-            db_dir: Some(self.db_dir),
-            target_version: None,
-            trusted_waypoints: Default::default(),
-            rocksdb_opt: RocksdbOpt::default(),
-            concurrent_downloads: self.concurrent_downloads,
-            replay_concurrency_level: self.replay_concurrency_level,
-        }
-        .try_into()?;
-        let storage = Arc::new(CommandAdapter::new(
-            CommandAdapterConfig::load_from_file(&self.config_path).await?,
-        ));
-
+        let storage = self.storage.init_storage().await?;
         // hack: get around this error, related to use of `async_trait`:
         //   error: higher-ranked lifetime error
         //   ...
         //   = note: could not prove for<'r, 's> Pin<Box<impl futures::Future<Output = std::result::Result<(), CliError>>>>: CoerceUnsized<Pin<Box<(dyn futures::Future<Output = std::result::Result<(), CliError>> + std::marker::Send + 's)>>>
         tokio::task::spawn_blocking(|| {
             let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(RestoreCoordinator::new(opt, global_opt, storage).run())
+            runtime
+                .block_on(RestoreCoordinator::new(self.opt, self.global.try_into()?, storage).run())
         })
         .await
         .unwrap()?;

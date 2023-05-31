@@ -80,7 +80,10 @@ async fn test_txn_emmitter() {
                 (TransactionTypeArg::NoOp.materialize(100, false), 20),
                 (
                     TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::EmitEvents { count: 60 },
+                        entry_point: EntryPoints::MakeOrChangeTable {
+                            offset: 0,
+                            count: 60,
+                        },
                         num_modules: 1,
                         use_account_pool: false,
                     },

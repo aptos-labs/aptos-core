@@ -13,7 +13,6 @@ use crate::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
-    pruner_utils,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataValue},
         transaction::TransactionSchema,
@@ -154,18 +153,6 @@ impl LedgerPruner {
         };
         pruner.initialize();
         pruner
-    }
-
-    /// Prunes the genesis transaction and saves the db alterations to the given change set
-    pub fn prune_genesis(ledger_db: Arc<DB>, db_batch: &mut SchemaBatch) -> anyhow::Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_db);
-        ledger_pruner.set_target_version(target_version);
-        ledger_pruner.prune_inner(max_version, db_batch)?;
-
-        Ok(())
     }
 
     fn prune_inner(

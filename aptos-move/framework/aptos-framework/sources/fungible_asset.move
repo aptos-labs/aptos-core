@@ -110,7 +110,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
-    /// FungibleAsset is ephermeral and cannot be stored directly. It must be deposited back into a store.
+    /// FungibleAsset is ephemeral and cannot be stored directly. It must be deposited back into a store.
     struct FungibleAsset {
         metadata: Object<Metadata>,
         amount: u64,

@@ -2,9 +2,13 @@
 
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-**Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
-
 ## Unreleased
+
+- Add `x-aptos-client` header to `IndexerClient` requests
+
+## 1.9.1 (2023-05-24)
+
+- Add `x-aptos-client` header to `AptosClient` requests
 
 ## 1.9.0 (2023-05-17)
 

@@ -4,7 +4,7 @@
 use crate::{assert_success, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{ModuleBundle, TransactionPayload},
+    transaction::{ExecutionStatus, ModuleBundle, TransactionPayload},
 };
 use move_binary_format::{
     file_format::{
@@ -113,5 +113,8 @@ fn access_path_panic() {
         Vec::<Vec<u8>>::new(),
     );
 
-    assert_eq!(res.status().unwrap_err(), StatusCode::STORAGE_ERROR);
+    assert_eq!(
+        res.status().unwrap(),
+        ExecutionStatus::MiscellaneousError(Some(StatusCode::STORAGE_ERROR))
+    );
 }

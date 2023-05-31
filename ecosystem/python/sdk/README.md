@@ -73,4 +73,4 @@ This project follows [semver](https://semver.org/) as closely as possible
 [pypi-image-downloads]: https://img.shields.io/pypi/dm/aptos-sdk.svg
 [pypi-url]: https://pypi.org/project/aptos-sdk
 [discord-image]: https://img.shields.io/discord/945856774056083548?label=Discord&logo=discord&style=flat~~~~
-[discord-url]: https://discord.gg/aptoslabs
+[discord-url]: https://discord.gg/aptosnetwork

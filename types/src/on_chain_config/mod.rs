@@ -39,7 +39,10 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
         ProposerElectionType,
     },
-    execution_config::{ExecutionConfigV1, OnChainExecutionConfig, TransactionShufflerType},
+    execution_config::{
+        ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionDeduperType,
+        TransactionShufflerType,
+    },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
     timestamp::CurrentTimeMicroseconds,
