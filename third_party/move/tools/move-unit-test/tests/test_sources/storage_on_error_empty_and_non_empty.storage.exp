@@ -5,15 +5,15 @@ Running Move unit tests
 [ FAIL    ] 0x1::A::x
 [ FAIL    ] 0x1::A::y
 0x1::A::a
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 0x1::A::b
-Output: Ok(ChangeSet { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChangeSet { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
+Output: Ok(Changes { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChanges { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
 0x1::A::c
-Output: Ok(ChangeSet { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChangeSet { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
+Output: Ok(Changes { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChanges { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
 0x1::A::x
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 0x1::A::y
-Output: Ok(ChangeSet { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChangeSet { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
+Output: Ok(Changes { accounts: {0000000000000000000000000000000000000000000000000000000000000001: AccountChanges { modules: {}, resources: {StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("A"), name: Identifier("A"), type_params: [] }: New([0])} }} })
 
 Test failures:
 
