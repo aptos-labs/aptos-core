@@ -161,6 +161,7 @@ transferred to A
 -  [Function `get_delegator_active_shares`](#0x1_delegation_pool_get_delegator_active_shares)
 -  [Function `get_delegator_pending_inactive_shares`](#0x1_delegation_pool_get_delegator_pending_inactive_shares)
 -  [Function `get_used_voting_power`](#0x1_delegation_pool_get_used_voting_power)
+-  [Function `borrow_mut_used_voting_power`](#0x1_delegation_pool_borrow_mut_used_voting_power)
 -  [Function `update_and_borrow_mut_delegator_vote_delegation`](#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation)
 -  [Function `update_and_borrow_mut_delegated_votes`](#0x1_delegation_pool_update_and_borrow_mut_delegated_votes)
 -  [Function `olc_with_index`](#0x1_delegation_pool_olc_with_index)
@@ -186,6 +187,7 @@ transferred to A
 -  [Function `redeem_inactive_shares`](#0x1_delegation_pool_redeem_inactive_shares)
 -  [Function `calculate_stake_pool_drift`](#0x1_delegation_pool_calculate_stake_pool_drift)
 -  [Function `synchronize_delegation_pool`](#0x1_delegation_pool_synchronize_delegation_pool)
+-  [Function `assert_and_update_proposal_used_voting_power`](#0x1_delegation_pool_assert_and_update_proposal_used_voting_power)
 -  [Function `update_governance_records_for_buy_in_active_shares`](#0x1_delegation_pool_update_governance_records_for_buy_in_active_shares)
 -  [Function `update_governance_records_for_buy_in_pending_inactive_shares`](#0x1_delegation_pool_update_governance_records_for_buy_in_pending_inactive_shares)
 -  [Function `update_governanace_records_for_redeem_active_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_active_shares)
@@ -1816,8 +1818,8 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
 
     <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
     // Check a edge case during the transient period of enabling partial governance <a href="voting.md#0x1_voting">voting</a>.
-    assert_and_update_proposal_used_voting_power(governance_records, pool_address, proposal_id, voting_power);
-    <b>let</b> used_voting_power = borrow_mut_used_voting_power(governance_records, voter_address, proposal_id);
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records, pool_address, proposal_id, voting_power);
+    <b>let</b> used_voting_power = <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records, voter_address, proposal_id);
     *used_voting_power = *used_voting_power + voting_power;
 
     <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
@@ -2240,6 +2242,36 @@ Get the used voting power of a voter on a proposal.
 
 </details>
 
+<a name="0x1_delegation_pool_borrow_mut_used_voting_power"></a>
+
+## Function `borrow_mut_used_voting_power`
+
+Borrow the mutable used voting power of a voter on a proposal.
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, voter: <b>address</b>, proposal_id: u64): &<b>mut</b> u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_used_voting_power">borrow_mut_used_voting_power</a>(governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, voter: <b>address</b>, proposal_id: u64): &<b>mut</b> u64 {
+    <b>let</b> votes = &<b>mut</b> governance_records.votes;
+    <b>let</b> key = <a href="delegation_pool.md#0x1_delegation_pool_VotingRecordKey">VotingRecordKey</a> {
+        proposal_id,
+        voter,
+    };
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(votes, key, 0)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation"></a>
 
 ## Function `update_and_borrow_mut_delegator_vote_delegation`
@@ -2266,6 +2298,7 @@ Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
     <b>let</b> vote_delegation_table = &<b>mut</b> governance_records.vote_delegation;
     // By default, a delegator's delegated voter is itself.
+    // TODO: recycle storage when <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> equals <b>to</b> default value.
     <b>if</b> (!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(vote_delegation_table, delegator)) {
         <b>return</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(vote_delegation_table, delegator, <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> {
             voter: delegator,
@@ -2314,6 +2347,7 @@ Update DelegatedVotes of a voter to up-to-date then borrow_mut it.
 
     <b>let</b> delegated_votes_per_voter = &<b>mut</b> governance_records.delegated_votes;
     // By default, a delegator's voter is itself.
+    // TODO: recycle storage when <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> equals <b>to</b> default value.
     <b>if</b> (!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(delegated_votes_per_voter, voter)) {
         <b>let</b> active_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(pool, voter);
         <b>let</b> inactive_shares = <a href="delegation_pool.md#0x1_delegation_pool_get_delegator_pending_inactive_shares">get_delegator_pending_inactive_shares</a>(pool, voter);
@@ -2800,6 +2834,7 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
 
 
 <pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_withdraw_internal">withdraw_internal</a>(pool: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, delegator_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    // TODO: recycle storage when a delegator fully exits the delegation pool.
     // short-circuit <b>if</b> amount <b>to</b> withdraw is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
 
@@ -3369,6 +3404,41 @@ shares pools, assign commission to operator and eventually prepare delegation po
             <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_create_with_scaling_factor">pool_u64::create_with_scaling_factor</a>(<a href="delegation_pool.md#0x1_delegation_pool_SHARES_SCALING_FACTOR">SHARES_SCALING_FACTOR</a>)
         );
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_delegation_pool_assert_and_update_proposal_used_voting_power"></a>
+
+## Function `assert_and_update_proposal_used_voting_power`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">delegation_pool::GovernanceRecords</a>, pool_address: <b>address</b>, proposal_id: u64, voting_power: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_and_update_proposal_used_voting_power">assert_and_update_proposal_used_voting_power</a>(
+    governance_records: &<b>mut</b> <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, pool_address : <b>address</b>, proposal_id : u64, voting_power: u64
+) {
+    <b>let</b> stake_pool_remaining_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">aptos_governance::get_remaining_voting_power</a>(pool_address, proposal_id);
+    <b>let</b> stake_pool_used_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address) - stake_pool_remaining_voting_power;
+    <b>let</b> proposal_used_voting_power = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut_with_default">smart_table::borrow_mut_with_default</a>(&<b>mut</b> governance_records.votes_per_proposal, proposal_id, 0);
+    // A edge case: Before enabling partial governance <a href="voting.md#0x1_voting">voting</a> on a delegation pool, the delegation pool <b>has</b>
+    // a voter which can vote <b>with</b> all <a href="voting.md#0x1_voting">voting</a> power of this delegation pool. If the voter votes on a proposal after
+    // partial governance <a href="voting.md#0x1_voting">voting</a> flag is enabled, the delegation pool doesn't have enough <a href="voting.md#0x1_voting">voting</a> power on this
+    // proposal for all the delegators. To be fair, no one can vote on this proposal through this delegation pool.
+    // To detect this case, check <b>if</b> the <a href="stake.md#0x1_stake">stake</a> pool had used <a href="voting.md#0x1_voting">voting</a> power not through <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a> <b>module</b>.
+    <b>assert</b>!(stake_pool_used_voting_power == *proposal_used_voting_power, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING">EALREADY_VOTED_BEFORE_ENABLE_PARTIAL_VOTING</a>));
+    *proposal_used_voting_power = *proposal_used_voting_power + voting_power;
 }
 </code></pre>
 
