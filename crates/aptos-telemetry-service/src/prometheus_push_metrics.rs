@@ -10,9 +10,13 @@ use crate::{
     metrics::METRICS_INGEST_BACKEND_REQUEST_DURATION,
     types::{auth::Claims, common::NodeType},
 };
+use futures::{select, stream::FuturesUnordered, FutureExt, StreamExt};
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
+use std::time::Duration;
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
+
+const MAX_METRICS_POST_WAIT_DURATION_SECS: u64 = 5;
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("ingest" / "metrics")
@@ -57,52 +61,82 @@ pub async fn handle_metrics_ingest(
 
     let start_timer = Instant::now();
 
-    let post_futures = client.iter().map(|(name, client)| async {
-        let result = client
-            .post_prometheus_metrics(
-                metrics_body.clone(),
-                extra_labels.clone(),
-                encoding.clone().unwrap_or_default(),
-            )
-            .await;
+    let mut post_futures: FuturesUnordered<_> = client
+        .into_iter()
+        .map(|(name, client)| async {
+            let result = client
+                .post_prometheus_metrics(
+                    metrics_body.clone(),
+                    extra_labels.clone(),
+                    encoding.clone().unwrap_or_default(),
+                )
+                .await;
 
-        match result {
-            Ok(res) => {
-                METRICS_INGEST_BACKEND_REQUEST_DURATION
-                    .with_label_values(&[&claims.peer_id.to_string(), name, res.status().as_str()])
-                    .observe(start_timer.elapsed().as_secs_f64());
-                if res.status().is_success() {
-                    debug!("remote write to victoria metrics succeeded");
-                } else {
+            match result {
+                Ok(res) => {
+                    METRICS_INGEST_BACKEND_REQUEST_DURATION
+                        .with_label_values(&[
+                            &claims.peer_id.to_string(),
+                            name,
+                            res.status().as_str(),
+                        ])
+                        .observe(start_timer.elapsed().as_secs_f64());
+                    if res.status().is_success() {
+                        debug!("remote write to victoria metrics succeeded");
+                    } else {
+                        error!(
+                            "remote write failed to victoria_metrics for client {}: {}",
+                            name.clone(),
+                            res.error_for_status().err().unwrap()
+                        );
+                        return Err(());
+                    }
+                },
+                Err(err) => {
+                    METRICS_INGEST_BACKEND_REQUEST_DURATION
+                        .with_label_values(&[name, "Unknown"])
+                        .observe(start_timer.elapsed().as_secs_f64());
                     error!(
-                        "remote write failed to victoria_metrics for client {}: {}",
+                        "error sending remote write request for client {}: {}",
                         name.clone(),
-                        res.error_for_status().err().unwrap()
+                        err
                     );
                     return Err(());
+                },
+            }
+            Ok(())
+        })
+        .collect();
+
+    // wait for all futures to complete or for the timeout to expire. If none of the futures complete successfully,
+    // we return an error.
+    let mut successful_posts = 0;
+    let mut failed_posts = 0;
+    loop {
+        select! {
+            _ = tokio::time::sleep(Duration::from_secs(MAX_METRICS_POST_WAIT_DURATION_SECS)).fuse() => {
+                break;
+            },
+            res = post_futures.select_next_some() => {
+                match res {
+                    Ok(_) => {
+                        successful_posts += 1;
+                    },
+                    Err(_) => {
+                        failed_posts += 1;
+                        if failed_posts == client.len() {
+                            break;
+                        }
+                    },
                 }
             },
-            Err(err) => {
-                METRICS_INGEST_BACKEND_REQUEST_DURATION
-                    .with_label_values(&[name, "Unknown"])
-                    .observe(start_timer.elapsed().as_secs_f64());
-                error!(
-                    "error sending remote write request for client {}: {}",
-                    name.clone(),
-                    err
-                );
-                return Err(());
-            },
+            complete => {
+                break;
+            }
         }
-        Ok(())
-    });
+    }
 
-    #[allow(clippy::unnecessary_fold)]
-    if futures::future::join_all(post_futures)
-        .await
-        .iter()
-        .all(|result| result.is_err())
-    {
+    if successful_posts == 0 {
         return Err(reject::custom(ServiceError::internal(
             MetricsIngestError::IngestionError.into(),
         )));
@@ -267,7 +301,7 @@ mod test {
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
         mock1.assert();
-        mock2.assert_hits(4);
+        assert!(mock2.hits_async().await >= 1);
         assert!(result.is_ok());
     }
 
@@ -302,7 +336,7 @@ mod test {
         let result =
             handle_metrics_ingest(test_context.inner, claims, Some("gzip".into()), body).await;
 
-        mock1.assert_hits(4);
+        assert!(mock1.hits_async().await >= 1);
         mock2.assert();
         assert!(result.is_err());
     }
