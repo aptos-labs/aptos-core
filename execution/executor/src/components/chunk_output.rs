@@ -187,13 +187,16 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            StateViewId::Miscellaneous => {
+                V::execute_block(transactions, &state_view, maybe_block_gas_limit)?
+            },
             _ => transactions
                 .iter()
                 .map(|_| {
@@ -207,16 +210,6 @@ impl ChunkOutput {
                 .collect::<Vec<_>>(),
         };
         Ok(transaction_outputs)
-    }
-
-    /// In consensus-only mode, we do not care about gas limits.
-    #[cfg(feature = "consensus-only-perf-test")]
-    fn execute_block_with_block_gas_limit<V: VMExecutor>(
-        transactions: Vec<Transaction>,
-        state_view: &CachedStateView,
-        _maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>> {
-        Self::execute_block::<V>(transactions, state_view)
     }
 }
 
