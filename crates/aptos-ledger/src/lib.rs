@@ -144,25 +144,25 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
     }
 }
 
-/// Returns the next available account in Ledger starting from start_index to end_index, inclusive
-/// Note: We only allow a range of 20 for performance purpose
+/// Returns the the batch/HashMap of the accounts for the account index in index_range
+/// Note: We only allow a range of 10 for performance purpose
 ///
 /// # Arguments
 ///
-/// * `index_range` - The range of the accounts in index, that you want to fetch, if None default to 0-20
+/// * `index_range` - start(inclusive) - end(exclusive) acounts, that you want to fetch, if None default to 0-10
 pub fn fetch_batch_accounts(
     index_range: Option<Range<u32>>,
 ) -> Result<HashMap<String, AccountAddress>, AptosLedgerError> {
     let range = if let Some(range) = index_range {
         range
     } else {
-        0..20
+        0..10
     };
 
-    // Make sure start_index and end_index is valid
-    if range.end - range.start > 20 {
+    // Make sure the range is within 10 counts
+    if range.end - range.start > 10 {
         return Err(AptosLedgerError::UnexpectedError(
-            "Unexpected Error: Make sure the range is less than or equal to 20".to_string(),
+            "Unexpected Error: Make sure the range is less than or equal to 10".to_string(),
             None,
         ));
     }
@@ -286,7 +286,7 @@ pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, Apt
 /// # Arguments
 ///
 /// * `raw_txn` - the serialized raw transaction that need to be signed
-pub fn sign_txn(raw_txn: Vec<u8>, path: &str) -> Result<Vec<u8>, AptosLedgerError> {
+pub fn sign_txn(path: &str, raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
     // open connection to ledger
     let transport = open_ledger_transport()?;
 
