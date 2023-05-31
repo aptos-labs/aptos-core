@@ -1,0 +1,28 @@
+name: "TS SDK indexer tests"
+on:
+  pull_request:
+  push:
+    branches:
+      - testnet
+
+jobs:
+  # Run the TS SDK indexer tests. Note: indexer service can be flaky and we
+  # dont want those tests to be land blocking for any PR on the aptos repo.
+  # This is why we run those tests separate from
+  # test-sdk-confirm-client-generated-publish.
+  run-indexer-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v2
+
+      # Run indexer tests.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: ts-sdk-indexer-test
+        with:
+          max_attempts: 5
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk && pnpm run test:indexer

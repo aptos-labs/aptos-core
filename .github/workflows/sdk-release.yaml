@@ -130,7 +130,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: cd ./ecosystem/typescript/sdk && pnpm test
+          command: cd ./ecosystem/typescript/sdk && pnpm run test:ci
       - run: cd ./ecosystem/typescript/sdk && pnpm build
 
       # Confirm the Rust API client examples pass.
