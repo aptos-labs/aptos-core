@@ -232,7 +232,6 @@ impl AptosVM {
         resolver: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-        aggregator_enabled: bool,
     ) -> VMOutput {
         self.failed_transaction_cleanup_and_keep_vm_status(
             error_code,
@@ -241,7 +240,7 @@ impl AptosVM {
             resolver,
             log_context,
             change_set_configs,
-            aggregator_enabled,
+            false,
         )
         .1
     }
@@ -1132,7 +1131,7 @@ impl AptosVM {
                         resolver,
                         log_context,
                         &storage_gas_params.change_set_configs,
-                        aggregator_enabled,
+                        false,
                     )
                 }
             },
@@ -1364,6 +1363,7 @@ impl AptosVM {
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
+        aggregator_enabled: bool,
     ) -> (VMStatus, TransactionOutput) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
@@ -1374,6 +1374,7 @@ impl AptosVM {
             &state_view.as_move_resolver(),
             txn,
             &log_context,
+            aggregator_enabled,
         );
 
         // Because simulation returns a VMOutput, it has both writes and deltas
@@ -1390,6 +1391,7 @@ impl AptosVM {
                     &state_view.as_move_resolver(),
                     txn,
                     &log_context,
+                    aggregator_enabled,
                 );
 
                 // Make sure to return the right types. Note that here conversion
@@ -1608,6 +1610,8 @@ impl VMValidator for AptosVM {
     /// 2. The script to be executed is under given specific configuration.
     /// 3. Invokes `Account.prologue`, which checks properties such as the transaction has the
     /// right sequence number and the sender has enough balance to pay for the gas.
+    /// For transaction validation, we only run prologue and therefore we always
+    /// disable aggregators to make the validation happen in a straightforward way.
     /// TBD:
     /// 1. Transaction arguments matches the main function's type signature.
     ///    We don't check this item for now and would execute the check at execution time.
@@ -1815,6 +1819,7 @@ impl AptosSimulationVM {
         resolver: &impl MoveResolverExt,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
+        aggregator_enabled: bool,
     ) -> (VMStatus, VMOutput) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
@@ -1824,9 +1829,9 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self
-            .0
-            .new_session(resolver, SessionId::txn_meta(&txn_data), false);
+        let mut session =
+            self.0
+                .new_session(resolver, SessionId::txn_meta(&txn_data), aggregator_enabled);
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
@@ -1862,7 +1867,7 @@ impl AptosSimulationVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
-                    false,
+                    aggregator_enabled,
                 )
             },
             TransactionPayload::Multisig(multisig) => {
@@ -1888,7 +1893,7 @@ impl AptosSimulationVM {
                                         &mut gas_meter,
                                         &storage_gas_params.change_set_configs,
                                         &txn_data,
-                                        false,
+                                        aggregator_enabled,
                                     )?;
 
                                 self.0.success_transaction_cleanup(
@@ -1916,7 +1921,7 @@ impl AptosSimulationVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 &storage_gas_params.change_set_configs,
-                false,
+                aggregator_enabled,
             ),
         };
 
