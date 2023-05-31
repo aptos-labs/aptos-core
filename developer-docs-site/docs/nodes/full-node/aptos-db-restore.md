@@ -20,7 +20,7 @@ Our CLI supports restoring a database using backup files. It reads from the back
 
 The command restores the database from the closest snapshot to the target version. This command can quickly restore a database to a target version, but it does not restore all the transaction history from the past.
 
-:::tip Prerequisite Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install). :::
+:::tip Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install). :::
 
 Here is an example command:
 
