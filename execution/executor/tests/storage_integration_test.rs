@@ -19,10 +19,10 @@ use aptos_types::{
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
+    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
-    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
 };
 use move_core_types::move_resource::MoveStructType;
 
@@ -140,7 +140,11 @@ fn test_reconfiguration() {
     let txn_block = vec![txn1, txn2, txn3];
     let block_id = gen_block_id(1);
     let vm_output = executor
-        .execute_block((block_id, txn_block.clone()), parent_block_id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block_id, txn_block.clone()),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
 
     // Make sure the execution result sees the reconfiguration

@@ -57,7 +57,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
-    maybe_block_gas_limit: Mutex<Option<u64>>
+    maybe_block_gas_limit: Mutex<Option<u64>>,
 }
 
 impl ExecutionProxy {
@@ -138,7 +138,11 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
-                executor.execute_block((block_id, transactions_to_execute), parent_block_id, block_gas_limit)
+                executor.execute_block(
+                    (block_id, transactions_to_execute),
+                    parent_block_id,
+                    block_gas_limit,
+                )
             })
             .await
         )
@@ -337,6 +341,7 @@ async fn test_commit_sync_race() {
             &self,
             _block: (HashValue, Vec<Transaction>),
             _parent_block_id: HashValue,
+            _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {
             Ok(StateComputeResult::new_dummy())
         }

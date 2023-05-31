@@ -15,9 +15,9 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
+    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
-    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
 use std::sync::Arc;

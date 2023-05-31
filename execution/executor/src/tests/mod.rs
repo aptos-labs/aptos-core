@@ -152,10 +152,7 @@ fn test_executor_status() {
 
     let output = executor
         .execute_block(
-            (
-                block_id,
-                block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT),
-            ),
+            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -185,10 +182,7 @@ fn test_executor_status_consensus_only() {
 
     let output = executor
         .execute_block(
-            (
-                block_id,
-                block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT),
-            ),
+            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)),
             parent_block_id,
         )
         .unwrap();
@@ -263,20 +257,14 @@ fn test_executor_two_blocks_with_failed_txns() {
         .collect::<Vec<_>>();
     let _output1 = executor
         .execute_block(
-            (
-                block1_id,
-                block(block1_txns, BLOCK_GAS_LIMIT),
-            ),
+            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let output2 = executor
         .execute_block(
-            (
-                block2_id,
-                block(block2_txns, BLOCK_GAS_LIMIT),
-            ),
+            (block2_id, block(block2_txns, BLOCK_GAS_LIMIT)),
             block1_id,
             BLOCK_GAS_LIMIT,
         )
@@ -298,10 +286,7 @@ fn test_executor_commit_twice() {
     let block1_id = gen_block_id(1);
     let output1 = executor
         .execute_block(
-            (
-                block1_id,
-                block(block1_txns, BLOCK_GAS_LIMIT),
-            ),
+            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -331,10 +316,7 @@ fn test_executor_execute_same_block_multiple_times() {
     for _i in 0..100 {
         let output = executor
             .execute_block(
-                (
-                    block_id,
-                    block(txns.clone(), BLOCK_GAS_LIMIT),
-                ),
+                (block_id, block(txns.clone(), BLOCK_GAS_LIMIT)),
                 parent_block_id,
                 BLOCK_GAS_LIMIT,
             )
@@ -380,11 +362,14 @@ fn create_transaction_chunks(
     let id = gen_block_id(1);
 
     let output = executor
-        .execute_block((id, txns.clone()), executor.committed_block_id(), BLOCK_GAS_LIMIT)
+        .execute_block(
+            (id, txns.clone()),
+            executor.committed_block_id(),
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
 
-    let ledger_version =
-        ledger_version_from_block_size(txns.len(), BLOCK_GAS_LIMIT) as u64;
+    let ledger_version = ledger_version_from_block_size(txns.len(), BLOCK_GAS_LIMIT) as u64;
     let ledger_info = gen_ledger_info(ledger_version, output.root_hash(), id, 1);
     executor
         .commit_blocks(vec![id], ledger_info.clone())
@@ -417,12 +402,20 @@ fn test_noop_block_after_reconfiguration() {
     let first_txn = encode_reconfiguration_transaction();
     let first_block_id = gen_block_id(1);
     let output1 = executor
-        .execute_block((first_block_id, vec![first_txn]), parent_block_id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (first_block_id, vec![first_txn]),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     parent_block_id = first_block_id;
     let second_block = TestBlock::new(10, 10, gen_block_id(2), BLOCK_GAS_LIMIT);
     let output2 = executor
-        .execute_block((second_block.id, second_block.txns), parent_block_id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (second_block.id, second_block.txns),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     assert_eq!(output1.root_hash(), output2.root_hash());
 }
@@ -630,7 +623,12 @@ struct TestBlock {
 }
 
 impl TestBlock {
-    fn new(num_user_txns: u64, amount: u32, id: HashValue, maybe_block_gas_limit: Option<u64>) -> Self {
+    fn new(
+        num_user_txns: u64,
+        amount: u32,
+        id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Self {
         let txns = if num_user_txns == 0 {
             Vec::new()
         } else {
