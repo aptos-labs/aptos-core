@@ -39,25 +39,25 @@ pub struct ClientBuilder {
     reqwest_builder: ReqwestClientBuilder,
     version_path_base: String,
     base_url: Url,
-    timeout: Option<Duration>, // Default to 10 seconds if None
+    timeout: Duration,
     headers: HeaderMap,
 }
 
 impl ClientBuilder {
-    pub fn new(aptos_base_url: AptosBaseUrl) -> Result<Self> {
+    pub fn new(aptos_base_url: AptosBaseUrl) -> Self {
         let mut headers = HeaderMap::new();
         headers.insert(
             X_APTOS_CLIENT,
             HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE),
         );
 
-        Ok(Self {
+        Self {
             reqwest_builder: ReqwestClient::builder(),
             base_url: aptos_base_url.to_url(),
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
-            timeout: Some(Duration::from_secs(10)), // Default to 10 seconds
+            timeout: Duration::from_secs(10), // Default to 10 seconds
             headers,
-        })
+        }
     }
 
     pub fn base_url(mut self, base_url: Url) -> Self {
@@ -66,7 +66,7 @@ impl ClientBuilder {
     }
 
     pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
+        self.timeout = timeout;
         self
     }
 
@@ -84,14 +84,13 @@ impl ClientBuilder {
     }
 
     pub fn build(self) -> Client {
-        let timeout = self.timeout.unwrap_or_else(|| Duration::from_secs(10));
         let version_path_base = get_version_path_with_base(self.base_url.clone());
 
         Client {
             inner: self
                 .reqwest_builder
                 .default_headers(self.headers)
-                .timeout(timeout)
+                .timeout(self.timeout)
                 .cookie_store(true)
                 .build()
                 .unwrap(),

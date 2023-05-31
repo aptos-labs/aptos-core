@@ -28,7 +28,7 @@ use aptos_api_types::{
     mime_types::{BCS, BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, JSON},
     AptosError, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse, MoveModuleId,
     TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
-    VersionedEvent, ViewRequest, X_APTOS_CLIENT,
+    VersionedEvent, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -41,7 +41,7 @@ use aptos_types::{
 };
 use move_core_types::language_storage::StructTag;
 use reqwest::{
-    header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, CONTENT_TYPE},
+    header::{ACCEPT, CONTENT_TYPE},
     Client as ReqwestClient, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -73,30 +73,11 @@ pub struct Client {
 
 impl Client {
     pub fn builder(aptos_base_url: AptosBaseUrl) -> ClientBuilder {
-        ClientBuilder::new(aptos_base_url).unwrap()
+        ClientBuilder::new(aptos_base_url)
     }
 
     pub fn new(base_url: Url) -> Self {
-        let mut header_map = HeaderMap::new();
-        header_map.insert(
-            HeaderName::from_static(X_APTOS_CLIENT),
-            HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE),
-        );
-
-        let inner = ReqwestClient::builder()
-            .timeout(Duration::from_secs(10)) // Default to 10 seconds
-            .default_headers(header_map)
-            .cookie_store(true)
-            .build()
-            .unwrap();
-
-        let version_path_base = get_version_path_with_base(base_url.clone());
-
-        Self {
-            inner,
-            base_url,
-            version_path_base,
-        }
+        Self::builder(AptosBaseUrl::Custom(base_url)).build()
     }
 
     pub fn path_prefix_string(&self) -> String {
