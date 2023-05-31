@@ -100,7 +100,13 @@ def execute_command(command):
         raise CalledProcessError(p.returncode, p.args)
 
     # return the full output in the end for postprocessing
-    return "\n".join(result)
+    full_result = "\n".join(result)
+
+    if " ERROR " in full_result:
+        print("ERROR log line in execution")
+        exit(1)
+
+    return full_result
 
 
 @dataclass
