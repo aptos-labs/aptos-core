@@ -119,13 +119,17 @@ impl RestoreCoordinator {
         )
         .await?;
 
-        let target_version = self.global_opt.target_version;
-        COORDINATOR_TARGET_VERSION.set(target_version as i64);
-
         // calculate the start_version and replay_version
         let max_txn_ver = metadata_view
             .max_transaction_version()?
             .ok_or_else(|| anyhow!("No transaction backup found."))?;
+        let target_version = std::cmp::min(self.global_opt.target_version, max_txn_ver);
+        info!(
+            "User specified target version: {}, max transaction version: {}, Target version is set to {}",
+            self.global_opt.target_version, max_txn_ver, target_version
+        );
+
+        COORDINATOR_TARGET_VERSION.set(target_version as i64);
         let lhs = self.ledger_history_start_version();
 
         let latest_tree_version = self
@@ -185,7 +189,7 @@ impl RestoreCoordinator {
             snapshot.unwrap()
         } else {
             metadata_view
-                .select_state_snapshot(std::cmp::min(self.target_version(), max_txn_ver))?
+                .select_state_snapshot(target_version)?
                 .expect("Cannot find tree snapshot before target version")
         };
 
