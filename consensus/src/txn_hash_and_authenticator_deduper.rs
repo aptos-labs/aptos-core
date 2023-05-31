@@ -30,6 +30,8 @@ use std::collections::{HashMap, HashSet};
 ///    grouped independently and run in parallel in Step 3.
 /// b. Txn hashes are calculated at many places within a validator. A per-txn hash cache could speed
 ///    up dedup or later operations.
+/// c. If signature verification is moved to before dedup, then only the signature has to be matched
+///    for duplicates and not the hash.
 pub(crate) struct TxnHashAndAuthenticatorDeduper {}
 
 impl TransactionDeduper for TxnHashAndAuthenticatorDeduper {
