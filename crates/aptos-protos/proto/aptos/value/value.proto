@@ -1,0 +1,50 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.move.value;
+
+import "google/protobuf/descriptor.proto";
+
+message BcsOptions {
+  enum Kind {
+    // BOOL (bool in protobuf)
+    // uint32
+    U8 = 0;
+    U16 = 1;
+    U32 = 2;
+    // U64 (uint64 in protobuf)
+    // these are bytes in protobuf
+    ADDRESS = 4;
+    SIGNER = 5;
+    U128 = 6;
+    U256 = 7;
+    VEC_BOOL = 8;
+    VEC_U8 = 9;
+    VEC_WRAPPER = 10;  // Custom proto with only one field repeated ... vec = 1 [... options];
+  }
+
+  extend google.protobuf.FieldOptions {
+    BcsOptions.Kind bcs_kind = 50000;
+  }
+}
+
+/* Example
+
+struct SomeMoveStruct {
+  name: vector<u8>,
+  list: vector<u16>,
+  vec_vec: vector<vector<Address>>,
+}
+
+*/
+
+message SomeMoveStruct {
+  bytes name = 1 [(BcsOptions.bcs_kind) = VEC_U8];
+  repeated uint32 list = 2 [(BcsOptions.bcs_kind) = U16];
+  message Wrapper_vec_vec {
+    repeated bytes vec = 1 [(BcsOptions.bcs_kind) = ADDRESS];
+  }
+  repeated Wrapper_vec_vec vec_vec = 3 [(BcsOptions.bcs_kind) = VEC_WRAPPER];
+}

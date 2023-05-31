@@ -5,6 +5,7 @@ plugins:
     opt:
       #- bytes=.
       - file_descriptor_set
+      - compile_well_known_types
 
   - name: prost-serde
     out: src/pb

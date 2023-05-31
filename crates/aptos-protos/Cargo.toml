@@ -11,6 +11,9 @@ edition = "2021"
 
 [dependencies]
 pbjson = "0.4.0"
-prost = "0.11.3"
+prost = "0.11.9"
+prost-types = "0.11"
+bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 tonic = { version = "0.8.3", features = ["tls-roots", "transport", "prost", "gzip", "codegen"] }
+move-core-types = { path = "../../third_party/move/move-core/types" }

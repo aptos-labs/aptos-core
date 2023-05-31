@@ -18,6 +18,13 @@ pub mod aptos {
             }
         }
     }
+    pub mod r#move {
+        // @@protoc_insertion_point(attribute:aptos.move.value)
+        pub mod value {
+            include!("aptos.move.value.rs");
+            // @@protoc_insertion_point(aptos.move.value)
+        }
+    }
     pub mod transaction {
         // @@protoc_insertion_point(attribute:aptos.transaction.v1)
         pub mod v1 {
