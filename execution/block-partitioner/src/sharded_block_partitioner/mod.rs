@@ -11,7 +11,7 @@ use crate::{
         },
         partitioning_shard::PartitioningShard,
     },
-    types::{ShardId, TransactionsChunk},
+    types::{ShardId, SubBlock},
 };
 use aptos_logger::{error, info};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -204,7 +204,7 @@ impl ShardedBlockPartitioner {
     fn collect_partition_block_response(
         &self,
     ) -> (
-        Vec<TransactionsChunk>,
+        Vec<SubBlock>,
         Vec<RWSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -227,10 +227,10 @@ impl ShardedBlockPartitioner {
     fn discard_txns_with_cross_shard_dependencies(
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
-        frozen_chunks: Arc<Vec<TransactionsChunk>>,
+        frozen_chunks: Arc<Vec<SubBlock>>,
         frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
     ) -> (
-        Vec<TransactionsChunk>,
+        Vec<SubBlock>,
         Vec<RWSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -252,10 +252,10 @@ impl ShardedBlockPartitioner {
         &self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_chunks: Arc<Vec<TransactionsChunk>>,
+        frozen_chunks: Arc<Vec<SubBlock>>,
         frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
     ) -> (
-        Vec<TransactionsChunk>,
+        Vec<SubBlock>,
         Vec<RWSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -285,7 +285,7 @@ impl ShardedBlockPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
-    ) -> Vec<TransactionsChunk> {
+    ) -> Vec<SubBlock> {
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];
@@ -337,7 +337,7 @@ impl ShardedBlockPartitioner {
             .unwrap()
             .into_iter()
             .chain(remaining_frozen_chunks.into_iter())
-            .collect::<Vec<TransactionsChunk>>()
+            .collect::<Vec<SubBlock>>()
     }
 }
 
@@ -386,14 +386,14 @@ mod tests {
             create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
             generate_test_account, generate_test_account_for_address, TestAccount,
         },
-        types::TransactionsChunk,
+        types::SubBlock,
     };
     use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::collections::HashMap;
 
-    fn verify_no_cross_shard_dependency(partitioned_txns: Vec<TransactionsChunk>) {
+    fn verify_no_cross_shard_dependency(partitioned_txns: Vec<SubBlock>) {
         for chunk in partitioned_txns {
             for txn in chunk.transactions {
                 assert_eq!(txn.cross_shard_dependencies().len(), 0);

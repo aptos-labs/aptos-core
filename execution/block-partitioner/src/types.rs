@@ -41,7 +41,7 @@ impl CrossShardDependencies {
 #[derive(Debug, Clone)]
 /// A contiguous chunk of transactions (along with their dependencies) in a block.
 ///
-/// Each `TransactionsChunk` represents a sequential section of transactions within a block.
+/// Each `SubBlock` represents a sequential section of transactions within a block.
 /// The chunk includes the index of the first transaction relative to the block and a vector
 /// of `TransactionWithDependencies` representing the transactions included in the chunk.
 ///
@@ -56,13 +56,13 @@ impl CrossShardDependencies {
 ///  | Transaction 3  | Transaction 6    | Transaction 9    |
 ///  +----------------+------------------+------------------+
 /// ```
-pub struct TransactionsChunk {
+pub struct SubBlock {
     // This is the index of first transaction relative to the block.
     pub start_index: TxnIndex,
     pub transactions: Vec<TransactionWithDependencies>,
 }
 
-impl TransactionsChunk {
+impl SubBlock {
     pub fn new(start_index: TxnIndex, transactions: Vec<TransactionWithDependencies>) -> Self {
         Self {
             start_index,

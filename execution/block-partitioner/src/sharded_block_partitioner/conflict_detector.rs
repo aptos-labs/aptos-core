@@ -2,9 +2,7 @@
 
 use crate::{
     sharded_block_partitioner::dependency_analysis::{RWSet, RWSetWithTxnIndex},
-    types::{
-        CrossShardDependencies, ShardId, TransactionWithDependencies, TransactionsChunk, TxnIndex,
-    },
+    types::{CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIndex},
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -118,7 +116,7 @@ impl CrossShardConflictDetector {
         current_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
         prev_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
         index_offset: TxnIndex,
-    ) -> TransactionsChunk {
+    ) -> SubBlock {
         let mut frozen_txns = Vec::new();
         for txn in txns.into_iter() {
             let dependency = self.get_dependencies_for_frozen_txn(
@@ -128,7 +126,7 @@ impl CrossShardConflictDetector {
             );
             frozen_txns.push(TransactionWithDependencies::new(txn, dependency));
         }
-        TransactionsChunk::new(index_offset, frozen_txns)
+        SubBlock::new(index_offset, frozen_txns)
     }
 
     fn check_for_cross_shard_conflict(
