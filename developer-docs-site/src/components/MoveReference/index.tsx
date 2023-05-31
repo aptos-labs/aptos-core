@@ -14,7 +14,7 @@ const branches = ["mainnet", "testnet", "devnet", "main"];
 
 const branch_titles = ["Mainnet", "Testnet", "Devnet", "Main"];
 
-const frameworks = ["move-stdlib", "aptos-framework", "aptos-token", "aptos-token-objects"];
+const frameworks = ["move-stdlib", "aptos-stdlib", "aptos-framework", "aptos-token", "aptos-token-objects"];
 const TopNav = ({ branch }: TopNavProps) => {
   const adjustBranch = (event) => {
     const params = new URLSearchParams(window.location.search);
