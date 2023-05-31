@@ -1,3 +1,8 @@
+---
+title: "Aptos DB Restore Tools"
+slug: "aptos-db-restore"
+---
+
 # Aptos DB Restore Tools and Public Backup Files
 
 Since its launch in October 2022, the Aptos community has grown rapidly. As of May 2023, Aptos has 743G and 159G of data in testnet and mainnet, respectively. We expect the data to increase greatly as more transactions are submitted to the blockchain. Facing the large amount of data, we want to provide users with a way to achieve two goals:
@@ -58,7 +63,7 @@ The backup files consist of three types of data that can be used to reconstruct 
 
 Each type of data in the backup storage is organized in the following way. The metadata file in the metadata folder contains the range of each backup and the relative path to the backup folder. The backup contains a manifest file and all the actual chunked data files.
 
-![image.png](./aptos-db-restore-images/image.png)
+![aptos-db-restore.png](../../static/img/docs/aptos-db-restore.png)
 
 The Aptos Labs maintains a few publicly accessible database backups in Amazon S3 and Google Cloud Storage. You can access these data files as follows:
 
