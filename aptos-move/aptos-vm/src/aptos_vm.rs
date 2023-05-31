@@ -256,9 +256,9 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         aggregator_enabled: bool,
     ) -> (VMStatus, VMOutput) {
-        let mut session = self
-            .0
-            .new_session(resolver, SessionId::txn_meta(txn_data), aggregator_enabled);
+        let mut session =
+            self.0
+                .new_session(resolver, SessionId::txn_meta(txn_data), aggregator_enabled);
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
@@ -480,7 +480,13 @@ impl AptosVM {
 
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::txn_meta(txn_data);
-        RespawnedSession::spawn(&self.0, session_id, resolver, change_set, aggregator_enabled)
+        RespawnedSession::spawn(
+            &self.0,
+            session_id,
+            resolver,
+            change_set,
+            aggregator_enabled,
+        )
     }
 
     // Execute a multisig transaction:
@@ -692,7 +698,7 @@ impl AptosVM {
             SessionId::txn_meta(txn_data),
             resolver,
             VMChangeSet::empty(),
-            aggregator_enabled
+            aggregator_enabled,
         )?;
 
         let execution_error = ExecutionError::try_from(execution_error)
@@ -1368,7 +1374,6 @@ impl AptosVM {
             &state_view.as_move_resolver(),
             txn,
             &log_context,
-            true,
         );
 
         // Because simulation returns a VMOutput, it has both writes and deltas
@@ -1385,7 +1390,6 @@ impl AptosVM {
                     &state_view.as_move_resolver(),
                     txn,
                     &log_context,
-                    false,
                 );
 
                 // Make sure to return the right types. Note that here conversion

@@ -69,14 +69,13 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             &log_context,
             aggregator_enabled,
         ) {
-            Ok((vm_status, mut vm_output, sender)) => {
+            Ok((vm_status, vm_output, sender)) => {
                 if let PreprocessedTransaction::UserTransaction(_) = txn {
                     if !aggregator_enabled {
                         assert!(vm_output.delta_change_set().is_empty());
                     }
                 }
                 if vm_output.status().is_discarded() {
-
                     match sender {
                         Some(s) => speculative_trace!(
                             &log_context,
