@@ -29,7 +29,6 @@ pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedSta
         Arc::new(Mutex::new(ShardedBlockExecutor::new(
             AptosVM::get_num_shards(),
             None, // Defaults to num_cpus / num_shards
-            None,
         )))
     });
 
@@ -48,31 +47,10 @@ impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-    ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
-
-        // to print txn output for debugging, uncomment:
-        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
-
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
-
-        Ok(Self {
-            transactions,
-            transaction_outputs,
-            state_cache: state_view.into_state_cache(),
-        })
-    }
-
-    pub fn by_transaction_execution_with_block_gas_limit<V: VMExecutor>(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block_with_block_gas_limit::<V>(
-            transactions.clone(),
-            &state_view,
-            maybe_block_gas_limit,
-        )?;
+        let transaction_outputs =
+            Self::execute_block::<V>(transactions.clone(), &state_view, maybe_block_gas_limit)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -89,10 +67,14 @@ impl ChunkOutput {
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
-        let transaction_outputs =
-            Self::execute_block_sharded::<V>(transactions.clone(), state_view_arc.clone())?;
+        let transaction_outputs = Self::execute_block_sharded::<V>(
+            transactions.clone(),
+            state_view_arc.clone(),
+            maybe_block_gas_limit,
+        )?;
 
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
 
@@ -172,11 +154,13 @@ impl ChunkOutput {
     fn execute_block_sharded<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: Arc<CachedStateView>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
             SHARDED_BLOCK_EXECUTOR.lock().deref(),
             transactions,
             state_view,
+            maybe_block_gas_limit,
         )?)
     }
 
@@ -186,19 +170,9 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
-    ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(transactions, &state_view)?)
-    }
-
-    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
-    /// a vector of [TransactionOutput]s.
-    #[cfg(not(feature = "consensus-only-perf-test"))]
-    fn execute_block_with_block_gas_limit<V: VMExecutor>(
-        transactions: Vec<Transaction>,
-        state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_with_block_gas_limit(
+        Ok(V::execute_block(
             transactions,
             &state_view,
             maybe_block_gas_limit,

@@ -53,16 +53,9 @@ impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
-    }
-
-    fn execute_transaction_block_with_block_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_block_gas_limit::<FakeVM>(
+        ChunkOutput::by_transaction_execution::<FakeVM>(
             transactions,
             state_view,
             maybe_block_gas_limit,
@@ -75,18 +68,12 @@ impl VMExecutor for FakeVM {
         _sharded_block_executor: &ShardedBlockExecutor<S>,
         _transactions: Vec<Transaction>,
         _state_view: Arc<S>,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
 
     fn execute_block(
-        _transactions: Vec<Transaction>,
-        _state_view: &impl StateView,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        Ok(Vec::new())
-    }
-
-    fn execute_block_with_block_gas_limit(
         _transactions: Vec<Transaction>,
         _state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,

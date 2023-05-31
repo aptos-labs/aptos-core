@@ -645,7 +645,10 @@ impl TestBlock {
 
 // Executes a list of transactions by executing and immediately committing one at a time. Returns
 // the root hash after all transactions are committed.
-fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
+fn run_transactions_naive(
+    transactions: Vec<Transaction>,
+    maybe_block_gas_limit: Option<u64>,
+) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
     let mut ledger_view: ExecutedTrees = db.reader.get_latest_executed_trees().unwrap();
@@ -660,6 +663,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                     Arc::new(AsyncProofFetcher::new(db.reader.clone())),
                 )
                 .unwrap(),
+            maybe_block_gas_limit,
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
@@ -797,7 +801,7 @@ proptest! {
                 txns.push(Transaction::StateCheckpoint(block_b.id));
             }
             txns
-        });
+        }, BLOCK_GAS_LIMIT);
         prop_assert_eq!(root_hash, expected_root_hash);
     }
 

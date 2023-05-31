@@ -35,11 +35,6 @@ pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-    ) -> Result<ChunkOutput>;
-
-    fn execute_transaction_block_with_block_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput>;
 }
@@ -48,16 +43,9 @@ impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
-    }
-
-    fn execute_transaction_block_with_block_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_block_gas_limit::<AptosVM>(
+        ChunkOutput::by_transaction_execution::<AptosVM>(
             transactions,
             state_view,
             maybe_block_gas_limit,
@@ -241,15 +229,7 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                if maybe_block_gas_limit.is_some() {
-                    V::execute_transaction_block_with_block_gas_limit(
-                        transactions,
-                        state_view,
-                        maybe_block_gas_limit,
-                    )?
-                } else {
-                    V::execute_transaction_block(transactions, state_view)?
-                }
+                V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
             };
             chunk_output.trace_log_transaction_status();
 

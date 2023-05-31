@@ -436,7 +436,7 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
+        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
         if !self.no_parallel_exec {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);
