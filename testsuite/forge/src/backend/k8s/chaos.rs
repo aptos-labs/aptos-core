@@ -219,7 +219,7 @@ impl K8sSwarm {
                 loss_correlation_percentage = group_netem.loss_correlation_percentage,
                 instance_labels = &source_instance_labels,
                 target_instance_labels = &target_instance_labels,
-                rate = group_netem.rate,
+                rate = group_netem.rate_in_mbps,
             ));
         }
 

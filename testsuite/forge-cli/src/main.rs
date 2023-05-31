@@ -20,13 +20,13 @@ use aptos_testcases::{
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactinWorkload, Workloads},
-    modifiers::{ExecutionDelayConfig, ExecutionDelayTest},
+    modifiers::{CpuChaosTest, ExecutionDelayConfig, ExecutionDelayTest},
+    multi_region_network_test::MultiRegionNetworkEmulationTest,
     network_bandwidth_test::NetworkBandwidthTest,
     network_loss_test::NetworkLossTest,
     network_partition_test::NetworkPartitionTest,
     performance_test::PerformanceBenchmark,
     quorum_store_onchain_enable_test::QuorumStoreOnChainEnableTest,
-    real_network_simulation_test::RealNetworkSimulationTest,
     reconfiguration_test::ReconfigurationTest,
     state_sync_performance::{
         StateSyncFullnodeFastSyncPerformance, StateSyncFullnodePerformance,
@@ -493,9 +493,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
             run_consensus_only_three_region_simulation(config)
         },
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(config),
-        "multi_region_multi_cloud_simulation_test" => {
-            multi_region_multi_cloud_simulation_test(config)
-        },
+        "mainnet_like_simulation_test" => mainnet_like_simulation_test(config),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1460,7 +1458,7 @@ fn quorum_store_reconfig_enable_test(forge_config: ForgeConfig<'static>) -> Forg
         )
 }
 
-fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
+fn mainnet_like_simulation_test(config: ForgeConfig<'static>) -> ForgeConfig<'static> {
     config
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
@@ -1470,7 +1468,14 @@ fn multi_region_multi_cloud_simulation_test(config: ForgeConfig<'static>) -> For
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .with_network_tests(vec![&RealNetworkSimulationTest {}])
+        .with_network_tests(vec![&CompositeNetworkTest {
+            wrapper: &MultiRegionNetworkEmulationTest {
+                override_config: None,
+            },
+            test: &CpuChaosTest {
+                override_config: None,
+            },
+        }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
