@@ -6,10 +6,7 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
-use aptos_executor_benchmark::{
-    benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
-    pipeline::PipelineConfig,
-};
+use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
@@ -213,7 +210,7 @@ enum Command {
 
 fn run<E>(opt: Opt)
 where
-    E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    E: TransactionBlockExecutor + 'static,
 {
     match opt.cmd {
         Command::CreateDb {

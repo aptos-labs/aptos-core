@@ -8,7 +8,6 @@ use crate::{
     block_executor::AptosTransactionOutput,
     data_cache::{AsMoveResolver, StorageAdapter},
 };
-use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::TransactionOutputExt};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -69,16 +68,15 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
         {
-            Ok((vm_status, mut output_ext, sender)) => {
+            Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
-                    // Keep TransactionOutputExt type for wrapper.
-                    output_ext = TransactionOutputExt::new(
-                        DeltaChangeSet::empty(),                  // Cleared deltas.
-                        output_ext.into_transaction_output(view), // Materialize.
-                    );
+                    // TODO: Integrate delta application failure.
+                    vm_output = vm_output
+                        .try_materialize(view)
+                        .expect("Delta materialization failed");
                 }
 
-                if output_ext.txn_output().status().is_discarded() {
+                if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(
                             &log_context,
@@ -95,14 +93,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                         },
                     };
                 }
-                if AptosVM::should_restart_execution(output_ext.txn_output()) {
+                if AptosVM::should_restart_execution(&vm_output) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
             Err(err) => ExecutionStatus::Abort(err),

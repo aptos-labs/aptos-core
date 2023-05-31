@@ -509,7 +509,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVM, Transaction>,
+    BlockExecutor<AptosVM>,
     Waypoint,
 ) {
     let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));

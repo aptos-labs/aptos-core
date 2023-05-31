@@ -132,7 +132,7 @@ where
                         },
                         Data::Delta(d) => match acc.as_mut() {
                             Some(a) => {
-                                if a.merge_onto(*d).is_err() {
+                                if a.merge_with_previous_delta(*d).is_err() {
                                     failure = true;
                                 }
                             },

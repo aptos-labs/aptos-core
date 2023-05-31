@@ -5,6 +5,7 @@
 use crate::{
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
+    transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -78,6 +79,7 @@ pub trait StateComputer: Send + Sync {
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
+        transaction_deduper: Arc<dyn TransactionDeduper>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

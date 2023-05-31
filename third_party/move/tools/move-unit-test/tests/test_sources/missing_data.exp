@@ -4,13 +4,13 @@ Running Move unit tests
 [ PASS    ] 0x1::MissingData::missing_data_exact
 [ FAIL    ] 0x1::MissingData::missing_data_from_other_function
 0x1::MissingData::missing_data
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 0x1::MissingData::missing_data_captured
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 0x1::MissingData::missing_data_exact
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 0x1::MissingData::missing_data_from_other_function
-Output: Ok(ChangeSet { accounts: {} })
+Output: Ok(Changes { accounts: {} })
 
 Test failures:
 
