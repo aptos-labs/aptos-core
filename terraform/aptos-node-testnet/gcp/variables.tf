@@ -1,5 +1,11 @@
 ### Project config
 
+variable "cluster_bootstrap" {
+  description = "Set when bootstrapping a new cluster"
+  type        = bool
+  default     = false
+}
+
 variable "project" {
   description = "GCP project"
   type        = string

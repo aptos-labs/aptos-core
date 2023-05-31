@@ -11,7 +11,7 @@ use aptos_executor_types::ExecutedChunk;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     DbWriter, ExecutedTrees,
 };
 use aptos_types::{
@@ -127,7 +127,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     let base_state_view = executed_trees.verified_state_view(
         StateViewId::Miscellaneous,
         Arc::clone(&db.reader),
-        Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        Arc::new(AsyncProofFetcher::new(db.reader.clone())),
     )?;
 
     let epoch = if genesis_version == 0 {
@@ -138,7 +138,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
     let (mut output, _, _) =
         ChunkOutput::by_transaction_execution::<V>(vec![genesis_txn.clone()], base_state_view)?
-            .apply_to_ledger(&executed_trees)?;
+            .apply_to_ledger(&executed_trees, None)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."
@@ -151,7 +151,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         let state_view = output.result_view.verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
-            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(db.reader.clone())),
         )?;
         let next_epoch = epoch
             .checked_add(1)

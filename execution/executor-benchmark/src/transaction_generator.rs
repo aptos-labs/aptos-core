@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_generator::{AccountCache, AccountGenerator},
-    benchmark_transaction::{AccountCreationInfo, BenchmarkTransaction, ExtraInfo, TransferInfo},
-};
+use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -73,7 +70,7 @@ struct P2pTestCase {
 pub struct TransactionGenerator {
     /// The current state of the accounts. The main purpose is to keep track of the sequence number
     /// so generated transactions are guaranteed to be successfully executed.
-    accounts_cache: Option<AccountCache>,
+    main_signer_accounts: Option<AccountCache>,
 
     /// The current state of seed accounts. The purpose of the seed accounts to parallelize the
     /// account creation and minting process so that they are not blocked on sequence number of
@@ -89,7 +86,7 @@ pub struct TransactionGenerator {
 
     /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
     /// sure if execution is slow to consume the transactions, we do not run out of memory.
-    block_sender: Option<mpsc::SyncSender<Vec<BenchmarkTransaction>>>,
+    block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
 
     /// Transaction Factory
     transaction_factory: TransactionFactory,
@@ -120,45 +117,76 @@ impl TransactionGenerator {
         accounts
     }
 
-    pub fn gen_user_account_cache(num_accounts: usize) -> AccountCache {
-        Self::gen_account_cache(
-            AccountGenerator::new_for_user_accounts(0),
-            num_accounts,
+    pub fn resync_sequence_numbers(
+        reader: Arc<dyn DbReader>,
+        mut accounts: AccountCache,
+        name: &str,
+    ) -> AccountCache {
+        let mut updated = 0;
+        for account in &mut accounts.accounts {
+            let seq_num = get_sequence_number(account.address(), reader.clone());
+            if seq_num > 0 {
+                updated += 1;
+                *account.sequence_number_mut() = seq_num;
+            }
+        }
+        if updated > 0 {
+            println!(
+                "Updated {} seq numbers out of {} {} accounts",
+                updated,
+                accounts.accounts.len(),
+                name
+            );
+        }
+        accounts
+    }
+
+    pub fn gen_user_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
+        Self::resync_sequence_numbers(
+            reader,
+            Self::gen_account_cache(
+                AccountGenerator::new_for_user_accounts(0),
+                num_accounts,
+                "user",
+            ),
             "user",
         )
     }
 
     fn gen_seed_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize) -> AccountCache {
-        let generator = AccountGenerator::new_for_seed_accounts();
-
-        let mut accounts = Self::gen_account_cache(generator, num_accounts, "seed");
-
-        for account in &mut accounts.accounts {
-            *account.sequence_number_mut() = get_sequence_number(account.address(), reader.clone());
-        }
-        accounts
+        Self::resync_sequence_numbers(
+            reader,
+            Self::gen_account_cache(
+                AccountGenerator::new_for_seed_accounts(),
+                num_accounts,
+                "seed",
+            ),
+            "seed",
+        )
     }
 
     pub fn new_with_existing_db<P: AsRef<Path>>(
         db: DbReaderWriter,
         genesis_key: Ed25519PrivateKey,
-        block_sender: mpsc::SyncSender<Vec<BenchmarkTransaction>>,
+        block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
         version: Version,
+        num_main_signer_accounts: Option<usize>,
     ) -> Self {
         let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
-        let num_cached_accounts =
-            std::cmp::min(num_existing_accounts, MAX_ACCOUNTS_INVOLVED_IN_P2P);
-        let accounts_cache = Some(Self::gen_user_account_cache(num_cached_accounts));
 
         Self {
             seed_accounts_cache: None,
             root_account: LocalAccount::new(
                 aptos_test_root_address(),
                 genesis_key,
-                get_sequence_number(aptos_test_root_address(), db.reader),
+                get_sequence_number(aptos_test_root_address(), db.reader.clone()),
             ),
-            accounts_cache,
+            main_signer_accounts: num_main_signer_accounts.map(|num_main_signer_accounts| {
+                let num_cached_accounts =
+                    std::cmp::min(num_existing_accounts, num_main_signer_accounts);
+                Self::gen_user_account_cache(db.reader.clone(), num_cached_accounts)
+            }),
             num_existing_accounts,
             version,
             block_sender: Some(block_sender),
@@ -255,19 +283,14 @@ impl TransactionGenerator {
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
                 .into_iter()
                 .flat_map(|_| {
-                    let sender = self.accounts_cache.as_mut().unwrap().get_random();
+                    let sender = self.main_signer_accounts.as_mut().unwrap().get_random();
                     transaction_generator
-                        .generate_transactions(vec![sender], transactions_per_sender)
+                        .generate_transactions(sender, transactions_per_sender)
                         .into_iter()
-                        .map(|t| BenchmarkTransaction {
-                            transaction: Transaction::UserTransaction(t),
-                            extra_info: None,
-                        })
+                        .map(Transaction::UserTransaction)
                         .collect::<Vec<_>>()
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
 
@@ -313,18 +336,9 @@ impl TransactionGenerator {
                                 seed_account_balance,
                             ),
                     );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
-                            self.root_account.address(),
-                            new_account.address(),
-                            seed_account_balance,
-                        )),
-                    )
+                    Transaction::UserTransaction(txn)
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
@@ -367,18 +381,9 @@ impl TransactionGenerator {
                                 init_account_balance,
                             ),
                     );
-                    BenchmarkTransaction::new(
-                        Transaction::UserTransaction(txn),
-                        ExtraInfo::AccountCreationInfo(AccountCreationInfo::new(
-                            sender.address(),
-                            new_account.address(),
-                            init_account_balance,
-                        )),
-                    )
+                    Transaction::UserTransaction(txn)
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
@@ -403,7 +408,7 @@ impl TransactionGenerator {
                 .into_iter()
                 .flat_map(|_| {
                     let (sender, receivers) = self
-                        .accounts_cache
+                        .main_signer_accounts
                         .as_mut()
                         .unwrap()
                         .get_random_transfer_batch(transactions_per_sender);
@@ -414,20 +419,11 @@ impl TransactionGenerator {
                             let txn = sender.sign_with_transaction_builder(
                                 self.transaction_factory.transfer(receiver, amount),
                             );
-                            BenchmarkTransaction::new(
-                                Transaction::UserTransaction(txn),
-                                ExtraInfo::TransferInfo(TransferInfo::new(
-                                    sender.address(),
-                                    receiver,
-                                    amount,
-                                )),
-                            )
+                            Transaction::UserTransaction(txn)
                         })
                         .collect::<Vec<_>>()
                 })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
             self.version += transactions.len() as Version;
 
@@ -439,19 +435,19 @@ impl TransactionGenerator {
 
     /// Verifies the sequence numbers in storage match what we have locally.
     pub fn verify_sequence_numbers(&self, db: Arc<dyn DbReader>) {
-        if self.accounts_cache.is_none() {
+        if self.main_signer_accounts.is_none() {
             println!("Cannot verify account sequence numbers.");
             return;
         }
 
-        let num_accounts_in_cache = self.accounts_cache.as_ref().unwrap().len();
+        let num_accounts_in_cache = self.main_signer_accounts.as_ref().unwrap().len();
         println!(
             "[{}] verify {} account sequence numbers.",
             now_fmt!(),
             num_accounts_in_cache,
         );
         let bar = get_progress_bar(num_accounts_in_cache);
-        self.accounts_cache
+        self.main_signer_accounts
             .as_ref()
             .unwrap()
             .accounts()

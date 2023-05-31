@@ -97,7 +97,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -155,7 +155,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -213,7 +213,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -272,7 +272,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -335,7 +335,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -388,7 +388,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -447,7 +447,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -504,7 +504,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -567,7 +567,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -612,9 +612,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -673,7 +674,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -721,9 +722,10 @@
         "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": { "calcs": [], "fields": "", "limit": 10, "values": true },
-        "showUnfilled": true
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -765,7 +767,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -774,7 +776,7 @@
           "location": "US",
           "project": "analytics-test-345723",
           "rawQuery": true,
-          "rawSql": "SELECT count(DISTINCT peer_id) as unique_connected_pfns FROM `analytics-test-345723.aptos_node_telemetry.custom_events` WHERE $__timeFilter(event_timestamp) and (role_type = \"Unknown\" or role_type = \"PublicFullNode\");",
+          "rawSql": "SELECT count(DISTINCT peer_id) as unique_connected_pfns \nFROM `analytics-test-345723.aptos_node_telemetry.custom_events` \nWHERE $__timeFilter(event_timestamp) and (role_type in (\"Unknown\", \"PublicFullNode\",\"UnknownFullNode\"))\nand if(chain_id='1','mainnet',if(chain_id='2','testnet',null)) = \"$chain_name\";",
           "refId": "A",
           "sql": {
             "columns": [{ "parameters": [], "type": "function" }],
@@ -817,7 +819,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -877,7 +879,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -925,7 +927,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -967,7 +969,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -990,7 +992,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
         },
@@ -999,8 +1001,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 11, "y": 10 },
       "id": 72,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1066,7 +1072,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1092,7 +1098,7 @@
       "error": false,
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1107,8 +1113,12 @@
       "gridPos": { "h": 5, "w": 5, "x": 19, "y": 10 },
       "id": 142,
       "isNew": false,
-      "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-      "pluginVersion": "9.1.1",
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1137,324 +1147,407 @@
       "type": "table"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
       "id": 145,
-      "panels": [
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "none"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
-          "id": 143,
-          "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "avg(aptos_all_validators_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (peer_id) * 100 ",
-              "format": "table",
-              "hide": false,
-              "instant": true,
-              "intervalFactor": 1,
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Validator set with voting power",
-          "transformations": [
-            {
-              "id": "groupBy",
-              "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
-            }
-          ],
-          "type": "table"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-              "mappings": [],
-              "unit": "percent"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 5, "x": 8, "y": 16 },
-          "id": 148,
-          "options": {
-            "displayLabels": [],
-            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
-            "pieType": "pie",
-            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "avg(aptos_all_validators_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (peer_id) * 100 / avg(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"})",
-              "format": "time_series",
-              "hide": false,
-              "instant": true,
-              "intervalFactor": 1,
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Voting power distribution %",
-          "transformations": [
-            {
-              "id": "groupBy",
-              "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
-            }
-          ],
-          "type": "piechart"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "none"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 5, "x": 13, "y": 16 },
-          "id": 146,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "count(node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (git_hash, role)",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Release hash",
-          "transformations": [
-            {
-              "id": "groupBy",
-              "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
-            }
-          ],
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": { "type": "linear" },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": { "group": "A", "mode": "none" },
-                "thresholdsStyle": { "mode": "off" }
-              },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "percent"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
-          "id": 147,
-          "options": {
-            "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
-            "tooltip": { "mode": "single", "sort": "none" }
-          },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "\nsum by (git_hash) (\n    max by (kubernetes_pod_name) (\n        aptos_validator_voting_power {chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}\n    ) * \n    on (kubernetes_pod_name) group_left(git_hash) \n    (\n        max by(kubernetes_pod_name, git_hash) (\n            node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}\n        )\n     )\n) * 100 \n/ \navg(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"})",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Release hash by voting power",
-          "transformations": [
-            {
-              "id": "groupBy",
-              "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
-            }
-          ],
-          "type": "timeseries"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
-              "unit": "none"
-            },
-            "overrides": []
-          },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
-          "id": 149,
-          "options": { "footer": { "fields": "", "reducer": ["sum"], "show": false }, "showHeader": true },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "avg(node_hostname{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (kubernetes_pod_name, name)",
-              "format": "table",
-              "hide": false,
-              "instant": true,
-              "intervalFactor": 1,
-              "refId": "A"
-            },
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "expr": "",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Peer_id to host name",
-          "transformations": [
-            {
-              "id": "groupBy",
-              "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
-            }
-          ],
-          "type": "table"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "fieldConfig": {
-            "defaults": {
-              "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false },
-              "mappings": [],
-              "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] }
-            },
-            "overrides": [
-              {
-                "matcher": { "id": "byName", "options": "Time" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "Value" },
-                "properties": [{ "id": "custom.hidden", "value": true }]
-              },
-              {
-                "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
-                "properties": [{ "id": "custom.width", "value": 296 }]
-              }
-            ]
-          },
-          "gridPos": { "h": 8, "w": 10, "x": 8, "y": 24 },
-          "id": 152,
-          "options": {
-            "footer": { "fields": "", "reducer": ["sum"], "show": false },
-            "showHeader": true,
-            "sortBy": []
-          },
-          "pluginVersion": "9.1.1",
-          "targets": [
-            {
-              "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-              "editorMode": "code",
-              "exemplar": false,
-              "expr": "label_del(node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}, \"chain_name\", \"cluster\", \"metrics_source\", \"namespace\", \"__name__\", \"role\")",
-              "format": "table",
-              "instant": true,
-              "legendFormat": "__auto",
-              "range": false,
-              "refId": "A"
-            }
-          ],
-          "title": "Git Hash to Peers Mapping",
-          "type": "table"
-        }
-      ],
+      "panels": [],
       "title": "Release Information",
       "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "id": 143,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(aptos_all_validators_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (peer_id) * 100 ",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "intervalFactor": 1,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Validator set with voting power",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": [],
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 5, "x": 8, "y": 16 },
+      "id": 148,
+      "options": {
+        "displayLabels": [],
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(aptos_all_validators_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (peer_id) * 100 / avg(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"})",
+          "format": "time_series",
+          "hide": false,
+          "instant": true,
+          "intervalFactor": 1,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Voting power distribution % (by peer_id)",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 5, "x": 13, "y": 16 },
+      "id": 146,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "count(node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (git_hash, role)",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Release hash",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
+      "id": 147,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "\nsum by (git_hash) (\n    max by (kubernetes_pod_name) (\n        aptos_validator_voting_power {chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}\n    ) * \n    on (kubernetes_pod_name) group_left(git_hash) \n    (\n        max by(kubernetes_pod_name, git_hash) (\n            node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}\n        )\n     )\n) * 100 \n/ \navg(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"})",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Release hash by voting power",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "id": 149,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(node_hostname{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (kubernetes_pod_name, name)",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "intervalFactor": 1,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Peer_id to host name",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": [],
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 5, "x": 8, "y": 24 },
+      "id": 157,
+      "options": {
+        "displayLabels": [],
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "avg(aptos_all_validators_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}) by (peer_id) * 100 / avg(aptos_total_voting_power{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"})",
+          "format": "time_series",
+          "hide": false,
+          "instant": true,
+          "intervalFactor": 1,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Voting power distribution %",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": { "fields": { "Value": { "aggregations": [] }, "peer_id": { "aggregations": [] } } }
+        }
+      ],
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "filterable": true, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Time" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "kubernetes_pod_name" },
+            "properties": [{ "id": "custom.width", "value": 296 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 10, "x": 13, "y": 24 },
+      "id": 152,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "label_del(node_release_git_hash{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\",kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"validator\"}, \"chain_name\", \"cluster\", \"metrics_source\", \"namespace\", \"__name__\", \"role\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Git Hash to Peers Mapping",
+      "type": "table"
     },
     {
       "collapsed": false,
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 62,
       "isNew": false,
       "panels": [],
@@ -1474,7 +1567,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 17 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 33 },
       "hiddenSeries": false,
       "id": 10,
       "isNew": false,
@@ -1496,7 +1589,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1573,7 +1666,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 17 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 33 },
       "id": 67,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1634,7 +1727,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 17 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 33 },
       "id": 68,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1670,7 +1763,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
       "id": 22,
       "isNew": false,
       "panels": [],
@@ -1690,7 +1783,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 9, "w": 6, "x": 0, "y": 27 },
+      "gridPos": { "h": 9, "w": 6, "x": 0, "y": 43 },
       "hiddenSeries": false,
       "id": 26,
       "isNew": false,
@@ -1712,7 +1805,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1756,7 +1849,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 9, "w": 6, "x": 6, "y": 27 },
+      "gridPos": { "h": 9, "w": 6, "x": 6, "y": 43 },
       "hiddenSeries": false,
       "id": 45,
       "isNew": false,
@@ -1778,7 +1871,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1837,12 +1930,12 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 6, "x": 12, "y": 27 },
+      "gridPos": { "h": 9, "w": 6, "x": 12, "y": 43 },
       "id": 76,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1890,12 +1983,12 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent" }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }] },
           "unit": "none"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 27 },
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 43 },
       "id": 150,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -1922,7 +2015,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
       "id": 42,
       "isNew": false,
       "panels": [],
@@ -1943,7 +2036,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 37 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 53 },
       "hiddenSeries": false,
       "id": 20,
       "isNew": false,
@@ -1965,7 +2058,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2008,7 +2101,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 37 },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 53 },
       "hiddenSeries": false,
       "id": 48,
       "isNew": false,
@@ -2030,7 +2123,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2072,7 +2165,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 37 },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 53 },
       "hiddenSeries": false,
       "id": 77,
       "isNew": false,
@@ -2094,7 +2187,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2157,7 +2250,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 37 },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 53 },
       "hiddenSeries": false,
       "id": 129,
       "isNew": false,
@@ -2179,7 +2272,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2214,7 +2307,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
       "id": 140,
       "panels": [],
       "title": "PFN health",
@@ -2232,7 +2325,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 46 },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 62 },
       "hiddenSeries": false,
       "id": 135,
       "isNew": false,
@@ -2254,7 +2347,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2297,7 +2390,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 46 },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 62 },
       "hiddenSeries": false,
       "id": 136,
       "isNew": false,
@@ -2319,7 +2412,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2361,7 +2454,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 46 },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 62 },
       "hiddenSeries": false,
       "id": 137,
       "isNew": false,
@@ -2383,7 +2476,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2446,7 +2539,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 46 },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 62 },
       "hiddenSeries": false,
       "id": 138,
       "isNew": false,
@@ -2468,7 +2561,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2506,7 +2599,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
       "id": 53,
       "isNew": false,
       "panels": [],
@@ -2541,11 +2634,17 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 71 },
       "id": 108,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2590,11 +2689,17 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 71 },
       "id": 110,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -2625,7 +2730,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 63 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 79 },
       "hiddenSeries": false,
       "id": 50,
       "isNew": false,
@@ -2647,7 +2752,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2687,7 +2792,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 63 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 79 },
       "hiddenSeries": false,
       "id": 51,
       "isNew": false,
@@ -2709,7 +2814,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2749,7 +2854,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 63 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 79 },
       "hiddenSeries": false,
       "id": 54,
       "isNew": false,
@@ -2771,7 +2876,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2805,7 +2910,7 @@
       "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" },
       "editable": false,
       "error": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 71 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 87 },
       "id": 40,
       "isNew": false,
       "panels": [],
@@ -2825,7 +2930,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 72 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 88 },
       "hiddenSeries": false,
       "id": 30,
       "isNew": false,
@@ -2847,7 +2952,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2904,12 +3009,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "s"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 72 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 88 },
       "id": 32,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -2920,7 +3031,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "p50",
@@ -2930,7 +3041,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p90",
           "range": true,
@@ -2939,7 +3050,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count[1m]))",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"$kubernetes_pod_name\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
           "hide": false,
           "legendFormat": "p99",
           "range": true,
@@ -2960,7 +3071,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 1,
       "fillGradient": 0,
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 72 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 88 },
       "hiddenSeries": false,
       "id": 44,
       "isNew": false,
@@ -2982,7 +3093,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.1.1",
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3031,7 +3142,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 80 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 96 },
       "id": 98,
       "panels": [],
       "title": "State Sync",
@@ -3063,11 +3174,17 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 81 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 97 },
       "id": 100,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3112,11 +3229,17 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 81 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 97 },
       "id": 94,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3139,7 +3262,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 89 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 105 },
       "id": 81,
       "panels": [],
       "title": "System Metrics",
@@ -3172,12 +3295,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "percentunit"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 90 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 106 },
       "id": 79,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3249,12 +3378,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "deckbytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 90 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 106 },
       "id": 83,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3302,12 +3437,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "decbytes"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 90 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 106 },
       "id": 85,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3354,12 +3495,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "iops"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 98 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 114 },
       "id": 89,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3406,12 +3553,18 @@
           },
           "mappings": [],
           "min": 0,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "Bps"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 98 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 114 },
       "id": 87,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3458,12 +3611,18 @@
             "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
           "unit": "percentunit"
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 98 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 114 },
       "id": 92,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3484,7 +3643,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 107 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 123 },
       "id": 156,
       "panels": [],
       "title": "Other metrics",
@@ -3504,18 +3663,26 @@
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
             "lineWidth": 1,
-            "scaleDistribution": { "type": "linear" }
+            "scaleDistribution": { "type": "linear" },
+            "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 80 }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 108 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 124 },
       "id": 154,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
         "orientation": "auto",
@@ -3540,8 +3707,8 @@
       "type": "barchart"
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 37,
+  "refresh": false,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
@@ -3571,7 +3738,7 @@
       },
       {
         "description": "BigQuery data source",
-        "hide": 0,
+        "hide": 2,
         "includeAll": false,
         "multi": false,
         "name": "BigQuery",
@@ -3704,6 +3871,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 10,
+  "version": 15,
   "weekStart": ""
 }

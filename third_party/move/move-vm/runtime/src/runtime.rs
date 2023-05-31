@@ -9,7 +9,7 @@ use crate::{
     loader::{Function, LoadedFunction, Loader},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
-    session::{LoadedFunctionInstantiation, SerializedReturnValues, Session},
+    session::{LoadedFunctionInstantiation, SerializedReturnValues},
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -23,12 +23,10 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    data_store::DataStore,
     gas::GasMeter,
     loaded_data::runtime_types::Type,
     values::{Locals, Reference, VMValueCast, Value},
@@ -50,27 +48,11 @@ impl VMRuntime {
         })
     }
 
-    pub fn new_session<'r, S: MoveResolver>(&self, remote: &'r S) -> Session<'r, '_, S> {
-        self.new_session_with_extensions(remote, NativeContextExtensions::default())
-    }
-
-    pub fn new_session_with_extensions<'r, S: MoveResolver>(
-        &self,
-        remote: &'r S,
-        native_extensions: NativeContextExtensions<'r>,
-    ) -> Session<'r, '_, S> {
-        Session {
-            runtime: self,
-            data_cache: TransactionDataCache::new(remote, &self.loader),
-            native_extensions,
-        }
-    }
-
     pub(crate) fn publish_module_bundle(
         &self,
         modules: Vec<Vec<u8>>,
         sender: AccountAddress,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         _gas_meter: &mut impl GasMeter,
         compat: Compatibility,
     ) -> VMResult<()> {
@@ -331,7 +313,7 @@ impl VMRuntime {
         param_types: Vec<Type>,
         return_types: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
@@ -401,7 +383,7 @@ impl VMRuntime {
         function_name: &IdentStr,
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
@@ -427,7 +409,7 @@ impl VMRuntime {
         func: LoadedFunction,
         function_instantiation: LoadedFunctionInstantiation,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
@@ -487,7 +469,7 @@ impl VMRuntime {
         script: impl Borrow<[u8]>,
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut impl DataStore,
+        data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {

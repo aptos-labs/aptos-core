@@ -69,6 +69,11 @@ genesis:
     internal_host_suffix: fullnode-lb
   # -- The local path for move modules in the docker image. Defaults to the aptos-framework in the aptoslabs/tools docker image
   moveModulesDir: /aptos-framework/move/modules
+  # -- Options for multicluster mode. This is *experimental only*
+  multicluster:
+    enabled: false
+    # comma separated list of cluster names
+    domain_suffixes: ""
 
 serviceAccount:
   # -- Specifies whether a service account should be created

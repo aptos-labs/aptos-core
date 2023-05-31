@@ -41,6 +41,7 @@ pub enum ApiError {
     TransactionNotFound(Option<String>),
     TableItemNotFound(Option<String>),
     BlockNotFound(Option<String>),
+    StateValueNotFound(Option<String>),
     VersionPruned(Option<String>),
     BlockPruned(Option<String>),
     InvalidInput(Option<String>),
@@ -88,6 +89,7 @@ impl ApiError {
             TransactionNotFound(None),
             TableItemNotFound(None),
             BlockNotFound(None),
+            StateValueNotFound(None),
             VersionPruned(None),
             BlockPruned(None),
             InvalidInput(None),
@@ -134,6 +136,7 @@ impl ApiError {
             VmError(_) => 31,
             MempoolIsFull(_) => 32,
             CoinTypeFailedToBeFetched(_) => 33,
+            StateValueNotFound(_) => 34,
         }
     }
 
@@ -173,6 +176,7 @@ impl ApiError {
             ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
             ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
             ApiError::BlockNotFound(_) => "Block is missing events",
+            ApiError::StateValueNotFound(_) => "StateValue not found.",
             ApiError::TransactionParseError(_) => "Transaction failed to parse",
             ApiError::InternalError(_) => "Internal error",
             ApiError::CoinTypeFailedToBeFetched(_) => "Faileed to retrieve the coin type information, please retry",
@@ -273,6 +277,9 @@ impl From<RestError> for ApiError {
                     ApiError::TableItemNotFound(Some(err.error.message))
                 },
                 AptosErrorCode::BlockNotFound => ApiError::BlockNotFound(Some(err.error.message)),
+                AptosErrorCode::StateValueNotFound => {
+                    ApiError::StateValueNotFound(Some(err.error.message))
+                },
                 AptosErrorCode::VersionPruned => ApiError::VersionPruned(Some(err.error.message)),
                 AptosErrorCode::BlockPruned => ApiError::BlockPruned(Some(err.error.message)),
                 AptosErrorCode::InvalidInput => ApiError::InvalidInput(Some(err.error.message)),

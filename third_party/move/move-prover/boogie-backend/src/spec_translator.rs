@@ -6,12 +6,12 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address_blob, boogie_bv_type, boogie_byte_blob, boogie_choice_fun_name,
-        boogie_declare_global, boogie_field_sel, boogie_inst_suffix, boogie_modifies_memory_name,
-        boogie_num_type_base, boogie_reflection_type_info, boogie_reflection_type_is_struct,
-        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
-        boogie_spec_var_name, boogie_struct_name, boogie_type, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
+        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
+        boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
+        boogie_modifies_memory_name, boogie_num_type_base, boogie_reflection_type_info,
+        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_type,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
         boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
@@ -21,14 +21,14 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Exp, ExpData, LocalVarDecl, MemoryLabel, Operation, QuantKind, SpecFunDecl, SpecVarDecl,
+        Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind, SpecFunDecl, SpecVarDecl,
         TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, QualifiedInstId, SpecFunId,
-        SpecVarId, StructId,
+        FieldId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
+        SpecFunId, SpecVarId, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -117,6 +117,11 @@ impl<'env> SpecTranslator<'env> {
         let name_str = format!("${}_{}", prefix, *fvc_ref);
         *fvc_ref = usize::saturating_add(*fvc_ref, 1);
         name_str
+    }
+
+    /// Generates a fresh error symbol.
+    fn fresh_error_name(&self) -> Symbol {
+        self.env.symbol_pool().make(&self.fresh_var_name("error"))
     }
 
     /// Translates a sequence of items separated by `sep`.
@@ -321,26 +326,30 @@ impl<'env> SpecTranslator<'env> {
                 format!("__unused_{}", param_repr)
             }
         });
-        let params = fun.params.iter().enumerate().map(|(i, (name, ty))| {
-            let bv_flag = if global_state
-                .spec_fun_operation_map
-                .contains_key(&(module_env.get_id(), id))
-            {
-                global_state
+        let params = fun
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, Parameter(name, ty))| {
+                let bv_flag = if global_state
                     .spec_fun_operation_map
-                    .get(&(module_env.get_id(), id))
-                    .unwrap()
-                    .0[i]
-                    == Bitwise
-            } else {
-                false
-            };
-            format!(
-                "{}: {}",
-                name.display(module_env.symbol_pool()),
-                ty_str_fn(bv_flag)(self.env, &self.inst(ty))
-            )
-        });
+                    .contains_key(&(module_env.get_id(), id))
+                {
+                    global_state
+                        .spec_fun_operation_map
+                        .get(&(module_env.get_id(), id))
+                        .unwrap()
+                        .0[i]
+                        == Bitwise
+                } else {
+                    false
+                };
+                format!(
+                    "{}: {}",
+                    name.display(module_env.symbol_pool()),
+                    ty_str_fn(bv_flag)(self.env, &self.inst(ty))
+                )
+            });
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst, bv_flag_result);
         let param_list = mem_params.chain(params).join(", ");
@@ -367,7 +376,7 @@ impl<'env> SpecTranslator<'env> {
                 boogie_name,
                 fun.params
                     .iter()
-                    .map(|(n, _)| { format!("{}", n.display(module_env.symbol_pool())) })
+                    .map(|Parameter(n, _)| { format!("{}", n.display(module_env.symbol_pool())) })
                     .join(", ")
             );
             let type_check =
@@ -673,9 +682,9 @@ impl<'env> SpecTranslator<'env> {
                 self.set_writer_location(*node_id);
                 self.translate_quant(*node_id, *kind, ranges, triggers, condition, exp)
             },
-            ExpData::Block(node_id, vars, scope) => {
+            ExpData::Block(node_id, pat, binding, scope) => {
                 self.set_writer_location(*node_id);
-                self.translate_block(vars, scope)
+                self.translate_block(pat, binding, scope)
             },
             ExpData::IfElse(node_id, cond, on_true, on_false) => {
                 self.set_writer_location(*node_id);
@@ -716,14 +725,19 @@ impl<'env> SpecTranslator<'env> {
             suffix = boogie_bv_type(self.env, self.env.get_node_type(node_id).skip_reference());
         }
         match val {
-            Value::Address(addr) => emit!(self.writer, "{}", addr),
+            Value::Address(addr) => emit!(self.writer, "{}", boogie_address(self.env, addr)),
             Value::Number(val) => emit!(self.writer, "{}{}", val, suffix),
             Value::Bool(val) => emit!(self.writer, "{}", val),
             Value::ByteArray(val) => {
                 emit!(self.writer, &boogie_byte_blob(self.options, val, bv_flag))
             },
-            Value::AddressArray(val) => emit!(self.writer, &boogie_address_blob(self.options, val)),
-            Value::Vector(val) => emit!(self.writer, &boogie_value_blob(self.options, val)),
+            Value::AddressArray(val) => emit!(
+                self.writer,
+                &boogie_address_blob(self.env, self.options, val)
+            ),
+            Value::Vector(val) => {
+                emit!(self.writer, &boogie_value_blob(self.env, self.options, val))
+            },
         }
     }
 
@@ -743,21 +757,23 @@ impl<'env> SpecTranslator<'env> {
         }
     }
 
-    fn translate_block(&self, vars: &[LocalVarDecl], exp: &Exp) {
-        if vars.is_empty() {
-            return self.translate_exp(exp);
-        }
-        let mut bracket_num = 0;
-        for var in vars {
-            let name_str = self.env.symbol_pool().string(var.name);
-            emit!(self.writer, "(var {} := ", name_str);
-            self.translate_exp(var.binding.as_ref().expect("binding"));
-            emit!(self.writer, "; ");
-            bracket_num += 1;
-        }
-        self.translate_exp(exp);
-        for _n in 0..bracket_num {
-            emit!(self.writer, ")");
+    fn translate_block(&self, pat: &Pattern, binding: &Option<Exp>, scope: &Exp) {
+        match (pat, binding) {
+            (Pattern::Var(_, name), Some(exp)) => {
+                let name_str = self.env.symbol_pool().string(*name);
+                emit!(self.writer, "(var {} := ", name_str);
+                self.translate_exp(exp);
+                emit!(self.writer, "; ");
+                self.translate_exp(scope);
+                emit!(self.writer, ")");
+            },
+            (_, Some(_)) => {
+                self.error(
+                    &self.env.get_node_loc(pat.node_id()),
+                    "patterns not supported in specification language",
+                );
+            },
+            _ => panic!("unexpected missing binding in specification block"),
         }
     }
 
@@ -1066,7 +1082,7 @@ impl<'env> SpecTranslator<'env> {
         args: &[Exp],
     ) {
         let struct_env = self.env.get_module(module_id).into_struct(struct_id);
-        if struct_env.is_native_or_intrinsic() {
+        if struct_env.is_intrinsic() {
             self.env.error(
                 &self.env.get_node_loc(node_id),
                 "cannot select field of intrinsic struct",
@@ -1163,9 +1179,22 @@ impl<'env> SpecTranslator<'env> {
         emit!(self.writer, "]");
     }
 
+    fn require_range_var(&self, pat: &Pattern) -> (NodeId, Symbol) {
+        if let Pattern::Var(id, name) = pat {
+            (*id, *name)
+        } else {
+            let id = pat.node_id();
+            self.error(
+                &self.env.get_node_loc(id),
+                "quantifier binding must be a simple variable",
+            );
+            (id, self.fresh_error_name())
+        }
+    }
+
     fn with_range_selector_assignments<F>(
         &self,
-        ranges: &[(LocalVarDecl, Exp)],
+        ranges: &[(Pattern, Exp)],
         range_tmps: &HashMap<Symbol, String>,
         quant_vars: &HashMap<Symbol, String>,
         resource_vars: &HashMap<Symbol, String>,
@@ -1175,32 +1204,33 @@ impl<'env> SpecTranslator<'env> {
     {
         // Translate range selectors.
         for (var, range) in ranges {
-            let var_name = self.env.symbol_pool().string(var.name);
+            let (_, var_name) = self.require_range_var(var);
+            let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
             match quant_ty.skip_reference() {
                 Type::Vector(_) => {
-                    let range_tmp = range_tmps.get(&var.name).unwrap();
-                    let quant_var = quant_vars.get(&var.name).unwrap();
+                    let range_tmp = range_tmps.get(&var_name).unwrap();
+                    let quant_var = quant_vars.get(&var_name).unwrap();
                     emit!(
                         self.writer,
                         "(var {} := ReadVec({}, {});\n",
-                        var_name,
+                        var_name_str,
                         range_tmp,
                         quant_var,
                     );
                 },
                 Type::Primitive(PrimitiveType::Range) => {
-                    let quant_var = quant_vars.get(&var.name).unwrap();
-                    emit!(self.writer, "(var {} := {};\n", var_name, quant_var);
+                    let quant_var = quant_vars.get(&var_name).unwrap();
+                    emit!(self.writer, "(var {} := {};\n", var_name_str, quant_var);
                 },
                 Type::ResourceDomain(mid, sid, inst_opt) => {
                     let memory = &mid.qualified_inst(*sid, inst_opt.to_owned().unwrap_or_default());
-                    let addr_var = resource_vars.get(&var.name).unwrap();
+                    let addr_var = resource_vars.get(&var_name).unwrap();
                     let resource_name = boogie_resource_memory_name(self.env, memory, &None);
                     emit!(
                         self.writer,
                         "(var {} := $ResourceValue({}, {});\n",
-                        var_name,
+                        var_name_str,
                         resource_name,
                         addr_var
                     );
@@ -1219,7 +1249,7 @@ impl<'env> SpecTranslator<'env> {
         &self,
         _node_id: NodeId,
         kind: QuantKind,
-        ranges: &[(LocalVarDecl, Exp)],
+        ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
         condition: &Option<Exp>,
         body: &Exp,
@@ -1233,6 +1263,7 @@ impl<'env> SpecTranslator<'env> {
         // type quantification
         let mut range_tmps = HashMap::new();
         for (var, range) in ranges {
+            let (_, var_name) = self.require_range_var(var);
             let should_bind_range = match self.get_node_type(range.node_id()).skip_reference() {
                 Type::Vector(..) | Type::Primitive(PrimitiveType::Range) => true,
                 Type::Struct(mid, sid, ..) => {
@@ -1254,7 +1285,7 @@ impl<'env> SpecTranslator<'env> {
                 emit!(self.writer, "(var {} := ", range_tmp);
                 self.translate_exp(range);
                 emit!(self.writer, "; ");
-                range_tmps.insert(var.name, range_tmp);
+                range_tmps.insert(var_name, range_tmp);
             }
         }
         // Translate quantified variables.
@@ -1263,7 +1294,8 @@ impl<'env> SpecTranslator<'env> {
         let mut resource_vars = HashMap::new();
         let mut comma = "";
         for (var, range) in ranges {
-            let var_name = self.env.symbol_pool().string(var.name);
+            let (_, var_name) = self.require_range_var(var);
+            let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
             let num_oper = global_state.get_node_num_oper(range.node_id());
             let ty_str = |ty: _| {
@@ -1275,12 +1307,18 @@ impl<'env> SpecTranslator<'env> {
             };
             match quant_ty.skip_reference() {
                 Type::TypeDomain(ty) => {
-                    emit!(self.writer, "{}{}: {}", comma, var_name, ty_str(ty));
+                    emit!(self.writer, "{}{}: {}", comma, var_name_str, ty_str(ty));
                 },
                 Type::Struct(mid, sid, targs) => {
                     let struct_env = self.env.get_struct(mid.qualified(*sid));
                     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
-                        emit!(self.writer, "{}{}: {}", comma, var_name, ty_str(&targs[0]));
+                        emit!(
+                            self.writer,
+                            "{}{}: {}",
+                            comma,
+                            var_name_str,
+                            ty_str(&targs[0])
+                        );
                     } else {
                         panic!("unexpected type");
                     }
@@ -1288,12 +1326,12 @@ impl<'env> SpecTranslator<'env> {
                 Type::ResourceDomain(..) => {
                     let addr_quant_var = self.fresh_var_name("a");
                     emit!(self.writer, "{}{}: int", comma, addr_quant_var);
-                    resource_vars.insert(var.name, addr_quant_var);
+                    resource_vars.insert(var_name, addr_quant_var);
                 },
                 _ => {
                     let quant_var = self.fresh_var_name("i");
                     emit!(self.writer, "{}{}: int", comma, quant_var);
-                    quant_vars.insert(var.name, quant_var);
+                    quant_vars.insert(var_name, quant_var);
                 },
             }
             comma = ", ";
@@ -1321,10 +1359,11 @@ impl<'env> SpecTranslator<'env> {
             }
         } else {
             // Implicit triggers from ResourceDomain range.
-            for (var, range) in ranges {
+            for (pat, range) in ranges {
+                let (_, var_name) = self.require_range_var(pat);
                 let quant_ty = self.get_node_type(range.node_id());
                 if let Type::ResourceDomain(mid, sid, inst_opt) = quant_ty.skip_reference() {
-                    let addr_var = resource_vars.get(&var.name).unwrap();
+                    let addr_var = resource_vars.get(&var_name).unwrap();
                     let memory = &mid.qualified_inst(*sid, inst_opt.to_owned().unwrap_or_default());
                     let resource_name = boogie_resource_memory_name(self.env, memory, &None);
                     let resource_value = format!("$ResourceValue({}, {})", resource_name, addr_var);
@@ -1340,12 +1379,14 @@ impl<'env> SpecTranslator<'env> {
         };
         let mut separator = "";
         for (var, range) in ranges {
-            let var_name = self.env.symbol_pool().string(var.name);
+            let (_, var_name) = self.require_range_var(var);
+            let var_name_str = self.env.symbol_pool().string(var_name);
             let quant_ty = self.get_node_type(range.node_id());
             let num_oper = global_state.get_node_num_oper(range.node_id());
             match quant_ty.skip_reference() {
                 Type::TypeDomain(domain_ty) => {
-                    let mut type_check = boogie_well_formed_expr(self.env, &var_name, domain_ty);
+                    let mut type_check =
+                        boogie_well_formed_expr(self.env, &var_name_str, domain_ty);
                     if type_check.is_empty() {
                         type_check = "true".to_string();
                     }
@@ -1356,8 +1397,8 @@ impl<'env> SpecTranslator<'env> {
                     continue;
                 },
                 Type::Vector(..) => {
-                    let range_tmp = range_tmps.get(&var.name).unwrap();
-                    let quant_var = quant_vars.get(&var.name).unwrap();
+                    let range_tmp = range_tmps.get(&var_name).unwrap();
+                    let quant_var = quant_vars.get(&var_name).unwrap();
                     emit!(
                         self.writer,
                         "{}InRangeVec({}, {})",
@@ -1373,17 +1414,17 @@ impl<'env> SpecTranslator<'env> {
                             self.writer,
                             "{}ContainsTable({}, $EncodeKey'{}'({}))",
                             separator,
-                            range_tmps.get(&var.name).unwrap(),
+                            range_tmps.get(&var_name).unwrap(),
                             boogie_type_suffix_bv(self.env, &targs[0], num_oper == Bitwise),
-                            var_name,
+                            var_name_str,
                         );
                     } else {
                         panic!("unexpected type");
                     }
                 },
                 Type::Primitive(PrimitiveType::Range) => {
-                    let range_tmp = range_tmps.get(&var.name).unwrap();
-                    let quant_var = quant_vars.get(&var.name).unwrap();
+                    let range_tmp = range_tmps.get(&var_name).unwrap();
+                    let quant_var = quant_vars.get(&var_name).unwrap();
                     emit!(
                         self.writer,
                         "{}$InRange({}, {})",
@@ -1433,7 +1474,7 @@ impl<'env> SpecTranslator<'env> {
         &self,
         node_id: NodeId,
         kind: QuantKind,
-        range: &(LocalVarDecl, Exp),
+        range: &(Pattern, Exp),
         body: &Exp,
     ) {
         // Reconstruct the choice so we can easily determine used locals and temps.
@@ -1445,7 +1486,7 @@ impl<'env> SpecTranslator<'env> {
             None,
             body.clone(),
         );
-        let some_var = range.0.name;
+        let (_, some_var) = self.require_range_var(&range.0);
         let free_vars = range_and_body
             .free_vars(self.env)
             .into_iter()

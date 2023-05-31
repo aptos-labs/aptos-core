@@ -19,6 +19,16 @@
 
   /* Override this */
   --ifm-link-color: var(--ifm-color-primary-dark);
+  --ifm-navbar-height: 5rem;
+  --ifm-menu-link-padding-vertical: 0.75rem;
+  --ifm-menu-link-padding-horizontal: 1rem;
+  --submenu-color: var(--ifm-color-gray-700);
+  --ifm-toc-link-color: var(--submenu-color);
+}
+
+/* Smooth scrolling hash links */
+html {
+  scroll-behavior: smooth;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
@@ -35,7 +45,9 @@ html[data-theme='dark'] {
   --ifm-color-primary-custom-lightest: #c2ffff;
 
   /* Override this */
-  --ifm-link-color: var(--ifm-color-primary-dark);
+  --ifm-link-color: var(--ifm-color-primary-lighter);
+  --submenu-color: var(--ifm-color-gray-500);
+  --ifm-dropdown-font-weight: 400;
 }
 
 .docusaurus-highlight-code-line {
@@ -212,7 +224,6 @@ footer.footer > div.container-fluid {
 
 .navbar {
   background:var(--ifm-background-color);
-  height:80px;
   border-bottom:1px solid var(--ifm-toc-border-color);
   padding-left:1.5rem;
   padding-right:1.5rem;
@@ -350,6 +361,15 @@ b.navbar__title{
   margin-bottom: 0;
   border-radius: 0.25rem;
 }
+
+.list-group-item small {
+  color: black;
+}
+
+html[data-theme='dark'] .list-group-item small {
+  color: white;
+}
+
 .list-group-item-action {
   width: 100%;
   /* color: #495057; */
@@ -363,19 +383,10 @@ b.navbar__title{
   background-color: #f0ebec;
 }
 
-/* html[data-theme='light'] .list-group-item-action:focus, .list-group-item-action:hover {
-  background-color: var(--ifm-color-primary-light);
-}
-
- html[data-theme='dark'] .list-group-item-action:focus, .list-group-item-action:hover {
-  background-color: var(--ifm-color-gray-800);
-} */
-
 .list-group-item-action:active {
   color: #212529;
  /* background-color: #ebedf0; */
 }
-
 
 .list-group-item {
   position: relative;
@@ -834,14 +845,15 @@ b.navbar__title{
 }
 
 
-@media (min-width: 576px)
-.bd-example {
-    padding: 1.5rem;
-    margin-right: 0;
-    margin-left: 0;
-    border-width: 1px;
-    border-top-left-radius: 0.25rem;
-    border-top-right-radius: 0.25rem;
+@media (min-width: 576px) {
+  .bd-example {
+      padding: 1.5rem;
+      margin-right: 0;
+      margin-left: 0;
+      border-width: 1px;
+      border-top-left-radius: 0.25rem;
+      border-top-right-radius: 0.25rem;
+  }
 }
 .bd-example {
     position: relative;
@@ -1162,14 +1174,11 @@ html[data-theme='dark'] .sidebar-divider {
 }
 
 .sidebar-title {
-  font-size: 0.95rem;
-  letter-spacing: 0.05rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  font-family: Avenir, SFMono, ui-monospace, Monaco, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  font-weight: 700;
-  color: var(--ifm-color-primary-dark);
+  color: var(--ifm-color-gray-600);
   margin: 0.7rem;
-  /* background-color: var(--ifm-menu-color-background-active); */
 }
 
 html[data-theme='dark'] .sidebar-divider {
@@ -1199,4 +1208,159 @@ html[data-theme='dark'] .sidebar-divider {
   .powered-by-banner {
     margin-left: 1rem;
   }
+}
+
+.contributors {
+  margin-left: 50px;
+  margin-right: 50px;
+}
+
+.contributors-list {
+  display: flex;
+  flex-wrap: wrap;
+  margin: auto;
+}
+
+.contributor {
+  width: 210px;
+  padding: 5px;
+}
+
+.contributor-pic {
+  height: 60px;
+  width: 60px;
+}
+
+.move-reference-contents {
+  display: flex;
+  position: sticky;
+  top: 0;
+  height: 100%;
+}
+
+.move-content {
+  padding: 20px;
+  width: 80%;
+}
+
+.move-content a[name] {
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 0.5rem);
+}
+
+.move-sidebar {
+  float: left;
+  height: 100%; /* 100% Full-height */
+  padding: 20px;
+  position: sticky; /* Stay in place */
+  top: 0; /* Stay at the top */
+  transition: 0.5s; /* 0.5 second transition effect to slide in the sidenav */
+  width: 100; /* 0 width - change this with JavaScript */
+  z-index: 1; /* Stay on top */
+/*  overflow-x: hidden; /* Disable horizontal scroll */
+}
+
+.move-top-bar {
+  display: flex;
+  padding: 20px;
+}
+
+.move-top-bar-button {
+  padding: 20px;
+}
+
+/* Navbar items */
+
+.navbar__item {
+  border-radius: 0.5rem;
+  opacity:0.85;
+}
+
+@media (min-width: 1024px) {
+  .navbar__item {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .navbar__item {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.navbar__item:hover {
+  opacity:1;
+}
+
+/* Dropdowns */
+
+.dropdown__menu {
+  padding:1rem 0.5rem;
+}
+
+.dropdown__link {
+  padding:0.5rem 1rem;
+}
+
+.dropdown__link--active {
+  font-weight:500;
+}
+
+.dropdown > .navbar__link:after, .menu__caret:before {
+  content: '';
+  display: inline-block;
+  margin-left: 0.3em;
+  position: relative;
+  top: 2px;
+  background-color: currentColor;
+  mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"%3E%3Cpath d="M6 9l6 6l6 -6" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"%3E%3C/path%3E%3C/svg%3E') no-repeat center;
+  mask-size: contain;
+  transform:none;
+}
+
+.dropdown > .navbar__link:after {
+  width: 1em;
+  height: 1em;
+}
+
+.menu__caret:before {
+  width: 1.5em;
+  height: 1.5em;
+  filter:none;
+  background-image:none;
+}
+
+.menu__list-item:not(.theme-doc-sidebar-item-category-level-1):not(.theme-doc-sidebar-item-link.theme-doc-sidebar-item-link-level-1) .menu__link:not(.menu__link--active), .menu__caret{
+  font-weight:400;
+  color: var(--submenu-color);
+}
+
+.theme-doc-sidebar-item-category-level-1:not(.menu__list-item--collapsed) {
+  margin-bottom:1rem;
+}
+
+.menu__link--active, .menu__link:active, .menu__link:hover {
+  opacity:1;
+  color: var(--ifm-link-color);
+}
+
+/* Anchor links within content */
+.theme-doc-markdown a:not(.card-title):hover {
+  text-decoration:none;
+  border-bottom: 1px solid var(--ifm-color-primary-darkest);
+}
+
+/* Sidebar menu caret */
+.menu__list-item.menu__list-item--collapsed .menu__caret:before {
+  transform: rotateZ(-90deg);
+}
+
+.menu__list-item:not(.menu__list-item--collapsed) > .menu__list-item-collapsible .menu__caret:before {
+  transform: rotateZ(0deg);
+}
+
+/* Table of contents */
+.table-of-contents__link--active {
+  font-weight:500;
 }

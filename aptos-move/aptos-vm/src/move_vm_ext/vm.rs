@@ -25,6 +25,15 @@ use std::{ops::Deref, sync::Arc};
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
+    features: Arc<Features>,
+}
+
+pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u64) -> u32 {
+    if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
+        6
+    } else {
+        5
+    }
 }
 
 impl MoveVmExt {
@@ -40,16 +49,14 @@ impl MoveVmExt {
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
         let max_binary_format_version =
-            if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
-                6
-            } else {
-                5
-            };
+            get_max_binary_format_version(&features, gas_feature_version);
 
-        let treat_friend_as_private = features.is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-        let type_size_limit = timed_features.is_enabled(TimedFeatureFlag::EntryTypeSizeLimit);
+        let type_size_limit = true;
+
+        let verifier_config = verifier_config(&features, &timed_features);
+        let features = Arc::new(features);
 
         Ok(Self {
             inner: MoveVM::new_with_config(
@@ -57,11 +64,11 @@ impl MoveVmExt {
                     native_gas_params,
                     abs_val_size_gas_params,
                     gas_feature_version,
-                    timed_features.clone(),
-                    Arc::new(features),
+                    timed_features,
+                    features.clone(),
                 ),
                 VMConfig {
-                    verifier: verifier_config(treat_friend_as_private, &timed_features),
+                    verifier: verifier_config,
                     max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
@@ -69,6 +76,7 @@ impl MoveVmExt {
                 },
             )?,
             chain_id,
+            features,
         })
     }
 
@@ -76,7 +84,8 @@ impl MoveVmExt {
         &self,
         remote: &'r S,
         session_id: SessionId,
-    ) -> SessionExt<'r, '_, S> {
+        aggregator_enabled: bool,
+    ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
@@ -87,8 +96,13 @@ impl MoveVmExt {
         extensions.add(NativeTableContext::new(txn_hash, remote));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(txn_hash, remote));
+        extensions.add(NativeAggregatorContext::new(
+            txn_hash,
+            remote,
+            aggregator_enabled,
+        ));
 
+        let sender_opt = session_id.sender();
         let script_hash = match session_id {
             SessionId::Txn {
                 sender: _,
@@ -108,8 +122,9 @@ impl MoveVmExt {
 
         SessionExt::new(
             self.inner.new_session_with_extensions(remote, extensions),
-            self,
             remote,
+            sender_opt,
+            self.features.clone(),
         )
     }
 }
@@ -122,33 +137,7 @@ impl Deref for MoveVmExt {
     }
 }
 
-pub fn verifier_config(
-    _treat_friend_as_private: bool,
-    timed_features: &TimedFeatures,
-) -> VerifierConfig {
-    let mut max_back_edges_per_function = None;
-    let mut max_back_edges_per_module = None;
-    let mut max_basic_blocks_in_script = None;
-
-    let mut max_per_fun_meter_units = None;
-    let mut max_per_mod_meter_units = None;
-
-    let legacy_limit_back_edges =
-        timed_features.is_enabled(TimedFeatureFlag::VerifierLimitBackEdges);
-    let metering = timed_features.is_enabled(TimedFeatureFlag::VerifierMetering);
-
-    if legacy_limit_back_edges && !metering {
-        // Turn on limit on back edges, as long as metering is not active
-        max_back_edges_per_function = Some(20);
-        max_back_edges_per_module = Some(400);
-        max_basic_blocks_in_script = Some(1024);
-    }
-
-    if metering {
-        max_per_fun_meter_units = Some(1000 * 80000);
-        max_per_mod_meter_units = Some(1000 * 80000);
-    }
-
+pub fn verifier_config(features: &Features, _timed_features: &TimedFeatures) -> VerifierConfig {
     VerifierConfig {
         max_loop_depth: Some(5),
         max_generic_instantiation_length: Some(32),
@@ -161,10 +150,11 @@ pub fn verifier_config(
         max_struct_definitions: None,
         max_fields_in_struct: None,
         max_function_definitions: None,
-        max_back_edges_per_function,
-        max_back_edges_per_module,
-        max_basic_blocks_in_script,
-        max_per_fun_meter_units,
-        max_per_mod_meter_units,
+        max_back_edges_per_function: None,
+        max_back_edges_per_module: None,
+        max_basic_blocks_in_script: None,
+        max_per_fun_meter_units: Some(1000 * 80000),
+        max_per_mod_meter_units: Some(1000 * 80000),
+        use_signature_checker_v2: features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2),
     }
 }

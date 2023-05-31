@@ -51,8 +51,9 @@ try {
   deleteAnsFolder();
 } catch (error: any) {
   console.error("An error occurred:");
-  console.error("parsed stdout", error.stdout.toString("utf8"));
-  console.error("parsed stderr", error.stderr.toString("utf8"));
+  console.error("Status", error?.status);
+  console.error("parsed stdout", error?.stdout?.toString("utf8"));
+  console.error("parsed stderr", error?.stderr?.toString("utf8"));
   deleteAnsFolder();
   process.exit(1);
 }

@@ -12,6 +12,7 @@ APIs
 APT
 APT's
 APTs
+APY
 AUTH
 AWS
 Ait
@@ -24,6 +25,7 @@ AptosBFT
 AptosCoin
 AptosLabs
 AptosNet
+AptosRelease
 AptosWalletAdapterProvider
 BCS
 BFT
@@ -41,10 +43,12 @@ CPU
 CPUs
 ChainID
 Clippy
+CodeBlock
 CoinStore
 CoinType
 CollectionData
 Concat
+ConstructorRef
 Ctrl
 DAO
 DAO
@@ -55,6 +59,9 @@ DECL
 DM
 DNS
 Dapps
+DeleteRef
+Delegator
+Delegators
 Deref
 Deref
 Destructuring
@@ -63,6 +70,8 @@ DevEx
 Devnet
 DoS
 DocGen
+delegator
+delegators
 dropdown
 EACCOUNT
 EALREADY
@@ -95,11 +104,14 @@ EWITHDRAW
 EWRONG
 EZERO
 Eg
+Enqueue
 EntryFunction
 EntryFunctionPayload
 Enums
 EpochChangeProof
 Ethereum
+ExternalMarkdown
+ExtendRef
 FAQ
 FLAC
 FT
@@ -133,10 +145,12 @@ Integrators
 JPG
 JSON
 Jetbrains
+Jolteon
 Kubernetes
 LLVM
 Labs's
 Leaderboard
+LiquidityPool
 Liveness
 MOV
 MSL
@@ -150,6 +164,7 @@ MiB
 Modularity
 Monterey
 MoonCoin
+MoveReference
 MoveVM
 MultiEd
 Multinode
@@ -167,6 +182,8 @@ ORM
 Octa
 Octas
 Ohlone
+ObjectCore
+ObjectGroup
 OpenAPI
 OptionalAggregator
 PFN
@@ -213,6 +230,7 @@ SignedTransaction
 SignerCap
 Skylake
 Solana
+Staker
 StateCheckpointTransaction
 Subtyping
 TCP
@@ -231,6 +249,7 @@ TransactionBuilder
 TransactionBuilderABI
 TransactionFee
 Transactional
+TransferRef
 Traw
 TypeScript
 UB
@@ -301,6 +320,7 @@ cli
 clippy
 cn
 codebase
+composable
 config
 configs
 const
@@ -329,6 +349,8 @@ doesnt
 dr
 eg
 endian
+enqueue
+enqueued
 entrancy
 enum
 enums
@@ -345,10 +367,12 @@ gcloud
 gcp
 gcs
 groupId
+guid
 haproxy
 hardcoded
 hippospace
 hotfix
+hotfixes
 hotstuff
 href
 http
@@ -396,6 +420,7 @@ monorepo
 multinode
 multisig
 multisignature
+multisigner
 namespace
 natively
 nestable
@@ -495,6 +520,7 @@ txt
 typesafe
 uint
 unexportable
+ungated
 unixtime
 unmount
 unscoped
@@ -511,6 +537,7 @@ useState
 useWallet
 usecase
 utc
+xFD
 validator
 validator's
 validatorSet
@@ -527,3 +554,17 @@ withdrawable
 xlarge
 yaml
 yamls
+mintAptosName
+getAddressByName
+getPrimaryNameByAddress
+acount
+fundAccount
+extensibility
+MultiSig
+IndexerClient
+Hasura
+AptosClient
+ANSClient
+FaucetClient
+CoinClient
+RESTful

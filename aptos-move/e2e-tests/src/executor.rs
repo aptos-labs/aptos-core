@@ -33,7 +33,7 @@ use aptos_types::{
     on_chain_config::{
         Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
     },
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
         VMValidatorResult,
@@ -55,13 +55,13 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_types::gas::UnmeteredGasMeter;
-use num_cpus;
 use serde::Serialize;
 use std::{
     env,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -82,9 +82,9 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
-#[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,
+    executor_thread_pool: Arc<rayon::ThreadPool>,
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
@@ -92,13 +92,21 @@ pub struct FakeExecutor {
     no_parallel_exec: bool,
     features: Features,
     chain_id: u8,
+    aggregator_enabled: bool,
 }
 
 impl FakeExecutor {
     /// Creates an executor from a genesis [`WriteSet`].
     pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_cpus::get())
+                .build()
+                .unwrap(),
+        );
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
+            executor_thread_pool,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -106,11 +114,16 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: chain_id.id(),
+            aggregator_enabled: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
         aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
+    }
+
+    pub fn set_aggregator_enabled(&mut self, aggregator_enabled: bool) {
+        self.aggregator_enabled = aggregator_enabled;
     }
 
     /// Configure this executor to not use parallel execution.
@@ -151,8 +164,15 @@ impl FakeExecutor {
 
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
+        let executor_thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(num_cpus::get())
+                .build()
+                .unwrap(),
+        );
         FakeExecutor {
             data_store: FakeDataStore::default(),
+            executor_thread_pool,
             block_time: 0,
             executed_output: None,
             trace_dir: None,
@@ -160,6 +180,7 @@ impl FakeExecutor {
             no_parallel_exec: false,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            aggregator_enabled: true,
         }
     }
 
@@ -325,7 +346,7 @@ impl FakeExecutor {
                 Some(aggregator) => {
                     let state_key = aggregator.state_key();
                     let value_bytes = self
-                        .read_state_value(&state_key)
+                        .read_state_value_bytes(&state_key)
                         .expect("aggregator value must exist in data store");
                     bcs::from_bytes(&value_bytes).unwrap()
                 },
@@ -389,7 +410,13 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block(txn_block, &self.data_store, usize::min(4, num_cpus::get()))
+        BlockAptosVM::execute_block(
+            self.executor_thread_pool.clone(),
+            txn_block,
+            &self.data_store,
+            usize::min(4, num_cpus::get()),
+            None,
+        )
     }
 
     pub fn execute_transaction_block(
@@ -469,14 +496,19 @@ impl FakeExecutor {
         seq
     }
 
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<StateValue> {
+        TStateView::get_state_value(&self.data_store, state_key).unwrap()
+    }
+
     /// Get the blob for the associated AccessPath
-    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
         TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath
     pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
-        self.data_store.set(state_key, data_blob);
+        self.data_store
+            .set(state_key, StateValue::new_legacy(data_blob));
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
@@ -593,7 +625,8 @@ impl FakeExecutor {
             )
             .unwrap();
             let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session =
+                vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
             session
                 .execute_function_bypass_visibility(
                     &Self::module(module_name),
@@ -642,7 +675,7 @@ impl FakeExecutor {
         )
         .unwrap();
         let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let mut session = vm.new_session(&remote_view, SessionId::void(), self.aggregator_enabled);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

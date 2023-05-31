@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ledger_db::LedgerDb,
     metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
     pruner::{
         db_pruner::DBPruner, ledger_pruner_worker::LedgerPrunerWorker,
@@ -11,7 +12,6 @@ use crate::{
 };
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
-use aptos_schemadb::DB;
 use aptos_types::transaction::Version;
 use std::{sync::Arc, thread::JoinHandle};
 
@@ -99,8 +99,8 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_rocksdb);
+    pub fn new(ledger_db: Arc<LedgerDb>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
+        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_db);
 
         if ledger_pruner_config.enable {
             PRUNER_WINDOW

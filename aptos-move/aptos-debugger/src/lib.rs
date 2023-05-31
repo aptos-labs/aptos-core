@@ -220,7 +220,7 @@ impl AptosDebugger {
 
     pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<ChangeSet>
     where
-        F: FnOnce(&mut SessionExt<StorageAdapter<DebuggerStateView>>) -> VMResult<()>,
+        F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         let state_view_storage = StorageAdapter::new(&state_view);
@@ -234,7 +234,7 @@ impl AptosDebugger {
             TimedFeatures::enable_all(),
         )
         .unwrap();
-        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
+        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void, true);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set_ext = session
             .finish(

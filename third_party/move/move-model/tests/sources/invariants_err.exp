@@ -25,13 +25,13 @@ error: The type argument to `exists` and `global` must be a struct type but u64 
 36 │     invariant exists<u64>(@0x0);
    │               ^^^^^^^^^^^^^^^^^
 
-error: The type argument to `exists` and `global` must be a struct type but #0 is not a struct type.
+error: The type argument to `exists` and `global` must be a struct type but T is not a struct type.
    ┌─ tests/sources/invariants_err.move:37:18
    │
 37 │     invariant<T> global<T>(@0x1) == global<T>(@0x2);
    │                  ^^^^^^^^^^^^^^^
 
-error: The type argument to `exists` and `global` must be a struct type but #0 is not a struct type.
+error: The type argument to `exists` and `global` must be a struct type but T is not a struct type.
    ┌─ tests/sources/invariants_err.move:37:37
    │
 37 │     invariant<T> global<T>(@0x1) == global<T>(@0x2);

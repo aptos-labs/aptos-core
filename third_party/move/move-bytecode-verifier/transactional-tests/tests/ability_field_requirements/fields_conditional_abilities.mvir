@@ -1,0 +1,92 @@
+//# publish
+module 0x1.m1_good {
+    struct Bar has drop { x: bool }
+
+    struct Foo has drop {
+        // Good. Bar also has drop.
+        x: Self.Bar
+    }
+}
+
+//# publish
+module 0x1.m1_bad {
+    struct Bar { x: bool }
+
+    struct Foo has drop {
+        // Bad. Bar does not have drop.
+        x: Self.Bar
+    }
+}
+
+//# publish
+module 0x1.m2 {
+    struct Foo<T> has drop {
+        // Good. The field has drop if T is drop.
+        x: T
+    }
+}
+
+//# publish
+module 0x1.m3 {
+    struct Bar<T> has drop {
+        x: T
+    }
+
+    struct Foo<T> has drop {
+        // Good. Bar<Bar<T>> has drop if T has drop.
+        x: Self.Bar<Self.Bar<T>>
+    }
+}
+
+//# publish
+module 0x1.m4 {
+    struct Bar<T> has drop {
+        x: T
+    }
+
+    struct Baz { x: bool }
+
+    struct Foo<T> has drop {
+        // Bad. Baz does not have drop so Bar<Bar<Baz>> does not either.
+        x: Self.Bar<Self.Bar<Self.Baz>>
+    }
+}
+
+//# publish
+module 0x1.m5_good {
+    struct Bar has store {
+        x: u64
+    }
+
+    struct Foo has key {
+        // Good. Bar has store, which is required by Foo having key.
+        x: Self.Bar
+    }
+}
+
+//# publish
+module 0x1.m5_bad {
+    struct Bar has key {
+        x: u64
+    }
+
+    struct Foo has key {
+        // Bad. The key ability requires store, not key.
+        x: Self.Bar
+    }
+}
+
+//# publish
+module 0x1.m6 {
+    struct Bar<T1, T2> has copy {
+        x: T1,
+        y: T2,
+    }
+
+    struct Baz { x: bool }
+
+    struct Foo has copy {
+        // Bad. Baz does not have copy. The check needs to be recursive.
+        x: Self.Bar<u64, Self.Baz>
+    }
+}

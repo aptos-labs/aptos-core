@@ -7,7 +7,7 @@
 //! Consensus for the Aptos Core blockchain
 //!
 //! The consensus protocol implemented is AptosBFT (based on
-//! [HotStuff](https://arxiv.org/pdf/1803.05069.pdf)).
+//! [DiemBFT](https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf)).
 
 #![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
@@ -49,7 +49,9 @@ pub mod counters;
 pub mod network_interface;
 mod payload_manager;
 mod sender_aware_shuffler;
+mod transaction_deduper;
 mod transaction_shuffler;
+mod txn_hash_and_authenticator_deduper;
 
 use aptos_metrics_core::IntGauge;
 pub use consensusdb::create_checkpoint;

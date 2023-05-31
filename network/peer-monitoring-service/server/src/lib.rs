@@ -10,9 +10,12 @@ use crate::{
     storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::{BaseConfig, NodeConfig, RoleType};
+use aptos_config::{
+    config::{BaseConfig, NodeConfig},
+    network_id::NetworkId,
+};
 use aptos_logger::prelude::*;
-use aptos_network::{application::storage::PeersAndMetadata, ProtocolId};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{
@@ -83,14 +86,13 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         while let Some(network_request) = self.network_requests.next().await {
             // Log the request
             let peer_network_id = network_request.peer_network_id;
-            let protocol_id = network_request.protocol_id;
             let peer_monitoring_service_request = network_request.peer_monitoring_service_request;
             let response_sender = network_request.response_sender;
             trace!(LogSchema::new(LogEntry::ReceivedPeerMonitoringRequest)
                 .request(&peer_monitoring_service_request)
                 .message(&format!(
-                    "Received peer monitoring request. Peer: {:?}, protocol: {:?}.",
-                    peer_network_id, protocol_id,
+                    "Received peer monitoring request. Peer: {:?}",
+                    peer_network_id,
                 )));
 
             // All handler methods are currently CPU-bound so we want
@@ -109,7 +111,10 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                         storage,
                         time_service,
                     )
-                    .call(protocol_id, peer_monitoring_service_request);
+                    .call(
+                        peer_network_id.network_id(),
+                        peer_monitoring_service_request,
+                    );
                     log_monitoring_service_response(&response);
                     response_sender.send(response);
                 })
@@ -149,20 +154,20 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     pub fn call(
         &self,
-        protocol: ProtocolId,
+        network_id: NetworkId,
         request: PeerMonitoringServiceRequest,
     ) -> Result<PeerMonitoringServiceResponse> {
         // Update the request count
         increment_counter(
             &metrics::PEER_MONITORING_REQUESTS_RECEIVED,
-            protocol,
+            network_id,
             request.get_label(),
         );
 
         // Time the request processing (the timer will stop when it's dropped)
         let _timer = start_timer(
             &metrics::PEER_MONITORING_REQUEST_PROCESSING_LATENCY,
-            protocol,
+            network_id,
             request.get_label(),
         );
 
@@ -174,6 +179,11 @@ impl<T: StorageReaderInterface> Handler<T> {
             },
             PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
             PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
+
+            #[cfg(feature = "network-perf-test")] // Disabled by default
+            PeerMonitoringServiceRequest::PerformanceMonitoringRequest(request) => {
+                self.handle_performance_monitoring_request(request)
+            },
         };
 
         // Process the response and handle any errors
@@ -182,7 +192,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 // Log the error and update the counters
                 increment_counter(
                     &metrics::PEER_MONITORING_ERRORS_ENCOUNTERED,
-                    protocol,
+                    network_id,
                     error.get_label(),
                 );
                 error!(LogSchema::new(LogEntry::PeerMonitoringServiceError)
@@ -201,7 +211,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 // The request was successful
                 increment_counter(
                     &metrics::PEER_MONITORING_RESPONSES_SENT,
-                    protocol,
+                    network_id,
                     response.get_label(),
                 );
                 Ok(response)
@@ -286,6 +296,20 @@ impl<T: StorageReaderInterface> Handler<T> {
             latency_ping_response,
         ))
     }
+
+    #[cfg(feature = "network-perf-test")] // Disabled by default
+    fn handle_performance_monitoring_request(
+        &self,
+        performance_monitoring_request: &aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest,
+    ) -> Result<PeerMonitoringServiceResponse, Error> {
+        let performance_monitoring_response =
+            aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
+                response_counter: performance_monitoring_request.request_counter,
+            };
+        Ok(PeerMonitoringServiceResponse::PerformanceMonitoring(
+            performance_monitoring_response,
+        ))
+    }
 }
 
 /// Returns the distance from the validators using the given base config
@@ -294,39 +318,44 @@ fn get_distance_from_validators(
     base_config: &BaseConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> u64 {
-    match base_config.role {
-        RoleType::Validator => 0, // We're a validator!
-        RoleType::FullNode => {
-            match peers_and_metadata.get_connected_peers_and_metadata() {
-                Ok(peers_and_metadata) => {
-                    // Go through our peers, find the min, and return a distance relative to the min
-                    let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
-                    for peer_metadata in peers_and_metadata.values() {
-                        if let Some(latest_network_info_response) = peer_metadata
-                            .get_peer_monitoring_metadata()
-                            .latest_network_info_response
-                        {
-                            min_peer_distance_from_validators = min(
-                                min_peer_distance_from_validators,
-                                latest_network_info_response.distance_from_validators,
-                            );
-                        }
-                    }
-
-                    // We're one hop away from the peer
-                    min(
-                        MAX_DISTANCE_FROM_VALIDATORS,
-                        min_peer_distance_from_validators + 1,
-                    )
-                },
-                Err(error) => {
-                    // Log the error and return the max distance
-                    warn!(LogSchema::new(LogEntry::PeerMonitoringServiceError).error(&error.into()));
-                    MAX_DISTANCE_FROM_VALIDATORS
-                },
-            }
+    // Get the connected peers and metadata
+    let connected_peers_and_metadata = match peers_and_metadata.get_connected_peers_and_metadata() {
+        Ok(connected_peers_and_metadata) => connected_peers_and_metadata,
+        Err(error) => {
+            warn!(LogSchema::new(LogEntry::PeerMonitoringServiceError).error(&error.into()));
+            return MAX_DISTANCE_FROM_VALIDATORS;
         },
+    };
+
+    // If we're a validator and we have active validator peers, we're in the validator set.
+    // TODO: figure out if we need to deal with validator set forks here.
+    if base_config.role.is_validator() {
+        for peer_metadata in connected_peers_and_metadata.values() {
+            if peer_metadata.get_connection_metadata().role.is_validator() {
+                return 0;
+            }
+        }
     }
+
+    // Otherwise, go through our peers, find the min, and return a distance relative to the min
+    let mut min_peer_distance_from_validators = MAX_DISTANCE_FROM_VALIDATORS;
+    for peer_metadata in connected_peers_and_metadata.values() {
+        if let Some(latest_network_info_response) = peer_metadata
+            .get_peer_monitoring_metadata()
+            .latest_network_info_response
+        {
+            min_peer_distance_from_validators = min(
+                min_peer_distance_from_validators,
+                latest_network_info_response.distance_from_validators,
+            );
+        }
+    }
+
+    // We're one hop away from the peer
+    min(
+        MAX_DISTANCE_FROM_VALIDATORS,
+        min_peer_distance_from_validators + 1,
+    )
 }
 
 /// Logs the response sent by the monitoring service for a request

@@ -6,7 +6,9 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
-use aptos_executor_types::ExecutedChunk;
+use aptos_crypto::HashValue;
+use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
+use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -16,9 +18,20 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
 use fail::fail_point;
-use std::time::Duration;
+use move_core_types::vm_status::StatusCode;
+use once_cell::sync::Lazy;
+use std::{ops::Deref, sync::Arc, time::Duration};
+
+pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
+    Lazy::new(|| {
+        Arc::new(Mutex::new(ShardedBlockExecutor::new(
+            AptosVM::get_num_shards(),
+            None, // Defaults to num_cpus / num_shards
+            None,
+        )))
+    });
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -46,6 +59,50 @@ impl ChunkOutput {
         Ok(Self {
             transactions,
             transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+        })
+    }
+
+    pub fn by_transaction_execution_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<Self> {
+        let transaction_outputs = Self::execute_block_with_gas_limit::<V>(
+            transactions.clone(),
+            &state_view,
+            maybe_gas_limit,
+        )?;
+
+        // to print txn output for debugging, uncomment:
+        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+
+        Ok(Self {
+            transactions,
+            transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+        })
+    }
+
+    pub fn by_transaction_execution_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+    ) -> Result<Self> {
+        let state_view_arc = Arc::new(state_view);
+        let transaction_outputs =
+            Self::execute_block_sharded::<V>(transactions.clone(), state_view_arc.clone())?;
+
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+
+        let state_view = Arc::try_unwrap(state_view_arc).unwrap();
+
+        Ok(Self {
+            transactions,
+            transaction_outputs,
+            // Unwrapping here is safe because the execution has finished and it is guaranteed that
+            // the state view is not used anymore.
             state_cache: state_view.into_state_cache(),
         })
     }
@@ -78,11 +135,25 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::vm_execute_chunk", |_| {
+        fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply(self, base_view)
+        ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
+    }
+
+    pub fn apply_to_ledger_for_block(
+        self,
+        base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
+    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
+        fail_point!("executor::apply_to_ledger_for_block", |_| {
+            Err(anyhow::anyhow!(
+                "Injected error in apply_to_ledger_for_block."
+            ))
+        });
+        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
     }
 
     pub fn trace_log_transaction_status(&self) {
@@ -98,6 +169,17 @@ impl ChunkOutput {
         }
     }
 
+    fn execute_block_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: Arc<CachedStateView>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block_sharded(
+            SHARDED_BLOCK_EXECUTOR.lock().deref(),
+            transactions,
+            state_view,
+        )?)
+    }
+
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
@@ -106,6 +188,21 @@ impl ChunkOutput {
         state_view: &CachedStateView,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(transactions, &state_view)?)
+    }
+
+    /// Executes the block of [Transaction]s using the [VMExecutor] and returns
+    /// a vector of [TransactionOutput]s.
+    #[cfg(not(feature = "consensus-only-perf-test"))]
+    fn execute_block_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+        maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block_with_gas_limit(
+            transactions,
+            &state_view,
+            maybe_gas_limit,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -136,6 +233,16 @@ impl ChunkOutput {
                 .collect::<Vec<_>>(),
         };
         Ok(transaction_outputs)
+    }
+
+    /// In consensus-only mode, we do not care about gas limits.
+    #[cfg(feature = "consensus-only-perf-test")]
+    fn execute_block_with_gas_limit<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: &CachedStateView,
+        _maybe_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Self::execute_block::<V>(transactions, state_view)
     }
 }
 
@@ -193,7 +300,12 @@ pub fn update_counters_for_processed_chunk(
                     )
                 );
                 (
-                    "discard",
+                    // Specialize duplicate txns for alerts
+                    if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
+                        "discard_sequence_number_too_old"
+                    } else {
+                        "discard"
+                    },
                     "error_code",
                     if detailed_counters {
                         format!("{:?}", discard_status_code).to_lowercase()

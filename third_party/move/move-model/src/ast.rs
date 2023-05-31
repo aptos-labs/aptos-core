@@ -9,18 +9,18 @@
 use crate::{
     exp_rewriter::ExpRewriterFunctions,
     model::{
-        EnvDisplay, FieldId, FunId, FunctionVisibility, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
+        EnvDisplay, FieldId, FunId, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, SchemaId, SpecFunId, StructId, TypeParameter,
         GHOST_MEMORY_PREFIX,
     },
-    symbol::{Symbol, SymbolPool},
+    symbol::Symbol,
     ty::{Type, TypeDisplayContext},
 };
 use internment::LocalIntern;
 use itertools::Itertools;
-use move_binary_format::file_format::CodeOffset;
-use num::{BigInt, BigUint, Num};
-use once_cell::sync::Lazy;
+use move_binary_format::file_format::{CodeOffset, Visibility};
+use move_core_types::account_address::AccountAddress;
+use num::BigInt;
 use std::{
     borrow::Borrow,
     cell::RefCell,
@@ -38,7 +38,7 @@ use std::{
 pub struct SpecVarDecl {
     pub loc: Loc,
     pub name: Symbol,
-    pub type_params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<TypeParameter>,
     pub type_: Type,
     pub init: Option<Exp>,
 }
@@ -47,8 +47,8 @@ pub struct SpecVarDecl {
 pub struct SpecFunDecl {
     pub loc: Loc,
     pub name: Symbol,
-    pub type_params: Vec<(Symbol, Type)>,
-    pub params: Vec<(Symbol, Type)>,
+    pub type_params: Vec<TypeParameter>,
+    pub params: Vec<Parameter>,
     pub context_params: Option<Vec<(Symbol, bool)>>,
     pub result_type: Type,
     pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
@@ -119,7 +119,7 @@ impl ConditionKind {
     }
 
     /// Returns true if this condition is allowed on a function declaration.
-    pub fn allowed_on_fun_decl(&self, _visibility: FunctionVisibility) -> bool {
+    pub fn allowed_on_fun_decl(&self, _visibility: Visibility) -> bool {
         use ConditionKind::*;
         matches!(
             self,
@@ -389,13 +389,13 @@ pub enum ExpData {
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
     /// Represents a lambda.
-    Lambda(NodeId, Vec<LocalVarDecl>, Exp),
+    Lambda(NodeId, Pattern, Exp),
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
         QuantKind,
         /// Ranges
-        Vec<(LocalVarDecl, Exp)>,
+        Vec<(Pattern, Exp)>,
         /// Triggers
         Vec<Vec<Exp>>,
         /// Optional `where` clause
@@ -403,9 +403,9 @@ pub enum ExpData {
         /// Body
         Exp,
     ),
-    /// Represents a block which contains a set of variable bindings and an expression
-    /// for which those are defined.
-    Block(NodeId, Vec<LocalVarDecl>, Exp),
+    /// Represents a block `Block(id, pattern, optional_binding, scope)` which binds
+    /// a pattern, making the bound variables available in scope.
+    Block(NodeId, Pattern, Option<Exp>, Exp),
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
 
@@ -540,10 +540,13 @@ impl ExpData {
         let mut visitor = |up: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
-                Lambda(_, decls, _) | Block(_, decls, _) => {
-                    decls.iter().map(|d| d.name).collect_vec()
+                Lambda(_, pat, _) | Block(_, pat, _, _) => {
+                    pat.vars().iter().map(|(_, d)| *d).collect_vec()
                 },
-                Quant(_, _, decls, ..) => decls.iter().map(|(d, _)| d.name).collect_vec(),
+                Quant(_, _, ranges, ..) => ranges
+                    .iter()
+                    .flat_map(|(pat, _)| pat.vars().into_iter().map(|(_, name)| name))
+                    .collect_vec(),
                 _ => vec![],
             };
             if !up {
@@ -682,10 +685,7 @@ impl ExpData {
             },
             Lambda(_, _, body) => body.visit_pre_post(visitor),
             Quant(_, _, ranges, triggers, condition, body) => {
-                for (decl, range) in ranges {
-                    if let Some(binding) = &decl.binding {
-                        binding.visit_pre_post(visitor);
-                    }
+                for (_, range) in ranges {
                     range.visit_pre_post(visitor);
                 }
                 for trigger in triggers {
@@ -698,11 +698,9 @@ impl ExpData {
                 }
                 body.visit_pre_post(visitor);
             },
-            Block(_, decls, body) => {
-                for decl in decls {
-                    if let Some(def) = &decl.binding {
-                        def.visit_pre_post(visitor);
-                    }
+            Block(_, _, binding, body) => {
+                if let Some(exp) = binding {
+                    exp.visit_pre_post(visitor)
                 }
                 body.visit_pre_post(visitor)
             },
@@ -984,15 +982,6 @@ pub enum Operation {
 /// A label used for referring to a specific memory in Global and Exists expressions.
 pub type MemoryLabel = GlobalId;
 
-/// Declaration of local variable with an optional binding. The type is annotated at the
-/// declaration.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LocalVarDecl {
-    pub id: NodeId,
-    pub name: Symbol,
-    pub binding: Option<Exp>,
-}
-
 /// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
 /// Carries a node_id which has (at least) a type and location.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1005,11 +994,31 @@ pub enum Pattern {
 }
 
 impl Pattern {
+    /// Returns the node id of the pattern.
+    pub fn node_id(&self) -> NodeId {
+        match self {
+            Pattern::Var(id, _)
+            | Pattern::Wildcard(id)
+            | Pattern::Tuple(id, _)
+            | Pattern::Struct(id, _, _)
+            | Pattern::Error(id) => *id,
+        }
+    }
+
     /// Returns the variables in this pattern, per node_id and name.
     pub fn vars(&self) -> Vec<(NodeId, Symbol)> {
         let mut result = vec![];
         Self::collect_vars(&mut result, self);
         result
+    }
+
+    /// Returns true if this pattern is a simple variable or tuple of variables.
+    pub fn is_simple_decl(&self) -> bool {
+        match self {
+            Pattern::Var(..) => true,
+            Pattern::Tuple(_, pats) => pats.iter().all(|p| matches!(p, Pattern::Var(..))),
+            _ => false,
+        }
     }
 
     fn collect_vars(r: &mut Vec<(NodeId, Symbol)>, p: &Pattern) {
@@ -1051,18 +1060,19 @@ impl fmt::Display for TraceKind {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Value {
-    Address(BigUint),
+    Address(Address),
     Number(BigInt),
     Bool(bool),
     ByteArray(Vec<u8>),
-    AddressArray(Vec<BigUint>), // TODO: merge AddressArray to Vector type in the future
+    AddressArray(Vec<Address>), // TODO: merge AddressArray to Vector type in the future
     Vector(Vec<Value>),
 }
 
-impl fmt::Display for Value {
+// enables `env.display(&value)`
+impl<'a> fmt::Display for EnvDisplay<'a, Value> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        match self {
-            Value::Address(address) => write!(f, "{:x}", address),
+        match self.val {
+            Value::Address(address) => write!(f, "{}", self.env.display(address)),
             Value::Number(int) => write!(f, "{}", int),
             Value::Bool(b) => write!(f, "{}", b),
             // TODO(tzakian): Figure out a better story for byte array displays
@@ -1144,12 +1154,47 @@ impl ExpData {
 // =================================================================================================
 /// # Names
 
+/// Represents an account address, which can be either numerical or a symbol
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub enum Address {
+    Numerical(AccountAddress),
+    Symbolic(Symbol),
+}
+
+impl Address {
+    pub fn from_hex(mut s: &str) -> anyhow::Result<Address> {
+        if s.starts_with("0x") {
+            s = &s[2..]
+        }
+        let addr = AccountAddress::from_hex_literal(s).map(Address::Numerical)?;
+        Ok(addr)
+    }
+
+    pub fn expect_numerical(&self) -> AccountAddress {
+        if let Address::Numerical(a) = self {
+            *a
+        } else {
+            panic!("expected numerical address, found symbolic")
+        }
+    }
+}
+
+// enables `env.display(address)`
+impl<'a> fmt::Display for EnvDisplay<'a, Address> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.val {
+            Address::Numerical(addr) => write!(f, "0x{}", addr.short_str_lossless()),
+            Address::Symbolic(sym) => write!(f, "{}", sym.display(self.env.symbol_pool())),
+        }
+    }
+}
+
 /// Represents a module name, consisting of address and name.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct ModuleName(BigUint, Symbol);
+pub struct ModuleName(Address, Symbol);
 
 impl ModuleName {
-    pub fn new(addr: BigUint, name: Symbol) -> ModuleName {
+    pub fn new(addr: Address, name: Symbol) -> ModuleName {
         ModuleName(addr, name)
     }
 
@@ -1157,18 +1202,19 @@ impl ModuleName {
         addr: move_compiler::shared::NumericalAddress,
         name: Symbol,
     ) -> ModuleName {
-        ModuleName(BigUint::from_bytes_be(&addr.into_bytes()), name)
+        ModuleName(Address::Numerical(addr.into_inner()), name)
     }
 
-    pub fn from_str(mut addr: &str, name: Symbol) -> ModuleName {
-        if addr.starts_with("0x") {
-            addr = &addr[2..];
-        }
-        let bi = BigUint::from_str_radix(addr, 16).expect("valid hex");
-        ModuleName(bi, name)
+    pub fn from_str(addr: &str, name: Symbol) -> ModuleName {
+        let addr = if !addr.starts_with("0x") {
+            AccountAddress::from_hex_literal(&format!("0x{}", addr))
+        } else {
+            AccountAddress::from_hex_literal(addr)
+        };
+        ModuleName(Address::Numerical(addr.expect("valid address")), name)
     }
 
-    pub fn addr(&self) -> &BigUint {
+    pub fn addr(&self) -> &Address {
         &self.0
     }
 
@@ -1179,30 +1225,27 @@ impl ModuleName {
     /// Determine whether this is a script. The move-compiler infrastructure uses MAX_ADDR
     /// for pseudo modules created from scripts, so use this address to check.
     pub fn is_script(&self) -> bool {
-        static MAX_ADDR: Lazy<BigUint> = Lazy::new(|| {
-            BigUint::from_str_radix("ffffffffffffffffffffffffffffffff", 16).expect("valid hex")
-        });
-        self.0 == *MAX_ADDR
+        self.0 == Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH]))
     }
 }
 
 impl ModuleName {
     /// Creates a value implementing the Display trait which shows this name,
     /// excluding address.
-    pub fn display<'a>(&'a self, pool: &'a SymbolPool) -> ModuleNameDisplay<'a> {
+    pub fn display<'a>(&'a self, env: &'a GlobalEnv) -> ModuleNameDisplay<'a> {
         ModuleNameDisplay {
             name: self,
-            pool,
+            env,
             with_address: false,
         }
     }
 
     /// Creates a value implementing the Display trait which shows this name,
     /// including address.
-    pub fn display_full<'a>(&'a self, pool: &'a SymbolPool) -> ModuleNameDisplay<'a> {
+    pub fn display_full<'a>(&'a self, env: &'a GlobalEnv) -> ModuleNameDisplay<'a> {
         ModuleNameDisplay {
             name: self,
-            pool,
+            env,
             with_address: true,
         }
     }
@@ -1211,17 +1254,16 @@ impl ModuleName {
 /// A helper to support module names in formatting.
 pub struct ModuleNameDisplay<'a> {
     name: &'a ModuleName,
-    pool: &'a SymbolPool,
+    env: &'a GlobalEnv,
     with_address: bool,
 }
 
 impl<'a> fmt::Display for ModuleNameDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         if self.with_address && !self.name.is_script() {
-            write!(f, "0x{}::", self.name.0.to_str_radix(16))?;
+            write!(f, "{}::", self.env.display(&self.name.0))?
         }
-        write!(f, "{}", self.name.1.display(self.pool))?;
-        Ok(())
+        write!(f, "{}", self.name.1.display(self.env.symbol_pool()))
     }
 }
 
@@ -1234,10 +1276,10 @@ pub struct QualifiedSymbol {
 impl QualifiedSymbol {
     /// Creates a value implementing the Display trait which shows this symbol,
     /// including module name but excluding address.
-    pub fn display<'a>(&'a self, pool: &'a SymbolPool) -> QualifiedSymbolDisplay<'a> {
+    pub fn display<'a>(&'a self, env: &'a GlobalEnv) -> QualifiedSymbolDisplay<'a> {
         QualifiedSymbolDisplay {
             sym: self,
-            pool,
+            env,
             with_module: true,
             with_address: false,
         }
@@ -1245,10 +1287,10 @@ impl QualifiedSymbol {
 
     /// Creates a value implementing the Display trait which shows this qualified symbol,
     /// excluding module name.
-    pub fn display_simple<'a>(&'a self, pool: &'a SymbolPool) -> QualifiedSymbolDisplay<'a> {
+    pub fn display_simple<'a>(&'a self, env: &'a GlobalEnv) -> QualifiedSymbolDisplay<'a> {
         QualifiedSymbolDisplay {
             sym: self,
-            pool,
+            env,
             with_module: false,
             with_address: false,
         }
@@ -1256,10 +1298,10 @@ impl QualifiedSymbol {
 
     /// Creates a value implementing the Display trait which shows this symbol,
     /// including module name with address.
-    pub fn display_full<'a>(&'a self, pool: &'a SymbolPool) -> QualifiedSymbolDisplay<'a> {
+    pub fn display_full<'a>(&'a self, env: &'a GlobalEnv) -> QualifiedSymbolDisplay<'a> {
         QualifiedSymbolDisplay {
             sym: self,
-            pool,
+            env,
             with_module: true,
             with_address: true,
         }
@@ -1269,7 +1311,7 @@ impl QualifiedSymbol {
 /// A helper to support qualified symbols in formatting.
 pub struct QualifiedSymbolDisplay<'a> {
     sym: &'a QualifiedSymbol,
-    pool: &'a SymbolPool,
+    env: &'a GlobalEnv,
     with_module: bool,
     with_address: bool,
 }
@@ -1281,13 +1323,13 @@ impl<'a> fmt::Display for QualifiedSymbolDisplay<'a> {
                 f,
                 "{}::",
                 if self.with_address {
-                    self.sym.module_name.display_full(self.pool)
+                    self.sym.module_name.display_full(self.env)
                 } else {
-                    self.sym.module_name.display(self.pool)
+                    self.sym.module_name.display(self.env)
                 }
             )?;
         }
-        write!(f, "{}", self.sym.symbol.display(self.pool))?;
+        write!(f, "{}", self.sym.symbol.display(self.env.symbol_pool()))?;
         Ok(())
     }
 }
@@ -1310,7 +1352,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
         use ExpData::*;
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
-            Value(_, v) => write!(f, "{}", v),
+            Value(_, v) => write!(f, "{}", self.env.display(v)),
             LocalVar(_, name) => write!(f, "{}", name.display(self.env.symbol_pool())),
             Temporary(_, idx) => write!(f, "$t{}", idx),
             Call(node_id, oper, args) => {
@@ -1321,18 +1363,23 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(_, decls, body) => {
-                write!(f, "|{}| {}", self.fmt_decls(decls), body.display(self.env))
+            Lambda(_, pat, body) => {
+                write!(f, "|{}| {}", self.fmt_pattern(pat), body.display(self.env))
             },
-            Block(_, decls, body) => {
+            Block(_, pat, binding, body) => {
                 write!(
                     f,
-                    "{{let {}; {}}}",
-                    self.fmt_decls(decls),
+                    "{{let {}{}; {}}}",
+                    self.fmt_pattern(pat),
+                    if let Some(exp) = binding {
+                        format!(" = {}", exp.display(self.env))
+                    } else {
+                        "".to_string()
+                    },
                     body.display(self.env)
                 )
             },
-            Quant(_, kind, decls, triggers, opt_where, body) => {
+            Quant(_, kind, ranges, triggers, opt_where, body) => {
                 let triggers_str = triggers
                     .iter()
                     .map(|trigger| format!("{{{}}}", self.fmt_exps(trigger)))
@@ -1347,7 +1394,7 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     f,
                     "{} {}{}{}: {}",
                     kind,
-                    self.fmt_quant_decls(decls),
+                    self.fmt_quant_ranges(ranges),
                     triggers_str,
                     where_str,
                     body.display(self.env)
@@ -1388,19 +1435,6 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
 }
 
 impl<'a> ExpDisplay<'a> {
-    fn fmt_decls(&self, decls: &[LocalVarDecl]) -> String {
-        decls.iter().map(|decl| self.fmt_decl(decl)).join(", ")
-    }
-
-    fn fmt_decl(&self, decl: &LocalVarDecl) -> String {
-        let binding = if let Some(exp) = &decl.binding {
-            format!(" = {}", exp.display(self.env))
-        } else {
-            "".to_string()
-        };
-        format!("{}{}", decl.name.display(self.env.symbol_pool()), binding)
-    }
-
     fn fmt_patterns(&self, patterns: &[Pattern]) -> String {
         patterns.iter().map(|pat| self.fmt_pattern(pat)).join(", ")
     }
@@ -1448,16 +1482,10 @@ impl<'a> ExpDisplay<'a> {
         }
     }
 
-    fn fmt_quant_decls(&self, decls: &[(LocalVarDecl, Exp)]) -> String {
-        decls
+    fn fmt_quant_ranges(&self, ranges: &[(Pattern, Exp)]) -> String {
+        ranges
             .iter()
-            .map(|(decl, domain)| {
-                format!(
-                    "{}: {}",
-                    decl.name.display(self.env.symbol_pool()),
-                    domain.display(self.env)
-                )
-            })
+            .map(|(pat, domain)| format!("{}: {}", self.fmt_pattern(pat), domain.display(self.env)))
             .join(", ")
     }
 
@@ -1529,10 +1557,7 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
         // If operation has a type instantiation, add it.
         let type_inst = self.env.get_node_instantiation(self.node_id);
         if !type_inst.is_empty() {
-            let tctx = TypeDisplayContext::WithEnv {
-                env: self.env,
-                type_param_names: None,
-            };
+            let tctx = TypeDisplayContext::new(self.env);
             write!(
                 f,
                 "<{}>",
@@ -1549,7 +1574,7 @@ impl<'a> OperationDisplay<'a> {
         let fun = module_env.get_spec_fun(*fid);
         format!(
             "{}::{}",
-            module_env.get_name().display(self.env.symbol_pool()),
+            module_env.get_name().display(self.env),
             fun.name.display(self.env.symbol_pool()),
         )
     }
@@ -1559,7 +1584,7 @@ impl<'a> OperationDisplay<'a> {
         let struct_env = module_env.get_struct(*sid);
         format!(
             "{}::{}",
-            module_env.get_name().display(self.env.symbol_pool()),
+            module_env.get_name().display(self.env),
             struct_env.get_name().display(self.env.symbol_pool()),
         )
     }

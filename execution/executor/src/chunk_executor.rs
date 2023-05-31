@@ -25,7 +25,7 @@ use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
-    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
     ExecutedTrees,
 };
 use aptos_types::{
@@ -131,7 +131,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 first_version: latest_view.txn_accumulator().num_leaves(),
             },
             Arc::clone(&self.db.reader),
-            Arc::new(SyncProofFetcher::new(self.db.reader.clone())),
+            Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
         )
     }
 
@@ -143,7 +143,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         transaction_infos: &[TransactionInfo],
     ) -> Result<ExecutedChunk> {
         let (mut executed_chunk, to_discard, to_retry) =
-            chunk_output.apply_to_ledger(latest_view)?;
+            chunk_output.apply_to_ledger(latest_view, None)?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
         executed_chunk.ledger_info = executed_chunk
@@ -398,7 +398,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         // Find epoch boundaries.
         let mut epochs = Vec::new();
-        let mut epoch_begin = chunk_begin;
+        let mut epoch_begin = chunk_begin; // epoch begin version
         for (version, events) in multizip((chunk_begin..chunk_end, event_vecs.iter())) {
             let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(events)
                 .next()
@@ -438,6 +438,9 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
+    /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
+    /// The input range indicated by `[begin_version, end_version]` is guaranteed not to cross epoch boundaries.
+    /// Notice there can be known broken versions inside the range.
     fn remove_and_replay_epoch(
         &self,
         executed_chunk: &mut ExecutedChunk,
@@ -553,6 +556,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         Ok(end_version)
     }
 
+    /// Consume `end_version - begin_version` txns from the mutable input arguments
+    /// It's guaranteed that there's no known broken versions or epoch endings in the range.
     fn remove_and_apply(
         &self,
         executed_chunk: &mut ExecutedChunk,
@@ -587,7 +592,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         let state_view = self.state_view(latest_view)?;
         let chunk_output = ChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
-        let (executed_batch, to_discard, to_retry) = chunk_output.apply_to_ledger(latest_view)?;
+        let (executed_batch, to_discard, to_retry) =
+            chunk_output.apply_to_ledger(latest_view, None)?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
         executed_batch.ensure_transaction_infos_match(&txn_infos)?;

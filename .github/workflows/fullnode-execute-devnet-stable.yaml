@@ -28,7 +28,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-execute-devnet-stable
-      BRANCH: devnet
+      GIT_REF: devnet
       NETWORK: devnet
       BOOTSTRAPPING_MODE: ExecuteTransactionsFromGenesis
       CONTINUOUS_SYNCING_MODE: ExecuteTransactions

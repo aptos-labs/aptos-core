@@ -1,6 +1,18 @@
-/// This defines the module for interacting with primary stores of accounts/objects, which have deterministic addresses
+/// This module provides a way for creators of fungible assets to enable support for creating primary (deterministic)
+/// stores for their users. This is useful for assets that are meant to be used as a currency, as it allows users to
+/// easily create a store for their account and deposit/withdraw/transfer fungible assets to/from it.
+///
+/// The transfer flow works as below:
+/// 1. The sender calls `transfer` on the fungible asset metadata object to transfer `amount` of fungible asset to
+///   `recipient`.
+/// 2. The fungible asset metadata object calls `ensure_primary_store_exists` to ensure that both the sender's and the
+/// recipient's primary stores exist. If either doesn't, it will be created.
+/// 3. The fungible asset metadata object calls `withdraw` on the sender's primary store to withdraw `amount` of
+/// fungible asset from it. This emits an withdraw event.
+/// 4. The fungible asset metadata object calls `deposit` on the recipient's primary store to deposit `amount` of
+/// fungible asset to it. This emits an deposit event.
 module aptos_framework::primary_fungible_store {
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
     use std::option::Option;
@@ -8,27 +20,41 @@ module aptos_framework::primary_fungible_store {
     use std::string::String;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Resource stored on the fungible asset metadata object to allow creating primary stores for it.
+    /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
+    /// stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
+    /// assets.
     struct DeriveRefPod has key {
         metadata_derive_ref: DeriveRef,
     }
 
-    /// Creators of fungible assets can call this to enable support for creating primary (deterministic) stores for
-    /// their users.
+    /// Create a fungible asset with primary store support. When users transfer fungible assets to each other, their
+    /// primary stores will be created automatically if they don't exist. Primary stores have deterministic addresses
+    /// so that users can easily deposit/withdraw/transfer fungible assets.
     public fun create_primary_store_enabled_fungible_asset(
         constructor_ref: &ConstructorRef,
-        monitoring_supply_with_maximum: Option<Option<u128>>,
+        maximum_supply: Option<u128>,
         name: String,
         symbol: String,
         decimals: u8,
+        icon_uri: String,
+        project_uri: String,
     ) {
-        fungible_asset::add_fungibility(constructor_ref, monitoring_supply_with_maximum, name, symbol, decimals);
+        fungible_asset::add_fungibility(
+            constructor_ref,
+            maximum_supply,
+            name,
+            symbol,
+            decimals,
+            icon_uri,
+            project_uri,
+        );
         let metadata_obj = &object::generate_signer(constructor_ref);
         move_to(metadata_obj, DeriveRefPod {
             metadata_derive_ref: object::generate_derive_ref(constructor_ref),
         });
     }
 
+    /// Ensure that the primary store object for the given address exists. If it doesn't, create it.
     public fun ensure_primary_store_exists<T: key>(
         owner: address,
         metadata: Object<T>,
@@ -46,6 +72,7 @@ module aptos_framework::primary_fungible_store {
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
         let metadata_addr = object::object_address(&metadata);
+        object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
         let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
 
@@ -57,18 +84,21 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[view]
+    /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
         object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
+    /// Get the primary store object for the given account.
     public fun primary_store<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
         let store = primary_store_address(owner, metadata);
         object::address_to_object<FungibleStore>(store)
     }
 
     #[view]
+    /// Return whether the given account's primary store exists.
     public fun primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
         fungible_asset::store_exists(primary_store_address(account, metadata))
     }
@@ -84,22 +114,22 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[view]
-    /// Return whether the given account's primary store can do direct transfers.
-    public fun ungated_balance_transfer_allowed<T: key>(account: address, metadata: Object<T>): bool {
+    /// Return whether the given account's primary store is frozen.
+    public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
         if (primary_store_exists(account, metadata)) {
-            fungible_asset::ungated_balance_transfer_allowed(primary_store(account, metadata))
+            fungible_asset::is_frozen(primary_store(account, metadata))
         } else {
-            true
+            false
         }
     }
 
-    /// Withdraw `amount` of fungible asset from `store` by the owner.
+    /// Withdraw `amount` of fungible asset from the given account's primary store.
     public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
         let store = primary_store(signer::address_of(owner), metadata);
         fungible_asset::withdraw(owner, store, amount)
     }
 
-    /// Deposit `amount` of fungible asset to the given account's primary store.
+    /// Deposit fungible asset `fa` to the given account's primary store.
     public fun deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
@@ -131,10 +161,12 @@ module aptos_framework::primary_fungible_store {
     ): (MintRef, TransferRef, BurnRef) {
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(option::some(100)) /* max supply */,
-            string::utf8(b"USDA"),
-            string::utf8(b"$$$"),
-            0
+            option::some(100), // max supply
+            string::utf8(b"TEST COIN"),
+            string::utf8(b"@T"),
+            0,
+            string::utf8(b"http://example.com/icon"),
+            string::utf8(b"http://example.com"),
         );
         let mint_ref = generate_mint_ref(constructor_ref);
         let burn_ref = generate_burn_ref(constructor_ref);
@@ -152,8 +184,8 @@ module aptos_framework::primary_fungible_store {
         assert!(!primary_store_exists(aaron_address, metadata), 2);
         assert!(balance(creator_address, metadata) == 0, 3);
         assert!(balance(aaron_address, metadata) == 0, 4);
-        assert!(ungated_balance_transfer_allowed(creator_address, metadata), 5);
-        assert!(ungated_balance_transfer_allowed(aaron_address, metadata), 6);
+        assert!(!is_frozen(creator_address, metadata), 5);
+        assert!(!is_frozen(aaron_address, metadata), 6);
         ensure_primary_store_exists(creator_address, metadata);
         ensure_primary_store_exists(aaron_address, metadata);
         assert!(primary_store_exists(creator_address, metadata), 7);

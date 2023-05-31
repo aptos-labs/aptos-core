@@ -60,6 +60,7 @@ pub fn view_resource_in_move_storage(
         name: resource.to_owned(),
         type_params: type_args,
     };
+    // TODO
     match storage.get_resource(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
         Some(data) => {
@@ -336,7 +337,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
     fn perform_session_action<Ret>(
         &mut self,
         gas_budget: Option<u64>,
-        f: impl FnOnce(&mut Session<InMemoryStorage>, &mut GasStatus) -> VMResult<Ret>,
+        f: impl FnOnce(&mut Session, &mut GasStatus) -> VMResult<Ret>,
         vm_config: VMConfig,
     ) -> VMResult<Ret> {
         // start session

@@ -5,13 +5,14 @@ use crate::metrics::{LATEST_PROCESSED_VERSION, PROCESSED_VERSIONS_COUNT};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
-    config::IndexerGrpcConfig,
+    config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
-    file_store_operator::FileStoreOperator,
+    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
 use std::time::Duration;
+use tracing::info;
 
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
@@ -19,25 +20,30 @@ const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
     cache_operator: Option<CacheOperator<redis::aio::Connection>>,
-    file_store_processor: Option<FileStoreOperator>,
+    file_store_processor: Option<Box<dyn FileStoreOperator>>,
     cache_chain_id: Option<u64>,
-    config: IndexerGrpcConfig,
+    redis_main_instance_address: String,
+    file_store_config: IndexerGrpcFileStoreConfig,
 }
 
 impl Processor {
-    pub fn new(config: IndexerGrpcConfig) -> Self {
+    pub fn new(
+        redis_main_instance_address: String,
+        file_store_config: IndexerGrpcFileStoreConfig,
+    ) -> Self {
         Self {
             cache_operator: None,
             file_store_processor: None,
             cache_chain_id: None,
-            config,
+            redis_main_instance_address,
+            file_store_config,
         }
     }
 
     /// Init the processor, including creating the redis connection and file store operator.
     async fn init(&mut self) {
         // Connection to redis is a hard dependency for file store processor.
-        let conn = redis::Client::open(format!("redis://{}", self.config.redis_address))
+        let conn = redis::Client::open(format!("redis://{}", self.redis_main_instance_address))
             .expect("Create redis client failed.")
             .get_async_connection()
             .await
@@ -49,8 +55,14 @@ impl Processor {
             .await
             .expect("Get chain id failed.");
 
-        let file_store_operator =
-            FileStoreOperator::new(self.config.file_store_bucket_name.clone());
+        let file_store_operator: Box<dyn FileStoreOperator> = match &self.file_store_config {
+            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => Box::new(
+                GcsFileStoreOperator::new(gcs_file_store.gcs_file_store_bucket_name.clone()),
+            ),
+            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
+                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
+            ),
+        };
         file_store_operator.verify_storage_bucket_existence().await;
 
         self.cache_operator = Some(cache_operator);
@@ -138,7 +150,7 @@ impl Processor {
                 .unwrap();
             PROCESSED_VERSIONS_COUNT.inc_by(process_size as u64);
             tps_calculator.tick_now(process_size as u64);
-            aptos_logger::info!(
+            info!(
                 tps = (tps_calculator.avg() * 1000.0) as u64,
                 current_file_store_version = current_file_store_version,
                 "Upload transactions to file store."

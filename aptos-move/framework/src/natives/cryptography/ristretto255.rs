@@ -9,7 +9,7 @@ use crate::{
     safely_assert_eq, safely_pop_arg,
 };
 use aptos_types::{
-    on_chain_config::{Features, TimedFeatureFlag, TimedFeatures},
+    on_chain_config::{Features, TimedFeatures},
     vm_status::StatusCode,
 };
 use curve25519_dalek::scalar::Scalar;
@@ -182,28 +182,12 @@ pub fn make_all(
         ),
         (
             "multi_scalar_mul_internal",
-            if timed_features.is_enabled(TimedFeatureFlag::Ristretto255NativeFloatingPointFix) {
-                make_safe_native(
-                    gas_params.clone(),
-                    timed_features.clone(),
-                    features.clone(),
-                    ristretto255_point::safe_native_multi_scalar_mul_no_floating_point,
-                )
-            } else {
-                // NOTE: We could not keep the old "unsafe" variant of this native because all the
-                // helper functions that the old "unsafe" native used were modified to return
-                // `SafeNativeResult`'s instead of `PartialVMResult`'s. This would've resulted in
-                // a lot of awkward error-handling, so we chose to simply make the native "safe".
-                //
-                // The only difference between this and the `safe_native_multi_scalar_mul_no_floating_point`
-                // from above, is this native still uses the flawed floating-point arithmetic gas formula.
-                make_safe_native(
-                    gas_params.clone(),
-                    timed_features.clone(),
-                    features.clone(),
-                    ristretto255_point::native_multi_scalar_mul,
-                )
-            },
+            make_safe_native(
+                gas_params.clone(),
+                timed_features.clone(),
+                features.clone(),
+                ristretto255_point::safe_native_multi_scalar_mul_no_floating_point,
+            ),
         ),
         (
             "scalar_is_canonical_internal",

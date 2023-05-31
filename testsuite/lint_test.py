@@ -1,8 +1,7 @@
 import unittest
-from collections import OrderedDict
 from unittest.mock import patch
 
-from forge_test import SpyShell, RunResult, FakeCommand
+from test_framework.shell import SpyShell, RunResult, FakeCommand
 import lint
 from lint import main
 

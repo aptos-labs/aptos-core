@@ -14,7 +14,7 @@
 # 3 ${HOME}/bin/, or ${INSTALL_DIR} is expected to be on the path - hashicorp tools/etc.  will be installed there on linux systems.
 
 # fast fail.
-set -eo pipefail
+set -eox pipefail
 
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
@@ -470,8 +470,11 @@ function install_dotnet {
     fi
     # Below we need to (a) set TERM variable because the .net installer expects it and it is not set
     # in some environments (b) use bash not sh because the installer uses bash features.
-    curl -sSL https://dot.net/v1/dotnet-install.sh \
-        | TERM=linux /bin/bash -s -- --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
+    # NOTE: use wget to better follow the redirect
+    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+    chmod +x dotnet-install.sh
+    ./dotnet-install.sh --channel $DOTNET_VERSION --install-dir "${DOTNET_INSTALL_DIR}" --version latest
+    rm dotnet-install.sh
   else
     echo Dotnet already installed.
   fi
@@ -619,7 +622,7 @@ function install_solidity {
 }
 
 function install_pnpm {
-    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=7.14.2 SHELL="$(which bash)" bash -
+    curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
 }
 
 function install_python3 {
@@ -653,6 +656,14 @@ function install_lld {
   # Right now, only install lld for linux
   if [[ "$(uname)" == "Linux" ]]; then
     install_pkg lld "$PACKAGE_MANAGER"
+  fi
+}
+
+# this is needed for hdpi crate from aptos-ledger
+function install_libudev-dev {
+  # Need to install libudev-dev for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg libudev-dev "$PACKAGE_MANAGER"
   fi
 }
 
@@ -1009,6 +1020,8 @@ fi
 
 install_python3
 pip3 install pre-commit
+
+install_libudev-dev
 
 # For now best effort install, will need to improve later
 if command -v pre-commit; then

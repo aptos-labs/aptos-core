@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from forge import LocalShell
-from applogging import logger, init_logging
+from test_framework.logging import init_logging, log
 
 
 @click.group()
@@ -16,14 +16,12 @@ from applogging import logger, init_logging
     "--log-metadata/--no-log-metadata",
     default=True,
 )
-@logger
 def main(log_metadata: bool) -> None:
     init_logging(logger=log, level=logging.DEBUG, print_metadata=log_metadata)
 
 
 @main.command()
 @click.argument("paths", nargs=-1)
-@logger
 def helm(paths: Tuple[str]) -> None:
     shell = LocalShell()
 

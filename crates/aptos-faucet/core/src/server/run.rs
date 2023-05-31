@@ -72,10 +72,9 @@ impl RunConfig {
         info!("Starting server...");
 
         // Set whether we should use useful errors.
+        // If it's already set, then we'll carry on
         #[cfg(not(test))]
-        crate::endpoints::USE_HELPFUL_ERRORS
-            .set(self.handler_config.use_helpful_errors)
-            .expect("OnceCell somehow already set");
+        let _ = crate::endpoints::USE_HELPFUL_ERRORS.set(self.handler_config.use_helpful_errors);
 
         let concurrent_requests_semaphore = self
             .handler_config

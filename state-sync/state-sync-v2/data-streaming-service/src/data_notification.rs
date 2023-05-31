@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::streaming_client::Epoch;
-use aptos_data_client::{Response, ResponsePayload};
+use aptos_data_client::interface::{Response, ResponsePayload};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
@@ -139,7 +139,7 @@ pub struct TransactionsOrOutputsWithProofRequest {
 /// network and will be available in `client_response` when received.
 pub struct PendingClientResponse {
     pub client_request: DataClientRequest,
-    pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::Error>>,
+    pub client_response: Option<Result<Response<ResponsePayload>, aptos_data_client::error::Error>>,
 }
 
 impl Debug for PendingClientResponse {

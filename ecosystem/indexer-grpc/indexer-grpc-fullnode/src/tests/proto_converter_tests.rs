@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    runtime::IndexerStreamService,
+    runtime::FullnodeDataService,
     tests::{new_test_context, TestContext},
 };
 
@@ -26,7 +26,7 @@ async fn test_genesis_works() {
     let test_context = new_test_context(current_function_name!());
 
     let context = Arc::new(test_context.context);
-    let mut streamer = IndexerStreamService::new(context, 0, None);
+    let mut streamer = FullnodeDataService::new(context, 0, None);
     let converted = streamer.convert_next_block().await;
 
     // position 0 should be genesis
@@ -52,7 +52,7 @@ async fn test_block_transactions_work() {
     test_context.commit_block(&vec![txn.clone()]).await;
 
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = IndexerStreamService::new(context, 0, None);
+    let mut streamer = FullnodeDataService::new(context, 0, None);
 
     // emulating real stream, getting first block
     let block_0 = streamer.convert_next_block().await;
@@ -138,7 +138,7 @@ async fn test_block_height_and_ts_work() {
 
     let context = Arc::new(test_context.clone().context);
 
-    let streamer = IndexerStreamService::new(context, 0, None);
+    let streamer = FullnodeDataService::new(context, 0, None);
     let converted = fetch_all_stream(streamer).await;
 
     assert_eq!(converted.len(), 9);
@@ -190,7 +190,7 @@ async fn test_table_item_parsing_works() {
     ]);
 
     let context = Arc::new(test_context.clone().context);
-    let streamer = IndexerStreamService::new(context, 0, None);
+    let streamer = FullnodeDataService::new(context, 0, None);
     let converted = fetch_all_stream(streamer).await;
 
     let mut table_kv: HashMap<String, String> = HashMap::new();
@@ -262,7 +262,7 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
     out
 }
 
-async fn fetch_all_stream(mut streamer: IndexerStreamService) -> Vec<TransactionPB> {
+async fn fetch_all_stream(mut streamer: FullnodeDataService) -> Vec<TransactionPB> {
     // Overfetching should work
     let mut res = streamer.convert_next_block().await;
     for _ in 0..20 {

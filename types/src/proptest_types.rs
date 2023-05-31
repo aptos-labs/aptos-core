@@ -37,6 +37,7 @@ use aptos_crypto::{
     traits::*,
     HashValue,
 };
+use arr_macro::arr;
 use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
@@ -807,10 +808,15 @@ impl TransactionToCommitGen {
                     })
             })
             .unzip();
+        let mut sharded_state_updates = arr![HashMap::new(); 16];
+        state_updates.into_iter().for_each(|(k, v)| {
+            sharded_state_updates[k.get_shard_id() as usize].insert(k, v);
+        });
+
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
-            state_updates,
+            sharded_state_updates,
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
@@ -1124,7 +1130,7 @@ impl BlockGen {
                 Some(HashValue::random()),
                 ExecutionStatus::Success,
             ),
-            HashMap::new(),
+            arr_macro::arr![HashMap::new(); 16],
             WriteSet::default(),
             Vec::new(),
             false,

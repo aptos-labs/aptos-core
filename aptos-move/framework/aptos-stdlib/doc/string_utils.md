@@ -20,6 +20,10 @@ A module for formatting move values as strings.
 -  [Function `format4`](#0x1_string_utils_format4)
 -  [Function `cons`](#0x1_string_utils_cons)
 -  [Function `nil`](#0x1_string_utils_nil)
+-  [Function `list1`](#0x1_string_utils_list1)
+-  [Function `list2`](#0x1_string_utils_list2)
+-  [Function `list3`](#0x1_string_utils_list3)
+-  [Function `list4`](#0x1_string_utils_list4)
 -  [Function `native_format`](#0x1_string_utils_native_format)
 -  [Function `native_format_list`](#0x1_string_utils_native_format_list)
 -  [Specification](#@Specification_1)
@@ -273,7 +277,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format1">format1</a>&lt;T0: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0): String {
-    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &list1(a))
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list1">list1</a>(a))
 }
 </code></pre>
 
@@ -297,7 +301,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format2">format2</a>&lt;T0: drop, T1: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1): String {
-    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &list2(a, b))
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list2">list2</a>(a, b))
 }
 </code></pre>
 
@@ -321,7 +325,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format3">format3</a>&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2): String {
-    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &list3(a, b, c))
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list3">list3</a>(a, b, c))
 }
 </code></pre>
 
@@ -345,7 +349,7 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format4">format4</a>&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): String {
-    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &list4(a, b, c, d))
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d))
 }
 </code></pre>
 
@@ -391,6 +395,94 @@ Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x
 
 
 <pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_nil">nil</a>(): <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> { <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> {} }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_list1"></a>
+
+## Function `list1`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list1">list1</a>&lt;T0&gt;(a: T0): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list1">list1</a>&lt;T0&gt;(a: T0): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_nil">nil</a>()) }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_list2"></a>
+
+## Function `list2`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list2">list2</a>&lt;T0, T1&gt;(a: T0, b: T1): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list2">list2</a>&lt;T0, T1&gt;(a: T0, b: T1): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list1">list1</a>(b)) }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_list3"></a>
+
+## Function `list3`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list3">list3</a>&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list3">list3</a>&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list2">list2</a>(b, c)) }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_string_utils_list4"></a>
+
+## Function `list4`
+
+
+
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list4">list4</a>&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T3, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list4">list4</a>&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T3, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt;&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list3">list3</a>(b, c, d)) }
 </code></pre>
 
 

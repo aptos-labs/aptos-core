@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![allow(unused)]
 
-use crate::publishing::raw_module_data;
-use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
@@ -26,16 +25,6 @@ use rand_core::RngCore;
 //
 // Functions to load and update the original package
 //
-
-pub fn load_package() -> (Vec<CompiledModule>, PackageMetadata) {
-    let metadata = bcs::from_bytes::<PackageMetadata>(&raw_module_data::PACKAGE_METADATA_SIMPLE)
-        .expect("PackageMetadata for GenericModule must deserialize");
-    let mut modules = vec![];
-    let module = CompiledModule::deserialize(&raw_module_data::MODULE_SIMPLE)
-        .expect("Simple.move must deserialize");
-    modules.push(module);
-    (modules, metadata)
-}
 
 pub fn version(module: &mut CompiledModule, rng: &mut StdRng) {
     // change `const COUNTER_STEP` in Simple.move
@@ -97,6 +86,12 @@ pub fn scramble(module: &mut CompiledModule, fn_count: usize, rng: &mut StdRng) 
     }
 }
 
+pub enum MultiSigConfig {
+    None,
+    Random(usize),
+    Publisher,
+}
+
 //
 // List of entry points to expose
 //
@@ -106,6 +101,10 @@ pub enum EntryPoints {
     // 0 args
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, signed by 2 accounts
+    Nop2Signers,
+    /// Empty (NoOp) function, signed by 5 accounts
+    Nop5Signers,
     /// Increment signer resource - COUNTER_STEP
     Step,
     /// Fetch signer resource - COUNTER_STEP
@@ -144,11 +143,100 @@ pub enum EntryPoints {
     BytesMakeOrChange {
         data_length: Option<usize>,
     },
+    EmitEvents {
+        count: u64,
+    },
+    MakeOrChangeTable {
+        offset: u64,
+        count: u64,
+    },
+    MakeOrChangeTableRandom {
+        max_offset: u64,
+        max_count: u64,
+    },
     /// Increment destination resource - COUNTER_STEP
     StepDst,
+
+    /// Initialize Token V1 NFT collection
+    TokenV1InitializeCollection,
+    /// Mint an NFT token. Should be called only after InitializeCollection is called
+    TokenV1MintAndStoreNFTParallel,
+    TokenV1MintAndStoreNFTSequential,
+    TokenV1MintAndTransferNFTParallel,
+    TokenV1MintAndTransferNFTSequential,
+    TokenV1MintAndStoreFT,
+    TokenV1MintAndTransferFT,
+
+    TokenV2AmbassadorMint,
 }
 
 impl EntryPoints {
+    pub fn package_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Nop2Signers
+            | EntryPoints::Nop5Signers
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
+            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+        }
+    }
+
+    pub fn module_name(&self) -> &'static str {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Nop2Signers
+            | EntryPoints::Nop5Signers
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loopy { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::StepDst => "simple",
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
+            EntryPoints::TokenV2AmbassadorMint => "ambassador",
+        }
+    }
+
     pub fn create_payload(
         &self,
         module_id: ModuleId,
@@ -158,6 +246,12 @@ impl EntryPoints {
         match self {
             // 0 args
             EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Nop2Signers => {
+                get_payload_void(module_id, ident_str!("nop_2_signers").to_owned())
+            },
+            EntryPoints::Nop5Signers => {
+                get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
+            },
             EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
             EntryPoints::GetCounter => {
                 get_payload_void(module_id, ident_str!("get_counter").to_owned())
@@ -200,7 +294,108 @@ impl EntryPoints {
                 let data_len = data_length.unwrap_or_else(|| rng.gen_range(0usize, 1000usize));
                 bytes_make_or_change(rng, module_id, data_len)
             },
+            EntryPoints::EmitEvents { count } => {
+                get_payload(module_id, ident_str!("emit_events").to_owned(), vec![
+                    bcs::to_bytes(count).unwrap(),
+                ])
+            },
+            EntryPoints::MakeOrChangeTable { offset, count } => get_payload(
+                module_id,
+                ident_str!("make_or_change_table").to_owned(),
+                vec![
+                    bcs::to_bytes(offset).unwrap(),
+                    bcs::to_bytes(count).unwrap(),
+                ],
+            ),
+            EntryPoints::MakeOrChangeTableRandom {
+                max_offset,
+                max_count,
+            } => {
+                let rng = rng.expect("Must provide RNG");
+                let mut offset: u64 = rng.gen();
+                offset %= max_offset;
+                let mut count: u64 = rng.gen();
+                count %= max_count;
+                get_payload(
+                    module_id,
+                    ident_str!("make_or_change_table").to_owned(),
+                    vec![
+                        bcs::to_bytes(&offset).unwrap(),
+                        bcs::to_bytes(&count).unwrap(),
+                    ],
+                )
+            },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
+            EntryPoints::TokenV1InitializeCollection => get_payload_void(
+                module_id,
+                ident_str!("token_v1_initialize_collection").to_owned(),
+            ),
+            EntryPoints::TokenV1MintAndStoreNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+
+            EntryPoints::TokenV1MintAndTransferNFTParallel => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_parallel").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferNFTSequential => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_nft_sequential").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndStoreFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_store_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV1MintAndTransferFT => get_payload(
+                module_id,
+                ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
+                vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
+            ),
+            EntryPoints::TokenV2AmbassadorMint => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 20)).unwrap(),  // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+        }
+    }
+
+    pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
+        match self {
+            EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => {
+                Some(EntryPoints::TokenV1InitializeCollection)
+            },
+            _ => None,
+        }
+    }
+
+    pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
+        match self {
+            EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
+            EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
+            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            _ => MultiSigConfig::None,
         }
     }
 }
@@ -296,11 +491,7 @@ fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
 
 fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let len = rng.gen_range(0usize, 1000usize);
-    let name: String = rng
-        .sample_iter(&Alphanumeric)
-        .take(len)
-        .map(char::from)
-        .collect();
+    let name: String = rand_string(rng, len);
     get_payload(module_id, ident_str!("set_name").to_owned(), vec![
         bcs::to_bytes(&name).unwrap(),
     ])
@@ -324,6 +515,19 @@ fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
     ])
 }
 
+fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
+    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
+        bcs::to_bytes(&other).unwrap(),
+    ])
+}
+
+fn rand_string(rng: &mut StdRng, len: usize) -> String {
+    rng.sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect()
+}
+
 fn make_or_change(
     rng: &mut StdRng,
     module_id: ModuleId,
@@ -331,11 +535,7 @@ fn make_or_change(
     data_len: usize,
 ) -> TransactionPayload {
     let id: u64 = rng.gen();
-    let name: String = rng
-        .sample_iter(&Alphanumeric)
-        .take(str_len)
-        .map(char::from)
-        .collect();
+    let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
     get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![

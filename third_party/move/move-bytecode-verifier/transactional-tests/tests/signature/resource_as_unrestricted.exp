@@ -5,6 +5,6 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
     location: 0x1::M,
-    indices: [(Signature, 1), (FunctionDefinition, 0)],
+    indices: [(Signature, 1)],
     offsets: [],
 }

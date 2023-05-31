@@ -243,14 +243,11 @@ impl UnitTestingConfig {
         let mut test_runner = TestRunner::new(
             self.gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
             self.num_threads,
-            self.check_stackless_vm,
-            self.verbose,
             self.report_storage_on_error,
             self.report_stacktrace_on_abort,
             test_plan,
             native_function_table,
             cost_table,
-            verify_and_create_named_address_mapping(self.named_address_values.clone()).unwrap(),
             self.report_writeset,
             #[cfg(feature = "evm-backend")]
             self.evm,

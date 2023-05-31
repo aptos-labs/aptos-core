@@ -1,7 +1,7 @@
 [package]
 name = "aptos-indexer-grpc-fullnode"
-description = "Aptos Indexer GRPC Fullnode"
-version = "0.1.0"
+description = "Aptos Indexer GRPC runtime on fullnode."
+version = "1.0.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -22,7 +22,6 @@ futures = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 once_cell = { workspace = true }
-prost = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
