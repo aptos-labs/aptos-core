@@ -20,9 +20,7 @@ Our CLI supports restoring a database using backup files. It reads from the back
 
 The command restores the database from the closest snapshot to the target version. This command can quickly restore a database to a target version, but it does not restore all the transaction history from the past.
 
-:::Prerequisite
-Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install).
-:::
+:::tip Prerequisite Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install). :::
 
 Here is an example command:
 
@@ -37,7 +35,7 @@ aptos node bootstrap-db \
     --target-db-dir /path/to/local/db
 ```
 
-The ([s3-public.yaml](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/s3-public.yaml)) used in the command specifies the location of the public backup files mentioned above, as well as the commands used by our backup and restore tool to interact with S3. Additionally, you can use the [public Google backup files](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/gcs.yaml).
+The [s3-public.yaml](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/s3-public.yaml) used in the command specifies the location of the public backup files mentioned above, as well as the commands used by our backup and restore tool to interact with S3. Additionally, you can use the [public Google backup files](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/gcs.yaml).
 
 **Restore a DB over a specific time period**
 
