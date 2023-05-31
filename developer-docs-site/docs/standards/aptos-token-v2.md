@@ -309,15 +309,15 @@ To mint a soul bound token, the creator can call `aptos_token::mint_soul_bound` 
 the holder cannot transfer.
 ```rust
 public entry fun mint_soul_bound(
-creator: &signer,
-collection: String,
-description: String,
-name: String,
-uri: String,
-property_keys: vector<String>,
-property_types: vector<String>,
-property_values: vector<vector<u8>>,
-soul_bound_to: address,
+    creator: &signer,
+    collection: String,
+    description: String,
+    name: String,
+    uri: String,
+    property_keys: vector<String>,
+    property_types: vector<String>,
+    property_values: vector<vector<u8>>,
+    soul_bound_to: address,
 ) acquires AptosCollection
 ```
 
@@ -338,3 +338,53 @@ the refs obtained from creating the collection and token objects and do not expo
 If a creator wants more custom functionalities such as being able to forcefully transfer a soul bound token, they would
 need to write their own custom module that builds on top of the base token v2 standard. They can of course borrow inspiration
 and code from the Aptos Token module.
+
+## Fungible Token
+Similar to [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155), the Token v2 standard also supports fungible tokens
+(also known as semi-fungible tokens). An example of this would be armor tokens in a game. Each armor token represents a
+type of armor and is a token in a collection with metadata (e.g. durability, defense, etc.) and can be minted and burned.
+However, there are multiple instances of the same armor type. For example, a player can have 3 wooden armors, where wooden armor
+is a token in the Armor collection.
+
+This can be easily built by combining Token v2 and Fungible Assets. After the creator creates the Armor collection and the
+Wooden Armor token, they can make the Wooden Armor token "fungible":
+
+```rust
+use aptos_framework::primary_fungible_store;
+
+public entry fun create_armor_collection(creator: &signer) {
+    collection::create_unlimited_collection(
+        creator,
+        "Collection containing different types of armors. Each armor type is a separate token",
+        "Armor",
+        royalty,
+        "https://myarmor.com",
+    );
+}
+
+public entry fun create_armor_type(creator: &signer, armor_type: String) {
+    let new_armor_type_constructor_ref = &token::create_from_account(
+        creator,
+        "Armor",
+        "Armor description",
+        armor_type,
+        royalty,
+        "https://myarmor.com/my-named-token.jpeg",
+    );
+    // Make this armor token fungible so there can multiple instances of it.
+    primary_fungible_store::create_primary_store_enabled_fungible_asset(
+        new_armor_type_constructor_ref,
+        maximum_number_of_armors,
+        armor_type,
+        "ARMOR",
+        0, // Armor cannot be divided so decimals is 0,
+        "https://mycollection.com/armor-icon.jpeg",
+        "https://myarmor.com",
+    );
+
+    // Add properties such as durability, defence, etc. to this armor token
+}
+```
+
+Now the creator can mint multiple instances of the same armor type and transfer them to players. The players can freely
+transfer the armor tokens to each other the same way they would transfer a fungible asset.
