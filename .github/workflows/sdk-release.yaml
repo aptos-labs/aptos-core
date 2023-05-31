@@ -61,7 +61,7 @@ jobs:
 
       # Self hosted runners don't have pnpm preinstalled.
       # https://github.com/actions/setup-node/issues/182
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
 
       # When using high-perf-docker, the CI is actually run with two containers
       # in a k8s pod, one for docker commands run in the CI steps (docker), and
@@ -149,11 +149,14 @@ jobs:
   run-indexer-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
         with:
           node-version-file: .node-version
-      - uses: pnpm/action-setup@v2
+          registry-url: "https://registry.npmjs.org"
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
 
       # Run package install. If install fails, it probably means the lockfile
       # was not included in the commit.
