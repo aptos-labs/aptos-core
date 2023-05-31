@@ -1,9 +1,9 @@
 ---
-title: "Aptos DB Restore Tools"
+title: "Bootstrap Fullnode from Backup"
 slug: "aptos-db-restore"
 ---
 
-# Aptos DB Restore Tools and Public Backup Files
+# Bootstrap Fullnode from Backup
 
 Since its launch in October 2022, the Aptos community has grown rapidly. As of May 2023, Aptos has 743G and 159G of data in testnet and mainnet, respectively. We expect the data to increase greatly as more transactions are submitted to the blockchain. Facing the large amount of data, we want to provide users with a way to achieve two goals:
 
