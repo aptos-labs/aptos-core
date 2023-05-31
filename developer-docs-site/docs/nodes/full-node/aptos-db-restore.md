@@ -12,11 +12,11 @@ Since the Aptos mainnet launch in October 2022, the Aptos community has grown ra
 
 Our DB restore tool lets you use existing public backup files to restore the database on your local machine to any historical range or to the latest version. The public backup files are backed by cryptographic proof and stored on both AWS and Google Cloud for an easy download.
 
-## **Restore a DB using the Public Backup Files**
+## Restore a DB using the Public Backup Files
 
 Our CLI supports restoring a database using backup files. It reads from the backup files and recreates the Aptos DB. We support two kinds of restore: (1) recreating a DB with minimal transaction history at a user-specified transaction version (or the latest version the backup has), and (2) restoring the database over a specific period. In addition to (1), this option ensures that the recreated DB carries the ledger history of the user-designated version range.
 
-**Bootstrap a DB**
+### Bootstrap a DB
 
 The command restores the database from the closest snapshot to the target version. This command can quickly restore a database to a target version, but it does not restore all the transaction history from the past.
 
@@ -37,7 +37,7 @@ aptos node bootstrap-db \
 
 The [s3-public.yaml](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/s3-public.yaml) used in the command specifies the location of the public backup files mentioned above, as well as the commands used by our backup and restore tool to interact with S3. Additionally, you can use the [public Google backup files](https://github.com/aptos-labs/aptos-networks/blob/main/testnet/backups/gcs.yaml).
 
-**Restore a DB over a specific time period**
+### Restore a DB over a specific time period
 
 We also support restoring the database to a previous period in the past. The command will restore all transaction history (events, write sets, key-value pairs, etc.) within the specified period, along with the state Merkle tree at the target version.
 
@@ -53,7 +53,7 @@ aptos node bootstrap-db \
     --target-db-dir /path/to/local/db
 ```
 
-## **Public Backup Files**
+## Public Backup Files
 
 The backup files are created by continuously querying a local fullnode and storing the backup data in either local files or remote storage (e.g., Google Cloud, AWS, Azure, etc.).
 
