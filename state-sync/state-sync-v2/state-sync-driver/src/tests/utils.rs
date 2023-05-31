@@ -14,6 +14,7 @@ use aptos_data_streaming_service::{
 };
 use aptos_event_notifications::EventNotificationListener;
 use aptos_mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
+use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_storage_service_types::responses::CompleteDataRange;
 use aptos_types::{
     account_address::AccountAddress,
@@ -219,14 +220,16 @@ pub fn create_transaction_output() -> TransactionOutput {
     )
 }
 
-/// Verifies that mempool is notified about the committed transactions and
-/// verifies that the event listener is notified about the committed
-/// events (if it exists).
-pub async fn verify_mempool_and_event_notification(
+/// Verifies that: (i) mempool is notified about the committed transactions;
+/// (ii) the event listener is notified about the committed events (if it exists);
+/// and (iii) the storage service is notified about the committed transactions.
+pub async fn verify_commit_notification(
     event_listener: Option<&mut EventNotificationListener>,
     mempool_notification_listener: &mut MempoolNotificationListener,
+    storage_service_notification_listener: &mut StorageServiceNotificationListener,
     expected_transactions: Vec<Transaction>,
     expected_events: Vec<ContractEvent>,
+    expected_highest_synced_version: u64,
 ) {
     // Verify mempool is notified and ack the notification
     let mempool_notification = mempool_notification_listener.select_next_some().await;
@@ -245,4 +248,13 @@ pub async fn verify_mempool_and_event_notification(
         let event_notification = event_listener.select_next_some().await;
         assert_eq!(event_notification.subscribed_events, expected_events);
     }
+
+    // Verify that the storage service is notified
+    let storage_service_notification = storage_service_notification_listener
+        .select_next_some()
+        .await;
+    assert_eq!(
+        storage_service_notification.highest_synced_version,
+        expected_highest_synced_version
+    );
 }

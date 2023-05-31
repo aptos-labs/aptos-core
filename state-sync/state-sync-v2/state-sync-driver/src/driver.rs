@@ -213,6 +213,8 @@ impl<
                     self.handle_client_notification(notification).await;
                 },
                 notification = self.commit_notification_listener.select_next_some() => {
+                    // TODO(joshlind): we should probably just remove this path
+                    // now that we aren't reusing it.
                     self.handle_commit_notification(notification).await;
                 }
                 notification = self.consensus_notification_handler.select_next_some() => {

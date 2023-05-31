@@ -34,7 +34,7 @@ async fn test_get_transaction_outputs_with_proof() {
         );
 
         // Create the storage client and server
-        let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+        let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
         utils::update_storage_server_summary(&mut service, proof_version + 100, 10);
         tokio::spawn(service.start());
 
@@ -84,7 +84,7 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
     );
 
     // Create the storage client and server
-    let (mut mock_client, mut service, _, _) = MockClient::new(Some(db_reader), None);
+    let (mut mock_client, mut service, _, _, _) = MockClient::new(Some(db_reader), None);
     utils::update_storage_server_summary(&mut service, proof_version + chunk_size, 10);
     tokio::spawn(service.start());
 
@@ -114,7 +114,7 @@ async fn test_get_transaction_outputs_with_proof_chunk_limit() {
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof_invalid() {
     // Create the storage client and server
-    let (mut mock_client, service, _, _) = MockClient::new(None, None);
+    let (mut mock_client, service, _, _, _) = MockClient::new(None, None);
     tokio::spawn(service.start());
 
     // Test invalid ranges
@@ -152,7 +152,7 @@ async fn test_get_transaction_outputs_with_proof_not_serviceable() {
         let proof_version = end_version;
 
         // Create the storage client and server (that cannot service the request)
-        let (mut mock_client, mut service, _, _) = MockClient::new(None, None);
+        let (mut mock_client, mut service, _, _, _) = MockClient::new(None, None);
         utils::update_storage_server_summary(&mut service, proof_version - 1, 10);
         tokio::spawn(service.start());
 
@@ -226,7 +226,7 @@ async fn get_outputs_with_proof_network_limit(network_limit_bytes: u64) {
         };
 
         // Create the storage client and server
-        let (mut mock_client, mut service, _, _) =
+        let (mut mock_client, mut service, _, _, _) =
             MockClient::new(Some(db_reader), Some(storage_config));
         utils::update_storage_server_summary(&mut service, proof_version, 10);
         tokio::spawn(service.start());

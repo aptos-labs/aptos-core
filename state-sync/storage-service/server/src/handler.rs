@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, trace, warn};
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
@@ -222,6 +222,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 );
             );
         }
+        info!("Optimistic fetch request added to the queue");
 
         // Update the optimistic fetch metrics
         increment_counter(
