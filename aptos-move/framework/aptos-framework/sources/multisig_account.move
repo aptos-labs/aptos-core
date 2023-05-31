@@ -677,9 +677,6 @@ module aptos_framework::multisig_account {
     ////////////////////////// Multisig transaction flow ///////////////////////////////
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
-    ///
-    /// @param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-    /// @param args Vector of BCS-encoded argument values to invoke the target function with.
     public entry fun create_transaction(
         owner: &signer,
         multisig_account: address,
@@ -705,10 +702,6 @@ module aptos_framework::multisig_account {
     /// Create a multisig transaction with a transaction hash instead of the full payload.
     /// This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
     /// to provide the full payload, which will be validated against the hash stored on-chain.
-    ///
-    /// @param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-    /// @param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-    /// function arguments.
     public entry fun create_transaction_with_hash(
         owner: &signer,
         multisig_account: address,

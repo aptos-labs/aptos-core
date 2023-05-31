@@ -46,6 +46,7 @@ use crate::{
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
+    transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
@@ -681,6 +682,8 @@ impl EpochManager {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let transaction_deduper =
+            create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
 
         let payload_client = QuorumStoreClient::new(
@@ -694,6 +697,7 @@ impl EpochManager {
             payload_manager.clone(),
             transaction_shuffler,
             block_gas_limit,
+            transaction_deduper,
         );
         let state_computer = if onchain_consensus_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(

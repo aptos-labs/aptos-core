@@ -1182,14 +1182,8 @@ impl TransactionsApi {
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let move_resolver = state_view.as_move_resolver();
-        let (_, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
-
-        // Apply transaction outputs to build up a transaction
-        // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly. Fix this when
-        // VM error handling is fixed.
-        let output = output_ext.into_transaction_output(&move_resolver);
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
         let exe_status = match output.status().clone() {

@@ -162,7 +162,6 @@ test(
       { checkSuccess: true },
     );
     tokenAddress = (txn as Gen.UserTransaction).events[0].data.token;
-    console.log(tokenAddress);
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x4::token::Token"));
     const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(

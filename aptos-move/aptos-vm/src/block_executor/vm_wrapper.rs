@@ -69,13 +69,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             &log_context,
             aggregator_enabled,
         ) {
-            Ok((vm_status, output_ext, sender)) => {
+            Ok((vm_status, mut vm_output, sender)) => {
                 if let PreprocessedTransaction::UserTransaction(_) = txn {
                     if !aggregator_enabled {
-                        assert!(output_ext.delta_change_set().is_empty());
+                        assert!(vm_output.delta_change_set().is_empty());
                     }
                 }
-                if output_ext.txn_output().status().is_discarded() {
+                if vm_output.status().is_discarded() {
+
                     match sender {
                         Some(s) => speculative_trace!(
                             &log_context,
@@ -92,14 +93,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                         },
                     };
                 }
-                if AptosVM::should_restart_execution(output_ext.txn_output()) {
+                if AptosVM::should_restart_execution(&vm_output) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
+                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
             Err(err) => ExecutionStatus::Abort(err),

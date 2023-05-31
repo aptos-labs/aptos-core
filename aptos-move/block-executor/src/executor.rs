@@ -15,7 +15,7 @@ use crate::{
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     MVHashMap,
@@ -241,6 +241,11 @@ where
                 *scheduler_task = SchedulerTask::Done;
 
                 counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
+                counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                info!(
+                    "[BlockSTM]: Parallel execution completed, all {} txns committed.",
+                    txn_idx + 1
+                );
                 break;
             }
 
@@ -255,7 +260,8 @@ where
                     scheduler.halt();
 
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
-                    debug!("[BlockSTM]: Early halted due to Abort or SkipRest txn.");
+                    counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                    info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
                     break;
                 },
             };
@@ -268,8 +274,9 @@ where
                     scheduler.halt();
 
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
+                    counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                    debug!("[BlockSTM]: Early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", *accumulated_gas, per_block_gas_limit);
+                    info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_gas, per_block_gas_limit, txn_idx);
                     break;
                 }
             }
@@ -564,7 +571,7 @@ where
 
             // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
-                debug!("[Execution]: Sequential execution early halted due to SkipRest txn.");
+                info!("[Execution]: Sequential execution early halted due to SkipRest txn, {} txns committed.", ret.len());
                 break;
             }
 
@@ -573,13 +580,21 @@ where
                 // exceeds per_block_gas_limit, halt sequential execution.
                 if accumulated_gas >= per_block_gas_limit {
                     counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                    debug!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}.", accumulated_gas, per_block_gas_limit);
+                    info!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_gas, per_block_gas_limit, ret.len());
                     break;
                 }
             }
         }
 
+        if ret.len() == num_txns {
+            info!(
+                "[Execution]: Sequential execution completed, all {} txns committed.",
+                ret.len()
+            );
+        }
+
         counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
+        counters::SEQUENTIAL_PER_BLOCK_COMMITTED_TXNS.observe(ret.len() as f64);
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }

@@ -43,6 +43,7 @@ CPU
 CPUs
 ChainID
 Clippy
+CodeBlock
 CoinStore
 CoinType
 CollectionData
@@ -103,6 +104,7 @@ EWITHDRAW
 EWRONG
 EZERO
 Eg
+Enqueue
 EntryFunction
 EntryFunctionPayload
 Enums
@@ -347,6 +349,8 @@ doesnt
 dr
 eg
 endian
+enqueue
+enqueued
 entrancy
 enum
 enums
