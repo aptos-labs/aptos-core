@@ -5,7 +5,6 @@ import time
 from typing import Any, Dict, List, Optional
 
 import httpx
-import importlib.metadata
 
 from . import ed25519
 from .account import Account
@@ -21,6 +20,7 @@ from .transactions import (
     TransactionPayload,
 )
 from .type_tag import StructTag, TypeTag
+from .metadata import Metadata
 
 U64_MAX = 18446744073709551615
 
@@ -51,8 +51,7 @@ class RestClient:
         # long as progress is being made.
         timeout = httpx.Timeout(60.0, pool=None)
         # Default headers
-        version = importlib.metadata.version("aptos-sdk")
-        headers = {"x-aptos-sdk": f"aptos-sdk-python/{version}"}
+        headers = {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
         self.client = httpx.AsyncClient(
             http2=client_config.http2, limits=limits, timeout=timeout, headers=headers
         )
