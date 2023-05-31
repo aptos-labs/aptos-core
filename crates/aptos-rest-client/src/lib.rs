@@ -10,9 +10,11 @@ pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
+pub mod client_builder;
 pub mod state;
 pub mod types;
 
+pub use crate::client_builder::{AptosBaseUrl, ClientBuilder};
 use crate::{
     aptos::{AptosVersion, Balance},
     error::RestError,
@@ -50,7 +52,6 @@ use tokio::time::Instant;
 pub use types::{deserialize_from_prefixed_hex_string, Account, Resource};
 use url::Url;
 
-pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
 const DEFAULT_MAX_WAIT_MS: u64 = 60000;
 const DEFAULT_INTERVAL_MS: u64 = 1000;
@@ -59,6 +60,7 @@ static DEFAULT_INTERVAL_DURATION: Duration = Duration::from_millis(DEFAULT_INTER
 const DEFAULT_MAX_SERVER_LAG_WAIT_DURATION: Duration = Duration::from_secs(60);
 const RESOURCES_PER_CALL_PAGINATION: u64 = 9999;
 const MODULES_PER_CALL_PAGINATION: u64 = 1000;
+const X_APTOS_SDK_HEADER_VALUE: &str = concat!("aptos-rust-sdk/", env!("CARGO_PKG_VERSION"));
 
 type AptosResult<T> = Result<T, RestError>;
 
@@ -70,45 +72,12 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new_with_timeout(base_url: Url, timeout: Duration) -> Self {
-        Client::new_with_timeout_and_user_agent(base_url, timeout, USER_AGENT)
-    }
-
-    pub fn new_with_timeout_and_user_agent(
-        base_url: Url,
-        timeout: Duration,
-        user_agent: &str,
-    ) -> Self {
-        let inner = ReqwestClient::builder()
-            .timeout(timeout)
-            .user_agent(user_agent)
-            .cookie_store(true)
-            .build()
-            .unwrap();
-
-        // If the user provided no version in the path, use the default. If the
-        // provided version has no trailing slash, add it, otherwise url.join
-        // will ignore the version path base.
-        let version_path_base = match base_url.path() {
-            "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
-            path => {
-                if !path.ends_with('/') {
-                    format!("{}/", path)
-                } else {
-                    path.to_string()
-                }
-            },
-        };
-
-        Self {
-            inner,
-            base_url,
-            version_path_base,
-        }
+    pub fn builder(aptos_base_url: AptosBaseUrl) -> ClientBuilder {
+        ClientBuilder::new(aptos_base_url)
     }
 
     pub fn new(base_url: Url) -> Self {
-        Self::new_with_timeout(base_url, Duration::from_secs(10))
+        Self::builder(AptosBaseUrl::Custom(base_url)).build()
     }
 
     pub fn path_prefix_string(&self) -> String {
@@ -1580,6 +1549,22 @@ impl Client {
                 result.extend(response.into_inner());
             }
         }
+    }
+}
+
+// If the user provided no version in the path, use the default. If the
+// provided version has no trailing slash, add it, otherwise url.join
+// will ignore the version path base.
+pub fn get_version_path_with_base(base_url: Url) -> String {
+    match base_url.path() {
+        "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
+        path => {
+            if !path.ends_with('/') {
+                format!("{}/", path)
+            } else {
+                path.to_string()
+            }
+        },
     }
 }
 
