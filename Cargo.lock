@@ -930,6 +930,7 @@ dependencies = [
  "aptos-validator-interface",
  "aptos-vm",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "clap 3.2.23",
  "move-binary-format",
  "move-cli",
@@ -995,7 +996,6 @@ dependencies = [
  "aptos-db",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
- "aptos-gas",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
@@ -1409,6 +1409,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-package-builder",
  "aptos-types",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "clap 3.2.23",
  "move-binary-format",
@@ -3302,6 +3303,7 @@ dependencies = [
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
@@ -3386,6 +3388,20 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "smallvec",
+]
+
+[[package]]
+name = "aptos-vm-types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-language-e2e-tests",
+ "aptos-state-view",
+ "aptos-types",
+ "claims",
+ "move-binary-format",
+ "move-core-types",
 ]
 
 [[package]]

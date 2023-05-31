@@ -42,9 +42,7 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-#[cfg(any(test, feature = "fuzzing"))]
-pub use change_set::NoOpChangeSetChecker;
-pub use change_set::{ChangeSet, CheckChangeSet};
+pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
