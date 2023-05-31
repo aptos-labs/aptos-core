@@ -19,8 +19,8 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ChangeSet, ExecutionStatus, Module, ModuleBundle, NoOpChangeSetChecker, RawTransaction,
-        Script, SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
         TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
         TransactionToCommit, Version, WriteSetPayload,
     },
@@ -108,7 +108,7 @@ impl Arbitrary for ChangeSet {
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
-            .prop_map(|(ws, events)| ChangeSet::new(ws, events, &NoOpChangeSetChecker).unwrap())
+            .prop_map(|(ws, events)| ChangeSet::new(ws, events))
             .boxed()
     }
 }

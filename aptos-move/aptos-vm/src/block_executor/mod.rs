@@ -13,7 +13,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
@@ -27,9 +27,10 @@ use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet},
+    write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -43,14 +44,14 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 // Wrapper to avoid orphan rule
 #[derive(Debug)]
 pub(crate) struct AptosTransactionOutput {
-    output_ext: Mutex<Option<TransactionOutputExt>>,
+    vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
 
 impl AptosTransactionOutput {
-    pub(crate) fn new(output: TransactionOutputExt) -> Self {
+    pub(crate) fn new(output: VMOutput) -> Self {
         Self {
-            output_ext: Mutex::new(Some(output)),
+            vm_output: Mutex::new(Some(output)),
             committed_output: OnceCell::new(),
         }
     }
@@ -59,7 +60,7 @@ impl AptosTransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
             None => self
-                .output_ext
+                .vm_output
                 .lock()
                 .take()
                 .expect("Output must be set")
@@ -73,32 +74,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self::new(TransactionOutputExt::from(TransactionOutput::new(
-            WriteSet::default(),
-            vec![],
-            0,
-            TransactionStatus::Retry,
-        )))
+        Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
-    /// Should never be called after incorporate_delta_writes, as it will consume
-    /// output_ext to prepare an output with deltas.
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.output_ext
+        self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
-            .txn_output()
             .write_set()
             .iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it will consume
-    /// output_ext to prepare an output with deltas.
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
-        self.output_ext
+        self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
@@ -114,14 +109,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         assert!(
             self.committed_output
                 .set(
-                    self.output_ext
+                    self.vm_output
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
                         .output_with_delta_writes(delta_writes),
                 )
                 .is_ok(),
-            "Could not combine TransactionOutputExt with deltas"
+            "Could not combine VMOutput with deltas"
         );
     }
 
