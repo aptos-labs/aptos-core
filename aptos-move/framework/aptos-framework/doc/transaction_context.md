@@ -5,7 +5,7 @@
 
 
 
--  [Function `create_guid`](#0x1_transaction_context_create_guid)
+-  [Function `create_uuid`](#0x1_transaction_context_create_uuid)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Specification](#@Specification_0)
     -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
@@ -15,14 +15,14 @@
 
 
 
-<a name="0x1_transaction_context_create_guid"></a>
+<a name="0x1_transaction_context_create_uuid"></a>
 
-## Function `create_guid`
+## Function `create_uuid`
 
-Return a globally unique identifier
+Return a universally unique identifier
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_guid">create_guid</a>(): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_uuid">create_uuid</a>(): <b>address</b>
 </code></pre>
 
 
@@ -31,7 +31,7 @@ Return a globally unique identifier
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_guid">create_guid</a>(): <b>address</b>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_uuid">create_uuid</a>(): <b>address</b>;
 </code></pre>
 
 

@@ -17,8 +17,8 @@ use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 #[derive(Tid)]
 pub struct NativeTransactionContext {
     txn_hash: Vec<u8>,
-    /// This is the number of GUIDs (Globally unique identifiers) issued during the execution of this transaction
-    guid_counter: u64,
+    /// This is the number of UUIDs (Universally unique identifiers) issued during the execution of this transaction
+    uuid_counter: u64,
     script_hash: Vec<u8>,
     chain_id: u8,
 }
@@ -29,7 +29,7 @@ impl NativeTransactionContext {
     pub fn new(txn_hash: Vec<u8>, script_hash: Vec<u8>, chain_id: u8) -> Self {
         Self {
             txn_hash,
-            guid_counter: 0,
+            uuid_counter: 0,
             script_hash,
             chain_id,
         }
@@ -41,18 +41,18 @@ impl NativeTransactionContext {
 }
 
 /***************************************************************************************************
- * native fun create_guid
+ * native fun create_uuid
  *
  *   gas cost: base_cost
  *
  **************************************************************************************************/
 #[derive(Clone, Debug)]
-pub struct CreateGUIDGasParameters {
+pub struct CreateUUIDGasParameters {
     pub base: InternalGas,
 }
 
-fn native_create_guid(
-    gas_params: &CreateGUIDGasParameters,
+fn native_create_uuid(
+    gas_params: &CreateUUIDGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
@@ -62,13 +62,13 @@ fn native_create_guid(
     let mut transaction_context = context
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
-    transaction_context.guid_counter += 1;
-    const OBJECT_FROM_TRANSACTION_GUID_ADDRESS_SCHEME: u8 = 0xFB;
+    transaction_context.uuid_counter += 1;
+    const OBJECT_FROM_TRANSACTION_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
     let mut hash_arg = Vec::new();
-    hash_arg.push(OBJECT_FROM_TRANSACTION_GUID_ADDRESS_SCHEME);
+    hash_arg.push(OBJECT_FROM_TRANSACTION_UUID_ADDRESS_SCHEME);
     hash_arg.extend(transaction_context.txn_hash.clone());
-    hash_arg.extend(transaction_context.guid_counter.to_le_bytes().to_vec());
+    hash_arg.extend(transaction_context.uuid_counter.to_le_bytes().to_vec());
     let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
     Ok(smallvec![Value::address(AccountAddress::new(
         hash_vec
@@ -110,7 +110,7 @@ fn native_get_script_hash(
 #[derive(Debug, Clone)]
 pub struct GasParameters {
     pub get_script_hash: GetScriptHashGasParameters,
-    pub create_guid: CreateGUIDGasParameters,
+    pub create_uuid: CreateUUIDGasParameters,
 }
 
 pub fn make_all(
@@ -129,12 +129,12 @@ pub fn make_all(
             ),
         ),
         (
-            "create_guid",
+            "create_uuid",
             make_safe_native(
-                gas_params.create_guid,
+                gas_params.create_uuid,
                 timed_features,
                 features,
-                native_create_guid,
+                native_create_uuid,
             ),
         ),
     ];
