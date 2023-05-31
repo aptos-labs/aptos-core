@@ -1,7 +1,7 @@
 use crate::{
     assert_success,
     tests::common,
-    transaction_context::{create_many_guids, initialize},
+    transaction_context::{create_many_uuids, initialize},
     MoveHarness,
 };
 use aptos_language_e2e_tests::account::Account;
@@ -11,10 +11,10 @@ fn setup() -> (MoveHarness, Account) {
 }
 
 #[test]
-fn test_many_unique_guids() {
+fn test_many_unique_uuids() {
     let (mut h, acc) = setup();
 
-    let txn1 = create_many_guids(&mut h, &acc, 50);
+    let txn1 = create_many_uuids(&mut h, &acc, 50);
 
     assert_success!(h.run(txn1));
 }
