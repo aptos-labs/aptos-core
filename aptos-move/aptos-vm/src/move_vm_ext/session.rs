@@ -474,10 +474,7 @@ impl<'r> WriteOpConverter<'r> {
                     },
                 }
             },
-            Some(existing_value) => match existing_value.into_metadata() {
-                None => WriteOp::Modification(data),
-                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
-            },
+            Some(_) => WriteOp::Modification(data),
         };
 
         Ok(op)
