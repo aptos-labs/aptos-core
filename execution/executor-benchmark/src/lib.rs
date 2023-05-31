@@ -43,6 +43,8 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use aptos_sdk::types::LocalAccount;
+use aptos_transaction_generator_lib::TransactionType::CoinTransfer;
 
 pub fn init_db_and_executor<V>(
     config: &NodeConfig,
@@ -116,14 +118,36 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-
     let transaction_generator_creator = transaction_type.map(|transaction_type| {
-        init_workload::<V, _>(
+        let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
+        let num_accounts_to_be_loaded = std::cmp::min(
+            num_existing_accounts,
+            num_main_signer_accounts + num_additional_dst_pool_accounts,
+        );
+
+        let mut num_accounts_to_skip = 0;
+        if let CoinTransfer{..} = transaction_type {
+            if non_conflicting_txns_per_block {
+                // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+                // `3*block_size` addresses is required:
+                // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+                if num_accounts_to_be_loaded < block_size * 3 {
+                    panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+                }
+                num_accounts_to_skip = block_size;
+            }
+        }
+
+        let accounts_cache =
+            TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
+        let (mut main_signer_accounts, burner_accounts) =
+            accounts_cache.split(num_main_signer_accounts);
+
+        init_workload::<V>(
             transaction_type,
-            num_main_signer_accounts,
-            num_additional_dst_pool_accounts,
+            main_signer_accounts,
+            burner_accounts,
             db.clone(),
-            &source_dir,
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
             PipelineConfig {
@@ -140,13 +164,24 @@ pub fn run_benchmark<V>(
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
+
+    let mut num_accounts_to_load = num_main_signer_accounts;
+    if let Some(CoinTransfer{..}) = transaction_type {
+        // In case of non-conflicting coin transfer,
+        // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
+        // at least `block_size` number of accounts, all as signer only.
+        if non_conflicting_txns_per_block {
+            num_accounts_to_load = block_size;
+        }
+    }
+
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,
         source_dir,
         version,
-        Some(num_main_signer_accounts),
+        Some(num_accounts_to_load),
     );
 
     if non_conflicting_txns_per_block && transactions_per_sender > 1 {
@@ -206,12 +241,11 @@ pub fn run_benchmark<V>(
     }
 }
 
-fn init_workload<V, P: AsRef<Path>>(
+fn init_workload<V>(
     transaction_type: TransactionType,
-    num_main_signer_accounts: usize,
-    num_additional_dst_pool_accounts: usize,
+    mut main_signer_accounts: Vec<LocalAccount>,
+    burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
-    db_dir: &P,
     pipeline_config: PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
@@ -225,20 +259,9 @@ where
         None,
     );
 
-    let runtime = Runtime::new().unwrap();
-
-    let num_existing_accounts = TransactionGenerator::read_meta(db_dir);
-    let num_cached_accounts = std::cmp::min(
-        num_existing_accounts,
-        num_main_signer_accounts + num_additional_dst_pool_accounts,
-    );
-    let accounts_cache =
-        TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_cached_accounts);
-
-    let (mut main_signer_accounts, burner_accounts) =
-        accounts_cache.split(num_main_signer_accounts);
     let transaction_factory = TransactionGenerator::create_transaction_factory();
 
+    let runtime = Runtime::new().unwrap();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let phase = Arc::new(AtomicUsize::new(0));
 

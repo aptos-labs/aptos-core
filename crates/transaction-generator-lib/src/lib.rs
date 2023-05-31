@@ -228,6 +228,7 @@ pub async fn create_txn_generator_creator(
             .map(|d| d.address())
             .collect::<Vec<_>>(),
     ));
+
     let accounts_pool = Arc::new(RwLock::new(initial_burner_accounts));
 
     let mut txn_generator_creator_mix_per_phase: Vec<
