@@ -214,13 +214,13 @@ fn insert_delegator_balances(
             conn,
             diesel::insert_into(schema::current_delegator_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
-                .on_conflict((delegator_address, pool_address, pool_type))
+                .on_conflict((delegator_address, pool_address, pool_type, table_handle))
                 .do_update()
                 .set((
-                    table_handle.eq(excluded(table_handle)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
                     shares.eq(excluded(shares)),
+                    parent_table_handle.eq(excluded(parent_table_handle)),
                 )),
             Some(
                 " WHERE current_delegator_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
@@ -269,11 +269,7 @@ fn insert_delegator_pool_balances(
             diesel::insert_into(schema::delegated_staking_pool_balances::table)
                 .values(&item_to_insert[start_ind..end_ind])
                 .on_conflict((transaction_version, staking_pool_address))
-                .do_update()
-                .set((
-                    total_shares.eq(excluded(total_shares)),
-                    inserted_at.eq(excluded(inserted_at)),
-                )),
+                .do_nothing(),
             None,
         )?;
     }
@@ -302,6 +298,9 @@ fn insert_current_delegator_pool_balances(
                     total_shares.eq(excluded(total_shares)),
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     inserted_at.eq(excluded(inserted_at)),
+                    operator_commission_percentage.eq(excluded(operator_commission_percentage)),
+                    inactive_table_handle.eq(excluded(inactive_table_handle)),
+                    active_table_handle.eq(excluded(active_table_handle)),
                 )),
             Some(
                 " WHERE current_delegated_staking_pool_balances.last_transaction_version <= EXCLUDED.last_transaction_version ",
@@ -323,6 +322,8 @@ impl TransactionProcessor for StakeTransactionProcessor {
         start_version: u64,
         end_version: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
+        let mut conn = self.get_conn();
+
         let mut all_current_stake_pool_voters: StakingPoolVoterMap = HashMap::new();
         let mut all_proposal_votes = vec![];
         let mut all_delegator_activities = vec![];
@@ -343,7 +344,8 @@ impl TransactionProcessor for StakeTransactionProcessor {
             all_delegator_activities.append(&mut delegator_activities);
 
             // Add delegator balances
-            let delegator_balances = CurrentDelegatorBalance::from_transaction(txn).unwrap();
+            let delegator_balances =
+                CurrentDelegatorBalance::from_transaction(txn, &mut conn).unwrap();
             all_delegator_balances.extend(delegator_balances);
 
             // Add delegator pools
@@ -382,7 +384,6 @@ impl TransactionProcessor for StakeTransactionProcessor {
         all_current_delegator_pool_balances
             .sort_by(|a, b| a.staking_pool_address.cmp(&b.staking_pool_address));
 
-        let mut conn = self.get_conn();
         let tx_result = insert_to_db(
             &mut conn,
             self.name(),
