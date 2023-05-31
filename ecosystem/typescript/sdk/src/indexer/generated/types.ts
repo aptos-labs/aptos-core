@@ -75,11 +75,66 @@ export type String_Comparison_Exp = {
   _similar?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "address_events_summary" */
+export type Address_Events_Summary = {
+  __typename?: 'address_events_summary';
+  account_address?: Maybe<Scalars['String']>;
+  /** An object relationship */
+  block_metadata?: Maybe<Block_Metadata_Transactions>;
+  min_block_height?: Maybe<Scalars['bigint']>;
+  num_distinct_versions?: Maybe<Scalars['bigint']>;
+};
+
+/** Boolean expression to filter rows from the table "address_events_summary". All fields are combined with a logical 'AND'. */
+export type Address_Events_Summary_Bool_Exp = {
+  _and?: InputMaybe<Array<Address_Events_Summary_Bool_Exp>>;
+  _not?: InputMaybe<Address_Events_Summary_Bool_Exp>;
+  _or?: InputMaybe<Array<Address_Events_Summary_Bool_Exp>>;
+  account_address?: InputMaybe<String_Comparison_Exp>;
+  block_metadata?: InputMaybe<Block_Metadata_Transactions_Bool_Exp>;
+  min_block_height?: InputMaybe<Bigint_Comparison_Exp>;
+  num_distinct_versions?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "address_events_summary". */
+export type Address_Events_Summary_Order_By = {
+  account_address?: InputMaybe<Order_By>;
+  block_metadata?: InputMaybe<Block_Metadata_Transactions_Order_By>;
+  min_block_height?: InputMaybe<Order_By>;
+  num_distinct_versions?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "address_events_summary" */
+export enum Address_Events_Summary_Select_Column {
+  /** column name */
+  AccountAddress = 'account_address',
+  /** column name */
+  MinBlockHeight = 'min_block_height',
+  /** column name */
+  NumDistinctVersions = 'num_distinct_versions'
+}
+
+/** Streaming cursor of the table "address_events_summary" */
+export type Address_Events_Summary_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Address_Events_Summary_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Address_Events_Summary_Stream_Cursor_Value_Input = {
+  account_address?: InputMaybe<Scalars['String']>;
+  min_block_height?: InputMaybe<Scalars['bigint']>;
+  num_distinct_versions?: InputMaybe<Scalars['bigint']>;
+};
+
 /** columns and relationships of "address_version_from_events" */
 export type Address_Version_From_Events = {
   __typename?: 'address_version_from_events';
   account_address?: Maybe<Scalars['String']>;
   coin_activities: Array<Coin_Activities>;
+  coin_activities_aggregate: Coin_Activities_Aggregate;
   token_activities: Array<Token_Activities>;
   token_activities_aggregate: Token_Activities_Aggregate;
   transaction_version?: Maybe<Scalars['bigint']>;
@@ -88,6 +143,16 @@ export type Address_Version_From_Events = {
 
 /** columns and relationships of "address_version_from_events" */
 export type Address_Version_From_EventsCoin_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Coin_Activities_Order_By>>;
+  where?: InputMaybe<Coin_Activities_Bool_Exp>;
+};
+
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsCoin_Activities_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -301,6 +366,104 @@ export type Bigint_Comparison_Exp = {
   _nin?: InputMaybe<Array<Scalars['bigint']>>;
 };
 
+/** columns and relationships of "block_metadata_transactions" */
+export type Block_Metadata_Transactions = {
+  __typename?: 'block_metadata_transactions';
+  block_height: Scalars['bigint'];
+  epoch: Scalars['bigint'];
+  failed_proposer_indices: Scalars['jsonb'];
+  id: Scalars['String'];
+  previous_block_votes_bitvec: Scalars['jsonb'];
+  proposer: Scalars['String'];
+  round: Scalars['bigint'];
+  timestamp: Scalars['timestamp'];
+  version: Scalars['bigint'];
+};
+
+
+/** columns and relationships of "block_metadata_transactions" */
+export type Block_Metadata_TransactionsFailed_Proposer_IndicesArgs = {
+  path?: InputMaybe<Scalars['String']>;
+};
+
+
+/** columns and relationships of "block_metadata_transactions" */
+export type Block_Metadata_TransactionsPrevious_Block_Votes_BitvecArgs = {
+  path?: InputMaybe<Scalars['String']>;
+};
+
+/** Boolean expression to filter rows from the table "block_metadata_transactions". All fields are combined with a logical 'AND'. */
+export type Block_Metadata_Transactions_Bool_Exp = {
+  _and?: InputMaybe<Array<Block_Metadata_Transactions_Bool_Exp>>;
+  _not?: InputMaybe<Block_Metadata_Transactions_Bool_Exp>;
+  _or?: InputMaybe<Array<Block_Metadata_Transactions_Bool_Exp>>;
+  block_height?: InputMaybe<Bigint_Comparison_Exp>;
+  epoch?: InputMaybe<Bigint_Comparison_Exp>;
+  failed_proposer_indices?: InputMaybe<Jsonb_Comparison_Exp>;
+  id?: InputMaybe<String_Comparison_Exp>;
+  previous_block_votes_bitvec?: InputMaybe<Jsonb_Comparison_Exp>;
+  proposer?: InputMaybe<String_Comparison_Exp>;
+  round?: InputMaybe<Bigint_Comparison_Exp>;
+  timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "block_metadata_transactions". */
+export type Block_Metadata_Transactions_Order_By = {
+  block_height?: InputMaybe<Order_By>;
+  epoch?: InputMaybe<Order_By>;
+  failed_proposer_indices?: InputMaybe<Order_By>;
+  id?: InputMaybe<Order_By>;
+  previous_block_votes_bitvec?: InputMaybe<Order_By>;
+  proposer?: InputMaybe<Order_By>;
+  round?: InputMaybe<Order_By>;
+  timestamp?: InputMaybe<Order_By>;
+  version?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "block_metadata_transactions" */
+export enum Block_Metadata_Transactions_Select_Column {
+  /** column name */
+  BlockHeight = 'block_height',
+  /** column name */
+  Epoch = 'epoch',
+  /** column name */
+  FailedProposerIndices = 'failed_proposer_indices',
+  /** column name */
+  Id = 'id',
+  /** column name */
+  PreviousBlockVotesBitvec = 'previous_block_votes_bitvec',
+  /** column name */
+  Proposer = 'proposer',
+  /** column name */
+  Round = 'round',
+  /** column name */
+  Timestamp = 'timestamp',
+  /** column name */
+  Version = 'version'
+}
+
+/** Streaming cursor of the table "block_metadata_transactions" */
+export type Block_Metadata_Transactions_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Block_Metadata_Transactions_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Block_Metadata_Transactions_Stream_Cursor_Value_Input = {
+  block_height?: InputMaybe<Scalars['bigint']>;
+  epoch?: InputMaybe<Scalars['bigint']>;
+  failed_proposer_indices?: InputMaybe<Scalars['jsonb']>;
+  id?: InputMaybe<Scalars['String']>;
+  previous_block_votes_bitvec?: InputMaybe<Scalars['jsonb']>;
+  proposer?: InputMaybe<Scalars['String']>;
+  round?: InputMaybe<Scalars['bigint']>;
+  timestamp?: InputMaybe<Scalars['timestamp']>;
+  version?: InputMaybe<Scalars['bigint']>;
+};
+
 /** columns and relationships of "coin_activities" */
 export type Coin_Activities = {
   __typename?: 'coin_activities';
@@ -334,6 +497,47 @@ export type Coin_ActivitiesAptos_NamesArgs = {
   where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
 };
 
+/** aggregated selection of "coin_activities" */
+export type Coin_Activities_Aggregate = {
+  __typename?: 'coin_activities_aggregate';
+  aggregate?: Maybe<Coin_Activities_Aggregate_Fields>;
+  nodes: Array<Coin_Activities>;
+};
+
+/** aggregate fields of "coin_activities" */
+export type Coin_Activities_Aggregate_Fields = {
+  __typename?: 'coin_activities_aggregate_fields';
+  avg?: Maybe<Coin_Activities_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Coin_Activities_Max_Fields>;
+  min?: Maybe<Coin_Activities_Min_Fields>;
+  stddev?: Maybe<Coin_Activities_Stddev_Fields>;
+  stddev_pop?: Maybe<Coin_Activities_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Coin_Activities_Stddev_Samp_Fields>;
+  sum?: Maybe<Coin_Activities_Sum_Fields>;
+  var_pop?: Maybe<Coin_Activities_Var_Pop_Fields>;
+  var_samp?: Maybe<Coin_Activities_Var_Samp_Fields>;
+  variance?: Maybe<Coin_Activities_Variance_Fields>;
+};
+
+
+/** aggregate fields of "coin_activities" */
+export type Coin_Activities_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Coin_Activities_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Coin_Activities_Avg_Fields = {
+  __typename?: 'coin_activities_avg_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** Boolean expression to filter rows from the table "coin_activities". All fields are combined with a logical 'AND'. */
 export type Coin_Activities_Bool_Exp = {
   _and?: InputMaybe<Array<Coin_Activities_Bool_Exp>>;
@@ -355,6 +559,40 @@ export type Coin_Activities_Bool_Exp = {
   owner_address?: InputMaybe<String_Comparison_Exp>;
   transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Coin_Activities_Max_Fields = {
+  __typename?: 'coin_activities_max_fields';
+  activity_type?: Maybe<Scalars['String']>;
+  amount?: Maybe<Scalars['numeric']>;
+  block_height?: Maybe<Scalars['bigint']>;
+  coin_type?: Maybe<Scalars['String']>;
+  entry_function_id_str?: Maybe<Scalars['String']>;
+  event_account_address?: Maybe<Scalars['String']>;
+  event_creation_number?: Maybe<Scalars['bigint']>;
+  event_index?: Maybe<Scalars['bigint']>;
+  event_sequence_number?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate min on columns */
+export type Coin_Activities_Min_Fields = {
+  __typename?: 'coin_activities_min_fields';
+  activity_type?: Maybe<Scalars['String']>;
+  amount?: Maybe<Scalars['numeric']>;
+  block_height?: Maybe<Scalars['bigint']>;
+  coin_type?: Maybe<Scalars['String']>;
+  entry_function_id_str?: Maybe<Scalars['String']>;
+  event_account_address?: Maybe<Scalars['String']>;
+  event_creation_number?: Maybe<Scalars['bigint']>;
+  event_index?: Maybe<Scalars['bigint']>;
+  event_sequence_number?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
 };
 
 /** Ordering options when selecting data from "coin_activities". */
@@ -409,6 +647,39 @@ export enum Coin_Activities_Select_Column {
   TransactionVersion = 'transaction_version'
 }
 
+/** aggregate stddev on columns */
+export type Coin_Activities_Stddev_Fields = {
+  __typename?: 'coin_activities_stddev_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Coin_Activities_Stddev_Pop_Fields = {
+  __typename?: 'coin_activities_stddev_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Coin_Activities_Stddev_Samp_Fields = {
+  __typename?: 'coin_activities_stddev_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** Streaming cursor of the table "coin_activities" */
 export type Coin_Activities_Stream_Cursor_Input = {
   /** Stream column input with initial value */
@@ -433,6 +704,50 @@ export type Coin_Activities_Stream_Cursor_Value_Input = {
   owner_address?: InputMaybe<Scalars['String']>;
   transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
   transaction_version?: InputMaybe<Scalars['bigint']>;
+};
+
+/** aggregate sum on columns */
+export type Coin_Activities_Sum_Fields = {
+  __typename?: 'coin_activities_sum_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  block_height?: Maybe<Scalars['bigint']>;
+  event_creation_number?: Maybe<Scalars['bigint']>;
+  event_index?: Maybe<Scalars['bigint']>;
+  event_sequence_number?: Maybe<Scalars['bigint']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Coin_Activities_Var_Pop_Fields = {
+  __typename?: 'coin_activities_var_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Coin_Activities_Var_Samp_Fields = {
+  __typename?: 'coin_activities_var_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Coin_Activities_Variance_Fields = {
+  __typename?: 'coin_activities_variance_fields';
+  amount?: Maybe<Scalars['Float']>;
+  block_height?: Maybe<Scalars['Float']>;
+  event_creation_number?: Maybe<Scalars['Float']>;
+  event_index?: Maybe<Scalars['Float']>;
+  event_sequence_number?: Maybe<Scalars['Float']>;
+  transaction_version?: Maybe<Scalars['Float']>;
 };
 
 /** columns and relationships of "coin_balances" */
@@ -1464,11 +1779,86 @@ export type Current_Collections_V2_Stream_Cursor_Value_Input = {
   uri?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "current_delegated_staking_pool_balances" */
+export type Current_Delegated_Staking_Pool_Balances = {
+  __typename?: 'current_delegated_staking_pool_balances';
+  active_table_handle: Scalars['String'];
+  inactive_table_handle: Scalars['String'];
+  last_transaction_version: Scalars['bigint'];
+  operator_commission_percentage: Scalars['numeric'];
+  staking_pool_address: Scalars['String'];
+  total_coins: Scalars['numeric'];
+  total_shares: Scalars['numeric'];
+};
+
+/** Boolean expression to filter rows from the table "current_delegated_staking_pool_balances". All fields are combined with a logical 'AND'. */
+export type Current_Delegated_Staking_Pool_Balances_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Bool_Exp>>;
+  _not?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Bool_Exp>>;
+  active_table_handle?: InputMaybe<String_Comparison_Exp>;
+  inactive_table_handle?: InputMaybe<String_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  operator_commission_percentage?: InputMaybe<Numeric_Comparison_Exp>;
+  staking_pool_address?: InputMaybe<String_Comparison_Exp>;
+  total_coins?: InputMaybe<Numeric_Comparison_Exp>;
+  total_shares?: InputMaybe<Numeric_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "current_delegated_staking_pool_balances". */
+export type Current_Delegated_Staking_Pool_Balances_Order_By = {
+  active_table_handle?: InputMaybe<Order_By>;
+  inactive_table_handle?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  operator_commission_percentage?: InputMaybe<Order_By>;
+  staking_pool_address?: InputMaybe<Order_By>;
+  total_coins?: InputMaybe<Order_By>;
+  total_shares?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_delegated_staking_pool_balances" */
+export enum Current_Delegated_Staking_Pool_Balances_Select_Column {
+  /** column name */
+  ActiveTableHandle = 'active_table_handle',
+  /** column name */
+  InactiveTableHandle = 'inactive_table_handle',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  OperatorCommissionPercentage = 'operator_commission_percentage',
+  /** column name */
+  StakingPoolAddress = 'staking_pool_address',
+  /** column name */
+  TotalCoins = 'total_coins',
+  /** column name */
+  TotalShares = 'total_shares'
+}
+
+/** Streaming cursor of the table "current_delegated_staking_pool_balances" */
+export type Current_Delegated_Staking_Pool_Balances_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Delegated_Staking_Pool_Balances_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Delegated_Staking_Pool_Balances_Stream_Cursor_Value_Input = {
+  active_table_handle?: InputMaybe<Scalars['String']>;
+  inactive_table_handle?: InputMaybe<Scalars['String']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  operator_commission_percentage?: InputMaybe<Scalars['numeric']>;
+  staking_pool_address?: InputMaybe<Scalars['String']>;
+  total_coins?: InputMaybe<Scalars['numeric']>;
+  total_shares?: InputMaybe<Scalars['numeric']>;
+};
+
 /** columns and relationships of "current_delegator_balances" */
 export type Current_Delegator_Balances = {
   __typename?: 'current_delegator_balances';
   delegator_address: Scalars['String'];
   last_transaction_version: Scalars['bigint'];
+  parent_table_handle: Scalars['String'];
   pool_address: Scalars['String'];
   pool_type: Scalars['String'];
   shares: Scalars['numeric'];
@@ -1482,6 +1872,7 @@ export type Current_Delegator_Balances_Bool_Exp = {
   _or?: InputMaybe<Array<Current_Delegator_Balances_Bool_Exp>>;
   delegator_address?: InputMaybe<String_Comparison_Exp>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  parent_table_handle?: InputMaybe<String_Comparison_Exp>;
   pool_address?: InputMaybe<String_Comparison_Exp>;
   pool_type?: InputMaybe<String_Comparison_Exp>;
   shares?: InputMaybe<Numeric_Comparison_Exp>;
@@ -1492,6 +1883,7 @@ export type Current_Delegator_Balances_Bool_Exp = {
 export type Current_Delegator_Balances_Order_By = {
   delegator_address?: InputMaybe<Order_By>;
   last_transaction_version?: InputMaybe<Order_By>;
+  parent_table_handle?: InputMaybe<Order_By>;
   pool_address?: InputMaybe<Order_By>;
   pool_type?: InputMaybe<Order_By>;
   shares?: InputMaybe<Order_By>;
@@ -1504,6 +1896,8 @@ export enum Current_Delegator_Balances_Select_Column {
   DelegatorAddress = 'delegator_address',
   /** column name */
   LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  ParentTableHandle = 'parent_table_handle',
   /** column name */
   PoolAddress = 'pool_address',
   /** column name */
@@ -1526,6 +1920,7 @@ export type Current_Delegator_Balances_Stream_Cursor_Input = {
 export type Current_Delegator_Balances_Stream_Cursor_Value_Input = {
   delegator_address?: InputMaybe<Scalars['String']>;
   last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  parent_table_handle?: InputMaybe<Scalars['String']>;
   pool_address?: InputMaybe<Scalars['String']>;
   pool_type?: InputMaybe<Scalars['String']>;
   shares?: InputMaybe<Scalars['numeric']>;
@@ -1537,8 +1932,20 @@ export type Current_Staking_Pool_Voter = {
   __typename?: 'current_staking_pool_voter';
   last_transaction_version: Scalars['bigint'];
   operator_address: Scalars['String'];
+  /** An array relationship */
+  operator_aptos_name: Array<Current_Ans_Lookup>;
   staking_pool_address: Scalars['String'];
   voter_address: Scalars['String'];
+};
+
+
+/** columns and relationships of "current_staking_pool_voter" */
+export type Current_Staking_Pool_VoterOperator_Aptos_NameArgs = {
+  distinct_on?: InputMaybe<Array<Current_Ans_Lookup_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Ans_Lookup_Order_By>>;
+  where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
 };
 
 /** Boolean expression to filter rows from the table "current_staking_pool_voter". All fields are combined with a logical 'AND'. */
@@ -1548,6 +1955,7 @@ export type Current_Staking_Pool_Voter_Bool_Exp = {
   _or?: InputMaybe<Array<Current_Staking_Pool_Voter_Bool_Exp>>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
   operator_address?: InputMaybe<String_Comparison_Exp>;
+  operator_aptos_name?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
   staking_pool_address?: InputMaybe<String_Comparison_Exp>;
   voter_address?: InputMaybe<String_Comparison_Exp>;
 };
@@ -1556,6 +1964,7 @@ export type Current_Staking_Pool_Voter_Bool_Exp = {
 export type Current_Staking_Pool_Voter_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
   operator_address?: InputMaybe<Order_By>;
+  operator_aptos_name_aggregate?: InputMaybe<Current_Ans_Lookup_Aggregate_Order_By>;
   staking_pool_address?: InputMaybe<Order_By>;
   voter_address?: InputMaybe<Order_By>;
 };
@@ -2807,6 +3216,58 @@ export type Delegated_Staking_Pools_Stream_Cursor_Value_Input = {
   staking_pool_address?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "delegator_distinct_pool" */
+export type Delegator_Distinct_Pool = {
+  __typename?: 'delegator_distinct_pool';
+  /** An object relationship */
+  current_pool_balance?: Maybe<Current_Delegated_Staking_Pool_Balances>;
+  delegator_address?: Maybe<Scalars['String']>;
+  pool_address?: Maybe<Scalars['String']>;
+  /** An object relationship */
+  staking_pool_metadata?: Maybe<Current_Staking_Pool_Voter>;
+};
+
+/** Boolean expression to filter rows from the table "delegator_distinct_pool". All fields are combined with a logical 'AND'. */
+export type Delegator_Distinct_Pool_Bool_Exp = {
+  _and?: InputMaybe<Array<Delegator_Distinct_Pool_Bool_Exp>>;
+  _not?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
+  _or?: InputMaybe<Array<Delegator_Distinct_Pool_Bool_Exp>>;
+  current_pool_balance?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
+  delegator_address?: InputMaybe<String_Comparison_Exp>;
+  pool_address?: InputMaybe<String_Comparison_Exp>;
+  staking_pool_metadata?: InputMaybe<Current_Staking_Pool_Voter_Bool_Exp>;
+};
+
+/** Ordering options when selecting data from "delegator_distinct_pool". */
+export type Delegator_Distinct_Pool_Order_By = {
+  current_pool_balance?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Order_By>;
+  delegator_address?: InputMaybe<Order_By>;
+  pool_address?: InputMaybe<Order_By>;
+  staking_pool_metadata?: InputMaybe<Current_Staking_Pool_Voter_Order_By>;
+};
+
+/** select columns of table "delegator_distinct_pool" */
+export enum Delegator_Distinct_Pool_Select_Column {
+  /** column name */
+  DelegatorAddress = 'delegator_address',
+  /** column name */
+  PoolAddress = 'pool_address'
+}
+
+/** Streaming cursor of the table "delegator_distinct_pool" */
+export type Delegator_Distinct_Pool_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Delegator_Distinct_Pool_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Delegator_Distinct_Pool_Stream_Cursor_Value_Input = {
+  delegator_address?: InputMaybe<Scalars['String']>;
+  pool_address?: InputMaybe<Scalars['String']>;
+};
+
 /** columns and relationships of "events" */
 export type Events = {
   __typename?: 'events';
@@ -3448,13 +3909,20 @@ export type Proposal_Votes_Variance_Fields = {
 
 export type Query_Root = {
   __typename?: 'query_root';
+  /** fetch data from the table: "address_events_summary" */
+  address_events_summary: Array<Address_Events_Summary>;
   /** fetch data from the table: "address_version_from_events" */
   address_version_from_events: Array<Address_Version_From_Events>;
   /** fetch aggregated fields from the table: "address_version_from_events" */
   address_version_from_events_aggregate: Address_Version_From_Events_Aggregate;
   /** fetch data from the table: "address_version_from_move_resources" */
   address_version_from_move_resources: Array<Address_Version_From_Move_Resources>;
+  /** fetch data from the table: "block_metadata_transactions" */
+  block_metadata_transactions: Array<Block_Metadata_Transactions>;
+  /** fetch data from the table: "block_metadata_transactions" using primary key columns */
+  block_metadata_transactions_by_pk?: Maybe<Block_Metadata_Transactions>;
   coin_activities: Array<Coin_Activities>;
+  coin_activities_aggregate: Coin_Activities_Aggregate;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
   /** fetch data from the table: "coin_balances" */
@@ -3495,6 +3963,10 @@ export type Query_Root = {
   current_collections_v2: Array<Current_Collections_V2>;
   /** fetch data from the table: "current_collections_v2" using primary key columns */
   current_collections_v2_by_pk?: Maybe<Current_Collections_V2>;
+  /** fetch data from the table: "current_delegated_staking_pool_balances" */
+  current_delegated_staking_pool_balances: Array<Current_Delegated_Staking_Pool_Balances>;
+  /** fetch data from the table: "current_delegated_staking_pool_balances" using primary key columns */
+  current_delegated_staking_pool_balances_by_pk?: Maybe<Current_Delegated_Staking_Pool_Balances>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
@@ -3539,6 +4011,8 @@ export type Query_Root = {
   delegated_staking_pools: Array<Delegated_Staking_Pools>;
   /** fetch data from the table: "delegated_staking_pools" using primary key columns */
   delegated_staking_pools_by_pk?: Maybe<Delegated_Staking_Pools>;
+  /** fetch data from the table: "delegator_distinct_pool" */
+  delegator_distinct_pool: Array<Delegator_Distinct_Pool>;
   /** fetch data from the table: "events" */
   events: Array<Events>;
   /** fetch data from the table: "events" using primary key columns */
@@ -3598,6 +4072,15 @@ export type Query_Root = {
 };
 
 
+export type Query_RootAddress_Events_SummaryArgs = {
+  distinct_on?: InputMaybe<Array<Address_Events_Summary_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Events_Summary_Order_By>>;
+  where?: InputMaybe<Address_Events_Summary_Bool_Exp>;
+};
+
+
 export type Query_RootAddress_Version_From_EventsArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3625,7 +4108,30 @@ export type Query_RootAddress_Version_From_Move_ResourcesArgs = {
 };
 
 
+export type Query_RootBlock_Metadata_TransactionsArgs = {
+  distinct_on?: InputMaybe<Array<Block_Metadata_Transactions_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Block_Metadata_Transactions_Order_By>>;
+  where?: InputMaybe<Block_Metadata_Transactions_Bool_Exp>;
+};
+
+
+export type Query_RootBlock_Metadata_Transactions_By_PkArgs = {
+  version: Scalars['bigint'];
+};
+
+
 export type Query_RootCoin_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Coin_Activities_Order_By>>;
+  where?: InputMaybe<Coin_Activities_Bool_Exp>;
+};
+
+
+export type Query_RootCoin_Activities_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -3787,6 +4293,20 @@ export type Query_RootCurrent_Collections_V2_By_PkArgs = {
 };
 
 
+export type Query_RootCurrent_Delegated_Staking_Pool_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Delegated_Staking_Pool_Balances_By_PkArgs = {
+  staking_pool_address: Scalars['String'];
+};
+
+
 export type Query_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -3800,6 +4320,7 @@ export type Query_RootCurrent_Delegator_Balances_By_PkArgs = {
   delegator_address: Scalars['String'];
   pool_address: Scalars['String'];
   pool_type: Scalars['String'];
+  table_handle: Scalars['String'];
 };
 
 
@@ -3954,6 +4475,15 @@ export type Query_RootDelegated_Staking_PoolsArgs = {
 
 export type Query_RootDelegated_Staking_Pools_By_PkArgs = {
   staking_pool_address: Scalars['String'];
+};
+
+
+export type Query_RootDelegator_Distinct_PoolArgs = {
+  distinct_on?: InputMaybe<Array<Delegator_Distinct_Pool_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegator_Distinct_Pool_Order_By>>;
+  where?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
 };
 
 
@@ -4185,6 +4715,10 @@ export type Query_RootUser_Transactions_By_PkArgs = {
 
 export type Subscription_Root = {
   __typename?: 'subscription_root';
+  /** fetch data from the table: "address_events_summary" */
+  address_events_summary: Array<Address_Events_Summary>;
+  /** fetch data from the table in a streaming manner : "address_events_summary" */
+  address_events_summary_stream: Array<Address_Events_Summary>;
   /** fetch data from the table: "address_version_from_events" */
   address_version_from_events: Array<Address_Version_From_Events>;
   /** fetch aggregated fields from the table: "address_version_from_events" */
@@ -4195,7 +4729,14 @@ export type Subscription_Root = {
   address_version_from_move_resources: Array<Address_Version_From_Move_Resources>;
   /** fetch data from the table in a streaming manner : "address_version_from_move_resources" */
   address_version_from_move_resources_stream: Array<Address_Version_From_Move_Resources>;
+  /** fetch data from the table: "block_metadata_transactions" */
+  block_metadata_transactions: Array<Block_Metadata_Transactions>;
+  /** fetch data from the table: "block_metadata_transactions" using primary key columns */
+  block_metadata_transactions_by_pk?: Maybe<Block_Metadata_Transactions>;
+  /** fetch data from the table in a streaming manner : "block_metadata_transactions" */
+  block_metadata_transactions_stream: Array<Block_Metadata_Transactions>;
   coin_activities: Array<Coin_Activities>;
+  coin_activities_aggregate: Coin_Activities_Aggregate;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
   /** fetch data from the table in a streaming manner : "coin_activities" */
@@ -4258,6 +4799,12 @@ export type Subscription_Root = {
   current_collections_v2_by_pk?: Maybe<Current_Collections_V2>;
   /** fetch data from the table in a streaming manner : "current_collections_v2" */
   current_collections_v2_stream: Array<Current_Collections_V2>;
+  /** fetch data from the table: "current_delegated_staking_pool_balances" */
+  current_delegated_staking_pool_balances: Array<Current_Delegated_Staking_Pool_Balances>;
+  /** fetch data from the table: "current_delegated_staking_pool_balances" using primary key columns */
+  current_delegated_staking_pool_balances_by_pk?: Maybe<Current_Delegated_Staking_Pool_Balances>;
+  /** fetch data from the table in a streaming manner : "current_delegated_staking_pool_balances" */
+  current_delegated_staking_pool_balances_stream: Array<Current_Delegated_Staking_Pool_Balances>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
@@ -4322,6 +4869,10 @@ export type Subscription_Root = {
   delegated_staking_pools_by_pk?: Maybe<Delegated_Staking_Pools>;
   /** fetch data from the table in a streaming manner : "delegated_staking_pools" */
   delegated_staking_pools_stream: Array<Delegated_Staking_Pools>;
+  /** fetch data from the table: "delegator_distinct_pool" */
+  delegator_distinct_pool: Array<Delegator_Distinct_Pool>;
+  /** fetch data from the table in a streaming manner : "delegator_distinct_pool" */
+  delegator_distinct_pool_stream: Array<Delegator_Distinct_Pool>;
   /** fetch data from the table: "events" */
   events: Array<Events>;
   /** fetch data from the table: "events" using primary key columns */
@@ -4409,6 +4960,22 @@ export type Subscription_Root = {
 };
 
 
+export type Subscription_RootAddress_Events_SummaryArgs = {
+  distinct_on?: InputMaybe<Array<Address_Events_Summary_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Events_Summary_Order_By>>;
+  where?: InputMaybe<Address_Events_Summary_Bool_Exp>;
+};
+
+
+export type Subscription_RootAddress_Events_Summary_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Address_Events_Summary_Stream_Cursor_Input>>;
+  where?: InputMaybe<Address_Events_Summary_Bool_Exp>;
+};
+
+
 export type Subscription_RootAddress_Version_From_EventsArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Events_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -4450,7 +5017,37 @@ export type Subscription_RootAddress_Version_From_Move_Resources_StreamArgs = {
 };
 
 
+export type Subscription_RootBlock_Metadata_TransactionsArgs = {
+  distinct_on?: InputMaybe<Array<Block_Metadata_Transactions_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Block_Metadata_Transactions_Order_By>>;
+  where?: InputMaybe<Block_Metadata_Transactions_Bool_Exp>;
+};
+
+
+export type Subscription_RootBlock_Metadata_Transactions_By_PkArgs = {
+  version: Scalars['bigint'];
+};
+
+
+export type Subscription_RootBlock_Metadata_Transactions_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Block_Metadata_Transactions_Stream_Cursor_Input>>;
+  where?: InputMaybe<Block_Metadata_Transactions_Bool_Exp>;
+};
+
+
 export type Subscription_RootCoin_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Coin_Activities_Order_By>>;
+  where?: InputMaybe<Coin_Activities_Bool_Exp>;
+};
+
+
+export type Subscription_RootCoin_Activities_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Coin_Activities_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -4689,6 +5286,27 @@ export type Subscription_RootCurrent_Collections_V2_StreamArgs = {
 };
 
 
+export type Subscription_RootCurrent_Delegated_Staking_Pool_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegated_Staking_Pool_Balances_Order_By>>;
+  where?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Delegated_Staking_Pool_Balances_By_PkArgs = {
+  staking_pool_address: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Delegated_Staking_Pool_Balances_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Delegated_Staking_Pool_Balances_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
+};
+
+
 export type Subscription_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -4702,6 +5320,7 @@ export type Subscription_RootCurrent_Delegator_Balances_By_PkArgs = {
   delegator_address: Scalars['String'];
   pool_address: Scalars['String'];
   pool_type: Scalars['String'];
+  table_handle: Scalars['String'];
 };
 
 
@@ -4926,6 +5545,22 @@ export type Subscription_RootDelegated_Staking_Pools_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Delegated_Staking_Pools_Stream_Cursor_Input>>;
   where?: InputMaybe<Delegated_Staking_Pools_Bool_Exp>;
+};
+
+
+export type Subscription_RootDelegator_Distinct_PoolArgs = {
+  distinct_on?: InputMaybe<Array<Delegator_Distinct_Pool_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegator_Distinct_Pool_Order_By>>;
+  where?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
+};
+
+
+export type Subscription_RootDelegator_Distinct_Pool_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Delegator_Distinct_Pool_Stream_Cursor_Input>>;
+  where?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
 };
 
 

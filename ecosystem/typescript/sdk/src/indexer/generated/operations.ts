@@ -86,7 +86,7 @@ export type GetNumberOfDelegatorsQueryVariables = Types.Exact<{
 export type GetNumberOfDelegatorsQuery = { __typename?: 'query_root', num_active_delegator_per_pool: Array<{ __typename?: 'num_active_delegator_per_pool', num_active_delegator?: any | null }> };
 
 export type GetOwnedTokensQueryVariables = Types.Exact<{
-  address: Types.Scalars['String'];
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;
@@ -118,8 +118,7 @@ export type GetTokenDataQueryVariables = Types.Exact<{
 export type GetTokenDataQuery = { __typename?: 'query_root', current_token_datas: Array<{ __typename?: 'current_token_datas', token_data_id_hash: string, name: string, collection_name: string, creator_address: string, default_properties: any, largest_property_version: any, maximum: any, metadata_uri: string, payee_address: string, royalty_points_denominator: any, royalty_points_numerator: any, supply: any }> };
 
 export type GetTokenOwnedFromCollectionQueryVariables = Types.Exact<{
-  collection_id: Types.Scalars['String'];
-  owner_address: Types.Scalars['String'];
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;

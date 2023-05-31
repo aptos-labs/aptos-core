@@ -326,21 +326,42 @@ export class IndexerClient {
   /**
    * Queries account's current owned tokens.
    * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
-   *
+   * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
+   * @example An example of how to pass a specific token standard
+   * ```
+   * {
+   *    tokenStandard:"v2"
+   * }
+   * ```
    * @param ownerAddress The token owner address we want to get the tokens for
    * @returns GetOwnedTokensQuery response type
    */
   async getOwnedTokens(
     ownerAddress: MaybeHexString,
     extraArgs?: {
+      tokenStandard?: TokenStandard;
       options?: PaginationArgs;
     },
   ): Promise<GetOwnedTokensQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      owner_address: { _eq: address },
+      amount: { _gt: 0 },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
     const graphqlQuery = {
       query: GetOwnedTokens,
-      variables: { address, offset: extraArgs?.options?.offset, limit: extraArgs?.options?.limit },
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+      },
     };
     return this.queryIndexer(graphqlQuery);
   }
@@ -366,11 +387,20 @@ export class IndexerClient {
     const collectionHexAddress = HexString.ensure(collectionAddress).hex();
     IndexerClient.validateAddress(collectionHexAddress);
 
+    const whereCondition: any = {
+      owner_address: { _eq: ownerHexAddress },
+      current_token_data: { collection_id: { _eq: collectionHexAddress } },
+      amount: { _gt: 0 },
+    };
+
+    if (extraArgs?.tokenStandard) {
+      whereCondition.token_standard = { _eq: extraArgs?.tokenStandard };
+    }
+
     const graphqlQuery = {
       query: GetTokenOwnedFromCollection,
       variables: {
-        collection_id: collectionHexAddress,
-        owner_address: ownerHexAddress,
+        where_condition: whereCondition,
         offset: extraArgs?.options?.offset,
         limit: extraArgs?.options?.limit,
       },
@@ -460,6 +490,12 @@ export class IndexerClient {
       .collection_id;
   }
 
+  /**
+   * Queries for all collections that an account has tokens for.
+   *
+   * @param ownerAddress the account address that owns the tokens
+   * @returns the collection address
+   */
   async getCollectionsWithOwnedTokens(
     ownerAddress: MaybeHexString,
     extraArgs?: {
@@ -475,8 +511,7 @@ export class IndexerClient {
     };
 
     if (extraArgs?.tokenStandard) {
-      whereCondition.current_collection = {};
-      whereCondition.current_collection.token_standard = { _eq: extraArgs?.tokenStandard };
+      whereCondition.current_collection = { token_standard: { _eq: extraArgs?.tokenStandard } };
     }
 
     const graphqlQuery = {

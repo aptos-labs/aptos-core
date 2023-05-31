@@ -206,9 +206,9 @@ export const GetNumberOfDelegators = `
 }
     `;
 export const GetOwnedTokens = `
-    query getOwnedTokens($address: String!, $offset: Int, $limit: Int) {
+    query getOwnedTokens($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
-    where: {owner_address: {_eq: $address}, amount: {_gt: 0}}
+    where: $where_condition
     offset: $offset
     limit: $limit
   ) {
@@ -268,9 +268,9 @@ export const GetTokenData = `
 }
     `;
 export const GetTokenOwnedFromCollection = `
-    query getTokenOwnedFromCollection($collection_id: String!, $owner_address: String!, $offset: Int, $limit: Int) {
+    query getTokenOwnedFromCollection($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
-    where: {owner_address: {_eq: $owner_address}, current_token_data: {collection_id: {_eq: $collection_id}}, amount: {_gt: 0}}
+    where: $where_condition
     offset: $offset
     limit: $limit
   ) {
