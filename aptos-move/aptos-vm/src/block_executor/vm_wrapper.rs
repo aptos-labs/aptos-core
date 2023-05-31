@@ -70,9 +70,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             aggregator_enabled,
         ) {
             Ok((vm_status, vm_output, sender)) => {
-                if matches!(txn, PreprocessedTransaction::UserTransaction(_)) && !aggregator_enabled {
-                    assert!(vm_output.delta_change_set().is_empty());
-                }
+                // If aggregators are disabled for user transactions, then delta_change_set should be empty as there should not be any delta outputs.
+                assert!(
+                    aggregator_enabled
+                        || !matches!(txn, PreprocessedTransaction::UserTransaction(_))
+                        || vm_output.delta_change_set().is_empty()
+                );
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(
