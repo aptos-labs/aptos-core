@@ -373,6 +373,7 @@ impl AptosVMImpl {
         session: &mut SessionExt,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        gas_payer_tx: bool,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
         let txn_sequence_number = txn_data.sequence_number();
@@ -390,7 +391,7 @@ impl AptosVMImpl {
         let args = if txn_data.is_multi_agent() {
             vec![
                 MoveValue::Signer(txn_data.sender),
-                MoveValue::U64(txn_sequence_number),
+                MoveValue::U64(txn_sequence_number | if gas_payer_tx { 1u64 << 63 } else { 0x0 }),
                 MoveValue::vector_u8(txn_authentication_key),
                 MoveValue::vector_address(txn_data.secondary_signers()),
                 MoveValue::Vector(secondary_auth_keys),

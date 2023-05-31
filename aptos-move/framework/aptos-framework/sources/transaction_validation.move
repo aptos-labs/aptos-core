@@ -65,6 +65,7 @@ module aptos_framework::transaction_validation {
 
     fun prologue_common(
         sender: signer,
+        gas_payer: address,
         txn_sequence_number: u64,
         txn_authentication_key: vector<u8>,
         txn_gas_price: u64,
@@ -105,10 +106,10 @@ module aptos_framework::transaction_validation {
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         assert!(
-            coin::is_account_registered<AptosCoin>(transaction_sender),
+            coin::is_account_registered<AptosCoin>(gas_payer),
             error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
-        let balance = coin::balance<AptosCoin>(transaction_sender);
+        let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
@@ -121,7 +122,8 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+        let gas_payer = signer::address_of(&sender);
+        prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun script_prologue(
@@ -134,7 +136,8 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         _script_hash: vector<u8>,
     ) {
-        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+        let gas_payer = signer::address_of(&sender);
+        prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun multi_agent_script_prologue(
@@ -148,7 +151,12 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        prologue_common(sender, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
+        let gas_payer = signer::address_of(&sender);
+        if (txn_sequence_number & (1u64 << 63) != 0) {
+            gas_payer = *std::vector::borrow(&secondary_signer_addresses, std::vector::length(&secondary_signer_addresses) - 1);
+            txn_sequence_number = txn_sequence_number & ((1u64 << 63) - 1);
+        };
+        prologue_common(sender, gas_payer, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
 
         let num_secondary_signers = vector::length(&secondary_signer_addresses);
 

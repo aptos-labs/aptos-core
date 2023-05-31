@@ -96,11 +96,11 @@ pub(crate) fn get_allowed_structs(
 /// after validation, add senders and non-signer arguments to generate the final args
 pub(crate) fn validate_combine_signer_and_txn_args(
     session: &mut SessionExt,
-    senders: Vec<AccountAddress>,
+    mut senders: Vec<AccountAddress>,
     args: Vec<Vec<u8>>,
     func: &LoadedFunctionInstantiation,
     are_struct_constructors_enabled: bool,
-) -> Result<Vec<Vec<u8>>, VMStatus> {
+) -> Result<(Vec<Vec<u8>>, AccountAddress), VMStatus> {
     // entry function should not return
     if !func.return_.is_empty() {
         return Err(VMStatus::Error(
@@ -148,14 +148,26 @@ pub(crate) fn validate_combine_signer_and_txn_args(
             None,
         ));
     }
+    let mut gas_payer = senders[0].clone();
+
     // if function doesn't require signer, we reuse txn args
     // if the function require signer, we check senders number same as signers
     // and then combine senders with txn args.
     let mut combined_args = if signer_param_cnt == 0 {
+        if senders.len() > 2 {
+            return Err(VMStatus::Error(
+                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+                None,
+            ));
+        } else if senders.len() == 2 {
+            gas_payer = senders[1];
+        }
         args
     } else {
         // the number of txn senders should be the same number of signers
-        if senders.len() != signer_param_cnt {
+        if senders.len() == signer_param_cnt + 1 {
+            gas_payer = senders.pop().unwrap();
+        } else if senders.len() != signer_param_cnt {
             return Err(VMStatus::Error(
                 StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
                 None,
@@ -176,7 +188,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
             allowed_structs,
         )?;
     }
-    Ok(combined_args)
+    Ok((combined_args, gas_payer))
 }
 
 // Return whether the argument is valid/allowed and whether it needs construction.

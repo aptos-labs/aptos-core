@@ -365,7 +365,7 @@ impl AptosVM {
             .0
             .get_features()
             .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+        let (args, gas_payer) = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
             script_fn.args().to_vec(),
@@ -409,7 +409,7 @@ impl AptosVM {
                     senders.extend(txn_data.secondary_signers());
                     let loaded_func =
                         session.load_script(script.code(), script.ty_args().to_vec())?;
-                    let args =
+                    let (args, gas_payer) =
                         verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                             &mut session,
                             senders,
@@ -1193,7 +1193,7 @@ impl AptosVM {
 
                 let loaded_func =
                     tmp_session.load_script(script.code(), script.ty_args().to_vec())?;
-                let args =
+                let (args, gas_payer) =
                     verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
                         &mut tmp_session,
                         senders,
@@ -1399,22 +1399,23 @@ impl AptosVM {
         // Whether the prologue is run as part of tx simulation.
         is_simulation: bool,
     ) -> Result<(), VMStatus> {
+        let has_gas_payer = false;
         match payload {
             TransactionPayload::Script(_) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0.run_script_prologue(session, txn_data, log_context)
+                self.0.run_script_prologue(session, txn_data, log_context, has_gas_payer)
             },
             TransactionPayload::EntryFunction(_) => {
                 // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(resolver, txn_data, log_context)?;
-                self.0.run_script_prologue(session, txn_data, log_context)
+                self.0.run_script_prologue(session, txn_data, log_context, has_gas_payer)
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 self.0.check_gas(resolver, txn_data, log_context)?;
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
-                self.0.run_script_prologue(session, txn_data, log_context)?;
+                self.0.run_script_prologue(session, txn_data, log_context, false)?;
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
