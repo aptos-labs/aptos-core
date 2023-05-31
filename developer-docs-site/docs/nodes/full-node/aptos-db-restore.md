@@ -20,7 +20,9 @@ Our CLI supports restoring a database using backup files. It reads from the back
 
 The command restores the database from the closest snapshot to the target version. This command can quickly restore a database to a target version, but it does not restore all the transaction history from the past.
 
-:::Prerequisite Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install).:::
+:::Prerequisite
+Depending on whether you use AWS or Google Cloud, you may need to follow the instructions to install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) or [gsutil](https://cloud.google.com/storage/docs/gsutil_install).
+:::
 
 Here is an example command:
 
@@ -59,9 +61,9 @@ The backup files are created by continuously querying a local fullnode and stori
 
 The backup files consist of three types of data that can be used to reconstruct the blockchain DB:
 
-- `epoch_ending`: It contains the ledger_info at the ending block of each epoch since the genesis. This data can be used to prove the epoch's provenance from the genesis and validator set of each epoch.
-- `state_snapshot`: It contains a snapshot of the blockchain's state Merkle tree (SMT) and key values at a certain version.
-- `transaction`: It contains the raw transaction metadata, payload, the executed outputs of the transaction after VM, and the cryptographic proof of the transaction in the ledger history.
+- `epoch_ending` – It contains the ledger_info at the ending block of each epoch since the genesis. This data can be used to prove the epoch's provenance from the genesis and validator set of each epoch.
+- `state_snapshot` – It contains a snapshot of the blockchain's state Merkle tree (SMT) and key values at a certain version.
+- `transaction` – It contains the raw transaction metadata, payload, the executed outputs of the transaction after VM, and the cryptographic proof of the transaction in the ledger history.
 
 Each type of data in the backup storage is organized as follows:
 - The metadata file in the metadata folder contains the range of each backup and the relative path to the backup folder. 
