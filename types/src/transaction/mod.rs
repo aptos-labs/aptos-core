@@ -555,12 +555,20 @@ impl SignedTransaction {
         self.authenticator.clone()
     }
 
+    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
+        &self.authenticator
+    }
+
     pub fn sender(&self) -> AccountAddress {
         self.raw_txn.sender
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
         self.raw_txn
+    }
+
+    pub fn raw_transaction_ref(&self) -> &RawTransaction {
+        &self.raw_txn
     }
 
     pub fn sequence_number(&self) -> u64 {
