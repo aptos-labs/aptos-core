@@ -70,10 +70,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             aggregator_enabled,
         ) {
             Ok((vm_status, vm_output, sender)) => {
-                if let PreprocessedTransaction::UserTransaction(_) = txn {
-                    if !aggregator_enabled {
-                        assert!(vm_output.delta_change_set().is_empty());
-                    }
+                if matches!(txn, PreprocessedTransaction::UserTransaction(_)) && !aggregator_enabled {
+                    assert!(vm_output.delta_change_set().is_empty());
                 }
                 if vm_output.status().is_discarded() {
                     match sender {
