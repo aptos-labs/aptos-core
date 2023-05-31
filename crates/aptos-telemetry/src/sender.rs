@@ -26,7 +26,8 @@ use uuid::Uuid;
 
 pub const DEFAULT_VERSION_PATH_BASE: &str = "api/v1/";
 
-pub const PROMETHEUS_PUSH_METRICS_TIMEOUT_SECS: u64 = 10;
+pub const PROMETHEUS_PUSH_METRICS_TIMEOUT_SECS: u64 = 8;
+pub const TELEMETRY_SERVICE_TOTAL_RETRY_DURATION_SECS: u64 = 10;
 
 struct AuthContext {
     noise_config: Option<NoiseConfig>,
@@ -58,7 +59,7 @@ pub(crate) struct TelemetrySender {
 
 impl TelemetrySender {
     pub fn new(base_url: Url, chain_id: ChainId, node_config: &NodeConfig) -> Self {
-        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+        let retry_policy = ExponentialBackoff::builder().build_with_total_retry_duration(Duration::from_secs(TELEMETRY_SERVICE_TOTAL_RETRY_DURATION_SECS));
 
         let reqwest_client = reqwest::Client::new();
         let client = ClientBuilder::new(reqwest_client)
