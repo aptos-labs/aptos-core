@@ -23,9 +23,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, NoOpChangeSetChecker, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionOutput, TransactionPayload,
-        TransactionStatus, WriteSetPayload,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -57,7 +57,7 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
 
 pub struct MockVM;
 
-impl TransactionBlockExecutor<Transaction> for MockVM {
+impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
@@ -394,9 +394,10 @@ fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
 }
 
 pub fn encode_reconfiguration_transaction() -> Transaction {
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(
-        ChangeSet::new(WriteSet::default(), vec![], &NoOpChangeSetChecker).unwrap(),
-    ))
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
+        WriteSet::default(),
+        vec![],
+    )))
 }
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {

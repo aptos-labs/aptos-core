@@ -19,6 +19,7 @@ members = [
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
+    "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -370,6 +371,7 @@ aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
+aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
@@ -422,8 +424,8 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.0.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
-diesel_migrations = { version = "2.0.0", features = ["postgres"] }
+diesel = { version = "2.1.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
@@ -520,7 +522,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
-rocksdb = { version = "0.20.1", features = ["lz4"] }
+rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 sha-1 = "0.10.0"
@@ -627,14 +629,14 @@ inherits = "release"
 opt-level = 3
 debug = true
 overflow-checks = true
-lto = true
+lto = "thin"
 codegen-units = 1
 
 [profile.cli]
 inherits = "release"
 debug = false
 opt-level = "z"
-lto = true
+lto = "thin"
 strip = true
 codegen-units = 1
 
