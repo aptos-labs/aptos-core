@@ -63,7 +63,7 @@ The backup files consist of three types of data that can be used to reconstruct 
 
 Each type of data in the backup storage is organized in the following way. The metadata file in the metadata folder contains the range of each backup and the relative path to the backup folder. The backup contains a manifest file and all the actual chunked data files.
 
-![aptos-db-restore.png](../../static/img/docs/aptos-db-restore.png)
+![aptos-db-restore.png](../../../static/img/docs/aptos-db-restore.png)
 
 The Aptos Labs maintains a few publicly accessible database backups in Amazon S3 and Google Cloud Storage. You can access these data files as follows:
 
