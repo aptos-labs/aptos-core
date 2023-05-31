@@ -9,6 +9,7 @@ use crate::{
     monitor,
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -58,6 +59,7 @@ pub struct ExecutionProxy {
     payload_manager: Mutex<Option<Arc<PayloadManager>>>,
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
+    transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
 }
 
 impl ExecutionProxy {
@@ -92,6 +94,7 @@ impl ExecutionProxy {
             payload_manager: Mutex::new(None),
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
+            transaction_deduper: Mutex::new(None),
         }
     }
 }
@@ -119,10 +122,12 @@ impl StateComputer for ExecutionProxy {
         );
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
 
-        let shuffled_txns = txn_shuffler.shuffle(txns);
+        let deduped_txns = txn_deduper.dedup(txns);
+        let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
         let block_gas_limit = *self.maybe_block_gas_limit.lock();
 
@@ -183,6 +188,7 @@ impl StateComputer for ExecutionProxy {
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
 
         let payload_manager = self.payload_manager.lock().as_ref().unwrap().clone();
+        let txn_deduper = self.transaction_deduper.lock().as_ref().unwrap().clone();
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
 
         let block_gas_limit = *self.maybe_block_gas_limit.lock();
@@ -195,7 +201,8 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let shuffled_txns = txn_shuffler.shuffle(signed_txns);
+            let deduped_txns = txn_deduper.dedup(signed_txns);
+            let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
@@ -295,6 +302,7 @@ impl StateComputer for ExecutionProxy {
         payload_manager: Arc<PayloadManager>,
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
+        transaction_deduper: Arc<dyn TransactionDeduper>,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -305,6 +313,7 @@ impl StateComputer for ExecutionProxy {
             .lock()
             .replace(transaction_shuffler);
         *self.maybe_block_gas_limit.lock() = block_gas_limit;
+        self.transaction_deduper.lock().replace(transaction_deduper);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -317,11 +326,17 @@ impl StateComputer for ExecutionProxy {
 
 #[tokio::test]
 async fn test_commit_sync_race() {
-    use crate::{error::MempoolError, transaction_shuffler::create_transaction_shuffler};
+    use crate::{
+        error::MempoolError, transaction_deduper::create_transaction_deduper,
+        transaction_shuffler::create_transaction_shuffler,
+    };
     use aptos_consensus_notifications::Error;
     use aptos_types::{
-        aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
-        on_chain_config::TransactionShufflerType, transaction::SignedTransaction,
+        aggregate_signature::AggregateSignature,
+        block_info::BlockInfo,
+        ledger_info::LedgerInfo,
+        on_chain_config::{TransactionDeduperType, TransactionShufflerType},
+        transaction::SignedTransaction,
     };
 
     struct RecordedCommit {
@@ -423,6 +438,7 @@ async fn test_commit_sync_race() {
         Arc::new(PayloadManager::DirectMempool),
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         None,
+        create_transaction_deduper(TransactionDeduperType::NoDedup),
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

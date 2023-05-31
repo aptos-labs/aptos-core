@@ -147,6 +147,7 @@ impl BlockAptosVM {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
+        // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
