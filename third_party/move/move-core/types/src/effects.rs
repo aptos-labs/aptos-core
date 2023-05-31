@@ -73,8 +73,8 @@ impl<T> Op<T> {
 /// A collection of resource and module operations on a Move account.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AccountChanges<Module, Resource> {
-    modules: BTreeMap<Identifier, Op<M>>,
-    resources: BTreeMap<StructTag, Op<R>>,
+    modules: BTreeMap<Identifier, Op<Module>>,
+    resources: BTreeMap<StructTag, Op<Resource>>,
 }
 
 /// This implements an algorithm to squash two change sets together by merging pairs of operations
@@ -128,8 +128,8 @@ where
 
 impl<Module, Resource> AccountChanges<Module, Resource> {
     pub fn from_modules_resources(
-        modules: BTreeMap<Identifier, Op<M>>,
-        resources: BTreeMap<StructTag, Op<R>>,
+        modules: BTreeMap<Identifier, Op<Module>>,
+        resources: BTreeMap<StructTag, Op<Resource>>,
     ) -> Self {
         Self { modules, resources }
     }
@@ -142,7 +142,7 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
         }
     }
 
-    pub fn add_module_op(&mut self, name: Identifier, op: Op<M>) -> Result<()> {
+    pub fn add_module_op(&mut self, name: Identifier, op: Op<Module>) -> Result<()> {
         use btree_map::Entry::*;
 
         match self.modules.entry(name) {
@@ -155,7 +155,7 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
         Ok(())
     }
 
-    pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<R>) -> Result<()> {
+    pub fn add_resource_op(&mut self, struct_tag: StructTag, op: Op<Resource>) -> Result<()> {
         use btree_map::Entry::*;
 
         match self.resources.entry(struct_tag) {
@@ -168,23 +168,28 @@ impl<Module, Resource> AccountChanges<Module, Resource> {
         Ok(())
     }
 
-    pub fn into_inner(self) -> (BTreeMap<Identifier, Op<M>>, BTreeMap<StructTag, Op<R>>) {
+    pub fn into_inner(
+        self,
+    ) -> (
+        BTreeMap<Identifier, Op<Module>>,
+        BTreeMap<StructTag, Op<Resource>>,
+    ) {
         (self.modules, self.resources)
     }
 
-    pub fn into_resources(self) -> BTreeMap<StructTag, Op<R>> {
+    pub fn into_resources(self) -> BTreeMap<StructTag, Op<Resource>> {
         self.resources
     }
 
-    pub fn into_modules(self) -> BTreeMap<Identifier, Op<M>> {
+    pub fn into_modules(self) -> BTreeMap<Identifier, Op<Module>> {
         self.modules
     }
 
-    pub fn modules(&self) -> &BTreeMap<Identifier, Op<M>> {
+    pub fn modules(&self) -> &BTreeMap<Identifier, Op<Module>> {
         &self.modules
     }
 
-    pub fn resources(&self) -> &BTreeMap<StructTag, Op<R>> {
+    pub fn resources(&self) -> &BTreeMap<StructTag, Op<Resource>> {
         &self.resources
     }
 
@@ -251,7 +256,7 @@ impl<Module, Resource> Changes<Module, Resource> {
         }
     }
 
-    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<M>) -> Result<()> {
+    pub fn add_module_op(&mut self, module_id: ModuleId, op: Op<Module>) -> Result<()> {
         let account = self.get_or_insert_account_changeset(*module_id.address());
         account.add_module_op(module_id.name().to_owned(), op)
     }
@@ -260,7 +265,7 @@ impl<Module, Resource> Changes<Module, Resource> {
         &mut self,
         addr: AccountAddress,
         struct_tag: StructTag,
-        op: Op<R>,
+        op: Op<Resource>,
     ) -> Result<()> {
         let account = self.get_or_insert_account_changeset(addr);
         account.add_resource_op(struct_tag, op)
@@ -280,7 +285,7 @@ impl<Module, Resource> Changes<Module, Resource> {
         Ok(())
     }
 
-    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<M>)> {
+    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Op<Module>)> {
         self.accounts.into_iter().flat_map(|(addr, account)| {
             account
                 .modules
@@ -289,7 +294,7 @@ impl<Module, Resource> Changes<Module, Resource> {
         })
     }
 
-    pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&M>)> {
+    pub fn modules(&self) -> impl Iterator<Item = (AccountAddress, &Identifier, Op<&Module>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
             account
@@ -299,7 +304,7 @@ impl<Module, Resource> Changes<Module, Resource> {
         })
     }
 
-    pub fn resources(&self) -> impl Iterator<Item = (AccountAddress, &StructTag, Op<&R>)> {
+    pub fn resources(&self) -> impl Iterator<Item = (AccountAddress, &StructTag, Op<&Resource>)> {
         self.accounts.iter().flat_map(|(addr, account)| {
             let addr = *addr;
             account

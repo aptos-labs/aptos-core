@@ -84,7 +84,7 @@ impl<'r> TransactionDataCache<'r> {
     /// produced effects for resources.
     pub(crate) fn into_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<R>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
         loader: &Loader,
     ) -> PartialVMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
         let mut change_set = Changes::new();
