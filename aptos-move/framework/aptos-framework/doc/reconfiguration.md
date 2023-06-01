@@ -24,6 +24,7 @@ to synchronize configuration changes for the validators.
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `disable_reconfiguration`](#@Specification_1_disable_reconfiguration)
     -  [Function `enable_reconfiguration`](#@Specification_1_enable_reconfiguration)
+    -  [Function `reconfigure_with_signer`](#@Specification_1_reconfigure_with_signer)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
     -  [Function `last_reconfiguration_time`](#@Specification_1_last_reconfiguration_time)
     -  [Function `current_epoch`](#@Specification_1_current_epoch)
@@ -588,6 +589,28 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 <pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_reconfigure_with_signer"></a>
+
+### Function `reconfigure_with_signer`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_with_signer">reconfigure_with_signer</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
+<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
+<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+<b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
