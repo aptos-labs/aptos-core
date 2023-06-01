@@ -91,12 +91,13 @@ export class AccountAddress {
    */
   static standardizeAddress(address: string): string {
     // Convert the address to lowercase
-    address = address.toLowerCase();
+    const lowercaseAddress = address.toLowerCase();
     // Remove the "0x" prefix if present
-    const addressWithoutPrefix = address.startsWith("0x") ? address.slice(2) : address;
-    // Pad the address with leading zeros if necessary to ensure it has exactly 64 characters (excluding the "0x" prefix)
+    const addressWithoutPrefix = lowercaseAddress.startsWith("0x") ? lowercaseAddress.slice(2) : lowercaseAddress;
+    // Pad the address with leading zeros if necessary
+    // to ensure it has exactly 64 characters (excluding the "0x" prefix)
     const addressWithPadding = addressWithoutPrefix.padStart(64, "0");
     // Return the standardized address with the "0x" prefix
-    return "0x" + addressWithPadding;
+    return `0x${addressWithPadding}`;
   }
 }

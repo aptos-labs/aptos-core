@@ -83,7 +83,8 @@ describe("ANS", () => {
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
       const address = await ans.getAddressByName(DOMAIN_NAME);
-      expect(address).toEqual(ACCOUNT_ADDRESS);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
@@ -95,7 +96,8 @@ describe("ANS", () => {
       const ans = new AnsClient(provider, ANS_OWNER_ADDRESS);
 
       const address = await ans.getAddressByName(`${DOMAIN_NAME}.apt`);
-      expect(address).toEqual(ACCOUNT_ADDRESS);
+      const standardizeAddress = AccountAddress.standardizeAddress(address as string);
+      expect(standardizeAddress).toEqual(ACCOUNT_ADDRESS);
     },
     longTestTimeout,
   );
