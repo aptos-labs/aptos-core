@@ -1874,6 +1874,8 @@ dependencies = [
 name = "aptos-ledger"
 version = "0.2.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-types",
  "hex",
  "ledger-apdu",
  "ledger-transport-hid",
