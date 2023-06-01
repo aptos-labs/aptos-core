@@ -59,7 +59,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
             accurate_byte_count: Cell::new(false),
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
-        if gas_config(&s).1 >= 8 {
+        if gas_config(&s).1 >= 9 {
             s.accurate_byte_count.set(true);
         };
         s
