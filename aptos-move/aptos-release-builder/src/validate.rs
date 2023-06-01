@@ -375,7 +375,7 @@ async fn execute_release(
             dir.as_path()
         } else {
             scripts_path.path()
-        }
+        },
     )?;
 
     for proposal in release_config.proposals {
