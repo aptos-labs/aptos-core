@@ -30,7 +30,7 @@ import shutil
 import sys
 
 from cases.account import test_account_create, test_account_fund_with_faucet
-from cases.init import test_init
+from cases.init import test_init, test_metrics_accessible
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -96,6 +96,9 @@ def parse_args():
 
 
 def run_tests(run_helper):
+    # Make sure the metrics port is accessible.
+    test_metrics_accessible(run_helper)
+
     # Run init tests. We run these first to set up the CLI.
     test_init(run_helper)
 
