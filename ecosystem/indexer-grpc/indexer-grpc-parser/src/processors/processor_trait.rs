@@ -9,7 +9,7 @@ use crate::{
         database::{execute_with_better_error, PgDbPool, PgPoolConnection},
     },
 };
-use aptos_protos::transaction::testing1::v1::Transaction as ProtoTransaction;
+use aptos_protos::transaction::v1::Transaction as ProtoTransaction;
 use async_trait::async_trait;
 use diesel::{pg::upsert::excluded, prelude::*};
 use std::fmt::Debug;
@@ -49,7 +49,7 @@ pub trait ProcessorTrait: Send + Sync + Debug {
                 },
                 Err(err) => {
                     UNABLE_TO_GET_CONNECTION_COUNT.inc();
-                    aptos_logger::error!(
+                    tracing::error!(
                         "Could not get DB connection from pool, will retry in {:?}. Err: {:?}",
                         pool.connection_timeout(),
                         err

@@ -1,0 +1,111 @@
+# This compose file defines the services needed to run the indexer-grpc
+# It requires a redis instance to be running, and will start the following
+# services:
+# - indexer-grpc-cache-worker
+# - indexer-grpc-file-store (with the local file store on a docker volume)
+# - indexer-grpc-data-service
+# 
+# The indexer-grpc also requires a fullnode to be running with the indexer-grpc
+# feature enabled. This can be done using the `validator-testing` compose file
+# which starts with a local single-node network. The shared docker network
+# then connects the two compose files together.
+#
+# To start the services, run `docker-compose up -d`
+version: "3.8"
+services:
+  redis:
+    image: ${REDIS_IMAGE_REPO:-redis}:6.2
+    networks:
+      shared:
+        ipv4_address:  172.16.1.12
+    restart: unless-stopped
+    expose:
+      - 6379
+    ports:
+      - 6379:6379
+
+  redis-replica:
+    image: ${REDIS_IMAGE_REPO:-redis}:6.2
+    command: redis-server --replicaof redis 6379
+    networks:
+      shared:
+        ipv4_address:  172.16.1.22
+    restart: unless-stopped
+    expose:
+      - 6379
+    depends_on:
+      - redis
+
+  indexer-grpc-cache-worker:
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    networks:
+      shared:
+        ipv4_address:  172.16.1.13
+    restart: unless-stopped
+    volumes:
+      - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139
+        source: indexer-grpc-file-store
+        target: /opt/aptos/file-store
+      - type: bind
+        source: ./cache-worker-config.yaml
+        target: /opt/aptos/cache-worker-config.yaml
+    command:
+      - '/usr/local/bin/aptos-indexer-grpc-cache-worker'
+      - '--config-path'
+      - '/opt/aptos/cache-worker-config.yaml'
+    depends_on:
+      - redis
+
+  indexer-grpc-file-store:
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    networks:
+      shared:
+        ipv4_address:  172.16.1.14
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: indexer-grpc-file-store
+        target: /opt/aptos/file-store
+      - type: bind
+        source: ./file-store-config.yaml
+        target: /opt/aptos/file-store-config.yaml
+    command:
+      - '/usr/local/bin/aptos-indexer-grpc-file-store'
+      - '--config-path'
+      - '/opt/aptos/file-store-config.yaml'
+    depends_on:
+      - indexer-grpc-cache-worker
+
+  indexer-grpc-data-service:
+    image: "${INDEXER_GRPC_IMAGE_REPO:-aptoslabs/indexer-grpc}:${IMAGE_TAG:-devnet}"
+    networks:
+      shared:
+        ipv4_address:  172.16.1.15
+    restart: unless-stopped
+    volumes:
+      - type: volume # XXX: needed now before refactor https://github.com/aptos-labs/aptos-core/pull/8139
+        source: indexer-grpc-file-store
+        target: /opt/aptos/file-store
+      - type: bind
+        source: ./data-service-config.yaml
+        target: /opt/aptos/data-service-config.yaml
+    command:
+      - '/usr/local/bin/aptos-indexer-grpc-data-service'
+      - '--config-path'
+      - '/opt/aptos/data-service-config.yaml'
+    ports:
+      - "50052:50052" # GRPC
+      - "18084:8084" # health
+    depends_on:
+      - indexer-grpc-cache-worker
+      - redis-replica
+
+# This joins the indexer-grpc compose with the validator-testnet compose using a shared docker network
+networks:
+  shared:
+    external: true
+    name: "aptos-docker-compose-shared"
+
+volumes:
+  indexer-grpc-file-store:
+    name: indexer-grpc-file-store

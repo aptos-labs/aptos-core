@@ -5,7 +5,7 @@ slug: "testnet-release"
 
 # Latest Testnet Release
 
-The table below contains latest release information for each Aptos component in the testnet network. We also suggest you monitor the [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545) channel of [Aptos Discord](https://discord.gg/aptoslabs) for ongoing updates.
+The table below contains latest release information for each Aptos component in the testnet network. We also suggest you monitor the [#testnet-release](https://discord.com/channels/945856774056083548/1025614160555413545) channel of [Aptos Discord](https://discord.gg/aptosnetwork) for ongoing updates.
 
 See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub notifications and more release-related information.
 
@@ -15,7 +15,7 @@ See the [Latest Aptos Releases](./index.md) index for how to subscribe to GitHub
 
 ## Aptos SDK
 
-Aptos SDK Release v1.8.5
+Aptos SDK Release v1.8.5 check out the change-log [here.](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/typescript/sdk/CHANGELOG.md#185-2023-04-29)
 
 ## Aptos CLI
 
@@ -27,4 +27,4 @@ Aptos SDK Release v1.8.5
 
 |Release | Docker Image Tag | Docker SHA-256 | Branch | Commit Hash|
 |---|---|---|---|---|
-|[Aptos Node Release v1.4.0](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.4.0)| [`aptos-node-v1.4.0`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.4.0/images/sha256-a354732dd4b90bf1776a0b55a8109940124bbc183740aea79b35dd1a164561ff?context=explore) | `sha256:a354732dd4b90bf1776a0b55a8109940124bbc183740aea79b35dd1a164561ff` | [aptos-node-v1.4.0](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.4.0)| `57f8b499aead5adf38276acb585cd2c0de398568` |
+|[Aptos Node Release v1.4.1](https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-v1.4.1)| [`aptos-node-v1.4.1`](https://hub.docker.com/layers/aptoslabs/validator/aptos-node-v1.4.1/images/sha256-c109ab86066fc35cbff5d7f57340ea6da9ed480896d08cd1bbd30c3dec683033?context=explore) | `sha256:c109ab86066fc35cbff5d7f57340ea6da9ed480896d08cd1bbd30c3dec683033` | [aptos-node-v1.4.1](https://github.com/aptos-labs/aptos-core/tree/aptos-node-v1.4.1)| `8731f29f80ee0458d32793f2c818243745ca3904` |

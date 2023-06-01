@@ -24,13 +24,19 @@ use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     proof::accumulator::InMemoryAccumulator,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{
-        Transaction, TransactionInfo, TransactionOutput, TransactionStatus, TransactionToCommit,
+        ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
+        TransactionToCommit,
     },
+    write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::{collections::HashMap, iter::repeat, sync::Arc};
+use std::{
+    collections::HashMap,
+    iter::{once, repeat},
+    sync::Arc,
+};
 
 pub struct ApplyChunkOutput;
 
@@ -38,6 +44,7 @@ impl ApplyChunkOutput {
     pub fn apply_block(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
         let ChunkOutput {
             state_cache,
@@ -48,8 +55,15 @@ impl ApplyChunkOutput {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["sort_transactions"])
                 .start_timer();
-            // Separate transactions with different VM statuses.
-            Self::sort_transactions(transactions, transaction_outputs)?
+            // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
+            // Will return transactions with Retry txns sorted after Keep/Discard txns.
+            // If the transactions contain no reconfiguration txn, will insert the StateCheckpoint txn
+            // at the boundary of Keep/Discard txns and Retry txns.
+            Self::sort_transactions_with_state_checkpoint(
+                transactions,
+                transaction_outputs,
+                append_state_checkpoint_to_block,
+            )?
         };
 
         // Apply the write set, get the latest state.
@@ -59,6 +73,7 @@ impl ApplyChunkOutput {
             result_state,
             next_epoch_state,
             block_state_updates,
+            sharded_state_cache,
         ) = {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["calculate_for_transaction_block"])
@@ -95,6 +110,7 @@ impl ApplyChunkOutput {
                 reconfig_events,
                 transaction_info_hashes,
                 block_state_updates,
+                sharded_state_cache,
             },
             to_discard,
             to_retry,
@@ -104,6 +120,7 @@ impl ApplyChunkOutput {
     pub fn apply_chunk(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         let ChunkOutput {
             state_cache,
@@ -114,8 +131,15 @@ impl ApplyChunkOutput {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["sort_transactions"])
                 .start_timer();
-            // Separate transactions with different VM statuses.
-            Self::sort_transactions(transactions, transaction_outputs)?
+            // Separate transactions with different VM statuses, i.e., Keep, Discard and Retry.
+            // Will return transactions with Retry txns sorted after Keep/Discard txns.
+            // If the transactions contain no reconfiguration txn, will insert the StateCheckpoint txn
+            // at the boundary of Keep/Discard txns and Retry txns.
+            Self::sort_transactions_with_state_checkpoint(
+                transactions,
+                transaction_outputs,
+                append_state_checkpoint_to_block,
+            )?
         };
 
         // Apply the write set, get the latest state.
@@ -154,9 +178,10 @@ impl ApplyChunkOutput {
         ))
     }
 
-    fn sort_transactions(
+    fn sort_transactions_with_state_checkpoint(
         mut transactions: Vec<Transaction>,
         transaction_outputs: Vec<TransactionOutput>,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(
         bool,
         Vec<TransactionStatus>,
@@ -164,7 +189,6 @@ impl ApplyChunkOutput {
         Vec<Transaction>,
         Vec<Transaction>,
     )> {
-        let num_txns = transactions.len();
         let mut transaction_outputs: Vec<ParsedTransactionOutput> =
             transaction_outputs.into_iter().map(Into::into).collect();
         // N.B. off-by-1 intentionally, for exclusive index
@@ -173,29 +197,56 @@ impl ApplyChunkOutput {
             .position(|o| o.is_reconfig())
             .map(|idx| idx + 1);
 
-        // Transactions after the epoch ending are all to be retried.
+        let block_gas_limit_marker = transaction_outputs
+            .iter()
+            .position(|o| matches!(o.status(), TransactionStatus::Retry));
+
+        // Transactions after the epoch ending txn are all to be retried.
+        // Transactions after the txn that exceeded per-block gas limit are also to be retried.
         let to_retry = if let Some(pos) = new_epoch_marker {
+            transaction_outputs.drain(pos..);
+            transactions.drain(pos..).collect()
+        } else if let Some(pos) = block_gas_limit_marker {
             transaction_outputs.drain(pos..);
             transactions.drain(pos..).collect()
         } else {
             vec![]
         };
 
-        // N.B. Transaction status after the epoch marker are ignored and set to Retry forcibly.
-        let status = transaction_outputs
-            .iter()
-            .map(|t| t.status())
-            .cloned()
-            .chain(repeat(TransactionStatus::Retry))
-            .take(num_txns)
-            .collect();
+        let state_checkpoint_to_add =
+            new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
+
+        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+
+        let status = if state_checkpoint_to_add.is_some() {
+            keeps_and_discards
+                .chain(once(TransactionStatus::Keep(ExecutionStatus::Success)))
+                .chain(retries)
+                .collect()
+        } else {
+            keeps_and_discards.chain(retries).collect()
+        };
 
         // Separate transactions with the Keep status out.
-        let (to_keep, to_discard) =
+        let (mut to_keep, to_discard) =
             itertools::zip_eq(transactions.into_iter(), transaction_outputs.into_iter())
                 .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
                     matches!(o.status(), TransactionStatus::Keep(_))
                 });
+
+        // Append the StateCheckpoint transaction to the end of to_keep
+        if let Some(block_id) = state_checkpoint_to_add {
+            let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
+            let state_checkpoint_txn_output: ParsedTransactionOutput =
+                Into::into(TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(ExecutionStatus::Success),
+                ));
+            to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
+        }
 
         // Sanity check transactions with the Discard status:
         let to_discard = to_discard
@@ -290,7 +341,7 @@ impl ApplyChunkOutput {
 
     fn assemble_ledger_diff_for_block(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        state_updates_vec: Vec<HashMap<StateKey, Option<StateValue>>>,
+        state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (
         Vec<Arc<TransactionToCommit>>,

@@ -1,0 +1,22 @@
+[package]
+name = "aptos-ledger"
+description = "Library for integration with the Aptos app on Ledger"
+version = "0.2.0"
+publish = true
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = "https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-ledger"
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+hex = { workspace = true }
+ledger-apdu = "0.10.0"
+ledger-transport-hid = "0.10.0"
+once_cell = { workspace = true }
+thiserror = { workspace = true }

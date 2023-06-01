@@ -17,7 +17,7 @@ use crate::{
         AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
         Operation, PropKind,
     },
-    usage_analysis, verification_analysis,
+    usage_analysis, verification_analysis, COMPILED_MODULE_AVAILABLE,
 };
 use itertools::Itertools;
 use move_model::{
@@ -51,10 +51,7 @@ fn modify_check_fails_message(
     let targs_str = if targs.is_empty() {
         "".to_string()
     } else {
-        let tctx = TypeDisplayContext::WithEnv {
-            env,
-            type_param_names: None,
-        };
+        let tctx = TypeDisplayContext::new(env);
         format!(
             "<{}>",
             targs
@@ -66,7 +63,7 @@ fn modify_check_fails_message(
     let module_env = env.get_module(mem.module_id);
     format!(
         "caller does not have permission to modify `{}::{}{}` at given address",
-        module_env.get_name().display(env.symbol_pool()),
+        module_env.get_name().display(env),
         module_env
             .get_struct(mem.id)
             .get_name()
@@ -214,8 +211,9 @@ impl<'a> Instrumenter<'a> {
         // instruction into `Assign(r.., t..); Jump(RetLab)`.
         let ret_locals = builder
             .data
-            .return_types
+            .result_type
             .clone()
+            .flatten()
             .into_iter()
             .map(|ty| builder.new_temp(ty))
             .collect_vec();
@@ -244,7 +242,7 @@ impl<'a> Instrumenter<'a> {
         );
 
         // Translate inlined properties. This deals with elimination of `old(..)` expressions in
-        // inlined spec blocks
+        // ilined spec blocks
         let inlined_props: BTreeMap<_, _> = props
             .into_iter()
             .map(|(id, prop)| {
@@ -1094,8 +1092,10 @@ fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                check_caller_callee_modifies_relation(env, targets, &fun_env);
-                check_opaque_modifies_completeness(env, targets, &fun_env);
+                if !fun_env.is_inline() {
+                    check_caller_callee_modifies_relation(env, targets, &fun_env);
+                    check_opaque_modifies_completeness(env, targets, &fun_env);
+                }
             }
         }
     }
@@ -1110,8 +1110,11 @@ fn check_caller_callee_modifies_relation(
         return;
     }
     let caller_func_target = targets.get_target(fun_env, &FunctionVariant::Baseline);
-    for callee in fun_env.get_called_functions() {
-        let callee_fun_env = env.get_function(callee);
+    for callee in fun_env
+        .get_called_functions()
+        .expect(COMPILED_MODULE_AVAILABLE)
+    {
+        let callee_fun_env = env.get_function(*callee);
         if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() {
             continue;
         }

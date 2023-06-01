@@ -6,7 +6,9 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
+use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -16,10 +18,19 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use std::time::Duration;
+use once_cell::sync::Lazy;
+use std::{ops::Deref, sync::Arc, time::Duration};
+
+pub static SHARDED_BLOCK_EXECUTOR: Lazy<Arc<Mutex<ShardedBlockExecutor<CachedStateView>>>> =
+    Lazy::new(|| {
+        Arc::new(Mutex::new(ShardedBlockExecutor::new(
+            AptosVM::get_num_shards(),
+            None, // Defaults to num_cpus / num_shards
+        )))
+    });
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -36,8 +47,10 @@ impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block::<V>(transactions.clone(), &state_view)?;
+        let transaction_outputs =
+            Self::execute_block::<V>(transactions.clone(), &state_view, maybe_block_gas_limit)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
@@ -47,6 +60,31 @@ impl ChunkOutput {
         Ok(Self {
             transactions,
             transaction_outputs,
+            state_cache: state_view.into_state_cache(),
+        })
+    }
+
+    pub fn by_transaction_execution_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Self> {
+        let state_view_arc = Arc::new(state_view);
+        let transaction_outputs = Self::execute_block_sharded::<V>(
+            transactions.clone(),
+            state_view_arc.clone(),
+            maybe_block_gas_limit,
+        )?;
+
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+
+        let state_view = Arc::try_unwrap(state_view_arc).unwrap();
+
+        Ok(Self {
+            transactions,
+            transaction_outputs,
+            // Unwrapping here is safe because the execution has finished and it is guaranteed that
+            // the state view is not used anymore.
             state_cache: state_view.into_state_cache(),
         })
     }
@@ -79,23 +117,25 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply_chunk(self, base_view)
+        ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
     }
 
     pub fn apply_to_ledger_for_block(
         self,
         base_view: &ExecutedTrees,
+        append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger_for_block", |_| {
             Err(anyhow::anyhow!(
                 "Injected error in apply_to_ledger_for_block."
             ))
         });
-        ApplyChunkOutput::apply_block(self, base_view)
+        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
     }
 
     pub fn trace_log_transaction_status(&self) {
@@ -111,14 +151,32 @@ impl ChunkOutput {
         }
     }
 
+    fn execute_block_sharded<V: VMExecutor>(
+        transactions: Vec<Transaction>,
+        state_view: Arc<CachedStateView>,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>> {
+        Ok(V::execute_block_sharded(
+            SHARDED_BLOCK_EXECUTOR.lock().deref(),
+            transactions,
+            state_view,
+            maybe_block_gas_limit,
+        )?)
+    }
+
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block(transactions, &state_view)?)
+        Ok(V::execute_block(
+            transactions,
+            &state_view,
+            maybe_block_gas_limit,
+        )?)
     }
 
     /// In consensus-only mode, executes the block of [Transaction]s using the
@@ -129,13 +187,16 @@ impl ChunkOutput {
     fn execute_block<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: &CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
         use aptos_types::write_set::WriteSet;
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
-            StateViewId::Miscellaneous => V::execute_block(transactions, &state_view)?,
+            StateViewId::Miscellaneous => {
+                V::execute_block(transactions, &state_view, maybe_block_gas_limit)?
+            },
             _ => transactions
                 .iter()
                 .map(|_| {

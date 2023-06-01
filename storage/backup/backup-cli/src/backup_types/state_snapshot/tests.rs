@@ -15,7 +15,7 @@ use crate::{
         RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use aptos_db::AptosDB;
+use aptos_db::{state_restore::StateSnapshotRestoreMode, AptosDB};
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use std::{convert::TryInto, sync::Arc};
@@ -78,6 +78,7 @@ fn end_to_end() {
                 manifest_handle,
                 version,
                 validate_modules: false,
+                restore_mode: StateSnapshotRestoreMode::Default,
             },
             GlobalRestoreOpt {
                 dry_run: false,

@@ -1,0 +1,42 @@
+name: "Release aptos-node"
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        type: string
+        required: true
+        description: "The release tag to create. E.g. `aptos-node-v0.2.3`:"
+      branch:
+        type: string
+        required: true
+        description: "The branch to cut the release from"
+      release_title:
+        type: string
+        required: false
+        description: 'Name of the release, e.g. "Aptos Node Release v1.2.3":'
+
+jobs:
+  release-aptos-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+
+      - name: Bump aptos-node version
+        uses: aptos-labs/aptos-core/.github/actions/release-aptos-node@main
+        with:
+          release_tag: ${{ inputs.release_tag }}
+          aptos_node_cargo_toml: aptos-node/Cargo.toml
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@671dc9c9e0c2d73f07fa45a3eb0220e1622f0c5f # pin@v4
+        with:
+          add-paths: aptos-node
+          title: "[aptos-node] update release version"
+          body: Automated release bump for ${{ inputs.release_tag }}. Change the PR base accordingly
+          commit-message: "[aptos-node] update release version"
+          branch: auto-release-${{ inputs.release_tag }}
+          delete-branch: true

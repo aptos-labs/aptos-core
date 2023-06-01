@@ -10,7 +10,7 @@ use crate::{
     schema::{current_token_datas, token_datas},
     utils::util::standardize_address,
 };
-use aptos_protos::transaction::testing1::v1::WriteTableItem;
+use aptos_protos::transaction::v1::WriteTableItem;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -157,7 +157,7 @@ impl TokenData {
                     },
                 )));
             } else {
-                aptos_logger::warn!(
+                tracing::warn!(
                     transaction_version = txn_version,
                     key_type = table_item_data.key_type,
                     key = table_item_data.key,

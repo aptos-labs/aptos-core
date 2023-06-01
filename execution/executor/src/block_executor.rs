@@ -31,31 +31,36 @@ use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
-pub trait TransactionBlockExecutor<T>: Send + Sync {
-    fn execute_transaction_block(
-        transactions: Vec<T>,
-        state_view: CachedStateView,
-    ) -> Result<ChunkOutput>;
-}
-
-impl TransactionBlockExecutor<Transaction> for AptosVM {
+pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<ChunkOutput>;
+}
+
+impl TransactionBlockExecutor for AptosVM {
+    fn execute_transaction_block(
+        transactions: Vec<Transaction>,
+        state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<AptosVM>(
+            transactions,
+            state_view,
+            maybe_block_gas_limit,
+        )
     }
 }
 
-pub struct BlockExecutor<V, T> {
+pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
-    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+    inner: RwLock<Option<BlockExecutorInner<V>>>,
 }
 
-impl<V, T> BlockExecutor<V, T>
+impl<V> BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -80,10 +85,9 @@ where
     }
 }
 
-impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
+impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
@@ -101,15 +105,16 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_block(block, parent_block_id)
+            .execute_block(block, parent_block_id, maybe_block_gas_limit)
     }
 
     fn commit_blocks_ext(
@@ -130,16 +135,15 @@ where
     }
 }
 
-struct BlockExecutorInner<V, T> {
+struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<(V, T)>,
+    phantom: PhantomData<V>,
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
@@ -161,10 +165,9 @@ where
     }
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
@@ -172,8 +175,9 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
@@ -225,14 +229,17 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                V::execute_transaction_block(transactions, state_view)?
+                V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
             };
             chunk_output.trace_log_transaction_status();
 
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                 .with_label_values(&["apply_to_ledger"])
                 .start_timer();
-            let (output, _, _) = chunk_output.apply_to_ledger_for_block(parent_view)?;
+
+            let (output, _, _) = chunk_output
+                .apply_to_ledger_for_block(parent_view, maybe_block_gas_limit.map(|_| block_id))?;
+
             output
         };
         output.ensure_ends_with_state_checkpoint()?;
@@ -331,6 +338,7 @@ where
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
                 block.output.block_state_updates.clone(),
+                &block.output.sharded_state_cache,
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

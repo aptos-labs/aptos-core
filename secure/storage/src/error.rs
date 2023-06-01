@@ -63,13 +63,3 @@ impl From<aptos_vault_client::Error> for Error {
         }
     }
 }
-
-impl From<aptos_github_client::Error> for Error {
-    fn from(error: aptos_github_client::Error) -> Self {
-        match error {
-            aptos_github_client::Error::NotFound(key) => Self::KeyNotSet(key),
-            aptos_github_client::Error::HttpError(403, _, _) => Self::PermissionDenied,
-            _ => Self::InternalError(format!("{}", error)),
-        }
-    }
-}

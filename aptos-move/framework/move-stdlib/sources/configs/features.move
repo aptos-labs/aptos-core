@@ -193,6 +193,10 @@ module std::features {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
+    /// Charge invariant violation error.
+    /// Lifetime: transient
+    const CHARGE_INVARIANT_VIOLATION: u64 = 20;
+
     // ============================================================================================
     // Feature Flag Implementation
 

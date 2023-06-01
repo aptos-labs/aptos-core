@@ -46,19 +46,18 @@ pub(crate) fn gen_li_with_sigs(
     )
 }
 
-pub struct TransactionCommitter<V, T> {
-    executor: Arc<BlockExecutor<V, T>>,
+pub struct TransactionCommitter<V> {
+    executor: Arc<BlockExecutor<V>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
-impl<V, T> TransactionCommitter<V, T>
+impl<V> TransactionCommitter<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(
-        executor: Arc<BlockExecutor<V, T>>,
+        executor: Arc<BlockExecutor<V>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {

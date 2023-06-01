@@ -79,6 +79,8 @@ pub enum AptosErrorCode {
     /// Usually means the block is fully or partially pruned or the height / version is ahead
     /// of the latest version
     BlockNotFound = 108,
+    ///  StateValue not found at the requested version
+    StateValueNotFound = 109,
 
     /// Ledger version is pruned
     VersionPruned = 200,

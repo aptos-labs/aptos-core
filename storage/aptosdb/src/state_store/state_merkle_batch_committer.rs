@@ -104,6 +104,7 @@ impl StateMerkleBatchCommitter {
         let usage_from_ledger_db: StateStorageUsage = self
             .state_db
             .ledger_db
+            .metadata_db()
             .get::<VersionDataSchema>(&version)?
             .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
             .get_state_storage_usage();

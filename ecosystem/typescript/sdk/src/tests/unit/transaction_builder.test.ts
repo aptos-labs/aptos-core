@@ -59,6 +59,35 @@ test("throws when preparing signing message with invalid payload", () => {
   }).toThrow("Unknown transaction type.");
 });
 
+test("gets the signing message", () => {
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(
+      `${ADDRESS_1}::aptos_coin`,
+      "transfer",
+      [],
+      [bcsToBytes(AccountAddress.fromHex(ADDRESS_2)), bcsSerializeUint64(1)],
+    ),
+  );
+
+  const rawTxn = new RawTransaction(
+    AccountAddress.fromHex(new HexString(ADDRESS_3)),
+    BigInt(0),
+    entryFunctionPayload,
+    BigInt(2000),
+    BigInt(0),
+    BigInt(TXN_EXPIRE),
+    new ChainId(4),
+  );
+
+  const message = TransactionBuilder.getSigningMessage(rawTxn);
+
+  expect(message instanceof Uint8Array).toBeTruthy();
+
+  expect(HexString.fromUint8Array(message).hex()).toBe(
+    "0xb5e97db07fa0bd0e5598aa3643a9bc6f6693bddc1a9fec9e674a461eaa00b193000000000000000000000000000000000000000000000000000000000a550c1800000000000000000200000000000000000000000000000000000000000000000000000000000012220a6170746f735f636f696e087472616e7366657200022000000000000000000000000000000000000000000000000000000000000000dd080100000000000000d0070000000000000000000000000000ffffffffffffffff04",
+  );
+});
+
 test("serialize entry function payload with no type args", () => {
   const entryFunctionPayload = new TransactionPayloadEntryFunction(
     EntryFunction.natural(

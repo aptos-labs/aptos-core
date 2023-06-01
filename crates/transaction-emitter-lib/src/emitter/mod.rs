@@ -10,7 +10,7 @@ use crate::emitter::{
     account_minter::AccountMinter,
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
-    transaction_executor::RestApiTransactionExecutor,
+    transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
@@ -558,7 +558,7 @@ impl TxnEmitter {
             init_retries,
             req.init_retry_interval.as_secs_f32()
         );
-        let txn_executor = RestApiTransactionExecutor {
+        let txn_executor = RestApiReliableTransactionSubmitter {
             rest_clients: req.rest_clients.clone(),
             max_retries: init_retries,
             retry_after: req.init_retry_interval,
@@ -572,7 +572,6 @@ impl TxnEmitter {
 
         let (mut txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
-            num_workers,
             &mut all_accounts,
             vec![],
             &txn_executor,

@@ -9,6 +9,7 @@ Module providing debug functionality.
 -  [Constants](#@Constants_0)
 -  [Function `print`](#0x1_debug_print)
 -  [Function `print_stack_trace`](#0x1_debug_print_stack_trace)
+-  [Function `format`](#0x1_debug_format)
 -  [Function `native_print`](#0x1_debug_native_print)
 -  [Function `native_stack_trace`](#0x1_debug_native_stack_trace)
 -  [Specification](#@Specification_1)
@@ -61,7 +62,7 @@ Module providing debug functionality.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print">print</a>&lt;T&gt;(x: &T) {
-    <a href="debug.md#0x1_debug_native_print">native_print</a>(format(x));
+    <a href="debug.md#0x1_debug_native_print">native_print</a>(<a href="debug.md#0x1_debug_format">format</a>(x));
 }
 </code></pre>
 
@@ -86,6 +87,30 @@ Module providing debug functionality.
 
 <pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print_stack_trace">print_stack_trace</a>() {
     <a href="debug.md#0x1_debug_native_print">native_print</a>(<a href="debug.md#0x1_debug_native_stack_trace">native_stack_trace</a>());
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_debug_format"></a>
+
+## Function `format`
+
+
+
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_format">format</a>&lt;T&gt;(x: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="debug.md#0x1_debug_format">format</a>&lt;T&gt;(x: &T): String {
+    aptos_std::string_utils::debug_string(x)
 }
 </code></pre>
 

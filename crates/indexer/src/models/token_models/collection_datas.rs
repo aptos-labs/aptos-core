@@ -21,8 +21,8 @@ use diesel::{prelude::*, ExpressionMethods};
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-const QUERY_RETRIES: u32 = 5;
-const QUERY_RETRY_DELAY_MS: u64 = 500;
+pub const QUERY_RETRIES: u32 = 5;
+pub const QUERY_RETRY_DELAY_MS: u64 = 500;
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(collection_data_id_hash, transaction_version))]
 #[diesel(table_name = collection_datas)]

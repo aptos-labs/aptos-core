@@ -111,6 +111,8 @@ pub struct StateSyncDriverConfig {
     pub max_pending_data_chunks: u64,
     /// The maximum time (ms) to wait for a data stream notification
     pub max_stream_wait_time_ms: u64,
+    /// The maximum time (ms) allowed for mempool to ack a commit notification
+    pub mempool_commit_ack_timeout_ms: u64,
     /// The version lag we'll tolerate before snapshot syncing
     pub num_versions_to_skip_snapshot_sync: u64,
 }
@@ -131,6 +133,7 @@ impl Default for StateSyncDriverConfig {
             max_num_stream_timeouts: 12,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 5000,
+            mempool_commit_ack_timeout_ms: 5000, // 5 seconds
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
         }
     }
@@ -143,20 +146,26 @@ pub struct StorageServiceConfig {
     pub max_concurrent_requests: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
+    /// Maximum number of invalid requests per peer
+    pub max_invalid_requests_per_peer: u64,
     /// Maximum number of items in the lru cache before eviction
     pub max_lru_cache_size: u64,
     /// Maximum number of pending network messages
     pub max_network_channel_size: u64,
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
+    /// Maximum period (ms) of pending optimistic fetch requests
+    pub max_optimistic_fetch_period: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
-    /// Maximum period (ms) of pending subscription requests
-    pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
+    /// Minimum time (secs) to ignore peers after too many invalid requests
+    pub min_time_to_ignore_peers_secs: u64,
+    /// The interval (ms) to refresh the request moderator state
+    pub request_moderator_refresh_interval_ms: u64,
     /// The interval (ms) to refresh the storage summary
     pub storage_summary_refresh_interval_ms: u64,
 }
@@ -166,13 +175,16 @@ impl Default for StorageServiceConfig {
         Self {
             max_concurrent_requests: 4000,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
+            max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_optimistic_fetch_period: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 5000,
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            min_time_to_ignore_peers_secs: 300, // 5 minutes
+            request_moderator_refresh_interval_ms: 1000, // 1 second
             storage_summary_refresh_interval_ms: 50,
         }
     }
@@ -224,6 +236,8 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    /// The interval (milliseconds) at which to refresh the latency monitor
+    pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of in-flight polls for priority peers
@@ -244,8 +258,8 @@ pub struct AptosDataClientConfig {
     pub response_timeout_ms: u64,
     /// Timeout (in ms) when waiting for a subscription response
     pub subscription_timeout_ms: u64,
-    /// Interval (in ms) between data summary polls
-    pub summary_poll_interval_ms: u64,
+    /// Interval (in ms) between data summary poll loop executions
+    pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
     pub use_compression: bool,
 }
@@ -253,6 +267,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
@@ -263,7 +278,7 @@ impl Default for AptosDataClientConfig {
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             response_timeout_ms: 10000,    // 10 seconds
             subscription_timeout_ms: 5000, // 5 seconds
-            summary_poll_interval_ms: 200,
+            summary_poll_loop_interval_ms: 200,
             use_compression: true,
         }
     }

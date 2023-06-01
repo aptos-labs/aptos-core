@@ -22,6 +22,7 @@
 /aptos-move/framework/src/natives/cryptography/ @alinush
 /aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
+/aptos-move/sharded_block-executor/ @sitalkedia
 /aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
 /aptos-move/vm-genesis/ @davidiw @movekevin
 
@@ -38,7 +39,7 @@
 /consensus/src/quorum_store/ @bchocho @sasha8 @gelash
 
 # Owners for the `/crates/aptos` directory and all its subdirectories.
-/crates/aptos @gregnazario
+/crates/aptos @gregnazario @0xjinn @banool
 
 # Owners for the `/crates/aptos-crypto*` directories.
 /crates/aptos-crypto-derive/ @alinush
@@ -84,8 +85,8 @@
 /docker/ @aptos-labs/prod-eng
 
 # Owners for the `SDKs`.
-/ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan
-/ecosystem/typescript/sdk @jjleng @gregnazario @banool @0xmaayan
+/ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan @0xjinn
+/ecosystem/typescript/sdk @gregnazario @banool @0xmaayan @0xjinn
 
 # Owners for execution and storage.
 /execution/ @msmouse @lightmark

@@ -121,12 +121,14 @@ where
     )
     .unwrap();
     let state_view_storage = StorageAdapter::new(state_view);
-    let change_set_ext = {
+    let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(
-            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
-        );
+        let mut session = GenesisSession(move_vm.new_session(
+            &state_view_storage,
+            SessionId::genesis(genesis_id),
+            true,
+        ));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
@@ -141,6 +143,8 @@ where
     };
 
     // Genesis never produces the delta change set.
-    let (_delta_change_set, change_set) = change_set_ext.into_inner();
-    change_set
+    assert!(change_set.delta_change_set().is_empty());
+
+    let (write_set, _delta_change_set, events) = change_set.unpack();
+    ChangeSet::new(write_set, events)
 }

@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosValidatorInterface;
-use anyhow::{anyhow, bail, Result};
-use aptos_api_types::MoveStructTag;
-use aptos_rest_client::Client;
+use anyhow::{anyhow, Result};
+use aptos_api_types::{AptosError, AptosErrorCode};
+use aptos_rest_client::{
+    error::{AptosErrorResponse, RestError},
+    Client,
+};
 use aptos_types::{
-    access_path::Path,
     account_address::AccountAddress,
     account_state::AccountState,
-    state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_value::StateValue,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
 use std::collections::BTreeMap;
@@ -50,50 +49,19 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        match state_key.inner() {
-            StateKeyInner::AccessPath(path) => match path.get_path() {
-                Path::Code(module_id) => Ok(Some(StateValue::new_legacy(
-                    self.0
-                        .get_account_module_bcs_at_version(
-                            *module_id.address(),
-                            module_id.name().as_str(),
-                            version,
-                        )
-                        .await
-                        .map_err(|err| anyhow!("Failed to get account states: {:?}", err))?
-                        .into_inner()
-                        .to_vec(),
-                ))),
-                Path::Resource(tag) => Ok(self
-                    .0
-                    .get_account_resource_at_version_bytes(
-                        path.address,
-                        MoveStructTag::from(tag).to_string().as_str(),
-                        version,
-                    )
-                    .await
-                    .ok()
-                    .map(|inner| StateValue::new_legacy(inner.into_inner()))),
-
-                Path::ResourceGroup(_) => Ok(self
-                    .0
-                    .get_account_resources_at_version_bcs(path.address, version)
-                    .await
-                    .ok()
-                    .and_then(|inner| {
-                        Some(StateValue::new_legacy(
-                            bcs::to_bytes(&inner.into_inner()).ok()?,
-                        ))
-                    })),
+        match self.0.get_raw_state_value(state_key, version).await {
+            Ok(resp) => Ok(Some(bcs::from_bytes(&resp.into_inner())?)),
+            Err(err) => match err {
+                RestError::Api(AptosErrorResponse {
+                    error:
+                        AptosError {
+                            error_code: AptosErrorCode::StateValueNotFound,
+                            ..
+                        },
+                    ..
+                }) => Ok(None),
+                _ => Err(anyhow!(err)),
             },
-            StateKeyInner::TableItem { handle, key } => Ok(Some(StateValue::new_legacy(
-                self.0
-                    .get_raw_table_item(handle.0, key, version)
-                    .await
-                    .map_err(|err| anyhow!("Failed to get account states: {:?}", err))?
-                    .into_inner(),
-            ))),
-            StateKeyInner::Raw(_) => bail!("Unexpected key type"),
         }
     }
 

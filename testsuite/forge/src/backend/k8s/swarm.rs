@@ -59,7 +59,7 @@ impl K8sSwarm {
         fullnodes: HashMap<AccountAddress, K8sNode>,
         keep: bool,
     ) -> Result<Self> {
-        let kube_client = create_k8s_client().await;
+        let kube_client = create_k8s_client().await?;
 
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
@@ -118,6 +118,15 @@ impl K8sSwarm {
             .nth(idx)
             .unwrap()
             .rest_api_endpoint()
+            .to_string()
+    }
+
+    fn get_inspection_service_url(&self, idx: usize) -> String {
+        self.validators
+            .values()
+            .nth(idx)
+            .unwrap()
+            .inspection_service_endpoint()
             .to_string()
     }
 
@@ -250,7 +259,13 @@ impl Swarm for K8sSwarm {
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url(0);
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        let inspection_service_url = self.get_inspection_service_url(0);
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 
     // returns a kubectl logs command to retrieve the logs manually
@@ -351,7 +366,13 @@ impl Swarm for K8sSwarm {
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url(idx);
-        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
+        let inspection_service_url = self.get_inspection_service_url(idx);
+        ChainInfo::new(
+            &mut self.root_account,
+            rest_api_url,
+            inspection_service_url,
+            self.chain_id,
+        )
     }
 }
 

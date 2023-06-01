@@ -27,6 +27,11 @@ describe("Provider", () => {
     expect(provider.indexerClient.endpoint).toBe("indexer-url");
   });
 
+  it("includes static methods", async () => {
+    expect(Provider).toHaveProperty("generateBCSTransaction");
+    expect(Provider).toHaveProperty("generateBCSSimulation");
+  });
+
   it("throws error when endpoint not provided", async () => {
     expect(() => {
       new Provider({ fullnodeUrl: "", indexerUrl: "" });
