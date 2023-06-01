@@ -1,6 +1,5 @@
 ---
 title: "Bootstrap Fullnode from Backup"
-slug: "aptos-db-restore"
 ---
 
 # Bootstrap Fullnode from Backup
