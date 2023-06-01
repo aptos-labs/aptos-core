@@ -334,11 +334,10 @@ pub async fn get_delegation_stake_balances(
     pool_address: AccountAddress,
     version: u64,
 ) -> ApiResult<Option<BalanceResult>> {
-    let mut lockup_expiration: u64 = 0;
     let mut requested_balance: Option<String> = None;
 
     // get requested_balance
-    if let Ok(balances_response) = rest_client.view(
+    let balances_response = rest_client.view(
         &ViewRequest {
             function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
             type_arguments: vec![],
@@ -352,24 +351,19 @@ pub async fn get_delegation_stake_balances(
             ],
         },
         Some(version),
-    ).await {
-        let result = balances_response.into_inner();
+    ).await?;
 
-        if account_identifier.is_delegator_active_stake() {
-            requested_balance = result.get(0).map(|v| v.to_string());
-        } else if account_identifier.is_delegator_inactive_stake() {
-            requested_balance = result.get(1).map(|v| v.to_string());
-        } else if account_identifier.is_delegator_pending_inactive_stake() {
-            requested_balance = result.get(2).map(|v| v.to_string());
-        }
-    } else {
-        return Err(ApiError::InternalError(Some(
-            "Unable to get delegation stake balances".to_string(),
-        )));
+    let balances_result = balances_response.into_inner();
+    if account_identifier.is_delegator_active_stake() {
+        requested_balance = balances_result.get(0).map(|v| v.to_string());
+    } else if account_identifier.is_delegator_inactive_stake() {
+        requested_balance = balances_result.get(1).map(|v| v.to_string());
+    } else if account_identifier.is_delegator_pending_inactive_stake() {
+        requested_balance = balances_result.get(2).map(|v| v.to_string());
     }
 
     // get lockup_secs
-    if let Ok(lockup_secs_response) = rest_client.view(
+    let lockup_secs_response = rest_client.view(
         &ViewRequest {
             function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
             type_arguments: vec![],
@@ -380,14 +374,9 @@ pub async fn get_delegation_stake_balances(
             ]
         },
         Some(version),
-    ).await {
-        let result = lockup_secs_response.into_inner();
-        lockup_expiration = result.get(0).and_then(|v| v.as_u64()).unwrap();
-    } else {
-        return Err(ApiError::InternalError(Some(
-            "Unable to get lockup seconds".to_string(),
-        )));
-    }
+    ).await?;
+    let lockup_secs_result = lockup_secs_response.into_inner();
+    let lockup_expiration = lockup_secs_result.get(0).and_then(|v| v.as_u64()).unwrap();
 
     if let Some(balance) = requested_balance {
         Ok(Some(BalanceResult {
