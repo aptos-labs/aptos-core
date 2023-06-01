@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::transaction::{analyzed_transaction::AnalyzedTransaction, Transaction};
 use std::collections::HashSet;
 
 pub type ShardId = usize;
@@ -57,17 +57,12 @@ impl CrossShardDependencies {
 ///  +----------------+------------------+------------------+
 /// ```
 pub struct SubBlock {
-    // This is the index of first transaction relative to the block.
-    pub start_index: TxnIndex,
     pub transactions: Vec<TransactionWithDependencies>,
 }
 
 impl SubBlock {
-    pub fn new(start_index: TxnIndex, transactions: Vec<TransactionWithDependencies>) -> Self {
-        Self {
-            start_index,
-            transactions,
-        }
+    pub fn new(transactions: Vec<TransactionWithDependencies>) -> Self {
+        Self { transactions }
     }
 
     pub fn len(&self) -> usize {
@@ -80,6 +75,10 @@ impl SubBlock {
 
     pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies> {
         &self.transactions
+    }
+
+    pub fn into_transactions_with_deps(self) -> Vec<TransactionWithDependencies> {
+        self.transactions
     }
 }
 
@@ -97,6 +96,10 @@ impl TransactionWithDependencies {
         }
     }
 
+    pub fn into_txn(self) -> AnalyzedTransaction {
+        self.txn
+    }
+
     #[cfg(test)]
     pub fn txn(&self) -> &AnalyzedTransaction {
         &self.txn
@@ -105,5 +108,21 @@ impl TransactionWithDependencies {
     #[cfg(test)]
     pub fn cross_shard_dependencies(&self) -> &CrossShardDependencies {
         &self.cross_shard_dependencies
+    }
+}
+
+pub enum ExecutableTransactions {
+    Unsharded(Vec<Transaction>),
+    Sharded(Vec<SubBlock>),
+}
+
+impl ExecutableTransactions {
+    pub fn num_transactions(&self) -> usize {
+        match self {
+            ExecutableTransactions::Unsharded(transactions) => transactions.len(),
+            ExecutableTransactions::Sharded(sub_blocks) => {
+                sub_blocks.iter().map(|sub_block| sub_block.len()).sum()
+            },
+        }
     }
 }

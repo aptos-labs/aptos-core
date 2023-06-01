@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    partition_no_op,
     sharded_block_partitioner::{
         dependency_analysis::RWSetWithTxnIndex,
         messages::{
@@ -11,10 +12,11 @@ use crate::{
         },
         partitioning_shard::PartitioningShard,
     },
-    types::{ShardId, SubBlock},
+    types::{ExecutableTransactions, ShardId, SubBlock},
+    BlockPartitioner,
 };
 use aptos_logger::{error, info};
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::transaction::{analyzed_transaction::AnalyzedTransaction, Transaction};
 use std::{
     collections::HashMap,
     sync::{
@@ -281,7 +283,7 @@ impl ShardedBlockPartitioner {
     /// We repeatedly partition chunks, discarding a bunch of transactions with cross-shard dependencies. The set of discarded
     /// transactions are used as candidate chunks in the next round. This process is repeated until num_partitioning_rounds.
     /// The remaining transactions are then added to the chunks with cross-shard dependencies.
-    pub fn partition(
+    pub fn partition_with_rounds(
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
@@ -338,6 +340,22 @@ impl ShardedBlockPartitioner {
             .into_iter()
             .chain(remaining_frozen_chunks.into_iter())
             .collect::<Vec<SubBlock>>()
+    }
+}
+
+impl BlockPartitioner for ShardedBlockPartitioner {
+    fn partition(&self, transactions: Vec<Transaction>) -> ExecutableTransactions {
+        if self.num_shards == 1 {
+            // Avoid the overhead of partitioning if there is only one shard
+            return partition_no_op(transactions);
+        }
+
+        let analyzed_txns = transactions
+            .into_iter()
+            .map(|txn| txn.into())
+            .collect::<Vec<AnalyzedTransaction>>();
+        // Default is one partitioning round
+        ExecutableTransactions::Sharded(self.partition_with_rounds(analyzed_txns, 1))
     }
 }
 
@@ -417,7 +435,7 @@ mod tests {
             receivers.iter().collect::<Vec<&TestAccount>>(),
         );
         let partitioner = ShardedBlockPartitioner::new(4);
-        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+        let partitioned_txns = partitioner.partition_with_rounds(transactions.clone(), 1);
         assert_eq!(partitioned_txns.len(), 4);
         // The first shard should contain all the transactions
         assert_eq!(partitioned_txns[0].len(), num_txns);
@@ -444,7 +462,7 @@ mod tests {
             transactions.push(create_non_conflicting_p2p_transaction())
         }
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+        let partitioned_txns = partitioner.partition_with_rounds(transactions.clone(), 1);
         assert_eq!(partitioned_txns.len(), num_shards);
         // Verify that the transactions are in the same order as the original transactions and cross shard
         // dependencies are empty.
@@ -494,7 +512,7 @@ mod tests {
         transactions.push(txns_from_sender[txn_from_sender_index].clone());
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+        let partitioned_txns = partitioner.partition_with_rounds(transactions.clone(), 1);
         assert_eq!(partitioned_txns.len(), num_shards);
         assert_eq!(partitioned_txns[0].len(), 6);
         assert_eq!(partitioned_txns[1].len(), 2);
@@ -542,7 +560,7 @@ mod tests {
         ];
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_chunks = partitioner.partition(transactions, 1);
+        let partitioned_chunks = partitioner.partition_with_rounds(transactions, 1);
         assert_eq!(partitioned_chunks.len(), 2 * num_shards);
 
         // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
@@ -658,7 +676,7 @@ mod tests {
             accounts.push(sender)
         }
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_txns = partitioner.partition(transactions, 1);
+        let partitioned_txns = partitioner.partition_with_rounds(transactions, 1);
         // Build a map of storage location to corresponding shards in first round
         // and ensure that no storage location is present in more than one shard.
         let mut storage_location_to_shard_map = HashMap::new();

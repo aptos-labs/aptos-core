@@ -2,10 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_types::transaction::{Transaction, Version};
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
+use aptos_types::transaction::Version;
 use std::{
     sync::{mpsc, Arc},
     time::{Duration, Instant},
@@ -48,12 +49,12 @@ where
         }
     }
 
-    pub fn execute_block(&mut self, transactions: Vec<Transaction>) {
+    pub fn execute_block(&mut self, txns: ExecutableTransactions) {
         if self.start_time.is_none() {
             self.start_time = Some(Instant::now())
         }
 
-        let num_txns = transactions.len();
+        let num_txns = txns.num_transactions();
         self.version += num_txns as Version;
 
         let execution_start = Instant::now();
@@ -61,7 +62,7 @@ where
         let block_id = HashValue::random();
         let output = self
             .executor
-            .execute_block((block_id, transactions), self.parent_block_id)
+            .execute_block(ExecutableBlock::new(block_id, txns), self.parent_block_id)
             .unwrap();
 
         assert_eq!(output.compute_status().len(), num_txns);

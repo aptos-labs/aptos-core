@@ -8,7 +8,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_consensus_types::block::Block;
 use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
@@ -163,7 +163,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let block3 = block(block3, executor.get_block_gas_limit()); // append state checkpoint txn
 
     let output1 = executor
-        .execute_block((block1_id, block1.clone()), parent_block_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block1_id, block1.clone()),
+            parent_block_id,
+        )
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
     let epoch2_genesis_id = Block::make_genesis_block_from_ledger_info(li1.ledger_info()).id();
@@ -371,7 +374,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Execute block 2, 3, 4
     let output2 = executor
-        .execute_block((block2_id, block2), epoch2_genesis_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block2_id, block2),
+            epoch2_genesis_id,
+        )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, &[signer.clone()]);
     let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
@@ -386,7 +392,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     assert_eq!(current_version, 13);
 
     let output3 = executor
-        .execute_block((block3_id, block3.clone()), epoch3_genesis_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block3_id, block3.clone()),
+            epoch3_genesis_id,
+        )
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, &[signer]);
     executor.commit_blocks(vec![block3_id], li3).unwrap();

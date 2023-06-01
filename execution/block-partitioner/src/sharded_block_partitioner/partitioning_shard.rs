@@ -175,7 +175,7 @@ impl PartitioningShard {
             .map(|(txn, dependencies)| TransactionWithDependencies::new(txn, dependencies))
             .collect::<Vec<TransactionWithDependencies>>();
 
-        let frozen_chunk = SubBlock::new(index_offset, accepted_txns_with_dependencies);
+        let frozen_chunk = SubBlock::new(accepted_txns_with_dependencies);
         drop(prev_rounds_frozen_chunks);
         // send the result back to the controller
         self.result_tx
@@ -208,7 +208,6 @@ impl PartitioningShard {
             transactions,
             Arc::new(current_round_rw_set_with_index),
             prev_rounds_rw_set_with_index,
-            index_offset,
         );
 
         drop(prev_rounds_frozen_chunks);

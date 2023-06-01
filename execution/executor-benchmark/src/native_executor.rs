@@ -6,6 +6,7 @@ use crate::{
     metrics::TIMER,
 };
 use anyhow::Result;
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
@@ -336,9 +337,13 @@ impl NativeExecutor {
 
 impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
+        let transactions = match transactions {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            _ => todo!("sharded execution not yet supported"),
+        };
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()
@@ -414,7 +419,7 @@ impl TransactionBlockExecutor for NativeExecutor {
 
     // Dummy function that is not supposed to be used
     fn execute_transaction_block_with_gas_limit(
-        _transactions: Vec<Transaction>,
+        _transactions: ExecutableTransactions,
         state_view: CachedStateView,
         _maybe_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {

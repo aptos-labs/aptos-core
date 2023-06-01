@@ -10,7 +10,7 @@ use aptos_executor_test_helpers::{
         create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
     },
 };
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
@@ -139,7 +139,10 @@ fn test_reconfiguration() {
     let txn_block = vec![txn1, txn2, txn3];
     let block_id = gen_block_id(1);
     let vm_output = executor
-        .execute_block((block_id, txn_block.clone()), parent_block_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block_id, txn_block.clone()),
+            parent_block_id,
+        )
         .unwrap();
 
     // Make sure the execution result sees the reconfiguration

@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{TransactionCommitter, TransactionExecutor};
+use aptos_block_partitioner::{
+    sharded_block_partitioner::ShardedBlockPartitioner, types::ExecutableTransactions,
+    BlockPartitioner,
+};
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
 use aptos_types::transaction::{Transaction, Version};
-use aptos_vm::counters::TXN_GAS_USAGE;
+use aptos_vm::{counters::TXN_GAS_USAGE, AptosVM};
 use std::{
     marker::PhantomData,
     sync::{
@@ -47,7 +51,15 @@ where
         let executor_1 = Arc::new(executor);
         let executor_2 = executor_1.clone();
 
-        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
+        let (partitioning_sender, partitioning_receiver) = mpsc::sync_channel::<Vec<Transaction>>(
+            if config.delay_execution_start {
+                (num_blocks.unwrap() + 1).max(50)
+            } else {
+                50
+            }, /* bound */
+        );
+
+        let (execution_sender, execution_receiver) = mpsc::sync_channel::<ExecutableTransactions>(
             if config.delay_execution_start {
                 (num_blocks.unwrap() + 1).max(50)
             } else {
@@ -76,6 +88,22 @@ where
             (None, None)
         };
 
+        let partitioning_thread = std::thread::Builder::new()
+            .name("txn_partitioner".to_string())
+            .spawn(move || {
+                let partitioner = ShardedBlockPartitioner::new(AptosVM::get_num_shards());
+                while let Ok(transactions) = partitioning_receiver.recv() {
+                    info!(
+                        "Received block of size {:?} to partition",
+                        transactions.len()
+                    );
+                    let sub_blocks = partitioner.partition(transactions);
+                    info!("Finished partitioning block");
+                    execution_sender.send(sub_blocks).unwrap();
+                }
+            })
+            .unwrap();
+
         let exe_thread = std::thread::Builder::new()
             .name("txn_executor".to_string())
             .spawn(move || {
@@ -92,10 +120,11 @@ where
                 let start_time = Instant::now();
                 let mut executed = 0;
                 let start_gas = TXN_GAS_USAGE.get_sample_sum();
-                while let Ok(transactions) = block_receiver.recv() {
-                    info!("Received block of size {:?} to execute", transactions.len());
-                    executed += transactions.len();
-                    exe.execute_block(transactions);
+                while let Ok(txns) = execution_receiver.recv() {
+                    let txn_count = txns.num_transactions();
+                    info!("Received block of size {:?} to execute", txn_count);
+                    executed += txn_count;
+                    exe.execute_block(txns);
                     info!("Finished executing block");
                 }
 
@@ -131,7 +160,7 @@ where
                 }
             })
             .expect("Failed to spawn transaction committer thread.");
-        let join_handles = vec![exe_thread, commit_thread];
+        let join_handles = vec![partitioning_thread, exe_thread, commit_thread];
 
         (
             Self {
@@ -139,7 +168,7 @@ where
                 phantom: PhantomData,
                 start_execution_tx,
             },
-            block_sender,
+            partitioning_sender,
         )
     }
 

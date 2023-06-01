@@ -13,10 +13,13 @@ use crate::{
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
+use aptos_executor_types::{
+    BlockExecutorTrait, Error as ExecutionError, ExecutableBlock, StateComputeResult,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -136,7 +139,13 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {
-                executor.execute_block((block_id, transactions_to_execute), parent_block_id)
+                executor.execute_block(
+                    ExecutableBlock::new(
+                        block_id,
+                        ExecutableTransactions::Unsharded(transactions_to_execute),
+                    ),
+                    parent_block_id,
+                )
             })
             .await
         )
@@ -335,7 +344,7 @@ async fn test_commit_sync_race() {
 
         fn execute_block(
             &self,
-            _block: (HashValue, Vec<Transaction>),
+            _block: ExecutableBlock,
             _parent_block_id: HashValue,
         ) -> Result<StateComputeResult, ExecutionError> {
             Ok(StateComputeResult::new_dummy())

@@ -59,14 +59,20 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
             match command {
                 ExecutorShardCommand::ExecuteBlock(
                     state_view,
-                    transactions,
+                    sub_blocks,
                     concurrency_level_per_shard,
                 ) => {
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.len()
+                        sub_blocks.iter().map(|b| b.len()).sum::<usize>()
                     );
+
+                    let transactions = sub_blocks
+                        .into_iter()
+                        .flat_map(|b| b.into_transactions_with_deps())
+                        .map(|t| t.into_txn().into())
+                        .collect::<Vec<_>>();
                     let ret = BlockAptosVM::execute_block(
                         self.executor_thread_pool.clone(),
                         transactions,

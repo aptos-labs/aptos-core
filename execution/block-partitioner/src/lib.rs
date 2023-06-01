@@ -6,35 +6,20 @@ pub mod sharded_block_partitioner;
 pub mod test_utils;
 pub mod types;
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use crate::types::ExecutableTransactions;
+use aptos_types::transaction::Transaction;
 
-pub trait BlockPartitioner: Send + Sync {
-    fn partition(
-        &self,
-        transactions: Vec<AnalyzedTransaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<AnalyzedTransaction>>;
+pub trait BlockPartitioner {
+    fn partition(&self, transactions: Vec<Transaction>) -> ExecutableTransactions;
+}
+pub struct NoOpBlockPartitioner {}
+
+impl BlockPartitioner for NoOpBlockPartitioner {
+    fn partition(&self, transactions: Vec<Transaction>) -> ExecutableTransactions {
+        partition_no_op(transactions)
+    }
 }
 
-/// An implementation of partitioner that splits the transactions into equal-sized chunks.
-pub struct UniformPartitioner {}
-
-impl BlockPartitioner for UniformPartitioner {
-    fn partition(
-        &self,
-        transactions: Vec<AnalyzedTransaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<AnalyzedTransaction>> {
-        let total_txns = transactions.len();
-        if total_txns == 0 {
-            return vec![];
-        }
-        let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
-
-        let mut result = Vec::new();
-        for chunk in transactions.chunks(txns_per_shard) {
-            result.push(chunk.to_vec());
-        }
-        result
-    }
+fn partition_no_op(transactions: Vec<Transaction>) -> ExecutableTransactions {
+    ExecutableTransactions::Unsharded(transactions)
 }

@@ -13,10 +13,12 @@ use crate::{
     },
 };
 use anyhow::Result;
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+    BlockExecutorTrait, ChunkExecutorTrait, ExecutableBlock, TransactionReplayer,
+    VerifyExecutionMode,
 };
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
@@ -53,7 +55,10 @@ fn execute_and_commit_block(
 
     let output = executor
         .execute_block(
-            (id, block(vec![txn], executor.get_block_gas_limit())),
+            ExecutableBlock::from_unsharded_transactions(
+                id,
+                block(vec![txn], executor.get_block_gas_limit()),
+            ),
             parent_block_id,
         )
         .unwrap();
@@ -152,7 +157,7 @@ fn test_executor_status() {
 
     let output = executor
         .execute_block(
-            (
+            ExecutableBlock::from_unsharded_transactions(
                 block_id,
                 block(vec![txn0, txn1, txn2], executor.get_block_gas_limit()),
             ),
@@ -184,7 +189,7 @@ fn test_executor_status_consensus_only() {
 
     let output = executor
         .execute_block(
-            (
+            ExecutableBlock::from_unsharded_transactions(
                 block_id,
                 block(vec![txn0, txn1, txn2], executor.get_block_gas_limit()),
             ),
@@ -216,7 +221,10 @@ fn test_executor_one_block() {
         .collect::<Vec<_>>();
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            ExecutableBlock::from_unsharded_transactions(
+                block_id,
+                block(txns, executor.get_block_gas_limit()),
+            ),
             parent_block_id,
         )
         .unwrap();
@@ -261,7 +269,7 @@ fn test_executor_two_blocks_with_failed_txns() {
         .collect::<Vec<_>>();
     let _output1 = executor
         .execute_block(
-            (
+            ExecutableBlock::from_unsharded_transactions(
                 block1_id,
                 block(block1_txns, executor.get_block_gas_limit()),
             ),
@@ -270,7 +278,7 @@ fn test_executor_two_blocks_with_failed_txns() {
         .unwrap();
     let output2 = executor
         .execute_block(
-            (
+            ExecutableBlock::from_unsharded_transactions(
                 block2_id,
                 block(block2_txns, executor.get_block_gas_limit()),
             ),
@@ -294,7 +302,7 @@ fn test_executor_commit_twice() {
     let block1_id = gen_block_id(1);
     let output1 = executor
         .execute_block(
-            (
+            ExecutableBlock::from_unsharded_transactions(
                 block1_id,
                 block(block1_txns, executor.get_block_gas_limit()),
             ),
@@ -326,7 +334,7 @@ fn test_executor_execute_same_block_multiple_times() {
     for _i in 0..100 {
         let output = executor
             .execute_block(
-                (
+                ExecutableBlock::from_unsharded_transactions(
                     block_id,
                     block(txns.clone(), executor.get_block_gas_limit()),
                 ),
@@ -374,7 +382,10 @@ fn create_transaction_chunks(
     let id = gen_block_id(1);
 
     let output = executor
-        .execute_block((id, txns.clone()), executor.committed_block_id())
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(id, txns.clone()),
+            executor.committed_block_id(),
+        )
         .unwrap();
 
     let ledger_version =
@@ -411,12 +422,18 @@ fn test_noop_block_after_reconfiguration() {
     let first_txn = encode_reconfiguration_transaction();
     let first_block_id = gen_block_id(1);
     let output1 = executor
-        .execute_block((first_block_id, vec![first_txn]), parent_block_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(first_block_id, vec![first_txn]),
+            parent_block_id,
+        )
         .unwrap();
     parent_block_id = first_block_id;
     let second_block = TestBlock::new(10, 10, gen_block_id(2), executor.get_block_gas_limit());
     let output2 = executor
-        .execute_block((second_block.id, second_block.txns), parent_block_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(second_block.id, second_block.txns),
+            parent_block_id,
+        )
         .unwrap();
     assert_eq!(output1.root_hash(), output2.root_hash());
 }
@@ -597,16 +614,28 @@ fn test_reconfig_suffix_empty_blocks() {
     block_b.txns.push(encode_reconfiguration_transaction());
     let parent_block_id = executor.committed_block_id();
     executor
-        .execute_block((block_a.id, block_a.txns), parent_block_id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block_a.id, block_a.txns),
+            parent_block_id,
+        )
         .unwrap();
     let output = executor
-        .execute_block((block_b.id, block_b.txns), block_a.id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block_b.id, block_b.txns),
+            block_a.id,
+        )
         .unwrap();
     executor
-        .execute_block((block_c.id, block_c.txns), block_b.id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block_c.id, block_c.txns),
+            block_b.id,
+        )
         .unwrap();
     executor
-        .execute_block((block_d.id, block_d.txns), block_c.id)
+        .execute_block(
+            ExecutableBlock::from_unsharded_transactions(block_d.id, block_d.txns),
+            block_c.id,
+        )
         .unwrap();
 
     let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
@@ -648,7 +677,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
-            vec![txn],
+            ExecutableTransactions::Unsharded(vec![txn]),
             ledger_view
                 .verified_state_view(
                     StateViewId::Miscellaneous,
@@ -695,7 +724,7 @@ proptest! {
 
             let parent_block_id = executor.committed_block_id();
             let output = executor.execute_block(
-                (block_id, block.txns.clone()), parent_block_id
+                ExecutableBlock::from_unsharded_transactions(block_id, block.txns.clone()), parent_block_id
             ).unwrap();
 
             // assert: txns after the reconfiguration are with status "Retry"
@@ -714,7 +743,7 @@ proptest! {
             // retry txns after reconfiguration
             let retry_block_id = gen_block_id(2);
             let retry_output = executor.execute_block(
-                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()), parent_block_id
+                ExecutableBlock::from_unsharded_transactions(retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()), parent_block_id
             ).unwrap();
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
@@ -762,7 +791,7 @@ proptest! {
         {
             parent_block_id = executor.committed_block_id();
             let output_a = executor.execute_block(
-                (block_a.id, block_a.txns.clone()), parent_block_id
+                ExecutableBlock::from_unsharded_transactions(block_a.id, block_a.txns.clone()), parent_block_id
             ).unwrap();
             root_hash = output_a.root_hash();
             let ledger_info = gen_ledger_info(ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) as u64, root_hash, block_a.id, 1);
@@ -774,7 +803,7 @@ proptest! {
         {
             let executor = BlockExecutor::<MockVM>::new(db);
             executor.update_block_gas_limit(maybe_gas_limit);
-            let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
+            let output_b = executor.execute_block(ExecutableBlock::from_unsharded_transactions(block_b.id, block_b.txns.clone()), parent_block_id).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
                 (ledger_version_from_block_size(block_a.txns.len(), maybe_gas_limit) + ledger_version_from_block_size(block_b.txns.len(), maybe_gas_limit)) as u64,
@@ -831,13 +860,13 @@ proptest! {
         let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(
-            (first_block_id, first_block_txns),
+            ExecutableBlock::from_unsharded_transactions(first_block_id, first_block_txns),
             parent_block_id
         ).unwrap();
 
         let second_block_id = gen_block_id(2);
         let output2 = executor.execute_block(
-            (second_block_id, block(second_block_txns, executor.get_block_gas_limit())),
+            ExecutableBlock::from_unsharded_transactions(second_block_id, block(second_block_txns, executor.get_block_gas_limit())),
             first_block_id,
         ).unwrap();
 

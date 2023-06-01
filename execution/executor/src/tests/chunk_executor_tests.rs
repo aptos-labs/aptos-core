@@ -11,9 +11,10 @@ use crate::{
     mock_vm::{encode_mint_transaction, MockVM},
     tests,
 };
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_crypto::HashValue;
 use aptos_db::AptosDB;
-use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutableBlock};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -274,7 +275,10 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
-                (block_id, block(txns, executor.get_block_gas_limit())),
+                ExecutableBlock::new(
+                    block_id,
+                    ExecutableTransactions::Unsharded(block(txns, executor.get_block_gas_limit())),
+                ),
                 parent_block_id,
             )
             .unwrap();
@@ -327,7 +331,10 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
             .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
-            .execute_block((block_id, block(txns)), parent_block_id)
+            .execute_block(
+                ExecutableBlock::from_unsharded_transactions(block_id, block(txns)),
+                parent_block_id,
+            )
             .unwrap();
         let ledger_info = tests::gen_ledger_info(6, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();

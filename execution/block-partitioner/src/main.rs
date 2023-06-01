@@ -54,7 +54,7 @@ fn main() {
         let transactions = transactions.clone();
         println!("Starting to partition");
         let now = Instant::now();
-        partitioner.partition(transactions, 1);
+        partitioner.partition_with_rounds(transactions, 1);
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
     }

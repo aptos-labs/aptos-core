@@ -7,6 +7,7 @@ mod mock_vm_test;
 
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
+use aptos_block_partitioner::types::{ExecutableTransactions, SubBlock};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
@@ -23,10 +24,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, ChangeSet, ExecutionStatus,
-        NoOpChangeSetChecker, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
+        ChangeSet, ExecutionStatus, NoOpChangeSetChecker, RawTransaction, Script,
+        SignedTransaction, Transaction, TransactionArgument, TransactionOutput, TransactionPayload,
+        TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -60,14 +60,14 @@ pub struct MockVM;
 
 impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
     }
 
     fn execute_transaction_block_with_gas_limit(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -223,7 +223,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<AnalyzedTransaction>,
+        _block: Vec<SubBlock>,
         _state_view: Arc<S>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
         todo!()

@@ -22,6 +22,7 @@ use aptos_aggregator::{
     delta_change_set::DeltaChangeSet,
     transaction::{ChangeSetExt, TransactionOutputExt},
 };
+use aptos_block_partitioner::types::SubBlock;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -36,10 +37,10 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, ChangeSet, EntryFunction, ExecutionError,
-        ExecutionStatus, ModuleBundle, Multisig, MultisigTransactionPayload,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, WriteSetPayload,
+        ChangeSet, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
@@ -1513,25 +1514,24 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
-        transactions: Vec<AnalyzedTransaction>,
+        block: Vec<SubBlock>,
         state_view: Arc<S>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
+        let txn_count = block.iter().map(|b| b.transactions.len()).sum::<usize>();
         info!(
             log_context,
-            "Executing block, transaction count: {}",
-            transactions.len()
+            "Executing block, transaction count: {}", txn_count
         );
 
-        let count = transactions.len();
         let ret = sharded_block_executor.execute_block(
             state_view,
-            transactions,
+            block,
             AptosVM::get_concurrency_level(),
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
-            BLOCK_TRANSACTION_COUNT.observe(count as f64);
+            BLOCK_TRANSACTION_COUNT.observe(txn_count as f64);
         }
         ret
     }

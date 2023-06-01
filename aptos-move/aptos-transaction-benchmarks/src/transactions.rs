@@ -3,6 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
+use aptos_block_partitioner::{
+    sharded_block_partitioner::ShardedBlockPartitioner,
+    types::{
+        CrossShardDependencies, ExecutableTransactions, SubBlock, TransactionWithDependencies,
+    },
+    BlockPartitioner,
+};
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
@@ -13,7 +20,7 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
-    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction},
+    transaction::Transaction,
 };
 use aptos_vm::{data_cache::AsMoveResolver, sharded_block_executor::ShardedBlockExecutor};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
@@ -172,6 +179,7 @@ struct TransactionBenchState<S> {
     account_universe: AccountUniverse,
     parallel_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
     sequential_block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
+    sharded_block_partitioner: Arc<dyn BlockPartitioner>,
     validator_set: ValidatorSet,
     state_view: Arc<FakeDataStore>,
 }
@@ -229,6 +237,8 @@ where
         let sequential_block_executor =
             Arc::new(ShardedBlockExecutor::new(1, Some(1), maybe_gas_limit));
 
+        let sharded_block_partitioner = Arc::new(ShardedBlockPartitioner::new(num_executor_shards));
+
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()
                 .get_state_view()
@@ -242,12 +252,13 @@ where
             account_universe: universe,
             parallel_block_executor,
             sequential_block_executor,
+            sharded_block_partitioner,
             validator_set,
             state_view,
         }
     }
 
-    pub fn gen_transaction(&mut self, no_conflict_txns: bool) -> Vec<AnalyzedTransaction> {
+    pub fn gen_transaction(&mut self, no_conflict_txns: bool) -> Vec<Transaction> {
         if no_conflict_txns {
             // resetting the picker here so that we can re-use the same accounts from last block
             // but still generate non conflicting transactions for this block.
@@ -258,10 +269,10 @@ where
             .new_tree(&mut runner)
             .expect("creating a new value should succeed")
             .current();
-        let mut transactions: Vec<AnalyzedTransaction> = transaction_gens
+        let mut transactions: Vec<Transaction> = transaction_gens
             .into_iter()
             .map(|txn_gen| {
-                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0).into()
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
             })
             .collect();
 
@@ -281,7 +292,7 @@ where
             1,
         );
 
-        transactions.insert(0, Transaction::BlockMetadata(new_block).into());
+        transactions.insert(0, Transaction::BlockMetadata(new_block));
         transactions
     }
 
@@ -290,9 +301,18 @@ where
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
         let txns = self.gen_transaction(false);
+        // Create a single sub block with all the transactions.
+        let sub_blocks = vec![SubBlock::new(
+            txns.into_iter()
+                .map(|txn| {
+                    TransactionWithDependencies::new(txn.into(), CrossShardDependencies::default())
+                })
+                .collect::<Vec<TransactionWithDependencies>>(),
+        )];
+
         let executor = self.sequential_block_executor;
         executor
-            .execute_block(self.state_view.clone(), txns, 1)
+            .execute_block(self.state_view.clone(), sub_blocks, 1)
             .expect("VM should not fail to start");
     }
 
@@ -302,25 +322,29 @@ where
         // to assert correctness.
         let txns = self.gen_transaction(false);
         let executor = self.parallel_block_executor.clone();
-        executor
-            .execute_block(self.state_view.clone(), txns, num_cpus::get())
-            .expect("VM should not fail to start");
+        let executable_txns = self.sharded_block_partitioner.partition(txns);
+        match executable_txns {
+            ExecutableTransactions::Unsharded(_) => {
+                panic!("Should not be unsharded")
+            },
+            ExecutableTransactions::Sharded(sub_blocks) => {
+                executor
+                    .execute_block(self.state_view.clone(), sub_blocks, num_cpus::get())
+                    .expect("VM should not fail to start");
+            },
+        }
     }
 
     fn execute_benchmark(
         &self,
-        transactions: Vec<AnalyzedTransaction>,
+        block: Vec<SubBlock>,
         block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
         concurrency_level_per_shard: usize,
     ) -> usize {
-        let block_size = transactions.len();
+        let block_size: usize = block.iter().map(|b| b.transactions.len()).sum();
         let timer = Instant::now();
         block_executor
-            .execute_block(
-                self.state_view.clone(),
-                transactions,
-                concurrency_level_per_shard,
-            )
+            .execute_block(self.state_view.clone(), block, concurrency_level_per_shard)
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
 
@@ -337,11 +361,19 @@ where
         let transactions = self.gen_transaction(no_conflict_txns);
         let par_tps = if run_par {
             println!("Parallel execution starts...");
-            let tps = self.execute_benchmark(
-                transactions.clone(),
-                self.parallel_block_executor.clone(),
-                conurrency_level_per_shard,
-            );
+            let executable_txns = self
+                .sharded_block_partitioner
+                .partition(transactions.clone());
+            let tps = match executable_txns {
+                ExecutableTransactions::Unsharded(_) => {
+                    panic!("Should not be unsharded")
+                },
+                ExecutableTransactions::Sharded(sub_blocks) => self.execute_benchmark(
+                    sub_blocks,
+                    self.parallel_block_executor.clone(),
+                    conurrency_level_per_shard,
+                ),
+            };
             println!("Parallel execution finishes, TPS = {}", tps);
             tps
         } else {
@@ -349,8 +381,19 @@ where
         };
         let seq_tps = if run_seq {
             println!("Sequential execution starts...");
-            let tps =
-                self.execute_benchmark(transactions, self.sequential_block_executor.clone(), 1);
+            // Create a single sub block with all the transactions.
+            let sub_blocks = vec![SubBlock::new(
+                transactions
+                    .into_iter()
+                    .map(|txn| {
+                        TransactionWithDependencies::new(
+                            txn.into(),
+                            CrossShardDependencies::default(),
+                        )
+                    })
+                    .collect::<Vec<TransactionWithDependencies>>(),
+            )];
+            let tps = self.execute_benchmark(sub_blocks, self.sequential_block_executor.clone(), 1);
             println!("Sequential execution finishes, TPS = {}", tps);
             tps
         } else {

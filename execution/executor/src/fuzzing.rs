@@ -7,18 +7,16 @@ use crate::{
     components::chunk_output::ChunkOutput,
 };
 use anyhow::Result;
+use aptos_block_partitioner::types::{ExecutableTransactions, SubBlock};
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
 use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
-        TransactionToCommit, Version,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
@@ -41,7 +39,10 @@ pub fn fuzz_execute_and_commit_blocks(
     let mut block_ids = vec![];
     for block in blocks {
         let block_id = block.0;
-        let _execution_results = executor.execute_block(block, parent_block_id);
+        let _execution_results = executor.execute_block(
+            ExecutableBlock::from_unsharded_transactions(block.0, block.1),
+            parent_block_id,
+        );
         parent_block_id = block_id;
         block_ids.push(block_id);
     }
@@ -53,14 +54,14 @@ pub struct FakeVM;
 
 impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
     ) -> Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
     }
 
     fn execute_transaction_block_with_gas_limit(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
@@ -75,7 +76,7 @@ impl TransactionBlockExecutor for FakeVM {
 impl VMExecutor for FakeVM {
     fn execute_block_sharded<S: StateView + Send + Sync>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<AnalyzedTransaction>,
+        _sub_blocks: Vec<SubBlock>,
         _state_view: Arc<S>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())

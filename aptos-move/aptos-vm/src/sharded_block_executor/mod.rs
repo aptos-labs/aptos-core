@@ -3,12 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::executor_shard::ExecutorShard;
-use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
+use aptos_block_partitioner::types::SubBlock;
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
-use aptos_types::transaction::{
-    analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
-};
+use aptos_types::transaction::TransactionOutput;
 use move_core_types::vm_status::VMStatus;
 use std::{
     marker::PhantomData,
@@ -24,7 +22,6 @@ mod executor_shard;
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
     num_executor_shards: usize,
-    partitioner: Arc<dyn BlockPartitioner>,
     command_txs: Vec<Sender<ExecutorShardCommand<S>>>,
     shard_threads: Vec<thread::JoinHandle<()>>,
     result_rxs: Vec<Receiver<Result<Vec<TransactionOutput>, VMStatus>>>,
@@ -32,7 +29,7 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
 }
 
 pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
-    ExecuteBlock(Arc<S>, Vec<Transaction>, usize),
+    ExecuteBlock(Arc<S>, Vec<SubBlock>, usize),
     Stop,
 }
 
@@ -69,7 +66,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         );
         Self {
             num_executor_shards,
-            partitioner: Arc::new(UniformPartitioner {}),
             command_txs,
             shard_threads: shard_join_handles,
             result_rxs,
@@ -82,29 +78,36 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<AnalyzedTransaction>,
+        block: Vec<SubBlock>,
         concurrency_level_per_shard: usize,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
-        // Number of partitions might be smaller than the number of executor shards in case of
-        // block size is smaller than number of executor shards.
-        let num_partitions = block_partitions.len();
-        for (i, transactions) in block_partitions.into_iter().enumerate() {
+        assert_eq!(
+            block.len() % self.num_executor_shards,
+            0,
+            "block size must be a multiple of num_executor_shards"
+        );
+
+        // Round robin partition the block into num_remote_executors partitions.
+        let mut sub_block_by_shard = vec![Vec::new(); self.num_executor_shards];
+        block.into_iter().enumerate().for_each(|(i, sub_block)| {
+            sub_block_by_shard[i % self.num_executor_shards].push(sub_block);
+        });
+
+        for (i, sub_blocks) in sub_block_by_shard.into_iter().enumerate() {
             self.command_txs[i]
                 .send(ExecutorShardCommand::ExecuteBlock(
                     state_view.clone(),
-                    transactions
-                        .into_iter()
-                        .map(|t| t.into())
-                        .collect::<Vec<Transaction>>(),
+                    sub_blocks,
                     concurrency_level_per_shard,
                 ))
                 .unwrap();
         }
-        // wait for all remote executors to send the result back and append them in order by shard id
+        // wait for all remote executors to send the result back and
+        //
+        // append them in order by shard id
         let mut aggregated_results = vec![];
         trace!("ShardedBlockExecutor Waiting for results");
-        for i in 0..num_partitions {
+        for i in 0..self.num_executor_shards {
             let result = self.result_rxs[i].recv().unwrap();
             aggregated_results.extend(result?);
         }

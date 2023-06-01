@@ -14,7 +14,7 @@ use aptos_executor::{
 use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
 use aptos_gas::{ChangeSetConfigs, LATEST_GAS_FEATURE_VERSION};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
@@ -88,7 +88,10 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            ExecutableBlock::from_unsharded_transactions(
+                block_id,
+                block(txns, executor.get_block_gas_limit()),
+            ),
             executor.committed_block_id(),
         )
         .unwrap();

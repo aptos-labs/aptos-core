@@ -7,6 +7,7 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
@@ -18,7 +19,7 @@ use aptos_config::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::HashValue, SigningKey};
 use aptos_db::AptosDB;
 use aptos_executor::{block_executor::BlockExecutor, db_bootstrapper};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableBlock};
 use aptos_framework::BuiltPackage;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_mempool_notifications::MempoolNotificationSender;
@@ -604,7 +605,13 @@ impl TestContext {
         let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
-            .execute_block((metadata.id(), txns.clone()), parent_id)
+            .execute_block(
+                ExecutableBlock::new(
+                    metadata.id(),
+                    ExecutableTransactions::Unsharded(txns.clone()),
+                ),
+                parent_id,
+            )
             .unwrap();
         let mut compute_status = result.compute_status().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);

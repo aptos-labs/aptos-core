@@ -6,6 +6,7 @@
 
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
+use aptos_block_partitioner::types::{ExecutableTransactions, SubBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_infallible::Mutex;
@@ -16,10 +17,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus,
-    },
+    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
 use fail::fail_point;
@@ -49,6 +47,20 @@ pub struct ChunkOutput {
 
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
+        transactions: ExecutableTransactions,
+        state_view: CachedStateView,
+    ) -> Result<Self> {
+        match transactions {
+            ExecutableTransactions::Unsharded(txns) => {
+                ChunkOutput::by_transaction_execution_unsharded::<AptosVM>(txns, state_view)
+            },
+            ExecutableTransactions::Sharded(sub_blocks) => {
+                ChunkOutput::by_transaction_execution_sharded::<AptosVM>(sub_blocks, state_view)
+            },
+        }
+    }
+
+    fn by_transaction_execution_unsharded<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
@@ -67,35 +79,44 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_with_gas_limit<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_gas_limit: Option<u64>,
     ) -> Result<Self> {
-        let transaction_outputs = Self::execute_block_with_gas_limit::<V>(
-            transactions.clone(),
-            &state_view,
-            maybe_gas_limit,
-        )?;
+        match transactions {
+            ExecutableTransactions::Unsharded(transactions) => {
+                let transaction_outputs = Self::execute_block_with_gas_limit::<V>(
+                    transactions.clone(),
+                    &state_view,
+                    maybe_gas_limit,
+                )?;
 
-        // to print txn output for debugging, uncomment:
-        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+                // to print txn output for debugging, uncomment:
+                // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
 
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+                update_counters_for_processed_chunk(
+                    &transactions,
+                    &transaction_outputs,
+                    "executed",
+                );
 
-        Ok(Self {
-            transactions,
-            transaction_outputs,
-            state_cache: state_view.into_state_cache(),
-        })
+                Ok(Self {
+                    transactions,
+                    transaction_outputs,
+                    state_cache: state_view.into_state_cache(),
+                })
+            },
+            _ => todo!("Sharded block execution with gas limit is not supported yet"),
+        }
     }
 
-    pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        transactions: Vec<AnalyzedTransaction>,
+    fn by_transaction_execution_sharded<V: VMExecutor>(
+        sub_blocks: Vec<SubBlock>,
         state_view: CachedStateView,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
         let transaction_outputs =
-            Self::execute_block_sharded::<V>(transactions.clone(), state_view_arc.clone())?;
+            Self::execute_block_sharded::<V>(sub_blocks.clone(), state_view_arc.clone())?;
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
@@ -104,9 +125,10 @@ impl ChunkOutput {
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions: transactions
+            transactions: sub_blocks
                 .into_iter()
-                .map(|t| t.into())
+                .flat_map(|b| b.into_transactions_with_deps())
+                .map(|t| t.into_txn().into())
                 .collect::<Vec<Transaction>>(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
@@ -176,12 +198,12 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        transactions: Vec<AnalyzedTransaction>,
+        sub_blocks: Vec<SubBlock>,
         state_view: Arc<CachedStateView>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block_sharded(
             SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            transactions,
+            sub_blocks,
             state_view,
         )?)
     }

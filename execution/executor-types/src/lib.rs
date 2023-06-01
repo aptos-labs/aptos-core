@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
+use aptos_block_partitioner::types::ExecutableTransactions;
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
@@ -90,7 +91,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<Transaction>),
+        block: ExecutableBlock,
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error>;
 
@@ -128,6 +129,27 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn get_block_gas_limit(&self) -> Option<u64>;
 
     fn update_block_gas_limit(&self, block_gas_limit: Option<u64>);
+}
+
+pub struct ExecutableBlock {
+    pub block_id: HashValue,
+    pub transactions: ExecutableTransactions,
+}
+
+impl ExecutableBlock {
+    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
+        Self {
+            block_id,
+            transactions,
+        }
+    }
+
+    pub fn from_unsharded_transactions(
+        block_id: HashValue,
+        transactions: Vec<Transaction>,
+    ) -> Self {
+        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+    }
 }
 
 #[derive(Clone)]

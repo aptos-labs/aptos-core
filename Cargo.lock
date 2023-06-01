@@ -307,6 +307,7 @@ dependencies = [
  "anyhow",
  "aptos-api",
  "aptos-api-types",
+ "aptos-block-partitioner",
  "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
@@ -588,6 +589,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-partitioner",
  "aptos-bounded-executor",
  "aptos-channels",
  "aptos-config",
@@ -1004,6 +1006,7 @@ name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-cached-packages",
  "aptos-config",
  "aptos-consensus-types",
@@ -1042,6 +1045,7 @@ name = "aptos-executor-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
  "aptos-db",
@@ -1108,6 +1112,7 @@ name = "aptos-executor-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -3100,6 +3105,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-gas",
  "aptos-language-e2e-tests",
