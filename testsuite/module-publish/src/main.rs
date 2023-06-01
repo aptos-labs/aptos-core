@@ -23,7 +23,7 @@ fn additional_packages() -> Vec<(&'static str, &'static str)> {
     // Pairs of (package_name, package_path)
     vec![(
         "ambassador_token",
-        "../../aptos-move/move-examples/token_objects/ambassador/move",
+        "../../aptos-move/move-examples/token_objects/ambassador",
     )]
 }
 
