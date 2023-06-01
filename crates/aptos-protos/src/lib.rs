@@ -7,11 +7,8 @@ use move_core_types::{value::MoveTypeLayout, value::MoveStructLayout, u256};
 
 mod pb;
 pub use pb::aptos::*;
-use pbjson::private::base64::encode;
-use serde::de::DeserializeSeed;
 use move_core_types::account_address::AccountAddress;
-use move_core_types::value::{MoveStruct, MoveValue, serialize_values};
-use bcs::from_bytes;
+use move_core_types::value::{MoveStruct, MoveValue};
 
 fn make_url(option: &UninterpretedOption) -> String {
     let mut res = String::new();
@@ -96,7 +93,7 @@ pub fn reserialize(bcs: &[u8], layout: &[u8]) -> Vec<u8> {
 }
 */
 pub fn deserialize(bcs: &[u8], layout: &[u8]) -> Option<MoveStruct> {
-    let layout = bcs::from_bytes::<MoveStructLayout>(bcs).ok()?;
+    let layout = bcs::from_bytes::<MoveStructLayout>(layout).ok()?;
     MoveStruct::simple_deserialize(bcs, &layout).ok()
 }
 
@@ -150,7 +147,7 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
                 *proto = &proto[size..];
                 WireData::LengthDelimited(value)
             },
-            default => return None,
+            _ => return None,
         };
         parsed_fields.push((field_idx, data));
     }
@@ -221,7 +218,7 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
                             let v = as_length_delimited(val)?;
                             v.iter().map(|x| MoveValue::U8(*x)).collect()
                         },
-                        default=> {
+                        _ => {
                             let mut vec = vec![];
                             loop {
                                let x = match elem_layout.as_ref() {
@@ -240,7 +237,7 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
                                    Struct(struct_layout) => {
                                        MoveValue::Struct(proto_deserialize(as_length_delimited(val)?, struct_layout)?)
                                    },
-                                   default => return None,  // cannot happen
+                                   _ => return None,  // cannot happen
                                };
                                vec.push(x);
                                val = match val_from_parsed() { Some(x) => x, None => break };
@@ -290,8 +287,16 @@ fn serialize_length_delim(field_num: u32, value: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(value);
 }
 
-fn proto_serialize_vector_value(vec: &[MoveValue], field_num: u32, out: &mut Vec<u8>) {
+fn proto_serialize_vector_value(vec: &[MoveValue], field_num: u32, top_level: bool, out: &mut Vec<u8>) {
     if vec.is_empty() {
+        // An empty vector at top level is either empty bytes fields which can be omitted
+        // or has zero tag/value pairs which are thus not present. However, an empty vector not
+        // at top-level, ie. a vector inside a vector still needs to be present. A vector inside
+        // a vector is either a bool/u8 vector or a wrapped vector. Both representations are
+        // given by a length-delimited empty string rep.
+        if !top_level {
+            serialize_length_delim(field_num, &[], out);
+        }
         return;
     }
     let first = &vec[0];
@@ -303,12 +308,30 @@ fn proto_serialize_vector_value(vec: &[MoveValue], field_num: u32, out: &mut Vec
                 bytes.push(match v {
                     Bool(v) => if *v { 1u8 } else { 0u8 },
                     U8(v) => *v,
-                    default => return,  // should never happen
+                    _ => return,  // should never happen
                 });
             }
             serialize_length_delim(field_num, &bytes, out);
         },
-        default => for v in vec { proto_serialize_value(v, field_num, out); },
+        Vector(_) => {
+            // Difficult case we have a vector of vectors.
+            for v in vec {
+                let v = match v {
+                    Vector(v) => v,
+                    _ => return,  // should never happen
+                };
+                if top_level {
+                    proto_serialize_vector_value(v, field_num, false, out);
+                } else {
+                    let mut wrapped = vec![];
+                    proto_serialize_vector_value(v, 1, true, &mut wrapped);
+                    serialize_length_delim(field_num, &wrapped, out);
+                }
+            }
+        }
+        _ => for v in vec {
+            proto_serialize_value(v, field_num, out);
+        },
     }
 }
 
@@ -326,7 +349,7 @@ fn proto_serialize_value(value: &MoveValue, field_num: u32, out: &mut Vec<u8>) {
             serialize_length_delim(field_num, v.as_slice(), out);
         },
         Vector(v) => {
-            proto_serialize_vector_value(v, field_num, out);
+            proto_serialize_vector_value(v, field_num, true, out);
         },
         Struct(v) => {
             serialize_length_delim(field_num, &proto_serialize(v), out);
@@ -335,13 +358,13 @@ fn proto_serialize_value(value: &MoveValue, field_num: u32, out: &mut Vec<u8>) {
 }
 
 pub fn proto_serialize(value: &MoveStruct) -> Vec<u8> {
-    let mut res = vec![];
     use MoveStruct::*;
     let fields : Vec<&MoveValue> = match value {
         Runtime(fields) => fields.iter().map(|v| v).collect(),
         WithFields(fields) |
         WithTypes { fields, .. } => fields.iter().map(|(_, v)| v).collect(),
     };
+    let mut res = vec![];
     for (i, field) in fields.into_iter().enumerate() {
         proto_serialize_value(field, i as u32 + 1, &mut res);
     };
