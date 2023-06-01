@@ -313,24 +313,22 @@ fn proto_serialize_vector_value(vec: &[MoveValue], field_num: u32, top_level: bo
             }
             serialize_length_delim(field_num, &bytes, out);
         },
-        Vector(_) => {
+        Vector(_) if top_level => {
             // Difficult case we have a vector of vectors.
             for v in vec {
                 let v = match v {
                     Vector(v) => v,
                     _ => return,  // should never happen
                 };
-                if top_level {
-                    proto_serialize_vector_value(v, field_num, false, out);
-                } else {
-                    let mut wrapped = vec![];
-                    proto_serialize_vector_value(v, 1, true, &mut wrapped);
-                    serialize_length_delim(field_num, &wrapped, out);
-                }
+                proto_serialize_vector_value(v, field_num, false, out);
             }
         }
-        _ => for v in vec {
-            proto_serialize_value(v, field_num, out);
+        _  => if top_level {
+            for v in vec { proto_serialize_value(v, field_num, out); }
+        } else {
+            let mut wrapper = vec![];
+            proto_serialize_vector_value(vec, 1, false, &mut wrapper);
+            serialize_length_delim(field_num, &wrapper, out)
         },
     }
 }
