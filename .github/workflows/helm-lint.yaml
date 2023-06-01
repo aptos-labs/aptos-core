@@ -32,4 +32,5 @@ jobs:
 
       - name: Run Helm Lint
         if: steps.should-run-tests.outputs.SHOULD_RUN == 'true'
-        run: ./testsuite/testrun lint.py helm terraform/helm/*
+        run: ./testrun lint.py helm ../terraform/helm/*
+        working-directory: testsuite
