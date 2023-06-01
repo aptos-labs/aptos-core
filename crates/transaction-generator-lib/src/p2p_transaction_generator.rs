@@ -7,10 +7,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
-use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng, thread_rng};
+use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{cmp::max, sync::Arc};
 use std::cmp::min;
-use std::ops::Index;
 
 
 /// Specifies how to get a given number of samples from an item pool.
@@ -97,7 +96,7 @@ pub struct P2PTransactionGenerator {
 
 impl P2PTransactionGenerator {
     pub fn new(
-        mut rng: StdRng,
+        rng: StdRng,
         send_amount: u64,
         txn_factory: TransactionFactory,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
