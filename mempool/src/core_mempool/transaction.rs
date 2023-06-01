@@ -22,7 +22,7 @@ pub struct MempoolTransaction {
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
-    pub insertion_time: SystemTime,
+    pub insertion_info: InsertionInfo,
     pub was_parked: bool,
 }
 
@@ -34,6 +34,7 @@ impl MempoolTransaction {
         timeline_state: TimelineState,
         seqno: u64,
         insertion_time: SystemTime,
+        client_submitted: bool,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
@@ -44,7 +45,11 @@ impl MempoolTransaction {
             expiration_time,
             ranking_score,
             timeline_state,
-            insertion_time,
+            insertion_info: InsertionInfo {
+                insertion_time,
+                client_submitted,
+                is_end_to_end: timeline_state != TimelineState::NonQualified,
+            },
             was_parked: false,
         }
     }
@@ -84,6 +89,13 @@ pub struct SequenceInfo {
     pub account_sequence_number: u64,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct InsertionInfo {
+    pub insertion_time: SystemTime,
+    pub client_submitted: bool,
+    pub is_end_to_end: bool,
+}
+
 #[cfg(test)]
 mod test {
     use crate::core_mempool::{MempoolTransaction, TimelineState};
@@ -113,6 +125,7 @@ mod test {
             TimelineState::NotReady,
             0,
             SystemTime::now(),
+            false,
         )
     }
 

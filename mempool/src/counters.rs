@@ -93,6 +93,9 @@ pub const E2E_LABEL: &str = "e2e";
 pub const INSERT_LABEL: &str = "insert";
 pub const REMOVE_LABEL: &str = "remove";
 
+pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
+pub const SUBMITTED_BY_BROADCAST_LABEL: &str = "broadcast";
+
 // Histogram buckets that make more sense at larger timescales than DEFAULT_BUCKETS
 const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
     0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0,
@@ -180,11 +183,12 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
     scope: &'static str,
+    submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, scope, bucket])
+        .with_label_values(&[stage, scope, submitted_by, bucket])
         .observe(latency.as_secs_f64());
 }
 
@@ -196,7 +200,13 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "Latency of txn reaching various stages in core mempool after insertion",
         LARGER_LATENCY_BUCKETS.to_vec()
     );
-    register_histogram_vec!(histogram_opts, &["stage", "scope", "bucket"]).unwrap()
+    register_histogram_vec!(histogram_opts, &[
+        "stage",
+        "scope",
+        "submitted_by",
+        "bucket"
+    ])
+    .unwrap()
 });
 
 pub fn core_mempool_txn_ranking_score(
