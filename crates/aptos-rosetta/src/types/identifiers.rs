@@ -43,10 +43,7 @@ impl AccountIdentifier {
             }
         }
 
-        Err(ApiError::InvalidInput(Some(format!(
-            "Invalid pool address {:?}",
-            self
-        ))))
+        Ok(None)
     }
 
     pub fn base_account(address: AccountAddress) -> Self {

@@ -22,9 +22,9 @@ use std::{
 };
 
 static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
-    Lazy::new(|| EntryFunctionId::from_str("0x1::DelegationPool::get_stake").unwrap());
+    Lazy::new(|| "0x1::delegation_pool::get_stake".parse().unwrap());
 static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
-    Lazy::new(|| EntryFunctionId::from_str("0x1::Stake::get_lockup_secs").unwrap());
+    Lazy::new(|| "0x1::stake::get_lockup_secs".parse().unwrap());
 
 /// Errors that can be returned by the API
 ///
@@ -355,11 +355,11 @@ pub async fn get_delegation_stake_balances(
 
     let balances_result = balances_response.into_inner();
     if account_identifier.is_delegator_active_stake() {
-        requested_balance = balances_result.get(0).map(|v| v.to_string());
+        requested_balance = balances_result.get(0).and_then(|v| v.as_str().map(|s| s.to_owned()));
     } else if account_identifier.is_delegator_inactive_stake() {
-        requested_balance = balances_result.get(1).map(|v| v.to_string());
+        requested_balance = balances_result.get(1).and_then(|v| v.as_str().map(|s| s.to_owned()));
     } else if account_identifier.is_delegator_pending_inactive_stake() {
-        requested_balance = balances_result.get(2).map(|v| v.to_string());
+        requested_balance = balances_result.get(2).and_then(|v| v.as_str().map(|s| s.to_owned()));
     }
 
     // get lockup_secs
@@ -376,7 +376,8 @@ pub async fn get_delegation_stake_balances(
         Some(version),
     ).await?;
     let lockup_secs_result = lockup_secs_response.into_inner();
-    let lockup_expiration = lockup_secs_result.get(0).and_then(|v| v.as_u64()).unwrap();
+    let lockup_expiration = lockup_secs_result.get(0)
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok())).unwrap_or(0);
 
     if let Some(balance) = requested_balance {
         Ok(Some(BalanceResult {
