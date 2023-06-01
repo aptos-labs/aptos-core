@@ -990,15 +990,15 @@ impl EpochManager {
                 let execution_config = onchain_execution_config.unwrap_or_default();
                 self.quorum_store_enabled = self.enable_quorum_store(&consensus_config);
                 self.recovery_mode = false;
-                // self.start_round_manager(
-                //     initial_data,
-                //     epoch_state,
-                //     consensus_config,
-                //     execution_config,
-                // )
-                // .await
-                self.start_dag_driver(initial_data, epoch_state, execution_config)
-                    .await
+                self.start_round_manager(
+                    initial_data,
+                    epoch_state,
+                    consensus_config,
+                    execution_config,
+                )
+                .await
+                // self.start_dag_driver(initial_data, epoch_state, execution_config)
+                //     .await
             },
             LivenessStorageData::PartialRecoveryData(ledger_data) => {
                 self.recovery_mode = true;
