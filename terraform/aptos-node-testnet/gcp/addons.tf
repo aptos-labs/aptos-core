@@ -93,7 +93,7 @@ data "google_dns_managed_zone" "testnet" {
 
 locals {
   zone_project = var.zone_project != "" ? var.zone_project : var.project
-  dns_prefix   = var.workspace_dns ? "${local.workspace_name}.${var.dns_prefix_name}." : "${var.dns_prefix_name}."
+  dns_prefix   = var.workspace_dns ? "${local.workspace_name}." : ""
   domain       = var.zone_name != "" ? trimsuffix("${local.dns_prefix}${data.google_dns_managed_zone.testnet[0].dns_name}", ".") : null
 }
 
@@ -117,11 +117,36 @@ resource "helm_release" "external-dns" {
       domainFilters = var.zone_name != "" ? [data.google_dns_managed_zone.testnet[0].dns_name] : []
       extraArgs = [
         "--google-project=${local.zone_project}",
-        "--txt-owner-id=${local.workspace_name}",
-        "--txt-prefix=aptos",
+        "--txt-owner-id=aptos-${local.workspace_name}",
+        # "--txt-prefix=aptos-",
       ]
     })
   ]
+}
+
+resource "google_compute_global_address" "testnet-addons-ingress" {
+  count   = var.zone_name != "" ? 1 : 0
+  project = var.project
+  name    = "aptos-${local.workspace_name}-testnet-addons-ingress"
+}
+
+# This kind of certificate is a GCE resource, and has to be
+# added to the ingress using ingress.gcp.kubernetes.io/pre-shared-cert.
+# K8s ManagedCertificate resources use
+# networking.gke.io/managed-certificates instead.
+resource "google_compute_managed_ssl_certificate" "testnet-addons" {
+  count   = var.zone_name != "" ? 1 : 0
+  project = var.project
+  name    = "aptos-${local.workspace_name}-testnet-addons"
+  lifecycle {
+    create_before_destroy = true
+  }
+  managed {
+    domains = [
+      "${local.domain}.",
+      "api.${local.domain}.",
+    ]
+  }
 }
 
 resource "helm_release" "testnet-addons" {
@@ -144,11 +169,10 @@ resource "helm_release" "testnet-addons" {
       }
       service = {
         domain = local.domain
-        # aws_tags = local.aws_tags
       }
       ingress = {
-        # acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
-        # loadBalancerSourceRanges = # var.client_sources_ipv4
+        gcp_static_ip   = "aptos-${local.workspace_name}-testnet-addons-ingress"
+        gcp_certificate = "aptos-${local.workspace_name}-testnet-addons"
       }
       load_test = {
         fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])
