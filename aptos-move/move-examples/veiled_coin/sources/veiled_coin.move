@@ -16,12 +16,12 @@
 ///
 /// **WARNING:** This module is **experimental**! It is *NOT* production-ready. Specifically:
 ///
-///  1. deploying this module will likely lead to lost funds
-///  2. this module has not been cryptographically-audited
-///  3. the current implementation is vulnerable to _front-running attacks_ as described in the Zether paper [BAZB20].
-///  4. there is no integration with wallet software which, for veiled accounts, must maintain an additional ElGamal
-///    encryption keypair
-///  5. there is no support for rotating the ElGamal encryption public key of a veiled account
+///  1. Deploying this module will likely lead to lost funds.
+///  2. This module has not been cryptographically-audited.
+///  3. The current implementation is vulnerable to _front-running attacks_ as described in the Zether paper [BAZB20].
+///  4. There is no integration with wallet software which, for veiled accounts, must maintain an additional ElGamal
+///    encryption keypair.
+///  5. There is no support for rotating the ElGamal encryption public key of a veiled account.
 ///
 /// ### Veiled coin amounts as truncated `u32`'s
 ///
@@ -183,15 +183,26 @@ module veiled_coin::veiled_coin {
 
     /// A cryptographic proof that ensures correctness of a veiled-to-veiled coin transfer.
     struct VeiledTransferProof<phantom CoinType> has drop {
+        sigma_proof: FullSigmaProof<CoinType>,
         new_balance_proof: RangeProof,
         veiled_amount_proof: RangeProof,
-        sigma_proof: FullSigmaProof<CoinType>,
     }
 
     /// A cryptographic proof that ensures correctness of a veiled-to-*unveiled* coin transfer.
     struct UnveiledWithdrawalProof<phantom CoinType> has drop {
         sigma_proof: ElGamalToPedSigmaProof<CoinType>,
         new_balance_proof: RangeProof,
+    }
+
+
+    /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
+    /// (A more detailed description can be found in `unveil_sigma_protocol_verify`.)
+    struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
+        x1: RistrettoPoint,
+        x2: RistrettoPoint,
+        x3: RistrettoPoint,
+        alpha1: Scalar,
+        alpha2: Scalar,
     }
 
     /// A $\Sigma$-protocol proof used as part of a `VeiledTransferProof`.
@@ -209,16 +220,6 @@ module veiled_coin::veiled_coin {
         alpha2: Scalar,
         alpha3: Scalar,
         alpha4: Scalar,
-    }
-
-    /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
-    /// (A more detailed description can be found in `unveil_sigma_protocol_verify`.)
-    struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
-        x1: RistrettoPoint,
-        x2: RistrettoPoint,
-        x3: RistrettoPoint,
-        alpha1: Scalar,
-        alpha2: Scalar,
     }
 
     /// Event emitted when some amount of veiled coins were deposited into an account.
@@ -316,7 +317,7 @@ module veiled_coin::veiled_coin {
         let new_balance_comm = std::option::extract(&mut new_balance_comm);
 
         let withdrawal_proof = UnveiledWithdrawalProof {
-           sigma_proof, 
+           sigma_proof,
            new_balance_proof,
         };
 
@@ -824,7 +825,7 @@ module veiled_coin::veiled_coin {
         })
     }
 
-    /// Deserializes and returns a `ElGamalToPedSigmaProof` given its byte representation (see protocol description in
+    /// Deserializes and returns an `ElGamalToPedSigmaProof` given its byte representation (see protocol description in
     /// `unveil_sigma_protocol_verify`)
     ///
     /// Elements at the end of the `ElGamalToPedSigmaProof` struct are expected to be at the start of the byte vector, and
@@ -870,7 +871,7 @@ module veiled_coin::veiled_coin {
         let alpha2 = std::option::extract(&mut alpha2);
 
         std::option::some(ElGamalToPedSigmaProof {
-            x1, x2, x3, alpha1, alpha2 
+            x1, x2, x3, alpha1, alpha2
         })
     }
 
@@ -879,9 +880,9 @@ module veiled_coin::veiled_coin {
     /// randomness $r$, with `sender_pk` and `recipient_pk` respectively. In addition, it proves that ElGamal ciphertext
     /// `sender_updated_balance_ct` and Pedersen commitment `sender_updated_balance_comm` encode the same value $b$
     /// with the same randomness $r$, where the former uses `sender_pk`. It also proves that Pedersen commitment
-    /// `transfer_value` encodes the same value $v$ as `withdraw_ct` and `deposit_ct`, with the same randomness `r`. 
-    /// These Pedersen commitments are needed to ensure that the range proofs done elsewhere on the left part of the 
-    /// ElGamal ciphertexts cannot be forged by a user with their secret key, by providing binding for $v$ and $b$. 
+    /// `transfer_value` encodes the same value $v$ as `withdraw_ct` and `deposit_ct`, with the same randomness `r`.
+    /// These Pedersen commitments are needed to ensure that the range proofs done elsewhere on the left part of the
+    /// ElGamal ciphertexts cannot be forged by a user with their secret key, by providing binding for $v$ and $b$.
     ///
     /// # Cryptographic details
     ///
@@ -1080,7 +1081,7 @@ module veiled_coin::veiled_coin {
     ///  - $(c1, c2)$, the ElGamal ecnryption of the sender's updated balance $b$ with updated randomness $r$ after their transaction is sent
     ///  - $c$, the Pedersen commitment to $b$ with randomness $r$, using fixed randomness base $H$
     ///
-    /// The previse relation being proved is as follows: 
+    /// The previse relation being proved is as follows:
     ///
     /// ```
     /// R(
@@ -1097,7 +1098,7 @@ module veiled_coin::veiled_coin {
         sender_updated_balance_ct: &elgamal::Ciphertext,
         sender_updated_balance_comm: &pedersen::Commitment,
         proof: &ElGamalToPedSigmaProof<CoinType>)
-    { 
+    {
         let (c1, c2) = elgamal::ciphertext_as_points(sender_updated_balance_ct);
         let c = pedersen::commitment_as_point(sender_updated_balance_comm);
         let h = pedersen::randomness_base_for_bulletproof();
@@ -1126,11 +1127,11 @@ module veiled_coin::veiled_coin {
         assert!(ristretto255::point_equals(&c2_acc, &y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         // \rho * c + X_3 =? \alpha_2 * g + \alpha_1 * h
-        let c_acc = ristretto255::point_mul(c, &rho); 
+        let c_acc = ristretto255::point_mul(c, &rho);
         ristretto255::point_add_assign(&mut c_acc, &proof.x3);
         let h_alpha1 = ristretto255::point_mul(&h, &proof.alpha1);
         ristretto255::point_add_assign(&mut h_alpha1, &g_alpha2);
-        assert!(ristretto255::point_equals(&c_acc, &h_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED)); 
+        assert!(ristretto255::point_equals(&c_acc, &h_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
     }
 
     /// TODO: explain the challenge derivation as a function of the parameters
@@ -1155,9 +1156,9 @@ module veiled_coin::veiled_coin {
     {
         let (big_c, d) = elgamal::ciphertext_as_points(withdraw_ct);
         let (big_bar_c, _) = elgamal::ciphertext_as_points(deposit_ct);
-        let (c1, c2) = elgamal::ciphertext_as_points(sender_updated_balance); 
+        let (c1, c2) = elgamal::ciphertext_as_points(sender_updated_balance);
         let c = pedersen::commitment_as_point(balance);
-        let bar_c = pedersen::commitment_as_point(transfer_value); 
+        let bar_c = pedersen::commitment_as_point(transfer_value);
 
         let hash_input = vector::empty<u8>();
 
@@ -1361,7 +1362,7 @@ module veiled_coin::veiled_coin {
         let h = pedersen::randomness_base_for_bulletproof();
 
         // X1 <- x1 * g
-        let big_x1 = ristretto255::basepoint_mul(&x1); 
+        let big_x1 = ristretto255::basepoint_mul(&x1);
 
         let g_x2 = ristretto255::basepoint_mul(&x2);
         // X2 <- x2 * g + x1 * y
@@ -1569,13 +1570,13 @@ module veiled_coin::veiled_coin {
         );
 
         sigma_protocol_verify(
-            &sender_pk, 
-            &recipient_pk, 
-            &withdraw_ct, 
-            &deposit_ct, 
-            &updated_balance_ct, 
-            &updated_balance_comm, 
-            &value_comm, 
+            &sender_pk,
+            &recipient_pk,
+            &withdraw_ct,
+            &deposit_ct,
+            &updated_balance_ct,
+            &updated_balance_comm,
+            &value_comm,
             &sigma_proof
         );
     }
