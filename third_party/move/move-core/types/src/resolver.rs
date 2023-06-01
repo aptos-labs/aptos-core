@@ -8,6 +8,7 @@ use crate::{
     metadata::Metadata,
 };
 use anyhow::Error;
+use crate::gas_algebra::NumBytes;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -41,7 +42,7 @@ pub trait ResourceResolver {
         address: &AccountAddress,
         typ: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error>;
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
@@ -51,7 +52,7 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
         address: &AccountAddress,
         typ: &StructTag,
     ) -> Result<Option<Vec<u8>>, Error> {
-        self.get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
+        Ok(self.get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?.0)
     }
 }
 
@@ -63,7 +64,7 @@ impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
         (**self).get_resource_with_metadata(address, tag, metadata)
     }
 }

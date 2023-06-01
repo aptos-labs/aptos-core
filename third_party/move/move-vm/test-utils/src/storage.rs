@@ -17,6 +17,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
 };
+use move_core_types::gas_algebra::NumBytes;
 
 /// A dummy storage containing no modules or resources.
 #[derive(Debug, Clone)]
@@ -44,8 +45,8 @@ impl ResourceResolver for BlankStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>> {
-        Ok(None)
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>)> {
+        Ok((None, None))
     }
 }
 
@@ -90,10 +91,12 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
-                return Ok(blob_opt.clone().ok());
+                let buf = blob_opt.clone().ok();
+                let len = buf.as_ref().and_then(|b| Some(NumBytes::from(b.len() as u64)));
+                return Ok((buf, len));
             }
         }
 
@@ -303,11 +306,13 @@ impl ResourceResolver for InMemoryStorage {
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
         if let Some(account_storage) = self.accounts.get(address) {
-            return Ok(account_storage.resources.get(tag).cloned());
+            let buf = account_storage.resources.get(tag).cloned();
+            let len = buf.as_ref().and_then(|v| Some(NumBytes::new(v.len() as u64)));
+            return Ok((buf, len));
         }
-        Ok(None)
+        Ok((None, None))
     }
 }
 
