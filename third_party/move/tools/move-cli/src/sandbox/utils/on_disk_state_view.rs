@@ -13,6 +13,7 @@ use move_bytecode_utils::module_cache::GetModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,
+    gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
@@ -418,8 +419,10 @@ impl ResourceResolver for OnDiskStateView {
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        self.get_resource_bytes(*address, struct_tag.clone())
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), anyhow::Error> {
+        let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
+        let len = buf.as_ref().map(|b| NumBytes::from(b.len() as u64));
+        Ok((buf, len))
     }
 }
 

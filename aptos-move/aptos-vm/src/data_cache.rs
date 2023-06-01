@@ -19,15 +19,18 @@ use aptos_types::{
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
+    gas_algebra::NumBytes,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
-use std::cell::Cell;
-use move_core_types::gas_algebra::NumBytes;
+use std::{
+    cell::{Cell, RefCell},
+    collections::BTreeMap,
+    ops::Deref,
+};
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,

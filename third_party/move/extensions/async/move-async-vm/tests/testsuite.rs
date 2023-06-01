@@ -19,6 +19,7 @@ use move_compiler::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
+    gas_algebra::NumBytes,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
@@ -398,14 +399,15 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
         let res = self
             .harness
             .resource_store
             .borrow()
             .get(&(*address, typ.clone()))
             .cloned();
-        Ok(res)
+        let len = res.as_ref().map(|r| NumBytes::from(r.len() as u64));
+        Ok((res, len))
     }
 }
 

@@ -7,6 +7,7 @@ use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
+    gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
@@ -526,7 +527,7 @@ impl ResourceResolver for BogusStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), anyhow::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

@@ -15,6 +15,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    gas_algebra::NumBytes,
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -265,8 +266,8 @@ impl ResourceResolver for RemoteStore {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
-        Ok(None)
+    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), anyhow::Error> {
+        Ok((None, None))
     }
 }
 

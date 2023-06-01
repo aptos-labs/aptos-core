@@ -4,11 +4,11 @@
 
 use crate::{
     account_address::AccountAddress,
+    gas_algebra::NumBytes,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
 use anyhow::Error;
-use crate::gas_algebra::NumBytes;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -52,7 +52,9 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
         address: &AccountAddress,
         typ: &StructTag,
     ) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?.0)
+        Ok(self
+            .get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?
+            .0)
     }
 }
 

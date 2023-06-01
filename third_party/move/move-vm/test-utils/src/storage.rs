@@ -6,6 +6,7 @@ use anyhow::{bail, Error, Result};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
+    gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
@@ -17,7 +18,6 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
 };
-use move_core_types::gas_algebra::NumBytes;
 
 /// A dummy storage containing no modules or resources.
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 let buf = blob_opt.clone().ok();
-                let len = buf.as_ref().and_then(|b| Some(NumBytes::from(b.len() as u64)));
+                let len = buf.as_ref().map(|b| NumBytes::from(b.len() as u64));
                 return Ok((buf, len));
             }
         }
@@ -309,7 +309,7 @@ impl ResourceResolver for InMemoryStorage {
     ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
-            let len = buf.as_ref().and_then(|v| Some(NumBytes::new(v.len() as u64)));
+            let len = buf.as_ref().map(|v| NumBytes::from(v.len() as u64));
             return Ok((buf, len));
         }
         Ok((None, None))
