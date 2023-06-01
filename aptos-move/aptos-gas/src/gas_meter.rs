@@ -32,8 +32,10 @@ use move_vm_types::{
 };
 use std::collections::BTreeMap;
 // This gas feature version must be bumped up when one of the following conditions arises
-//  - a new gas parameter is added in `aptos_framework.rs`
-//  - [what else]?
+//  - a new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
+//  - Changing how gas is calculated in any way (needs to be gated by a new feature version in the
+//    first place)
+//  - << What else? >>
 //
 // Change log:
 // - V9
