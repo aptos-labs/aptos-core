@@ -30,7 +30,7 @@ use aptos_types::{
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::state_key::StateKey,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -87,8 +87,9 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, executor.get_block_gas_limit())),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)),
             executor.committed_block_id(),
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);

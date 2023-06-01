@@ -8,6 +8,8 @@
 /// The rank is determined by the level such that the rank is Bronze if the level is between 0 and 9,
 /// Silver if the level is between 10 and 19, and Gold if the level is 20 or greater.
 /// The rank is stored in the property map, thus displayed in a wallet as a trait of the token.
+/// The token uri is the concatenation of the base uri and the rank, where the base uri is given
+/// as an argument of the minting function. So, the token uri changes when the rank changes.
 module token_objects::ambassador {
     use std::error;
     use std::option;
@@ -47,12 +49,16 @@ module token_objects::ambassador {
 
     /// The ambassador token
     struct AmbassadorToken has key {
+        /// Used to mutate the token uri
+        mutator_ref: token::MutatorRef,
         /// Used to burn.
         burn_ref: token::BurnRef,
         /// Used to mutate properties
         property_mutator_ref: property_map::MutatorRef,
         /// Used to emit LevelUpdateEvent
         level_update_events: event::EventHandle<LevelUpdateEvent>,
+        /// the base URI of the token
+        base_uri: String,
     }
 
     /// The ambassador level
@@ -84,6 +90,20 @@ module token_objects::ambassador {
     /// Returns the ambassador rank of the token
     public fun ambassador_rank(token: Object<AmbassadorToken>): String {
         property_map::read_string(&token, &string::utf8(b"Rank"))
+    }
+
+    #[view]
+    /// Returns the ambassador level of the token of the address
+    public fun ambassador_level_from_address(addr: address): u64 acquires AmbassadorLevel {
+        let token = object::address_to_object<AmbassadorToken>(addr);
+        ambassador_level(token)
+    }
+
+    #[view]
+    /// Returns the ambassador rank of the token of the address
+    public fun ambassador_rank_from_address(addr: address): String {
+        let token = object::address_to_object<AmbassadorToken>(addr);
+        ambassador_rank(token)
     }
 
     /// Creates the ambassador collection. This function creates a collection with unlimited supply using
@@ -121,13 +141,15 @@ module token_objects::ambassador {
         creator: &signer,
         description: String,
         name: String,
-        uri: String,
+        base_uri: String,
         soul_bound_to: address,
     ) {
         // The collection name is used to locate the collection object and to create a new token object.
         let collection = string::utf8(COLLECTION_NAME);
         // Creates the ambassador token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
+        let uri = base_uri;
+        string::append(&mut uri, string::utf8(RANK_BRONZE));
         let constructor_ref = token::create_named_token(
             creator,
             collection,
@@ -141,6 +163,7 @@ module token_objects::ambassador {
         // (e.g., AmbassadorLevel) under the token object address. The refs are used to manage the token.
         let object_signer = object::generate_signer(&constructor_ref);
         let transfer_ref = object::generate_transfer_ref(&constructor_ref);
+        let mutator_ref = token::generate_mutator_ref(&constructor_ref);
         let burn_ref = token::generate_burn_ref(&constructor_ref);
         let property_mutator_ref = property_map::generate_mutator_ref(&constructor_ref);
 
@@ -165,9 +188,11 @@ module token_objects::ambassador {
 
         // Publishes the AmbassadorToken resource with the refs and the event handle for `LevelUpdateEvent`.
         let ambassador_token = AmbassadorToken {
+            mutator_ref,
             burn_ref,
             property_mutator_ref,
             level_update_events: object::new_event_handle(&object_signer),
+            base_uri
         };
         move_to(&object_signer, ambassador_token);
     }
@@ -178,9 +203,11 @@ module token_objects::ambassador {
         authorize_creator(creator, &token);
         let ambassador_token = move_from<AmbassadorToken>(object::object_address(&token));
         let AmbassadorToken {
+            mutator_ref: _,
             burn_ref,
             property_mutator_ref,
             level_update_events,
+            base_uri: _
         } = ambassador_token;
 
         event::destroy_handle(level_update_events);
@@ -229,10 +256,15 @@ module token_objects::ambassador {
         };
 
         let token_address = object::object_address(&token);
+        let ambassador_token = borrow_global<AmbassadorToken>(token_address);
         // Gets `property_mutator_ref` to update the rank in the property map.
-        let property_mutator_ref = &borrow_global<AmbassadorToken>(token_address).property_mutator_ref;
+        let property_mutator_ref = &ambassador_token.property_mutator_ref;
         // Updates the rank in the property map.
         property_map::update_typed(property_mutator_ref, &string::utf8(b"Rank"), string::utf8(new_rank));
+        // Updates the token URI based on the new rank.
+        let uri = ambassador_token.base_uri;
+        string::append(&mut uri, string::utf8(new_rank));
+        token::set_uri(&ambassador_token.mutator_ref, uri);
     }
 
     /// Authorizes the creator of the token. Asserts that the token exists and the creator of the token
@@ -261,7 +293,7 @@ module token_objects::ambassador {
         // -------------------------------------------
         let token_name = string::utf8(b"Ambassador Token #1");
         let token_description = string::utf8(b"Ambassador Token #1 Description");
-        let token_uri = string::utf8(b"Ambassador Token #1 URI");
+        let token_uri = string::utf8(b"Ambassador Token #1 URI/");
         let user1_addr = signer::address_of(user1);
         // Creates the Ambassador token for User1.
         mint_ambassador_token(
@@ -288,12 +320,13 @@ module token_objects::ambassador {
         assert!(ambassador_level(token) == 0, 2);
         // Asserts that the initial rank of the token is "Bronze".
         assert!(ambassador_rank(token) == string::utf8(RANK_BRONZE), 3);
+        assert!(token::uri(token) == string::utf8(b"Ambassador Token #1 URI/Bronze"), 4);
         // `creator` sets the level to 15.
         set_ambassador_level(creator, token, 15);
         // Asserts that the level is updated to 15.
         assert!(ambassador_level(token) == 15, 4);
         // Asserts that the rank is updated to "Silver" which is the expected rank for level 15.
-        assert!(ambassador_rank(token) == string::utf8(RANK_SILVER), 5);
+        assert!(token::uri(token) == string::utf8(b"Ambassador Token #1 URI/Silver"), 5);
 
         // ------------------------
         // Creator burns the token.

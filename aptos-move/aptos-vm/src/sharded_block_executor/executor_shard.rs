@@ -20,7 +20,6 @@ pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-    maybe_gas_limit: Option<u64>,
 }
 
 impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
@@ -30,7 +29,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
         num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
         result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-        maybe_gas_limit: Option<u64>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -49,7 +47,6 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
             executor_thread_pool,
             command_rx,
             result_tx,
-            maybe_gas_limit,
         }
     }
 
@@ -61,6 +58,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 ) => {
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
@@ -72,7 +70,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                         transactions,
                         state_view.as_ref(),
                         concurrency_level_per_shard,
-                        self.maybe_gas_limit,
+                        maybe_block_gas_limit,
                     );
                     drop(state_view);
                     self.result_tx.send(ret).unwrap();

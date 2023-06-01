@@ -305,6 +305,7 @@ async fn create_driver_for_tests(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         time_service.clone(),
+        db_rw.reader.clone(),
         network_client,
         None,
     );
