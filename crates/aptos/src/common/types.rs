@@ -29,7 +29,7 @@ use aptos_logger::Level;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
-    Client, Transaction,
+    AptosBaseUrl, Client, Transaction,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
@@ -62,6 +62,9 @@ const US_IN_SECS: u64 = 1_000_000;
 const ACCEPTED_CLOCK_SKEW_US: u64 = 5 * US_IN_SECS;
 pub const DEFAULT_EXPIRATION_SECS: u64 = 30;
 pub const DEFAULT_PROFILE: &str = "default";
+
+// Custom header value to identify the client
+const X_APTOS_CLIENT_VALUE: &str = concat!("aptos-cli/", env!("CARGO_PKG_VERSION"));
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -905,11 +908,10 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        Ok(Client::new_with_timeout_and_user_agent(
-            self.url(profile)?,
-            Duration::from_secs(self.connection_timeout_secs),
-            USER_AGENT,
-        ))
+        Ok(Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
+            .timeout(Duration::from_secs(self.connection_timeout_secs))
+            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?
+            .build())
     }
 }
 
