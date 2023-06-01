@@ -551,7 +551,7 @@ impl MoveHarness {
             CORE_CODE_ADDRESS,
             GasScheduleV2::struct_tag(),
             &GasScheduleV2 {
-                feature_version,
+                feature_version: feature_version,
                 entries: gas_params.to_on_chain_gas_schedule(feature_version),
             },
         );
