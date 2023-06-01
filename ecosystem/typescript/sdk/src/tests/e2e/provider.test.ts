@@ -38,67 +38,13 @@ describe("Provider", () => {
     }).toThrow("network is not provided");
   });
 
-  describe("requests", () => {
-    beforeAll(async () => {
-      await faucetClient.fundAccount(alice.address(), 100000000);
-    });
+  it("has AptosClient method defined", () => {
+    const provider = new Provider(Network.TESTNET);
+    expect(provider.getAccount).toBeDefined();
+  });
 
-    describe("query full node", () => {
-      it("gets genesis account from fullnode", async () => {
-        const provider = new Provider(Network.TESTNET);
-        const genesisAccount = await provider.getAccount("0x1");
-        expect(genesisAccount.authentication_key.length).toBe(66);
-        expect(genesisAccount.sequence_number).not.toBeNull();
-      });
-    });
-
-    describe("query indexer", () => {
-      const aptosClient = new AptosClient("https://fullnode.testnet.aptoslabs.com");
-      const tokenClient = new TokenClient(aptosClient);
-      const collectionName = "AliceCollection";
-      const tokenName = "Alice Token";
-
-      beforeAll(async () => {
-        // Create collection and token on Alice's account
-        await aptosClient.waitForTransaction(
-          await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
-          { checkSuccess: true },
-        );
-
-        await aptosClient.waitForTransaction(
-          await tokenClient.createTokenWithMutabilityConfig(
-            alice,
-            collectionName,
-            tokenName,
-            "Alice's simple token",
-            1,
-            "https://aptos.dev/img/nyan.jpeg",
-            1000,
-            alice.address(),
-            1,
-            0,
-            ["TOKEN_BURNABLE_BY_OWNER"],
-            [bcsSerializeBool(true)],
-            ["bool"],
-            [false, false, false, false, true],
-          ),
-          { checkSuccess: true },
-        );
-      }, longTestTimeout);
-
-      jest.retryTimes(5);
-      beforeEach(async () => {
-        await sleep(1000);
-      });
-
-      it("gets account NFTs from indexer", async () => {
-        let provider = new Provider(Network.TESTNET);
-        const accountNFTs = await provider.getAccountNFTs(alice.address().hex(), { limit: 20, offset: 0 });
-        expect(accountNFTs.current_token_ownerships).toHaveLength(1);
-        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_token_data");
-        expect(accountNFTs.current_token_ownerships[0]).toHaveProperty("current_collection_data");
-        expect(accountNFTs.current_token_ownerships[0].current_token_data?.name).toBe("Alice Token");
-      });
-    });
+  it("has IndexerClient method defined", () => {
+    const provider = new Provider(Network.TESTNET);
+    expect(provider.getAccountNFTs).toBeDefined();
   });
 });

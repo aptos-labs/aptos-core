@@ -23,27 +23,33 @@ impl ServerArgs {
     where
         C: RunnableConfig,
     {
-        let config = load::<GenericConfig<C>>(&self.config_path)?;
         // Set up the server.
         setup_logging();
         setup_panic_handler();
-
-        let runtime = aptos_runtimes::spawn_named_runtime(config.get_server_name(), None);
-        let health_port = config.health_check_port;
-        // Start liveness and readiness probes.
-        let task_handler = runtime.spawn(async move {
-            register_probes_and_metrics_handler(health_port).await;
-            Ok(())
-        });
-        let main_task_handler = runtime.spawn(async move { config.run().await });
-        let results = futures::future::join_all(vec![task_handler, main_task_handler]).await;
-        let errors = results.iter().filter(|r| r.is_err()).collect::<Vec<_>>();
-        if !errors.is_empty() {
-            return Err(anyhow::anyhow!("Failed to run server: {:?}", errors));
-        }
-        // TODO(larry): fix the dropped runtime issue.
-        Ok(())
+        let config = load::<GenericConfig<C>>(&self.config_path)?;
+        run_server_with_config(config).await
     }
+}
+
+pub async fn run_server_with_config<C>(config: GenericConfig<C>) -> Result<()>
+where
+    C: RunnableConfig,
+{
+    let runtime = aptos_runtimes::spawn_named_runtime(config.get_server_name(), None);
+    let health_port = config.health_check_port;
+    // Start liveness and readiness probes.
+    let task_handler = runtime.spawn(async move {
+        register_probes_and_metrics_handler(health_port).await;
+        Ok(())
+    });
+    let main_task_handler = runtime.spawn(async move { config.run().await });
+    let results = futures::future::join_all(vec![task_handler, main_task_handler]).await;
+    let errors = results.iter().filter(|r| r.is_err()).collect::<Vec<_>>();
+    if !errors.is_empty() {
+        return Err(anyhow::anyhow!("Failed to run server: {:?}", errors));
+    }
+    // TODO(larry): fix the dropped runtime issue.
+    Ok(())
 }
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -97,7 +103,7 @@ pub struct CrashInfo {
 /// Tokio's default behavior is to catch panics and ignore them.  Invoking this function will
 /// ensure that all subsequent thread panics (even Tokio threads) will report the
 /// details/backtrace and then exit.
-fn setup_panic_handler() {
+pub fn setup_panic_handler() {
     std::panic::set_hook(Box::new(move |pi: &PanicInfo<'_>| {
         handle_panic(pi);
     }));
@@ -119,7 +125,7 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
 }
 
 /// Set up logging for the server.
-fn setup_logging() {
+pub fn setup_logging() {
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
