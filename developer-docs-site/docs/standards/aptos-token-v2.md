@@ -155,7 +155,7 @@ struct MyCollectionMetadata has key {
 
 public entry fun create_collection(creator: &signer) {
     // Constructor ref is a non-storable struct returned when creating a new object.
-    // It can be exchanged for signer to add resources to the collection object.
+    // It can generate an object signer to add resources to the collection object.
     let collection_constructor_ref = &collection::create_unlimited_collection(
         creator,
         "My Collection Description",
