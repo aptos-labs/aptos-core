@@ -5,6 +5,7 @@
 from common import OTHER_ACCOUNT_ONE, TestError
 from test_helpers import RunHelper
 from test_results import test_case
+import requests
 
 
 @test_case
@@ -34,6 +35,14 @@ def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
     if balance == amount_in_octa:
         raise TestError(
             f"Account {run_helper.get_account_info().account_address} has balance {balance}, expected {amount_in_octa}"
+        )
+    
+    # Make sure the aptos-rust-sdk header is included on the original request
+    response = requests.get("http://127.0.0.1:9101/metrics/")
+    
+    if "aptos-rust-sdk" not in response.text:
+        raise TestError(
+            "request should contains the correct aptos header: aptos-rust-sdk"
         )
 
 
