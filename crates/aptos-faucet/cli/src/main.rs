@@ -74,8 +74,8 @@ impl FaucetCliArgs {
             Duration::from_secs(30),
             None,
             self.max_gas_amount,
-            10,
             15,
+            20,
             true,
         );
 
