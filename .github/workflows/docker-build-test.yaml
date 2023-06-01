@@ -179,7 +179,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
       github.event.pull_request.auto_merge != null ||
       contains(github.event.pull_request.body, '#e2e')
-    uses: ./.github/workflows/sdk-release.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/sdk-release.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}

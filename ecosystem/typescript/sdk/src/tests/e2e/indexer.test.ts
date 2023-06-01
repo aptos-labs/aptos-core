@@ -5,7 +5,7 @@ import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import { Network, NetworkToIndexerAPI, sleep } from "../../utils";
 import { Provider } from "../../providers";
 import { AptosToken } from "../../plugins";
 
@@ -25,19 +25,22 @@ const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
 
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
+    const address1 = "702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address1);
+    }).rejects.toThrow(`${address1} is less than 66 chars long.`);
 
+    const address2 = "0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address2);
+    }).rejects.toThrow(`${address2} is less than 66 chars long.`);
   });
 
   it("should not throw an error when account address is missing 0x", async () => {
+    const address = "790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).not.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address);
+    }).not.toThrow();
   });
 
   beforeAll(async () => {
