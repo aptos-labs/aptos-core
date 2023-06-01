@@ -226,6 +226,10 @@ impl K8sSwarm {
         Ok(network_chaos_specs.join("\n---\n"))
     }
 
+    /// Creates the CPU stress template, which can be used to inject CPU stress into a pod.
+    /// This can be used to simulate nodes with different available CPU resource even though the
+    /// nodes have identical hardware. For example, a node with 4 cores can be simulated as a node
+    /// with 2 cores by setting num_workers to 2.
     fn create_cpu_stress_template(&self, swarm_cpu_stress: &SwarmCpuStress) -> Result<String> {
         let mut cpu_stress_specs = vec![];
 

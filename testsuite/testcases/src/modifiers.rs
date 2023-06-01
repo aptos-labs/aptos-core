@@ -201,11 +201,12 @@ impl Test for NetworkUnreliabilityTest {
 #[derive(Clone)]
 pub struct CpuChaosConfig {
     pub num_groups: usize,
+    pub load_per_worker: u64,
 }
 
 impl Default for CpuChaosConfig {
     fn default() -> Self {
-        Self { num_groups: 4 }
+        Self { num_groups: 4, load_per_worker: 100 }
     }
 }
 
@@ -219,8 +220,8 @@ impl Test for CpuChaosTest {
     }
 }
 
-fn create_cpu_stress_template(all_validators: Vec<PeerId>, num_groups: usize) -> SwarmCpuStress {
-    let validator_chunks = chunk_validators(all_validators, num_groups);
+fn create_cpu_stress_template(all_validators: Vec<PeerId>, config: &CpuChaosConfig) -> SwarmCpuStress {
+    let validator_chunks = chunk_validators(all_validators, config.num_groups);
 
     let group_cpu_stresses = validator_chunks
         .into_iter()
@@ -228,8 +229,8 @@ fn create_cpu_stress_template(all_validators: Vec<PeerId>, num_groups: usize) ->
         .map(|(idx, chunk)| GroupCpuStress {
             name: format!("group-{}-cpu-stress", idx),
             target_nodes: chunk,
-            num_workers: (num_groups - idx) as u64,
-            load_per_worker: 100,
+            num_workers: (config.num_groups - idx) as u64,
+            load_per_worker: config.load_per_worker,
         })
         .collect();
     SwarmCpuStress { group_cpu_stresses }
@@ -245,7 +246,7 @@ impl NetworkLoadTest for CpuChaosTest {
 
         let config = self.override_config.as_ref().cloned().unwrap_or_default();
 
-        let swarm_cpu_stress = create_cpu_stress_template(all_validators, config.num_groups);
+        let swarm_cpu_stress = create_cpu_stress_template(all_validators, &config);
         ctx.swarm()
             .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))?;
 
@@ -257,7 +258,7 @@ impl NetworkLoadTest for CpuChaosTest {
 
         let config = self.override_config.as_ref().cloned().unwrap_or_default();
 
-        let swarm_cpu_stress = create_cpu_stress_template(all_validators, config.num_groups);
+        let swarm_cpu_stress = create_cpu_stress_template(all_validators, &config);
         swarm.remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
     }
 }
