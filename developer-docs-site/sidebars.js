@@ -46,6 +46,7 @@ const sidebars = {
         },
         "concepts/accounts",
         "concepts/resources",
+        "concepts/resource-accounts",
         "concepts/events",
         "concepts/txns-states",
         "concepts/gas-txn-fee",
