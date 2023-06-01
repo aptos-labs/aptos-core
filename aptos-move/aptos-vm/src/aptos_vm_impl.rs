@@ -482,7 +482,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let transaction_validation = self.transaction_validation();
-        let unreachable_error = VMStatus::Error(StatusCode::UNREACHABLE, None);
+        let unreachable_error = VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None);
         let provided_payload = if let Some(payload) = &payload.transaction_payload {
             bcs::to_bytes(&payload).map_err(|_| unreachable_error.clone())?
         } else {
@@ -556,6 +556,13 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
+        fail_point!("move_adapter::run_failure_epilogue", |_| {
+            Err(VMStatus::Error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
         let transaction_validation = self.transaction_validation();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price();

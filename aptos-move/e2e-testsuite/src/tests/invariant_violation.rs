@@ -64,3 +64,42 @@ fn invariant_violation_error() {
         &TransactionStatus::Discard(DiscardedVMStatus::UNKNOWN_INVARIANT_VIOLATION_ERROR),
     );
 }
+
+#[test]
+fn failed_epilogue_no_charge() {
+    let _scenario = fail::FailScenario::setup();
+    fail::cfg(
+        "move_adapter::execute_script_or_entry_function",
+        "100%return",
+    )
+    .unwrap();
+    fail::cfg(
+        "move_adapter::run_failure_epilogue",
+        "100%return",
+    )
+    .unwrap();
+
+    ::aptos_logger::Logger::init_for_testing();
+
+    let mut executor = FakeExecutor::from_head_genesis();
+
+    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
+    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let receiver = executor.create_raw_account_data(100_000, 10);
+    executor.add_account_data(&sender);
+    executor.add_account_data(&receiver);
+
+    let transfer_amount = 1_000;
+    let txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount, 0);
+
+    // execute transaction
+    let output = executor.execute_transaction(txn.clone());
+
+    // If the epilogue execution failed with invariant violation however, this transaction will be discarded.
+    assert_eq!(
+        output.status(),
+        &TransactionStatus::Discard(
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+        ),
+    );
+}

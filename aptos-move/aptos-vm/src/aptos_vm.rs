@@ -510,7 +510,7 @@ impl AptosVM {
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error =
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
                 .with_message("MultiSig transaction error".to_string())
                 .finish(Location::Undefined);
         let provided_payload = if let Some(payload) = &txn_payload.transaction_payload {
