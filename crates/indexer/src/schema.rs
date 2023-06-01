@@ -285,6 +285,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        decimals -> Int8,
     }
 }
 
@@ -639,6 +640,7 @@ diesel::table! {
         is_fungible_v2 -> Nullable<Bool>,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        decimals -> Int8,
     }
 }
 

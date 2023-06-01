@@ -21,3 +21,8 @@ CREATE TABLE IF NOT EXISTS current_token_v2_metadata (
   -- constraints
   PRIMARY KEY (object_address, resource_type)
 );
+-- create table for all structs in token object core
+ALTER TABLE token_datas_v2
+ADD COLUMN IF NOT EXISTS decimals BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE current_token_datas_v2
+ADD COLUMN IF NOT EXISTS decimals BIGINT NOT NULL DEFAULT 0;
