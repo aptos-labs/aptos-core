@@ -11,6 +11,7 @@ from .account import Account
 from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
+from .metadata import Metadata
 from .transactions import (
     EntryFunction,
     MultiAgentRawTransaction,
@@ -20,7 +21,6 @@ from .transactions import (
     TransactionPayload,
 )
 from .type_tag import StructTag, TypeTag
-from .metadata import Metadata
 
 U64_MAX = 18446744073709551615
 
