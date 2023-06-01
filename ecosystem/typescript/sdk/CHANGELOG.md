@@ -5,6 +5,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 ## Unreleased
 
 - Add `x-aptos-client` header to `IndexerClient` requests
+- Add `standardizeAddress` static function to `AccountAddress` class to standardizes an address to the format "0x" followed by 64 lowercase hexadecimal digits.
 
 ## 1.9.1 (2023-05-24)
 
