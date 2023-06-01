@@ -15,6 +15,7 @@ to synchronize configuration changes for the validators.
 -  [Function `disable_reconfiguration`](#0x1_reconfiguration_disable_reconfiguration)
 -  [Function `enable_reconfiguration`](#0x1_reconfiguration_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_reconfiguration_reconfiguration_enabled)
+-  [Function `reconfigure_with_signer`](#0x1_reconfiguration_reconfigure_with_signer)
 -  [Function `reconfigure`](#0x1_reconfiguration_reconfigure)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
@@ -309,6 +310,32 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 <pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>(): bool {
     !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_reconfiguration_reconfigure_with_signer"></a>
+
+## Function `reconfigure_with_signer`
+
+Signal validators to start using new configuration. Must be called from aptos_framework signer.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_with_signer">reconfigure_with_signer</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure_with_signer">reconfigure_with_signer</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>();
 }
 </code></pre>
 

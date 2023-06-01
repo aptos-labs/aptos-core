@@ -370,13 +370,11 @@ async fn execute_release(
     let scripts_path = TempPath::new();
     scripts_path.create_as_dir()?;
 
-    release_config.generate_release_proposal_scripts(
-        if let Some(dir) = &output_dir {
-            dir.as_path()
-        } else {
-            scripts_path.path()
-        },
-    )?;
+    release_config.generate_release_proposal_scripts(if let Some(dir) = &output_dir {
+        dir.as_path()
+    } else {
+        scripts_path.path()
+    })?;
 
     for proposal in release_config.proposals {
         let mut proposal_path = scripts_path.path().to_path_buf();
