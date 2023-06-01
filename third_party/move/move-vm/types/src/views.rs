@@ -5,7 +5,6 @@ use move_core_types::{
     account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
 };
 use std::mem::size_of;
-use move_core_types::language_storage::StructTag;
 
 /// Trait that provides an abstract view into a Move type.
 ///
@@ -14,18 +13,6 @@ use move_core_types::language_storage::StructTag;
 pub trait TypeView {
     /// Returns the `TypeTag` (fully qualified name) of the type.
     fn to_type_tag(&self) -> TypeTag;
-}
-
-impl TypeView for TypeTag {
-    fn to_type_tag(&self) -> TypeTag {
-        self.clone()
-    }
-}
-
-impl TypeView for &StructTag {
-    fn to_type_tag(&self) -> TypeTag {
-        TypeTag::Struct(Box::new((*self).clone()))
-    }
 }
 
 /// Trait that provides an abstract view into a Move Value.
