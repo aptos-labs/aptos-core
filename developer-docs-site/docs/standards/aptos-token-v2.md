@@ -65,7 +65,7 @@ struct ReferenceExample has key {
 ```
 where both `my_collection` and `my_token` are addresses (with `Object<>` wrapper).
 
-Off-chain, the address of an object can be passed along to create a transaction that calls entry functions with `Object<T>`
+Off-chain, the address of the object can be passed along to replace object arguments in entry functions called by transaction creation.
 as arguments. For example:
 ```rust
 public entry fun my_function(my_collection: Object<Collection>) {
