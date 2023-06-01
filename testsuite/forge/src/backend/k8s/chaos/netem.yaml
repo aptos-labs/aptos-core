@@ -1,0 +1,32 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  namespace: {namespace}
+  name: {name} 
+spec:
+  action: netem
+  mode: all 
+  selector:
+    namespaces:
+      - {namespace}
+    expressionSelectors:
+      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
+  delay:
+    latency: "{delay_latency_ms}ms"
+    correlation: "{delay_correlation_percentage}"
+    jitter: "{delay_jitter_ms}ms"
+  loss:
+    loss: "{loss_percentage}"
+    correlation: "{loss_correlation_percentage}"
+  bandwidth:
+    rate: "{rate}mbps"
+    limit: 20971520 # placeholder value. not supported by tc netem
+    buffer: 10000 # placeholder value. not supported by tc netem
+  direction: both
+  target:
+    selector:
+      namespaces:
+        - {namespace}
+      expressionSelectors:
+        - {{ key: app.kubernetes.io/instance, operator: In, values: [{target_instance_labels}] }}
+    mode: all
