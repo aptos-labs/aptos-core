@@ -91,6 +91,8 @@ module aptos_framework::multisig_account {
     const EDUPLICATE_METADATA_KEY: u64 = 16;
     /// The sequence number provided is invalid. It must be between [1, next pending transaction - 1].
     const EINVALID_SEQUENCE_NUMBER: u64 = 17;
+    /// Provided owners to remove and new owners overlap.
+    const EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP: u64 = 18;
 
     /// Represents a multisig account's configurations and transactions.
     /// This will be stored in the multisig account (created as a resource account separate from any owner accounts).
@@ -502,22 +504,12 @@ module aptos_framework::multisig_account {
     /// maliciously alter the owners list.
     entry fun add_owners(
         multisig_account: &signer, new_owners: vector<address>) acquires MultisigAccount {
-        // Short circuit if new owners list is empty.
-        // This avoids emitting an event if no changes happen, which is confusing to off-chain components.
-        if (vector::length(&new_owners) == 0) {
-            return
-        };
-
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-
-        vector::append(&mut multisig_account_resource.owners, new_owners);
-        // This will fail if an existing owner is added again.
-        validate_owners(&multisig_account_resource.owners, multisig_address);
-        emit_event(&mut multisig_account_resource.add_owners_events, AddOwnersEvent {
-            owners_added: new_owners,
-        });
+        flush_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            vector[],
+            option::none()
+        );
     }
 
     /// Add owners then update number of signatures required, in a single operation.
@@ -526,8 +518,12 @@ module aptos_framework::multisig_account {
         new_owners: vector<address>,
         new_num_signatures_required: u64
     ) acquires MultisigAccount {
-        add_owners(multisig_account, new_owners);
-        update_signatures_required(multisig_account, new_num_signatures_required);
+        flush_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            vector[],
+            option::some(new_num_signatures_required)
+        );
     }
 
     /// Similar to remove_owners, but only allow removing one owner.
@@ -545,37 +541,12 @@ module aptos_framework::multisig_account {
     /// maliciously alter the owners list.
     entry fun remove_owners(
         multisig_account: &signer, owners_to_remove: vector<address>) acquires MultisigAccount {
-        // Short circuit if the list of owners to remove is empty.
-        // This avoids emitting an event if no changes happen, which is confusing to off-chain components.
-        if (vector::length(&owners_to_remove) == 0) {
-            return
-        };
-
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-
-        let owners = &mut multisig_account_resource.owners;
-        let owners_removed = vector::empty<address>();
-        vector::for_each_ref(&owners_to_remove, |owner_to_remove| {
-            let owner_to_remove = *owner_to_remove;
-            let (found, index) = vector::index_of(owners, &owner_to_remove);
-            // Only remove an owner if they're present in the owners list.
-            if (found) {
-                vector::push_back(&mut owners_removed, owner_to_remove);
-                vector::swap_remove(owners, index);
-            };
-        });
-
-        // Make sure there's still at least as many owners as the number of signatures required.
-        // This also ensures that there's at least one owner left as signature threshold must be > 0.
-        assert!(
-            vector::length(owners) >= multisig_account_resource.num_signatures_required,
-            error::invalid_state(ENOT_ENOUGH_OWNERS),
+        flush_owner_schema(
+            address_of(multisig_account),
+            vector[],
+            owners_to_remove,
+            option::none()
         );
-        if (vector::length(&owners_removed) > 0) {
-            emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
-        }
     }
 
     /// Update the number of signatures required then remove owners, in a single operation.
@@ -584,8 +555,12 @@ module aptos_framework::multisig_account {
         owners_to_remove: vector<address>,
         new_num_signatures_required: u64
     ) acquires MultisigAccount {
-        update_signatures_required(multisig_account, new_num_signatures_required);
-        remove_owners(multisig_account, owners_to_remove);
+        flush_owner_schema(
+            address_of(multisig_account),
+            vector[],
+            owners_to_remove,
+            option::some(new_num_signatures_required)
+        );
     }
 
     /// Update the number of signatures required to execute transaction in the specified multisig account.
@@ -596,28 +571,32 @@ module aptos_framework::multisig_account {
     /// maliciously alter the number of signatures required.
     entry fun update_signatures_required(
         multisig_account: &signer, new_num_signatures_required: u64) acquires MultisigAccount {
-        let multisig_address = address_of(multisig_account);
-        assert_multisig_account_exists(multisig_address);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_address);
-        // Short-circuit if the new number of signatures required is the same as before.
-        // This avoids emitting an event.
-        if (multisig_account_resource.num_signatures_required == new_num_signatures_required) {
-            return
-        };
-        let num_owners = vector::length(&multisig_account_resource.owners);
-        assert!(
-            new_num_signatures_required > 0 && new_num_signatures_required <= num_owners,
-            error::invalid_argument(EINVALID_SIGNATURES_REQUIRED),
+        flush_owner_schema(
+            address_of(multisig_account),
+            vector[],
+            vector[],
+            option::some(new_num_signatures_required)
         );
+    }
 
-        let old_num_signatures_required = multisig_account_resource.num_signatures_required;
-        multisig_account_resource.num_signatures_required = new_num_signatures_required;
-        emit_event(
-            &mut multisig_account_resource.update_signature_required_events,
-            UpdateSignaturesRequiredEvent {
-                old_num_signatures_required,
-                new_num_signatures_required,
-            }
+    /// Add and/or remove owners, and optionally update number of signatures required.
+    ///
+    /// This function combines essentially all owner schema modification functions into one.
+    ///
+    /// An optional new number of signatures must be passed as a singleton vector due to entry
+    /// function constraints: pass either an empty vector for no update, or a singleton vector with
+    /// one element specifying the new number of signatures required.
+    entry fun update_owners_and_optionally_update_signatures_required(
+        multisig_account: &signer,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required_as_vector: vector<u64>
+    ) acquires MultisigAccount {
+        flush_owner_schema(
+            address_of(multisig_account),
+            new_owners,
+            owners_to_remove,
+            option::from_vec(optional_new_num_signatures_required_as_vector)
         );
     }
 
@@ -798,6 +777,45 @@ module aptos_framework::multisig_account {
         );
     }
 
+    /// Prototype function signature used for flush proposal payload generation.
+    ///
+    /// This entry function signature can be used to construct a flush transaction proposal
+    /// payload: in the case of a denial-of-service (DoS) attack where a malicious owner floods the
+    /// multisig with pending transactions, the flush operation allows other multisig owners to
+    /// remove the attacker(s) from the multisig and clear out the pending transaction queue,
+    /// without having to work through a backlog of DoS transaction proposals.
+    ///
+    /// The flush transaction enables the addition of new owners, the removal of the DoS
+    /// attacker(s), and optionally an update to the number of signatures required, all in an
+    /// atomic operation. The flow is as follows:
+    ///
+    /// 1. An owner proposes a standard multisig transaction containing either a payload or payload
+    ///    hash derived from this function signature.
+    /// 2. Once the proposal has enough votes, it can be executed by submitting to the Aptos API a
+    ///    MultisigFlush transaction type containing the sequence number of the proposal.
+    /// 3. The VM calls `validate_multisig_transaction_with_optional_sequence_number` to verify
+    ///    that the proposal has enough votes and, if the on-chain proposal includes only a payload
+    ///    hash, to verify the on-chain payload hash against a payload included in the Aptos API
+    ///    MultisigFlush transaction.
+    /// 4. The VM verifies that the on-chain transaction proposal at the indicated sequence number
+    ///    corresponds to a valid flush transaction: if the proposal stores the entire payload
+    ///    on-chain then the payload is deserialized and verified, but if the proposal stores only
+    ///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
+    ///    instead verified.
+    /// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
+    ///    required signature count updates, effectively bumping the proposal to the head of the
+    ///    pending transaction queue such that all other pending transactions are disregarded.
+    /// 6. The VM calls `successful_transaction_execution_cleanup`.
+    ///
+    /// An optional new number of signatures must be passed as a singleton vector due to entry
+    /// function constraints: pass either an empty vector for no update, or a singleton vector with
+    /// one element specifying the new number of signatures required.
+    entry fun flush_next_sequence_number_and_owner_schema(
+        _new_owners: vector<address>,
+        _owners_to_remove: vector<address>,
+        _optional_new_num_signatures_required_as_vector: vector<u64>,
+    ) {}
+
     ////////////////////////// To be called by VM only ///////////////////////////////
 
     /// Called by the VM as part of transaction prologue, which is invoked during mempool transaction validation and as
@@ -806,30 +824,103 @@ module aptos_framework::multisig_account {
     /// Transaction payload is optional if it's already stored on chain for the transaction.
     fun validate_multisig_transaction(
         owner: &signer, multisig_account: address, payload: vector<u8>) acquires MultisigAccount {
-        assert_multisig_account_exists(multisig_account);
-        let multisig_account_resource = borrow_global<MultisigAccount>(multisig_account);
-        assert_is_owner(owner, multisig_account_resource);
-        let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
+        validate_multisig_transaction_with_optional_sequence_number(
+            owner,
+            multisig_account,
+            payload,
+            option::none()
+        )
+    }
+
+    /// Validate a multisig transaction at an optional sequence number.
+    ///
+    /// Check next sequence number to execute if none specified.
+    fun validate_multisig_transaction_with_optional_sequence_number(
+        owner: &signer,
+        multisig_address: address,
+        payload: vector<u8>,
+        optional_sequence_number: Option<u64>
+    ) acquires MultisigAccount {
+        assert_multisig_account_exists(multisig_address);
+        let multisig_account_ref =
+            borrow_global<MultisigAccount>(multisig_address);
+        assert_is_owner(owner, multisig_account_ref);
+        // If sequence number not specified get next one to execute.
+        let sequence_number = option::get_with_default(
+            &optional_sequence_number,
+            multisig_account_ref.last_executed_sequence_number + 1
+        );
+        // Verify transaction is present at indicated sequence number.
         assert!(
-            table::contains(&multisig_account_resource.transactions, sequence_number),
+            table::contains(
+                &multisig_account_ref.transactions,
+                sequence_number
+            ),
             error::invalid_argument(ETRANSACTION_NOT_FOUND),
         );
-        let transaction = table::borrow(&multisig_account_resource.transactions, sequence_number);
-        let (num_approvals, _) = num_approvals_and_rejections(&multisig_account_resource.owners, transaction);
+        // Verify transaction has enough approvals to be executed.
+        let transaction = table::borrow(
+            &multisig_account_ref.transactions,
+            sequence_number
+        );
+        let (num_approvals, _) = num_approvals_and_rejections(
+            &multisig_account_ref.owners,
+            transaction
+        );
         assert!(
-            num_approvals >= multisig_account_resource.num_signatures_required,
+            num_approvals >= multisig_account_ref.num_signatures_required,
             error::invalid_argument(ENOT_ENOUGH_APPROVALS),
         );
-
-        // If the transaction payload is not stored on chain, verify that the provided payload matches the hashes stored
-        // on chain.
+        // If transaction payload not stored on-chain:
         if (option::is_some(&transaction.payload_hash)) {
+            // Verify payload hash matches on-chain hash.
             let payload_hash = option::borrow(&transaction.payload_hash);
             assert!(
                 sha3_256(payload) == *payload_hash,
                 error::invalid_argument(EPAYLOAD_DOES_NOT_MATCH_HASH),
             );
         };
+
+    }
+
+    /// Flush pending transactions and owner schema in reponse to a DoS attack.
+    ///
+    /// Bumps a flush transaction proposal to the front of the pending transaction queue, then
+    /// updates the next transaction proposal sequence number such all other pending transactions
+    /// are ignored, to be overwritten by future transaction proposals.
+    fun flush_next_sequence_number_and_owner_schema_execution(
+        multisig_address: address,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required: Option<u64>,
+        flush_transaction_proposal_sequence_number: u64,
+    ) acquires MultisigAccount {
+        let multisig_account_ref_mut =
+            borrow_global_mut<MultisigAccount>(multisig_address);
+        let transactions_table_ref_mut =
+            &mut multisig_account_ref_mut.transactions;
+        // Get new sequence number for flush transaction proposal.
+        let new_flush_transaction_proposal_sequence_number =
+            multisig_account_ref_mut.last_executed_sequence_number + 1;
+        // Update flush transaction proposal sequence number.
+        let flush_transaction_proposal = table::remove(
+            transactions_table_ref_mut,
+            flush_transaction_proposal_sequence_number
+        );
+        table::upsert(
+            transactions_table_ref_mut,
+            new_flush_transaction_proposal_sequence_number,
+            flush_transaction_proposal
+        );
+        // Update sequence number for next transaction proposal.
+        multisig_account_ref_mut.next_sequence_number =
+            new_flush_transaction_proposal_sequence_number + 1;
+        flush_owner_schema(
+            multisig_address,
+            new_owners,
+            owners_to_remove,
+            optional_new_num_signatures_required
+        );
     }
 
     /// Post-execution cleanup for a successful multisig transaction execution.
@@ -890,7 +981,7 @@ module aptos_framework::multisig_account {
 
         let sequence_number = multisig_account.next_sequence_number;
         multisig_account.next_sequence_number = sequence_number + 1;
-        table::add(&mut multisig_account.transactions, sequence_number, transaction);
+        table::upsert(&mut multisig_account.transactions, sequence_number, transaction);
         emit_event(
             &mut multisig_account.create_transaction_events,
             CreateTransactionEvent { creator, sequence_number, transaction },
@@ -919,15 +1010,31 @@ module aptos_framework::multisig_account {
         multisig_account_seed
     }
 
-    fun validate_owners(owners: &vector<address>, multisig_account: address) {
-        let distinct_owners: vector<address> = vector[];
-        vector::for_each_ref(owners, |owner| {
-            let owner = *owner;
-            assert!(owner != multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
-            let (found, _) = vector::index_of(&distinct_owners, &owner);
-            assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
-            vector::push_back(&mut distinct_owners, owner);
-        });
+    fun validate_owners(
+        owners_ref: &vector<address>,
+        multisig_address: address
+    ) {
+        assert!(
+            !vector::contains(owners_ref, &multisig_address),
+            EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF
+        );
+        validate_unique_owners(owners_ref);
+    }
+
+    fun validate_unique_owners(owners_ref: &vector<address>) {
+        let (i, n) = (0, vector::length(owners_ref));
+        while (i < n) {
+            let owner_i = *vector::borrow(owners_ref, i);
+            let j = i + 1;
+            while (j < n) {
+                assert!(
+                    owner_i != *vector::borrow(owners_ref, j),
+                    error::invalid_argument(EDUPLICATE_OWNER)
+                );
+                j = j + 1;
+            };
+            i = i + 1;
+        };
     }
 
     fun assert_is_owner(owner: &signer, multisig_account: &MultisigAccount) {
@@ -957,6 +1064,86 @@ module aptos_framework::multisig_account {
 
     fun assert_multisig_account_exists(multisig_account: address) {
         assert!(exists<MultisigAccount>(multisig_account), error::invalid_state(EACCOUNT_NOT_MULTISIG));
+    }
+
+    /// Add new owners, remove owners to remove, update signatures required.
+    fun flush_owner_schema(
+        multisig_address: address,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required: Option<u64>,
+    ) acquires MultisigAccount {
+        assert_multisig_account_exists(multisig_address);
+        let multisig_account_ref_mut =
+            borrow_global_mut<MultisigAccount>(multisig_address);
+        // Verify no overlap between new owners and owners to remove.
+        vector::for_each_ref(&new_owners, |new_owner_ref| {
+            assert!(
+                !vector::contains(&owners_to_remove, new_owner_ref),
+                error::invalid_argument(EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP)
+            )
+        });
+        // If new owners provided, try to add them and emit an event.
+        if (vector::length(&new_owners) > 0) {
+            vector::append(&mut multisig_account_ref_mut.owners, new_owners);
+            validate_owners(
+                &multisig_account_ref_mut.owners,
+                multisig_address
+            );
+            emit_event(
+                &mut multisig_account_ref_mut.add_owners_events,
+                AddOwnersEvent { owners_added: new_owners }
+            );
+        };
+        // If owners to remove provided, try to remove them.
+        if (vector::length(&owners_to_remove) > 0) {
+            let owners_ref_mut = &mut multisig_account_ref_mut.owners;
+            let owners_removed = vector[];
+            vector::for_each_ref(&owners_to_remove, |owner_to_remove_ref| {
+                let (found, index) =
+                    vector::index_of(owners_ref_mut, owner_to_remove_ref);
+                if (found) vector::push_back(
+                    &mut owners_removed,
+                    vector::swap_remove(owners_ref_mut, index)
+                );
+            });
+            // Only emit event if owner(s) actually removed.
+            if (vector::length(&owners_removed) > 0) {
+                emit_event(
+                    &mut multisig_account_ref_mut.remove_owners_events,
+                    RemoveOwnersEvent { owners_removed }
+                );
+            }
+        };
+        // If new signature count provided, try to update count.
+        if (option::is_some(&optional_new_num_signatures_required)) {
+            let new_num_signatures_required =
+                option::extract(&mut optional_new_num_signatures_required);
+            assert!(
+                new_num_signatures_required > 0,
+                error::invalid_argument(EINVALID_SIGNATURES_REQUIRED)
+            );
+            let old_num_signatures_required =
+                multisig_account_ref_mut.num_signatures_required;
+            // Only apply update and emit event if a change indicated.
+            if (new_num_signatures_required != old_num_signatures_required) {
+                multisig_account_ref_mut.num_signatures_required =
+                    new_num_signatures_required;
+                emit_event(
+                    &mut multisig_account_ref_mut.update_signature_required_events,
+                    UpdateSignaturesRequiredEvent {
+                        old_num_signatures_required,
+                        new_num_signatures_required,
+                    }
+                );
+            }
+        };
+        // Verify number of owners.
+        let num_owners = vector::length(&multisig_account_ref_mut.owners);
+        assert!(
+            num_owners >= multisig_account_ref_mut.num_signatures_required,
+            error::invalid_state(ENOT_ENOUGH_OWNERS)
+        );
     }
 
     ////////////////////////// Tests ///////////////////////////////
@@ -1214,7 +1401,7 @@ module aptos_framework::multisig_account {
     }
 
     #[test(owner = @0x123)]
-    #[expected_failure(abort_code = 0x1000B, location = Self)]
+    #[expected_failure(abort_code = 0x30005, location = Self)]
     public entry fun test_update_with_too_many_signatures_required_should_fail(
         owner: &signer) acquires MultisigAccount {
         setup();
@@ -1629,5 +1816,37 @@ module aptos_framework::multisig_account {
         create_transaction(owner_1, multisig_account, PAYLOAD);
         reject_transaction(owner_2, multisig_account, 1);
         execute_rejected_transaction(owner_3, multisig_account);
+    }
+
+    #[test(
+        owner_1 = @0x123,
+        owner_2 = @0x124,
+        owner_3 = @0x125
+    )]
+    #[expected_failure(abort_code = 0x10012, location = Self)]
+    fun test_flush_owner_schema_overlap_should_fail(
+        owner_1: &signer,
+        owner_2: &signer,
+        owner_3: &signer
+    ) acquires MultisigAccount {
+        setup();
+        let owner_1_addr = address_of(owner_1);
+        let owner_2_addr = address_of(owner_2);
+        let owner_3_addr = address_of(owner_3);
+        create_account(owner_1_addr);
+        let multisig_address = get_next_multisig_account_address(owner_1_addr);
+        create_with_owners(
+            owner_1,
+            vector[owner_2_addr, owner_3_addr],
+            2,
+            vector[],
+            vector[]
+        );
+        flush_owner_schema(
+            multisig_address,
+            vector[owner_1_addr],
+            vector[owner_1_addr],
+            option::none()
+        );
     }
 }

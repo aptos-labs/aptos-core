@@ -15,6 +15,15 @@ pub struct Multisig {
     pub transaction_payload: Option<MultisigTransactionPayload>,
 }
 
+/// A special multisig transaction that allows the owner of a multisig account to execute a
+/// pre-approved flush transaction in response to a DoS attack, as the multisig account.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MultisigFlush {
+    pub multisig_transaction: Multisig,
+    /// Sequence number of the flush transaction proposal.
+    pub sequence_number: u64,
+}
+
 // We use an enum here for extensibility so we can add Script payload support
 // in the future for example.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]

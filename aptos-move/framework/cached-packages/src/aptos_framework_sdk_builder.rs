@@ -404,6 +404,45 @@ pub enum EntryFunctionCall {
         multisig_account: AccountAddress,
     },
 
+    /// Prototype function signature used for flush proposal payload generation.
+    ///
+    /// This entry function signature can be used to construct a flush transaction proposal
+    /// payload: in the case of a denial-of-service (DoS) attack where a malicious owner floods the
+    /// multisig with pending transactions, the flush operation allows other multisig owners to
+    /// remove the attacker(s) from the multisig and clear out the pending transaction queue,
+    /// without having to work through a backlog of DoS transaction proposals.
+    ///
+    /// The flush transaction enables the addition of new owners, the removal of the DoS
+    /// attacker(s), and optionally an update to the number of signatures required, all in an
+    /// atomic operation. The flow is as follows:
+    ///
+    /// 1. An owner proposes a standard multisig transaction containing either a payload or payload
+    ///    hash derived from this function signature.
+    /// 2. Once the proposal has enough votes, it can be executed by submitting to the Aptos API a
+    ///    MultisigFlush transaction type containing the sequence number of the proposal.
+    /// 3. The VM calls `validate_multisig_transaction_with_optional_sequence_number` to verify
+    ///    that the proposal has enough votes and, if the on-chain proposal includes only a payload
+    ///    hash, to verify the on-chain payload hash against a payload included in the Aptos API
+    ///    MultisigFlush transaction.
+    /// 4. The VM verifies that the on-chain transaction proposal at the indicated sequence number
+    ///    corresponds to a valid flush transaction: if the proposal stores the entire payload
+    ///    on-chain then the payload is deserialized and verified, but if the proposal stores only
+    ///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
+    ///    instead verified.
+    /// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
+    ///    required signature count updates, effectively bumping the proposal to the head of the
+    ///    pending transaction queue such that all other pending transactions are disregarded.
+    /// 6. The VM calls `successful_transaction_execution_cleanup`.
+    ///
+    /// An optional new number of signatures must be passed as a singleton vector due to entry
+    /// function constraints: pass either an empty vector for no update, or a singleton vector with
+    /// one element specifying the new number of signatures required.
+    MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+        _new_owners: Vec<AccountAddress>,
+        _owners_to_remove: Vec<AccountAddress>,
+        _optional_new_num_signatures_required_as_vector: Vec<u64>,
+    },
+
     /// Reject a multisig transaction.
     MultisigAccountRejectTransaction {
         multisig_account: AccountAddress,
@@ -442,6 +481,19 @@ pub enum EntryFunctionCall {
     MultisigAccountUpdateMetadata {
         keys: Vec<Vec<u8>>,
         values: Vec<Vec<u8>>,
+    },
+
+    /// Add and/or remove owners, and optionally update number of signatures required.
+    ///
+    /// This function combines essentially all owner schema modification functions into one.
+    ///
+    /// An optional new number of signatures must be passed as a singleton vector due to entry
+    /// function constraints: pass either an empty vector for no update, or a singleton vector with
+    /// one element specifying the new number of signatures required.
+    MultisigAccountUpdateOwnersAndOptionallyUpdateSignaturesRequired {
+        new_owners: Vec<AccountAddress>,
+        owners_to_remove: Vec<AccountAddress>,
+        optional_new_num_signatures_required_as_vector: Vec<u64>,
     },
 
     /// Update the number of signatures required to execute transaction in the specified multisig account.
@@ -1008,6 +1060,15 @@ impl EntryFunctionCall {
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
+            MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+                _new_owners,
+                _owners_to_remove,
+                _optional_new_num_signatures_required_as_vector,
+            } => multisig_account_flush_next_sequence_number_and_owner_schema(
+                _new_owners,
+                _owners_to_remove,
+                _optional_new_num_signatures_required_as_vector,
+            ),
             MultisigAccountRejectTransaction {
                 multisig_account,
                 sequence_number,
@@ -1028,6 +1089,15 @@ impl EntryFunctionCall {
             MultisigAccountUpdateMetadata { keys, values } => {
                 multisig_account_update_metadata(keys, values)
             },
+            MultisigAccountUpdateOwnersAndOptionallyUpdateSignaturesRequired {
+                new_owners,
+                owners_to_remove,
+                optional_new_num_signatures_required_as_vector,
+            } => multisig_account_update_owners_and_optionally_update_signatures_required(
+                new_owners,
+                owners_to_remove,
+                optional_new_num_signatures_required_as_vector,
+            ),
             MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required,
             } => multisig_account_update_signatures_required(new_num_signatures_required),
@@ -2272,6 +2342,62 @@ pub fn multisig_account_execute_rejected_transaction(
     ))
 }
 
+/// Prototype function signature used for flush proposal payload generation.
+///
+/// This entry function signature can be used to construct a flush transaction proposal
+/// payload: in the case of a denial-of-service (DoS) attack where a malicious owner floods the
+/// multisig with pending transactions, the flush operation allows other multisig owners to
+/// remove the attacker(s) from the multisig and clear out the pending transaction queue,
+/// without having to work through a backlog of DoS transaction proposals.
+///
+/// The flush transaction enables the addition of new owners, the removal of the DoS
+/// attacker(s), and optionally an update to the number of signatures required, all in an
+/// atomic operation. The flow is as follows:
+///
+/// 1. An owner proposes a standard multisig transaction containing either a payload or payload
+///    hash derived from this function signature.
+/// 2. Once the proposal has enough votes, it can be executed by submitting to the Aptos API a
+///    MultisigFlush transaction type containing the sequence number of the proposal.
+/// 3. The VM calls `validate_multisig_transaction_with_optional_sequence_number` to verify
+///    that the proposal has enough votes and, if the on-chain proposal includes only a payload
+///    hash, to verify the on-chain payload hash against a payload included in the Aptos API
+///    MultisigFlush transaction.
+/// 4. The VM verifies that the on-chain transaction proposal at the indicated sequence number
+///    corresponds to a valid flush transaction: if the proposal stores the entire payload
+///    on-chain then the payload is deserialized and verified, but if the proposal stores only
+///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
+///    instead verified.
+/// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
+///    required signature count updates, effectively bumping the proposal to the head of the
+///    pending transaction queue such that all other pending transactions are disregarded.
+/// 6. The VM calls `successful_transaction_execution_cleanup`.
+///
+/// An optional new number of signatures must be passed as a singleton vector due to entry
+/// function constraints: pass either an empty vector for no update, or a singleton vector with
+/// one element specifying the new number of signatures required.
+pub fn multisig_account_flush_next_sequence_number_and_owner_schema(
+    _new_owners: Vec<AccountAddress>,
+    _owners_to_remove: Vec<AccountAddress>,
+    _optional_new_num_signatures_required_as_vector: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("flush_next_sequence_number_and_owner_schema").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&_new_owners).unwrap(),
+            bcs::to_bytes(&_owners_to_remove).unwrap(),
+            bcs::to_bytes(&_optional_new_num_signatures_required_as_vector).unwrap(),
+        ],
+    ))
+}
+
 /// Reject a multisig transaction.
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
@@ -2378,6 +2504,36 @@ pub fn multisig_account_update_metadata(
         vec![
             bcs::to_bytes(&keys).unwrap(),
             bcs::to_bytes(&values).unwrap(),
+        ],
+    ))
+}
+
+/// Add and/or remove owners, and optionally update number of signatures required.
+///
+/// This function combines essentially all owner schema modification functions into one.
+///
+/// An optional new number of signatures must be passed as a singleton vector due to entry
+/// function constraints: pass either an empty vector for no update, or a singleton vector with
+/// one element specifying the new number of signatures required.
+pub fn multisig_account_update_owners_and_optionally_update_signatures_required(
+    new_owners: Vec<AccountAddress>,
+    owners_to_remove: Vec<AccountAddress>,
+    optional_new_num_signatures_required_as_vector: Vec<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("update_owners_and_optionally_update_signatures_required").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&new_owners).unwrap(),
+            bcs::to_bytes(&owners_to_remove).unwrap(),
+            bcs::to_bytes(&optional_new_num_signatures_required_as_vector).unwrap(),
         ],
     ))
 }
@@ -4063,6 +4219,25 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_flush_next_sequence_number_and_owner_schema(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+                    _new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    _owners_to_remove: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    _optional_new_num_signatures_required_as_vector: bcs::from_bytes(
+                        script.args().get(2)?,
+                    )
+                    .ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_reject_transaction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -4123,6 +4298,20 @@ mod decoder {
                 keys: bcs::from_bytes(script.args().get(0)?).ok()?,
                 values: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_update_owners_and_optionally_update_signatures_required(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountUpdateOwnersAndOptionallyUpdateSignaturesRequired {
+            new_owners : bcs::from_bytes(script.args().get(0)?).ok()?,
+            owners_to_remove : bcs::from_bytes(script.args().get(1)?).ok()?,
+            optional_new_num_signatures_required_as_vector : bcs::from_bytes(script.args().get(2)?).ok()?,
+        })
         } else {
             None
         }
@@ -4974,6 +5163,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_execute_rejected_transaction),
         );
         map.insert(
+            "multisig_account_flush_next_sequence_number_and_owner_schema".to_string(),
+            Box::new(decoder::multisig_account_flush_next_sequence_number_and_owner_schema),
+        );
+        map.insert(
             "multisig_account_reject_transaction".to_string(),
             Box::new(decoder::multisig_account_reject_transaction),
         );
@@ -4992,6 +5185,12 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_update_metadata".to_string(),
             Box::new(decoder::multisig_account_update_metadata),
+        );
+        map.insert(
+            "multisig_account_update_owners_and_optionally_update_signatures_required".to_string(),
+            Box::new(
+                decoder::multisig_account_update_owners_and_optionally_update_signatures_required,
+            ),
         );
         map.insert(
             "multisig_account_update_signatures_required".to_string(),
