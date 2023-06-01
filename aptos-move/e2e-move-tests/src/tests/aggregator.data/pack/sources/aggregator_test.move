@@ -101,12 +101,28 @@ module 0x1::aggregator_test {
         aggregator::add(aggregator, value);
     }
 
+    public entry fun materialize_and_try_add(account: &signer, i: u64, value: u128) acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow_mut(aggregators, i);
+        aggregator::read(aggregator);
+        aggregator::try_add(aggregator, value);
+    }
+
     public entry fun materialize_and_sub(account: &signer, i: u64, value: u128) acquires AggregatorStore {
         let addr = signer::address_of(account);
         let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
         let aggregator = table::borrow_mut(aggregators, i);
         aggregator::read(aggregator);
         aggregator::sub(aggregator, value);
+    }
+
+    public entry fun materialize_and_try_sub(account: &signer, i: u64, value: u128) acquires AggregatorStore {
+        let addr = signer::address_of(account);
+        let aggregators = &mut borrow_global_mut<AggregatorStore>(addr).aggregators;
+        let aggregator = table::borrow_mut(aggregators, i);
+        aggregator::read(aggregator);
+        aggregator::try_sub(aggregator, value);
     }
 
     public entry fun add_and_materialize(account: &signer, i: u64, value: u128) acquires AggregatorStore {

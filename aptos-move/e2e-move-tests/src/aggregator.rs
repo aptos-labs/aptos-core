@@ -175,6 +175,23 @@ pub fn materialize_and_add(
     )
 }
 
+pub fn materialize_and_try_add(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+    value: u128,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_test::materialize_and_try_add").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&index).unwrap(),
+            bcs::to_bytes(&value).unwrap(),
+        ],
+    )
+}
+
 pub fn materialize_and_sub(
     harness: &mut MoveHarness,
     account: &Account,
@@ -184,6 +201,23 @@ pub fn materialize_and_sub(
     harness.create_entry_function(
         account,
         str::parse("0x1::aggregator_test::materialize_and_sub").unwrap(),
+        vec![],
+        vec![
+            bcs::to_bytes(&index).unwrap(),
+            bcs::to_bytes(&value).unwrap(),
+        ],
+    )
+}
+
+pub fn materialize_and_try_sub(
+    harness: &mut MoveHarness,
+    account: &Account,
+    index: u64,
+    value: u128,
+) -> SignedTransaction {
+    harness.create_entry_function(
+        account,
+        str::parse("0x1::aggregator_test::materialize_and_try_sub").unwrap(),
         vec![],
         vec![
             bcs::to_bytes(&index).unwrap(),
