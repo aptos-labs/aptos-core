@@ -1,11 +1,12 @@
 import { AptosAccount } from "../../account";
+import { AccountAddress } from "../../aptos_types";
 import { AnsClient } from "../../plugins/ans_client";
 import { Provider } from "../../providers";
 import { HexString, Network } from "../../utils";
 import { ANS_OWNER_ADDRESS, ANS_OWNER_PK, getFaucetClient, longTestTimeout, NODE_URL } from "../unit/test_helper.test";
 
 const alice = new AptosAccount();
-const ACCOUNT_ADDRESS = alice.address().hex();
+const ACCOUNT_ADDRESS = AccountAddress.standardizeAddress(alice.address().hex());
 // generate random name so we can run the test against local tesnet without the need to re-run it each time.
 // This will produce a string anywhere between zero and 12 characters long, usually 11 characters, only lower-case and numbers
 const DOMAIN_NAME = Math.random().toString(36).slice(2);
