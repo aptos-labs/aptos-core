@@ -14,7 +14,7 @@ Our database restore tool lets you use the existing [public backup files](#publi
 
 ## Public backup files
 
-The backup files are created remote storage (e.g., Google Cloud, AWS, Azure, etc.). Aptos Labs maintains a few publicly accessible database backups by continuously querying a local fullnode and storing the backup data in either local files or remote storage (e.g., Amazon S3 or Google Cloud Storage).
+Aptos Labs maintains a few publicly accessible database backups by continuously querying a local fullnode and storing the backup data in remote storage, such as Amazon S3 or Google Cloud Storage.
 
 |  | AWS Backup Data | Google Cloud Backup Data  |
 | --- | --- | --- |
