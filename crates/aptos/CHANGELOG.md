@@ -1,17 +1,15 @@
 # Aptos CLI Changelog
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-## [1.0.14] - 2023/05/26
-### Added
-- Add nested vector arg support
-- Updated DB bootstrap command with new DB restore features
 
-## [1.0.14] - 2023/05/25
-
+## [2.0.0] - Current
 ### Added
-- Recursive nested vector parsing
 - Multisig v2 governance support
-- JSON support for both input files and CLI argument input
+- JSON input file support
+
+## [1.0.14] - 2023/05/26
+- Updated DB bootstrap command with new DB restore features
+- Nested vector arg support
     - **Breaking change**: You can no longer pass in a vector like this: `--arg vector<address>:0x1,0x2`, you must do it like this: `--arg 'address:["0x1", "0x2"]'`
 
 ## [1.0.13] - 2023/04/27
