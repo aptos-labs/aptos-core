@@ -3,19 +3,21 @@
 
 # Module `0x1::pedersen`
 
-This module implements a Pedersen commitment API that can be used with the Bulletproofs module.
+This module implements a Pedersen commitment API, over the Ristretto255 curve, that can be used with the
+Bulletproofs module.
 
-A Pedersen commitment to a value v under a _commitment key_ (g, h) is v * g + r * h, for a random scalar r.
+A Pedersen commitment to a value <code>v</code> under _commitment key_ <code>(g, h)</code> is <code>v * g + r * h</code>, for a random scalar <code>r</code>.
 
 
 -  [Struct `Commitment`](#0x1_pedersen_Commitment)
 -  [Constants](#@Constants_0)
--  [Function `new_commitment_from_point`](#0x1_pedersen_new_commitment_from_point)
--  [Function `new_commitment_from_compressed`](#0x1_pedersen_new_commitment_from_compressed)
+-  [Function `new_commitment_from_bytes`](#0x1_pedersen_new_commitment_from_bytes)
+-  [Function `commitment_to_bytes`](#0x1_pedersen_commitment_to_bytes)
+-  [Function `commitment_from_point`](#0x1_pedersen_commitment_from_point)
+-  [Function `commitment_from_compressed`](#0x1_pedersen_commitment_from_compressed)
 -  [Function `new_commitment`](#0x1_pedersen_new_commitment)
 -  [Function `new_commitment_with_basepoint`](#0x1_pedersen_new_commitment_with_basepoint)
 -  [Function `new_commitment_for_bulletproof`](#0x1_pedersen_new_commitment_for_bulletproof)
--  [Function `new_non_hiding_commitment_for_bulletproof`](#0x1_pedersen_new_non_hiding_commitment_for_bulletproof)
 -  [Function `commitment_add`](#0x1_pedersen_commitment_add)
 -  [Function `commitment_add_assign`](#0x1_pedersen_commitment_add_assign)
 -  [Function `commitment_sub`](#0x1_pedersen_commitment_sub)
@@ -70,7 +72,7 @@ A Pedersen commitment to some value with some randomness.
 
 <a name="0x1_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE"></a>
 
-The default Pedersen randomness base used in our underlying Bulletproofs library.
+The default Pedersen randomness base <code>h</code> used in our underlying Bulletproofs library.
 This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512 (not SHA2-512).
 
 
@@ -79,14 +81,27 @@ This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512
 
 
 
-<a name="0x1_pedersen_new_commitment_from_point"></a>
-
-## Function `new_commitment_from_point`
-
-Moves a Ristretto point into a Pedersen commitment.
+<a name="0x1_pedersen_EWRONG_BYTE_LENGTH"></a>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_point">new_commitment_from_point</a>(point: <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+Error Codes
+
+The wrong number of bytes was passed in for deserialization
+
+
+<pre><code><b>const</b> <a href="pedersen.md#0x1_pedersen_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_pedersen_new_commitment_from_bytes"></a>
+
+## Function `new_commitment_from_bytes`
+
+Creates a new public key from a serialized Ristretto255 point.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_bytes">new_commitment_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>&gt;
 </code></pre>
 
 
@@ -95,7 +110,66 @@ Moves a Ristretto point into a Pedersen commitment.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_point">new_commitment_from_point</a>(point: RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_bytes">new_commitment_from_bytes</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a>&gt; {
+    <b>assert</b>!(<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&bytes) == 32, <a href="pedersen.md#0x1_pedersen_EWRONG_BYTE_LENGTH">EWRONG_BYTE_LENGTH</a>);
+    <b>let</b> point = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(bytes);
+    <b>if</b> (std::option::is_some(&<b>mut</b> point)) {
+        <b>let</b> comm = <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+            point: std::option::extract(&<b>mut</b> point)
+        };
+        std::option::some(comm)
+    } <b>else</b> {
+        std::option::none&lt;<a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a>&gt;()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_pedersen_commitment_to_bytes"></a>
+
+## Function `commitment_to_bytes`
+
+Returns a commitment as a serialized byte array
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_to_bytes">commitment_to_bytes</a>(comm: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_to_bytes">commitment_to_bytes</a>(comm: &<a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&comm.point))
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_pedersen_commitment_from_point"></a>
+
+## Function `commitment_from_point`
+
+Moves a Ristretto point into a Pedersen commitment.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_from_point">commitment_from_point</a>(point: <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_from_point">commitment_from_point</a>(point: RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
     <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
         point
     }
@@ -106,14 +180,14 @@ Moves a Ristretto point into a Pedersen commitment.
 
 </details>
 
-<a name="0x1_pedersen_new_commitment_from_compressed"></a>
+<a name="0x1_pedersen_commitment_from_compressed"></a>
 
-## Function `new_commitment_from_compressed`
+## Function `commitment_from_compressed`
 
 Deserializes a commitment from a compressed Ristretto point.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_compressed">new_commitment_from_compressed</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_from_compressed">commitment_from_compressed</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
 </code></pre>
 
 
@@ -122,7 +196,7 @@ Deserializes a commitment from a compressed Ristretto point.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_from_compressed">new_commitment_from_compressed</a>(point: &CompressedRistretto): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_from_compressed">commitment_from_compressed</a>(point: &CompressedRistretto): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
     <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
         point: <a href="ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(point)
     }
@@ -137,10 +211,10 @@ Deserializes a commitment from a compressed Ristretto point.
 
 ## Function `new_commitment`
 
-Returns a commitment val * val_base + r * rand_base where (val_base, rand_base) is the commitment key.
+Returns a commitment <code>v * val_base + r * rand_base</code> where <code>(val_base, rand_base)</code> is the commitment key.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment">new_commitment</a>(val: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, rand: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment">new_commitment</a>(v: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, val_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, r: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
 </code></pre>
 
 
@@ -149,9 +223,9 @@ Returns a commitment val * val_base + r * rand_base where (val_base, rand_base) 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment">new_commitment</a>(val: &Scalar, val_base: &RistrettoPoint, rand: &Scalar, rand_base: &RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment">new_commitment</a>(v: &Scalar, val_base: &RistrettoPoint, r: &Scalar, rand_base: &RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
     <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
-        point: <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul">ristretto255::double_scalar_mul</a>(val, val_base, rand, rand_base)
+        point: <a href="ristretto255.md#0x1_ristretto255_double_scalar_mul">ristretto255::double_scalar_mul</a>(v, val_base, r, rand_base)
     }
 }
 </code></pre>
@@ -164,10 +238,10 @@ Returns a commitment val * val_base + r * rand_base where (val_base, rand_base) 
 
 ## Function `new_commitment_with_basepoint`
 
-Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code> is the Ristretto255 basepoint.
+Returns a commitment <code>v * G + r * rand_base</code> where <code>G</code> is the Ristretto255 basepoint.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_with_basepoint">new_commitment_with_basepoint</a>(val: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_with_basepoint">new_commitment_with_basepoint</a>(v: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, r: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand_base: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
 </code></pre>
 
 
@@ -176,9 +250,9 @@ Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_with_basepoint">new_commitment_with_basepoint</a>(val: &Scalar, rand: &Scalar, rand_base: &RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_with_basepoint">new_commitment_with_basepoint</a>(v: &Scalar, r: &Scalar, rand_base: &RistrettoPoint): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
     <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
-        point: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">ristretto255::basepoint_double_mul</a>(rand, rand_base, val)
+        point: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">ristretto255::basepoint_double_mul</a>(r, rand_base, v)
     }
 }
 </code></pre>
@@ -191,11 +265,11 @@ Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code
 
 ## Function `new_commitment_for_bulletproof`
 
-Returns a commitment val * basepoint + r * rand_base where <code>basepoint</code> is the Ristretto255 basepoint and <code>rand_base</code>
-is the default randomness base used in the Bulletproof library (i.e., BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE).
+Returns a commitment <code>v * G + r * H</code> where <code>G</code> is the Ristretto255 basepoint and <code>H</code> is the default randomness
+base used in the Bulletproofs library (i.e., <code><a href="pedersen.md#0x1_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE">BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</a></code>).
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(val: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rand: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(v: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, r: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
 </code></pre>
 
 
@@ -204,39 +278,12 @@ is the default randomness base used in the Bulletproof library (i.e., BULLETPROO
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(val: &Scalar, rand: &Scalar): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_commitment_for_bulletproof">new_commitment_for_bulletproof</a>(v: &Scalar, r: &Scalar): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
     <b>let</b> rand_base = <a href="ristretto255.md#0x1_ristretto255_new_point_from_bytes">ristretto255::new_point_from_bytes</a>(<a href="pedersen.md#0x1_pedersen_BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE">BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE</a>);
     <b>let</b> rand_base = std::option::extract(&<b>mut</b> rand_base);
 
     <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
-        point: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">ristretto255::basepoint_double_mul</a>(rand, &rand_base, val)
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_pedersen_new_non_hiding_commitment_for_bulletproof"></a>
-
-## Function `new_non_hiding_commitment_for_bulletproof`
-
-Returns a non-hiding commitment val * basepoint where <code>basepoint</code> is the Ristretto255 basepoint.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_non_hiding_commitment_for_bulletproof">new_non_hiding_commitment_for_bulletproof</a>(val: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_new_non_hiding_commitment_for_bulletproof">new_non_hiding_commitment_for_bulletproof</a>(val: &Scalar): <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
-    <a href="pedersen.md#0x1_pedersen_Commitment">Commitment</a> {
-        point: <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">ristretto255::basepoint_mul</a>(val)
+        point: <a href="ristretto255.md#0x1_ristretto255_basepoint_double_mul">ristretto255::basepoint_double_mul</a>(r, &rand_base, v)
     }
 }
 </code></pre>
@@ -249,7 +296,8 @@ Returns a non-hiding commitment val * basepoint where <code>basepoint</code> is 
 
 ## Function `commitment_add`
 
-Returns lhs + rhs. Useful for re-randomizing the commitment or updating the committed value.
+Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs + rhs</code>.
+Useful for re-randomizing the commitment or updating the committed value.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_add">commitment_add</a>(lhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, rhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
@@ -276,7 +324,7 @@ Returns lhs + rhs. Useful for re-randomizing the commitment or updating the comm
 
 ## Function `commitment_add_assign`
 
-Sets lhs = lhs + rhs. Useful for re-randomizing the commitment or updating the committed value.
+Like <code>commitment_add</code> but assigns <code>lhs = lhs + rhs</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_add_assign">commitment_add_assign</a>(lhs: &<b>mut</b> <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, rhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>)
@@ -301,7 +349,8 @@ Sets lhs = lhs + rhs. Useful for re-randomizing the commitment or updating the c
 
 ## Function `commitment_sub`
 
-Returns lhs - rhs. Useful for re-randomizing the commitment or updating the committed value.
+Homomorphically combines two commitments <code>lhs</code> and <code>rhs</code> as <code>lhs - rhs</code>.
+Useful for re-randomizing the commitment or updating the committed value.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_sub">commitment_sub</a>(lhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, rhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>
@@ -328,7 +377,7 @@ Returns lhs - rhs. Useful for re-randomizing the commitment or updating the comm
 
 ## Function `commitment_sub_assign`
 
-Sets lhs = lhs - rhs. Useful for re-randomizing the commitment or updating the committed value.
+Like <code>commitment_add</code> but assigns <code>lhs = lhs - rhs</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_sub_assign">commitment_sub_assign</a>(lhs: &<b>mut</b> <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>, rhs: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>)
@@ -405,7 +454,7 @@ Returns true if the two commitments are identical: i.e., same value and same ran
 
 ## Function `commitment_as_point`
 
-Returns the underlying elliptic curve point representing the commitment as an in-memory RistrettoPoint.
+Returns the underlying elliptic curve point representing the commitment as an in-memory <code>RistrettoPoint</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_as_point">commitment_as_point</a>(c: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
@@ -430,7 +479,7 @@ Returns the underlying elliptic curve point representing the commitment as an in
 
 ## Function `commitment_as_compressed_point`
 
-Returns the Pedersen commitment as a CompressedRistretto point.
+Returns the Pedersen commitment as a <code>CompressedRistretto</code> point.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_as_compressed_point">commitment_as_compressed_point</a>(c: &<a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>
@@ -481,7 +530,7 @@ Moves the Commitment into a CompressedRistretto point.
 
 ## Function `commitment_into_compressed_point`
 
-Moves the Commitment into a CompressedRistretto point.
+Moves the Commitment into a <code>CompressedRistretto</code> point.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_commitment_into_compressed_point">commitment_into_compressed_point</a>(c: <a href="pedersen.md#0x1_pedersen_Commitment">pedersen::Commitment</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>
@@ -507,10 +556,13 @@ Moves the Commitment into a CompressedRistretto point.
 ## Function `randomness_base_for_bulletproof`
 
 Returns the randomness base compatible with the Bulletproofs module.
-A Bulletproof attests, in zero-knowledge, that a value <code>v</code> inside a Pedersen commitment <code>v * g + r * h</code> is
-sufficiently "small" (e.g., is 32-bits wide). Here, <code>h</code> is referred to as the "randomness base"
-of the commitment scheme. Bulletproof has a default choice for <code>g</code> and <code>h</code> and this function
-returns the default <code>h</code> as used in the Bulletproofs Move module.
+
+Recal that a Bulletproof range proof attests, in zero-knowledge, that a value <code>v</code> inside a Pedersen commitment
+<code>v * g + r * h</code> is sufficiently "small" (e.g., is 32-bits wide). Here, <code>h</code> is referred to as the
+"randomness base" of the commitment scheme.
+
+Bulletproof has a default choice for <code>g</code> and <code>h</code> and this function returns the default <code>h</code> as used in the
+Bulletproofs Move module.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="pedersen.md#0x1_pedersen_randomness_base_for_bulletproof">randomness_base_for_bulletproof</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>

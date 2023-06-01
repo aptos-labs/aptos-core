@@ -150,7 +150,6 @@ Lifetime: transient
 
 
 
-<<<<<<< HEAD
 <a name="0x1_features_BULLETPROOFS_NATIVES"></a>
 
 Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
@@ -159,7 +158,10 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_BULLETPROOFS_NATIVES">BULLETPROOFS_NATIVES</a>: u64 = 16;
-=======
+</code></pre>
+
+
+
 <a name="0x1_features_CHARGE_INVARIANT_VIOLATION"></a>
 
 Charge invariant violation error.
@@ -167,7 +169,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CHARGE_INVARIANT_VIOLATION">CHARGE_INVARIANT_VIOLATION</a>: u64 = 20;
->>>>>>> origin/main
 </code></pre>
 
 
