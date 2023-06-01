@@ -93,6 +93,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-parser",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
      "ecosystem/indexer-grpc/indexer-grpc-server-framework",
