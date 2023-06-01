@@ -101,26 +101,25 @@ pub fn deserialize(bcs: &[u8], layout: &[u8]) -> Option<MoveStruct> {
 
 fn read_varint(proto: &mut &[u8]) -> Option<u64> {
     let mut res = 0;
-    let mut shift = 0;
-    loop {
-        if proto.is_empty() || shift > 63 {
-            return None;
-        }
-        let byte = proto[0] as u64;
-        *proto = &proto[1..];
-        res |= (byte & 0x7f) << shift;
-        if byte & 0x80 == 0 {
+    for i in 0 .. 10 {
+        if i >= proto.len() {
             break;
         }
-        shift += 7;
-    }
-    Some(res)
+        let byte = proto[i] as u64;
+        res |= (byte & 0x7f) << (i * 7);
+        if byte & 0x80 == 0 {
+            *proto = &proto[i + 1 ..];
+            return Some(res)
+        }
+    };
+    None
 }
 
 enum WireData<'a> {
     Varint(u64),
     LengthDelimited(&'a [u8]),
 }
+
 fn as_length_delimited<'a>(data: &WireData<'a>) -> Option<&'a [u8]> {
     match data {
         WireData::LengthDelimited(x) => Some(*x),
@@ -132,7 +131,7 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
     let mut parsed_fields = vec![];
     while !proto.is_empty() {
         let tag = read_varint(proto)?;
-        if tag >= 1 << 29 {
+        if tag == 0 || tag >= 1 << 29 {
             return None;
         }
         let field_idx = (tag >> 3) as u32 - 1;
@@ -151,7 +150,9 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
         };
         parsed_fields.push((field_idx, data));
     }
-    // Important to be a stable sort for repeated fields
+    // Proto doesn't guarantee that fields are in field_num order, so we sort them.
+    // However it's crucial to use a stable sort because the order for the same field number
+    // corresponds with the ordering of repeated fields
     parsed_fields.sort_by_key(|(field_idx, _)| *field_idx);
     let as_varint = |data: Option<&WireData>| match data {
         Some(WireData::Varint(x)) => Some(*x),
@@ -160,55 +161,44 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
     };
     let mut idx_in_parsed = 0;
     let mut res = vec![];
+    let mut val_from_parsed = |i| {
+        let field_idx = if idx_in_parsed < parsed_fields.len() { parsed_fields[idx_in_parsed].0 } else { u32::max_value() };
+        // At this point i is always <= field_idx
+        if i < field_idx as usize {
+            None
+        } else {
+            // i must be equal to field_idx
+            idx_in_parsed += 1;
+            Some(&parsed_fields[idx_in_parsed - 1].1)
+        }
+    };
     for (i, field_layout) in layout.iter().enumerate() {
-        let mut val_from_parsed = || {
-            let field_idx = if idx_in_parsed < parsed_fields.len() { parsed_fields[idx_in_parsed].0 } else { u32::max_value() };
-            if i < field_idx as usize { None } else {
-                // i must be equal to field_idx
-                idx_in_parsed += 1;
-                Some(&parsed_fields[idx_in_parsed - 1].1)
-            }
-        };
         use move_core_types::value::MoveTypeLayout::*;
+        let val = val_from_parsed(i);
         match field_layout {
-            Bool => {
-                let val = as_varint(val_from_parsed())? != 0;
-                res.push(MoveValue::Bool(val));
-            },
-            U8 => {
-                let val = as_varint(val_from_parsed())? as u8;
-                res.push(MoveValue::U8(val));
-            },
-            U16 => {
-                let val = as_varint(val_from_parsed())? as u16;
-                res.push(MoveValue::U16(val));
-            },
-            U32 => {
-                let val = as_varint(val_from_parsed())? as u32;
-                res.push(MoveValue::U32(val));
-            },
-            U64 => {
-                let val = as_varint(val_from_parsed())? as u64;
-                res.push(MoveValue::U64(val));
-            },
+            Bool => res.push(MoveValue::Bool(as_varint(val)? != 0)),
+            U8 => res.push(MoveValue::U8(as_varint(val)? as u8)),
+            U16 => res.push(MoveValue::U16(as_varint(val)? as u16)),
+            U32 => res.push(MoveValue::U32(as_varint(val)? as u32)),
+            U64 => res.push(MoveValue::U64(as_varint(val)? as u64)),
             U128 => {
-                let val = u128::from_le_bytes(as_length_delimited(val_from_parsed()?)?.try_into().ok()?);
+                let val = u128::from_le_bytes(as_length_delimited(val?)?.try_into().ok()?);
                 res.push(MoveValue::U128(val));
             },
             U256 => {
-                let val = u256::U256::from_le_bytes(as_length_delimited(val_from_parsed()?)?.try_into().ok()?);
+                let val = u256::U256::from_le_bytes(as_length_delimited(val?)?.try_into().ok()?);
                 res.push(MoveValue::U256(val));
             },
             Address => {
-                let val = AccountAddress::from_bytes(as_length_delimited(val_from_parsed()?)?).ok()?;
+                let val = AccountAddress::from_bytes(as_length_delimited(val?)?).ok()?;
                 res.push(MoveValue::Address(val));
             },
             Signer => {
-                let val = AccountAddress::from_bytes(as_length_delimited(val_from_parsed()?)?).ok()?;
+                let val = AccountAddress::from_bytes(as_length_delimited(val?)?).ok()?;
                 res.push(MoveValue::Signer(val));
             },
             Vector(elem_layout) => {
-                let val = if let Some(mut val) = val_from_parsed() {
+                let val = if let Some(mut val) = val {
                     match elem_layout.as_ref() {
                         Bool => {
                             let v = as_length_delimited(val)?;
@@ -229,10 +219,21 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
                                    U256 => MoveValue::U256(u256::U256::from_le_bytes(as_length_delimited(val)?.try_into().ok()?)),
                                    Address => MoveValue::Address(AccountAddress::from_bytes(as_length_delimited(val)?).ok()?),
                                    Signer => MoveValue::Signer(AccountAddress::from_bytes(as_length_delimited(val)?).ok()?),
-                                   Vector(_) => {
-                                       let wrapper_layout = std::slice::from_ref(elem_layout.as_ref());
-                                       let wrapper = proto_deserialize_inner(&mut as_length_delimited(val)?, wrapper_layout)?;
-                                       wrapper.into_fields().pop()?
+                                   Vector(inner_layout) => {
+                                       let mut buffer = as_length_delimited(val)?;
+                                       match inner_layout.as_ref() {
+                                           Bool => {
+                                               MoveValue::Vector(buffer.iter().map(|x| MoveValue::Bool(*x != 0)).collect())
+                                           },
+                                           U8 => {
+                                               MoveValue::Vector(buffer.iter().map(|x| MoveValue::U8(*x)).collect())
+                                           },
+                                           _ => {
+                                               let wrapper_layout = std::slice::from_ref(elem_layout.as_ref());
+                                               let wrapper = proto_deserialize_inner(&mut buffer, wrapper_layout)?;
+                                               wrapper.into_fields().pop()?
+                                           },
+                                       }
                                    },
                                    Struct(struct_layout) => {
                                        MoveValue::Struct(proto_deserialize(as_length_delimited(val)?, struct_layout)?)
@@ -240,18 +241,19 @@ fn proto_deserialize_inner(proto: &mut &[u8], layout: &[MoveTypeLayout]) -> Opti
                                    _ => return None,  // cannot happen
                                };
                                vec.push(x);
-                               val = match val_from_parsed() { Some(x) => x, None => break };
+                               val = match val_from_parsed(i) { Some(x) => x, None => break };
                             }
                             vec
                         }
                     }
                 } else {
+                    // no fields present, so empty vector
                     vec![]
                 };
                 res.push(MoveValue::Vector(val));
             },
             Struct(child_layout) => {
-                let val = proto_deserialize(as_length_delimited(val_from_parsed()?)?, child_layout)?;
+                let val = proto_deserialize(as_length_delimited(val?)?, child_layout)?;
                 res.push(MoveValue::Struct(val));
             },
         }
@@ -323,12 +325,14 @@ fn proto_serialize_vector_value(vec: &[MoveValue], field_num: u32, top_level: bo
                 proto_serialize_vector_value(v, field_num, false, out);
             }
         }
-        _  => if top_level {
-            for v in vec { proto_serialize_value(v, field_num, out); }
-        } else {
-            let mut wrapper = vec![];
-            proto_serialize_vector_value(vec, 1, false, &mut wrapper);
-            serialize_length_delim(field_num, &wrapper, out)
+        _  => {
+            if top_level {
+                for v in vec { proto_serialize_value(v, field_num, out); }
+            } else {
+                let mut wrapper = vec![];
+                proto_serialize_vector_value(vec, 1, false, &mut wrapper);
+                serialize_length_delim(field_num, &wrapper, out)
+            }
         },
     }
 }
