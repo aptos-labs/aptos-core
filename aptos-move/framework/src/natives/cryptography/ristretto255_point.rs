@@ -255,7 +255,7 @@ pub(crate) fn native_point_clone(
     let handle = pop_as_ristretto_handle(&mut args)?;
     let point = point_data.get_point(&handle);
     let clone = *point;
-    let result_handle = point_data.add_point(clone);
+    let result_handle = point_data.safe_add_point(clone)?;
 
     Ok(smallvec![Value::u64(result_handle)])
 }

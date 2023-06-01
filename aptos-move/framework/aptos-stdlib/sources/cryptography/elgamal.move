@@ -2,7 +2,7 @@
 /// Bulletproofs module.
 ///
 /// An ElGamal *ciphertext* is an encryption of a value `v` under a basepoint `G` and public key `Y = sk * G`, where `sk`
-/// is the corresponding secret key, is `(v * G + r * Y, r * G), for a random scalar `r`.
+/// is the corresponding secret key, is `(v * G + r * Y, r * G)`, for a random scalar `r`.
 ///
 /// Note that we place the value `v` "in the exponent" of `G` so that ciphertexts are additively homomorphic: i.e., so
 /// that `Enc_Y(v, r) + Enc_Y(v', r') = Enc_Y(v + v', r + r')` where `v, v'` are plaintext messages, `Y` is a public key and `r, r'`

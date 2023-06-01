@@ -81,6 +81,8 @@ module aptos_std::ristretto255 {
     const E_ZERO_SCALARS: u64 = 3;
     /// Too many points have been created in the current transaction execution.
     const E_TOO_MANY_POINTS_CREATED: u64 = 4;
+    /// The native function has not been deployed yet.
+    const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 5;
 
     //
     // Scalar and point structs
