@@ -37,8 +37,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - name: Install grpcurl
-        # uses: aptos-labs/aptos-core/.github/actions/install-grpcurl@main
-        uses: ./.github/actions/install-grpcurl
+        uses: aptos-labs/aptos-core/.github/actions/install-grpcurl@main
 
       - name: Set up and verify indexer GRPC local docker
         shell: bash
