@@ -46,7 +46,7 @@ impl OnChainExecutionConfig {
 /// This is used when on-chain config is not initialized.
 impl Default for OnChainExecutionConfig {
     fn default() -> Self {
-        OnChainExecutionConfig::V1(ExecutionConfigV1::default())
+        OnChainExecutionConfig::V3(ExecutionConfigV3::default())
     }
 }
 
@@ -108,7 +108,7 @@ impl Default for ExecutionConfigV3 {
         Self {
             transaction_shuffler_type: TransactionShufflerType::NoShuffling,
             block_gas_limit: None,
-            transaction_deduper_type: TransactionDeduperType::NoDedup,
+            transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         }
     }
 }
