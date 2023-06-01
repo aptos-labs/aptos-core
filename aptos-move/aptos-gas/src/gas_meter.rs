@@ -31,12 +31,13 @@ use move_vm_types::{
     views::{TypeView, ValueView},
 };
 use std::collections::BTreeMap;
-// TODO: We will need to bump up the gas version (currently at 7, so update to 8)
 // This gas feature version must be bumped up when one of the following conditions arises
 //  - a new gas parameter is added in `aptos_framework.rs`
 //  - [what else]?
 //
 // Change log:
+// - V9
+//   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
 // - V8
 //   - Added BLS12-381 operations.
 // - V7
