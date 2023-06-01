@@ -58,7 +58,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(txns, &state_view)
+        AptosVM::execute_block(txns, &state_view, None)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
