@@ -59,4 +59,4 @@ def test_aptos_header_included(run_helper: RunHelper, test_name=None):
     response = requests.get(run_helper.get_metrics_url())
 
     if 'request_source_client="aptos-cli' not in response.text:
-        raise TestError("request should contains the correct aptos header: aptos-cli")
+        raise TestError("Request should contain the correct aptos header: aptos-cli")
