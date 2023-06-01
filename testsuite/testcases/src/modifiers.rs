@@ -206,7 +206,10 @@ pub struct CpuChaosConfig {
 
 impl Default for CpuChaosConfig {
     fn default() -> Self {
-        Self { num_groups: 4, load_per_worker: 100 }
+        Self {
+            num_groups: 4,
+            load_per_worker: 100,
+        }
     }
 }
 
@@ -220,7 +223,10 @@ impl Test for CpuChaosTest {
     }
 }
 
-fn create_cpu_stress_template(all_validators: Vec<PeerId>, config: &CpuChaosConfig) -> SwarmCpuStress {
+fn create_cpu_stress_template(
+    all_validators: Vec<PeerId>,
+    config: &CpuChaosConfig,
+) -> SwarmCpuStress {
     let validator_chunks = chunk_validators(all_validators, config.num_groups);
 
     let group_cpu_stresses = validator_chunks
