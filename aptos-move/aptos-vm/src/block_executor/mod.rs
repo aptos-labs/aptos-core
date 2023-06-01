@@ -23,7 +23,7 @@ use aptos_block_executor::{
     },
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
@@ -156,7 +156,11 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
-        init_speculative_logs(num_txns);
+        if state_view.id() != StateViewId::Miscellaneous {
+            // Speculation is disabled in Miscellaneous context, which is used by testing and
+            // can even lead to concurrent execute_block invocations, leading to errors on flush.
+            init_speculative_logs(num_txns);
+        }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
         let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
@@ -177,7 +181,11 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                flush_speculative_logs(pos);
+                if state_view.id() != StateViewId::Miscellaneous {
+                    // Speculation is disabled in Miscellaneous context, which is used by testing and
+                    // can even lead to concurrent execute_block invocations, leading to errors on flush.
+                    flush_speculative_logs(pos);
+                }
 
                 Ok(output_vec)
             },
