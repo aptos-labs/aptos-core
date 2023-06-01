@@ -171,7 +171,6 @@ async fn start_server<T: RunnableConfig>(
                     } else {
                         "Server was still starting up".to_string()
                     };
-                    println!("waiting...");
                     bail!(
                         "Server didn't come up within given timeout: {:#?} {}",
                         e,

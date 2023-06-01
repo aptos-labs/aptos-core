@@ -21,7 +21,7 @@ use aptos_protos::internal::fullnode::v1::{
 };
 use futures::{self, StreamExt};
 use prost::Message;
-use tracing::{debug, error};
+use tracing::{error, info};
 
 type ChainID = u32;
 type StartingVersion = u64;
@@ -282,7 +282,7 @@ async fn process_streaming_response(
                     PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
                     LATEST_PROCESSED_VERSION.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    debug!(
+                    info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] Data chunk received.",
@@ -300,7 +300,7 @@ async fn process_streaming_response(
                     start_version,
                     num_of_transactions,
                 } => {
-                    debug!(
+                    info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
                         "[Indexer Cache] End signal received for current batch.",
@@ -321,7 +321,7 @@ async fn process_streaming_response(
                         .await
                         .unwrap();
                     transaction_count = 0;
-                    debug!(
+                    info!(
                         current_version = current_version,
                         chain_id = fullnode_chain_id,
                         tps = (tps_calculator.avg() * 1000.0) as u64,

@@ -53,16 +53,6 @@ class StartSubcommand(Enum):
     NO_INDEXER_GRPC = "no-indexer-grpc"
 
 
-def normalize_var_name(var_name: str) -> str:
-    return var_name.replace("-", "_").upper()
-
-
-# set envs based on platform, if it's not already overriden
-if not os.environ.get("REDIS_IMAGE_REPO"):
-    if platform.system() == "Darwin":
-        os.environ["REDIS_IMAGE_REPO"] = "arm64v8/redis"
-
-
 class DockerComposeError(Exception):
     def __init__(self, message="Docker Compose Error"):
         self.message = message
@@ -74,7 +64,7 @@ def run_docker_compose(
     compose_file_path: str,
     compose_action: DockerComposeAction,
     extra_args: List[str] = [],
-):
+) -> None:
     log.info(f"Running docker-compose {compose_action.value} on {compose_file_path}")
     try:
         shell.run(
@@ -95,13 +85,13 @@ def run_docker_compose(
             raise e
 
 
-def start_single_validator_testnet(shell: Shell):
+def start_single_validator_testnet(shell: Shell) -> None:
     run_docker_compose(
         shell, VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE, DockerComposeAction.UP
     )
 
 
-def start_indexer_grpc(shell: Shell, redis_only: bool = False):
+def start_indexer_grpc(shell: Shell, redis_only: bool = False) -> None:
     extra_indexer_grpc_docker_args = []
     if redis_only:
         extra_indexer_grpc_docker_args = [
@@ -121,13 +111,13 @@ def start_indexer_grpc(shell: Shell, redis_only: bool = False):
     )
 
 
-def stop_single_validator_testnet(shell: Shell):
+def stop_single_validator_testnet(shell: Shell) -> None:
     run_docker_compose(
         shell, VALIDATOR_TESTNET_DOCKER_COMPOSE_FILE, DockerComposeAction.DOWN
     )
 
 
-def stop_indexer_grpc(shell: Shell):
+def stop_indexer_grpc(shell: Shell) -> None:
     run_docker_compose(
         shell, INDEXER_GRPC_DOCKER_COMPOSE_FILE, DockerComposeAction.DOWN
     )
@@ -155,7 +145,7 @@ def wait_for_testnet_progress(client: HttpClient) -> int:
     raise Exception("Testnet failed to start within timeout period")
 
 
-def wait_for_indexer_grpc_progress(shell: Shell, client: HttpClient):
+def wait_for_indexer_grpc_progress(shell: Shell, client: HttpClient) -> None:
     """Wait for the indexer grpc to start and try streaming from it"""
     log.info(
         f"Waiting for indexer grpc to start for {WAIT_INDEXER_GRPC_START_TIMEOUT_SECS}s"
@@ -218,7 +208,7 @@ def wait_for_indexer_grpc_progress(shell: Shell, client: HttpClient):
     log.info("Stream finished successfully")
 
 
-def start(context: SystemContext, no_indexer_grpc: bool = False):
+def start(context: SystemContext, no_indexer_grpc: bool = False) -> None:
     start_single_validator_testnet(context.shell)
 
     # wait for progress
@@ -231,17 +221,22 @@ def start(context: SystemContext, no_indexer_grpc: bool = False):
         wait_for_indexer_grpc_progress(context.shell, context.http_client)
 
 
-def stop(context: SystemContext):
+def stop(context: SystemContext) -> None:
     stop_indexer_grpc(context.shell)
     stop_single_validator_testnet(context.shell)
 
 
-def wipe(context: SystemContext):
+def wipe(context: SystemContext) -> None:
     stop(context)  # call stop() just for sanity
     context.shell.run(["docker", "volume", "rm"] + SHARED_DOCKER_VOLUME_NAMES)
 
 
-def main():
+def main() -> None:
+    # set envs based on platform, if it's not already overriden
+    if not os.environ.get("REDIS_IMAGE_REPO"):
+        if platform.system() == "Darwin":
+            os.environ["REDIS_IMAGE_REPO"] = "arm64v8/redis"
+
     parser = argparse.ArgumentParser(
         prog="Indexer GRPC Local",
         description="Spins up an indexer GRPC locally using a single validator testnet",
