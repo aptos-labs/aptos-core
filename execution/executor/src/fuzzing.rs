@@ -15,6 +15,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
+    test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
     vm_status::VMStatus,
 };
@@ -38,7 +39,7 @@ pub fn fuzz_execute_and_commit_blocks(
     let mut block_ids = vec![];
     for block in blocks {
         let block_id = block.0;
-        let _execution_results = executor.execute_block(block, parent_block_id);
+        let _execution_results = executor.execute_block(block, parent_block_id, BLOCK_GAS_LIMIT);
         parent_block_id = block_id;
         block_ids.push(block_id);
     }
@@ -52,19 +53,12 @@ impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<FakeVM>(transactions, state_view)
-    }
-
-    fn execute_transaction_block_with_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_gas_limit::<FakeVM>(
+        ChunkOutput::by_transaction_execution::<FakeVM>(
             transactions,
             state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
     }
 }
@@ -74,6 +68,7 @@ impl VMExecutor for FakeVM {
         _sharded_block_executor: &ShardedBlockExecutor<S>,
         _transactions: Vec<Transaction>,
         _state_view: Arc<S>,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
@@ -81,14 +76,7 @@ impl VMExecutor for FakeVM {
     fn execute_block(
         _transactions: Vec<Transaction>,
         _state_view: &impl StateView,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        Ok(Vec::new())
-    }
-
-    fn execute_block_with_gas_limit(
-        _transactions: Vec<Transaction>,
-        _state_view: &impl StateView,
-        _maybe_gas_limit: Option<u64>,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         Ok(Vec::new())
     }
