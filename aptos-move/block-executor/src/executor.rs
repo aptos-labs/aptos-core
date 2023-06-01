@@ -49,7 +49,7 @@ pub struct BlockExecutor<T, E, S> {
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
-    maybe_gas_limit: Option<u64>,
+    maybe_block_gas_limit: Option<u64>,
     phantom: PhantomData<(T, E, S)>,
 }
 
@@ -64,7 +64,7 @@ where
     pub fn new(
         concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
@@ -74,7 +74,7 @@ where
         Self {
             concurrency_level,
             executor_thread_pool,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
             phantom: PhantomData,
         }
     }
@@ -221,7 +221,7 @@ where
 
     fn coordinator_commit_hook(
         &self,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
@@ -266,7 +266,7 @@ where
                 },
             };
 
-            if let Some(per_block_gas_limit) = maybe_gas_limit {
+            if let Some(per_block_gas_limit) = maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
                 if *accumulated_gas >= per_block_gas_limit {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
@@ -360,7 +360,7 @@ where
             match &role {
                 CommitRole::Coordinator(post_commit_txs) => {
                     self.coordinator_commit_hook(
-                        self.maybe_gas_limit,
+                        self.maybe_block_gas_limit,
                         scheduler,
                         post_commit_txs,
                         &mut worker_idx,
@@ -575,7 +575,7 @@ where
                 break;
             }
 
-            if let Some(per_block_gas_limit) = self.maybe_gas_limit {
+            if let Some(per_block_gas_limit) = self.maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns
                 // exceeds per_block_gas_limit, halt sequential execution.
                 if accumulated_gas >= per_block_gas_limit {

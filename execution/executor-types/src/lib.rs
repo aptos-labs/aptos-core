@@ -92,6 +92,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         &self,
         block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error>;
 
     /// Saves eligible blocks to persistent storage.
@@ -124,10 +125,6 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
-
-    fn get_block_gas_limit(&self) -> Option<u64>;
-
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>);
 }
 
 #[derive(Clone)]

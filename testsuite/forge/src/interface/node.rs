@@ -6,7 +6,7 @@ use crate::{Result, Version};
 use anyhow::anyhow;
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_inspection_service::inspection_client::InspectionClient;
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{AptosBaseUrl, Client as RestClient};
 use aptos_sdk::types::PeerId;
 use std::{
     collections::HashMap,
@@ -144,7 +144,9 @@ pub trait NodeExt: Node {
 
     /// Return REST API client of this Node
     fn rest_client_with_timeout(&self, timeout: Duration) -> RestClient {
-        RestClient::new_with_timeout(self.rest_api_endpoint(), timeout)
+        RestClient::builder(AptosBaseUrl::Custom(self.rest_api_endpoint()))
+            .timeout(timeout)
+            .build()
     }
 
     /// Return an InspectionClient for this Node
