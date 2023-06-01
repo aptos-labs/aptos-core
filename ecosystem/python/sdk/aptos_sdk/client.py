@@ -20,6 +20,7 @@ from .transactions import (
     TransactionPayload,
 )
 from .type_tag import StructTag, TypeTag
+from .metadata import Metadata
 
 U64_MAX = 18446744073709551615
 
@@ -44,6 +45,7 @@ class RestClient:
     def __init__(self, base_url: str, client_config: ClientConfig = ClientConfig()):
         self.base_url = base_url
         self.client = httpx.Client()
+        self.client.headers[Metadata.APTOS_HEADER] = Metadata.get_aptos_header_val()
         self.client_config = client_config
         self.chain_id = int(self.info()["chain_id"])
 

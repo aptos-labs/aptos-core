@@ -20,6 +20,7 @@ from .transactions import (
     TransactionPayload,
 )
 from .type_tag import StructTag, TypeTag
+from .metadata import Metadata
 
 U64_MAX = 18446744073709551615
 
@@ -49,8 +50,10 @@ class RestClient:
         # Default timeouts but do not set a pool timeout, since the idea is that jobs will wait as
         # long as progress is being made.
         timeout = httpx.Timeout(60.0, pool=None)
+        # Default headers
+        headers = {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
         self.client = httpx.AsyncClient(
-            http2=client_config.http2, limits=limits, timeout=timeout
+            http2=client_config.http2, limits=limits, timeout=timeout, headers=headers
         )
         self.client_config = client_config
         self._chain_id = None
