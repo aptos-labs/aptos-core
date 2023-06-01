@@ -398,7 +398,7 @@ bytes = "1.1.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg-if = "1.0.0"
 claims = "0.7"
-clap = { version = "3.2.23", features = ["derive", "env", "suggestions"] }
+clap = { version = "3.2.23" }
 clap_complete = "3.2.3"
 cloud-storage = { version = "0.11.1", features = ["global-client"] }
 codespan-reporting = "0.11.1"
