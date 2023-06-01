@@ -2,10 +2,13 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [2.0.0] - Current
+## [2.0.0] - 2023/06/01
 ### Added
 - Multisig v2 governance support
 - JSON input file support
+- Builder Pattern support for RestClient
+  - NOTE: Methods **new_with_timeout** and **new_with_timeout_and_user_agent** are no longer available.
+- Added custom header *x-aptos-client* for analytic purpose
 
 ## [1.0.14] - 2023/05/26
 - Updated DB bootstrap command with new DB restore features
