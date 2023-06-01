@@ -195,7 +195,6 @@ impl GasParameters {
         };
 
         // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
-        // TODO: But an MSM is used so we should account for that
         context.charge(self.per_bit_rangeproof_verify * NumArgs::new(bit_length as u64))?;
 
         let mut ver_trans = Transcript::new(dst.as_slice());
