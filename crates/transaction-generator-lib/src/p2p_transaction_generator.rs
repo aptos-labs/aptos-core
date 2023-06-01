@@ -7,7 +7,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
-use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng};
+use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng, thread_rng};
 use std::{cmp::max, sync::Arc};
 use std::cmp::min;
 use std::ops::Index;
@@ -39,6 +39,7 @@ struct BurnAndRecycleSampler {
     item_pool: Vec<usize>,
     next_index: usize,
     segment_size: usize,
+    init_shuffle_done: bool
 }
 
 impl BurnAndRecycleSampler {
@@ -47,10 +48,15 @@ impl BurnAndRecycleSampler {
             item_pool: (0..num_items).collect(),
             next_index: 0,
             segment_size,
+            init_shuffle_done: false,
         }
     }
 
     fn sample_one(&mut self, rng: &mut StdRng) -> usize {
+        if !self.init_shuffle_done {
+            self.item_pool.shuffle(rng);
+            self.init_shuffle_done = true;
+        }
         if self.next_index % self.segment_size == 0 {
             // Switching to a new sub-pool: shuffle it first.
             let segment_end = min(self.item_pool.len(), self.next_index + self.segment_size);
@@ -67,6 +73,17 @@ impl Sampler for BurnAndRecycleSampler {
         (0..count).map(|_| self.sample_one(rng)).collect()
     }
 }
+
+#[test]
+fn test_burn_and_recycle_sampler() {
+    let mut rng = StdRng::from_entropy();
+    let mut sampler = BurnAndRecycleSampler::new(6, 3);
+    for _ in 0..20 {
+        let s = sampler.sample_one(&mut rng);
+        println!("s={s}");
+    }
+}
+
 
 pub struct P2PTransactionGenerator {
     rng: StdRng,

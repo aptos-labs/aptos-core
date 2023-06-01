@@ -121,7 +121,6 @@ pub trait TransactionGenerator: Sync + Send {
     ) -> Vec<SignedTransaction>;
 }
 
-
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
     fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator>;
