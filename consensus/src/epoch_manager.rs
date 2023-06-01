@@ -819,10 +819,12 @@ impl EpochManager {
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
         );
-        let chain_health_backoff_config =
-            ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
-        let pipeline_backpressure_config =
-            PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+        // let chain_health_backoff_config =
+        //     ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
+        // let pipeline_backpressure_config =
+        //     PipelineBackpressureConfig::new(self.config.pipeline_backpressure.clone());
+        let chain_health_backoff_config = ChainHealthBackoffConfig::new_no_backoff();
+        let pipeline_backpressure_config = PipelineBackpressureConfig::new_no_backoff();
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
