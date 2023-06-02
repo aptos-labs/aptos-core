@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
+use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ impl MempoolTransaction {
             insertion_info: InsertionInfo {
                 insertion_time,
                 client_submitted,
-                is_end_to_end: timeline_state != TimelineState::NonQualified,
+                validator_end_to_end: timeline_state != TimelineState::NonQualified,
             },
             was_parked: false,
         }
@@ -92,8 +92,36 @@ pub struct SequenceInfo {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct InsertionInfo {
     pub insertion_time: SystemTime,
+    /// The transaction was received from a client REST API submission, rather than a mempool
+    /// broadcast. This can be used as the time a transaction first entered the network,
+    /// to measure end-to-end latency within the entire network. However, if a transaction is
+    /// submitted to multiple nodes (by the client) then the end-to-end latency measured will not
+    /// be accurate.
     pub client_submitted: bool,
-    pub is_end_to_end: bool,
+    /// At a validator, whether the transaction was received from a VFN, rather than from another
+    /// validator. This can be used as the time a transaction first entered the validator network,
+    /// to measure end-to-end latency within the validator network. However, if a transaction enters
+    /// via multiple validators (due to duplication outside of the validator network) then the
+    /// validator end-to-end latency measured will not be accurate.
+    pub validator_end_to_end: bool,
+}
+
+impl InsertionInfo {
+    pub fn submitted_by_label(&self) -> &'static str {
+        if self.client_submitted {
+            counters::SUBMITTED_BY_CLIENT_LABEL
+        } else {
+            counters::SUBMITTED_BY_BROADCAST_LABEL
+        }
+    }
+
+    pub fn validator_scope_label(&self) -> &'static str {
+        if self.validator_end_to_end {
+            counters::E2E_LABEL
+        } else {
+            counters::LOCAL_LABEL
+        }
+    }
 }
 
 #[cfg(test)]

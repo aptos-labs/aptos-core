@@ -117,20 +117,10 @@ impl Mempool {
         stage: &'static str,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
-            let scope = if insertion_info.is_end_to_end {
-                counters::E2E_LABEL
-            } else {
-                counters::LOCAL_LABEL
-            };
-            let submitted_by = if insertion_info.client_submitted {
-                counters::SUBMITTED_BY_CLIENT_LABEL
-            } else {
-                counters::SUBMITTED_BY_BROADCAST_LABEL
-            };
             counters::core_mempool_txn_commit_latency(
                 stage,
-                scope,
-                submitted_by,
+                insertion_info.validator_scope_label(),
+                insertion_info.submitted_by_label(),
                 bucket,
                 time_delta,
             );

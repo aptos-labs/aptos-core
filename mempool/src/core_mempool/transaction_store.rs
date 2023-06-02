@@ -15,7 +15,7 @@ use crate::{
     counters,
     counters::{
         BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL,
-        LOCAL_LABEL, SUBMITTED_BY_BROADCAST_LABEL, SUBMITTED_BY_CLIENT_LABEL,
+        LOCAL_LABEL,
     },
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
     shared_mempool::types::MultiBucketTimelineIndexIds,
@@ -382,12 +382,7 @@ impl TransactionStore {
         broadcast_ready: bool,
     ) {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
-            let submitted_by = if insertion_info.client_submitted {
-                SUBMITTED_BY_CLIENT_LABEL
-            } else {
-                SUBMITTED_BY_BROADCAST_LABEL
-            };
-
+            let submitted_by = insertion_info.submitted_by_label();
             if broadcast_ready {
                 counters::core_mempool_txn_commit_latency(
                     CONSENSUS_READY_LABEL,

@@ -89,14 +89,14 @@ fn test_transaction_metrics() {
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(0), 0)
         .unwrap();
-    assert!(insertion_info.is_end_to_end);
+    assert!(insertion_info.validator_end_to_end);
 
     // Check timestamp returned as not end-to-end for non-broadcast-able transaction
     let (insertion_info, _bucket) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(1), 0)
         .unwrap();
-    assert!(!insertion_info.is_end_to_end);
+    assert!(!insertion_info.validator_end_to_end);
 }
 
 #[test]
