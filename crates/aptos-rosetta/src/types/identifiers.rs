@@ -39,7 +39,7 @@ impl AccountIdentifier {
     pub fn pool_address(&self) -> ApiResult<Option<AccountAddress>> {
         if let Some(sub_account) = &self.sub_account {
             if let Some(metadata) = &sub_account.metadata {
-                return str_to_account_address(&metadata.pool_address.as_str()).map(Some);
+                return str_to_account_address(metadata.pool_address.as_str()).map(Some);
             }
         }
 

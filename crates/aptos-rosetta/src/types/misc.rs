@@ -342,12 +342,8 @@ pub async fn get_delegation_stake_balances(
             function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
             type_arguments: vec![],
             arguments: vec![
-                serde_json::Value::String(String::from(
-                    pool_address.to_string(),
-                )),
-                serde_json::Value::String(String::from(
-                    owner_address.to_string()
-                )),
+                serde_json::Value::String(pool_address.to_string()),
+                serde_json::Value::String(owner_address.to_string()),
             ],
         },
         Some(version),
@@ -368,9 +364,7 @@ pub async fn get_delegation_stake_balances(
             function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
             type_arguments: vec![],
             arguments: vec![
-                serde_json::Value::String(String::from(
-                    pool_address.to_string(),
-                )),
+                serde_json::Value::String(pool_address.to_string()),
             ]
         },
         Some(version),
@@ -388,8 +382,8 @@ pub async fn get_delegation_stake_balances(
             lockup_expiration,
         }))
     } else {
-        return Err(ApiError::InternalError(Some(
+        Err(ApiError::InternalError(Some(
             "Unable to construct BalanceResult instance".to_string(),
-        )));
+        )))
     }
 }
