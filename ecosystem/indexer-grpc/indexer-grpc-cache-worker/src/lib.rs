@@ -13,7 +13,6 @@ use worker::Worker;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcCacheWorkerConfig {
-    pub server_name: String,
     pub fullnode_grpc_address: String,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: String,
@@ -33,6 +32,6 @@ impl RunnableConfig for IndexerGrpcCacheWorkerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxcache".to_string()
     }
 }
