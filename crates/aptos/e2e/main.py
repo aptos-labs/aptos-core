@@ -30,7 +30,7 @@ import shutil
 import sys
 
 from cases.account import test_account_create, test_account_fund_with_faucet
-from cases.init import test_init, test_metrics_accessible
+from cases.init import test_aptos_header_included, test_init, test_metrics_accessible
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -105,6 +105,9 @@ def run_tests(run_helper):
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
+
+    # Make sure the aptos-cli header is included on the original request
+    test_aptos_header_included(run_helper)
 
 
 def main():
