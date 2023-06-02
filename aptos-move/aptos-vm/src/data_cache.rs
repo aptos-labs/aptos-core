@@ -131,13 +131,8 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 
     fn release_resource_group_cache(
         &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        self.resource_group_cache
-            .borrow_mut()
-            .get_mut(address)?
-            .remove(resource_group)
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
+        self.resource_group_cache.take()
     }
 }
 
