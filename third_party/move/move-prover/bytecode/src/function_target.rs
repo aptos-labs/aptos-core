@@ -234,9 +234,7 @@ impl<'env> FunctionTarget<'env> {
     /// Gets the number of user declared locals of this function, excluding locals which have
     /// been introduced by transformations.
     pub fn get_user_local_count(&self) -> usize {
-        self.func_env
-            .get_local_count()
-            .expect("compiled module available")
+        self.func_env.get_local_count().unwrap_or_default()
     }
 
     /// Return an iterator over the non-parameter local variables of this function
@@ -410,22 +408,11 @@ impl FunctionData {
         local_types: Vec<Type>,
         result_type: Type,
         locations: BTreeMap<AttrId, Loc>,
+        name_to_index: BTreeMap<Symbol, usize>,
         acquires_global_resources: Vec<StructId>,
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
     ) -> Self {
-        let name_to_index = (0..func_env
-            .get_local_count()
-            .expect("compiled module available"))
-            .map(|idx| {
-                (
-                    func_env
-                        .get_local_name(idx)
-                        .expect("compiled module available"),
-                    idx,
-                )
-            })
-            .collect();
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
             variant: FunctionVariant::Baseline,
