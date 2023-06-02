@@ -33,6 +33,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V9
+//   - Accurate tracking of the cost of loading resource groups
 // - V8
 //   - Added BLS12-381 operations.
 // - V7
