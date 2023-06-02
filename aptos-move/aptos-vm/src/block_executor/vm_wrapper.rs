@@ -53,8 +53,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     }
 
     // This function is called by the BlockExecutor for each transaction is intends
-    // to execute (via the ExecutorTask trait). It can be as a part of sequential
-    // execution, or speculatively as a part of a parallel execution.
+    // to execute (via the ExecutorTask trait). This function is run speculatively
+    // as a part of a parallel execution.
     fn execute_transaction_parallel(
         &self,
         view: &impl StateView,
@@ -108,8 +108,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     }
 
     // This function is called by the BlockExecutor for each transaction is intends
-    // to execute (via the ExecutorTask trait). It can be as a part of sequential
-    // execution, or speculatively as a part of a parallel execution.
+    // to execute (via the ExecutorTask trait). This function is run during
+    // sequential execution of a block.
     fn execute_transaction_sequential(
         &self,
         view: &impl StateView,
