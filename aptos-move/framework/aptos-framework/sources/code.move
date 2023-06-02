@@ -199,30 +199,27 @@ module aptos_framework::code {
         assert!(can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy),
             error::invalid_argument(EUPGRADE_WEAKER_POLICY));
         let old_modules = get_module_names(old_pack);
-        let i = 0;
-        while (i < vector::length(&old_modules)) {
+
+        vector::for_each_ref(&old_modules, |old_module| {
             assert!(
-                vector::contains(new_modules, vector::borrow(&old_modules, i)),
+                vector::contains(new_modules, old_module),
                 EMODULE_MISSING
             );
-            i = i + 1;
-        }
+        });
     }
 
     /// Checks whether a new package with given names can co-exist with old package.
     fun check_coexistence(old_pack: &PackageMetadata, new_modules: &vector<String>) {
         // The modules introduced by each package must not overlap with `names`.
-        let i = 0;
-        while (i < vector::length(&old_pack.modules)) {
-            let old_mod = vector::borrow(&old_pack.modules, i);
+        vector::for_each_ref(&old_pack.modules, |old_mod| {
+            let old_mod: &ModuleMetadata = old_mod;
             let j = 0;
             while (j < vector::length(new_modules)) {
                 let name = vector::borrow(new_modules, j);
                 assert!(&old_mod.name != name, error::already_exists(EMODULE_NAME_CLASH));
                 j = j + 1;
             };
-            i = i + 1;
-        }
+        });
     }
 
     /// Check that the upgrade policies of all packages are equal or higher quality than this package. Also
@@ -287,11 +284,10 @@ module aptos_framework::code {
     /// Get the names of the modules in a package.
     fun get_module_names(pack: &PackageMetadata): vector<String> {
         let module_names = vector::empty();
-        let i = 0;
-        while (i < vector::length(&pack.modules)) {
-            vector::push_back(&mut module_names, vector::borrow(&pack.modules, i).name);
-            i = i + 1
-        };
+        vector::for_each_ref(&pack.modules, |pack_module| {
+            let pack_module: &ModuleMetadata = pack_module;
+            vector::push_back(&mut module_names, pack_module.name);
+        });
         module_names
     }
 
