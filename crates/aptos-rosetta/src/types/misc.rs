@@ -7,12 +7,8 @@ use crate::{
     types::{AccountIdentifier, Amount},
     AccountAddress, ApiResult,
 };
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, ViewRequest};
 use aptos_types::stake_pool::StakePool;
-use aptos_rest_client::{
-    aptos_api_types::{
-        EntryFunctionId, ViewRequest,
-    },
-};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -337,41 +333,51 @@ pub async fn get_delegation_stake_balances(
     let mut requested_balance: Option<String> = None;
 
     // get requested_balance
-    let balances_response = rest_client.view(
-        &ViewRequest {
-            function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
-            type_arguments: vec![],
-            arguments: vec![
-                serde_json::Value::String(pool_address.to_string()),
-                serde_json::Value::String(owner_address.to_string()),
-            ],
-        },
-        Some(version),
-    ).await?;
+    let balances_response = rest_client
+        .view(
+            &ViewRequest {
+                function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![
+                    serde_json::Value::String(pool_address.to_string()),
+                    serde_json::Value::String(owner_address.to_string()),
+                ],
+            },
+            Some(version),
+        )
+        .await?;
 
     let balances_result = balances_response.into_inner();
     if account_identifier.is_delegator_active_stake() {
-        requested_balance = balances_result.get(0).and_then(|v| v.as_str().map(|s| s.to_owned()));
+        requested_balance = balances_result
+            .get(0)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
     } else if account_identifier.is_delegator_inactive_stake() {
-        requested_balance = balances_result.get(1).and_then(|v| v.as_str().map(|s| s.to_owned()));
+        requested_balance = balances_result
+            .get(1)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
     } else if account_identifier.is_delegator_pending_inactive_stake() {
-        requested_balance = balances_result.get(2).and_then(|v| v.as_str().map(|s| s.to_owned()));
+        requested_balance = balances_result
+            .get(2)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
     }
 
     // get lockup_secs
-    let lockup_secs_response = rest_client.view(
-        &ViewRequest {
-            function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
-            type_arguments: vec![],
-            arguments: vec![
-                serde_json::Value::String(pool_address.to_string()),
-            ]
-        },
-        Some(version),
-    ).await?;
+    let lockup_secs_response = rest_client
+        .view(
+            &ViewRequest {
+                function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![serde_json::Value::String(pool_address.to_string())],
+            },
+            Some(version),
+        )
+        .await?;
     let lockup_secs_result = lockup_secs_response.into_inner();
-    let lockup_expiration = lockup_secs_result.get(0)
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok())).unwrap_or(0);
+    let lockup_expiration = lockup_secs_result
+        .get(0)
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        .unwrap_or(0);
 
     if let Some(balance) = requested_balance {
         Ok(Some(BalanceResult {

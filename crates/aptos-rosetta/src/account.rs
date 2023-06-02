@@ -107,7 +107,9 @@ async fn get_balances(
             owner_address,
             pool_address.unwrap(),
             version,
-        ).await {
+        )
+        .await
+        {
             Ok(Some(balance_result)) => {
                 if let Some(balance) = balance_result.balance {
                     total_requested_balance = Some(
