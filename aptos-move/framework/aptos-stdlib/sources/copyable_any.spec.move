@@ -4,7 +4,7 @@ spec aptos_std::copyable_any {
     // Function specifications
     // -----------------------
 
-    spec pack<T: drop + store>(x: T): Any {
+    spec pack<T: drop + store + copy>(x: T): Any {
         use std::bcs;
         aborts_if false;
         ensures result == Any {
