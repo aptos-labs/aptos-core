@@ -179,11 +179,11 @@ impl TransactionSubmissionConfig {
     }
 
     fn default_transaction_expiration_secs() -> u64 {
-        15
+        25
     }
 
     fn default_wait_for_outstanding_txns_secs() -> u64 {
-        20
+        30
     }
 
     pub fn get_gas_unit_price_ttl_secs(&self) -> Duration {
