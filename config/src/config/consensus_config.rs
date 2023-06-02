@@ -94,7 +94,7 @@ pub struct ChainHealthBackoffValues {
 impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
-            max_network_channel_size: 4096,
+            max_network_channel_size: 1024,
             max_sending_block_txns: 2500,
             max_sending_block_txns_quorum_store_override:
                 MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
