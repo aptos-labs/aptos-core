@@ -246,6 +246,7 @@ TokenClient
 TokenData
 TokenStore
 TokenTransfers
+TokenV
 TransactionBuilder
 TransactionBuilderABI
 TransactionFee
