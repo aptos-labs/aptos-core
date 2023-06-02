@@ -154,10 +154,10 @@ pub struct StorageServiceConfig {
     pub max_network_channel_size: u64,
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
+    /// Maximum period (ms) of pending optimistic fetch requests
+    pub max_optimistic_fetch_period: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
-    /// Maximum period (ms) of pending subscription requests
-    pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -179,8 +179,8 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_optimistic_fetch_period: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 5000, // 5 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -236,6 +236,8 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    /// The interval (milliseconds) at which to refresh the latency monitor
+    pub latency_monitor_loop_interval_ms: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of in-flight polls for priority peers
@@ -265,6 +267,7 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
+            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,

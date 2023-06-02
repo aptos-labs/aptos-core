@@ -173,6 +173,7 @@ pub async fn emit_transactions_with_cluster(
     if !cluster.coin_source_is_root {
         emit_job_request = emit_job_request.prompt_before_spending();
     }
+
     let stats = emitter
         .emit_txn_for_with_stats(
             &mut coin_source_account,

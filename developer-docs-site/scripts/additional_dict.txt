@@ -72,6 +72,7 @@ DoS
 DocGen
 delegator
 delegators
+deletable
 dropdown
 EACCOUNT
 EALREADY
