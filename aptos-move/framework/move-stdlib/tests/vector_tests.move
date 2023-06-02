@@ -267,6 +267,59 @@ module std::vector_tests {
     }
 
     #[test]
+    fun remove_value_singleton_vector() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        assert!(V::borrow(&V::remove_value(&mut v, &0), 0) == &0, 0);
+        assert!(V::length(&v) == 0, 0);
+    }
+
+    #[test]
+    fun remove_value_nonsingleton_vector() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+
+        assert!(V::borrow(&V::remove_value(&mut v, &2), 0) == &2, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 1, 0);
+        assert!(*V::borrow(&v, 2) == 3, 0);
+    }
+
+    #[test]
+    fun remove_value_nonsingleton_vector_last_elem() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+
+        assert!(V::borrow(&V::remove_value(&mut v, &3), 0) == &3, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 1, 0);
+        assert!(*V::borrow(&v, 2) == 2, 0);
+    }
+
+    #[test]
+    fun remove_value_empty_vector() {
+        let v = V::empty<u64>();
+        assert!(V::length(&V::remove_value(&mut v, &1)) == 0, 0);
+        assert!(V::length(&v) == 0, 1);
+    }
+
+    #[test]
+    fun remove_value_nonexistent() {
+        let v = V::empty<u64>();
+        V::push_back(&mut v, 0);
+        assert!(V::length(&V::remove_value(&mut v, &1)) == 0, 0);
+        assert!(V::length(&v) == 1, 1);
+    }
+
+    #[test]
     fun reverse_vector_empty() {
         let v = V::empty<u64>();
         let is_empty = V::is_empty(&v);
