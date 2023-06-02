@@ -1,0 +1,10 @@
+[package]
+name = 'WrappedToken'
+version = '1.0.0'
+
+[addresses]
+token_migration = "_"
+
+[dependencies]
+AptosToken = { local = "../../framework/aptos-token" }
+AptosTokenObjects = { local = "../../framework/aptos-token-objects" }
