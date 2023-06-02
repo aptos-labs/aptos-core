@@ -149,10 +149,9 @@ module aptos_framework::code {
         let packages = &mut borrow_global_mut<PackageRegistry>(addr).packages;
         let len = vector::length(packages);
         let index = len;
-        let i = 0;
         let upgrade_number = 0;
-        while (i < len) {
-            let old = vector::borrow(packages, i);
+        vector::enumerate_ref(packages, |i, old| {
+            let old: &PackageMetadata = old;
             if (old.name == pack.name) {
                 upgrade_number = old.upgrade_number + 1;
                 check_upgradability(old, &pack, &module_names);
@@ -160,8 +159,7 @@ module aptos_framework::code {
             } else {
                 check_coexistence(old, &module_names)
             };
-            i = i + 1;
-        };
+        });
 
         // Assign the upgrade counter.
         pack.upgrade_number = upgrade_number;
@@ -234,54 +232,47 @@ module aptos_framework::code {
     acquires PackageRegistry {
         let allowed_module_deps = vector::empty();
         let deps = &pack.deps;
-        let i = 0;
-        let n = vector::length(deps);
-        while (i < n) {
-            let dep = vector::borrow(deps, i);
+        vector::for_each_ref(deps, |dep| {
+            let dep: &PackageDep = dep;
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
             if (is_policy_exempted_address(dep.account)) {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
-                let account = dep.account;
+                let account: address = dep.account;
                 let module_name = string::utf8(b"");
                 vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
-                i = i + 1;
-                continue
-            };
-            let registry = borrow_global<PackageRegistry>(dep.account);
-            let j = 0;
-            let m = vector::length(&registry.packages);
-            let found = false;
-            while (j < m) {
-                let dep_pack = vector::borrow(&registry.packages, j);
-                if (dep_pack.name == dep.package_name) {
-                    found = true;
-                    // Check policy
-                    assert!(
-                        dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
-                        error::invalid_argument(EDEP_WEAKER_POLICY)
-                    );
-                    if (dep_pack.upgrade_policy == upgrade_policy_arbitrary()) {
+            } else {
+                let registry = borrow_global<PackageRegistry>(dep.account);
+                let found = vector::any(&registry.packages, |dep_pack| {
+                    let dep_pack: &PackageMetadata = dep_pack;
+                    if (dep_pack.name == dep.package_name) {
+                        // Check policy
                         assert!(
-                            dep.account == publish_address,
-                            error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
-                        )
-                    };
-                    // Add allowed deps
-                    let k = 0;
-                    let r = vector::length(&dep_pack.modules);
-                    while (k < r) {
+                            dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
+                            error::invalid_argument(EDEP_WEAKER_POLICY)
+                        );
+                        if (dep_pack.upgrade_policy == upgrade_policy_arbitrary()) {
+                            assert!(
+                                dep.account == publish_address,
+                                error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
+                            )
+                        };
+                        // Add allowed deps
                         let account = dep.account;
-                        let module_name = vector::borrow(&dep_pack.modules, k).name;
-                        vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
-                        k = k + 1;
-                    };
-                    break
-                };
-                j = j + 1;
+                        let k = 0;
+                        let r = vector::length(&dep_pack.modules);
+                        while (k < r) {
+                            let module_name = vector::borrow(&dep_pack.modules, k).name;
+                            vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+                            k = k + 1;
+                        };
+                        true
+                    } else {
+                        false
+                    }
+                });
+                assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
             };
-            assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
-            i = i + 1;
-        };
+        });
         allowed_module_deps
     }
 
