@@ -122,7 +122,7 @@ module veiled_coin::sigma_protocols {
     ///
     /// Note also that the equations $C_L - C = b' G + sk (C_R - D)$ and $Y = sk G$ in the Zether paper are enforced
     /// programmatically by this smart contract and so are not needed in our $\Sigma$-protocol.
-    public fun full_sigma_protocol_verify<CoinType>(
+    public fun verify_full_sigma_proof<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
         withdraw_ct: &elgamal::Ciphertext,
@@ -142,7 +142,7 @@ module veiled_coin::sigma_protocols {
         let h = pedersen::randomness_base_for_bulletproof();
 
         // TODO: Can be optimized so we don't re-serialize the proof for Fiat-Shamir
-        let rho = full_sigma_protocol_fiat_shamir<CoinType>(
+        let rho = fiat_shamir_full_sigma_protocol<CoinType>(
             sender_pk, recipient_pk,
             withdraw_ct, deposit_ct,
             sender_updated_balance_ct,
@@ -235,7 +235,7 @@ module veiled_coin::sigma_protocols {
     ///     c = b * g + r * h
     /// }
     /// ```
-    public fun unveil_sigma_protocol_verify<CoinType>(
+    public fun verify_unveil_sigma_prof<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
         sender_updated_balance_comm: &pedersen::Commitment,
@@ -246,7 +246,7 @@ module veiled_coin::sigma_protocols {
         let h = pedersen::randomness_base_for_bulletproof();
         let sender_pk_point = elgamal::pubkey_to_point(sender_pk);
 
-        let rho = unveil_sigma_protocol_fiat_shamir<CoinType>(
+        let rho = fiat_shamir_unveil_sigma_protocol<CoinType>(
             sender_pk,
             sender_updated_balance_ct,
             sender_updated_balance_comm,
@@ -330,10 +330,11 @@ module veiled_coin::sigma_protocols {
         })
     }
 
-    /// Deserializes and returns a `SigmaProof` given its byte representation (see protocol description in
-    /// `sigma_protocol_verify`)
+    /// Deserializes and returns a `FullSigmaProof` given its byte representation (see protocol description in
+    /// `verify_full_sigma_protocol`)
+    /// TODO: update all other occurences
     ///
-    /// Elements at the end of the `SigmaProof` struct are expected to be at the start  of the byte vector, and
+    /// Elements at the end of the `FullSigmaProof` struct are expected to be at the start  of the byte vector, and
     /// serialized using the serialization formats in the `ristretto255` module.
     public fun deserialize_full_sigma_proof<CoinType>(proof_bytes: vector<u8>): Option<FullSigmaProof<CoinType>> {
         if (vector::length<u8>(&proof_bytes) != 352) {
@@ -430,7 +431,7 @@ module veiled_coin::sigma_protocols {
     /// Computes the challenge value as `rho = H(g, h, y, c_1, c_2, c, X_1, X_2, X_3)
     /// for the $\Sigma$-protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
     /// used above is from the Zether [BAZB20] paper.
-    fun unveil_sigma_protocol_fiat_shamir<CoinType>(
+    fun fiat_shamir_unveil_sigma_protocol<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
         sender_updated_balance_comm: &pedersen::Commitment,
@@ -481,7 +482,7 @@ module veiled_coin::sigma_protocols {
     /// Computes the challenge value as `rho = H(g, y, \bar{y}, h, C, D, \bar{C}, c_1, c_2, c, \bar{c}, {X_i}_{i=1}^7)`
     /// for the $\Sigma$-protocol from `verify_withdrawal_sigma_protocol` using the Fiat-Shamir transform. The notation
     /// used above is from the Zether [BAZB20] paper.
-    fun full_sigma_protocol_fiat_shamir<CoinType>(
+    fun fiat_shamir_full_sigma_protocol<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
         withdraw_ct: &elgamal::Ciphertext,
@@ -573,7 +574,7 @@ module veiled_coin::sigma_protocols {
     #[test_only]
     /// Proves the $\Sigma$-protocol used for veiled-to-unveiled coin transfers.
     /// See `unveil_sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
-    public fun unveil_sigma_protocol_prove<CoinType>(
+    public fun prove_unveil_sigma_proof<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
         sender_updated_balance_comm: &pedersen::Commitment,
@@ -597,7 +598,7 @@ module veiled_coin::sigma_protocols {
         let big_x3 = ristretto255::point_mul(&h, &x1);
         ristretto255::point_add_assign(&mut big_x3, &g_x2);
 
-        let rho = unveil_sigma_protocol_fiat_shamir<CoinType>(
+        let rho = fiat_shamir_unveil_sigma_protocol<CoinType>(
             sender_pk,
             sender_updated_balance_ct,
             sender_updated_balance_comm,
@@ -625,7 +626,7 @@ module veiled_coin::sigma_protocols {
     #[test_only]
     /// Proves the $\Sigma$-protocol used for veiled coin transfers.
     /// See `full_sigma_protocol_verify` for a detailed description of the $\Sigma$-protocol
-    public fun full_sigma_protocol_prove<CoinType>(
+    public fun prove_full_sigma_proof<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         recipient_pk: &elgamal::CompressedPubkey,
         withdraw_ct: &elgamal::Ciphertext,
@@ -678,7 +679,7 @@ module veiled_coin::sigma_protocols {
         ristretto255::point_add_assign(&mut big_x7, &h_x2);
 
 
-        let rho = full_sigma_protocol_fiat_shamir<CoinType>(
+        let rho = fiat_shamir_full_sigma_protocol<CoinType>(
             sender_pk, recipient_pk,
             withdraw_ct, deposit_ct,
             sender_updated_balance,
@@ -740,7 +741,7 @@ module veiled_coin::sigma_protocols {
 
     #[test_only]
     /// Given a $\Sigma$-protocol proof, serializes it into byte form.
-    /// Elements at the end of the `SigmaProof` struct are placed into the vector first,
+    /// Elements at the end of the `FullSigmaProof` struct are placed into the vector first,
     /// using the serialization formats in the `ristretto255` module.
     public fun serialize_full_sigma_proof<CoinType>(proof: &FullSigmaProof<CoinType>): vector<u8> {
         let x1_bytes = ristretto255::point_to_bytes(&ristretto255::point_compress(&proof.x1));
@@ -776,7 +777,7 @@ module veiled_coin::sigma_protocols {
     //
 
     #[test]
-    fun full_sigma_proof_verify_test()
+    fun verify_full_sigma_proof_test()
     {
         // Pick a keypair for the sender, and one for the recipient
         let (_, sender_pk) = generate_elgamal_keypair();
@@ -800,7 +801,7 @@ module veiled_coin::sigma_protocols {
 
         let updated_balance_comm = pedersen::new_commitment_for_bulletproof(&updated_balance_val, &updated_balance_rand);
 
-        let sigma_proof = full_sigma_protocol_prove<coin::FakeMoney>(
+        let sigma_proof = prove_full_sigma_proof<coin::FakeMoney>(
             &sender_pk,
             &recipient_pk,
             &withdraw_ct,           // withdrawn amount, encrypted under sender PK
@@ -814,7 +815,7 @@ module veiled_coin::sigma_protocols {
             &updated_balance_val,   // sender's balance after the transfer
         );
 
-        full_sigma_protocol_verify(
+        verify_full_sigma_proof(
             &sender_pk,
             &recipient_pk,
             &withdraw_ct,
@@ -828,7 +829,7 @@ module veiled_coin::sigma_protocols {
 
     #[test]
     #[expected_failure(abort_code = 0x10001, location = Self)]
-    fun full_sigma_proof_verify_fails_test()
+    fun verify_full_sigma_proof_fails_test()
     {
         let (_, source_pk) = generate_elgamal_keypair();
         let transfer_val = ristretto255::new_scalar_from_u32(50);
@@ -845,12 +846,12 @@ module veiled_coin::sigma_protocols {
 
         //let (transfer_range_proof, transfer_comm) = bulletproofs::prove_range_pedersen(&transfer_val, &transfer_rand, MAX_BITS_IN_VALUE, VEILED_COIN_DST);
 
-        let sigma_proof = full_sigma_protocol_prove<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &transfer_rand, &transfer_val, &updated_balance_rand, &updated_balance_val);
+        let sigma_proof = prove_full_sigma_proof<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &transfer_rand, &transfer_val, &updated_balance_rand, &updated_balance_val);
 
         let random_point = ristretto255::random_point();
         sigma_proof.x1 = random_point;
 
-        full_sigma_protocol_verify(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &sigma_proof);
+        verify_full_sigma_proof(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &sigma_proof);
     }
 
     //
@@ -858,7 +859,7 @@ module veiled_coin::sigma_protocols {
     //
 
     #[test]
-    fun full_sigma_proof_serialize_test()
+    fun serialize_full_sigma_proof_test()
     {
         let (_, source_pk) = generate_elgamal_keypair();
         let transfer_val = ristretto255::new_scalar_from_u32(50);
@@ -872,7 +873,7 @@ module veiled_coin::sigma_protocols {
         let updated_balance_ct = elgamal::new_ciphertext_with_basepoint(&updated_balance_val, &updated_balance_rand, &source_pk);
         let updated_balance_comm = pedersen::new_commitment_for_bulletproof(&updated_balance_val, &updated_balance_rand);
 
-        let sigma_proof = full_sigma_protocol_prove<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &transfer_rand, &transfer_val, &updated_balance_rand, &updated_balance_val);
+        let sigma_proof = prove_full_sigma_proof<coin::FakeMoney>(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &transfer_rand, &transfer_val, &updated_balance_rand, &updated_balance_val);
 
         let sigma_proof_bytes = serialize_full_sigma_proof<coin::FakeMoney>(&sigma_proof);
 

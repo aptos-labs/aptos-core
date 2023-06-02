@@ -29,7 +29,7 @@ module veiled_coin::veiled_coin_tests {
     #[test_only]
     use veiled_coin::sigma_protocols::{
         serialize_full_sigma_proof, serialize_unveil_sigma_proof,
-        full_sigma_protocol_prove, unveil_sigma_protocol_prove,
+    prove_full_sigma_proof, prove_unveil_sigma_proof,
     };
 
     //
@@ -164,7 +164,7 @@ module veiled_coin::veiled_coin_tests {
 
         // Compute a sigma proof which shows that the recipient's new balance ciphertext and commitment both encode
         // the same value. The commitment is necessary to ensure the value is binding
-        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&recipient_pk, &new_balance_ct, &new_balance_comm, &ristretto255::scalar_zero(), &recipient_new_balance);
+        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(&recipient_pk, &new_balance_ct, &new_balance_comm, &ristretto255::scalar_zero(), &recipient_new_balance);
         let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
 
         // Transfer `50` veiled coins from the `recipient` to the `sender`'s public balance
@@ -227,7 +227,7 @@ module veiled_coin::veiled_coin_tests {
         let new_balance_comm = pedersen::new_commitment_for_bulletproof(&sender_new_balance, &zero_randomness);
         let new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_balance_comm);
 
-        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&sender_pk, &new_balance_ct, &new_balance_comm, &zero_randomness, &sender_new_balance);
+        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(&sender_pk, &new_balance_ct, &new_balance_comm, &zero_randomness, &sender_new_balance);
         let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
 
         println(b"about to unveil");
@@ -311,7 +311,7 @@ module veiled_coin::veiled_coin_tests {
         println(b"Computed commitments to the amount to transfer and the sender's updated balance");
 
         // Prove that the two encryptions of `v` are to the same value
-        let sigma_proof = full_sigma_protocol_prove<coin::FakeMoney>(
+        let sigma_proof = prove_full_sigma_proof<coin::FakeMoney>(
             &sender_pk, &recipient_pk, &withdraw_ct, &deposit_ct, &new_balance_ct, &new_balance_comm, &amount_comm, &amount_rand, &amount_val, &new_balance_rand, &new_balance_val);
         let sigma_proof_bytes = serialize_full_sigma_proof<coin::FakeMoney>(&sigma_proof);
         println(b"Created sigma protocol proof");
@@ -352,7 +352,7 @@ module veiled_coin::veiled_coin_tests {
         let new_new_balance_ct = elgamal::new_ciphertext_with_basepoint(&new_new_balance_val, &new_balance_rand, &sender_pk);
         let new_new_balance_comm = pedersen::new_commitment_for_bulletproof(&new_new_balance_val, &new_balance_rand);
         let new_new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_new_balance_comm);
-        let sigma_proof = unveil_sigma_protocol_prove<coin::FakeMoney>(&sender_pk, &new_new_balance_ct, &new_new_balance_comm, &new_balance_rand, &new_new_balance_val);
+        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(&sender_pk, &new_new_balance_ct, &new_new_balance_comm, &new_balance_rand, &new_new_balance_val);
         let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
 
         // Unveil all coins of the `sender`

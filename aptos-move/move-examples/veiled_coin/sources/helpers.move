@@ -22,6 +22,20 @@ module veiled_coin::helpers {
         res
     }
 
+    /// Returns an encryption of zero, without any randomness (i.e., $r=0$), under any ElGamal PK.
+    public fun get_veiled_balance_zero_ciphertext(): elgamal::CompressedCiphertext {
+        elgamal::ciphertext_from_compressed_points(
+            ristretto255::point_identity_compressed(), ristretto255::point_identity_compressed())
+    }
+
+    /// Returns an encryption of `amount`, without any randomness (i.e., $r=0$), under any ElGamal PK.
+    /// WARNING: This is not a proper ciphertext: the value `amount` can be easily bruteforced.
+    public fun amount_to_veiled_balance_ciphertext(amount: u32): (ristretto255::Scalar, elgamal::Ciphertext) {
+        let scalar = ristretto255::new_scalar_from_u32(amount);
+
+        (scalar, elgamal::new_ciphertext_no_randomness(&scalar))
+    }
+
     #[test_only]
     /// Returns a random ElGamal keypair
     public fun generate_elgamal_keypair(): (ristretto255::Scalar, elgamal::CompressedPubkey) {
