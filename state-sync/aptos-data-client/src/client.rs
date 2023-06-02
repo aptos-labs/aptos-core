@@ -24,6 +24,7 @@ use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
+use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
@@ -88,10 +89,12 @@ impl AptosDataClient {
         data_client_config: AptosDataClientConfig,
         base_config: BaseConfig,
         time_service: TimeService,
+        storage: Arc<dyn DbReader>,
         storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
         runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
-        let client = Self {
+        // Create the data client
+        let data_client = Self {
             data_client_config,
             storage_service_client: storage_service_client.clone(),
             peer_states: Arc::new(RwLock::new(PeerStates::new(
@@ -102,13 +105,18 @@ impl AptosDataClient {
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };
-        let poller = DataSummaryPoller::new(
-            client.clone(),
-            Duration::from_millis(client.data_client_config.summary_poll_loop_interval_ms),
+
+        // Create the data summary poller
+        let data_summary_poller = DataSummaryPoller::new(
+            data_client_config,
+            data_client.clone(),
+            Duration::from_millis(data_client.data_client_config.summary_poll_loop_interval_ms),
             runtime,
+            storage,
             time_service,
         );
-        (client, poller)
+
+        (data_client, data_summary_poller)
     }
 
     /// Returns true iff compression should be requested

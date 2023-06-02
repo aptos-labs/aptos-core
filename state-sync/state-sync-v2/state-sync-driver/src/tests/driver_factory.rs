@@ -76,6 +76,7 @@ fn test_new_initialized_configs() {
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         TimeService::mock(),
+        db_rw.reader.clone(),
         network_client,
         None,
     );

@@ -4,6 +4,9 @@ All notable changes to the Aptos Python SDK will be captured in this file. This 
 
 **Note:** Until we cut a 1.0.0 release, the Aptos Python SDK does not follow semantic versioning.
 
+## 0.6.2
+- Added custom header "x-aptos-client" to both sync/async RestClient
+
 ## 0.6.1
 - Updated package manifest.
 

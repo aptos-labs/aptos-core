@@ -410,6 +410,7 @@ const sidebars = {
       items: [
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/bootstrap-fullnode",
+        "nodes/full-node/aptos-db-restore",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",

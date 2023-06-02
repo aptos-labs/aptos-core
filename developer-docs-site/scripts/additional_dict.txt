@@ -72,6 +72,7 @@ DoS
 DocGen
 delegator
 delegators
+deletable
 dropdown
 EACCOUNT
 EALREADY
@@ -245,6 +246,7 @@ TokenClient
 TokenData
 TokenStore
 TokenTransfers
+TokenV
 TransactionBuilder
 TransactionBuilderABI
 TransactionFee

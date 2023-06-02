@@ -17,7 +17,8 @@ class TestResults:
 
 
 # This is a decorator that you put above every test case. It handles capturing test
-# success / failure so it can be reported at the end of the test suite.
+# success / failure so it can be reported at the end of the test suite. It also handles
+# passing in test_name based on the name of the function so the caller doesn't have to.
 def build_test_case_decorator(test_results: TestResults):
     def test_case_inner(f):
         @wraps(f)
