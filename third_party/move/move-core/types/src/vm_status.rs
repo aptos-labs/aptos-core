@@ -43,6 +43,12 @@ pub static EXECUTION_STATUS_MIN_CODE: u64 = 4000;
 /// The maximum status code for runtim statuses
 pub static EXECUTION_STATUS_MAX_CODE: u64 = 4999;
 
+/// When `Addition` operation overflows the `limit`.
+pub const EADD_OVERFLOW: u64 = 0x02_0001;
+
+/// When `Subtraction` operation goes below zero.
+pub const ESUB_UNDERFLOW: u64 = 0x02_0002;
+
 /// A `VMStatus` is represented as either
 /// - `Executed` indicating successful execution
 /// - `Error` indicating an error from the VM itself
@@ -160,6 +166,15 @@ impl VMStatus {
     /// Return the status type for this `VMStatus`. This is solely determined by the `status_code`
     pub fn status_type(&self) -> StatusType {
         self.status_code().status_type()
+    }
+
+    pub fn is_aggregator_error(&self) -> bool {
+        if let VMStatus::MoveAbort(_, code) = self {
+            if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW {
+                return true;
+            }
+        }
+        false
     }
 
     /// Returns `Ok` with a recorded status if it should be kept, `Err` of the error code if it

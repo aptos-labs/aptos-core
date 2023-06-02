@@ -55,7 +55,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // This function is called by the BlockExecutor for each transaction is intends
     // to execute (via the ExecutorTask trait). It can be as a part of sequential
     // execution, or speculatively as a part of a parallel execution.
-    fn execute_transaction(
+    fn execute_transaction_parallel(
         &self,
         view: &impl StateView,
         txn: &PreprocessedTransaction,
@@ -76,6 +76,54 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                         || !matches!(txn, PreprocessedTransaction::UserTransaction(_))
                         || vm_output.delta_change_set().is_empty()
                 );
+                if vm_output.status().is_discarded() {
+                    match sender {
+                        Some(s) => speculative_trace!(
+                            &log_context,
+                            format!(
+                                "Transaction discarded, sender: {}, error: {:?}",
+                                s, vm_status
+                            ),
+                        ),
+                        None => {
+                            speculative_trace!(
+                                &log_context,
+                                format!("Transaction malformed, error: {:?}", vm_status),
+                            )
+                        },
+                    };
+                }
+                if AptosVM::should_restart_execution(&vm_output) {
+                    speculative_info!(
+                        &log_context,
+                        "Reconfiguration occurred: restart required".into()
+                    );
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
+                } else {
+                    ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
+                }
+            },
+            Err(err) => ExecutionStatus::Abort(err),
+        }
+    }
+
+    // This function is called by the BlockExecutor for each transaction is intends
+    // to execute (via the ExecutorTask trait). It can be as a part of sequential
+    // execution, or speculatively as a part of a parallel execution.
+    fn execute_transaction_sequential(
+        &self,
+        view: &impl StateView,
+        txn: &PreprocessedTransaction,
+        txn_idx: TxnIndex,
+    ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+        let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
+
+        match self
+            .vm
+            .execute_single_transaction_sequential(txn, &view, &log_context)
+        {
+            Ok((vm_status, vm_output, sender)) => {
+                // If aggregators are disabled for user transactions, then delta_change_set should be empty as there should not be any delta outputs.
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

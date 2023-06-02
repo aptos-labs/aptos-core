@@ -57,12 +57,20 @@ pub trait ExecutorTask: Sync {
     fn init(args: Self::Argument) -> Self;
 
     /// Execute a single transaction given the view of the current state.
-    fn execute_transaction(
+    fn execute_transaction_parallel(
         &self,
         view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         aggregator_enabled: bool,
+    ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    /// Execute a single transaction given the view of the current state.
+    fn execute_transaction_sequential(
+        &self,
+        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        txn: &Self::Txn,
+        txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }
 

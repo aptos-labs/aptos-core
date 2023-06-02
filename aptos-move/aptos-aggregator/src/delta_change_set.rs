@@ -16,10 +16,10 @@ use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
 
 /// When `Addition` operation overflows the `limit`.
-const EADD_OVERFLOW: u64 = 0x02_0001;
+pub const EADD_OVERFLOW: u64 = 0x02_0001;
 
 /// When `Subtraction` operation goes below zero.
-const ESUB_UNDERFLOW: u64 = 0x02_0002;
+pub const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]

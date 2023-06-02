@@ -1780,6 +1780,41 @@ impl VMAdapter for AptosVM {
             },
         })
     }
+
+    fn execute_single_transaction_sequential(
+        &self,
+        txn: &PreprocessedTransaction,
+        view: &impl StateView,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        match self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, true) {
+            Ok((vm_status, vm_output, sender)) => match vm_output.try_materialize(view) {
+                Ok(vm_output) => {
+                    return Ok((vm_status, vm_output, sender));
+                },
+                Err(vm_status) => {
+                    if !vm_status.is_aggregator_error() {
+                        return Err(vm_status);
+                    }
+                },
+            },
+            Err(vm_status) => {
+                if !vm_status.is_aggregator_error() {
+                    return Err(vm_status);
+                }
+            },
+        }
+        match self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, false) {
+            Ok((vm_status, vm_output, sender)) => {
+                assert!(
+                    !matches!(txn, PreprocessedTransaction::UserTransaction(_))
+                        || vm_output.delta_change_set().is_empty()
+                );
+                Ok((vm_status, vm_output, sender))
+            },
+            Err(vm_status) => Err(vm_status),
+        }
+    }
 }
 
 impl AsRef<AptosVMImpl> for AptosVM {

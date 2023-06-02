@@ -4,6 +4,7 @@
 
 use crate::move_vm_ext::{MoveResolverExt, SessionExt, SessionId};
 use anyhow::Result;
+use aptos_state_view::StateView;
 use aptos_types::{
     block_metadata::BlockMetadata,
     transaction::{
@@ -54,6 +55,14 @@ pub(crate) trait VMAdapter {
         data_cache: &impl MoveResolverExt,
         log_context: &AdapterLogSchema,
         aggregator_enabled: bool,
+    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
+
+    /// Execute a single transaction when running the block sequentially.
+    fn execute_single_transaction_sequential(
+        &self,
+        txn: &PreprocessedTransaction,
+        view: &impl StateView,
+        log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
 
     fn validate_signature_checked_transaction(

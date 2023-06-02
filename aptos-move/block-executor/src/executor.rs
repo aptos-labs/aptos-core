@@ -96,7 +96,7 @@ where
         let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
-        let execute_result = executor.execute_transaction(
+        let execute_result = executor.execute_transaction_parallel(
             &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
@@ -538,11 +538,10 @@ where
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_gas = 0;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let res = executor.execute_transaction(
+            let res = executor.execute_transaction_sequential(
                 &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
-                false,
             );
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
