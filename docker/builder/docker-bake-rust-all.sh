@@ -51,9 +51,9 @@ echo "To build only a specific target, run: docker/builder/docker-bake-rust-all.
 echo "E.g. docker/builder/docker-bake-rust-all.sh forge-images"
 
 if [ "$CI" == "true" ]; then
-  TARGET_REGISTRY=remote docker buildx bake --progress=plain --file docker/builder/docker-bake-rust-all.hcl --push $BUILD_TARGET
+  docker buildx bake --progress=plain --file docker/builder/docker-bake-rust-all.hcl --push $BUILD_TARGET
 else
-  TARGET_REGISTRY=local docker buildx bake --file docker/builder/docker-bake-rust-all.hcl $BUILD_TARGET
+  docker buildx bake --file docker/builder/docker-bake-rust-all.hcl $BUILD_TARGET
 fi
 
 echo "Build complete. Docker buildx cache usage:"
