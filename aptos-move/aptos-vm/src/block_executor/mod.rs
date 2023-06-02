@@ -25,6 +25,7 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    executable::ExecutableTestType,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -163,7 +164,12 @@ impl BlockAptosVM {
         }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+        let executor = BlockExecutor::<
+            PreprocessedTransaction,
+            AptosExecutorTask<S>,
+            S,
+            ExecutableTestType,
+        >::new(
             concurrency_level,
             executor_thread_pool,
             maybe_block_gas_limit,

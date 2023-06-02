@@ -4,6 +4,7 @@
 
 use super::{
     types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
+    unsync_map::UnsyncMap,
     *,
 };
 use aptos_aggregator::{
@@ -15,7 +16,7 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
     state_store::state_value::StateValue,
 };
-use claims::{assert_err_eq, assert_ok_eq};
+use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
 use std::sync::Arc;
 
 mod proptest_types;
@@ -81,6 +82,22 @@ impl<K: Hash + Clone + Eq + Debug> ModulePath for KeyType<K> {
 }
 
 #[test]
+fn unsync_map_data_basic() {
+    let map: UnsyncMap<KeyType<Vec<u8>>, Value, ExecutableTestType> = UnsyncMap::new();
+
+    let ap = KeyType(b"/foo/b".to_vec());
+
+    // Reads that should go the DB return None
+    assert_none!(map.fetch_data(&ap));
+    // Ensure write registers the new value.
+    map.write(ap.clone(), value_for(10, 1));
+    assert_some_eq!(map.fetch_data(&ap), arc_value_for(10, 1));
+    // Ensure the next write overwrites the value.
+    map.write(ap.clone(), value_for(14, 1));
+    assert_some_eq!(map.fetch_data(&ap), arc_value_for(14, 1));
+}
+
+#[test]
 fn create_write_read_placeholder_struct() {
     use MVDataError::*;
     use MVDataOutput::*;
@@ -89,14 +106,14 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, Value, ExecutableTestType> = MVHashMap::new(None);
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, Value, ExecutableTestType> = MVHashMap::new();
 
     // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.fetch_data(&ap1, 5);
     assert_eq!(Err(NotFound), r_db);
 
     // Write by txn 10.
-    mvtbl.write(&ap1, (10, 1), value_for(10, 1));
+    mvtbl.write(ap1.clone(), (10, 1), value_for(10, 1));
 
     // Reads that should go the DB return Err(NotFound)
     let r_db = mvtbl.fetch_data(&ap1, 9);
@@ -110,17 +127,17 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 1), arc_value_for(10, 1))), r_10);
 
     // More deltas.
-    mvtbl.add_delta(&ap1, 11, delta_add(11, u128::MAX));
-    mvtbl.add_delta(&ap1, 12, delta_add(12, u128::MAX));
-    mvtbl.add_delta(&ap1, 13, delta_sub(74, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 11, delta_add(11, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 12, delta_add(12, u128::MAX));
+    mvtbl.add_delta(ap1.clone(), 13, delta_sub(74, u128::MAX));
 
     // Reads have to go traverse deltas until a write is found.
     let r_sum = mvtbl.fetch_data(&ap1, 14);
     assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
-    mvtbl.write(&ap1, (12, 0), value_for(12, 0));
-    mvtbl.write(&ap1, (8, 3), value_for(8, 3));
+    mvtbl.write(ap1.clone(), (12, 0), value_for(12, 0));
+    mvtbl.write(ap1.clone(), (8, 3), value_for(8, 3));
 
     // Verify reads.
     let r_12 = mvtbl.fetch_data(&ap1, 15);
@@ -143,15 +160,15 @@ fn create_write_read_placeholder_struct() {
 
     // Delete the entry written by 10, write to a different ap.
     mvtbl.delete(&ap1, 10);
-    mvtbl.write(&ap2, (10, 2), value_for(10, 2));
+    mvtbl.write(ap2.clone(), (10, 2), value_for(10, 2));
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.fetch_data(&ap1, 11);
     assert_eq!(Ok(Versioned((8, 3), arc_value_for(8, 3))), r_8);
 
     // Reads, writes for ap2 and ap3.
-    mvtbl.write(&ap2, (5, 0), value_for(5, 0));
-    mvtbl.write(&ap3, (20, 4), value_for(20, 4));
+    mvtbl.write(ap2.clone(), (5, 0), value_for(5, 0));
+    mvtbl.write(ap3.clone(), (20, 4), value_for(20, 4));
     let r_5 = mvtbl.fetch_data(&ap2, 10);
     assert_eq!(Ok(Versioned((5, 0), arc_value_for(5, 0))), r_5);
     let r_20 = mvtbl.fetch_data(&ap3, 21);
@@ -175,16 +192,16 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned((10, 2), arc_value_for(10, 2))), r_10);
 
     // Both delta-write and delta-delta application failures are detected.
-    mvtbl.add_delta(&ap1, 30, delta_add(30, 32));
-    mvtbl.add_delta(&ap1, 31, delta_add(31, 32));
+    mvtbl.add_delta(ap1.clone(), 30, delta_add(30, 32));
+    mvtbl.add_delta(ap1.clone(), 31, delta_add(31, 32));
     let r_33 = mvtbl.fetch_data(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = AggregatorValue::from_write(&val).unwrap().into();
-    mvtbl.write(&ap2, (10, 3), val);
-    mvtbl.add_delta(&ap2, 30, delta_sub(30 + sub_base, u128::MAX));
+    mvtbl.write(ap2.clone(), (10, 3), val);
+    mvtbl.add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));
     let r_31 = mvtbl.fetch_data(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);
 }
@@ -197,9 +214,9 @@ fn materialize_delta_shortcut() {
     let ap = KeyType(b"/foo/b".to_vec());
     let limit = 10000;
 
-    vd.add_delta(&ap, 5, delta_add(10, limit));
-    vd.add_delta(&ap, 8, delta_add(20, limit));
-    vd.add_delta(&ap, 11, delta_add(30, limit));
+    vd.add_delta(ap.clone(), 5, delta_add(10, limit));
+    vd.add_delta(ap.clone(), 8, delta_add(20, limit));
+    vd.add_delta(ap.clone(), 11, delta_add(30, limit));
 
     match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
     assert_err_eq!(
@@ -216,11 +233,11 @@ fn materialize_delta_shortcut() {
 
     // Make sure shortcut is committed by adding a delta at a lower txn idx
     // and ensuring tha fetch_data output no longer changes.
-    vd.add_delta(&ap, 6, delta_add(15, limit));
+    vd.add_delta(ap.clone(), 6, delta_add(15, limit));
     assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(35)));
 
     // However, if we add a delta at txn_idx = 9, it should have an effect.
-    vd.add_delta(&ap, 9, delta_add(15, limit));
+    vd.add_delta(ap.clone(), 9, delta_add(15, limit));
     assert_eq!(vd.fetch_data(&ap, 10), Ok(Resolved(50)));
 }
 
@@ -261,7 +278,7 @@ fn commit_without_entry() {
     let vd: VersionedData<KeyType<Vec<u8>>, Value> = VersionedData::new();
     let ap = KeyType(b"/foo/b".to_vec());
 
-    vd.add_delta(&ap, 8, delta_add(20, 1000));
+    vd.add_delta(ap.clone(), 8, delta_add(20, 1000));
     vd.set_aggregator_base_value(&ap, 10);
 
     // Must panic as there is no delta at provided index.
