@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexerGrpcFileStoreWorkerConfig {
-    pub server_name: String,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: String,
 }
@@ -30,6 +29,6 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
     }
 
     fn get_server_name(&self) -> String {
-        self.server_name.clone()
+        "idxfile".to_string()
     }
 }
