@@ -251,7 +251,7 @@ impl NativeFunctions {
                         vec![result_ty.clone().unwrap()]
                     }
                 } else {
-                    fun.get_return_types()
+                    fun.get_result_type().flatten()
                 };
                 if !fun_ret_types.is_empty() {
                     emit!(ctx.writer, "{} := ", results);
@@ -415,7 +415,7 @@ impl NativeFunctions {
 
     fn check_external_result(&self, ctx: &Context, fun: &FunctionEnv) -> (bool, Option<Type>) {
         if fun.get_return_count() == 1 {
-            let ret_type = &fun.get_return_types()[0];
+            let ret_type = &fun.get_result_type().flatten()[0];
             return ctx.extract_external_result(ret_type);
         }
         (false, None)
@@ -468,7 +468,7 @@ impl SoliditySignature {
                 ret_type_lst.push((solidity_ty, SignatureDataLocation::Memory));
             }
         } else {
-            for move_ty in fun.get_return_types() {
+            for move_ty in fun.get_result_type().flatten() {
                 let solidity_ty = SolidityType::translate_from_move(ctx, &move_ty, false);
                 ret_type_lst.push((solidity_ty, SignatureDataLocation::Memory));
             }
@@ -519,7 +519,7 @@ impl SoliditySignature {
                 return false;
             }
         } else {
-            let ret_types = fun.get_return_types();
+            let ret_types = fun.get_result_type().flatten();
             if ret_types.len() != sig_ret_vec.len() {
                 return false;
             }

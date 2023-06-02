@@ -4,7 +4,7 @@
 use anyhow::Result;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use move_binary_format::CompiledModule;
-use std::{fs::File, io::Write};
+use std::{fs, fs::File, io::Write, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -18,7 +18,18 @@ struct Args {
     out_dir: Option<String>,
 }
 
-// Update `raw_module_data.rs` in
+// List of additional packages (beyond those in testsuite/module-publish/src/packages) to include
+fn additional_packages() -> Vec<(&'static str, &'static str)> {
+    // Pairs of (package_name, package_path)
+    vec![(
+        "ambassador_token",
+        "../../aptos-move/move-examples/token_objects/ambassador",
+    )]
+}
+
+// Run "cargo run -p module-publish" to generate the file `raw_module_data.rs`.
+
+// This file updates `raw_module_data.rs` in
 // `crates/transaction-emitter-lib/src/transaction_generator/publishing/` by default,
 // or in a provided directory.
 // That file contains `Lazy` static variables for the binary of all the packages in
@@ -40,6 +51,7 @@ fn main() -> Result<()> {
         None => env!("CARGO_MANIFEST_DIR"),
         Some(str) => str,
     };
+    println!("Building GenericModule in {}", provided_dir);
     let base_dir = std::path::Path::new(provided_dir);
     // this is gotta be the most brittle solution ever!
     // If directory structure changes this breaks.
@@ -66,13 +78,13 @@ fn main() -> Result<()> {
         r#"
 // This file was generated. Do not modify!
 //
-// To update this code, run `cargo run` from `testsuite/module-publish` in aptos core.
+// To update this code, run `cargo run -p module-publish` in aptos core.
 // That test compiles the set of modules defined in
 // `testsuite/simple/src/simple/sources/`
 // and it writes the binaries here.
 // The module name (prefixed with `MODULE_`) is a `Lazy` instance that returns the
 // byte array of the module binary.
-// This create should also provide a Rust file that allows proper manipulation of each
+// This crate should also provide a Rust file that allows proper manipulation of each
 // module defined below."#
     )
     .expect("Writing header comment failed");
@@ -84,28 +96,65 @@ fn main() -> Result<()> {
         generic_mod,
         r#"
 use once_cell::sync::Lazy;
-"#,
+use std::collections::HashMap;"#,
     )
     .expect("Use directive failed");
 
-    // write out package metadata
-    write_pacakge_simple(&mut generic_mod);
+    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let path = base_dir.join("src/packages");
+    let paths: fs::ReadDir = fs::read_dir(path).unwrap();
+
+    let mut packages = Vec::new();
+    for path in paths {
+        let dir = path.unwrap();
+
+        // Skip if Move.toml doesn't exist, as it is not a move source folder.
+        if !dir.path().join("Move.toml").exists() {
+            continue;
+        }
+
+        let file_name = dir.file_name();
+
+        // write out package metadata
+        writeln!(generic_mod).expect("Empty line failed");
+        packages.push(write_package(
+            &mut generic_mod,
+            dir.path(),
+            file_name.to_str().unwrap(),
+        ));
+    }
+
+    for (package_name, additional_package) in additional_packages() {
+        packages.push(write_package(
+            &mut generic_mod,
+            base_dir.join(additional_package),
+            package_name,
+        ));
+    }
+
+    write_accessors(&mut generic_mod, packages);
+
     Ok(())
 }
 
-// Write out package `Simple`
-fn write_pacakge_simple(file: &mut File) {
-    // build GenericModule
-    let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let path = base_dir.join("src/packages/simple/");
-    let package =
-        BuiltPackage::build(path, BuildOptions::default()).expect("building package must succeed");
+// Write out given package
+fn write_package(file: &mut File, package_path: PathBuf, package_name: &str) -> String {
+    println!("Building package {}", package_name);
+    // build package
+    let package = BuiltPackage::build(package_path, BuildOptions::default())
+        .expect("building package must succeed");
     let code = package.extract_code();
     let package_metadata = package.extract_metadata().expect("Metadata must exist");
     let metadata = bcs::to_bytes(&package_metadata).expect("Metadata must serialize");
 
     // write out package metadata
-    write_lazy(file, "PACKAGE_METADATA_SIMPLE", &metadata);
+    write_lazy(
+        file,
+        format!("PACKAGE_{}_METADATA", package_name.to_uppercase()).as_str(),
+        &metadata,
+    );
+
+    let mut module_names = Vec::new();
 
     // write out all modules
     for module in &code {
@@ -114,10 +163,71 @@ fn write_pacakge_simple(file: &mut File) {
         let compiled_module = CompiledModule::deserialize(module).expect("Module must deserialize");
         let module_name = compiled_module.self_id().name().to_owned().into_string();
         // start Lazy declaration
-        let name = format!("MODULE_{}", module_name.to_uppercase());
+        let name: String = format!(
+            "MODULE_{}_{}",
+            package_name.to_uppercase(),
+            module_name.to_uppercase()
+        );
         writeln!(file).expect("Empty line failed");
         write_lazy(file, name.as_str(), module);
+        module_names.push(name);
     }
+
+    writeln!(file).expect("Empty line failed");
+    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
+    writeln!(
+        file,
+        "pub static MODULES_{}: Lazy<Vec<Vec<u8>>> = Lazy::new(|| {{ vec![",
+        package_name.to_uppercase(),
+    )
+    .expect("Lazy MODULES declaration failed");
+
+    for module_name in module_names {
+        writeln!(file, "\t{}.to_vec(),", module_name).expect("Module name declaration failed");
+    }
+
+    writeln!(file, "]}});").expect("Lazy declaration closing } failed");
+    package_name.to_string()
+}
+
+fn write_accessors(file: &mut File, packages: Vec<String>) {
+    writeln!(file).expect("Empty line failed");
+    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
+    writeln!(
+        file,
+        "pub static PACKAGE_TO_METADATA: Lazy<HashMap<String, Vec<u8>>> = Lazy::new(|| {{ HashMap::from([",
+    )
+    .expect("Lazy PACKAGE_TO_METADATA declaration failed");
+
+    for package in &packages {
+        writeln!(
+            file,
+            "\t(\"{}\".to_string(), PACKAGE_{}_METADATA.to_vec()),",
+            package,
+            package.to_uppercase()
+        )
+        .expect("PACKAGE_TO_METADATA declaration failed");
+    }
+    writeln!(file, "])}});").expect("Lazy declaration closing } failed");
+
+    writeln!(file).expect("Empty line failed");
+    writeln!(file, "#[rustfmt::skip]").expect("rustfmt skip failed");
+    writeln!(
+        file,
+        "pub static PACKAGE_TO_MODULES: Lazy<HashMap<String, Vec<Vec<u8>>>> = Lazy::new(|| {{ HashMap::from([",
+    )
+    .expect("Lazy PACKAGE_TO_MODULES declaration failed");
+
+    for package in &packages {
+        writeln!(
+            file,
+            "\t(\"{}\".to_string(), MODULES_{}.to_vec()),",
+            package,
+            package.to_uppercase()
+        )
+        .expect("PACKAGE_TO_MODULES declaration failed");
+    }
+    writeln!(file, "])}});").expect("Lazy declaration closing } failed");
 }
 
 // Write out a `Lazy` declaration

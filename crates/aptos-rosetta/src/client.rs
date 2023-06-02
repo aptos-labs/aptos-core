@@ -471,6 +471,85 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn add_delegated_stake(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        pool_address: AccountAddress,
+        amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let delegator = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+
+        let mut keys = HashMap::new();
+        keys.insert(delegator, private_key);
+
+        let operations = vec![Operation::add_delegated_stake(
+            0,
+            None,
+            delegator,
+            AccountIdentifier::base_account(pool_address),
+            amount,
+        )];
+
+        self.submit_operations(
+            delegator,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            true,
+        )
+        .await
+    }
+
+    pub async fn unlock_delegated_stake(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        pool_address: AccountAddress,
+        amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let delegator = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(delegator, private_key);
+
+        let operations = vec![Operation::unlock_delegated_stake(
+            0,
+            None,
+            delegator,
+            AccountIdentifier::base_account(pool_address),
+            amount,
+        )];
+
+        self.submit_operations(
+            delegator,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            true,
+        )
+        .await
+    }
+
     /// Retrieves the account address from the derivation path if there isn't an overriding account specified
     async fn get_account_address(
         &self,

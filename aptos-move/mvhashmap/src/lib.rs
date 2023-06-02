@@ -124,7 +124,7 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
     // ----------------------------------------------
     // Functions specific to the multi-versioned code.
 
-    /// Adds a new executable to the multiversion data-structure. The executable is either
+    /// Adds a new executable to the multi-version data-structure. The executable is either
     /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
     /// module published during the block.
     pub fn store_executable(&self, key: &K, descriptor: ExecutableDescriptor, executable: X) {

@@ -23,17 +23,17 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, NoOpChangeSetChecker, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionArgument, TransactionOutput, TransactionPayload,
-        TransactionStatus, WriteSetPayload,
+        ChangeSet, ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use aptos_vm::VMExecutor;
+use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, VMExecutor};
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug)]
 enum MockVMTransaction {
@@ -57,12 +57,17 @@ pub static DISCARD_STATUS: Lazy<TransactionStatus> =
 
 pub struct MockVM;
 
-impl TransactionBlockExecutor<Transaction> for MockVM {
+impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<MockVM>(transactions, state_view)
+        ChunkOutput::by_transaction_execution::<MockVM>(
+            transactions,
+            state_view,
+            maybe_block_gas_limit,
+        )
     }
 }
 
@@ -70,6 +75,7 @@ impl VMExecutor for MockVM {
     fn execute_block(
         transactions: Vec<Transaction>,
         state_view: &impl StateView,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         if state_view.is_genesis() {
             assert_eq!(
@@ -198,6 +204,15 @@ impl VMExecutor for MockVM {
         }
 
         Ok(outputs)
+    }
+
+    fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
+        _sharded_block_executor: &ShardedBlockExecutor<S>,
+        _transactions: Vec<Transaction>,
+        _state_view: Arc<S>,
+        _maybe_block_gas_limit: Option<u64>,
+    ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
+        todo!()
     }
 }
 
@@ -366,9 +381,10 @@ fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
 }
 
 pub fn encode_reconfiguration_transaction() -> Transaction {
-    Transaction::GenesisTransaction(WriteSetPayload::Direct(
-        ChangeSet::new(WriteSet::default(), vec![], &NoOpChangeSetChecker).unwrap(),
-    ))
+    Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
+        WriteSet::default(),
+        vec![],
+    )))
 }
 
 fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {

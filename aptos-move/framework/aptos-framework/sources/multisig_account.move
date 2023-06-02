@@ -520,6 +520,16 @@ module aptos_framework::multisig_account {
         });
     }
 
+    /// Add owners then update number of signatures required, in a single operation.
+    entry fun add_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        new_owners: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        add_owners(multisig_account, new_owners);
+        update_signatures_required(multisig_account, new_num_signatures_required);
+    }
+
     /// Similar to remove_owners, but only allow removing one owner.
     entry fun remove_owner(
         multisig_account: &signer, owner_to_remove: address) acquires MultisigAccount {
@@ -563,8 +573,19 @@ module aptos_framework::multisig_account {
             vector::length(owners) >= multisig_account_resource.num_signatures_required,
             error::invalid_state(ENOT_ENOUGH_OWNERS),
         );
+        if (vector::length(&owners_removed) > 0) {
+            emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+        }
+    }
 
-        emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+    /// Update the number of signatures required then remove owners, in a single operation.
+    entry fun remove_owners_and_update_signatures_required(
+        multisig_account: &signer,
+        owners_to_remove: vector<address>,
+        new_num_signatures_required: u64
+    ) acquires MultisigAccount {
+        update_signatures_required(multisig_account, new_num_signatures_required);
+        remove_owners(multisig_account, owners_to_remove);
     }
 
     /// Update the number of signatures required to execute transaction in the specified multisig account.
@@ -657,9 +678,6 @@ module aptos_framework::multisig_account {
     ////////////////////////// Multisig transaction flow ///////////////////////////////
 
     /// Create a multisig transaction, which will have one approval initially (from the creator).
-    ///
-    /// @param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-    /// @param args Vector of BCS-encoded argument values to invoke the target function with.
     public entry fun create_transaction(
         owner: &signer,
         multisig_account: address,
@@ -685,10 +703,6 @@ module aptos_framework::multisig_account {
     /// Create a multisig transaction with a transaction hash instead of the full payload.
     /// This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
     /// to provide the full payload, which will be validated against the hash stored on-chain.
-    ///
-    /// @param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-    /// @param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-    /// function arguments.
     public entry fun create_transaction_with_hash(
         owner: &signer,
         multisig_account: address,

@@ -32,6 +32,12 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
+-  [Function `for_each`](#0x1_vector_for_each)
+-  [Function `for_each_ref`](#0x1_vector_for_each_ref)
+-  [Function `for_each_mut`](#0x1_vector_for_each_mut)
+-  [Function `fold`](#0x1_vector_fold)
+-  [Function `map`](#0x1_vector_map)
+-  [Function `filter`](#0x1_vector_filter)
 -  [Module Specification](#@Module_Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
 
@@ -575,6 +581,187 @@ Aborts if <code>i</code> is out of bounds.
 
 
 <pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each"></a>
+
+## Function `for_each`
+
+Apply the function to each element in the vector, consuming it.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|) {
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v); // We need <b>to</b> reverse the <a href="vector.md#0x1_vector">vector</a> <b>to</b> consume it efficiently
+    <b>while</b> (!<a href="vector.md#0x1_vector_is_empty">is_empty</a>(&v)) {
+        <b>let</b> e = <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v);
+        f(e);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each_ref"></a>
+
+## Function `for_each_ref`
+
+Apply the function to a reference of each element in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
+        f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_for_each_mut"></a>
+
+## Function `for_each_mut`
+
+Apply the function to a mutable reference to each element in the vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|) {
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
+        f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_fold"></a>
+
+## Function `fold`
+
+Fold the function over the elements. For example, <code><a href="vector.md#0x1_vector_fold">fold</a>(<a href="vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
+<code>f(f(f(0, 1), 2), 3)</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Accumulator, Element)|Accumulator): Accumulator
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    init: Accumulator,
+    f: |Accumulator,Element|Accumulator
+): Accumulator {
+    <b>let</b> accu = init;
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| accu = f(accu, elem));
+    accu
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_map"></a>
+
+## Function `map`
+
+Map the function over the elements of the vector, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    f: |Element|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_filter"></a>
+
+## Function `filter`
+
+Filter the vector using the boolean function, removing all elements for which <code>p(e)</code> is not true.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element: drop&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element:drop&gt;(
+    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
+    p: |&Element|bool
+): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;[];
+    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| {
+        <b>if</b> (p(&elem)) <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, elem);
+    });
+    result
+}
 </code></pre>
 
 

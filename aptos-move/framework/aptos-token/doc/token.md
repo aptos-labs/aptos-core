@@ -4,7 +4,7 @@
 # Module `0x3::token`
 
 This module provides the foundation for Tokens.
-Checkout our developer doc on our token standard https://aptos.dev/concepts/coin-and-token/aptos-token
+Checkout our developer doc on our token standard https://aptos.dev/standards
 
 
 -  [Struct `Token`](#0x3_token_Token)
@@ -1075,6 +1075,25 @@ Insufficient token balance
 
 
 
+<a name="0x3_token_EURI_TOO_LONG"></a>
+
+The URI is too long
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 27;
+</code></pre>
+
+
+
+<a name="0x3_token_MAX_URI_LENGTH"></a>
+
+
+
+<pre><code><b>const</b> <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
+</code></pre>
+
+
+
 <a name="0x3_token_BURNABLE_BY_CREATOR"></a>
 
 
@@ -1431,16 +1450,6 @@ TokenStore doesn't exist
 
 
 
-<a name="0x3_token_EURI_TOO_LONG"></a>
-
-The URI is too long
-
-
-<pre><code><b>const</b> <a href="token.md#0x3_token_EURI_TOO_LONG">EURI_TOO_LONG</a>: u64 = 27;
-</code></pre>
-
-
-
 <a name="0x3_token_EUSER_NOT_OPT_IN_DIRECT_TRANSFER"></a>
 
 User didn't opt-in direct transfer
@@ -1485,15 +1494,6 @@ Cannot withdraw 0 token
 
 
 <pre><code><b>const</b> <a href="token.md#0x3_token_MAX_NFT_NAME_LENGTH">MAX_NFT_NAME_LENGTH</a>: u64 = 128;
-</code></pre>
-
-
-
-<a name="0x3_token_MAX_URI_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="token.md#0x3_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
 </code></pre>
 
 
@@ -6078,6 +6078,21 @@ The collection_name should exist in collection_data of the creator_address's Col
 
 
 <pre><code><b>include</b> <a href="token.md#0x3_token_AssertCollectionExistsAbortsIf">AssertCollectionExistsAbortsIf</a>;
+</code></pre>
+
+
+
+
+<a name="0x3_token_AssertCollectionExistsAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="token.md#0x3_token_AssertCollectionExistsAbortsIf">AssertCollectionExistsAbortsIf</a> {
+    creator_address: <b>address</b>;
+    collection_name: String;
+    <b>let</b> all_collection_data = <b>global</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address).collection_data;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="token.md#0x3_token_Collections">Collections</a>&gt;(creator_address);
+    <b>aborts_if</b> !<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(all_collection_data, collection_name);
+}
 </code></pre>
 
 

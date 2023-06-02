@@ -78,17 +78,19 @@ mod compaction_tests {
         metadata,
         metadata::{cache::MetadataCacheOpt, view::MetadataView},
         storage::{local_fs::LocalFs, BackupStorage},
+        utils::test_utils::start_local_backup_service,
     };
-    use aptos_backup_service::start_backup_service;
+    use aptos_config::config::RocksdbConfigs;
+    use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
     use aptos_temppath::TempPath;
-    use aptos_types::transaction::Version;
-    use clap::Parser;
-    use std::{
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-        sync::Arc,
-        time::Duration,
+    use aptos_types::{
+        state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
+        transaction::Version,
     };
+    use clap::Parser;
+    use std::{ops::Deref, path::PathBuf, sync::Arc, time::Duration};
+    use tokio::runtime::Runtime;
 
     fn assert_metadata_view_eq(view1: &MetadataView, view2: &MetadataView) {
         assert!(
@@ -109,13 +111,17 @@ mod compaction_tests {
         backup_dir.create_as_dir().unwrap();
         let local_fs = LocalFs::new(backup_dir.path().to_path_buf());
         let store: Arc<dyn BackupStorage> = Arc::new(local_fs);
-        let rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186), db);
+        let (rt, port) = start_local_backup_service(db);
+        let server_addr = format!(" http://localhost:{}", port);
+
         // Backup the local_test DB
         rt.block_on(
             DBTool::try_parse_from([
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "epoch-ending",
                 "--start-epoch",
                 "0",
@@ -134,6 +140,8 @@ mod compaction_tests {
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "epoch-ending",
                 "--start-epoch",
                 "1",
@@ -152,6 +160,8 @@ mod compaction_tests {
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "state-snapshot",
                 "--state-snapshot-epoch",
                 "1",
@@ -168,6 +178,8 @@ mod compaction_tests {
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "state-snapshot",
                 "--state-snapshot-epoch",
                 "2",
@@ -183,6 +195,8 @@ mod compaction_tests {
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "transaction",
                 "--start-version",
                 "0",
@@ -200,6 +214,8 @@ mod compaction_tests {
                 "aptos-db-tool",
                 "backup",
                 "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
                 "transaction",
                 "--start-version",
                 "15",
@@ -250,6 +266,283 @@ mod compaction_tests {
             ))
             .unwrap();
         assert_metadata_view_eq(&old_metaview, &new_metaview);
+        rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    #[cfg(test)]
+    fn db_restore_test_setup(
+        start: Version,
+        end: Version,
+        backup_dir: PathBuf,
+        new_db_dir: PathBuf,
+    ) -> (Runtime, String) {
+        use aptos_db::utils::iterators::PrefixedStateValueIterator;
+        use aptos_storage_interface::DbReader;
+        use itertools::zip_eq;
+
+        let db = test_execution_with_storage_impl();
+        let (rt, port) = start_local_backup_service(Arc::clone(&db));
+        let server_addr = format!(" http://localhost:{}", port);
+        // Backup the local_test DB
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "epoch-ending",
+                "--start-epoch",
+                "0",
+                "--end-epoch",
+                "1",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "epoch-ending",
+                "--start-epoch",
+                "1",
+                "--end-epoch",
+                "2",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "state-snapshot",
+                "--state-snapshot-epoch",
+                "0",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "state-snapshot",
+                "--state-snapshot-epoch",
+                "1",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "state-snapshot",
+                "--state-snapshot-epoch",
+                "2",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "transaction",
+                "--start-version",
+                "0",
+                "--num_transactions",
+                "15",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "backup",
+                "oneoff",
+                "--backup-service-address",
+                server_addr.as_str(),
+                "transaction",
+                "--start-version",
+                "15",
+                "--num_transactions",
+                "15",
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+        // boostrap a historical DB starting from version 1 to version 12
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "restore",
+                "bootstrap-db",
+                "--ledger-history-start-version",
+                format!("{}", start).as_str(),
+                "--target-version",
+                format!("{}", end).as_str(),
+                "--target-db-dir",
+                new_db_dir.as_path().to_str().unwrap(),
+                "--local-fs-dir",
+                backup_dir.as_path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
+
+        // verify the new DB has the same data as the original DB
+        let (ledger_db, tree_db, _) =
+            AptosDB::open_dbs(new_db_dir, RocksdbConfigs::default(), true, 0).unwrap();
+
+        // assert the kv are the same in db and new_db
+        // current all the kv are still stored in the ledger db
+        //
+        // TODO(grao): Support state kv db sharding here.
+        for ver in start..=end {
+            let new_iter = PrefixedStateValueIterator::new(
+                ledger_db.metadata_db(),
+                StateKeyPrefix::new(AccessPath, b"".to_vec()),
+                None,
+                ver,
+            )
+            .unwrap();
+            let old_iter = db
+                .deref()
+                .get_prefixed_state_value_iterator(
+                    &StateKeyPrefix::new(AccessPath, b"".to_vec()),
+                    None,
+                    ver,
+                )
+                .unwrap();
+
+            zip_eq(new_iter, old_iter).for_each(|(new, old)| {
+                let (new_key, new_value) = new.unwrap();
+                let (old_key, old_value) = old.unwrap();
+                assert_eq!(new_key, old_key);
+                assert_eq!(new_value, old_value);
+            });
+        }
+        // first snapshot tree not recovered
+        assert!(
+            tree_db.get_root_hash(0).is_err() || tree_db.get_leaf_count(0).unwrap() == 0,
+            "tree at version 0 should not be restored"
+        );
+        // second snapshot tree recovered
+        let second_snapshot_version: Version = 13;
+        assert!(
+            tree_db.get_root_hash(second_snapshot_version).is_ok(),
+            "root hash at version {} doesn't exist",
+            second_snapshot_version,
+        );
+        (rt, server_addr)
+    }
+    #[test]
+    fn test_restore_db_with_replay() {
+        let backup_dir = TempPath::new();
+        backup_dir.create_as_dir().unwrap();
+        let new_db_dir = TempPath::new();
+        // Test the basic db boostrap that replays from previous snapshot to the target version
+        let (rt, _) = db_restore_test_setup(
+            16,
+            16,
+            PathBuf::from(backup_dir.path()),
+            PathBuf::from(new_db_dir.path()),
+        );
+        rt.shutdown_timeout(Duration::from_secs(1));
+    }
+    #[test]
+    fn test_restore_archive_db() {
+        let backup_dir = TempPath::new();
+        backup_dir.create_as_dir().unwrap();
+        let new_db_dir = TempPath::new();
+        // Test the db boostrap in some historical range with all the kvs restored
+        let (rt, _) = db_restore_test_setup(
+            1,
+            16,
+            PathBuf::from(backup_dir.path()),
+            PathBuf::from(new_db_dir.path()),
+        );
+        rt.shutdown_timeout(Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_resume_db_from_kv_replay() {
+        let backup_dir = TempPath::new();
+        backup_dir.create_as_dir().unwrap();
+        let new_db_dir = TempPath::new();
+        new_db_dir.create_as_dir().unwrap();
+        // Test the basic db boostrap that replays from previous snapshot to the target version
+        let (rt, _) = db_restore_test_setup(
+            1,
+            16,
+            PathBuf::from(backup_dir.path()),
+            PathBuf::from(new_db_dir.path()),
+        );
+        // boostrap a historical DB starting from version 1 to version 18
+        // This only replays the txn from txn 17 to 18
+        rt.block_on(
+            DBTool::try_parse_from([
+                "aptos-db-tool",
+                "restore",
+                "bootstrap-db",
+                "--ledger-history-start-version",
+                "1",
+                "--target-version",
+                "18",
+                "--target-db-dir",
+                new_db_dir.path().to_str().unwrap(),
+                "--local-fs-dir",
+                backup_dir.path().to_str().unwrap(),
+            ])
+            .unwrap()
+            .run(),
+        )
+        .unwrap();
         rt.shutdown_timeout(Duration::from_secs(1));
     }
 }

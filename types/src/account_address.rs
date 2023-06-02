@@ -162,6 +162,17 @@ pub fn create_token_address(
     create_object_address(creator, &seed)
 }
 
+pub fn create_derived_object_address(
+    creator: AccountAddress,
+    object_address: AccountAddress,
+) -> AccountAddress {
+    let mut input = bcs::to_bytes(&creator).unwrap();
+    input.extend(bcs::to_bytes(&object_address).unwrap());
+    input.push(Scheme::DeriveObjectAddressFromObject as u8);
+    let hash = HashValue::sha3_256_of(&input);
+    AccountAddress::from_bytes(hash.as_ref()).unwrap()
+}
+
 pub fn create_object_address(creator: AccountAddress, seed: &[u8]) -> AccountAddress {
     let mut input = bcs::to_bytes(&creator).unwrap();
     input.extend(seed);

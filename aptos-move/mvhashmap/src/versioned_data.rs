@@ -44,7 +44,7 @@ struct VersionedValue<V> {
     aggregator_base_value: Option<u128>,
 }
 
-/// Maps each key (access path) to an interal VersionedValue.
+/// Maps each key (access path) to an internal VersionedValue.
 pub struct VersionedData<K, V> {
     values: DashMap<K, VersionedValue<V>>,
 }
@@ -161,7 +161,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                         // other deltas. Merge two deltas together. If Delta application
                         // fails, we record an error, but continue processing (to e.g.
                         // account for the case when the aggregator was deleted).
-                        if a.merge_onto(*delta).is_err() {
+                        if a.merge_with_previous_delta(*delta).is_err() {
                             Err(())
                         } else {
                             Ok(a)

@@ -3,14 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Operation, PropertyBag, PropertyValue, QualifiedSymbol},
+    ast::{Address, Operation, PropertyBag, PropertyValue, QualifiedSymbol},
     builder::module_builder::SpecBlockContext,
     model::{IntrinsicId, QualifiedId, SpecFunId},
     pragmas::{INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS},
     symbol::{Symbol, SymbolPool},
     FunId, GlobalEnv, Loc, ModuleBuilder, StructId,
 };
-use num::BigUint;
 use std::{collections::BTreeMap, ops::Deref};
 
 /// An information pack that holds the intrinsic declaration
@@ -25,7 +24,7 @@ pub struct IntrinsicDecl {
 }
 
 impl IntrinsicDecl {
-    pub fn get_fun_triple(&self, env: &GlobalEnv, name: &str) -> Option<(BigUint, String, String)> {
+    pub fn get_fun_triple(&self, env: &GlobalEnv, name: &str) -> Option<(Address, String, String)> {
         let symbol_pool = env.symbol_pool();
         let sym = symbol_pool.make(name);
         self.intrinsic_to_move_fun
@@ -161,7 +160,7 @@ fn populate_intrinsic_decl(
                         &format!(
                             "an intrinsic function mapping can only refer to functions \
                             declared in the same module while `{}` is not",
-                            qual_sym.display(symbol_pool)
+                            qual_sym.display(builder.parent.env)
                         ),
                     );
                     continue;
@@ -182,7 +181,7 @@ fn populate_intrinsic_decl(
                         loc,
                         &format!(
                             "unable to find move function for intrinsic mapping: {}",
-                            qualified_sym.display(symbol_pool)
+                            qualified_sym.display(builder.parent.env)
                         ),
                     );
                     continue;
@@ -198,7 +197,7 @@ fn populate_intrinsic_decl(
                             loc,
                             &format!(
                                 "duplicated intrinsic mapping for move function: {}",
-                                qualified_sym.display(symbol_pool)
+                                qualified_sym.display(builder.parent.env)
                             ),
                         );
                         continue;
@@ -212,7 +211,7 @@ fn populate_intrinsic_decl(
                         loc,
                         &format!(
                             "unable to find spec function for intrinsic mapping: {}",
-                            qualified_sym.display(symbol_pool)
+                            qualified_sym.display(builder.parent.env)
                         ),
                     );
                     continue;
@@ -223,7 +222,7 @@ fn populate_intrinsic_decl(
                             loc,
                             &format!(
                                 "unable to find a unique spec function for intrinsic mapping: {}",
-                                qualified_sym.display(symbol_pool)
+                                qualified_sym.display(builder.parent.env)
                             ),
                         );
                         continue;
@@ -241,7 +240,7 @@ fn populate_intrinsic_decl(
                                 loc,
                                 &format!(
                                     "duplicated intrinsic mapping for spec function: {}",
-                                    qualified_sym.display(symbol_pool)
+                                    qualified_sym.display(builder.parent.env)
                                 ),
                             );
                             continue;

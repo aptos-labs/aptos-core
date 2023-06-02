@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_options::{ledger_db_column_families, state_merkle_db_column_families},
-    LEDGER_DB_NAME, STATE_MERKLE_DB_NAME,
+    db_options::state_merkle_db_column_families, ledger_db::LedgerDb, STATE_MERKLE_DB_NAME,
 };
 use anyhow::Result;
+use aptos_config::config::RocksdbConfigs;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
 use std::path::{Path, PathBuf};
@@ -19,6 +19,7 @@ pub struct DbDir {
 }
 
 impl DbDir {
+    // TODO(grao): Use StateMerkleDb struct.
     pub fn open_state_merkle_db(&self) -> Result<aptos_schemadb::DB> {
         aptos_schemadb::DB::open_cf_readonly(
             &aptos_schemadb::Options::default(),
@@ -28,13 +29,8 @@ impl DbDir {
         )
     }
 
-    pub fn open_ledger_db(&self) -> Result<aptos_schemadb::DB> {
-        aptos_schemadb::DB::open_cf_readonly(
-            &aptos_schemadb::Options::default(),
-            self.db_dir.join(LEDGER_DB_NAME).as_path(),
-            LEDGER_DB_NAME,
-            ledger_db_column_families(),
-        )
+    pub fn open_ledger_db(&self) -> Result<LedgerDb> {
+        LedgerDb::new(self.db_dir.as_path(), RocksdbConfigs::default(), true)
     }
 }
 

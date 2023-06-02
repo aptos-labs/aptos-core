@@ -127,6 +127,18 @@ impl TransactionFactory {
         self
     }
 
+    pub fn get_max_gas_amount(&self) -> u64 {
+        self.max_gas_amount
+    }
+
+    pub fn get_gas_unit_price(&self) -> u64 {
+        self.gas_unit_price
+    }
+
+    pub fn get_transaction_expiration_time(&self) -> u64 {
+        self.transaction_expiration_time
+    }
+
     pub fn payload(&self, payload: TransactionPayload) -> TransactionBuilder {
         self.transaction_builder(payload)
     }

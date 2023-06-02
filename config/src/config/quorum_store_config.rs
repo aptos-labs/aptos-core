@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, Error, NodeConfig, RoleType,
+    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
@@ -183,10 +183,9 @@ impl QuorumStoreConfig {
 }
 
 impl ConfigSanitizer for QuorumStoreConfig {
-    /// Validate and process the quorum store config according to the given node role and chain ID
     fn sanitize(
         node_config: &mut NodeConfig,
-        _node_role: RoleType,
+        _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();

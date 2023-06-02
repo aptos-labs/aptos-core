@@ -33,6 +33,8 @@ pub enum StorageServiceError {
     InternalError(String),
     #[error("Invalid storage request: {0}")]
     InvalidRequest(String),
+    #[error("Too many invalid requests! Back off required: {0}")]
+    TooManyInvalidRequests(String),
 }
 
 /// A single storage service message sent or received over AptosNet.

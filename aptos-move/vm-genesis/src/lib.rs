@@ -35,7 +35,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -114,7 +113,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default();
@@ -139,12 +138,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let cs1 = session.finish(&mut (), &configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
@@ -153,17 +148,12 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
-    let cs2 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
-    let change_set_ext = cs1.squash(cs2).unwrap();
+    let cs2 = session.finish(&mut (), &configs).unwrap();
+    let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -173,11 +163,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
-        .iter()
-        .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
+    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(&events);
+    let change_set = ChangeSet::new(write_set, events);
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
 
@@ -231,7 +219,7 @@ pub fn encode_genesis_change_set(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
 
     // On-chain genesis process.
     initialize(
@@ -258,12 +246,8 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let cs1 = session.finish(&mut (), &configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
@@ -272,18 +256,12 @@ pub fn encode_genesis_change_set(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
-    let cs2 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let cs2 = session.finish(&mut (), &configs).unwrap();
+    let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let change_set_ext = cs1.squash(cs2).unwrap();
-
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -293,12 +271,9 @@ pub fn encode_genesis_change_set(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
-        .iter()
-        .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    change_set
+    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(&events);
+    ChangeSet::new(write_set, events)
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
@@ -338,7 +313,7 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
 }
 
 fn exec_function(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -367,7 +342,7 @@ fn exec_function(
 }
 
 fn initialize(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
     consensus_config: &OnChainConsensusConfig,
@@ -434,10 +409,12 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
+        FeatureFlag::STORAGE_SLOT_METADATA,
+        FeatureFlag::CHARGE_INVARIANT_VIOLATION,
     ]
 }
 
-fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_features(session: &mut SessionExt) {
     let features: Vec<u64> = default_features()
         .into_iter()
         .map(|feature| feature as u64)
@@ -456,7 +433,7 @@ fn initialize_features(session: &mut SessionExt<impl MoveResolver>) {
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+fn initialize_aptos_coin(session: &mut SessionExt) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -466,7 +443,7 @@ fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
     );
 }
 
-fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
+fn set_genesis_end(session: &mut SessionExt) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -477,7 +454,7 @@ fn set_genesis_end(session: &mut SessionExt<impl MoveResolver>) {
 }
 
 fn initialize_core_resources_and_aptos_coin(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     core_resources_key: &Ed25519PublicKey,
 ) {
     let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
@@ -494,10 +471,7 @@ fn initialize_core_resources_and_aptos_coin(
 }
 
 /// Create and initialize Association and Core Code accounts.
-fn initialize_on_chain_governance(
-    session: &mut SessionExt<impl MoveResolver>,
-    genesis_config: &GenesisConfiguration,
-) {
+fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &GenesisConfiguration) {
     exec_function(
         session,
         GOVERNANCE_MODULE_NAME,
@@ -512,7 +486,7 @@ fn initialize_on_chain_governance(
     );
 }
 
-fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[AccountBalance]) {
+fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
     let accounts_bytes = bcs::to_bytes(accounts).expect("AccountMaps can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(accounts_bytes);
@@ -526,7 +500,7 @@ fn create_accounts(session: &mut SessionExt<impl MoveResolver>, accounts: &[Acco
 }
 
 fn create_employee_validators(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     employees: &[EmployeePool],
     genesis_config: &GenesisConfiguration,
 ) {
@@ -549,10 +523,7 @@ fn create_employee_validators(
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
-fn create_and_initialize_validators(
-    session: &mut SessionExt<impl MoveResolver>,
-    validators: &[Validator],
-) {
+fn create_and_initialize_validators(session: &mut SessionExt, validators: &[Validator]) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
     let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
     serialized_values.push(validators_bytes);
@@ -566,7 +537,7 @@ fn create_and_initialize_validators(
 }
 
 fn create_and_initialize_validators_with_commission(
-    session: &mut SessionExt<impl MoveResolver>,
+    session: &mut SessionExt,
     validators: &[ValidatorWithCommissionRate],
 ) {
     let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
@@ -584,7 +555,7 @@ fn create_and_initialize_validators_with_commission(
     );
 }
 
-fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolver>) {
+fn allow_core_resources_to_set_version(session: &mut SessionExt) {
     exec_function(
         session,
         VERSION_MODULE_NAME,
@@ -595,14 +566,14 @@ fn allow_core_resources_to_set_version(session: &mut SessionExt<impl MoveResolve
 }
 
 /// Publish the framework release bundle.
-fn publish_framework(session: &mut SessionExt<impl MoveResolver>, framework: &ReleaseBundle) {
+fn publish_framework(session: &mut SessionExt, framework: &ReleaseBundle) {
     for pack in &framework.packages {
         publish_package(session, pack)
     }
 }
 
 /// Publish the given package.
-fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePackage) {
+fn publish_package(session: &mut SessionExt, pack: &ReleasePackage) {
     let modules = pack.sorted_code_and_modules();
     let addr = *modules.first().unwrap().1.self_id().address();
     let code = modules
@@ -630,7 +601,7 @@ fn publish_package(session: &mut SessionExt<impl MoveResolver>, pack: &ReleasePa
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn emit_new_block_and_epoch_event(session: &mut SessionExt<impl MoveResolver>) {
+fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
     exec_function(
         session,
         "block",
@@ -913,7 +884,7 @@ pub fn test_genesis_module_publishing() {
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), true);
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 

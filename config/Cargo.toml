@@ -25,6 +25,7 @@ aptos-types = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 cfg-if = { workspace = true }
+cfg_block = { workspace = true }
 get_if_addrs = { workspace = true }
 mirai-annotations = { workspace = true }
 poem-openapi = { workspace = true }
@@ -41,4 +42,5 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 [features]
 default = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+network-perf-test = []
 testing = []

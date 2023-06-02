@@ -7,13 +7,11 @@
 mod crypto_kv_storage;
 mod crypto_storage;
 mod error;
-mod github;
 mod in_memory;
 mod kv_storage;
 mod namespaced;
 mod on_disk;
 mod policy;
-mod rocks_db;
 mod storage;
 mod vault;
 
@@ -21,13 +19,11 @@ pub use crate::{
     crypto_kv_storage::CryptoKVStorage,
     crypto_storage::{CryptoStorage, PublicKeyResponse},
     error::Error,
-    github::GitHubStorage,
     in_memory::InMemoryStorage,
     kv_storage::{GetResponse, KVStorage},
     namespaced::Namespaced,
     on_disk::OnDiskStorage,
     policy::{Capability, Identity, Permission, Policy},
-    rocks_db::{RocksDbStorage, SECURE_STORAGE_DB_NAME},
     storage::Storage,
     vault::VaultStorage,
 };

@@ -11,8 +11,8 @@ on:
         description: "The unique name of the fullnode test."
         type: string
         required: true
-      BRANCH:
-        description: "The aptos-core branch to switch to before running the fullnode."
+      GIT_REF:
+        description: "The aptos-core git ref (GIT_REF or commit hash) to switch to before running the fullnode."
         type: string
         required: true
       NETWORK:
@@ -32,18 +32,39 @@ on:
         type: number
         required: false
         default: 300 # Run for at most 5 hours
+  workflow_dispatch:
+    inputs:
+      TEST_NAME:
+        description: "The unique name of the fullnode test."
+        type: string
+        required: true
+      GIT_REF:
+        description: "The aptos-core GIT_REF (or ref) to switch to before running the fullnode."
+        type: string
+        required: true
+      NETWORK:
+        description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
+        type: string
+        required: true
+      BOOTSTRAPPING_MODE:
+        description: "The state sync bootstrapping mode for the fullnode."
+        type: string
+        required: true
+      CONTINUOUS_SYNCING_MODE:
+        description: "The state sync continuous syncing mode for the fullnode."
+        type: string
+        required: true
 
 jobs:
   fullnode-sync:
     runs-on: medium-perf-docker-with-local-ssd
-    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
+    timeout-minutes: ${{ inputs.TIMEOUT_MINUTES || 300 }} # the default run is 300 minutes (5 hours). Specified here because workflow_dispatch uses string rather than number
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
 
       - uses: ./.github/actions/fullnode-sync
         with:
-          TIMEOUT_MINUTES: ${{ inputs.TIMEOUT_MINUTES }}
-          BRANCH: ${{ inputs.BRANCH }}
+          GIT_REF: ${{ inputs.GIT_REF }}
           NETWORK: ${{ inputs.NETWORK }}
           BOOTSTRAPPING_MODE: ${{ inputs.BOOTSTRAPPING_MODE }}
           CONTINUOUS_SYNCING_MODE: ${{ inputs.CONTINUOUS_SYNCING_MODE }}
@@ -72,7 +93,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
 
       # Because we have to checkout the actions and then check out a different
-      # branch, it's possible the actions directory will be modified. So, we
+      # git ref, it's possible the actions directory will be modified. So, we
       # need to check it out again for the Post Run actions/checkout to succeed.
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:

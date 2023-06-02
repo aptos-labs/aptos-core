@@ -17,9 +17,8 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
+    account_address::AccountAddress, ident_str, identifier::Identifier, vm_status::StatusCode,
 };
-use std::str::FromStr;
 
 #[test]
 fn unbalanced_stack_crash() {
@@ -54,11 +53,11 @@ fn unbalanced_stack_crash() {
 
     module.identifiers.extend(
         vec![
-            Identifier::from_str("zf_hello_world").unwrap(),
-            Identifier::from_str("awldFnU18mlDKQfh6qNfBGx8X").unwrap(),
-            Identifier::from_str("aQPwJNHyAHpvJ").unwrap(),
-            Identifier::from_str("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").unwrap(),
-            Identifier::from_str("arYpsFa2fvrpPJ").unwrap(),
+            ident_str!("zf_hello_world").into(),
+            ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
+            ident_str!("aQPwJNHyAHpvJ").into(),
+            ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
+            ident_str!("arYpsFa2fvrpPJ").into(),
         ]
         .into_iter(),
     );

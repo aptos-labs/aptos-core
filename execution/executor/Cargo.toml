@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-executor-types = { workspace = true }
-aptos-gas = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
@@ -27,7 +26,9 @@ aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+arr_macro = { workspace = true }
 bcs = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }

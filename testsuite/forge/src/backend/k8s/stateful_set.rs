@@ -9,8 +9,9 @@ use aptos_retrier::ExponentWithLimitDelay;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 use kube::{
-    api::{Api, Meta, Patch, PatchParams},
+    api::{Api, Patch, PatchParams},
     client::Client as K8sClient,
+    ResourceExt,
 };
 use serde_json::{json, Value};
 use std::{process::Command, sync::Arc, time::Duration};
@@ -185,7 +186,7 @@ pub async fn set_stateful_set_image_tag(
     image_tag: String,
     kube_namespace: String,
 ) -> Result<()> {
-    let kube_client: K8sClient = create_k8s_client().await;
+    let kube_client: K8sClient = create_k8s_client().await?;
     let sts_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), &kube_namespace);
     let sts = sts_api.get(&stateful_set_name).await?;
     let image_repo = get_stateful_set_image(&sts)?.name;
@@ -216,7 +217,7 @@ pub async fn scale_stateful_set_replicas(
     kube_namespace: &str,
     replica_num: u64,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let pp = PatchParams::apply("forge").force();
     let patch = serde_json::json!({
@@ -250,7 +251,7 @@ pub async fn set_identity(
     kube_namespace: &str,
     k8s_secret_name: &str,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let patch_op = PatchOperation::Replace(ReplaceOperation {
         // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
@@ -264,7 +265,7 @@ pub async fn set_identity(
 }
 
 pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let sts = stateful_set_api.get(sts_name).await?;
     // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.

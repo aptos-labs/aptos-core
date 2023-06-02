@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize, Debug)]
 pub struct Features {
+    #[serde(default)]
     pub enabled: Vec<FeatureFlag>,
+    #[serde(default)]
     pub disabled: Vec<FeatureFlag>,
 }
 
@@ -35,6 +37,8 @@ pub enum FeatureFlag {
     PeriodicalRewardRateReduction,
     PartialGovernanceVoting,
     SignatureCheckerV2,
+    StorageSlotMetadata,
+    ChargeInvariantViolation,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -87,7 +91,7 @@ pub fn generate_feature_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        "std::features",
+        &["std::features", "aptos_framework::reconfiguration"],
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
             generate_features_blob(writer, &enabled);
@@ -102,10 +106,18 @@ pub fn generate_feature_upgrade_proposal(
                     writer,
                     "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
                 );
+                emitln!(
+                    writer,
+                    "reconfiguration::reconfigure_with_signer(framework_signer);"
+                );
             } else {
                 emitln!(
                     writer,
                     "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
+                );
+                emitln!(
+                    writer,
+                    "reconfiguration::reconfigure_with_signer(&framework_signer);"
                 );
             }
         },
@@ -148,6 +160,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::PartialGovernanceVoting => AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::StorageSlotMetadata => AptosFeatureFlag::STORAGE_SLOT_METADATA,
+            FeatureFlag::ChargeInvariantViolation => AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION,
         }
     }
 }
@@ -186,6 +200,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING => FeatureFlag::PartialGovernanceVoting,
             AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
+            AptosFeatureFlag::STORAGE_SLOT_METADATA => FeatureFlag::StorageSlotMetadata,
+            AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION => FeatureFlag::ChargeInvariantViolation,
         }
     }
 }

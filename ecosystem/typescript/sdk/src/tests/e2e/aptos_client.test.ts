@@ -16,12 +16,20 @@ import { bcsSerializeUint64, bcsToBytes } from "../../bcs";
 import { AccountAddress, Ed25519PublicKey, stringStructTag, TypeTagStruct } from "../../aptos_types";
 import { Provider } from "../../providers";
 import { BCS } from "../..";
+import { VERSION } from "../../version";
 
 const account = "0x1::account::Account";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 const coinTransferFunction = "0x1::coin::transfer";
+
+test("call should include x-aptos-client header", async () => {
+  const client = new AptosClient(NODE_URL, { HEADERS: { my: "header" } });
+  const heders = client.client.request.config.HEADERS;
+  expect(heders).toHaveProperty("x-aptos-client", `aptos-ts-sdk/${VERSION}`);
+  expect(heders).toHaveProperty("my", "header");
+});
 
 test("node url empty", () => {
   expect(() => {
@@ -154,7 +162,6 @@ test(
       { checkSuccess: true },
     );
     tokenAddress = (txn as Gen.UserTransaction).events[0].data.token;
-    console.log(tokenAddress);
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x4::token::Token"));
     const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
