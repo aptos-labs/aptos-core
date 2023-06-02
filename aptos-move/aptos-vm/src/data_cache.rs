@@ -19,18 +19,13 @@ use aptos_types::{
 use move_binary_format::{errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::NumBytes,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{resource_add_cost, ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
-use std::{
-    cell::{Cell, RefCell},
-    collections::BTreeMap,
-    ops::Deref,
-};
+use std::{cell::RefCell, collections::BTreeMap, ops::Deref};
 
 pub(crate) fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
@@ -47,20 +42,20 @@ pub(crate) fn get_resource_group_from_metadata(
 /// Adapter to convert a `StateView` into a `MoveResolverExt`.
 pub struct StorageAdapter<'a, S> {
     state_store: &'a S,
-    accurate_byte_count: Cell<bool>,
+    accurate_byte_count: bool,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
     pub fn new(state_store: &'a S) -> Self {
-        let s = Self {
+        let mut s = Self {
             state_store,
-            accurate_byte_count: Cell::new(false),
+            accurate_byte_count: false,
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
         if gas_config(&s).1 >= 9 {
-            s.accurate_byte_count.set(true);
+            s.accurate_byte_count = true;
         };
         s
     }
@@ -76,7 +71,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), VMError> {
+    ) -> Result<Option<(Vec<u8>, u64)>, VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let mut cache = self.resource_group_cache.borrow_mut();
@@ -85,31 +80,30 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                 // This resource group is already cached for this address. So just return the
                 // cached value.
                 let buf = group_data.get(struct_tag).cloned();
-                let len = buf.as_ref().map(|b| NumBytes::new(b.len() as u64));
-                return Ok((buf, len));
+                return Ok(resource_add_cost(buf, 0));
             }
             let group_data = self.get_resource_group_data(address, &resource_group)?;
             if let Some(group_data) = group_data {
-                let mut len = Some(NumBytes::new(group_data.len() as u64));
+                let len = if self.accurate_byte_count {
+                    group_data.len() as u64
+                } else {
+                    0
+                };
                 let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .finish(Location::Undefined)
                     })?;
                 let res = group_data.get(struct_tag).cloned();
-                if !self.accurate_byte_count.get() {
-                    len = res.as_ref().map(|b| NumBytes::new(b.len() as u64));
-                }
                 cache.insert(resource_group, group_data);
-                Ok((res, len))
+                Ok(resource_add_cost(res, len))
             } else {
                 cache.insert(resource_group, BTreeMap::new());
-                Ok((None, None))
+                Ok(None)
             }
         } else {
             let buf = self.get_standard_resource(address, struct_tag)?;
-            let len = buf.as_ref().map(|b| NumBytes::new(b.len() as u64));
-            Ok((buf, len))
+            Ok(resource_add_cost(buf, 0))
         }
     }
 }
@@ -153,7 +147,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), Error> {
+    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }

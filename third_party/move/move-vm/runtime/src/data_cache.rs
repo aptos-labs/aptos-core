@@ -193,8 +193,8 @@ impl<'r> TransactionDataCache<'r> {
                 .remote
                 .get_resource_with_metadata(&addr, &ty_tag, metadata)
             {
-                Ok((Some(blob), bytes)) => {
-                    load_res = Some(bytes);
+                Ok(Some((blob, bytes))) => {
+                    load_res = Some(Some(NumBytes::new(bytes)));
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
@@ -209,7 +209,7 @@ impl<'r> TransactionDataCache<'r> {
 
                     GlobalValue::cached(val)?
                 },
-                Ok((None, _)) => {
+                Ok(None) => {
                     load_res = Some(None);
                     GlobalValue::none()
                 },

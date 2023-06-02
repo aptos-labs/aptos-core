@@ -13,12 +13,11 @@ use move_bytecode_utils::module_cache::GetModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
     parser,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{resource_add_cost, ModuleResolver, ResourceResolver},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
@@ -419,10 +418,9 @@ impl ResourceResolver for OnDiskStateView {
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<(Option<Vec<u8>>, Option<NumBytes>), anyhow::Error> {
+    ) -> Result<Option<(Vec<u8>, u64)>> {
         let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
-        let len = buf.as_ref().map(|b| NumBytes::from(b.len() as u64));
-        Ok((buf, len))
+        Ok(resource_add_cost(buf, 0))
     }
 }
 
