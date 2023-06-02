@@ -18,5 +18,5 @@ export enum Network {
 
 export interface CustomEndpoints {
   fullnodeUrl: string;
-  indexerUrl: string;
+  indexerUrl?: string;
 }
