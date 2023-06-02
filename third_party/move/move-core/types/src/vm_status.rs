@@ -169,12 +169,7 @@ impl VMStatus {
     }
 
     pub fn is_aggregator_error(&self) -> bool {
-        if let VMStatus::MoveAbort(_, code) = self {
-            if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW {
-                return true;
-            }
-        }
-        false
+        matches!(self, VMStatus::MoveAbort(_, code) if *code == EADD_OVERFLOW || *code == ESUB_UNDERFLOW)
     }
 
     /// Returns `Ok` with a recorded status if it should be kept, `Err` of the error code if it

@@ -52,7 +52,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         }
     }
 
-    // This function is called by the BlockExecutor for each transaction is intends
+    // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). This function is run speculatively
     // as a part of a parallel execution.
     fn execute_transaction_parallel(
@@ -70,12 +70,6 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             aggregator_enabled,
         ) {
             Ok((vm_status, vm_output, sender)) => {
-                // If aggregators are disabled for user transactions, then delta_change_set should be empty as there should not be any delta outputs.
-                assert!(
-                    aggregator_enabled
-                        || !matches!(txn, PreprocessedTransaction::UserTransaction(_))
-                        || vm_output.delta_change_set().is_empty()
-                );
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(
@@ -107,7 +101,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         }
     }
 
-    // This function is called by the BlockExecutor for each transaction is intends
+    // This function is called by the BlockExecutor for each transaction it intends
     // to execute (via the ExecutorTask trait). This function is run during
     // sequential execution of a block.
     fn execute_transaction_sequential(
@@ -123,7 +117,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .execute_single_transaction_sequential(txn, &view, &log_context)
         {
             Ok((vm_status, vm_output, sender)) => {
-                // If aggregators are disabled for user transactions, then delta_change_set should be empty as there should not be any delta outputs.
+                // Aggregators are already materialized by this point, so delta change set should be empty
+                assert!(vm_output.delta_change_set().is_empty());
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

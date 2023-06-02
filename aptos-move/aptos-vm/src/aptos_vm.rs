@@ -1735,6 +1735,8 @@ impl VMAdapter for AptosVM {
                 if let Some(label) = counter_label {
                     USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
                 }
+                // If aggregators are not enabled, then delta change set should be empty.
+                assert!(aggregator_enabled || output.delta_change_set().is_empty());
                 (vm_status, output, Some(sender))
             },
             PreprocessedTransaction::InvalidSignature => {
@@ -1773,16 +1775,7 @@ impl VMAdapter for AptosVM {
                 }
             },
         }
-        match self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, false) {
-            Ok((vm_status, vm_output, sender)) => {
-                assert!(
-                    !matches!(txn, PreprocessedTransaction::UserTransaction(_))
-                        || vm_output.delta_change_set().is_empty()
-                );
-                Ok((vm_status, vm_output, sender))
-            },
-            Err(vm_status) => Err(vm_status),
-        }
+        self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, false)
     }
 }
 
