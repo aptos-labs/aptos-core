@@ -18,7 +18,7 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_aggregator::delta_change_set::DeltaChangeSet;
+use aptos_aggregator::delta_change_set::{DeltaChangeSet, EADD_OVERFLOW, ESUB_UNDERFLOW};
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
@@ -1764,13 +1764,15 @@ impl VMAdapter for AptosVM {
                     return Ok((vm_status, vm_output, sender));
                 },
                 Err(vm_status) => {
-                    if !vm_status.is_aggregator_error() {
+                    if matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
+                    {
                         return Err(vm_status);
                     }
                 },
             },
             Err(vm_status) => {
-                if !vm_status.is_aggregator_error() {
+                if matches!(vm_status, VMStatus::MoveAbort(_, code) if code == EADD_OVERFLOW || code == ESUB_UNDERFLOW)
+                {
                     return Err(vm_status);
                 }
             },
