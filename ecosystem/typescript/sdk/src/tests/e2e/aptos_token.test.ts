@@ -186,9 +186,38 @@ describe("token objects", () => {
   test(
     "transfer token ownership",
     async () => {
-      await provider.waitForTransaction(await aptosToken.transferTokenOwnership(alice, tokenAddress, bob.address()), {
-        checkSuccess: true,
-      });
+      await provider.waitForTransaction(
+        await aptosToken.transferTokenOwnership({ owner: alice, token: tokenAddress, recipient: bob.address() }),
+        {
+          checkSuccess: true,
+        },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "transfer token ownership",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.transfer({ owner: alice, token: tokenAddress, recipient: bob.address() }),
+        {
+          checkSuccess: true,
+        },
+      );
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "transfer token ownership",
+    async () => {
+      await provider.waitForTransaction(
+        await aptosToken.transfer({ owner: alice, token: tokenAddress, recipient: bob.address(), amount: 1 }),
+        {
+          checkSuccess: true,
+        },
+      );
     },
     longTestTimeout,
   );

@@ -41,6 +41,23 @@ const PropertyTypeMap = {
 
 export type PropertyType = keyof typeof PropertyTypeMap;
 
+type FungibleTokenParameters = {
+  owner: AptosAccount;
+  token: MaybeHexString;
+  recipient: MaybeHexString;
+  amount: number | bigint;
+  tokenType?: string;
+  extraArgs?: OptionalTransactionArgs;
+};
+
+type NonFungibleTokenParameters = {
+  owner: AptosAccount;
+  token: MaybeHexString;
+  recipient: MaybeHexString;
+  tokenType?: string;
+  extraArgs?: OptionalTransactionArgs;
+};
+
 /**
  * Class for managing aptos_token
  */
@@ -459,31 +476,43 @@ export class AptosToken {
     );
   }
 
+  async transfer(data: NonFungibleTokenParameters): Promise<string>;
+  async transfer(data: FungibleTokenParameters): Promise<string>;
+
+  async transfer(data: NonFungibleTokenParameters | FungibleTokenParameters, isFungible?: boolean): Promise<string> {
+    // fungible token
+    if (isFungible === undefined) {
+      // query token data by `token` property (token ddress)
+      // and check if it is a fungible or non-fungible
+      const tokenData = await this.provider.getTokenData(HexString.ensure(data.token).hex());
+    }
+    if ("amount" in data) {
+      // TODO use FungibleAsset transfer() method
+      return await this.transferTokenOwnership(data);
+    } else {
+      return await this.transferTokenOwnership(data);
+    }
+  }
+
   /**
-   * Transfer a token ownership.
+   * Transfer a non fungible token ownership.
    * We can transfer a token only when the token is not frozen (i.e. owner transfer is not disabled such as for soul bound tokens)
    * @param owner The account of the current token owner
    * @param token Token address
    * @param recipient Recipient address
    * @returns The hash of the transaction submitted to the API
    */
-  async transferTokenOwnership(
-    owner: AptosAccount,
-    token: MaybeHexString,
-    recipient: MaybeHexString,
-    tokenType?: string,
-    extraArgs?: OptionalTransactionArgs,
-  ): Promise<string> {
+  async transferTokenOwnership(data: NonFungibleTokenParameters): Promise<string> {
     const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: owner.address(),
-      ...extraArgs,
+      sender: data.owner.address(),
+      ...data.extraArgs,
     });
     const rawTxn = await builder.build(
       "0x1::object::transfer",
-      [tokenType || this.tokenType],
-      [HexString.ensure(token).hex(), HexString.ensure(recipient).hex()],
+      [data.tokenType || this.tokenType],
+      [HexString.ensure(data.token).hex(), HexString.ensure(data.recipient).hex()],
     );
-    const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
+    const bcsTxn = AptosClient.generateBCSTransaction(data.owner, rawTxn);
     const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
   }
