@@ -13,8 +13,10 @@ repository = "https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos-le
 rust-version = { workspace = true }
 
 [dependencies]
-hex = "0.4.3"
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+hex = { workspace = true }
 ledger-apdu = "0.10.0"
 ledger-transport-hid = "0.10.0"
-once_cell = "1.10.0"
-thiserror = "1.0.37"
+once_cell = { workspace = true }
+thiserror = { workspace = true }

@@ -11,8 +11,8 @@ pub mod local;
 pub use local::*;
 
 pub const FILE_FOLDER_NAME: &str = "files";
-
 const METADATA_FILE_NAME: &str = "metadata.json";
+const FILE_STORE_UPDATE_FREQUENCY_SECS: u64 = 5;
 
 #[inline]
 pub fn generate_blob_name(starting_version: u64) -> String {
@@ -78,6 +78,11 @@ pub trait FileStoreOperator: Send + Sync {
         chain_id: u64,
         transactions: Vec<EncodedTransactionWithVersion>,
     ) -> anyhow::Result<()>;
+
+    async fn get_starting_version(&self) -> Option<u64> {
+        let metadata = self.get_file_store_metadata().await;
+        metadata.map(|metadata| metadata.version)
+    }
 }
 
 pub(crate) fn build_transactions_file(

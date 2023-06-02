@@ -9,7 +9,7 @@ pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
 pub mod modifiers;
-pub mod multi_region_simulation_test;
+pub mod multi_region_network_test;
 pub mod network_bandwidth_test;
 pub mod network_loss_test;
 pub mod network_partition_test;

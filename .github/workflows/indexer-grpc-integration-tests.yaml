@@ -1,0 +1,59 @@
+name: "Indexer gRPC Integration Tests"
+on:
+  pull_request:
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  run-tests-local-testnet:
+    runs-on: high-perf-docker
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # spin up the local testnet using the latest devnet image
+      VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
+      FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
+      INDEXER_GRPC_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
+      IMAGE_TAG: devnet
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Run indexer gRPC dependnencies locally (${{ env.IMAGE_TAG }})
+        shell: bash
+        run: ./testsuite/indexer_grpc_local.py --verbose start --no-indexer-grpc
+
+      - name: Run indexer gRPC integration tests
+        shell: bash
+        run: cargo nextest run --features integration-tests --package aptos-indexer-grpc-integration-tests
+
+      - name: Print docker-compose indexer-grpc deps logs on failure
+        if: ${{ failure() }}
+        working-directory: docker/compose/indexer-grpc
+        run: docker-compose logs
+
+      - name: Print docker-compose validator-testnet logs on failure
+        if: ${{ failure() }}
+        working-directory: docker/compose/validator-testnet
+        run: docker-compose logs
+
+# validator-testnet-validator-1

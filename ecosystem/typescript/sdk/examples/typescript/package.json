@@ -11,7 +11,8 @@
     "transfer_coin": "ts-node transfer_coin.ts",
     "test": "run-s bcs_transaction multisig_transaction simple_nft transfer_coin",
     "your_coin": "ts-node your_coin.ts",
-    "call_aptos_cli": "ts-node call_aptos_cli.ts"
+    "call_aptos_cli": "ts-node call_aptos_cli.ts",
+    "ambassador": "ts-node ambassador"
   },
   "keywords": [],
   "author": "",

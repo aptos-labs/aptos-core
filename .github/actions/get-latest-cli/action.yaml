@@ -1,0 +1,21 @@
+name: "Get latest Aptos CLI"
+description: |
+  Fetches the latest released Aptos CLI.
+inputs:
+  destination_directory:
+    description: "Directory to install the CLI in"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup python
+      uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+    - name: Get installation script
+      shell: bash
+      run: |
+        curl -fsSL "https://aptos.dev/scripts/install_cli.py" > install_cli.py
+    - name: Run installation script
+      shell: bash
+      run: |
+        python3 install_cli.py --bin-dir ${{ inputs.destination_directory }}
