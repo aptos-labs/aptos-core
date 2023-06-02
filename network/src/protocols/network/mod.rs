@@ -20,17 +20,22 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
-    channel::oneshot,
+    channel::{mpsc, oneshot},
     future,
-    stream::{FilterMap, FusedStream, Map, Select, Stream, StreamExt},
+    stream::{FusedStream, Map, Select, Stream, StreamExt},
     task::{Context, Poll},
 };
+use futures_util::SinkExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use tokio::runtime::Handle;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
+
+// TODO: do we want to make this configurable?
+const MAX_DESERIALIZATION_QUEUE_SIZE: usize = 1024;
 
 /// Events received by network clients in a validator
 ///
@@ -154,11 +159,7 @@ impl NetworkApplicationConfig {
 pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
-        FilterMap<
-            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-            future::Ready<Option<Event<TMessage>>>,
-            fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
-        >,
+        mpsc::Receiver<Event<TMessage>>,
         Map<
             aptos_channel::Receiver<PeerId, ConnectionNotification>,
             fn(ConnectionNotification) -> Event<TMessage>,
@@ -175,19 +176,49 @@ pub trait NewNetworkEvents {
     ) -> Self;
 }
 
-impl<TMessage: Message> NewNetworkEvents for NetworkEvents<TMessage> {
+impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
-        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        mut peer_mgr_notifs_rx: aptos_channel::Receiver<
+            (PeerId, ProtocolId),
+            PeerManagerNotification,
+        >,
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self {
-        let data_event_stream = peer_mgr_notifs_rx.filter_map(
-            peer_mgr_notif_to_event
-                as fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
-        );
+        // Deserialize the peer manager notifications. This is done in parallel
+        // and sent to the message receiver when complete. Note: this may
+        // result in out of order delivery of messages.
+        let (deserialized_message_sender, deserialized_message_receiver) =
+            mpsc::channel(MAX_DESERIALIZATION_QUEUE_SIZE);
+        Handle::current().spawn(async move {
+            // For each notification, spawn a new task to deserialize the message
+            while let Some(peer_manager_notification) = peer_mgr_notifs_rx.next().await {
+                let mut deserialized_message_sender = deserialized_message_sender.clone();
+                Handle::current().spawn(async move {
+                    if let Some(deserialized_message) =
+                        peer_mgr_notif_to_event(peer_manager_notification).await
+                    {
+                        if let Err(error) =
+                            deserialized_message_sender.send(deserialized_message).await
+                        {
+                            warn!(
+                                "Failed to send deserialized message to receiver: {:?}",
+                                error
+                            );
+                        }
+                    }
+                });
+            }
+        });
+
+        // Process the control messages
         let control_event_stream = connection_notifs_rx
             .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
+
         Self {
-            event_stream: ::futures::stream::select(data_event_stream, control_event_stream),
+            event_stream: ::futures::stream::select(
+                deserialized_message_receiver,
+                control_event_stream,
+            ),
             _marker: PhantomData,
         }
     }

@@ -277,7 +277,9 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
 }
 
 /// Registers a new application client and service with the network
-fn register_client_and_service_with_network<T: Serialize + for<'de> Deserialize<'de>>(
+fn register_client_and_service_with_network<
+    T: Serialize + for<'de> Deserialize<'de> + Send + 'static,
+>(
     network_builder: &mut NetworkBuilder,
     network_id: NetworkId,
     application_config: NetworkApplicationConfig,
