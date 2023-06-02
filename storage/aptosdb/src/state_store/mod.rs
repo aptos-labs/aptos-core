@@ -7,12 +7,15 @@
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     epoch_by_version::EpochByVersionSchema,
+    ledger_db::LedgerDb,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_restore::{StateSnapshotProgress, StateSnapshotRestore, StateValueWriter},
+    state_restore::{
+        StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
+    },
     state_store::buffered_state::BufferedState,
     utils::{
         iterators::PrefixedStateValueIterator,
@@ -32,7 +35,7 @@ use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
 use aptos_logger::info;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher,
@@ -43,6 +46,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
@@ -50,6 +54,7 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::Version,
+    write_set::{TransactionWrite, WriteSet},
 };
 use arr_macro::arr;
 use claims::{assert_ge, assert_le};
@@ -85,7 +90,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 });
 
 pub(crate) struct StateDb {
-    pub ledger_db: Arc<DB>,
+    pub ledger_db: Arc<LedgerDb>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -94,7 +99,7 @@ pub(crate) struct StateDb {
 }
 
 pub(crate) struct StateStore {
-    pub(crate) state_db: Arc<StateDb>,
+    pub state_db: Arc<StateDb>,
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
@@ -194,6 +199,7 @@ impl DbReader for StateDb {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(self
                 .ledger_db
+                .metadata_db()
                 .get::<VersionDataSchema>(&version)?
                 .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?
                 .get_state_storage_usage())
@@ -212,6 +218,7 @@ impl StateDb {
 
         let mut iter = self
             .ledger_db
+            .metadata_db()
             .iter::<EpochByVersionSchema>(ReadOptions::default())?;
         // Search for the end of the previous epoch.
         iter.seek_for_prev(&prev_version)?;
@@ -292,7 +299,7 @@ impl StateDb {
 
 impl StateStore {
     pub fn new(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
         state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
@@ -300,6 +307,7 @@ impl StateStore {
         state_kv_pruner: StateKvPrunerManager,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
+        empty_buffered_state_for_restore: bool,
     ) -> Self {
         Self::sync_commit_progress(
             Arc::clone(&ledger_db),
@@ -314,30 +322,44 @@ impl StateStore {
             epoch_snapshot_pruner,
             state_kv_pruner,
         });
-        let buffered_state = Mutex::new(
-            Self::create_buffered_state_from_latest_snapshot(
+        if empty_buffered_state_for_restore {
+            let buffered_state = Mutex::new(BufferedState::new(
                 &state_db,
+                StateDelta::new_empty(),
                 buffered_state_target_items,
-                hack_for_tests,
-                /*check_max_versions_after_snapshot=*/ true,
-            )
-            .expect("buffered state creation failed."),
-        );
-        Self {
-            state_db,
-            buffered_state,
-            buffered_state_target_items,
+            ));
+            Self {
+                state_db,
+                buffered_state,
+                buffered_state_target_items,
+            }
+        } else {
+            let buffered_state = Mutex::new(
+                Self::create_buffered_state_from_latest_snapshot(
+                    &state_db,
+                    buffered_state_target_items,
+                    hack_for_tests,
+                    /*check_max_versions_after_snapshot=*/ true,
+                )
+                .expect("buffered state creation failed."),
+            );
+            Self {
+                state_db,
+                buffered_state,
+                buffered_state_target_items,
+            }
         }
     }
 
     // We commit the overall commit progress at the last, and use it as the source of truth of the
     // commit progress.
     pub fn sync_commit_progress(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
         crash_if_difference_is_too_large: bool,
     ) {
-        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_db
+        let ledger_metadata_db = ledger_db.metadata_db();
+        if let Some(DbMetadataValue::Version(overall_commit_progress)) = ledger_metadata_db
             .get::<DbMetadataSchema>(&DbMetadataKey::OverallCommitProgress)
             .expect("Failed to read overall commit progress.")
         {
@@ -345,7 +367,7 @@ impl StateStore {
                 overall_commit_progress = overall_commit_progress,
                 "Start syncing databases..."
             );
-            let ledger_commit_progress = ledger_db
+            let ledger_commit_progress = ledger_metadata_db
                 .get::<DbMetadataSchema>(&DbMetadataKey::LedgerCommitProgress)
                 .expect("Failed to read ledger commit progress.")
                 .expect("Ledger commit progress cannot be None.")
@@ -369,8 +391,9 @@ impl StateStore {
                 if crash_if_difference_is_too_large {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
+                // TODO(grao): Support truncation for splitted ledger DBs.
                 truncate_ledger_db(
-                    Arc::clone(&ledger_db),
+                    ledger_db,
                     ledger_commit_progress,
                     overall_commit_progress,
                     difference as usize,
@@ -402,7 +425,7 @@ impl StateStore {
 
     #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
-        ledger_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
@@ -447,9 +470,10 @@ impl StateStore {
             .map(|(version, _)| version + 1)
             .unwrap_or(0);
 
+        // The latest snapshot can be at exactly num_transactions or before it.
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(num_transactions)
+            .get_state_snapshot_version_before(num_transactions + 1)
             .expect("Failed to query latest node on initialization.");
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
@@ -517,6 +541,7 @@ impl StateStore {
                 .last()
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
+
             let calculator = InMemoryStateCalculator::new(
                 buffered_state.current_state(),
                 latest_snapshot_state_view.into_state_cache(),
@@ -583,6 +608,51 @@ impl StateStore {
         self.state_merkle_db.get_range_proof(rightmost_key, version)
     }
 
+    /// Put the write sets on top of current state
+    pub fn put_write_sets(
+        &self,
+        write_sets: Vec<WriteSet>,
+        first_version: Version,
+        batch: &SchemaBatch,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["put_writesets"])
+            .start_timer();
+
+        // convert value state sets to hash map reference
+        let value_state_sets_raw: Vec<ShardedStateUpdates> = write_sets
+            .iter()
+            .map(|ws| {
+                let mut sharded_state_updates = create_empty_sharded_state_updates();
+                ws.iter().for_each(|(key, value)| {
+                    sharded_state_updates[key.get_shard_id() as usize]
+                        .insert(key.clone(), value.as_state_value());
+                });
+                sharded_state_updates
+            })
+            .collect::<Vec<_>>();
+
+        let value_state_sets = value_state_sets_raw.iter().collect::<Vec<_>>();
+
+        self.put_stats_and_indices(
+            value_state_sets.as_slice(),
+            first_version,
+            StateStorageUsage::new_untracked(),
+            None,
+            batch,
+            sharded_state_kv_batches,
+        )?;
+
+        self.put_state_values(
+            value_state_sets.to_vec(),
+            first_version,
+            sharded_state_kv_batches,
+        )?;
+
+        Ok(())
+    }
+
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
@@ -610,6 +680,15 @@ impl StateStore {
             .with_label_values(&["add_state_kv_batch"])
             .start_timer();
 
+        self.put_state_values(value_state_sets, first_version, sharded_state_kv_batches)
+    }
+
+    pub fn put_state_values(
+        &self,
+        value_state_sets: Vec<&ShardedStateUpdates>,
+        first_version: Version,
+        sharded_state_kv_batches: &ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
         sharded_state_kv_batches
             .par_iter()
             .enumerate()
@@ -915,6 +994,7 @@ impl StateStore {
             version,
             expected_root_hash,
             false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
         )?))
     }
 
@@ -1005,6 +1085,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
     fn write_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.ledger_db
+            .metadata_db()
             .put::<VersionDataSchema>(&version, &usage.into())
     }
 

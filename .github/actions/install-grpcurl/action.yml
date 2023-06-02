@@ -1,0 +1,25 @@
+name: "Install grpcurl"
+description: |
+  Installs grpcurl https://github.com/fullstorydev/grpcurl
+inputs:
+  install_directory:
+    description: "Where to install grpcurl binary. Defaults to github.workspace."
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Install grpcurl
+      shell: bash
+      run: ${{ github.action_path }}/install_grpcurl.sh
+    - name: Add grpcurl to install directory and path
+      shell: bash
+      run: |
+        if [ -z "${INSTALL_DIRECTORY}" ]; then
+          INSTALL_DIRECTORY=${{ github.workspace }}
+        else
+          mv grpcurl $INSTALL_DIRECTORY
+        fi
+        echo "${INSTALL_DIRECTORY}" | tee -a $GITHUB_PATH
+      env:
+        INSTALL_DIRECTORY: ${{ inputs.install_directory }}

@@ -203,7 +203,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let state_view = self.state_view(&latest_view)?;
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
-            ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
+            // State sync executor shouldn't have block gas limit.
+            ChunkOutput::by_transaction_execution::<V>(transactions, state_view, None)?
         };
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
             verified_target_li,
@@ -398,7 +399,7 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 
         // Find epoch boundaries.
         let mut epochs = Vec::new();
-        let mut epoch_begin = chunk_begin;
+        let mut epoch_begin = chunk_begin; // epoch begin version
         for (version, events) in multizip((chunk_begin..chunk_end, event_vecs.iter())) {
             let is_epoch_ending = ParsedTransactionOutput::parse_reconfig_events(events)
                 .next()
@@ -438,6 +439,9 @@ impl<V: VMExecutor> TransactionReplayer for ChunkExecutorInner<V> {
 }
 
 impl<V: VMExecutor> ChunkExecutorInner<V> {
+    /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
+    /// The input range indicated by `[begin_version, end_version]` is guaranteed not to cross epoch boundaries.
+    /// Notice there can be known broken versions inside the range.
     fn remove_and_replay_epoch(
         &self,
         executed_chunk: &mut ExecutedChunk,
@@ -526,7 +530,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .cloned()
             .collect();
 
-        let chunk_output = ChunkOutput::by_transaction_execution::<V>(txns, state_view)?;
+        // State sync executor shouldn't have block gas limit.
+        let chunk_output = ChunkOutput::by_transaction_execution::<V>(txns, state_view, None)?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
@@ -553,6 +558,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         Ok(end_version)
     }
 
+    /// Consume `end_version - begin_version` txns from the mutable input arguments
+    /// It's guaranteed that there's no known broken versions or epoch endings in the range.
     fn remove_and_apply(
         &self,
         executed_chunk: &mut ExecutedChunk,

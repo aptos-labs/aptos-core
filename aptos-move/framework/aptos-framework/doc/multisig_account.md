@@ -74,8 +74,10 @@ and implement the governance voting logic on top.
 -  [Function `create_with_owners_internal`](#0x1_multisig_account_create_with_owners_internal)
 -  [Function `add_owner`](#0x1_multisig_account_add_owner)
 -  [Function `add_owners`](#0x1_multisig_account_add_owners)
+-  [Function `add_owners_and_update_signatures_required`](#0x1_multisig_account_add_owners_and_update_signatures_required)
 -  [Function `remove_owner`](#0x1_multisig_account_remove_owner)
 -  [Function `remove_owners`](#0x1_multisig_account_remove_owners)
+-  [Function `remove_owners_and_update_signatures_required`](#0x1_multisig_account_remove_owners_and_update_signatures_required)
 -  [Function `update_signatures_required`](#0x1_multisig_account_update_signatures_required)
 -  [Function `update_metadata`](#0x1_multisig_account_update_metadata)
 -  [Function `update_metadata_internal`](#0x1_multisig_account_update_metadata_internal)
@@ -1531,6 +1533,36 @@ maliciously alter the owners list.
 
 </details>
 
+<a name="0x1_multisig_account_add_owners_and_update_signatures_required"></a>
+
+## Function `add_owners_and_update_signatures_required`
+
+Add owners then update number of signatures required, in a single operation.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owners_and_update_signatures_required">add_owners_and_update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_num_signatures_required: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_owners_and_update_signatures_required">add_owners_and_update_signatures_required</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_num_signatures_required: u64
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_add_owners">add_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_owners);
+    <a href="multisig_account.md#0x1_multisig_account_update_signatures_required">update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_num_signatures_required);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_multisig_account_remove_owner"></a>
 
 ## Function `remove_owner`
@@ -1609,8 +1641,39 @@ maliciously alter the owners list.
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(owners) &gt;= multisig_account_resource.num_signatures_required,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_OWNERS">ENOT_ENOUGH_OWNERS</a>),
     );
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&owners_removed) &gt; 0) {
+        emit_event(&<b>mut</b> multisig_account_resource.remove_owners_events, <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed });
+    }
+}
+</code></pre>
 
-    emit_event(&<b>mut</b> multisig_account_resource.remove_owners_events, <a href="multisig_account.md#0x1_multisig_account_RemoveOwnersEvent">RemoveOwnersEvent</a> { owners_removed });
+
+
+</details>
+
+<a name="0x1_multisig_account_remove_owners_and_update_signatures_required"></a>
+
+## Function `remove_owners_and_update_signatures_required`
+
+Update the number of signatures required then remove owners, in a single operation.
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owners_and_update_signatures_required">remove_owners_and_update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, new_num_signatures_required: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_remove_owners_and_update_signatures_required">remove_owners_and_update_signatures_required</a>(
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
+    new_num_signatures_required: u64
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <a href="multisig_account.md#0x1_multisig_account_update_signatures_required">update_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, new_num_signatures_required);
+    <a href="multisig_account.md#0x1_multisig_account_remove_owners">remove_owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, owners_to_remove);
 }
 </code></pre>
 
@@ -1771,9 +1834,6 @@ maliciously alter the number of signatures required.
 
 Create a multisig transaction, which will have one approval initially (from the creator).
 
-@param target_function The target function to call such as 0x123::module_to_call::function_to_call.
-@param args Vector of BCS-encoded argument values to invoke the target function with.
-
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_transaction">create_transaction</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
@@ -1818,10 +1878,6 @@ Create a multisig transaction, which will have one approval initially (from the 
 Create a multisig transaction with a transaction hash instead of the full payload.
 This means the payload will be stored off chain for gas saving. Later, during execution, the executor will need
 to provide the full payload, which will be validated against the hash stored on-chain.
-
-@param function_hash The sha-256 hash of the function to invoke, e.g. 0x123::module_to_call::function_to_call.
-@param args_hash The sha-256 hash of the function arguments - a concatenated vector of the bcs-encoded
-function arguments.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_create_transaction_with_hash">create_transaction_with_hash</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, payload_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)

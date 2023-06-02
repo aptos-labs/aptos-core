@@ -3,11 +3,9 @@
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
-    on_chain_config::StorageGasSchedule,
-    state_store::state_key::StateKey,
-    transaction::{ChangeSet, CheckChangeSet},
-    write_set::WriteOp,
+    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
+use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
@@ -266,7 +264,7 @@ impl ChangeSetConfigs {
 }
 
 impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &ChangeSet) -> Result<(), VMStatus> {
+    fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
 
         let mut write_set_size = 0;

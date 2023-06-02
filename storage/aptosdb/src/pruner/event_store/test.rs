@@ -65,7 +65,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
             .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(batch).unwrap();
+    aptos_db.ledger_db.event_db().write_schemas(batch).unwrap();
 
     let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
         enable: true,
@@ -106,7 +106,7 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
             .put_events(version as u64, events_for_version, &batch)
             .unwrap();
     }
-    aptos_db.ledger_db.write_schemas(batch).unwrap();
+    aptos_db.ledger_db.event_db().write_schemas(batch).unwrap();
 
     // Verify no pruning has happened.
     for _i in (0..=num_versions).step_by(2) {

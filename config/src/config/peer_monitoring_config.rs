@@ -28,7 +28,7 @@ pub struct PeerMonitoringServiceConfig {
 impl Default for PeerMonitoringServiceConfig {
     fn default() -> Self {
         Self {
-            enable_peer_monitoring_client: false,
+            enable_peer_monitoring_client: true,
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
@@ -131,17 +131,6 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
-        let sanitizer_name = Self::get_sanitizer_name();
-        let peer_monitoring_config = &node_config.peer_monitoring_service;
-
-        // Verify the peer monitoring service is not enabled in mainnet
-        if chain_id.is_mainnet() && peer_monitoring_config.enable_peer_monitoring_client {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "The peer monitoring service is not enabled in mainnet!".into(),
-            ));
-        };
-
         // Sanitize the performance monitoring config
         PerformanceMonitoringConfig::sanitize(node_config, node_type, chain_id)
     }
@@ -218,18 +207,8 @@ impl ConfigOptimizer for PeerMonitoringServiceConfig {
         let peer_monitoring_config = &mut node_config.peer_monitoring_service;
         let local_monitoring_config_yaml = &local_config_yaml["peer_monitoring_service"];
 
-        // Enable the peer monitoring service client for all networks
-        // that aren't testnet or mainnet (for testing).
-        let mut modified_config = false;
-        if !chain_id.is_testnet()
-            && !chain_id.is_mainnet()
-            && local_monitoring_config_yaml["enable_peer_monitoring_client"].is_null()
-        {
-            peer_monitoring_config.enable_peer_monitoring_client = true;
-            modified_config = true;
-        }
-
         // Increase the max number of message bytes if the network-perf-test feature is enabled
+        let mut modified_config = false;
         if local_monitoring_config_yaml["max_num_response_bytes"].is_null()
             && is_network_perf_test_enabled()
         {
@@ -278,58 +257,6 @@ impl ConfigOptimizer for PerformanceMonitoringConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_sanitize_enabled_monitoring_config() {
-        // Create a monitoring config with an enabled monitoring client
-        let mut node_config = NodeConfig {
-            peer_monitoring_service: PeerMonitoringServiceConfig {
-                enable_peer_monitoring_client: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        // Verify the config passes sanitization for testnet
-        PeerMonitoringServiceConfig::sanitize(
-            &mut node_config,
-            NodeType::PublicFullnode,
-            ChainId::testnet(),
-        )
-        .unwrap();
-
-        // Verify the config fails sanitization for mainnet
-        let error = PeerMonitoringServiceConfig::sanitize(
-            &mut node_config,
-            NodeType::PublicFullnode,
-            ChainId::mainnet(),
-        )
-        .unwrap_err();
-        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
-    }
-
-    #[test]
-    fn test_optimize_enable_monitoring_client() {
-        // Create a node config with the peer monitoring client disabled
-        let mut node_config = create_config_with_disabled_client();
-
-        // Optimize the config and verify modifications are made
-        let modified_config = PeerMonitoringServiceConfig::optimize(
-            &mut node_config,
-            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
-            NodeType::ValidatorFullnode,
-            ChainId::test(),
-        )
-        .unwrap();
-        assert!(modified_config);
-
-        // Verify that the peer monitoring client is enabled
-        assert!(
-            node_config
-                .peer_monitoring_service
-                .enable_peer_monitoring_client
-        );
-    }
 
     #[test]
     fn test_optimize_enable_monitoring_client_mainnet() {

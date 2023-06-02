@@ -204,6 +204,26 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    /// Remove the first occurrence of a given value in the vector `v` and return it in a vector, shifting all
+    /// subsequent elements.
+    /// This is O(n) and preserves ordering of elements in the vector.
+    /// This returns an empty vector if the value isn't present in the vector.
+    /// Note that this cannot return an option as option uses vector and there'd be a circular dependency between option
+    /// and vector.
+    public fun remove_value<Element>(v: &mut vector<Element>, val: &Element): vector<Element> {
+        // This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
+        // while remove would continue from the identified index to the end of the vector.
+        let (found, index) = index_of(v, val);
+        if (found) {
+            vector[remove(v, index)]
+        } else {
+           vector[]
+        }
+    }
+    spec remove_value {
+        pragma intrinsic = true;
+    }
+
     /// Swap the `i`th element of the vector `v` with the last element and then pop the vector.
     /// This is O(1), but does not preserve ordering of elements in the vector.
     /// Aborts if `i` is out of bounds.

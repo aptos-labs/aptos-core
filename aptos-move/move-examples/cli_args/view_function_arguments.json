@@ -1,0 +1,13 @@
+{
+    "function_id": "<test_account>::cli_args::reveal",
+    "type_args": [
+        "0x1::account::Account",
+        "0x1::account::Account"
+    ],
+    "args": [
+        {
+            "type": "address",
+            "value": "<test_account>"
+        }
+    ]
+}

@@ -1,7 +1,7 @@
 [package]
 name = "aptos-indexer-grpc-file-store"
-description = "Indexer gRPC file store to save transactions to Google Cloud Storage."
-version = "0.1.0"
+description = "Indexer gRPC file store saves transactions to persistent storage."
+version = "1.0.0"
 
 # Workspace inherited keys
 authors = { workspace = true }

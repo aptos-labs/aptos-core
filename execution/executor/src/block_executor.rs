@@ -16,7 +16,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_state_view::StateViewId;
@@ -31,49 +31,36 @@ use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
 
-pub trait TransactionBlockExecutor<T>: Send + Sync {
+pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
-        transactions: Vec<T>,
+        transactions: Vec<Transaction>,
         state_view: CachedStateView,
-    ) -> Result<ChunkOutput>;
-
-    fn execute_transaction_block_with_gas_limit(
-        transactions: Vec<T>,
-        state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput>;
 }
 
-impl TransactionBlockExecutor<Transaction> for AptosVM {
+impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view)
-    }
-
-    fn execute_transaction_block_with_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: CachedStateView,
-        maybe_gas_limit: Option<u64>,
-    ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution_with_gas_limit::<AptosVM>(
+        ChunkOutput::by_transaction_execution::<AptosVM>(
             transactions,
             state_view,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
     }
 }
 
-pub struct BlockExecutor<V, T> {
+pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
-    inner: RwLock<Option<BlockExecutorInner<V, T>>>,
+    inner: RwLock<Option<BlockExecutorInner<V>>>,
 }
 
-impl<V, T> BlockExecutor<V, T>
+impl<V> BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Self {
         Self {
@@ -98,29 +85,10 @@ where
     }
 }
 
-impl<V, T> BlockExecutorTrait<T> for BlockExecutor<V, T>
+impl<V> BlockExecutorTrait for BlockExecutor<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
-    fn get_block_gas_limit(&self) -> Option<u64> {
-        self.maybe_initialize().expect("Failed to initialize.");
-        self.inner
-            .read()
-            .as_ref()
-            .expect("BlockExecutor is not reset")
-            .get_block_gas_limit()
-    }
-
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>) {
-        self.maybe_initialize().expect("Failed to initialize.");
-        self.inner
-            .write()
-            .as_ref()
-            .expect("BlockExecutor is not reset")
-            .update_block_gas_limit(block_gas_limit);
-    }
-
     fn committed_block_id(&self) -> HashValue {
         self.maybe_initialize().expect("Failed to initialize.");
         self.inner
@@ -137,15 +105,16 @@ where
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_block(block, parent_block_id)
+            .execute_block(block, parent_block_id, maybe_block_gas_limit)
     }
 
     fn commit_blocks_ext(
@@ -166,17 +135,15 @@ where
     }
 }
 
-struct BlockExecutorInner<V, T> {
+struct BlockExecutorInner<V> {
     db: DbReaderWriter,
     block_tree: BlockTree,
-    phantom: PhantomData<(V, T)>,
-    block_gas_limit: Mutex<Option<u64>>,
+    phantom: PhantomData<V>,
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
     pub fn new(db: DbReaderWriter) -> Result<Self> {
         let block_tree = BlockTree::new(&db.reader)?;
@@ -184,7 +151,6 @@ where
             db,
             block_tree,
             phantom: PhantomData,
-            block_gas_limit: Mutex::new(None),
         })
     }
 
@@ -199,28 +165,19 @@ where
     }
 }
 
-impl<V, T> BlockExecutorInner<V, T>
+impl<V> BlockExecutorInner<V>
 where
-    V: TransactionBlockExecutor<T>,
-    T: Send + Sync,
+    V: TransactionBlockExecutor,
 {
-    fn get_block_gas_limit(&self) -> Option<u64> {
-        self.block_gas_limit.lock().as_ref().copied()
-    }
-
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>) {
-        let mut gas_limit = self.block_gas_limit.lock();
-        *gas_limit = block_gas_limit;
-    }
-
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
     }
 
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let (block_id, transactions) = block;
@@ -265,8 +222,6 @@ where
                 )?
             };
 
-            let maybe_gas_limit = self.get_block_gas_limit();
-
             let chunk_output = {
                 let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
                 fail_point!("executor::vm_execute_block", |_| {
@@ -274,15 +229,7 @@ where
                         "Injected error in vm_execute_block"
                     )))
                 });
-                if maybe_gas_limit.is_some() {
-                    V::execute_transaction_block_with_gas_limit(
-                        transactions,
-                        state_view,
-                        maybe_gas_limit,
-                    )?
-                } else {
-                    V::execute_transaction_block(transactions, state_view)?
-                }
+                V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
             };
             chunk_output.trace_log_transaction_status();
 
@@ -291,7 +238,7 @@ where
                 .start_timer();
 
             let (output, _, _) = chunk_output
-                .apply_to_ledger_for_block(parent_view, maybe_gas_limit.map(|_| block_id))?;
+                .apply_to_ledger_for_block(parent_view, maybe_block_gas_limit.map(|_| block_id))?;
 
             output
         };

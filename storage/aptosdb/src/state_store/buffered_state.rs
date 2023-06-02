@@ -57,6 +57,7 @@ impl BufferedState {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
+        // Create a new thread with receiver subscribing to state commit changes
         let join_handle = std::thread::Builder::new()
             .name("state-committer".to_string())
             .spawn(move || {
@@ -84,6 +85,9 @@ impl BufferedState {
         self.state_after_checkpoint.base_version
     }
 
+    /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
+    /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
+    /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
     fn maybe_commit(&mut self, sync_commit: bool) {
         if sync_commit {
             let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
@@ -95,7 +99,7 @@ impl BufferedState {
             self.state_commit_sender
                 .send(CommitMessage::Sync(commit_sync_sender))
                 .unwrap();
-            commit_sync_receiver.recv().unwrap();
+            commit_sync_receiver.recv().unwrap(); // blocks until the to_commit is received.
         } else if self.state_until_checkpoint.is_some() {
             let take_out_to_commit = {
                 let state_until_checkpoint =
@@ -140,6 +144,7 @@ impl BufferedState {
         );
     }
 
+    /// This method updates the buffered state with new data.
     pub fn update(
         &mut self,
         updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,

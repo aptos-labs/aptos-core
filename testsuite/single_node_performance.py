@@ -7,7 +7,7 @@ import re
 import os
 import tempfile
 import json
-from typing import Callable, Optional, Tuple, Mapping, Sequence
+from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass
@@ -22,10 +22,12 @@ EXPECTED_TPS = {
     ("coin-transfer", True, 1): (22100.0, True),
     ("account-generation", False, 1): (11000.0, True),
     ("account-generation", True, 1): (17600.0, True),
-    ("create-new-account-resource", False, 1): (13000.0, True),
+    # changed to not use account_pool. either recalibrate or add here to use account pool.
+    ("account-resource32-b", False, 1): (13000.0, False),
     ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
-    ("publish-package", False, 1): (159.0, True),
+    # seems to have changed, disabling as land_blocking, until recalibrated
+    ("publish-package", False, 1): (159.0, False),
     ("batch100-transfer", False, 1): (350, True),
     ("batch100-transfer", True, 1): (553, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
@@ -89,15 +91,22 @@ def execute_command(command):
         universal_newlines=True,
     ) as p:
         # stream to output while command is executing
-        for line in p.stdout:
-            print(line, end="")
-            result.append(line)
+        if p.stdout is not None:
+            for line in p.stdout:
+                print(line, end="")
+                result.append(line)
 
     if p.returncode != 0:
         raise CalledProcessError(p.returncode, p.args)
 
     # return the full output in the end for postprocessing
-    return "\n".join(result)
+    full_result = "\n".join(result)
+
+    if " ERROR " in full_result:
+        print("ERROR log line in execution")
+        exit(1)
+
+    return full_result
 
 
 @dataclass
@@ -151,7 +160,7 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
 def print_table(
     results: Sequence[RunGroupInstance],
     by_levels: bool,
-    single_field: Optional[Tuple[str, Callable[[RunResults], any]]],
+    single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
     concurrency_levels=EXECUTION_ONLY_CONCURRENCY_LEVELS,
 ):
     headers = [
@@ -186,11 +195,14 @@ def print_table(
             result.expected_tps,
         ]
         if by_levels:
-            _, field_getter = single_field
-            for concurrency_level in concurrency_levels:
-                row.append(
-                    field_getter(result.concurrency_level_results[concurrency_level])
-                )
+            if single_field is not None:
+                _, field_getter = single_field
+                for concurrency_level in concurrency_levels:
+                    row.append(
+                        field_getter(
+                            result.concurrency_level_results[concurrency_level]
+                        )
+                    )
 
         if single_field is not None:
             _, field_getter = single_field

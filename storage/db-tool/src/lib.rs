@@ -7,7 +7,7 @@ mod backup;
 mod backup_maintenance;
 mod debugger;
 mod replay_verify;
-mod restore;
+pub mod restore;
 #[cfg(test)]
 mod tests;
 mod utils;

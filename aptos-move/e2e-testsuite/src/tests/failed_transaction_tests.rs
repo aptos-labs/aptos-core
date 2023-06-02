@@ -55,16 +55,16 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(!out1.txn_output().write_set().is_empty());
-    assert_eq!(out1.txn_output().gas_used(), 90_000);
-    assert!(!out1.txn_output().status().is_discarded());
+    assert!(!out1.write_set().is_empty());
+    assert_eq!(out1.gas_used(), 90_000);
+    assert!(!out1.status().is_discarded());
     assert_eq!(
-        out1.txn_output().status().status(),
+        out1.status().status(),
         // StatusCode::TYPE_MISMATCH
         Ok(ExecutionStatus::MiscellaneousError(Some(TYPE_MISMATCH)))
     );
 
-    // Invariant violations should be discarded and not charged.
+    // Invariant violations should be charged.
     let out2 = aptos_vm.failed_transaction_cleanup(
         VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None),
         &mut gas_meter,
@@ -73,12 +73,13 @@ fn failed_transaction_cleanup_test() {
         &log_context,
         &change_set_configs,
     );
-    assert!(out2.txn_output().write_set().is_empty());
-    assert!(out2.txn_output().gas_used() == 0);
-    assert!(out2.txn_output().status().is_discarded());
+    assert!(out2.gas_used() != 0);
+    assert!(!out2.status().is_discarded());
     assert_eq!(
-        out2.txn_output().status().status(),
-        Err(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+        out2.status().status(),
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+        )))
     );
 }
 
