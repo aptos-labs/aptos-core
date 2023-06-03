@@ -31,7 +31,11 @@ use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
 use optimistic_fetch::OptimisticFetchRequest;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use storage::StorageReaderInterface;
 use thiserror::Error;
 use tokio::runtime::Handle;
@@ -177,6 +181,13 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                             )
                         },
                         notification = storage_service_listener.select_next_some() => {
+                            info!(
+                                "Received the storage service commit notification from state sync: {:?}",
+                                SystemTime::now()
+                                    .duration_since(SystemTime::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_micros()
+                            );
                             trace!(LogSchema::new(LogEntry::ReceivedCommitNotification)
                                 .message(&format!(
                                     "Received commit notification for highest synced version: {:?}.",
@@ -238,6 +249,13 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                             )
                         },
                         notification = cached_summary_update_listener.select_next_some() => {
+                            info!(
+                                "Received the storage service commit notification from the refresher: {:?}",
+                                SystemTime::now()
+                                    .duration_since(SystemTime::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_micros()
+                            );
                             trace!(LogSchema::new(LogEntry::ReceivedCacheUpdateNotification)
                                 .message(&format!("Received cache update notification! Highest synced version: {:?}", notification.highest_synced_version))
                             );

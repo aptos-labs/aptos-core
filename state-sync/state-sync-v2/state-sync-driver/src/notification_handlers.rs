@@ -27,6 +27,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::SystemTime,
 };
 
 /// A notification for new data that has been committed to storage
@@ -83,8 +84,32 @@ impl CommitNotification {
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
         mut storage_service_notification_handler: StorageServiceNotificationHandler<S>,
     ) -> Result<(), Error> {
-        // Notify mempool of the committed transactions
+        // Notify the storage service of the committed transactions
+        info!(
+            "Notifying the storage service of committed transactions: {:?}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+        );
         let blockchain_timestamp_usecs = latest_synced_ledger_info.ledger_info().timestamp_usecs();
+        debug!(
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Notifying the storage service of transactions at version: {:?}, timestamp: {:?}",
+                latest_synced_version, blockchain_timestamp_usecs
+            ))
+        );
+        storage_service_notification_handler
+            .notify_storage_service_of_committed_transactions(latest_synced_version)
+            .await
+            .map_err(|error| {
+                Error::UnexpectedError(format!(
+                    "Failed to notify the storage service of committed transactions: {:?}",
+                    error
+                ))
+            })?;
+
+        // Notify mempool of the committed transactions
         debug!(
             LogSchema::new(LogEntry::NotificationHandler).message(&format!(
                 "Notifying mempool of transactions at version: {:?}, timestamp: {:?}",
@@ -109,16 +134,7 @@ impl CommitNotification {
             .lock()
             .notify_events(latest_synced_version, events.clone())?;
 
-        // Notify the storage service of the committed transactions
-        debug!(
-            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
-                "Notifying the storage service of transactions at version: {:?}, timestamp: {:?}",
-                latest_synced_version, blockchain_timestamp_usecs
-            ))
-        );
-        storage_service_notification_handler
-            .notify_storage_service_of_committed_transactions(latest_synced_version)
-            .await
+        Ok(())
     }
 }
 
