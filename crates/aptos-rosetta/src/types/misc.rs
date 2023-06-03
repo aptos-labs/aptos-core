@@ -7,13 +7,20 @@ use crate::{
     types::{AccountIdentifier, Amount},
     AccountAddress, ApiResult,
 };
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, ViewRequest};
 use aptos_types::stake_pool::StakePool;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{Display, Formatter},
     str::FromStr,
 };
+
+static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
+    Lazy::new(|| "0x1::delegation_pool::get_stake".parse().unwrap());
+static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
+    Lazy::new(|| "0x1::stake::get_lockup_secs".parse().unwrap());
 
 /// Errors that can be returned by the API
 ///
@@ -313,5 +320,76 @@ pub async fn get_stake_balances(
         }
     } else {
         Ok(None)
+    }
+}
+
+pub async fn get_delegation_stake_balances(
+    rest_client: &aptos_rest_client::Client,
+    account_identifier: &AccountIdentifier,
+    owner_address: AccountAddress,
+    pool_address: AccountAddress,
+    version: u64,
+) -> ApiResult<Option<BalanceResult>> {
+    let mut requested_balance: Option<String> = None;
+
+    // get requested_balance
+    let balances_response = rest_client
+        .view(
+            &ViewRequest {
+                function: DELEGATION_POOL_GET_STAKE_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![
+                    serde_json::Value::String(pool_address.to_string()),
+                    serde_json::Value::String(owner_address.to_string()),
+                ],
+            },
+            Some(version),
+        )
+        .await?;
+
+    let balances_result = balances_response.into_inner();
+    if account_identifier.is_delegator_active_stake() {
+        requested_balance = balances_result
+            .get(0)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_inactive_stake() {
+        requested_balance = balances_result
+            .get(1)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    } else if account_identifier.is_delegator_pending_inactive_stake() {
+        requested_balance = balances_result
+            .get(2)
+            .and_then(|v| v.as_str().map(|s| s.to_owned()));
+    }
+
+    // get lockup_secs
+    let lockup_secs_response = rest_client
+        .view(
+            &ViewRequest {
+                function: STAKE_GET_LOCKUP_SECS_FUNCTION.clone(),
+                type_arguments: vec![],
+                arguments: vec![serde_json::Value::String(pool_address.to_string())],
+            },
+            Some(version),
+        )
+        .await?;
+    let lockup_secs_result = lockup_secs_response.into_inner();
+    let lockup_expiration = lockup_secs_result
+        .get(0)
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        .unwrap_or(0);
+
+    if let Some(balance) = requested_balance {
+        Ok(Some(BalanceResult {
+            balance: Some(Amount {
+                value: balance,
+                currency: native_coin(),
+            }),
+            lockup_expiration,
+        }))
+    } else {
+        Err(ApiError::InternalError(Some(
+            "Unable to construct BalanceResult instance".to_string(),
+        )))
     }
 }
