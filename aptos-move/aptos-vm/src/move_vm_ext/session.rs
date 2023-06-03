@@ -344,9 +344,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     let write_op = woc.convert_aggregator_mod(&state_key, value)?;
                     write_set_mut.insert((state_key, write_op));
                 },
-                AggregatorChange::Merge(delta_op) => {
-                    delta_change_set.insert((state_key, delta_op));
-                },
+                AggregatorChange::Merge(delta_op) => delta_change_set.insert((state_key, delta_op)),
                 AggregatorChange::Delete => {
                     let write_op = woc.convert(&state_key, MoveStorageOp::Delete, false)?;
                     write_set_mut.insert((state_key, write_op));
@@ -474,7 +472,10 @@ impl<'r> WriteOpConverter<'r> {
                     },
                 }
             },
-            Some(_) => WriteOp::Modification(data),
+            Some(existing_value) => match existing_value.into_metadata() {
+                None => WriteOp::Modification(data),
+                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
+            },
         };
 
         Ok(op)
