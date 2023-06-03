@@ -550,6 +550,45 @@ impl RosettaClient {
         .await
     }
 
+    pub async fn withdraw_undelegated_stake(
+        &self,
+        network_identifier: &NetworkIdentifier,
+        private_key: &Ed25519PrivateKey,
+        pool_address: AccountAddress,
+        amount: Option<u64>,
+        expiry_time_secs: u64,
+        sequence_number: Option<u64>,
+        max_gas: Option<u64>,
+        gas_unit_price: Option<u64>,
+    ) -> anyhow::Result<TransactionIdentifier> {
+        let sender = self
+            .get_account_address(network_identifier.clone(), private_key)
+            .await?;
+        let mut keys = HashMap::new();
+        keys.insert(sender, private_key);
+
+        let operations = vec![Operation::withdraw_undelegated_stake(
+            0,
+            None,
+            sender,
+            AccountIdentifier::base_account(pool_address),
+            amount,
+        )];
+
+        self.submit_operations(
+            sender,
+            network_identifier.clone(),
+            &keys,
+            operations,
+            expiry_time_secs,
+            sequence_number,
+            max_gas,
+            gas_unit_price,
+            false,
+        )
+        .await
+    }
+
     /// Retrieves the account address from the derivation path if there isn't an overriding account specified
     async fn get_account_address(
         &self,
