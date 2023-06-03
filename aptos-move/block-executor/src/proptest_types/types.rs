@@ -425,7 +425,7 @@ where
         Self::new()
     }
 
-    fn execute_transaction_parallel(
+    fn execute_transaction_in_parallel_execution(
         &self,
         view: &impl TStateView<Key = K>,
         txn: &Self::Txn,
@@ -467,13 +467,13 @@ where
         }
     }
 
-    fn execute_transaction_sequential(
+    fn execute_transaction_in_sequential_execution(
         &self,
         view: &impl TStateView<Key = K>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
-        self.execute_transaction_parallel(view, txn, txn_idx, true)
+        self.execute_transaction_in_parallel_execution(view, txn, txn_idx, true)
     }
 }
 
