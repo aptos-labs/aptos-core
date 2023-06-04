@@ -73,9 +73,9 @@ impl CrossShardConflictDetector {
             // and find the first shard id that has taken a write lock on the storage location. This ensures that we find the highest txn index that is conflicting
             // with the current transaction.
             for rw_set_with_index in current_round_rw_set_with_index
-                .iter()
+                .iter().rev()
                 .take(self.shard_id)
-                .chain(prev_rounds_rw_set_with_index.iter())
+                .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
                 if rw_set_with_index.has_write_lock(read_location) {
                     cross_shard_dependencies.add_depends_on_txn(
@@ -88,9 +88,9 @@ impl CrossShardConflictDetector {
 
         for write_location in frozen_txn.write_set().iter() {
             for rw_set_with_index in current_round_rw_set_with_index
-                .iter()
+                .iter().rev()
                 .take(self.shard_id)
-                .chain(prev_rounds_rw_set_with_index.iter())
+                .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
                 if rw_set_with_index.has_read_lock(write_location) {
                     cross_shard_dependencies.add_depends_on_txn(

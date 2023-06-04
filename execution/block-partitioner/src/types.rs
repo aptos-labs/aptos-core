@@ -3,11 +3,12 @@
 
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter, Write};
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
 /// 1. `depends_on`: The transaction depends on the execution of the transactions in the set. In this
@@ -20,6 +21,12 @@ pub struct CrossShardDependencies {
     _dependents: HashSet<TxnIndex>,
 }
 
+impl Debug for CrossShardDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let deps = &self.depends_on;
+        f.write_str(format!("{deps:?}").as_str())
+    }
+}
 impl CrossShardDependencies {
     pub fn len(&self) -> usize {
         self.depends_on.len()
@@ -83,10 +90,18 @@ impl SubBlock {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TransactionWithDependencies {
     pub txn: AnalyzedTransaction,
     pub cross_shard_dependencies: CrossShardDependencies,
+}
+
+impl Debug for TransactionWithDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let txn  = &self.txn;
+        let deps = &self.cross_shard_dependencies;
+        f.write_str(format!("TXN({txn:?},deps={deps:?})").as_str())
+    }
 }
 
 impl TransactionWithDependencies {

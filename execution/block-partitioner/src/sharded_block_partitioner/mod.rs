@@ -296,7 +296,7 @@ impl ShardedBlockPartitioner {
         let mut frozen_rw_set_with_index = Arc::new(Vec::new());
         let mut frozen_chunks = Arc::new(Vec::new());
 
-        for _ in 0..num_partitioning_round {
+        for i in 0..num_partitioning_round {
             let (
                 current_frozen_chunks_vec,
                 current_frozen_rw_set_with_index_vec,
@@ -306,6 +306,13 @@ impl ShardedBlockPartitioner {
                 frozen_chunks.clone(),
                 frozen_rw_set_with_index.clone(),
             );
+            println!("round {i} finished.");
+            for (j, x) in current_frozen_chunks_vec.iter().enumerate() {
+                println!("current_frozen_chunks[{j}]={x:?}");
+            }
+            for (j, x) in current_frozen_rw_set_with_index_vec.iter().enumerate() {
+                println!("current_frozen_rw_set[{j}]={x:?}");
+            }
             let mut prev_frozen_chunk = Arc::try_unwrap(frozen_chunks).unwrap();
             let mut prev_frozen_rw_set_with_index =
                 Arc::try_unwrap(frozen_rw_set_with_index).unwrap();

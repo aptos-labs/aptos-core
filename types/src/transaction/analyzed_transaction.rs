@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::fmt::{Debug, format, Formatter, Write};
 use crate::{
     access_path::AccessPath,
     account_config::{AccountResource, CoinStoreResource},
@@ -19,7 +20,7 @@ use move_core_types::{
 };
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AnalyzedTransaction {
     transaction: Transaction,
     /// Set of storage locations that are read by the transaction - this doesn't include location
@@ -33,10 +34,35 @@ pub struct AnalyzedTransaction {
     predictable_transaction: bool,
     /// The hash of the transaction - this is cached for performance reasons.
     hash: HashValue,
+
+    pub recipient: Option<AccountAddress>,
+}
+
+impl Debug for AnalyzedTransaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let sender = self.sender().unwrap().brief();
+        let receiver = self.recipient.unwrap().brief();
+        f.write_str(format!("{sender}->{receiver}").as_str())
+    }
+}
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct StorageLocation {
+    inner: StorageLocationInner,
+    owner: Option<AccountAddress>,
+}
+
+impl Debug for StorageLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let owner = match self.owner {
+            Some(addr) => addr.brief(),
+            None => "????".to_string(),
+        };
+        f.write_str(format!("{owner}...").as_str())
+    }
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum StorageLocation {
+pub enum StorageLocationInner {
     // A specific storage location denoted by an address and a struct tag.
     Specific(StateKey),
     // Storage location denoted by a struct tag and any arbitrary address.
@@ -50,23 +76,34 @@ impl CryptoHash for StorageLocation {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        match self {
-            StorageLocation::Specific(state_key) => CryptoHash::hash(state_key),
+        match &self.inner {
+            StorageLocationInner::Specific(state_key) => CryptoHash::hash(state_key),
             _ => todo!("hashing of wildcard storage location is not supported yet"),
         }
     }
 }
+
+impl StorageLocation {
+    pub fn specific(x: StateKey, y: Option<AccountAddress>) -> Self {
+        Self {
+            inner: StorageLocationInner::Specific(x),
+            owner: y,
+        }
+    }
+}
+
 
 impl AnalyzedTransaction {
     pub fn new(
         transaction: Transaction,
         read_set: Vec<StorageLocation>,
         write_set: Vec<StorageLocation>,
+        recipient: Option<AccountAddress>,
     ) -> Self {
         let hints_contain_wildcard = read_set
             .iter()
             .chain(write_set.iter())
-            .any(|hint| !matches!(hint, StorageLocation::Specific(_)));
+            .any(|hint| !matches!(hint.inner, StorageLocationInner::Specific(_)));
         let hash = transaction.hash();
         AnalyzedTransaction {
             transaction,
@@ -74,6 +111,7 @@ impl AnalyzedTransaction {
             write_set,
             predictable_transaction: !hints_contain_wildcard,
             hash,
+            recipient,
         }
     }
 
@@ -128,20 +166,21 @@ impl AnalyzedTransaction {
             CoinStoreResource::struct_tag().access_vector(),
         ));
         let mut write_set = vec![
-            StorageLocation::Specific(sender_coin_store_key),
-            StorageLocation::Specific(receiver_coin_store_key),
-            StorageLocation::Specific(sender_account_resource_key),
+            StorageLocation::specific(sender_coin_store_key, Some(sender_address)),
+            StorageLocation::specific(receiver_coin_store_key, Some(receiver_address)),
+            StorageLocation::specific(sender_account_resource_key, Some(sender_address)),
         ];
         if !receiver_exists {
             // If the receiver doesn't exist, we create the receiver account, so we need to read the
             // receiver account resource.
-            write_set.push(StorageLocation::Specific(receiver_account_resource_key));
+            write_set.push(StorageLocation::specific(receiver_account_resource_key, Some(receiver_address)));
         }
         AnalyzedTransaction::new(
             Transaction::UserTransaction(signed_txn),
             vec![],
             // read and write locations are same for coin transfer
             write_set,
+            Some(receiver_address),
         )
     }
 
@@ -167,16 +206,17 @@ impl AnalyzedTransaction {
             CoinStoreResource::struct_tag().access_vector(),
         ));
         let read_hints = vec![
-            StorageLocation::Specific(sender_coin_store_key),
-            StorageLocation::Specific(sender_account_resource_key),
-            StorageLocation::Specific(receiver_coin_store_key),
-            StorageLocation::Specific(receiver_account_resource_key),
+            StorageLocation::specific(sender_coin_store_key, Some(sender_address)),
+            StorageLocation::specific(sender_account_resource_key, Some(sender_address)),
+            StorageLocation::specific(receiver_coin_store_key, Some(receiver_address)),
+            StorageLocation::specific(receiver_account_resource_key, Some(receiver_address)),
         ];
         AnalyzedTransaction::new(
             Transaction::UserTransaction(signed_txn),
             vec![],
             // read and write locations are same for create account
             read_hints,
+            Some(receiver_address),
         )
     }
 }
@@ -238,6 +278,7 @@ impl From<Transaction> for AnalyzedTransaction {
                             Transaction::UserTransaction(signed_txn),
                             vec![],
                             vec![],
+                            None,
                         ),
                     }
                 },
@@ -245,9 +286,10 @@ impl From<Transaction> for AnalyzedTransaction {
                     Transaction::UserTransaction(signed_txn),
                     vec![],
                     vec![],
+                    None,
                 ),
             },
-            _ => AnalyzedTransaction::new(txn, vec![], vec![]),
+            _ => AnalyzedTransaction::new(txn, vec![], vec![], None),
         }
     }
 }

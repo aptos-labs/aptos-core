@@ -12,16 +12,16 @@ use std::{sync::Mutex, time::Instant};
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, default_value = "2000000")]
+    #[clap(long, default_value = "10")]
     pub num_accounts: usize,
 
-    #[clap(long, default_value = "100000")]
+    #[clap(long, default_value = "9")]
     pub block_size: usize,
 
-    #[clap(long, default_value = "10")]
+    #[clap(long, default_value = "1")]
     pub num_blocks: usize,
 
-    #[clap(long, default_value = "12")]
+    #[clap(long, default_value = "3")]
     pub num_shards: usize,
 }
 
@@ -42,7 +42,13 @@ fn main() {
             // randomly select a sender and receiver from accounts
             let mut rng = OsRng;
             let sender_index = rng.gen_range(0, num_accounts);
-            let receiver_index = rng.gen_range(0, num_accounts);
+            let mut receiver_index = 0;
+            loop {
+                receiver_index = rng.gen_range(0, num_accounts);
+                if receiver_index != sender_index {
+                    break;
+                }
+            }
             let receiver = accounts[receiver_index].lock().unwrap();
             let mut sender = accounts[sender_index].lock().unwrap();
             create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
@@ -54,7 +60,18 @@ fn main() {
         let transactions = transactions.clone();
         println!("Starting to partition");
         let now = Instant::now();
-        partitioner.partition(transactions, 1);
+        let sub_blocks = partitioner.partition(transactions, 3);
+        for (i, sub_block) in sub_blocks.into_iter().enumerate() {
+            let shard_id = i % args.num_shards;
+            let b = sub_block.start_index;
+            for (j, txn) in sub_block.transactions.into_iter().enumerate() {
+                let txn_id = b + j;
+                let sender = txn.txn.sender().as_ref().unwrap().brief();
+                let recipient = txn.txn.recipient.as_ref().unwrap().brief();
+                let deps = txn.cross_shard_dependencies;
+                println!("sub_block_id={i}, shard_id={shard_id}, txn_id={txn_id}, sender={sender}, recipient={recipient}, deps={deps:?}");
+            }
+        }
         let elapsed = now.elapsed();
         println!("Time taken to partition: {:?}", elapsed);
     }

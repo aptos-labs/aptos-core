@@ -15,6 +15,12 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 pub struct AccountAddress([u8; AccountAddress::LENGTH]);
 
 impl AccountAddress {
+    pub fn brief(&self) -> String {
+        hex::encode(self.0).split_off(60)
+    }
+}
+
+impl AccountAddress {
     /// The number of bytes in an address.
     /// Default to 16 bytes, can be set to 20 bytes with address20 feature.
     pub const LENGTH: usize = 32;
