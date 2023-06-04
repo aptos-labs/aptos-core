@@ -187,9 +187,13 @@ impl ValidationStatus {
 }
 
 pub struct Scheduler {
+    no_more_txns: bool,
+
     /// Number of txns to execute, immutable.
     num_txns: TxnIndex,
 
+    /// if `txn_dependency[i]={x,y}`, txn `x` and `y` are waiting for txn `i`.
+    ///
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
@@ -230,28 +234,34 @@ pub struct Scheduler {
 
 /// Public Interfaces for the Scheduler
 impl Scheduler {
-    pub fn new(num_txns: TxnIndex) -> Self {
-        // Empty block should early return and not create a scheduler.
-        assert!(num_txns > 0, "No scheduler needed for 0 transactions");
-
+    pub fn new() -> Self {
         Self {
-            num_txns,
-            txn_dependency: (0..num_txns)
-                .map(|_| CachePadded::new(Mutex::new(Vec::new())))
-                .collect(),
-            txn_status: (0..num_txns)
-                .map(|_| {
-                    CachePadded::new((
-                        RwLock::new(ExecutionStatus::ReadyToExecute(0, None)),
-                        RwLock::new(ValidationStatus::new()),
-                    ))
-                })
-                .collect(),
+            no_more_txns: false,
+            num_txns: 0,
+            txn_dependency: vec![],
+            txn_status: vec![],
             commit_state: CachePadded::new(Mutex::new((0, 0))),
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
+    }
+
+    pub fn add_txns(&mut self, num_txns: TxnIndex) {
+        self.txn_dependency.extend((0..num_txns).map(|_| CachePadded::new(Mutex::new(Vec::new()))));
+        self.txn_status.extend(
+            (0..num_txns).map(|_| {
+                CachePadded::new((
+                    RwLock::new(ExecutionStatus::ReadyToExecute(0, None)),
+                    RwLock::new(ValidationStatus::new()),
+                ))
+            }
+        ));
+        self.num_txns += num_txns;
+    }
+
+    pub fn end_of_txn_stream(&mut self) {
+        self.no_more_txns = true;
     }
 
     pub fn num_txns(&self) -> TxnIndex {
@@ -289,7 +299,7 @@ impl Scheduler {
                             *status_write = ExecutionStatus::Committed(incarnation);
 
                             *commit_idx += 1;
-                            if *commit_idx == self.num_txns {
+                            if *commit_idx == self.num_txns && self.no_more_txns {
                                 // All txns have been committed, the parallel execution can finish.
                                 self.done_marker.store(true, Ordering::SeqCst);
                             }

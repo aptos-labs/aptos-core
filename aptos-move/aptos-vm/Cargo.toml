@@ -31,6 +31,7 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 bcs = { workspace = true }
+crossbeam = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 move-binary-format = { workspace = true }
@@ -47,6 +48,7 @@ once_cell = { workspace = true }
 ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+select = "0.6.0"
 serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }

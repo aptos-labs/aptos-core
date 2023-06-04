@@ -18,8 +18,9 @@ use std::sync::{
 pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
     shard_id: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    command_rx: Receiver<ExecutorShardCommand<S>>,
-    result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    rx: Receiver<ExecutorShardCommand<S>>,
+    master_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    peer_txs: Vec<Sender<ExecutorShardCommand<S>>>,
     maybe_gas_limit: Option<u64>,
 }
 
@@ -29,7 +30,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
         shard_id: usize,
         num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
-        result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+        master_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+        peer_txs: Vec<Sender<ExecutorShardCommand<S>>>,
         maybe_gas_limit: Option<u64>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
@@ -47,15 +49,16 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
         Self {
             shard_id,
             executor_thread_pool,
-            command_rx,
-            result_tx,
+            rx: command_rx,
+            master_tx,
+            peer_txs,
             maybe_gas_limit,
         }
     }
 
     pub fn start(&self) {
         loop {
-            let command = self.command_rx.recv().unwrap();
+            let command = self.rx.recv().unwrap();
             match command {
                 ExecutorShardCommand::ExecuteBlock(
                     state_view,
@@ -75,11 +78,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                         self.maybe_gas_limit,
                     );
                     drop(state_view);
-                    self.result_tx.send(ret).unwrap();
+                    self.master_tx.send(ret).unwrap();
                 },
                 ExecutorShardCommand::Stop => {
                     break;
                 },
+                ExecutorShardCommand::SubBlockFinished(sub_block_output) => {
+                    println!("yes");
+                }
             }
         }
         trace!("Shard {} is shutting down", self.shard_id);

@@ -31,8 +31,13 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
     phantom: PhantomData<S>,
 }
 
+pub struct SubBlockOutput {
+    sub_block_id: usize,
+}
+
 pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
     ExecuteBlock(Arc<S>, Vec<Transaction>, usize),
+    SubBlockFinished(SubBlockOutput),
     Stop,
 }
 
@@ -46,23 +51,33 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         let executor_threads_per_shard = executor_threads_per_shard.unwrap_or_else(|| {
             (num_cpus::get() as f64 / num_executor_shards as f64).ceil() as usize
         });
-        let mut command_txs = vec![];
-        let mut result_rxs = vec![];
+        let mut to_shard_txs = vec![];
+        let mut to_shard_rxs = vec![];
+        let mut to_master_txs = vec![];
+        let mut to_master_rxs = vec![];
+
+        for _i in 0..num_executor_shards {
+            let (to_shard_tx, to_shard_rx) = std::sync::mpsc::channel();
+            let (from_shard_tx, from_shard_rx) = std::sync::mpsc::channel();
+            to_shard_txs.push(to_shard_tx);
+            to_shard_rxs.push(to_shard_rx);
+            to_master_txs.push(from_shard_tx);
+            to_master_rxs.push(from_shard_rx);
+        }
+
         let mut shard_join_handles = vec![];
-        for i in 0..num_executor_shards {
-            let (transactions_tx, transactions_rx) = std::sync::mpsc::channel();
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
-            command_txs.push(transactions_tx);
-            result_rxs.push(result_rx);
+        for (shard_id, (to_shard_rx, to_master_tx)) in to_shard_rxs.into_iter().zip(to_master_txs.into_iter()).enumerate() {
             shard_join_handles.push(spawn_executor_shard(
                 num_executor_shards,
-                i,
+                shard_id,
                 executor_threads_per_shard,
-                transactions_rx,
-                result_tx,
+                to_shard_rx,
+                to_master_tx,
+                to_shard_txs.clone(),
                 maybe_gas_limit,
             ));
         }
+
         info!(
             "Creating a new ShardedBlockExecutor with {} shards and concurrency per shard {}",
             num_executor_shards, executor_threads_per_shard
@@ -70,9 +85,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         Self {
             num_executor_shards,
             partitioner: Arc::new(UniformPartitioner {}),
-            command_txs,
+            command_txs: to_shard_txs,
             shard_threads: shard_join_handles,
-            result_rxs,
+            result_rxs: to_master_rxs,
             phantom: PhantomData,
         }
     }
@@ -137,6 +152,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     concurrency_level: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
+    peer_tx_vec: Vec<Sender<ExecutorShardCommand<S>>>,
     maybe_gas_limit: Option<u64>,
 ) -> thread::JoinHandle<()> {
     // create and start a new executor shard in a separate thread
@@ -149,6 +165,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
                 concurrency_level,
                 command_rx,
                 result_tx,
+                peer_tx_vec,
                 maybe_gas_limit,
             );
             executor_shard.start();

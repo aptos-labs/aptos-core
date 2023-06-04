@@ -96,8 +96,9 @@ where
         let speculative_view = MVHashMapView::new(versioned_cache, scheduler);
 
         // VM execution.
-        let execute_result = executor.execute_transaction(
-            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+        let latest_view = LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute);
+        let execute_result: ExecutionStatus<<E as ExecutorTask>::Output, <E as ExecutorTask>::Error> = executor.execute_transaction(
+            &latest_view,
             txn,
             idx_to_execute,
             false,
@@ -448,8 +449,9 @@ where
 
         let num_txns = signature_verified_block.len() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
-        let scheduler = Scheduler::new(num_txns);
-
+        let mut scheduler = Scheduler::new();
+        scheduler.add_txns(num_txns);
+        scheduler.end_of_txn_stream();
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
         for _ in 0..(self.concurrency_level - 1) {

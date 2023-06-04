@@ -259,7 +259,9 @@ fn early_skips() {
 
 #[test]
 fn scheduler_tasks() {
-    let s = Scheduler::new(5);
+    let mut s = Scheduler::new();
+    s.add_txns(5);
+    s.end_of_txn_stream();
 
     for i in 0..5 {
         // No validation tasks.
@@ -350,7 +352,9 @@ fn scheduler_tasks() {
 
 #[test]
 fn scheduler_first_wave() {
-    let s = Scheduler::new(6);
+    let mut s = Scheduler::new();
+    s.add_txns(6);
+    s.end_of_txn_stream();
 
     for i in 0..5 {
         // Nothing to validate.
@@ -405,7 +409,9 @@ fn scheduler_first_wave() {
 
 #[test]
 fn scheduler_dependency() {
-    let s = Scheduler::new(10);
+    let mut s = Scheduler::new();
+    s.add_txns(10);
+    s.end_of_txn_stream();
 
     for i in 0..5 {
         // Nothing to validate.
@@ -452,7 +458,9 @@ fn scheduler_dependency() {
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
 fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
-    let s = Scheduler::new(num_txns);
+    let mut s = Scheduler::new();
+    s.add_txns(num_txns);
+    s.end_of_txn_stream();
 
     for i in 0..num_txns {
         // Get the first executions out of the way.
@@ -566,7 +574,9 @@ fn scheduler_incarnation() {
 
 #[test]
 fn scheduler_basic() {
-    let s = Scheduler::new(3);
+    let mut s = Scheduler::new();
+    s.add_txns(3);
+    s.end_of_txn_stream();
 
     for i in 0..3 {
         // Nothing to validate.
@@ -616,7 +626,9 @@ fn scheduler_basic() {
 
 #[test]
 fn scheduler_drain_idx() {
-    let s = Scheduler::new(3);
+    let mut s = Scheduler::new();
+    s.add_txns(3);
+    s.end_of_txn_stream();
 
     for i in 0..3 {
         // Nothing to validate.
@@ -759,7 +771,9 @@ fn no_conflict_task_count() {
 
     let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
-        let s = Scheduler::new(num_txns);
+        let mut s = Scheduler::new();
+        s.add_txns(num_txns);
+        s.end_of_txn_stream();
 
         let mut tasks = BTreeMap::new();
 
