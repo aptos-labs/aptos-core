@@ -37,6 +37,7 @@ pub struct SubBlockOutput {
 
 pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
     ExecuteBlock(Arc<S>, Vec<Transaction>, usize),
+    ExeDone(Result<Vec<TransactionOutput>, VMStatus>),
     SubBlockFinished(SubBlockOutput),
     Stop,
 }
@@ -66,11 +67,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         }
 
         let mut shard_join_handles = vec![];
-        for (shard_id, (to_shard_rx, to_master_tx)) in to_shard_rxs.into_iter().zip(to_master_txs.into_iter()).enumerate() {
+        for (shard_id, ((to_shard_rx, to_master_tx), to_shard_tx)) in to_shard_rxs.into_iter().zip(to_master_txs.into_iter()).zip(to_shard_txs.iter()).enumerate() {
             shard_join_handles.push(spawn_executor_shard(
                 num_executor_shards,
                 shard_id,
                 executor_threads_per_shard,
+                to_shard_tx.clone(),
                 to_shard_rx,
                 to_master_tx,
                 to_shard_txs.clone(),
@@ -150,6 +152,7 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     num_executor_shards: usize,
     shard_id: usize,
     concurrency_level: usize,
+    command_tx: Sender<ExecutorShardCommand<S>>,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
     peer_tx_vec: Vec<Sender<ExecutorShardCommand<S>>>,
@@ -159,10 +162,11 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     thread::Builder::new()
         .name(format!("executor-shard-{}", shard_id))
         .spawn(move || {
-            let executor_shard = ExecutorShard::new(
+            let mut executor_shard = ExecutorShard::new(
                 num_executor_shards,
                 shard_id,
                 concurrency_level,
+                command_tx,
                 command_rx,
                 result_tx,
                 peer_tx_vec,
