@@ -37,6 +37,7 @@ use std::{
         Arc,
     },
 };
+use std::collections::BTreeSet;
 
 #[derive(Debug)]
 enum CommitRole {
@@ -238,14 +239,14 @@ where
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
-            if txn_idx as usize + 1 == scheduler.num_txns() as usize {
+            if scheduler.txn_index_right_after(txn_idx).is_none() && scheduler.no_more_txns {
                 *scheduler_task = SchedulerTask::Done;
 
                 counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
                 counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                 info!(
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
-                    txn_idx + 1
+                    scheduler.get_txn_local_position(txn_idx) + 1
                 );
                 break;
             }
@@ -262,7 +263,7 @@ where
 
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
-                    info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
+                    info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", scheduler.get_txn_local_position(txn_idx) + 1);
                     break;
                 },
             };
@@ -450,7 +451,8 @@ where
         let num_txns = signature_verified_block.len() as u32;
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let mut scheduler = Scheduler::new();
-        scheduler.add_txns(num_txns);
+        let txn_indices: BTreeSet<TxnIndex> = (0..num_txns).collect();
+        scheduler.add_txns(txn_indices);
         scheduler.end_of_txn_stream();
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);

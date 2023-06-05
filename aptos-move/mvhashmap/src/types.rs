@@ -9,6 +9,7 @@ use std::sync::Arc;
 pub type TxnIndex = u32;
 pub type Incarnation = u32;
 pub type Version = (TxnIndex, Incarnation);
+pub const TXN_IDX_NONE: TxnIndex = 0xffffffff;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum Flag {
