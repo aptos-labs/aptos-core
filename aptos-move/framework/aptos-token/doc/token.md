@@ -4517,17 +4517,14 @@ Deposit the token balance into the recipients account and emit an event.
 
 
 <pre><code><b>fun</b> <a href="token.md#0x3_token_assert_non_standard_reserved_property">assert_non_standard_reserved_property</a>(keys: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;) {
-    <b>let</b> len = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(keys);
-    <b>let</b> i = 0;
-    <b>while</b> ( i &lt; len) {
-        <b>let</b> key = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(keys, i);
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(keys, |key| {
+        <b>let</b> key: &String = key;
         <b>let</b> length = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(key);
         <b>if</b> (length &gt;= 6) {
             <b>let</b> prefix = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_sub_string">string::sub_string</a>(&*key, 0, 6);
             <b>assert</b>!(prefix != <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"TOKEN_"), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="token.md#0x3_token_EPROPERTY_RESERVED_BY_STANDARD">EPROPERTY_RESERVED_BY_STANDARD</a>));
         };
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 

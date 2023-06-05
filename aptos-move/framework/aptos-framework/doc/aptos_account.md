@@ -210,13 +210,10 @@ Batch version of APT transfer.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; recipients_len) {
-        <b>let</b> <b>to</b> = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&recipients, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source, <b>to</b>, amount);
-        i = i + 1;
-    };
+        <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source, *<b>to</b>, amount);
+    });
 }
 </code></pre>
 
@@ -282,13 +279,10 @@ Batch version of transfer_coins.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; recipients_len) {
-        <b>let</b> <b>to</b> = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&recipients, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, <b>to</b>, amount);
-        i = i + 1;
-    };
+        <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, *<b>to</b>, amount);
+    });
 }
 </code></pre>
 

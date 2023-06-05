@@ -205,18 +205,12 @@ module std::features {
             move_to<Features>(framework, Features{features: vector[]})
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
-        let i = 0;
-        let n = vector::length(&enable);
-        while (i < n) {
-            set(features, *vector::borrow(&enable, i), true);
-            i = i + 1
-        };
-        let i = 0;
-        let n = vector::length(&disable);
-        while (i < n) {
-            set(features, *vector::borrow(&disable, i), false);
-            i = i + 1
-        };
+        vector::for_each_ref(&enable, |feature| {
+            set(features, *feature, true);
+        });
+        vector::for_each_ref(&disable, |feature| {
+            set(features, *feature, false);
+        });
     }
 
     /// Check whether the feature is enabled.

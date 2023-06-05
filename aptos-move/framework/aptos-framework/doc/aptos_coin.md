@@ -378,12 +378,10 @@ Create delegated token for the address so the account could claim MintCapability
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_delegate_mint_capability">delegate_mint_capability</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="aptos_coin.md#0x1_aptos_coin_Delegations">Delegations</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_core_resource">system_addresses::assert_core_resource</a>(&<a href="account.md#0x1_account">account</a>);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="aptos_coin.md#0x1_aptos_coin_Delegations">Delegations</a>&gt;(@core_resources).inner;
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(delegations)) {
-        <b>let</b> element = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(delegations, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(delegations, |element| {
+        <b>let</b> element: &<a href="aptos_coin.md#0x1_aptos_coin_DelegatedMintCapability">DelegatedMintCapability</a> = element;
         <b>assert</b>!(element.<b>to</b> != <b>to</b>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_coin.md#0x1_aptos_coin_EALREADY_DELEGATED">EALREADY_DELEGATED</a>));
-        i = i + 1;
-    };
+    });
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(delegations, <a href="aptos_coin.md#0x1_aptos_coin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b> });
 }
 </code></pre>
