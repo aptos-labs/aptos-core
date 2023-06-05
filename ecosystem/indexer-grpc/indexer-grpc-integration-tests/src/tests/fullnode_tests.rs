@@ -222,7 +222,6 @@ async fn test_cold_start_cache_worker_progress() {
 
     let tmp_dir = TempDir::new().expect("Could not create temp dir"); // start with a new file store each time
     let cache_worker_config = IndexerGrpcCacheWorkerConfig {
-        server_name: "tcw-1".to_string(),
         fullnode_grpc_address: TESTNET_FULLNODE_GRPC_URL.to_string(),
         file_store_config: IndexerGrpcFileStoreConfig::LocalFileStore(LocalFileStore {
             local_file_store_path: tmp_dir.path().to_path_buf(),
@@ -289,7 +288,6 @@ async fn test_cold_start_file_store_worker_progress() {
     let tmp_dir = TempDir::new().expect("Could not create temp dir"); // start with a new file store each time
 
     let cache_worker_config = IndexerGrpcCacheWorkerConfig {
-        server_name: "tcw-1".to_string(),
         fullnode_grpc_address: TESTNET_FULLNODE_GRPC_URL.to_string(),
         file_store_config: IndexerGrpcFileStoreConfig::LocalFileStore(LocalFileStore {
             local_file_store_path: tmp_dir.path().to_path_buf(),
@@ -298,7 +296,6 @@ async fn test_cold_start_file_store_worker_progress() {
     };
 
     let file_store_worker_config = IndexerGrpcFileStoreWorkerConfig {
-        server_name: "tfs-1".to_string(),
         redis_main_instance_address: REDIS_PRIMARY_URL.to_string(),
         file_store_config: IndexerGrpcFileStoreConfig::LocalFileStore(LocalFileStore {
             local_file_store_path: tmp_dir.path().to_path_buf(),
