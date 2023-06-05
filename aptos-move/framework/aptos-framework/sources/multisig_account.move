@@ -173,6 +173,20 @@ module aptos_framework::multisig_account {
         num_signatures_required: u64,
     }
 
+    /// A message that can be signed by an owner to indicate their approval for removing all pending transactions up to
+    /// the specified last id.
+    /// This allows for batch removal of transactions when there are enough signed messages from the owners to meet
+    /// the signature threshold.
+    struct BatchRemoveTransactions has drop {
+        // Chain id is included to prevent cross-chain replay.
+        chain_id: u8,
+        // Multisig account address is included to prevent cross-account replay (when multiple accounts share the same
+        // auth key).
+        multisig_account: address,
+        // The last pending transaction to remove.
+        last_transaction_to_remove: u64,
+    }
+
     /// Event emitted when new owners are added to the multisig account.
     struct AddOwnersEvent has drop, store {
         owners_added: vector<address>,
@@ -631,6 +645,57 @@ module aptos_framework::multisig_account {
     entry fun update_metadata(
         multisig_account: &signer, keys: vector<String>, values: vector<vector<u8>>) acquires MultisigAccount {
         update_metadata_internal(multisig_account, keys, values, true);
+    }
+
+    /// Allow the owners of a multisig to remove multiple pending transactions from the queue in a single transaction.
+    /// This requires sufficient signed messages from the owners to meet the signature threshold.
+    /// This also effetively allows the batch removal to be done out-of-order with other pending transactions in the
+    /// queue.
+    entry fun batch_remove_transactions(
+        multisig_account: address,
+        owners_signing: vector<address>,
+        owner_accounts_schemes: vector<u8>,
+        owner_public_keys: vector<vector<u8>>,
+        signed_owner_removals: vector<vector<u8>>,
+        last_transaction_to_remove: u64,
+    ) acquires MultisigAccount {
+        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+        assert!(
+            last_transaction_to_remove > multisig_account_resource.last_executed_sequence_number
+                && last_transaction_to_remove < multisig_account_resource.next_sequence_number,
+            error::invalid_argument(EINVALID_SEQUENCE_NUMBER),
+        );
+        let num_signatures = vector::length(&signed_owner_removals);
+        assert!(
+            num_signatures >= multisig_account_resource.num_signatures_required,
+            error::invalid_argument(ENOT_ENOUGH_REJECTIONS),
+        );
+
+        // Verify all signed messages. This will fail if any of the signatures are invalid or is from an invalid owner.
+        let signed_removal = BatchRemoveTransactions {
+            chain_id: chain_id::get(),
+            multisig_account,
+            last_transaction_to_remove,
+        };
+        vector::enumerate_ref(&signed_owner_removals, |idx, signed_removal| {
+            let owner = *vector::borrow(&owners_signing, idx);
+            assert!(
+                vector::contains(&multisig_account_resource.owners, owner),
+                error::permission_denied(ENOT_OWNER),
+            );
+            account::verify_signed_message(
+                owner,
+                *vector::borrow(&owner_accounts_schemes, idx),
+                *vector::borrow(&owner_public_keys, idx),
+                *vector::borrow(&signed_owner_removals, idx),
+                signed_removal,
+            );
+        });
+
+        while (multisig_account_resource.last_executed_sequence_number < last_transaction_to_remove) {
+            // TODO: Update the number of rejections for each removed transaction to ensure correct records.
+            remove_executed_transaction(multisig_account_resource);
+        }
     }
 
     fun update_metadata_internal(
