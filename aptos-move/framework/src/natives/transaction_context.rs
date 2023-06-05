@@ -61,13 +61,9 @@ fn native_get_txn_hash(
 
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
-    Ok(smallvec![Value::address(AccountAddress::new(
-        transaction_context
-            .txn_hash
-            .clone()
-            .try_into()
-            .expect("Unable to convert transaction hash to address")
-    ))])
+    Ok(smallvec![Value::vector_u8(
+        transaction_context.txn_hash.clone()
+    )])
 }
 
 /***************************************************************************************************

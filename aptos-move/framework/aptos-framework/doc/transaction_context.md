@@ -5,6 +5,7 @@
 
 
 
+-  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `create_uuid`](#0x1_transaction_context_create_uuid)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Specification](#@Specification_0)
@@ -14,6 +15,29 @@
 <pre><code></code></pre>
 
 
+
+<a name="0x1_transaction_context_get_txn_hash"></a>
+
+## Function `get_txn_hash`
+
+Return the transaction hash of the current transaction
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_get_txn_hash">get_txn_hash</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
 
 <a name="0x1_transaction_context_create_uuid"></a>
 
