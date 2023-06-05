@@ -473,6 +473,8 @@ where
         txn: &Self::Txn,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
+        // As these functions are dummy, we reuse the code by calling 
+        // `execute_transaction_in_parallel_execution` function
         self.execute_transaction_in_parallel_execution(view, txn, txn_idx, true)
     }
 }
