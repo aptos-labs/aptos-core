@@ -589,6 +589,19 @@ module std::vector_tests {
     }
 
     #[test]
+    fun test_enumerate_ref() {
+        let v = vector[1, 2, 3];
+        let i_s = 0;
+        let s = 0;
+        V::enumerate_ref(&v, |i, e| {
+            i_s = i_s + i;
+            s = s + *e;
+        });
+        assert!(i_s == 3, 0);
+        assert!(s == 6, 0);
+    }
+
+    #[test]
     fun test_for_each_ref() {
         let v = vector[1, 2, 3];
         let s = 0;
@@ -602,6 +615,20 @@ module std::vector_tests {
         let s = 2;
         V::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
         assert!(v == vector[2, 3, 4], 0)
+    }
+
+    #[test]
+    fun test_enumerate_mut() {
+        let v = vector[1, 2, 3];
+        let i_s = 0;
+        let s = 2;
+        V::enumerate_mut(&mut v, |i, e| {
+            i_s = i_s + i;
+            *e = s;
+            s = s + 1
+        });
+        assert!(i_s == 3, 0);
+        assert!(v == vector[2, 3, 4], 0);
     }
 
     #[test]
