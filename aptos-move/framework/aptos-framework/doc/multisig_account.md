@@ -88,10 +88,10 @@ and implement the governance voting logic on top.
 -  [Function `reject_transaction`](#0x1_multisig_account_reject_transaction)
 -  [Function `vote_transanction`](#0x1_multisig_account_vote_transanction)
 -  [Function `execute_rejected_transaction`](#0x1_multisig_account_execute_rejected_transaction)
--  [Function `flush_next_sequence_number_and_owner_schema`](#0x1_multisig_account_flush_next_sequence_number_and_owner_schema)
+-  [Function `flush_last_resolved_sequence_number_and_owner_schema`](#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema)
 -  [Function `validate_multisig_transaction`](#0x1_multisig_account_validate_multisig_transaction)
 -  [Function `validate_multisig_transaction_with_optional_sequence_number`](#0x1_multisig_account_validate_multisig_transaction_with_optional_sequence_number)
--  [Function `flush_next_sequence_number_and_owner_schema_execution`](#0x1_multisig_account_flush_next_sequence_number_and_owner_schema_execution)
+-  [Function `flush_last_resolved_sequence_number_and_owner_schema_execution`](#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema_execution)
 -  [Function `successful_transaction_execution_cleanup`](#0x1_multisig_account_successful_transaction_execution_cleanup)
 -  [Function `failed_transaction_execution_cleanup`](#0x1_multisig_account_failed_transaction_execution_cleanup)
 -  [Function `remove_executed_transaction`](#0x1_multisig_account_remove_executed_transaction)
@@ -777,6 +777,16 @@ Owner list cannot contain the same address more than once.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EDUPLICATE_OWNER">EDUPLICATE_OWNER</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_multisig_account_EFLUSH_TXN_EXPIRED"></a>
+
+Flush transaction proposal has expired.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EFLUSH_TXN_EXPIRED">EFLUSH_TXN_EXPIRED</a>: u64 = 19;
 </code></pre>
 
 
@@ -2082,9 +2092,9 @@ Remove the next transaction if it has sufficient owner rejections.
 
 </details>
 
-<a name="0x1_multisig_account_flush_next_sequence_number_and_owner_schema"></a>
+<a name="0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema"></a>
 
-## Function `flush_next_sequence_number_and_owner_schema`
+## Function `flush_last_resolved_sequence_number_and_owner_schema`
 
 Prototype function signature used for flush proposal payload generation.
 
@@ -2111,17 +2121,20 @@ corresponds to a valid flush transaction: if the proposal stores the entire payl
 on-chain then the payload is deserialized and verified, but if the proposal stores only
 a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
 instead verified.
-5. The VM calls <code>flush_next_sequence_number_and_owner_schema_execution</code>, applying owner and
-required signature count updates, effectively bumping the proposal to the head of the
-pending transaction queue such that all other pending transactions are disregarded.
+5. The VM calls <code>flush_last_resolved_sequence_number_and_owner_schema_execution</code>, applying
+owner and required signature count updates, effectively bumping the proposal to the head
+of the pending transaction queue such that all other pending transactions are
+disregarded.
 6. The VM calls <code>successful_transaction_execution_cleanup</code>.
 
 An optional new number of signatures must be passed as a singleton vector due to entry
 function constraints: pass either an empty vector for no update, or a singleton vector with
 one element specifying the new number of signatures required.
 
+An expiry time in UNIX seconds is required to safeguard against untimely execution.
 
-<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_next_sequence_number_and_owner_schema">flush_next_sequence_number_and_owner_schema</a>(_new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, _owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, _optional_new_num_signatures_required_as_vector: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema">flush_last_resolved_sequence_number_and_owner_schema</a>(_new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, _owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, _optional_new_num_signatures_required_as_vector: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, _expiry_in_unix_seconds: u64)
 </code></pre>
 
 
@@ -2130,10 +2143,11 @@ one element specifying the new number of signatures required.
 <summary>Implementation</summary>
 
 
-<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_next_sequence_number_and_owner_schema">flush_next_sequence_number_and_owner_schema</a>(
+<pre><code>entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema">flush_last_resolved_sequence_number_and_owner_schema</a>(
     _new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     _owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     _optional_new_num_signatures_required_as_vector: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    _expiry_in_unix_seconds: u64
 ) {}
 </code></pre>
 
@@ -2246,18 +2260,18 @@ Check next sequence number to execute if none specified.
 
 </details>
 
-<a name="0x1_multisig_account_flush_next_sequence_number_and_owner_schema_execution"></a>
+<a name="0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema_execution"></a>
 
-## Function `flush_next_sequence_number_and_owner_schema_execution`
+## Function `flush_last_resolved_sequence_number_and_owner_schema_execution`
 
 Flush pending transactions and owner schema in reponse to a DoS attack.
 
-Bumps a flush transaction proposal to the front of the pending transaction queue, then
-updates the next transaction proposal sequence number such all other pending transactions
-are ignored, to be overwritten by future transaction proposals.
+Bumps a flush transaction proposal to the front of the pending transaction queue, by
+updating the last resolved sequence number such that all pending transactions
+are ignored.
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_next_sequence_number_and_owner_schema_execution">flush_next_sequence_number_and_owner_schema_execution</a>(multisig_address: <b>address</b>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, optional_new_num_signatures_required: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, flush_transaction_proposal_sequence_number: u64)
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema_execution">flush_last_resolved_sequence_number_and_owner_schema_execution</a>(multisig_address: <b>address</b>, new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, optional_new_num_signatures_required: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, expiry_in_unix_seconds: u64, flush_transaction_proposal_sequence_number: u64)
 </code></pre>
 
 
@@ -2266,20 +2280,26 @@ are ignored, to be overwritten by future transaction proposals.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_next_sequence_number_and_owner_schema_execution">flush_next_sequence_number_and_owner_schema_execution</a>(
+<pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_flush_last_resolved_sequence_number_and_owner_schema_execution">flush_last_resolved_sequence_number_and_owner_schema_execution</a>(
     multisig_address: <b>address</b>,
     new_owners: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     owners_to_remove: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;,
     optional_new_num_signatures_required: Option&lt;u64&gt;,
-    flush_transaction_proposal_sequence_number: u64,
+    expiry_in_unix_seconds: u64,
+    flush_transaction_proposal_sequence_number: u64
 ) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    // Verify that the proposal <b>has</b> not yet expired.
+    <b>assert</b>!(
+        expiry_in_unix_seconds &lt; now_seconds(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EFLUSH_TXN_EXPIRED">EFLUSH_TXN_EXPIRED</a>)
+    );
     <b>let</b> multisig_account_ref_mut =
         <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(multisig_address);
     <b>let</b> transactions_table_ref_mut =
         &<b>mut</b> multisig_account_ref_mut.transactions;
     // Get new sequence number for flush transaction proposal.
     <b>let</b> new_flush_transaction_proposal_sequence_number =
-        multisig_account_ref_mut.last_executed_sequence_number + 1;
+        multisig_account_ref_mut.next_sequence_number;
     // Update flush transaction proposal sequence number.
     <b>let</b> flush_transaction_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(
         transactions_table_ref_mut,
@@ -2293,6 +2313,9 @@ are ignored, to be overwritten by future transaction proposals.
     // Update sequence number for next transaction proposal.
     multisig_account_ref_mut.next_sequence_number =
         new_flush_transaction_proposal_sequence_number + 1;
+    // Update sequence number for last resolved transaction proposal.
+    multisig_account_ref_mut.last_executed_sequence_number =
+        new_flush_transaction_proposal_sequence_number - 1;
     <a href="multisig_account.md#0x1_multisig_account_flush_owner_schema">flush_owner_schema</a>(
         multisig_address,
         new_owners,

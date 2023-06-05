@@ -429,18 +429,22 @@ pub enum EntryFunctionCall {
     ///    on-chain then the payload is deserialized and verified, but if the proposal stores only
     ///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
     ///    instead verified.
-    /// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
-    ///    required signature count updates, effectively bumping the proposal to the head of the
-    ///    pending transaction queue such that all other pending transactions are disregarded.
+    /// 5. The VM calls `flush_last_resolved_sequence_number_and_owner_schema_execution`, applying
+    ///    owner and required signature count updates, effectively bumping the proposal to the head
+    ///    of the pending transaction queue such that all other pending transactions are
+    ///    disregarded.
     /// 6. The VM calls `successful_transaction_execution_cleanup`.
     ///
     /// An optional new number of signatures must be passed as a singleton vector due to entry
     /// function constraints: pass either an empty vector for no update, or a singleton vector with
     /// one element specifying the new number of signatures required.
-    MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+    ///
+    /// An expiry time in UNIX seconds is required to safeguard against untimely execution.
+    MultisigAccountFlushLastResolvedSequenceNumberAndOwnerSchema {
         _new_owners: Vec<AccountAddress>,
         _owners_to_remove: Vec<AccountAddress>,
         _optional_new_num_signatures_required_as_vector: Vec<u64>,
+        _expiry_in_unix_seconds: u64,
     },
 
     /// Reject a multisig transaction.
@@ -1060,14 +1064,16 @@ impl EntryFunctionCall {
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
-            MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+            MultisigAccountFlushLastResolvedSequenceNumberAndOwnerSchema {
                 _new_owners,
                 _owners_to_remove,
                 _optional_new_num_signatures_required_as_vector,
-            } => multisig_account_flush_next_sequence_number_and_owner_schema(
+                _expiry_in_unix_seconds,
+            } => multisig_account_flush_last_resolved_sequence_number_and_owner_schema(
                 _new_owners,
                 _owners_to_remove,
                 _optional_new_num_signatures_required_as_vector,
+                _expiry_in_unix_seconds,
             ),
             MultisigAccountRejectTransaction {
                 multisig_account,
@@ -2367,18 +2373,22 @@ pub fn multisig_account_execute_rejected_transaction(
 ///    on-chain then the payload is deserialized and verified, but if the proposal stores only
 ///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
 ///    instead verified.
-/// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
-///    required signature count updates, effectively bumping the proposal to the head of the
-///    pending transaction queue such that all other pending transactions are disregarded.
+/// 5. The VM calls `flush_last_resolved_sequence_number_and_owner_schema_execution`, applying
+///    owner and required signature count updates, effectively bumping the proposal to the head
+///    of the pending transaction queue such that all other pending transactions are
+///    disregarded.
 /// 6. The VM calls `successful_transaction_execution_cleanup`.
 ///
 /// An optional new number of signatures must be passed as a singleton vector due to entry
 /// function constraints: pass either an empty vector for no update, or a singleton vector with
 /// one element specifying the new number of signatures required.
-pub fn multisig_account_flush_next_sequence_number_and_owner_schema(
+///
+/// An expiry time in UNIX seconds is required to safeguard against untimely execution.
+pub fn multisig_account_flush_last_resolved_sequence_number_and_owner_schema(
     _new_owners: Vec<AccountAddress>,
     _owners_to_remove: Vec<AccountAddress>,
     _optional_new_num_signatures_required_as_vector: Vec<u64>,
+    _expiry_in_unix_seconds: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2388,12 +2398,13 @@ pub fn multisig_account_flush_next_sequence_number_and_owner_schema(
             ]),
             ident_str!("multisig_account").to_owned(),
         ),
-        ident_str!("flush_next_sequence_number_and_owner_schema").to_owned(),
+        ident_str!("flush_last_resolved_sequence_number_and_owner_schema").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&_new_owners).unwrap(),
             bcs::to_bytes(&_owners_to_remove).unwrap(),
             bcs::to_bytes(&_optional_new_num_signatures_required_as_vector).unwrap(),
+            bcs::to_bytes(&_expiry_in_unix_seconds).unwrap(),
         ],
     ))
 }
@@ -4219,18 +4230,19 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_flush_next_sequence_number_and_owner_schema(
+    pub fn multisig_account_flush_last_resolved_sequence_number_and_owner_schema(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(
-                EntryFunctionCall::MultisigAccountFlushNextSequenceNumberAndOwnerSchema {
+                EntryFunctionCall::MultisigAccountFlushLastResolvedSequenceNumberAndOwnerSchema {
                     _new_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
                     _owners_to_remove: bcs::from_bytes(script.args().get(1)?).ok()?,
                     _optional_new_num_signatures_required_as_vector: bcs::from_bytes(
                         script.args().get(2)?,
                     )
                     .ok()?,
+                    _expiry_in_unix_seconds: bcs::from_bytes(script.args().get(3)?).ok()?,
                 },
             )
         } else {
@@ -5163,8 +5175,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_execute_rejected_transaction),
         );
         map.insert(
-            "multisig_account_flush_next_sequence_number_and_owner_schema".to_string(),
-            Box::new(decoder::multisig_account_flush_next_sequence_number_and_owner_schema),
+            "multisig_account_flush_last_resolved_sequence_number_and_owner_schema".to_string(),
+            Box::new(
+                decoder::multisig_account_flush_last_resolved_sequence_number_and_owner_schema,
+            ),
         );
         map.insert(
             "multisig_account_reject_transaction".to_string(),

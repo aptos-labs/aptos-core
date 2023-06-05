@@ -93,6 +93,8 @@ module aptos_framework::multisig_account {
     const EINVALID_SEQUENCE_NUMBER: u64 = 17;
     /// Provided owners to remove and new owners overlap.
     const EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP: u64 = 18;
+    /// Flush transaction proposal has expired.
+    const EFLUSH_TXN_EXPIRED: u64 = 19;
 
     /// Represents a multisig account's configurations and transactions.
     /// This will be stored in the multisig account (created as a resource account separate from any owner accounts).
@@ -802,18 +804,22 @@ module aptos_framework::multisig_account {
     ///    on-chain then the payload is deserialized and verified, but if the proposal stores only
     ///    a payload hash, then the payload included in the Aptos API MultisigFlush transaction is
     ///    instead verified.
-    /// 5. The VM calls `flush_next_sequence_number_and_owner_schema_execution`, applying owner and
-    ///    required signature count updates, effectively bumping the proposal to the head of the
-    ///    pending transaction queue such that all other pending transactions are disregarded.
+    /// 5. The VM calls `flush_last_resolved_sequence_number_and_owner_schema_execution`, applying
+    ///    owner and required signature count updates, effectively bumping the proposal to the head
+    ///    of the pending transaction queue such that all other pending transactions are
+    ///    disregarded.
     /// 6. The VM calls `successful_transaction_execution_cleanup`.
     ///
     /// An optional new number of signatures must be passed as a singleton vector due to entry
     /// function constraints: pass either an empty vector for no update, or a singleton vector with
     /// one element specifying the new number of signatures required.
-    entry fun flush_next_sequence_number_and_owner_schema(
+    ///
+    /// An expiry time in UNIX seconds is required to safeguard against untimely execution.
+    entry fun flush_last_resolved_sequence_number_and_owner_schema(
         _new_owners: vector<address>,
         _owners_to_remove: vector<address>,
         _optional_new_num_signatures_required_as_vector: vector<u64>,
+        _expiry_in_unix_seconds: u64
     ) {}
 
     ////////////////////////// To be called by VM only ///////////////////////////////
@@ -885,23 +891,29 @@ module aptos_framework::multisig_account {
 
     /// Flush pending transactions and owner schema in reponse to a DoS attack.
     ///
-    /// Bumps a flush transaction proposal to the front of the pending transaction queue, then
-    /// updates the next transaction proposal sequence number such all other pending transactions
-    /// are ignored, to be overwritten by future transaction proposals.
-    fun flush_next_sequence_number_and_owner_schema_execution(
+    /// Bumps a flush transaction proposal to the front of the pending transaction queue, by
+    /// updating the last resolved sequence number such that all pending transactions
+    /// are ignored.
+    fun flush_last_resolved_sequence_number_and_owner_schema_execution(
         multisig_address: address,
         new_owners: vector<address>,
         owners_to_remove: vector<address>,
         optional_new_num_signatures_required: Option<u64>,
-        flush_transaction_proposal_sequence_number: u64,
+        expiry_in_unix_seconds: u64,
+        flush_transaction_proposal_sequence_number: u64
     ) acquires MultisigAccount {
+        // Verify that the proposal has not yet expired.
+        assert!(
+            expiry_in_unix_seconds < now_seconds(),
+            error::invalid_state(EFLUSH_TXN_EXPIRED)
+        );
         let multisig_account_ref_mut =
             borrow_global_mut<MultisigAccount>(multisig_address);
         let transactions_table_ref_mut =
             &mut multisig_account_ref_mut.transactions;
         // Get new sequence number for flush transaction proposal.
         let new_flush_transaction_proposal_sequence_number =
-            multisig_account_ref_mut.last_executed_sequence_number + 1;
+            multisig_account_ref_mut.next_sequence_number;
         // Update flush transaction proposal sequence number.
         let flush_transaction_proposal = table::remove(
             transactions_table_ref_mut,
@@ -915,6 +927,9 @@ module aptos_framework::multisig_account {
         // Update sequence number for next transaction proposal.
         multisig_account_ref_mut.next_sequence_number =
             new_flush_transaction_proposal_sequence_number + 1;
+        // Update sequence number for last resolved transaction proposal.
+        multisig_account_ref_mut.last_executed_sequence_number =
+            new_flush_transaction_proposal_sequence_number - 1;
         flush_owner_schema(
             multisig_address,
             new_owners,
