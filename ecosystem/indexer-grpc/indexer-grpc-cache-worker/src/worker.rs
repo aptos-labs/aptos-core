@@ -26,8 +26,6 @@ use tracing::{error, info};
 type ChainID = u32;
 type StartingVersion = u64;
 
-const WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS: u64 = 60;
-
 pub struct Worker {
     /// Redis client.
     redis_client: redis::Client,
@@ -103,22 +101,12 @@ impl Worker {
             };
 
             file_store_operator.verify_storage_bucket_existence().await;
-            let mut starting_version = 0;
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            let starting_version = file_store_operator
+                .get_starting_version()
+                .await
+                .unwrap_or(0);
 
-            if let Some(metadata) = file_store_metadata {
-                info!("[Indexer Cache] File store metadata: {:?}", metadata);
-                starting_version = metadata.version;
-            } else {
-                error!("[Indexer Cache] File store is empty. Exit after 1 minute.");
-                tokio::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        WORKER_RESTART_DELAY_IF_METADATA_NOT_FOUND_IN_SECS,
-                    ))
-                    .await;
-                    std::process::exit(1);
-                });
-            }
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
 
             // 2. Start streaming RPC.
             let request = tonic::Request::new(GetTransactionsFromNodeRequest {

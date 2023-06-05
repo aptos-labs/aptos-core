@@ -73,6 +73,7 @@ impl MoveVmExt {
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
+                    max_value_nest_depth: Some(128),
                 },
             )?,
             chain_id,

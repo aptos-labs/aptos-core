@@ -338,6 +338,7 @@ impl TransactionBlockExecutor for NativeExecutor {
     fn execute_transaction_block(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
+        _maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
@@ -408,19 +409,6 @@ impl TransactionBlockExecutor for NativeExecutor {
         Ok(ChunkOutput {
             transactions,
             transaction_outputs,
-            state_cache: state_view.into_state_cache(),
-        })
-    }
-
-    // Dummy function that is not supposed to be used
-    fn execute_transaction_block_with_gas_limit(
-        _transactions: Vec<Transaction>,
-        state_view: CachedStateView,
-        _maybe_gas_limit: Option<u64>,
-    ) -> Result<ChunkOutput> {
-        Ok(ChunkOutput {
-            transactions: vec![],
-            transaction_outputs: vec![],
             state_cache: state_view.into_state_cache(),
         })
     }

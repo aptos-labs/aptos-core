@@ -23,8 +23,9 @@ use aptos_block_executor::{
     },
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    executable::ExecutableTestType,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -136,7 +137,7 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -156,13 +157,22 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
-        init_speculative_logs(num_txns);
+        if state_view.id() != StateViewId::Miscellaneous {
+            // Speculation is disabled in Miscellaneous context, which is used by testing and
+            // can even lead to concurrent execute_block invocations, leading to errors on flush.
+            init_speculative_logs(num_txns);
+        }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+        let executor = BlockExecutor::<
+            PreprocessedTransaction,
+            AptosExecutorTask<S>,
+            S,
+            ExecutableTestType,
+        >::new(
             concurrency_level,
             executor_thread_pool,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
@@ -177,7 +187,11 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                flush_speculative_logs(pos);
+                if state_view.id() != StateViewId::Miscellaneous {
+                    // Speculation is disabled in Miscellaneous context, which is used by testing and
+                    // can even lead to concurrent execute_block invocations, leading to errors on flush.
+                    flush_speculative_logs(pos);
+                }
 
                 Ok(output_vec)
             },

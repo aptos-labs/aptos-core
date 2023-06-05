@@ -1472,6 +1472,7 @@ impl VMExecutor for AptosVM {
     fn execute_block(
         transactions: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::Error(
@@ -1492,41 +1493,7 @@ impl VMExecutor for AptosVM {
             transactions,
             state_view,
             Self::get_concurrency_level(),
-            None,
-        );
-        if ret.is_ok() {
-            // Record the histogram count for transactions per block.
-            BLOCK_TRANSACTION_COUNT.observe(count as f64);
-        }
-        ret
-    }
-
-    fn execute_block_with_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
-        maybe_gas_limit: Option<u64>,
-    ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {
-        fail_point!("move_adapter::execute_block", |_| {
-            Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        info!(
-            log_context,
-            "Executing block, transaction count: {}",
-            transactions.len()
-        );
-
-        let count = transactions.len();
-        let ret = BlockAptosVM::execute_block(
-            Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
-            state_view,
-            Self::get_concurrency_level(),
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.
@@ -1539,6 +1506,7 @@ impl VMExecutor for AptosVM {
         sharded_block_executor: &ShardedBlockExecutor<S>,
         transactions: Vec<Transaction>,
         state_view: Arc<S>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         info!(
@@ -1552,6 +1520,7 @@ impl VMExecutor for AptosVM {
             state_view,
             transactions,
             AptosVM::get_concurrency_level(),
+            maybe_block_gas_limit,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

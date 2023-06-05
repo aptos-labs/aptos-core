@@ -20,8 +20,21 @@
   "liveNow": false,
   "panels": [
     {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 9,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "In order to view metrics for:\n- mainnet\n  - datasource: VictoriaMetrics Mainnet\n  - chain_name: mainnet\n- testnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: testnet\n- devnet\n  - datasource: VictoriaMetrics Global (Non-mainnet)\n  - chain_name: devnet",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "title": "Guide",
+      "type": "text"
+    },
+    {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
       "id": 5,
       "panels": [],
       "title": "Aggregations",
@@ -29,7 +42,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 1 },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 9 },
       "id": 7,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
@@ -41,8 +54,8 @@
       "type": "text"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-      "description": "This shows the most popular clients.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "This shows the most popular clients by request count over the configured time window.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -51,7 +64,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 4 },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 12 },
       "id": 1,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -61,9 +74,9 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-          "editorMode": "builder",
-          "expr": "count by(request_source_client) (label_replace(aptos_api_request_source_client, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\"))",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
+          "expr": "sum by(request_source_client) (increase(label_replace(aptos_api_request_source_client{chain_name=\"$chain_name\"}, \"request_source_client\", \"$1\", \"request_source_client\", \"(.*)/.*\")[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -73,8 +86,8 @@
       "type": "piechart"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-      "description": "This shows the most popular clients. There is a separate entry per client + client version.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "This shows the most popular clients by request count over the configured time window. There is a separate entry per client + client version. ",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -83,7 +96,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 4 },
+      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 12 },
       "id": 8,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -93,9 +106,9 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-          "editorMode": "builder",
-          "expr": "count by(request_source_client) (aptos_api_request_source_client)",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "editorMode": "code",
+          "expr": "sum by(request_source_client) (increase(aptos_api_request_source_client{chain_name=\"$chain_name\"}[$__range])) != 0",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -106,7 +119,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
       "id": 4,
       "panels": [],
       "repeat": "source_client",
@@ -116,7 +129,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
-      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 28 },
       "id": 6,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
@@ -128,8 +141,8 @@
       "type": "text"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-      "description": "This shows what are the top 5 most common endpoints called by users of this client.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "This shows what are the top 5 most common endpoints called by users of this client in the configured time window.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -138,7 +151,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 23 },
+      "gridPos": { "h": 15, "w": 12, "x": 0, "y": 31 },
       "id": 3,
       "options": {
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -149,48 +162,15 @@
       "pluginVersion": "9.5.3-cloud.2.0cb5a501",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "editorMode": "code",
-          "expr": "topk(5, count by(operation_id) (aptos_api_request_source_client{request_source_client=\"$source_client\"}))",
+          "expr": "topk(5, sum by(operation_id) (increase(aptos_api_request_source_client{request_source_client=\"$source_client\", chain_name=\"$chain_name\"}[$__range])))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Top 5 endpoints",
-      "type": "piechart"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-      "description": "If we see a client is making requests to a particular endpoint and getting lots of 400s, it could indicate an issue with the client. It could also just indicate bad requests by the user, so we need to take this with a pinch of salt.",
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 15, "w": 12, "x": 12, "y": 23 },
-      "id": 2,
-      "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "pieType": "pie",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "tooltip": { "mode": "single", "sort": "none" }
-      },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "vU-Lwva4k" },
-          "editorMode": "builder",
-          "expr": "topk(5, count by(operation_id) (aptos_api_request_source_client{status=\"400\", request_source_client=\"$source_client\"}))",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Top 5 endpoints where the response is a 400",
       "type": "piechart"
     }
   ],
@@ -202,7 +182,7 @@
     "list": [
       {
         "current": { "selected": false, "text": "unknown", "value": "unknown" },
-        "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
         "definition": "label_values(aptos_api_request_source_client,request_source_client)",
         "hide": 0,
         "includeAll": false,
@@ -218,6 +198,44 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics Global (Non-mainnet)",
+          "value": "VictoriaMetrics Global (Non-mainnet)"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "VictoriaMetrics.*Global|US",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": false, "text": "testnet", "value": "testnet" },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(aptos_api_request_source_client,chain_name)",
+        "description": "When looking at non-mainnet, use this to select the network.",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(aptos_api_request_source_client,chain_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "testnet|devnet|mainnet",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
@@ -226,6 +244,6 @@
   "timezone": "",
   "title": "Developer Platform Client Metrics",
   "uid": "be847ea3-c7cc-4048-b783-eb2fdb4f1abd",
-  "version": 27,
+  "version": 48,
   "weekStart": ""
 }

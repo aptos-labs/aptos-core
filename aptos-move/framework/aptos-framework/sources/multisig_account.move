@@ -573,8 +573,9 @@ module aptos_framework::multisig_account {
             vector::length(owners) >= multisig_account_resource.num_signatures_required,
             error::invalid_state(ENOT_ENOUGH_OWNERS),
         );
-
-        emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+        if (vector::length(&owners_removed) > 0) {
+            emit_event(&mut multisig_account_resource.remove_owners_events, RemoveOwnersEvent { owners_removed });
+        }
     }
 
     /// Update the number of signatures required then remove owners, in a single operation.
