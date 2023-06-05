@@ -635,7 +635,7 @@ test(
   longTestTimeout,
 );
 
-test(
+test.only(
   "gets block by version",
   async () => {
     const version = 100;

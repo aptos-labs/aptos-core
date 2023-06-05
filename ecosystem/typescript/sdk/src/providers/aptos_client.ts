@@ -1030,7 +1030,7 @@ export class AptosClient {
    *
    * @returns Block
    */
-  @parseApiError
+  //@parseApiError
   async getBlockByVersion(version: number, withTransactions?: boolean): Promise<Gen.Block> {
     const { data } = await get<{}, Gen.Block>({
       url: this.nodeUrl,
