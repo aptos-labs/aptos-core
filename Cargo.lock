@@ -9178,9 +9178,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.13.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "oorandom"
@@ -10362,10 +10362,11 @@ dependencies = [
 
 [[package]]
 name = "random_word"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b2bb830d03b36582fd6723a57d2451b9db74574d21c34db9d7122c96b24fa0"
+checksum = "1d0f7171155590e912ab907550240a5764c665388ab0a1e46d783a493e816ff3"
 dependencies = [
+ "once_cell",
  "rand 0.8.5",
 ]
 
