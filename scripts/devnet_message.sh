@@ -23,6 +23,6 @@ For upgrade, make sure you pulled the latest docker image, or build the rust bin
 - genesis.blob sha256: $GENESIS_SHA
 - waypoint: $WAYPOINT
 - Chain ID: $CHAIN_ID
-You can follow the instructions here for upgrade: https://aptos.dev/tutorials/run-a-fullnode#update-fullnode-with-new-releases/
+You can follow the instructions here for upgrade: https://aptos.dev/nodes/full-node/update-fullnode-with-new-devnet-releases
 
 EOF

@@ -142,9 +142,10 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "1.0.14"
+version = "2.0.1"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-backup-cli",
  "aptos-bitvec",
  "aptos-build-info",
@@ -571,6 +572,7 @@ dependencies = [
  "anyhow",
  "aptos-bitvec",
  "aptos-bounded-executor",
+ "aptos-cached-packages",
  "aptos-channels",
  "aptos-config",
  "aptos-consensus-notifications",
@@ -619,6 +621,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.7.3",
+ "rayon",
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",
@@ -739,6 +742,7 @@ dependencies = [
 name = "aptos-data-client"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-channels",
  "aptos-config",
  "aptos-crypto",
@@ -748,6 +752,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-storage-interface",
  "aptos-storage-service-client",
  "aptos-storage-service-server",
  "aptos-storage-service-types",
@@ -759,6 +764,7 @@ dependencies = [
  "futures",
  "itertools",
  "maplit",
+ "mockall",
  "rand 0.7.3",
  "serde 1.0.149",
  "thiserror",
@@ -928,6 +934,7 @@ dependencies = [
  "aptos-validator-interface",
  "aptos-vm",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "clap 3.2.23",
  "move-binary-format",
  "move-cli",
@@ -993,7 +1000,6 @@ dependencies = [
  "aptos-db",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
- "aptos-gas",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
@@ -1407,6 +1413,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-package-builder",
  "aptos-types",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "clap 3.2.23",
  "move-binary-format",
@@ -1529,6 +1536,7 @@ name = "aptos-indexer-grpc-cache-worker"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
@@ -1544,9 +1552,11 @@ dependencies = [
  "once_cell",
  "prost",
  "redis",
+ "reqwest",
  "serde 1.0.149",
  "serde_json",
  "serde_yaml 0.8.26",
+ "tempfile",
  "tokio",
  "tonic",
  "tracing",
@@ -1654,6 +1664,48 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-indexer-grpc-cache-worker",
+ "aptos-indexer-grpc-data-service",
+ "aptos-indexer-grpc-file-store",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-inspection-service",
+ "aptos-logger",
+ "aptos-protos",
+ "aptos-runtimes",
+ "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
+ "aptos-types",
+ "async-trait",
+ "backoff",
+ "base64 0.13.0",
+ "clap 3.2.23",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "itertools",
+ "prometheus",
+ "prost",
+ "redis",
+ "regex",
+ "reqwest",
+ "serde 1.0.149",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "tokio",
+ "tonic",
+ "tracing",
+ "url",
+ "warp",
 ]
 
 [[package]]
@@ -1870,6 +1922,8 @@ dependencies = [
 name = "aptos-ledger"
 version = "0.2.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-types",
  "hex",
  "ledger-apdu",
  "ledger-transport-hid",
@@ -2191,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "1.4.0"
+version = "1.5.0"
 dependencies = [
  "anyhow",
  "aptos-api",
@@ -2693,6 +2747,7 @@ name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "aptos-api-types",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-global-constants",
@@ -3300,6 +3355,7 @@ dependencies = [
  "aptos-types",
  "aptos-utils",
  "aptos-vm-logging",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "dashmap",
  "fail 0.5.0",
@@ -3384,6 +3440,20 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "smallvec",
+]
+
+[[package]]
+name = "aptos-vm-types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-language-e2e-tests",
+ "aptos-state-view",
+ "aptos-types",
+ "claims",
+ "move-binary-format",
+ "move-core-types",
 ]
 
 [[package]]

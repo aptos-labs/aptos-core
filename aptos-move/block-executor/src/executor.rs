@@ -18,18 +18,15 @@ use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
+    unsync_map::UnsyncMap,
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{
-    executable::ExecutableTestType, // TODO: fix up with the proper generics.
-    write_set::WriteOp,
-};
+use aptos_types::{executable::Executable, write_set::WriteOp};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
-    collections::btree_map::BTreeMap,
     marker::PhantomData,
     sync::{
         mpsc,
@@ -44,27 +41,28 @@ enum CommitRole {
     Worker(Receiver<TxnIndex>),
 }
 
-pub struct BlockExecutor<T, E, S> {
+pub struct BlockExecutor<T, E, S, X> {
     // number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
-    maybe_gas_limit: Option<u64>,
-    phantom: PhantomData<(T, E, S)>,
+    maybe_block_gas_limit: Option<u64>,
+    phantom: PhantomData<(T, E, S, X)>,
 }
 
-impl<T, E, S> BlockExecutor<T, E, S>
+impl<T, E, S, X> BlockExecutor<T, E, S, X>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
+    X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         assert!(
             concurrency_level > 0 && concurrency_level <= num_cpus::get(),
@@ -74,7 +72,7 @@ where
         Self {
             concurrency_level,
             executor_thread_pool,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
             phantom: PhantomData,
         }
     }
@@ -84,7 +82,7 @@ where
         version: Version,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -97,7 +95,7 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction(
-            &LatestView::<T, S>::new_mv_view(base_view, &speculative_view, idx_to_execute),
+            &LatestView::<T, S, X>::new_mv_view(base_view, &speculative_view, idx_to_execute),
             txn,
             idx_to_execute,
             false,
@@ -113,7 +111,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.write(&k, write_version, v);
+                versioned_cache.write(k, write_version, v);
             }
 
             // Then, apply deltas.
@@ -121,7 +119,7 @@ where
                 if !prev_modified_keys.remove(&k) {
                     updates_outside = true;
                 }
-                versioned_cache.add_delta(&k, idx_to_execute, d);
+                versioned_cache.add_delta(k, idx_to_execute, d);
             }
         };
 
@@ -168,7 +166,7 @@ where
         version_to_validate: Version,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         use MVDataError::*;
@@ -221,7 +219,7 @@ where
 
     fn coordinator_commit_hook(
         &self,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
@@ -266,7 +264,7 @@ where
                 },
             };
 
-            if let Some(per_block_gas_limit) = maybe_gas_limit {
+            if let Some(per_block_gas_limit) = maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
                 if *accumulated_gas >= per_block_gas_limit {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
@@ -294,7 +292,7 @@ where
     fn worker_commit_hook(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
         base_view: &S,
     ) {
@@ -339,7 +337,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Value, ExecutableTestType>,
+        versioned_cache: &MVHashMap<T::Key, T::Value, X>,
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
@@ -360,7 +358,7 @@ where
             match &role {
                 CommitRole::Coordinator(post_commit_txs) => {
                     self.coordinator_commit_hook(
-                        self.maybe_gas_limit,
+                        self.maybe_block_gas_limit,
                         scheduler,
                         post_commit_txs,
                         &mut worker_idx,
@@ -440,7 +438,7 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        let versioned_cache = MVHashMap::new(None);
+        let versioned_cache = MVHashMap::new();
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -533,13 +531,13 @@ where
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
-        let mut data_map = BTreeMap::new();
+        let data_map = UnsyncMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_gas = 0;
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
-                &LatestView::<T, S>::new_btree_view(base_view, &data_map, idx as TxnIndex),
+                &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
                 txn,
                 idx as TxnIndex,
                 true,
@@ -555,7 +553,7 @@ where
                     );
                     // Apply the writes.
                     for (ap, write_op) in output.get_writes().into_iter() {
-                        data_map.insert(ap, write_op);
+                        data_map.write(ap, write_op);
                     }
                     // Calculating the accumulated gas of the committed txns.
                     let txn_gas = output.gas_used();
@@ -575,7 +573,7 @@ where
                 break;
             }
 
-            if let Some(per_block_gas_limit) = self.maybe_gas_limit {
+            if let Some(per_block_gas_limit) = self.maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns
                 // exceeds per_block_gas_limit, halt sequential execution.
                 if accumulated_gas >= per_block_gas_limit {

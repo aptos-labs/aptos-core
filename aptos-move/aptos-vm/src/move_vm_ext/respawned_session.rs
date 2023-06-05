@@ -7,7 +7,6 @@ use crate::{
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
-use aptos_aggregator::transaction::ChangeSetExt;
 use aptos_gas::ChangeSetConfigs;
 use aptos_state_view::{StateView, StateViewId, TStateView};
 use aptos_types::{
@@ -16,6 +15,7 @@ use aptos_types::{
     },
     write_set::TransactionWrite,
 };
+use aptos_vm_types::change_set::VMChangeSet;
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// We finish the session after the user transaction is done running to get the change set and
@@ -38,7 +38,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         vm: &'l AptosVMImpl,
         session_id: SessionId,
         base_state_view: &'r dyn StateView,
-        previous_session_change_set: ChangeSetExt,
+        previous_session_change_set: VMChangeSet,
     ) -> Result<Self, VMStatus> {
         let state_view = ChangeSetStateView::new(base_state_view, previous_session_change_set)?;
 
@@ -57,28 +57,30 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn finish(
         mut self,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let new_change_set = self.with_session_mut(|session| {
             session.take().unwrap().finish(&mut (), change_set_configs)
         })?;
         let change_set = self.into_heads().state_view.change_set;
-        change_set.squash(new_change_set).map_err(|_err| {
-            VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg("Failed to squash ChangeSetExt"),
-            )
-        })
+        change_set
+            .squash(new_change_set, change_set_configs)
+            .map_err(|_err| {
+                VMStatus::Error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    err_msg("Failed to squash VMChangeSet"),
+                )
+            })
     }
 }
 
 /// A state view as if a change set is applied on top of the base state view.
 struct ChangeSetStateView<'r> {
     base: &'r dyn StateView,
-    change_set: ChangeSetExt,
+    change_set: VMChangeSet,
 }
 
 impl<'r> ChangeSetStateView<'r> {
-    pub fn new(base: &'r dyn StateView, change_set: ChangeSetExt) -> Result<Self, VMStatus> {
+    pub fn new(base: &'r dyn StateView, change_set: VMChangeSet) -> Result<Self, VMStatus> {
         Ok(Self { base, change_set })
     }
 }
@@ -113,20 +115,24 @@ impl<'r> TStateView for ChangeSetStateView<'r> {
 
 #[cfg(test)]
 mod test {
-    use super::ChangeSetStateView;
-    use aptos_aggregator::{
-        delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet},
-        transaction::ChangeSetExt,
-    };
+    use super::*;
+    use aptos_aggregator::delta_change_set::{delta_add, deserialize, serialize, DeltaChangeSet};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_state_view::TStateView;
     use aptos_types::{
-        state_store::{state_key::StateKey, table::TableHandle},
-        transaction::{ChangeSet, NoOpChangeSetChecker},
+        state_store::table::TableHandle,
         write_set::{WriteOp, WriteSetMut},
     };
+    use aptos_vm_types::check_change_set::CheckChangeSet;
     use move_core_types::account_address::AccountAddress;
-    use std::sync::Arc;
+
+    /// A mock for testing. Always succeeds on checking a change set.
+    struct NoOpChangeSetChecker;
+
+    impl CheckChangeSet for NoOpChangeSetChecker {
+        fn check_change_set(&self, _change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_change_set_state_view() {
@@ -153,11 +159,9 @@ mod test {
         let write_set = WriteSetMut::new(write_set_ops.into_iter())
             .freeze()
             .unwrap();
-        let change_set = ChangeSet::new(write_set, vec![], &NoOpChangeSetChecker).unwrap();
-
-        let change_set_ext =
-            ChangeSetExt::new(delta_change_set, change_set, Arc::new(NoOpChangeSetChecker));
-        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set_ext).unwrap();
+        let change_set =
+            VMChangeSet::new(write_set, delta_change_set, vec![], &NoOpChangeSetChecker).unwrap();
+        let change_set_state_view = ChangeSetStateView::new(&base_view, change_set).unwrap();
 
         assert_eq!(
             deserialize(

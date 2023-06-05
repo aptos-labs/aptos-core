@@ -15,7 +15,7 @@ nodes with a pruning window that can be configured. This document describes
 how you can configure the pruning behavior.
 
 :::note
-By default the ledger pruner keeps 150 million recent transactions. Unless 
+By default the ledger pruner keeps 150 million recent transactions. The approximate amount of disk space required for every 150M transactions is 200G. Unless 
 bootstrapped from the genesis and configured to disable the pruner or a long 
 prune window, the node doesn't carry the entirety of the ledger history. 
 Majority of the nodes on both the testnet and mainnet have a partial 

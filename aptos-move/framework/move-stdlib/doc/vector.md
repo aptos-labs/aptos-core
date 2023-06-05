@@ -36,11 +36,14 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `insert`](#0x1_vector_insert)
 -  [Function `remove`](#0x1_vector_remove)
+-  [Function `remove_value`](#0x1_vector_remove_value)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
 -  [Function `for_each`](#0x1_vector_for_each)
 -  [Function `for_each_reverse`](#0x1_vector_for_each_reverse)
 -  [Function `for_each_ref`](#0x1_vector_for_each_ref)
+-  [Function `enumerate_ref`](#0x1_vector_enumerate_ref)
 -  [Function `for_each_mut`](#0x1_vector_for_each_mut)
+-  [Function `enumerate_mut`](#0x1_vector_enumerate_mut)
 -  [Function `fold`](#0x1_vector_fold)
 -  [Function `foldr`](#0x1_vector_foldr)
 -  [Function `map_ref`](#0x1_vector_map_ref)
@@ -67,6 +70,7 @@ the return on investment didn't seem worth it for these simple functions.
     -  [Function `index_of`](#@Specification_1_index_of)
     -  [Function `insert`](#@Specification_1_insert)
     -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `remove_value`](#@Specification_1_remove_value)
     -  [Function `swap_remove`](#@Specification_1_swap_remove)
     -  [Function `rotate`](#@Specification_1_rotate)
     -  [Function `rotate_slice`](#@Specification_1_rotate_slice)
@@ -643,6 +647,43 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+<a name="0x1_vector_remove_value"></a>
+
+## Function `remove_value`
+
+Remove the first occurrence of a given value in the vector <code>v</code> and return it in a vector, shifting all
+subsequent elements.
+This is O(n) and preserves ordering of elements in the vector.
+This returns an empty vector if the value isn't present in the vector.
+Note that this cannot return an option as option uses vector and there'd be a circular dependency between option
+and vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
+    // This doesn't cost a O(2N) run time <b>as</b> index_of scans from left <b>to</b> right and stops when the element is found,
+    // <b>while</b> remove would <b>continue</b> from the identified index <b>to</b> the end of the <a href="vector.md#0x1_vector">vector</a>.
+    <b>let</b> (found, index) = <a href="vector.md#0x1_vector_index_of">index_of</a>(v, val);
+    <b>if</b> (found) {
+        <a href="vector.md#0x1_vector">vector</a>[<a href="vector.md#0x1_vector_remove">remove</a>(v, index)]
+    } <b>else</b> {
+       <a href="vector.md#0x1_vector">vector</a>[]
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_swap_remove"></a>
 
 ## Function `swap_remove`
@@ -759,6 +800,36 @@ Apply the function to a reference of each element in the vector.
 
 </details>
 
+<a name="0x1_vector_enumerate_ref"></a>
+
+## Function `enumerate_ref`
+
+Apply the function to a reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_for_each_mut"></a>
 
 ## Function `for_each_mut`
@@ -782,6 +853,36 @@ Apply the function to a mutable reference to each element in the vector.
         f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
         i = i + 1
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_enumerate_mut"></a>
+
+## Function `enumerate_mut`
+
+Apply the function to a mutable reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &<b>mut</b> Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &<b>mut</b> Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1;
+    };
 }
 </code></pre>
 
@@ -1464,6 +1565,22 @@ Check if <code>v</code> contains <code>e</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove">remove</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): Element
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> intrinsic = <b>true</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_remove_value"></a>
+
+### Function `remove_value`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_remove_value">remove_value</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, val: &Element): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
 </code></pre>
 
 

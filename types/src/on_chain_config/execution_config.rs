@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub enum OnChainExecutionConfig {
     V1(ExecutionConfigV1),
     V2(ExecutionConfigV2),
+    V3(ExecutionConfigV3),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -19,6 +20,7 @@ impl OnChainExecutionConfig {
         match &self {
             OnChainExecutionConfig::V1(config) => config.transaction_shuffler_type.clone(),
             OnChainExecutionConfig::V2(config) => config.transaction_shuffler_type.clone(),
+            OnChainExecutionConfig::V3(config) => config.transaction_shuffler_type.clone(),
         }
     }
 
@@ -27,6 +29,16 @@ impl OnChainExecutionConfig {
         match &self {
             OnChainExecutionConfig::V1(_config) => None,
             OnChainExecutionConfig::V2(config) => config.block_gas_limit,
+            OnChainExecutionConfig::V3(config) => config.block_gas_limit,
+        }
+    }
+
+    /// The type of the transaction deduper being used.
+    pub fn transaction_deduper_type(&self) -> TransactionDeduperType {
+        match &self {
+            OnChainExecutionConfig::V1(_config) => TransactionDeduperType::NoDedup,
+            OnChainExecutionConfig::V2(_config) => TransactionDeduperType::NoDedup,
+            OnChainExecutionConfig::V3(config) => config.transaction_deduper_type.clone(),
         }
     }
 }
@@ -84,11 +96,35 @@ impl Default for ExecutionConfigV2 {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ExecutionConfigV3 {
+    pub transaction_shuffler_type: TransactionShufflerType,
+    pub block_gas_limit: Option<u64>,
+    pub transaction_deduper_type: TransactionDeduperType,
+}
+
+impl Default for ExecutionConfigV3 {
+    fn default() -> Self {
+        Self {
+            transaction_shuffler_type: TransactionShufflerType::NoShuffling,
+            block_gas_limit: None,
+            transaction_deduper_type: TransactionDeduperType::NoDedup,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
 pub enum TransactionShufflerType {
     NoShuffling,
     SenderAwareV1(u32),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")] // cannot use tag = "type" as nested enums cannot work, and bcs doesn't support it
+pub enum TransactionDeduperType {
+    NoDedup,
+    TxnHashAndAuthenticatorV1,
 }
 
 #[cfg(test)]

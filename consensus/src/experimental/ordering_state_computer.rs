@@ -10,6 +10,7 @@ use crate::{
     },
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
+    transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -126,6 +127,7 @@ impl StateComputer for OrderingStateComputer {
         _payload_manager: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
+        _: Arc<dyn TransactionDeduper>,
     ) {
     }
 

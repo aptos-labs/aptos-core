@@ -73,7 +73,6 @@ where
                     self.num_transactions,
                     1,
                     AccountPickStyle::Unlimited,
-                    None,
                 )
             },
             |state| state.execute_sequential(),
@@ -92,7 +91,6 @@ where
                     self.num_transactions,
                     1,
                     AccountPickStyle::Unlimited,
-                    None,
                 )
             },
             |state| state.execute_parallel(),
@@ -113,7 +111,7 @@ where
         num_executor_shards: usize,
         concurrency_level_per_shard: usize,
         no_conflict_txn: bool,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<usize>, Vec<usize>) {
         let mut par_tps = Vec::new();
         let mut seq_tps = Vec::new();
@@ -138,7 +136,6 @@ where
             num_txn,
             num_executor_shards,
             account_pick_style,
-            maybe_gas_limit,
         );
 
         for i in 0..total_runs {
@@ -149,6 +146,7 @@ where
                     run_seq,
                     no_conflict_txn,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 );
             } else {
                 let tps = state.execute_blockstm_benchmark(
@@ -156,6 +154,7 @@ where
                     run_seq,
                     no_conflict_txn,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 );
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);
@@ -188,14 +187,12 @@ where
         num_transactions: usize,
         num_executor_shards: usize,
         account_pick_style: AccountPickStyle,
-        maybe_gas_limit: Option<u64>,
     ) -> Self {
         Self::with_universe(
             strategy,
             universe_strategy(num_accounts, num_transactions, account_pick_style),
             num_transactions,
             num_executor_shards,
-            maybe_gas_limit,
         )
     }
 
@@ -206,7 +203,6 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
-        maybe_gas_limit: Option<u64>,
     ) -> Self {
         let mut runner = TestRunner::default();
         let universe_gen = universe_strategy
@@ -221,13 +217,9 @@ where
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
         let state_view = Arc::new(executor.get_state_view().clone());
-        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(
-            num_executor_shards,
-            None,
-            maybe_gas_limit,
-        ));
-        let sequential_block_executor =
-            Arc::new(ShardedBlockExecutor::new(1, Some(1), maybe_gas_limit));
+        let parallel_block_executor =
+            Arc::new(ShardedBlockExecutor::new(num_executor_shards, None));
+        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1)));
 
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()
@@ -292,7 +284,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.sequential_block_executor;
         executor
-            .execute_block(self.state_view.clone(), txns, 1)
+            .execute_block(self.state_view.clone(), txns, 1, None)
             .expect("VM should not fail to start");
     }
 
@@ -303,7 +295,7 @@ where
         let txns = self.gen_transaction(false);
         let executor = self.parallel_block_executor.clone();
         executor
-            .execute_block(self.state_view.clone(), txns, num_cpus::get())
+            .execute_block(self.state_view.clone(), txns, num_cpus::get(), None)
             .expect("VM should not fail to start");
     }
 
@@ -312,6 +304,7 @@ where
         transactions: Vec<Transaction>,
         block_executor: Arc<ShardedBlockExecutor<FakeDataStore>>,
         concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
     ) -> usize {
         let block_size = transactions.len();
         let timer = Instant::now();
@@ -320,6 +313,7 @@ where
                 self.state_view.clone(),
                 transactions,
                 concurrency_level_per_shard,
+                maybe_block_gas_limit,
             )
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
@@ -333,6 +327,7 @@ where
         run_seq: bool,
         no_conflict_txns: bool,
         conurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
     ) -> (usize, usize) {
         let transactions = self.gen_transaction(no_conflict_txns);
         let par_tps = if run_par {
@@ -341,6 +336,7 @@ where
                 transactions.clone(),
                 self.parallel_block_executor.clone(),
                 conurrency_level_per_shard,
+                maybe_block_gas_limit,
             );
             println!("Parallel execution finishes, TPS = {}", tps);
             tps
@@ -349,8 +345,12 @@ where
         };
         let seq_tps = if run_seq {
             println!("Sequential execution starts...");
-            let tps =
-                self.execute_benchmark(transactions, self.sequential_block_executor.clone(), 1);
+            let tps = self.execute_benchmark(
+                transactions,
+                self.sequential_block_executor.clone(),
+                1,
+                maybe_block_gas_limit,
+            );
             println!("Sequential execution finishes, TPS = {}", tps);
             tps
         } else {

@@ -8,7 +8,6 @@ use crate::{
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaChangeSet},
-    transaction::ChangeSetExt,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -22,9 +21,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
-    transaction::{ChangeSet, SignatureCheckedTransaction},
+    transaction::SignatureCheckedTransaction,
     write_set::{WriteOp, WriteSetMut},
 };
+use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -127,7 +127,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<ChangeSetExt> {
+    ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
 
@@ -143,7 +143,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
 
-        let change_set_ext = Self::convert_change_set(
+        let change_set = Self::convert_change_set(
             self.remote,
             self.new_slot_payer,
             self.features.is_storage_slot_metadata_enabled(),
@@ -158,7 +158,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
 
-        Ok(change_set_ext)
+        Ok(change_set)
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -279,7 +279,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let mut write_set_mut = WriteSetMut::new(Vec::new());
         let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
@@ -364,13 +364,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
-
-        let change_set = ChangeSet::new(write_set, events, configs)?;
-        Ok(ChangeSetExt::new(
-            delta_change_set,
-            change_set,
-            Arc::new(configs.clone()),
-        ))
+        VMChangeSet::new(write_set, delta_change_set, events, configs)
     }
 }
 
