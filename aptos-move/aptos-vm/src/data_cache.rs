@@ -43,18 +43,43 @@ pub(crate) fn get_resource_group_from_metadata(
 pub struct StorageAdapter<'a, S> {
     state_store: &'a S,
     accurate_byte_count: bool,
+    max_binary_format_version: u32,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
+    pub fn new_with_cached_config(
+        state_store: &'a S,
+        gas_feature_version: u64,
+        features: &Features,
+    ) -> Self {
+        let mut s = Self {
+            state_store,
+            accurate_byte_count: false,
+            max_binary_format_version: 0,
+            resource_group_cache: RefCell::new(BTreeMap::new()),
+        };
+        if gas_feature_version >= 9 {
+            s.accurate_byte_count = true;
+        }
+        s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
+        s
+    }
+
     pub fn new(state_store: &'a S) -> Self {
         let mut s = Self {
             state_store,
             accurate_byte_count: false,
+            max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
-        s.accurate_byte_count = true;
+        let (_, gas_feature_version) = gas_config(&s);
+        let features = Features::fetch_config(&s).unwrap_or_default();
+        if gas_feature_version >= 9 {
+            s.accurate_byte_count = true;
+        }
+        s.max_binary_format_version = get_max_binary_format_version(&features, gas_feature_version);
         s
     }
 
@@ -151,13 +176,9 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
             Ok(Some(bytes)) => bytes,
             _ => return vec![],
         };
-        let (_, gas_feature_version) = gas_config(self);
-        let features = Features::fetch_config(self).unwrap_or_default();
-        let max_binary_format_version =
-            get_max_binary_format_version(&features, gas_feature_version);
         let module = match CompiledModule::deserialize_with_max_version(
             &module_bytes,
-            max_binary_format_version,
+            self.max_binary_format_version,
         ) {
             Ok(module) => module,
             _ => return vec![],

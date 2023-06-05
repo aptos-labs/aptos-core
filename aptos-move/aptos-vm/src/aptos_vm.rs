@@ -9,7 +9,7 @@ use crate::{
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::BlockAptosVM,
     counters::*,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::StorageAdapter,
     errors::expect_only_successful_execution,
     move_vm_ext::{MoveResolverExt, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::ShardedBlockExecutor,
@@ -242,6 +242,14 @@ impl AptosVM {
             change_set_configs,
         )
         .1
+    }
+
+    pub fn as_move_resolver<'a, S: StateView>(&self, state_view: &'a S) -> StorageAdapter<'a, S> {
+        StorageAdapter::new_with_cached_config(
+            state_view,
+            self.0.get_gas_feature_version(),
+            self.0.get_features(),
+        )
     }
 
     fn failed_transaction_cleanup_and_keep_vm_status(
@@ -1140,8 +1148,7 @@ impl AptosVM {
         F: FnOnce(u64, AptosGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
         // TODO(Gas): revisit this.
-        let resolver = StorageAdapter::new(state_view);
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(state_view);
 
         // TODO(Gas): avoid creating txn metadata twice.
         let balance = TransactionMetadata::new(txn).max_gas_amount();
@@ -1152,6 +1159,11 @@ impl AptosVM {
             balance,
         )?;
 
+        let resolver = StorageAdapter::new_with_cached_config(
+            state_view,
+            vm.0.get_gas_feature_version(),
+            vm.0.get_features(),
+        );
         let (status, output) =
             vm.execute_user_transaction_impl(&resolver, txn, log_context, &mut gas_meter);
 
@@ -1335,7 +1347,7 @@ impl AptosVM {
 
         // Try to simulate with aggregator enabled.
         let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-            &state_view.as_move_resolver(),
+            &simulation_vm.0.as_move_resolver(state_view),
             txn,
             &log_context,
             true,
@@ -1352,7 +1364,7 @@ impl AptosVM {
             Err(_) => {
                 // Conversion to TransactionOutput failed, re-simulate without aggregators.
                 let (vm_status, vm_output) = simulation_vm.simulate_signed_transaction(
-                    &state_view.as_move_resolver(),
+                    &simulation_vm.0.as_move_resolver(state_view),
                     txn,
                     &log_context,
                     false,
@@ -1386,8 +1398,8 @@ impl AptosVM {
             vm.0.get_storage_gas_parameters(&log_context)?.clone(),
             gas_budget,
         );
-        let resolver = &state_view.as_move_resolver();
-        let mut session = vm.new_session(resolver, SessionId::Void, true);
+        let resolver = vm.as_move_resolver(state_view);
+        let mut session = vm.new_session(&resolver, SessionId::Void, true);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
@@ -1560,11 +1572,11 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let resolver = &state_view.as_move_resolver();
-        let mut session = self.0.new_session(resolver, SessionId::txn(&txn), true);
+        let resolver = self.as_move_resolver(state_view);
+        let mut session = self.0.new_session(&resolver, SessionId::txn(&txn), true);
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,
-            resolver,
+            &resolver,
             &txn,
             true,
             &log_context,
