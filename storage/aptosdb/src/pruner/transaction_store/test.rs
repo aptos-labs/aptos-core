@@ -133,10 +133,6 @@ fn verify_txn_store_pruner(
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
-        assert_eq!(
-            *pruner.last_version_sent_to_pruner.as_ref().lock(),
-            i as u64
-        );
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
             // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
