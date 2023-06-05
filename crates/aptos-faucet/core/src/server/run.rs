@@ -811,6 +811,7 @@ mod test {
                 get_current_time_secs() + 30,
                 None,
                 None,
+                None,
             )
             .await
             .context("Failed to wait for transaction")?;

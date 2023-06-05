@@ -208,6 +208,8 @@ async fn submit_and_check(
             txn.expiration_timestamp_secs(),
             None,
             Some(wait_duration.saturating_sub(start.elapsed())),
+            // Poll less often, to put less load on the node.
+            Some(Duration::from_secs(2)),
         )
         .await
     {

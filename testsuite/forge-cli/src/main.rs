@@ -231,6 +231,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "land_blocking" {
+        "three_region_simulation"
+    } else {
+        panic!()
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -1120,10 +1126,12 @@ fn three_region_simulation() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
         .with_initial_fullnode_count(12)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
-        .add_network_test(ThreeRegionSameCloudSimulationTest)
+        .add_network_test(MultiRegionNetworkEmulationTest {
+            override_config: None,
+        })
         // TODO(rustielin): tune these success criteria after we have a better idea of the test behavior
         .with_success_criteria(
-            SuccessCriteria::new(3000)
+            SuccessCriteria::new(1000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {

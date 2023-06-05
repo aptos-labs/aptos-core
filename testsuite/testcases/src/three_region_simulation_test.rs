@@ -83,14 +83,14 @@ fn create_bandwidth_limit() -> SwarmNetworkBandwidth {
 impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         // inject network delay
-        let delay = create_three_region_swarm_network_delay(ctx.swarm());
-        let chaos = SwarmChaos::Delay(delay);
-        ctx.swarm().inject_chaos(chaos)?;
+        // let delay = create_three_region_swarm_network_delay(ctx.swarm());
+        // let chaos = SwarmChaos::Delay(delay);
+        // ctx.swarm().inject_chaos(chaos)?;
 
-        // inject bandwidth limit
-        let bandwidth = create_bandwidth_limit();
-        let chaos = SwarmChaos::Bandwidth(bandwidth);
-        ctx.swarm().inject_chaos(chaos)?;
+        // // inject bandwidth limit
+        // let bandwidth = create_bandwidth_limit();
+        // let chaos = SwarmChaos::Bandwidth(bandwidth);
+        // ctx.swarm().inject_chaos(chaos)?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }

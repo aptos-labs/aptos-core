@@ -494,6 +494,7 @@ impl Client {
                 .inner(),
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
+            None,
         )
         .await
     }
@@ -510,6 +511,7 @@ impl Client {
                 .inner(),
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
+            None,
         )
         .await
     }
@@ -524,6 +526,7 @@ impl Client {
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
             None,
+            None,
         )
         .await
     }
@@ -537,6 +540,7 @@ impl Client {
             transaction.clone().committed_hash(),
             expiration_timestamp,
             Some(DEFAULT_MAX_SERVER_LAG_WAIT_DURATION),
+            None,
             None,
         )
         .await
@@ -558,15 +562,15 @@ impl Client {
         hash: HashValue,
         expiration_timestamp_secs: u64,
         max_server_lag_wait: Option<Duration>,
-
         timeout_from_call: Option<Duration>,
+        poll_interval: Option<Duration>,
         fetch: F,
     ) -> AptosResult<Response<T>>
     where
         F: Fn(HashValue) -> Fut,
         Fut: Future<Output = AptosResult<WaitForTransactionResult<T>>>,
     {
-        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+        let cur_poll_interval = poll_interval.unwrap_or_else(|| Duration::from_millis(500));
         let mut reached_mempool = false;
         let start = std::time::Instant::now();
         loop {
@@ -671,7 +675,7 @@ impl Client {
                 );
             }
 
-            tokio::time::sleep(DEFAULT_DELAY).await;
+            tokio::time::sleep(cur_poll_interval).await;
         }
     }
 
@@ -681,12 +685,14 @@ impl Client {
         expiration_timestamp_secs: u64,
         max_server_lag_wait: Option<Duration>,
         timeout_from_call: Option<Duration>,
+        poll_interval: Option<Duration>,
     ) -> AptosResult<Response<Transaction>> {
         self.wait_for_transaction_by_hash_inner(
             hash,
             expiration_timestamp_secs,
             max_server_lag_wait,
             timeout_from_call,
+            poll_interval,
             |hash| async move {
                 let resp = self.get_transaction_by_hash_inner(hash).await?;
                 if resp.status() != StatusCode::NOT_FOUND {
@@ -722,12 +728,14 @@ impl Client {
         expiration_timestamp_secs: u64,
         max_server_lag_wait: Option<Duration>,
         timeout_from_call: Option<Duration>,
+        poll_interval: Option<Duration>,
     ) -> AptosResult<Response<TransactionOnChainData>> {
         self.wait_for_transaction_by_hash_inner(
             hash,
             expiration_timestamp_secs,
             max_server_lag_wait,
             timeout_from_call,
+            poll_interval,
             |hash| async move {
                 let resp = self.get_transaction_by_hash_bcs_inner(hash).await?;
                 if resp.status() != StatusCode::NOT_FOUND {

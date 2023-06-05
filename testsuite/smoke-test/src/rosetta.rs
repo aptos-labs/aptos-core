@@ -2258,6 +2258,7 @@ async fn wait_for_transaction(
             expiry_time.as_secs(),
             Some(DEFAULT_MAX_WAIT_DURATION),
             None,
+            None,
         )
         .await;
     match response {
