@@ -17,8 +17,8 @@ use crate::{
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{MVDataError, MVDataOutput, TxnIndex, Version},
     MVHashMap,
+    types::{MVDataError, MVDataOutput, TxnIndex, Version},
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
@@ -32,9 +32,9 @@ use std::{
     collections::btree_map::BTreeMap,
     marker::PhantomData,
     sync::{
+        Arc,
         mpsc,
         mpsc::{Receiver, Sender},
-        Arc,
     },
 };
 use std::collections::BTreeSet;
@@ -449,10 +449,11 @@ where
         }
 
         let num_txns = signature_verified_block.len() as u32;
-        let last_input_output = TxnLastInputOutput::new(num_txns);
+        let mut last_input_output: TxnLastInputOutput<<T as Transaction>::Key, <E as ExecutorTask>::Output, <E as ExecutorTask>::Error> = TxnLastInputOutput::new();
         let mut scheduler = Scheduler::new();
         let txn_indices: BTreeSet<TxnIndex> = (0..num_txns).collect();
-        scheduler.add_txns(txn_indices);
+        last_input_output.add_txns(&txn_indices);
+        scheduler.add_txns(&txn_indices);
         scheduler.end_of_txn_stream();
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);

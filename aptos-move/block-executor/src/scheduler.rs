@@ -253,7 +253,7 @@ impl Scheduler {
         }
     }
 
-    pub fn add_txns(&mut self, new_indices: BTreeSet<TxnIndex>) {
+    pub fn add_txns(&mut self, new_indices: &BTreeSet<TxnIndex>) {
         if let Some(&old_biggest) = self.txn_indices.last() {
             if let Some(&new_smallest) = new_indices.first() {
                 if old_biggest > new_smallest {

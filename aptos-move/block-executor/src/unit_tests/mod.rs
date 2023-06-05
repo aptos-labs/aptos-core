@@ -260,7 +260,7 @@ fn early_skips() {
 #[test]
 fn scheduler_tasks() {
     let mut s = Scheduler::new();
-    s.add_txns((0..5).collect());
+    s.add_txns(&(0..5).collect());
     s.end_of_txn_stream();
 
     for i in 0..5 {
@@ -353,7 +353,7 @@ fn scheduler_tasks() {
 #[test]
 fn scheduler_first_wave() {
     let mut s = Scheduler::new();
-    s.add_txns((0..6).collect());
+    s.add_txns(&(0..6).collect());
     s.end_of_txn_stream();
 
     for i in 0..5 {
@@ -410,7 +410,7 @@ fn scheduler_first_wave() {
 #[test]
 fn scheduler_dependency() {
     let mut s = Scheduler::new();
-    s.add_txns((0..10).collect());
+    s.add_txns(&(0..10).collect());
     s.end_of_txn_stream();
 
     for i in 0..5 {
@@ -459,7 +459,7 @@ fn scheduler_dependency() {
 // for execution, validation index = num_txns, and wave = 0.
 fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
     let mut s = Scheduler::new();
-    s.add_txns((0..num_txns).collect());
+    s.add_txns(&(0..num_txns).collect());
     s.end_of_txn_stream();
 
     for i in 0..num_txns {
@@ -575,7 +575,7 @@ fn scheduler_incarnation() {
 #[test]
 fn scheduler_basic() {
     let mut s = Scheduler::new();
-    s.add_txns((0..3).collect());
+    s.add_txns(&(0..3).collect());
     s.end_of_txn_stream();
 
     for i in 0..3 {
@@ -627,7 +627,7 @@ fn scheduler_basic() {
 #[test]
 fn scheduler_drain_idx() {
     let mut s = Scheduler::new();
-    s.add_txns((0..3).collect());
+    s.add_txns(&(0..3).collect());
     s.end_of_txn_stream();
 
     for i in 0..3 {
@@ -772,7 +772,7 @@ fn no_conflict_task_count() {
     let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
         let mut s = Scheduler::new();
-        s.add_txns((0..num_txns).collect());
+        s.add_txns(&(0..num_txns).collect());
         s.end_of_txn_stream();
 
         let mut tasks = BTreeMap::new();
