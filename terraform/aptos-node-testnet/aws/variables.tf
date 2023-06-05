@@ -71,7 +71,6 @@ variable "chain_id" {
   default     = 4
 }
 
-
 variable "era" {
   description = "Chain era, used to start a clean chain"
   default     = 15
