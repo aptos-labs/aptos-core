@@ -468,7 +468,7 @@ impl<'a> AptosTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage.clone())?;
+        let mut outputs = AptosVM::execute_block(vec![txn], &self.storage.clone(), None)?;
 
         assert_eq!(outputs.len(), 1);
 

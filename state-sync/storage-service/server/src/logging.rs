@@ -13,10 +13,10 @@ pub struct LogSchema<'a> {
     name: LogEntry,
     error: Option<&'a Error>,
     message: Option<&'a str>,
+    optimistic_fetch_related: Option<bool>,
     peer_network_id: Option<&'a PeerNetworkId>,
     response: Option<&'a str>,
     request: Option<&'a StorageServiceRequest>,
-    subscription_related: Option<bool>,
 }
 
 impl<'a> LogSchema<'a> {
@@ -25,10 +25,10 @@ impl<'a> LogSchema<'a> {
             name,
             error: None,
             message: None,
+            optimistic_fetch_related: None,
             peer_network_id: None,
             response: None,
             request: None,
-            subscription_related: None,
         }
     }
 }
@@ -36,13 +36,13 @@ impl<'a> LogSchema<'a> {
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
+    OptimisticFetchRefresh,
+    OptimisticFetchRequest,
+    OptimisticFetchResponse,
     ReceivedStorageRequest,
     RequestModeratorIgnoredPeer,
     RequestModeratorRefresh,
     SentStorageResponse,
     StorageServiceError,
     StorageSummaryRefresh,
-    SubscriptionRefresh,
-    SubscriptionResponse,
-    SubscriptionRequest,
 }

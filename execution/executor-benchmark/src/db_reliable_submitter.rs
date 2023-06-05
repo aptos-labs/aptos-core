@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    benchmark_transaction::BenchmarkTransaction,
-    db_access::{CoinStore, DbAccessUtil},
-};
+use crate::db_access::{CoinStore, DbAccessUtil};
 use anyhow::{Context, Result};
 use aptos_crypto::HashValue;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -26,7 +23,7 @@ use std::{
 
 pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
-    pub block_sender: mpsc::SyncSender<Vec<BenchmarkTransaction>>,
+    pub block_sender: mpsc::SyncSender<Vec<Transaction>>,
 }
 
 #[async_trait]
@@ -58,13 +55,8 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
     ) -> Result<()> {
         self.block_sender.send(
             txns.iter()
-                .map(|t| BenchmarkTransaction {
-                    transaction: Transaction::UserTransaction(t.clone()),
-                    extra_info: None,
-                })
-                .chain(once(
-                    Transaction::StateCheckpoint(HashValue::random()).into(),
-                ))
+                .map(|t| Transaction::UserTransaction(t.clone()))
+                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect(),
         )?;
 

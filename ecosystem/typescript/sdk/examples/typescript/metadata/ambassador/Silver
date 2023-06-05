@@ -1,0 +1,6 @@
+{
+  "name": "Ambassador #1",
+  "description": "Aptos Ambassador Token",
+  "image": "https://raw.githubusercontent.com/aptos-labs/aptos-core/main/aptos-move/move-examples/token_objects/ambassador/metadata/Silver.png",
+  "attributes": []
+}

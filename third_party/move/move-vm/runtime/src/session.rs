@@ -13,7 +13,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event},
+    effects::{ChangeSet, Changes, Event},
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -22,7 +22,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
-    values::GlobalValue,
+    values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
 
@@ -262,6 +262,15 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
+    pub fn finish_with_custom_effects<Resource>(
+        self,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+    ) -> VMResult<(Changes<Vec<u8>, Resource>, Vec<Event>)> {
+        self.data_cache
+            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
     /// Same like `finish`, but also extracts the native context extensions from the session.
     pub fn finish_with_extensions(
         self,
@@ -273,6 +282,25 @@ impl<'r, 'l> Session<'r, 'l> {
         } = self;
         let (change_set, events) = data_cache
             .into_effects(self.move_vm.runtime.loader())
+            .map_err(|e| e.finish(Location::Undefined))?;
+        Ok((change_set, events, native_extensions))
+    }
+
+    pub fn finish_with_extensions_with_custom_effects<Resource>(
+        self,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+    ) -> VMResult<(
+        Changes<Vec<u8>, Resource>,
+        Vec<Event>,
+        NativeContextExtensions<'r>,
+    )> {
+        let Session {
+            data_cache,
+            native_extensions,
+            ..
+        } = self;
+        let (change_set, events) = data_cache
+            .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
         Ok((change_set, events, native_extensions))
     }

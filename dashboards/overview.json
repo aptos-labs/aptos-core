@@ -59,7 +59,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 4,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -84,7 +83,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 2, "x": 0, "y": 1 },
       "id": 46,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -97,7 +95,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -142,7 +140,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 3, "x": 2, "y": 1 },
       "id": 2,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -155,7 +152,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -200,7 +197,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 3, "x": 5, "y": 1 },
       "id": 90,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -213,7 +209,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -259,7 +255,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 3, "x": 8, "y": 1 },
       "id": 105,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -272,7 +267,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -322,7 +317,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 2, "x": 11, "y": 1 },
       "id": 66,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -335,7 +329,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -375,7 +369,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 2, "x": 13, "y": 1 },
       "id": 133,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -388,7 +381,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -434,7 +427,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 4, "x": 15, "y": 1 },
       "id": 101,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -447,7 +439,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -491,7 +483,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 3, "x": 19, "y": 1 },
       "id": 106,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -504,7 +495,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -554,7 +545,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 2, "x": 22, "y": 1 },
       "id": 70,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -567,7 +557,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -615,7 +605,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -661,7 +651,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 2, "x": 11, "y": 5 },
       "id": 134,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -674,7 +663,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -725,7 +714,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -767,7 +756,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "grafana-bigquery-datasource", "uid": "${BigQuery}" },
@@ -806,7 +795,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 4, "w": 3, "x": 21, "y": 5 },
       "id": 130,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -819,7 +807,7 @@
         "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -879,7 +867,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -927,7 +915,7 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -969,7 +957,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1000,13 +988,12 @@
       },
       "gridPos": { "h": 5, "w": 5, "x": 11, "y": 10 },
       "id": 72,
-      "isNew": false,
       "options": {
         "cellHeight": "sm",
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1059,7 +1046,6 @@
       "gauge": { "maxValue": 0, "minValue": 0, "show": false, "thresholdLabels": false, "thresholdMarkers": false },
       "gridPos": { "h": 5, "w": 3, "x": 16, "y": 10 },
       "id": 141,
-      "isNew": false,
       "nullPointMode": "",
       "options": {
         "colorMode": "value",
@@ -1072,7 +1058,7 @@
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "span": 0,
       "sparkline": {},
       "targets": [
@@ -1112,13 +1098,12 @@
       },
       "gridPos": { "h": 5, "w": 5, "x": 19, "y": 10 },
       "id": 142,
-      "isNew": false,
       "options": {
         "cellHeight": "sm",
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "scroll": false,
       "span": 0,
       "targets": [
@@ -1179,7 +1164,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1412,7 +1397,7 @@
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
         "showHeader": true
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1525,7 +1510,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
@@ -1549,7 +1534,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 62,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -1570,7 +1554,6 @@
       "gridPos": { "h": 9, "w": 8, "x": 0, "y": 33 },
       "hiddenSeries": false,
       "id": 10,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1589,7 +1572,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1765,7 +1748,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
       "id": 22,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -1786,7 +1768,6 @@
       "gridPos": { "h": 9, "w": 6, "x": 0, "y": 43 },
       "hiddenSeries": false,
       "id": 26,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1805,7 +1786,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1852,7 +1833,6 @@
       "gridPos": { "h": 9, "w": 6, "x": 6, "y": 43 },
       "hiddenSeries": false,
       "id": 45,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1871,7 +1851,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2017,7 +1997,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
       "id": 42,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -2039,7 +2018,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 0, "y": 53 },
       "hiddenSeries": false,
       "id": 20,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2058,7 +2036,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2104,7 +2082,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 53 },
       "hiddenSeries": false,
       "id": 48,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2123,7 +2100,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2168,7 +2145,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 53 },
       "hiddenSeries": false,
       "id": 77,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2187,7 +2163,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2253,7 +2229,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 53 },
       "hiddenSeries": false,
       "id": 129,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2272,7 +2247,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2328,7 +2303,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 0, "y": 62 },
       "hiddenSeries": false,
       "id": 135,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2347,7 +2321,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2393,7 +2367,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 62 },
       "hiddenSeries": false,
       "id": 136,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2412,7 +2385,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2457,7 +2430,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 62 },
       "hiddenSeries": false,
       "id": 137,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2476,7 +2448,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2542,7 +2514,6 @@
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 62 },
       "hiddenSeries": false,
       "id": 138,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2561,7 +2532,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2601,7 +2572,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 70 },
       "id": 53,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -2733,7 +2703,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 79 },
       "hiddenSeries": false,
       "id": 50,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2752,7 +2721,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2795,7 +2764,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 79 },
       "hiddenSeries": false,
       "id": 51,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2814,7 +2782,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2857,7 +2825,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 79 },
       "hiddenSeries": false,
       "id": 54,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2876,7 +2843,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2912,7 +2879,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 87 },
       "id": 40,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PCD0403638111AF12" }, "refId": "A" }],
@@ -2933,7 +2899,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 88 },
       "hiddenSeries": false,
       "id": 30,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2952,7 +2917,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3074,7 +3039,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 88 },
       "hiddenSeries": false,
       "id": 44,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -3093,7 +3057,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3141,8 +3105,85 @@
       "yaxis": { "align": false }
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 96 },
+      "id": 158,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "9.1.1",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.5, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "p50",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.9, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "hide": false,
+          "legendFormat": "p90",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.99, rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted\", kubernetes_pod_name=~\"pfn.*\", chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=\"vmagent\", namespace=~\"$namespace\", scope=\"e2e\"}[1m]))",
+          "hide": false,
+          "legendFormat": "p99",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "(devnet/testnet) PFN-only e2e latency",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 96 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 104 },
       "id": 98,
       "panels": [],
       "title": "State Sync",
@@ -3184,7 +3225,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 97 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 105 },
       "id": 100,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3239,7 +3280,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 97 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 105 },
       "id": 94,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3262,7 +3303,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 105 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 113 },
       "id": 81,
       "panels": [],
       "title": "System Metrics",
@@ -3306,7 +3347,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 106 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 114 },
       "id": 79,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3389,7 +3430,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 106 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 114 },
       "id": 83,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3448,7 +3489,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 106 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 114 },
       "id": 85,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3506,7 +3547,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 114 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 122 },
       "id": 89,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3564,7 +3605,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 114 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 122 },
       "id": 87,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -3622,7 +3663,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 114 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 122 },
       "id": 92,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
@@ -3643,7 +3684,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 123 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 131 },
       "id": 156,
       "panels": [],
       "title": "Other metrics",
@@ -3677,7 +3718,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 124 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 132 },
       "id": 154,
       "options": {
         "barRadius": 0,
@@ -3707,7 +3748,7 @@
       "type": "barchart"
     }
   ],
-  "refresh": false,
+  "refresh": "1m",
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -3871,6 +3912,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 15,
+  "version": 16,
   "weekStart": ""
 }

@@ -1008,6 +1008,91 @@ impl CallStack {
     }
 }
 
+fn check_depth_of_type(resolver: &Resolver, ty: &Type) -> PartialVMResult<()> {
+    // Start at 1 since we always call this right before we add a new node to the value's depth.
+    let max_depth = match resolver.loader().vm_config().max_value_nest_depth {
+        Some(max_depth) => max_depth,
+        None => return Ok(()),
+    };
+    check_depth_of_type_impl(resolver, ty, max_depth, 1)?;
+    Ok(())
+}
+
+fn check_depth_of_type_impl(
+    resolver: &Resolver,
+    ty: &Type,
+    max_depth: u64,
+    depth: u64,
+) -> PartialVMResult<u64> {
+    macro_rules! check_depth {
+        ($additional_depth:expr) => {{
+            let new_depth = depth.saturating_add($additional_depth);
+            if new_depth > max_depth {
+                return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
+            } else {
+                new_depth
+            }
+        }};
+    }
+
+    // Calculate depth of the type itself
+    let ty_depth = match ty {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::Address
+        | Type::Signer => check_depth!(0),
+        // Even though this is recursive this is OK since the depth of this recursion is
+        // bounded by the depth of the type arguments, which we have already checked.
+        Type::Reference(ty) | Type::MutableReference(ty) | Type::Vector(ty) => {
+            check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
+        },
+        Type::Struct(si) => {
+            let struct_type = resolver.loader().get_struct_type(*si).ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Struct Definition not resolved".to_string())
+            })?;
+            check_depth!(struct_type
+                .depth
+                .as_ref()
+                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
+                .solve(&[]))
+        },
+        // NB: substitution must be performed before calling this function
+        Type::StructInstantiation(si, ty_args) => {
+            // Calculate depth of all type arguments, and make sure they themselves are not too deep.
+            let ty_arg_depths = ty_args
+                .iter()
+                .map(|ty| {
+                    // Ty args should be fully resolved and not need any type arguments
+                    check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
+                })
+                .collect::<PartialVMResult<Vec<_>>>()?;
+            let struct_type = resolver.loader().get_struct_type(*si).ok_or_else(|| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Struct Definition not resolved".to_string())
+            })?;
+            check_depth!(struct_type
+                .depth
+                .as_ref()
+                .ok_or_else(|| { PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED) })?
+                .solve(&ty_arg_depths))
+        },
+        Type::TyParam(_) => {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Type parameter should be fully resolved".to_string()),
+            )
+        },
+    };
+
+    Ok(ty_depth)
+}
+
 /// A `Frame` is the execution context for a function. It holds the locals of the function and
 /// the function itself.
 // #[derive(Debug)]
@@ -1872,6 +1957,8 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = resolver.field_count(*sd_idx);
+                        let struct_type = resolver.get_struct_type(*sd_idx);
+                        check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack(
                             false,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -1883,6 +1970,8 @@ impl Frame {
                     },
                     Bytecode::PackGeneric(si_idx) => {
                         let field_count = resolver.field_instantiation_count(*si_idx);
+                        let ty = resolver.instantiate_generic_type(*si_idx, self.ty_args())?;
+                        check_depth_of_type(resolver, &ty)?;
                         gas_meter.charge_pack(
                             true,
                             interpreter.operand_stack.last_n(field_count as usize)?,
@@ -2199,6 +2288,7 @@ impl Frame {
                     },
                     Bytecode::VecPack(si, num) => {
                         let ty = resolver.instantiate_single_type(*si, self.ty_args())?;
+                        check_depth_of_type(resolver, &ty)?;
                         gas_meter.charge_vec_pack(
                             make_ty!(&ty),
                             interpreter.operand_stack.last_n(*num as usize)?,

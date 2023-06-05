@@ -160,7 +160,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "hiddenSeries": false,
       "id": 39,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -179,7 +178,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -254,7 +253,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "hiddenSeries": false,
       "id": 40,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -273,7 +271,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -358,7 +356,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
       "hiddenSeries": false,
       "id": 41,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -377,7 +374,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -446,11 +443,20 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(block_executor_duplicates_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) ",
+          "expr": "quantile(0.67, rate(aptos_execution_transaction_dedup_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) ",
           "hide": false,
-          "legendFormat": "duplicate_filter",
+          "legendFormat": "pre_dedup",
           "range": true,
           "refId": "G"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(aptos_execution_transaction_shuffle_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) ",
+          "hide": false,
+          "legendFormat": "pre_shuffle",
+          "range": true,
+          "refId": "H"
         }
       ],
       "thresholds": [],
@@ -480,7 +486,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "hiddenSeries": false,
       "id": 42,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -499,7 +504,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -575,7 +580,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "hiddenSeries": false,
       "id": 43,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -594,7 +598,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -697,7 +701,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "hiddenSeries": false,
       "id": 44,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -716,7 +719,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -870,7 +873,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
       "hiddenSeries": false,
       "id": 45,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -889,7 +891,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -947,9 +949,9 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "quantile(0.67, rate(block_executor_duplicates_filtered_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) /  quantile(0.67, rate(aptos_executor_execute_block_seconds_count{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])  )",
+          "expr": "quantile(0.67, rate(aptos_execution_transaction_dedup_filtered_sum{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])) /  quantile(0.67, rate(aptos_executor_execute_block_seconds_count{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval])  )",
           "hide": false,
-          "legendFormat": "duplicates_filtered_per_block",
+          "legendFormat": "deduped_per_block",
           "range": true,
           "refId": "F"
         }
@@ -981,7 +983,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
       "hiddenSeries": false,
       "id": 46,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1000,7 +1001,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1115,7 +1116,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 32 },
       "hiddenSeries": false,
       "id": 51,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1134,7 +1134,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1174,7 +1174,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "id": 13,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
@@ -1196,7 +1195,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 41 },
       "hiddenSeries": false,
       "id": 9,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1215,7 +1213,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1261,7 +1259,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 41 },
       "hiddenSeries": false,
       "id": 24,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1280,7 +1277,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1326,7 +1323,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 41 },
       "hiddenSeries": false,
       "id": 23,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1345,7 +1341,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1391,7 +1387,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 49 },
       "hiddenSeries": false,
       "id": 18,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1410,7 +1405,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1456,7 +1451,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 49 },
       "hiddenSeries": false,
       "id": 25,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1475,7 +1469,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1521,7 +1515,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 49 },
       "hiddenSeries": false,
       "id": 26,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1540,7 +1533,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "9.5.3-cloud.2.0cb5a501",
+      "pluginVersion": "10.0.0-cloud.3.b04cc88b",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1586,7 +1579,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 57 },
       "hiddenSeries": false,
       "id": 16,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1651,7 +1643,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 57 },
       "hiddenSeries": false,
       "id": 27,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1716,7 +1707,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 57 },
       "hiddenSeries": false,
       "id": 28,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1781,7 +1771,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 65 },
       "hiddenSeries": false,
       "id": 17,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1846,7 +1835,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 65 },
       "hiddenSeries": false,
       "id": 29,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1911,7 +1899,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 65 },
       "hiddenSeries": false,
       "id": 30,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -1968,7 +1955,6 @@
       "error": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
       "id": 11,
-      "isNew": false,
       "panels": [],
       "span": 0,
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
@@ -1990,7 +1976,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 74 },
       "hiddenSeries": false,
       "id": 6,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2055,7 +2040,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 74 },
       "hiddenSeries": false,
       "id": 15,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2120,7 +2104,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 74 },
       "hiddenSeries": false,
       "id": 4,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2185,7 +2168,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 82 },
       "hiddenSeries": false,
       "id": 2,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2250,7 +2232,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 82 },
       "hiddenSeries": false,
       "id": 20,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2313,7 +2294,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 82 },
       "hiddenSeries": false,
       "id": 50,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2380,7 +2360,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 90 },
       "hiddenSeries": false,
       "id": 32,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2447,7 +2426,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 90 },
       "hiddenSeries": false,
       "id": 49,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2653,7 +2631,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 90 },
       "hiddenSeries": false,
       "id": 22,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2724,7 +2701,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 99 },
       "hiddenSeries": false,
       "id": 52,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2799,7 +2775,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 99 },
       "hiddenSeries": false,
       "id": 56,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -2874,7 +2849,6 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 99 },
       "hiddenSeries": false,
       "id": 53,
-      "isNew": false,
       "legend": {
         "alignAsTable": false,
         "avg": false,
@@ -3147,6 +3121,6 @@
   "timezone": "",
   "title": "execution",
   "uid": "execution",
-  "version": 10,
+  "version": 12,
   "weekStart": ""
 }

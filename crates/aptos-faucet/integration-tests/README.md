@@ -27,11 +27,24 @@ poetry run python main.py -h
 
 For example:
 ```
-poetry run python main.py --base-network mainnet
+poetry run python main.py --base-network testnet
 ```
+
+## Debugging
+If you are get an error message similar to this:
+```
+docker: no matching manifest for linux/arm64/v8 in the manifest list entries.
+```
+
+Try running the poetry command with this env var:
+```
+DOCKER_DEFAULT_PLATFORM=linux/amd64 poetry run python main.py --base-network testnet
+```
+This makes the docker commands use the x86_64 images since we don't publish images for ARM.
 
 ## Formatting:
 ```
 poetry run isort .
 poetry run black .
 ```
+

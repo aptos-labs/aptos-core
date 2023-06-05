@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  namespace: {namespace}
+  name: {name} 
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - {namespace}
+    expressionSelectors:
+      - {{ key: app.kubernetes.io/instance, operator: In, values: [{instance_labels}] }}
+  stressors:
+    cpu:
+      workers: {num_workers}
+      load: {load_per_worker}

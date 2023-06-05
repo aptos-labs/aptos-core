@@ -49,7 +49,7 @@ struct ParamSweepOpt {
     pub num_runs: usize,
 
     #[clap(long)]
-    pub maybe_gas_limit: Option<u64>,
+    pub maybe_block_gas_limit: Option<u64>,
 }
 
 #[derive(Debug, Parser)]
@@ -76,7 +76,7 @@ struct ExecuteOpt {
     pub no_conflict_txns: bool,
 
     #[clap(long)]
-    pub maybe_gas_limit: Option<u64>,
+    pub maybe_block_gas_limit: Option<u64>,
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -91,7 +91,7 @@ fn param_sweep(opt: ParamSweepOpt) {
     let run_parallel = !opt.skip_parallel;
     let run_sequential = !opt.skip_sequential;
 
-    let maybe_gas_limit = opt.maybe_gas_limit;
+    let maybe_block_gas_limit = opt.maybe_block_gas_limit;
 
     assert!(
         run_sequential || run_parallel,
@@ -110,7 +110,7 @@ fn param_sweep(opt: ParamSweepOpt) {
                 1,
                 concurrency_level,
                 false,
-                maybe_gas_limit,
+                maybe_block_gas_limit,
             );
             par_tps.sort();
             seq_tps.sort();
@@ -171,7 +171,7 @@ fn execute(opt: ExecuteOpt) {
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
         opt.no_conflict_txns,
-        opt.maybe_gas_limit,
+        opt.maybe_block_gas_limit,
     );
 
     let sum: usize = par_tps.iter().sum();

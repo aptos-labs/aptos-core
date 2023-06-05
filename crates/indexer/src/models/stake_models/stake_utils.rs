@@ -15,11 +15,14 @@ pub struct StakePoolResource {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DelegationPoolResource {
-    pub active_shares: SharesResource,
+    pub active_shares: PoolResource,
+    pub inactive_shares: Table,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub operator_commission_percentage: BigDecimal,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SharesResource {
+pub struct PoolResource {
     pub shares: SharesInnerResource,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub total_coins: BigDecimal,
@@ -82,6 +85,30 @@ pub struct ReactivateStakeEvent {
     pub amount_reactivated: u64,
     pub delegator_address: String,
     pub pool_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum StakeTableItem {
+    Pool(PoolResource),
+}
+
+impl StakeTableItem {
+    pub fn from_table_item_type(
+        data_type: &str,
+        data: &serde_json::Value,
+        txn_version: i64,
+    ) -> Result<Option<Self>> {
+        match data_type {
+            "0x1::pool_u64_unbound::Pool" => {
+                serde_json::from_value(data.clone()).map(|inner| Some(StakeTableItem::Pool(inner)))
+            },
+            _ => Ok(None),
+        }
+        .context(format!(
+            "version {} failed! failed to parse type {}, data {:?}",
+            txn_version, data_type, data
+        ))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

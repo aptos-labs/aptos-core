@@ -19,6 +19,7 @@ members = [
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
+    "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -92,6 +93,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-parser",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
      "ecosystem/indexer-grpc/indexer-grpc-server-framework",
@@ -370,6 +372,7 @@ aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
+aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
@@ -627,14 +630,14 @@ inherits = "release"
 opt-level = 3
 debug = true
 overflow-checks = true
-lto = true
+lto = "thin"
 codegen-units = 1
 
 [profile.cli]
 inherits = "release"
 debug = false
 opt-level = "z"
-lto = true
+lto = "thin"
 strip = true
 codegen-units = 1
 
