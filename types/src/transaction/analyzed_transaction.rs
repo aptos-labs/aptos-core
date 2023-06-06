@@ -77,6 +77,10 @@ impl AnalyzedTransaction {
         }
     }
 
+    pub fn new_with_no_hints(transaction: Transaction) -> Self {
+        AnalyzedTransaction::new(transaction, vec![], vec![])
+    }
+
     pub fn into_inner(self) -> Transaction {
         self.transaction
     }
@@ -221,7 +225,7 @@ impl From<Transaction> for AnalyzedTransaction {
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
             },
-            _ => todo!("Only user transactions are supported for now"),
+            _ => AnalyzedTransaction::new_with_no_hints(txn),
         }
     }
 }
