@@ -36,7 +36,7 @@ export class CoinClient {
    *
    * The TS SDK supports fungible assets operations. If you want to use CoinClient
    * with this feature, set the `coinType` to be the fungible asset metadata address.
-   * This option uses the FungibleAssetClient class and queries the
+   * This option uses the `FungibleAssetClient` class and queries the
    * fungible asset primary store.
    *
    * @param from Account sending the coins

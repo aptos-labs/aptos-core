@@ -38,7 +38,7 @@ export class FungibleAssetClient {
     amount: number | bigint,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const rawTransaction = await this.generateTransfer(
+    const rawTransaction = await this.generateTransferFromPrimaryFungibleStore(
       sender,
       fungibleAssetMetadataAddress,
       recipient,
@@ -72,7 +72,7 @@ export class FungibleAssetClient {
   /**
    *
    * Generate a transfer transaction that can be used to sign and submit to transfer an asset amount
-   * from the sender primary_fungible_store to the recipient primary_fungible_store.
+   * from the sender primary fungible store to the recipient primary fungible store.
    *
    * This method can be used if you want/need to get the raw transaction so you can
    * first simulate the transaction and then sign and submit it.
@@ -84,7 +84,7 @@ export class FungibleAssetClient {
    * @param amount Number of assets to transfer
    * @returns Raw Transaction
    */
-  async generateTransfer(
+  async generateTransferFromPrimaryFungibleStore(
     sender: AptosAccount,
     fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,

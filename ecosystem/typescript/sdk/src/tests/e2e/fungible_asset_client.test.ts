@@ -112,7 +112,7 @@ describe("fungible asset", () => {
   );
 
   /**
-   * Test `transferFromPrimaryFungibleStore` and `checkBalance` functions in CoinClient class
+   * Test `transferFromPrimaryFungibleStore` and `checkBalance` functions in `CoinClient` class
    */
   test("coin client supports fungible assets operations", async () => {
     const coinClient = new CoinClient(provider.aptosClient);
@@ -135,7 +135,12 @@ describe("fungible asset", () => {
 
   test("it generates and returns a transferFromPrimaryFungibleStore raw transaction", async () => {
     const fungibleAsset = new FungibleAssetClient(provider);
-    const rawTxn = await fungibleAsset.generateTransfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
+    const rawTxn = await fungibleAsset.generateTransferFromPrimaryFungibleStore(
+      alice,
+      fungibleAssetMetadataAddress,
+      bob.address(),
+      2,
+    );
     expect(rawTxn instanceof RawTransaction).toBeTruthy();
     expect(rawTxn.sender.toHexString()).toEqual(alice.address().hex());
   });
