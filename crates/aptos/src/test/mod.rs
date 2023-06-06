@@ -12,12 +12,12 @@ use crate::{
     common::{
         init::{InitTool, Network},
         types::{
-            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec, CliError,
-            CliTypedResult, EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions,
-            KeyType, MoveManifestAccountWrapper, MovePackageDir, OptionalPoolAddressArgs,
-            PoolAddressArgs, PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions,
-            RestOptions, RngArgs, SaveFile, ScriptFunctionArguments, TransactionOptions,
-            TransactionSummary, TypeArgVec,
+            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
+            AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
+            EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
+            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
+            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
+            ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -76,7 +76,6 @@ use thiserror::__private::PathAsDisplay;
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
-use crate::common::types::AuthenticationKeyInputOptions;
 
 #[cfg(test)]
 mod tests;
