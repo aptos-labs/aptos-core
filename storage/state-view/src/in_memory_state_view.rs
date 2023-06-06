@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
-
-//! This crate defines [`trait StateView`](StateView).
-
 use crate::TStateView;
 use anyhow::Result;
 use aptos_types::state_store::{

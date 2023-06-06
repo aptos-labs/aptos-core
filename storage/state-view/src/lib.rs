@@ -53,7 +53,7 @@ pub trait TStateView {
     fn get_usage(&self) -> Result<StateStorageUsage>;
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
-        unreachable!("not an in-memory state view")
+        unreachable!("in-memory state view conversion not supported yet")
     }
 }
 

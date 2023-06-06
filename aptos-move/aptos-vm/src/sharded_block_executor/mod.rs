@@ -38,10 +38,6 @@ pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
 
 impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn new<E: TBlockExecutorClient + Sync + Send + 'static>(executor_clients: Vec<E>) -> Self {
-        // assert!(num_executor_shards > 0, "num_executor_shards must be > 0");
-        // let executor_threads_per_shard = executor_threads_per_shard.unwrap_or_else(|| {
-        //     (num_cpus::get() as f64 / num_executor_shards as f64).ceil() as usize
-        // });
         let mut command_txs = vec![];
         let mut result_rxs = vec![];
         let mut shard_join_handles = vec![];

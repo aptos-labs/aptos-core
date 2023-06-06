@@ -479,7 +479,6 @@ where
                 });
             }
         });
-        println!("waiting for timer");
         drop(timer);
 
         let num_txns = num_txns as usize;

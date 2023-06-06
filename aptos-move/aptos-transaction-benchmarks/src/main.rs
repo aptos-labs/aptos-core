@@ -166,7 +166,6 @@ fn param_sweep(opt: ParamSweepOpt) {
 }
 
 fn execute(opt: ExecuteOpt) {
-    println!("socket address = {:?}", opt.remote_executor_addresses);
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
     let (par_tps, _) = bencher.blockstm_benchmark(
