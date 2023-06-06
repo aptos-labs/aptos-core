@@ -60,7 +60,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             ));
         }
         info!(
-            "Creating a new ShardedBlockExecutor with {} shards and concurrency per shard",
+            "Creating a new ShardedBlockExecutor with {} shards",
             num_executor_shards
         );
         Self {

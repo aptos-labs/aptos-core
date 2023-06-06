@@ -4,6 +4,7 @@
 
 use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
+use aptos_executor_service::remote_executor_client::RemoteExecutorClient;
 use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverse, AccountUniverseGen},
     data_store::FakeDataStore,
@@ -25,7 +26,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{sync::Arc, time::Instant};
+use std::{net::SocketAddr, sync::Arc, time::Instant};
 
 /// Benchmarking support for transactions.
 #[derive(Clone)]
@@ -75,6 +76,7 @@ where
                     self.num_accounts,
                     self.num_transactions,
                     1,
+                    None,
                     AccountPickStyle::Unlimited,
                 )
             },
@@ -93,6 +95,7 @@ where
                     self.num_accounts,
                     self.num_transactions,
                     1,
+                    None,
                     AccountPickStyle::Unlimited,
                 )
             },
@@ -113,6 +116,7 @@ where
         num_runs: usize,
         num_executor_shards: usize,
         concurrency_level_per_shard: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
         no_conflict_txn: bool,
         maybe_block_gas_limit: Option<u64>,
     ) -> (Vec<usize>, Vec<usize>) {
@@ -138,6 +142,7 @@ where
             num_accounts,
             num_txn,
             num_executor_shards,
+            remote_executor_addresses,
             account_pick_style,
         );
 
@@ -189,6 +194,7 @@ where
         num_accounts: usize,
         num_transactions: usize,
         num_executor_shards: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
         account_pick_style: AccountPickStyle,
     ) -> Self {
         Self::with_universe(
@@ -196,6 +202,7 @@ where
             universe_strategy(num_accounts, num_transactions, account_pick_style),
             num_transactions,
             num_executor_shards,
+            remote_executor_addresses,
         )
     }
 
@@ -206,6 +213,7 @@ where
         universe_strategy: impl Strategy<Value = AccountUniverseGen>,
         num_transactions: usize,
         num_executor_shards: usize,
+        remote_executor_addresses: Option<Vec<SocketAddr>>,
     ) -> Self {
         let mut runner = TestRunner::default();
         let universe_gen = universe_strategy
@@ -220,8 +228,18 @@ where
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
         let state_view = Arc::new(executor.get_state_view().clone());
-        let executor_clients = LocalExecutorClient::create_local_clients(num_executor_shards, None);
-        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(executor_clients));
+        let parallel_block_executor =
+            if let Some(remote_executor_addresses) = remote_executor_addresses {
+                let remote_executor_clients = remote_executor_addresses
+                    .into_iter()
+                    .map(|addr| RemoteExecutorClient::new(addr, 10000))
+                    .collect::<Vec<RemoteExecutorClient>>();
+                Arc::new(ShardedBlockExecutor::new(remote_executor_clients))
+            } else {
+                let local_executor_client =
+                    LocalExecutorClient::create_local_clients(num_executor_shards, None);
+                Arc::new(ShardedBlockExecutor::new(local_executor_client))
+            };
         let sequential_executor_client = LocalExecutorClient::create_local_clients(1, Some(1));
         let sequential_block_executor =
             Arc::new(ShardedBlockExecutor::new(sequential_executor_client));

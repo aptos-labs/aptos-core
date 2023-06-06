@@ -3178,6 +3178,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
+ "aptos-executor-service",
  "aptos-gas",
  "aptos-language-e2e-tests",
  "aptos-logger",

@@ -175,8 +175,6 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
         );
 
-        println!("AptosVM: execute_block");
-
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
             Ok(outputs) => {

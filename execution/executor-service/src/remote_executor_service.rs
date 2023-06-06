@@ -6,7 +6,7 @@ use crate::{
     BlockExecutionResult,
 };
 use aptos_logger::{error, info};
-use aptos_secure_net::{NetworkClient, NetworkServer};
+use aptos_secure_net::NetworkServer;
 use aptos_vm::sharded_block_executor::block_executor_client::{
     LocalExecutorClient, TBlockExecutorClient,
 };
@@ -33,6 +33,7 @@ impl ExecutorService {
         &self,
         execution_request: BlockExecutionRequest,
     ) -> Result<BlockExecutionResult, Error> {
+        info!("server received request");
         //println!("server executing block");
         let result = match execution_request {
             BlockExecutionRequest::ExecuteBlock(command) => self.client.execute_block(
@@ -49,12 +50,7 @@ impl ExecutorService {
 
 pub trait RemoteExecutorService {
     fn client(&self) -> RemoteExecutorClient {
-        let network_client = NetworkClient::new(
-            "remote-executor-service",
-            self.server_address(),
-            self.network_timeout_ms(),
-        );
-        RemoteExecutorClient::new(network_client)
+        RemoteExecutorClient::new(self.server_address(), self.network_timeout_ms())
     }
 
     fn server_address(&self) -> SocketAddr;
@@ -85,12 +81,14 @@ fn process_one_message(
 ) -> Result<(), Error> {
     let request = network_server.read()?;
     let response = executor_service.handle_message(request)?;
+    info!("server sending response");
     network_server.write(&response)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use crate::{
         remote_executor_service::RemoteExecutorService,
         thread_executor_service::ThreadExecutorService,
@@ -101,89 +99,95 @@ mod tests {
         transaction::{ExecutionStatus, Transaction, TransactionStatus},
     };
     use aptos_vm::sharded_block_executor::block_executor_client::TBlockExecutorClient;
+    use crate::remote_executor_client::RemoteExecutorClient;
 
     #[test]
-    fn test_remote_execute() {
+    fn test_remote_block_execute() {
         let executor_service = ThreadExecutorService::new(1000, 2);
-        let client = executor_service.client();
+        // Uncomment for testing with a real server
+        let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
+        let client = RemoteExecutorClient::new(server_addr, 1000);
+        // let executor_service = ProcessExecutorService::new(server_addr, 1000, 2);
+        //let client = executor_service.client();
         let mut executor = FakeExecutor::from_head_genesis();
+        for _ in 0..5 {
+            let sender = executor.create_raw_account_data(3_000_000_000, 10);
+            let receiver = executor.create_raw_account_data(3_000_000_000, 10);
+            executor.add_account_data(&sender);
+            executor.add_account_data(&receiver);
 
-        let sender = executor.create_raw_account_data(3_000_000_000, 10);
-        let receiver = executor.create_raw_account_data(3_000_000_000, 10);
-        executor.add_account_data(&sender);
-        executor.add_account_data(&receiver);
+            let transfer_amount = 1_000;
 
-        let transfer_amount = 1_000;
+            // execute transaction
+            let txns: Vec<Transaction> = vec![
+                Transaction::UserTransaction(peer_to_peer_txn(
+                    sender.account(),
+                    receiver.account(),
+                    10,
+                    transfer_amount,
+                    100,
+                )),
+                Transaction::UserTransaction(peer_to_peer_txn(
+                    sender.account(),
+                    receiver.account(),
+                    11,
+                    transfer_amount,
+                    100,
+                )),
+                Transaction::UserTransaction(peer_to_peer_txn(
+                    sender.account(),
+                    receiver.account(),
+                    12,
+                    transfer_amount,
+                    100,
+                )),
+                Transaction::UserTransaction(peer_to_peer_txn(
+                    sender.account(),
+                    receiver.account(),
+                    13,
+                    transfer_amount,
+                    100,
+                )),
+            ];
+            let output = client
+                .execute_block(txns, executor.data_store(), 2, None)
+                .unwrap();
+            for (idx, txn_output) in output.iter().enumerate() {
+                assert_eq!(
+                    txn_output.status(),
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
+                );
 
-        // execute transaction
-        let txns: Vec<Transaction> = vec![
-            Transaction::UserTransaction(peer_to_peer_txn(
-                sender.account(),
-                receiver.account(),
-                10,
-                transfer_amount,
-                100,
-            )),
-            Transaction::UserTransaction(peer_to_peer_txn(
-                sender.account(),
-                receiver.account(),
-                11,
-                transfer_amount,
-                100,
-            )),
-            Transaction::UserTransaction(peer_to_peer_txn(
-                sender.account(),
-                receiver.account(),
-                12,
-                transfer_amount,
-                100,
-            )),
-            Transaction::UserTransaction(peer_to_peer_txn(
-                sender.account(),
-                receiver.account(),
-                13,
-                transfer_amount,
-                100,
-            )),
-        ];
-        let output = client
-            .execute_block(txns, executor.data_store(), 2, None)
-            .unwrap();
-        for (idx, txn_output) in output.iter().enumerate() {
-            assert_eq!(
-                txn_output.status(),
-                &TransactionStatus::Keep(ExecutionStatus::Success)
-            );
-
-            // check events
-            for event in txn_output.events() {
-                if let Ok(payload) = WithdrawEvent::try_from(event) {
-                    assert_eq!(transfer_amount, payload.amount());
-                } else if let Ok(payload) = DepositEvent::try_from(event) {
-                    if payload.amount() == 0 {
-                        continue;
+                // check events
+                for event in txn_output.events() {
+                    if let Ok(payload) = WithdrawEvent::try_from(event) {
+                        assert_eq!(transfer_amount, payload.amount());
+                    } else if let Ok(payload) = DepositEvent::try_from(event) {
+                        if payload.amount() == 0 {
+                            continue;
+                        }
+                        assert_eq!(transfer_amount, payload.amount());
+                    } else {
+                        panic!("Unexpected Event Type")
                     }
-                    assert_eq!(transfer_amount, payload.amount());
-                } else {
-                    panic!("Unexpected Event Type")
                 }
+
+                let original_receiver_balance = executor
+                    .read_coin_store_resource(receiver.account())
+                    .expect("receiver balcne must exist");
+                executor.apply_write_set(txn_output.write_set());
+
+                // check that numbers in stored DB are correct
+                let receiver_balance = original_receiver_balance.coin() + transfer_amount;
+                let updated_receiver_balance = executor
+                    .read_coin_store_resource(receiver.account())
+                    .expect("receiver balance must exist");
+                assert_eq!(receiver_balance, updated_receiver_balance.coin());
+                assert_eq!(
+                    idx as u64 + 1,
+                    updated_receiver_balance.deposit_events().count()
+                );
             }
-
-            let original_receiver_balance = executor
-                .read_coin_store_resource(receiver.account())
-                .expect("receiver balcne must exist");
-            executor.apply_write_set(txn_output.write_set());
-
-            // check that numbers in stored DB are correct
-            let receiver_balance = original_receiver_balance.coin() + transfer_amount;
-            let updated_receiver_balance = executor
-                .read_coin_store_resource(receiver.account())
-                .expect("receiver balance must exist");
-            assert_eq!(receiver_balance, updated_receiver_balance.coin());
-            assert_eq!(
-                idx as u64 + 1,
-                updated_receiver_balance.deposit_events().count()
-            );
         }
     }
 }

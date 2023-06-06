@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, BlockExecutionRequest, BlockExecutionResult, ExecuteBlockCommand};
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_secure_net::NetworkClient;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -13,7 +13,7 @@ use aptos_types::{
     },
 };
 use aptos_vm::sharded_block_executor::block_executor_client::TBlockExecutorClient;
-use std::sync::Mutex;
+use std::{net::SocketAddr, sync::Mutex};
 
 pub struct RemoteExecutorClient {
     // fields omitted
@@ -21,7 +21,12 @@ pub struct RemoteExecutorClient {
 }
 
 impl RemoteExecutorClient {
-    pub fn new(network_client: NetworkClient) -> Self {
+    pub fn new(server_address: SocketAddr, network_timeout_ms: u64) -> Self {
+        let network_client = NetworkClient::new(
+            "remote-executor-service",
+            server_address,
+            network_timeout_ms,
+        );
         Self {
             network_client: Mutex::new(network_client),
         }
@@ -58,6 +63,7 @@ impl TBlockExecutorClient for RemoteExecutorClient {
             )
         })?;
         loop {
+            info!("Sending request to Executor service");
             match self.process_one_message(&input_message) {
                 Err(err) => {
                     error!("Failed to communicate with Executor service: {}", err)

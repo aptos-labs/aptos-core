@@ -115,6 +115,7 @@ fn param_sweep(opt: ParamSweepOpt) {
                 opt.num_runs,
                 1,
                 concurrency_level,
+                None,
                 false,
                 maybe_block_gas_limit,
             );
@@ -177,6 +178,7 @@ fn execute(opt: ExecuteOpt) {
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
+        opt.remote_executor_addresses,
         opt.no_conflict_txns,
         opt.maybe_block_gas_limit,
     );
