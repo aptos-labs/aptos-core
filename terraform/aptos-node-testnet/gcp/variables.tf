@@ -154,7 +154,7 @@ variable "enable_forge" {
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 variable "monitoring_helm_values" {
@@ -165,7 +165,7 @@ variable "monitoring_helm_values" {
 
 variable "enable_prometheus_node_exporter" {
   description = "Enable prometheus-node-exporter within monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 ### Autoscaling
