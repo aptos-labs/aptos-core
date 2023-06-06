@@ -102,6 +102,7 @@ pub enum SubmittedBy {
     /// The transaction was received at a validator from another validator, rather than from the
     /// downstream VFN. This transaction should not be used to measure end-to-end latency within the
     /// validator network (see Downstream).
+    /// Note, with Quorum Store enabled, no transactions will be classified as PeerValidator.
     PeerValidator,
 }
 
