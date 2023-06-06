@@ -56,6 +56,14 @@ spec aptos_std::simple_map {
         pragma verify=false;
     }
 
+    spec keys {
+        pragma verify=false;
+    }
+
+    spec values {
+        pragma verify=false;
+    }
+
     spec to_vec_pair<Key: store, Value: store>(map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         pragma intrinsic;
         pragma opaque;

@@ -263,6 +263,16 @@ module std::vector {
         }
     }
 
+    /// Apply the function to a reference of each element in the vector with its index.
+    public inline fun enumerate_ref<Element>(v: &vector<Element>, f: |u64, &Element|) {
+        let i = 0;
+        let len = length(v);
+        while (i < len) {
+            f(i, borrow(v, i));
+            i = i + 1;
+        };
+    }
+
     /// Apply the function to a mutable reference to each element in the vector.
     public inline fun for_each_mut<Element>(v: &mut vector<Element>, f: |&mut Element|) {
         let i = 0;
@@ -271,6 +281,16 @@ module std::vector {
             f(borrow_mut(v, i));
             i = i + 1
         }
+    }
+
+    /// Apply the function to a mutable reference of each element in the vector with its index.
+    public inline fun enumerate_mut<Element>(v: &mut vector<Element>, f: |u64, &mut Element|) {
+        let i = 0;
+        let len = length(v);
+        while (i < len) {
+            f(i, borrow_mut(v, i));
+            i = i + 1;
+        };
     }
 
     /// Fold the function over the elements. For example, `fold(vector[1,2,3], 0, f)` will execute
