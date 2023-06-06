@@ -461,6 +461,7 @@ where
         // picks up a role will be a coordinator. Hence, if multiple parallel
         // executors are running concurrently, they will all have active coordinator.
         roles.push(CommitRole::Coordinator(senders));
+        println!("roles: {:?}", roles);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
@@ -479,6 +480,7 @@ where
                 });
             }
         });
+        println!("waiting for timer");
         drop(timer);
 
         let num_txns = num_txns as usize;

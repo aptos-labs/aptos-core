@@ -15,7 +15,10 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::Transaction,
 };
-use aptos_vm::{data_cache::AsMoveResolver, sharded_block_executor::ShardedBlockExecutor};
+use aptos_vm::{
+    data_cache::AsMoveResolver,
+    sharded_block_executor::{block_executor_client::LocalExecutorClient, ShardedBlockExecutor},
+};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use proptest::{
     collection::vec,
@@ -217,9 +220,11 @@ where
         let universe = universe_gen.setup_gas_cost_stability(&mut executor);
 
         let state_view = Arc::new(executor.get_state_view().clone());
-        let parallel_block_executor =
-            Arc::new(ShardedBlockExecutor::new(num_executor_shards, None));
-        let sequential_block_executor = Arc::new(ShardedBlockExecutor::new(1, Some(1)));
+        let executor_clients = LocalExecutorClient::create_local_clients(num_executor_shards, None);
+        let parallel_block_executor = Arc::new(ShardedBlockExecutor::new(executor_clients));
+        let sequential_executor_client = LocalExecutorClient::create_local_clients(1, Some(1));
+        let sequential_block_executor =
+            Arc::new(ShardedBlockExecutor::new(sequential_executor_client));
 
         let validator_set = ValidatorSet::fetch_config(
             &FakeExecutor::from_head_genesis()

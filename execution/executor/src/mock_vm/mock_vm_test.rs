@@ -4,7 +4,7 @@
 
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
-use aptos_state_view::TStateView;
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
@@ -13,7 +13,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
@@ -34,6 +34,44 @@ impl TStateView for MockStateView {
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
         Ok(StateStorageUsage::new_untracked())
+    }
+}
+
+#[test]
+fn test_remote_execute() {
+    //let executor_service = ThreadExecutorService::new(1000);
+    //let client = executor_service.client();
+    let amount = 100;
+    let mut txns = vec![];
+    for i in 0..10 {
+        txns.push(encode_mint_transaction(gen_address(i), amount));
+    }
+
+    let outputs =
+        MockVM::execute_block(txns.clone(), &InMemoryStateView::new(HashMap::new()), None)
+            .expect("Remote execution should not fail");
+
+    for (output, txn) in itertools::zip_eq(outputs.iter(), txns.iter()) {
+        let sender = txn.try_as_signed_user_txn().unwrap().sender();
+        assert_eq!(
+            output
+                .write_set()
+                .iter()
+                .map(|(key, op)| (key.clone(), op.clone()))
+                .collect::<BTreeMap<_, _>>(),
+            [
+                (
+                    StateKey::access_path(balance_ap(sender)),
+                    WriteOp::Modification(amount.to_le_bytes().to_vec())
+                ),
+                (
+                    StateKey::access_path(seqnum_ap(sender)),
+                    WriteOp::Modification(1u64.to_le_bytes().to_vec())
+                ),
+            ]
+            .into_iter()
+            .collect()
+        );
     }
 }
 

@@ -9,7 +9,10 @@ use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
@@ -71,6 +74,9 @@ struct ExecuteOpt {
 
     #[clap(long, default_value = "1")]
     pub num_executor_shards: usize,
+
+    #[clap(long, min_values = 1, conflicts_with = "num_executor_shards")]
+    pub remote_executor_addresses: Option<Vec<SocketAddr>>,
 
     #[clap(long, default_value = "true")]
     pub no_conflict_txns: bool,
@@ -159,6 +165,7 @@ fn param_sweep(opt: ParamSweepOpt) {
 }
 
 fn execute(opt: ExecuteOpt) {
+    println!("socket address = {:?}", opt.remote_executor_addresses);
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
 
     let (par_tps, _) = bencher.blockstm_benchmark(
