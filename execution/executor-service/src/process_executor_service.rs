@@ -3,6 +3,7 @@
 use crate::{remote_executor_service, remote_executor_service::RemoteExecutorService};
 use std::net::SocketAddr;
 
+/// An implementation of the remote executor service that runs in a standalone process.
 pub struct ProcessExecutorService {
     server_addr: SocketAddr,
     network_timeout_ms: u64,

@@ -26,6 +26,11 @@ pub enum BlockExecutionRequest {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ExecuteBlockCommand {
     pub(crate) transactions: Vec<Transaction>,
+    // Currently we only support the state view backed by in-memory hashmap, which means that
+    // the controller needs to pre-read all the KV pairs from the storage and pass them to the
+    // executor service. In the future, we will support other types of state view, e.g., the
+    // state view backed by remote storage service, which will allow the executor service to read the KV pairs
+    // directly from the storage.
     pub(crate) state_view: InMemoryStateView,
     pub(crate) concurrency_level: usize,
     pub(crate) maybe_block_gas_limit: Option<u64>,

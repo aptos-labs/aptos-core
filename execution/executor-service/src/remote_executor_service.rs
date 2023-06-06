@@ -12,6 +12,8 @@ use aptos_vm::sharded_block_executor::block_executor_client::{
 };
 use std::net::SocketAddr;
 
+/// A service that provides support for remote execution. Essentially, it reads a request from
+/// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
     client: LocalExecutorClient,
 }
@@ -33,8 +35,6 @@ impl ExecutorService {
         &self,
         execution_request: BlockExecutionRequest,
     ) -> Result<BlockExecutionResult, Error> {
-        info!("server received request");
-        //println!("server executing block");
         let result = match execution_request {
             BlockExecutionRequest::ExecuteBlock(command) => self.client.execute_block(
                 command.transactions,
@@ -43,7 +43,6 @@ impl ExecutorService {
                 command.maybe_block_gas_limit,
             ),
         };
-        //println!("server sending result: {:?}", result);
         Ok(BlockExecutionResult { inner: result })
     }
 }

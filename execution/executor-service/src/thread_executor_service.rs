@@ -9,8 +9,8 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-// This is a simple implementation of RemoteExecutorService that runs the executor service in a
-// separate thread. This should be used for testing only.
+/// This is a simple implementation of RemoteExecutorService that runs the executor service in a
+/// separate thread. This should be used for testing only.
 pub struct ThreadExecutorService {
     _child: JoinHandle<()>,
     server_addr: SocketAddr,

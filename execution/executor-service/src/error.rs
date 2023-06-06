@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
-/// Different reasons for proposal rejection
+/// Different reasons for executor service fails to execute a block.
 pub enum Error {
     #[error("Internal error: {0}")]
     InternalError(String),
