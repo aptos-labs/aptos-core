@@ -3,7 +3,7 @@
 
 use crate::{
     sharded_block_partitioner::{
-        dependency_analysis::RWSetWithTxnIndex,
+        dependency_analysis::WriteSetWithTxnIndex,
         messages::{
             AddTxnsWithCrossShardDep, ControlMsg,
             ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
@@ -154,7 +154,7 @@ impl ShardedBlockPartitioner {
     // reorders the transactions so that transactions from the same sender always go to the same shard.
     // This places transactions from the same sender next to each other, which is not optimal for parallelism.
     // TODO(skedia): Improve this logic to shuffle senders
-    fn reorder_txns_by_senders(
+    fn partition_by_senders(
         &self,
         txns: Vec<AnalyzedTransaction>,
     ) -> Vec<Vec<AnalyzedTransaction>> {
@@ -203,33 +203,37 @@ impl ShardedBlockPartitioner {
         &self,
     ) -> (
         Vec<SubBlock>,
-        Vec<RWSetWithTxnIndex>,
+        Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let mut frozen_chunks = Vec::new();
-        let mut frozen_rw_set_with_index = Vec::new();
+        let mut frozen_write_set_with_index = Vec::new();
         let mut rejected_txns_vec = Vec::new();
         for rx in &self.result_rxs {
             let PartitioningBlockResponse {
                 frozen_sub_block: frozen_chunk,
-                rw_set_with_index,
+                write_set_with_index,
                 discarded_txns: rejected_txns,
             } = rx.recv().unwrap();
             frozen_chunks.push(frozen_chunk);
-            frozen_rw_set_with_index.push(rw_set_with_index);
+            frozen_write_set_with_index.push(write_set_with_index);
             rejected_txns_vec.push(rejected_txns);
         }
-        (frozen_chunks, frozen_rw_set_with_index, rejected_txns_vec)
+        (
+            frozen_chunks,
+            frozen_write_set_with_index,
+            rejected_txns_vec,
+        )
     }
 
     fn discard_txns_with_cross_shard_dependencies(
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
         frozen_sub_blocks: Arc<Vec<SubBlock>>,
-        frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
+        frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
         Vec<SubBlock>,
-        Vec<RWSetWithTxnIndex>,
+        Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let partition_block_msgs = txns_to_partition
@@ -237,7 +241,7 @@ impl ShardedBlockPartitioner {
             .map(|txns| {
                 DiscardCrossShardDepReq(DiscardTxnsWithCrossShardDep::new(
                     txns,
-                    frozen_rw_set_with_index.clone(),
+                    frozen_write_set_with_index.clone(),
                     frozen_sub_blocks.clone(),
                 ))
             })
@@ -250,10 +254,10 @@ impl ShardedBlockPartitioner {
         &self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
+        frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
         Vec<SubBlock>,
-        Vec<RWSetWithTxnIndex>,
+        Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let mut index_offset = index_offset;
@@ -264,7 +268,7 @@ impl ShardedBlockPartitioner {
                 let partitioning_msg = AddCrossShardDepReq(AddTxnsWithCrossShardDep::new(
                     remaining_txns,
                     index_offset,
-                    frozen_rw_set_with_index.clone(),
+                    frozen_write_set_with_index.clone(),
                 ));
                 index_offset += remaining_txns_len;
                 partitioning_msg
@@ -288,8 +292,8 @@ impl ShardedBlockPartitioner {
         }
 
         // First round, we filter all transactions with cross-shard dependencies
-        let mut txns_to_partition = self.reorder_txns_by_senders(transactions);
-        let mut frozen_rw_set_with_index = Arc::new(Vec::new());
+        let mut txns_to_partition = self.partition_by_senders(transactions);
+        let mut frozen_write_set_with_index = Arc::new(Vec::new());
         let mut frozen_sub_blocks = Arc::new(Vec::new());
 
         for _ in 0..num_partitioning_round {
@@ -300,15 +304,15 @@ impl ShardedBlockPartitioner {
             ) = self.discard_txns_with_cross_shard_dependencies(
                 txns_to_partition,
                 frozen_sub_blocks.clone(),
-                frozen_rw_set_with_index.clone(),
+                frozen_write_set_with_index.clone(),
             );
             let mut prev_frozen_sub_blocks = Arc::try_unwrap(frozen_sub_blocks).unwrap();
-            let mut prev_frozen_rw_set_with_index =
-                Arc::try_unwrap(frozen_rw_set_with_index).unwrap();
+            let mut prev_frozen_write_set_with_index =
+                Arc::try_unwrap(frozen_write_set_with_index).unwrap();
             prev_frozen_sub_blocks.extend(current_frozen_sub_blocks_vec);
-            prev_frozen_rw_set_with_index.extend(current_frozen_rw_set_with_index_vec);
+            prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
             frozen_sub_blocks = Arc::new(prev_frozen_sub_blocks);
-            frozen_rw_set_with_index = Arc::new(prev_frozen_rw_set_with_index);
+            frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
             txns_to_partition = discarded_txns_to_partition;
             if txns_to_partition
                 .iter()
@@ -328,7 +332,7 @@ impl ShardedBlockPartitioner {
         let (remaining_frozen_chunks, _, _) = self.add_cross_shard_dependencies(
             index_offset,
             txns_to_partition,
-            frozen_rw_set_with_index,
+            frozen_write_set_with_index,
         );
 
         Arc::try_unwrap(frozen_sub_blocks)
@@ -664,9 +668,9 @@ mod tests {
             for txn in txns.transactions_with_deps().iter() {
                 let storage_locations = txn
                     .txn()
-                    .read_set()
+                    .read_hints()
                     .iter()
-                    .chain(txn.txn().write_set().iter());
+                    .chain(txn.txn().write_hints().iter());
                 for storage_location in storage_locations {
                     if storage_location_to_shard_map.contains_key(storage_location) {
                         assert_eq!(

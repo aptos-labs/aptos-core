@@ -89,11 +89,11 @@ impl AnalyzedTransaction {
         &self.transaction
     }
 
-    pub fn read_set(&self) -> &[StorageLocation] {
+    pub fn read_hints(&self) -> &[StorageLocation] {
         &self.read_hints
     }
 
-    pub fn write_set(&self) -> &[StorageLocation] {
+    pub fn write_hints(&self) -> &[StorageLocation] {
         &self.write_hints
     }
 

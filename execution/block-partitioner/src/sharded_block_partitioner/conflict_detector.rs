@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    sharded_block_partitioner::dependency_analysis::{RWSet, RWSetWithTxnIndex},
+    sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
     types::{CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIndex},
 };
 use aptos_crypto::hash::CryptoHash;
@@ -25,7 +25,7 @@ impl CrossShardConflictDetector {
         &mut self,
         txns: Vec<AnalyzedTransaction>,
         cross_shard_rw_set: &[RWSet],
-        prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
+        prev_rounds_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
         Vec<AnalyzedTransaction>,
         Vec<CrossShardDependencies>,
@@ -60,48 +60,32 @@ impl CrossShardConflictDetector {
     fn get_dependencies_for_frozen_txn(
         &self,
         frozen_txn: &AnalyzedTransaction,
-        current_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
-        prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
+        current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
+        prev_rounds_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> CrossShardDependencies {
         if current_round_rw_set_with_index.is_empty() && prev_rounds_rw_set_with_index.is_empty() {
             return CrossShardDependencies::default();
         }
         // Iterate through the frozen dependencies and add the max transaction index for each storage location
         let mut cross_shard_dependencies = CrossShardDependencies::default();
-        for read_location in frozen_txn.read_set().iter() {
+        for storage_location in frozen_txn
+            .read_hints()
+            .iter()
+            .chain(frozen_txn.write_hints().iter())
+        {
             // For current round, iterate through all shards less than current shards in the reverse order and for previous rounds iterate through all shards in the reverse order
             // and find the first shard id that has taken a write lock on the storage location. This ensures that we find the highest txn index that is conflicting
-            // with the current transaction.
+            // with the current transaction. Please note that since we use a multi-version database, there is no conflict if any previous txn index has taken
+            // a read lock on the storage location.
             for rw_set_with_index in current_round_rw_set_with_index
                 .iter()
                 .take(self.shard_id)
                 .rev()
                 .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
-                if rw_set_with_index.has_write_lock(read_location) {
+                if rw_set_with_index.has_write_lock(storage_location) {
                     cross_shard_dependencies.add_depends_on_txn(
-                        rw_set_with_index.get_write_lock_txn_index(read_location),
-                    );
-                    break;
-                }
-            }
-        }
-
-        for write_location in frozen_txn.write_set().iter() {
-            for rw_set_with_index in current_round_rw_set_with_index
-                .iter()
-                .take(self.shard_id)
-                .chain(prev_rounds_rw_set_with_index.iter())
-            {
-                if rw_set_with_index.has_read_lock(write_location) {
-                    cross_shard_dependencies.add_depends_on_txn(
-                        rw_set_with_index.get_read_lock_txn_index(write_location),
-                    );
-                    break;
-                }
-                if rw_set_with_index.has_write_lock(write_location) {
-                    cross_shard_dependencies.add_depends_on_txn(
-                        rw_set_with_index.get_write_lock_txn_index(write_location),
+                        rw_set_with_index.get_write_lock_txn_index(storage_location),
                     );
                     break;
                 }
@@ -114,8 +98,8 @@ impl CrossShardConflictDetector {
     pub fn get_frozen_sub_block(
         &self,
         txns: Vec<AnalyzedTransaction>,
-        current_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
-        prev_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
+        current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
+        prev_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         index_offset: TxnIndex,
     ) -> SubBlock {
         let mut frozen_txns = Vec::new();
@@ -151,7 +135,7 @@ impl CrossShardConflictDetector {
         txn: &AnalyzedTransaction,
         cross_shard_rw_set: &[RWSet],
     ) -> bool {
-        for read_location in txn.read_set().iter() {
+        for read_location in txn.read_hints().iter() {
             // Each storage location is allocated an anchor shard id, which is used to conflict resolution deterministically across shards.
             // During conflict resolution, shards starts scanning from the anchor shard id and
             // first shard id that has taken a read/write lock on this storage location is the owner of this storage location.
@@ -178,7 +162,7 @@ impl CrossShardConflictDetector {
         txn: &AnalyzedTransaction,
         cross_shard_rw_set: &[RWSet],
     ) -> bool {
-        for write_location in txn.write_set().iter() {
+        for write_location in txn.write_hints().iter() {
             let anchor_shard_id = write_location.hash().byte(0) as usize % self.num_shards;
             for offset in 0..self.num_shards {
                 let shard_id = (anchor_shard_id + offset) % self.num_shards;

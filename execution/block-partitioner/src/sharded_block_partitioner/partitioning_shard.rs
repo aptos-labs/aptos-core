@@ -5,7 +5,7 @@
 use crate::{
     sharded_block_partitioner::{
         conflict_detector::CrossShardConflictDetector,
-        dependency_analysis::{RWSet, RWSetWithTxnIndex},
+        dependency_analysis::{RWSet, WriteSetWithTxnIndex},
         messages::{
             AddTxnsWithCrossShardDep, ControlMsg, CrossShardMsg, DiscardTxnsWithCrossShardDep,
             PartitioningBlockResponse,
@@ -73,12 +73,12 @@ impl PartitioningShard {
         rw_set_vec
     }
 
-    fn broadcast_rw_set_with_index(&self, rw_set_with_index: RWSetWithTxnIndex) {
+    fn broadcast_write_set_with_index(&self, rw_set_with_index: WriteSetWithTxnIndex) {
         let num_shards = self.message_txs.len();
         for i in 0..num_shards {
             if i != self.shard_id {
                 self.message_txs[i]
-                    .send(CrossShardMsg::RWSetWithTxnIndexMsg(
+                    .send(CrossShardMsg::WriteSetWithTxnIndexMsg(
                         rw_set_with_index.clone(),
                     ))
                     .unwrap();
@@ -86,15 +86,16 @@ impl PartitioningShard {
         }
     }
 
-    fn collect_rw_set_with_index(&self) -> Vec<RWSetWithTxnIndex> {
-        let mut rw_set_with_index_vec = vec![RWSetWithTxnIndex::default(); self.message_txs.len()];
+    fn collect_write_set_with_index(&self) -> Vec<WriteSetWithTxnIndex> {
+        let mut rw_set_with_index_vec =
+            vec![WriteSetWithTxnIndex::default(); self.message_txs.len()];
         for (i, msg_rx) in self.message_rxs.iter().enumerate() {
             if i == self.shard_id {
                 continue;
             }
             let msg = msg_rx.recv().unwrap();
             match msg {
-                CrossShardMsg::RWSetWithTxnIndexMsg(rw_set_with_index) => {
+                CrossShardMsg::WriteSetWithTxnIndexMsg(rw_set_with_index) => {
                     rw_set_with_index_vec[i] = rw_set_with_index;
                 },
                 _ => panic!("Unexpected message"),
@@ -134,7 +135,7 @@ impl PartitioningShard {
     fn discard_txns_with_cross_shard_deps(&self, partition_msg: DiscardTxnsWithCrossShardDep) {
         let DiscardTxnsWithCrossShardDep {
             transactions,
-            prev_rounds_rw_set_with_index,
+            prev_rounds_write_set_with_index,
             prev_rounds_frozen_sub_blocks,
         } = partition_msg;
         let num_shards = self.message_txs.len();
@@ -149,7 +150,7 @@ impl PartitioningShard {
             .discard_txns_with_cross_shard_deps(
                 transactions,
                 &cross_shard_rw_set,
-                prev_rounds_rw_set_with_index,
+                prev_rounds_write_set_with_index,
             );
         // Broadcast and collect the stats around number of accepted and rejected transactions from other shards
         // this will be used to determine the absolute index of accepted transactions in this shard.
@@ -163,12 +164,14 @@ impl PartitioningShard {
             .iter()
             .map(|chunk| chunk.len())
             .sum::<usize>();
+        // Drop the previous rounds frozen sub blocks so that the reference count for this drops and
+        // the coordinator can unwrap the Arc after receiving the response
         drop(prev_rounds_frozen_sub_blocks);
         let num_accepted_txns = accepted_txns_vec.iter().take(self.shard_id).sum::<usize>();
         index_offset += num_accepted_txns;
 
         // Calculate the RWSetWithTxnIndex for the accepted transactions
-        let current_rw_set_with_index = RWSetWithTxnIndex::new(&accepted_txns, index_offset);
+        let current_rw_set_with_index = WriteSetWithTxnIndex::new(&accepted_txns, index_offset);
 
         let accepted_txns_with_dependencies = accepted_txns
             .into_iter()
@@ -192,28 +195,28 @@ impl PartitioningShard {
             transactions,
             index_offset,
             // The frozen dependencies in previous chunks.
-            prev_rounds_rw_set_with_index,
+            prev_rounds_write_set_with_index,
         } = partition_msg;
         let num_shards = self.message_txs.len();
         let conflict_detector = CrossShardConflictDetector::new(self.shard_id, num_shards);
 
         // Since txn filtering is not allowed, we can create the RW set with maximum txn
         // index with the index offset passed.
-        let rw_set_with_index_for_shard = RWSetWithTxnIndex::new(&transactions, index_offset);
+        let write_set_with_index_for_shard = WriteSetWithTxnIndex::new(&transactions, index_offset);
 
-        self.broadcast_rw_set_with_index(rw_set_with_index_for_shard.clone());
-        let current_round_rw_set_with_index = self.collect_rw_set_with_index();
+        self.broadcast_write_set_with_index(write_set_with_index_for_shard.clone());
+        let current_round_rw_set_with_index = self.collect_write_set_with_index();
         let frozen_sub_block = conflict_detector.get_frozen_sub_block(
             transactions,
             Arc::new(current_round_rw_set_with_index),
-            prev_rounds_rw_set_with_index,
+            prev_rounds_write_set_with_index,
             index_offset,
         );
 
         self.result_tx
             .send(PartitioningBlockResponse::new(
                 frozen_sub_block,
-                rw_set_with_index_for_shard,
+                write_set_with_index_for_shard,
                 vec![],
             ))
             .unwrap();
