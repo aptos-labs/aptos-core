@@ -235,7 +235,7 @@ describe("Indexer", () => {
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
     });
 
-    it("gets account current tokens from a specified token standrd", async () => {
+    it("gets account current tokens from a specified token standard", async () => {
       const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
       expect(tokens.current_token_ownerships_v2).toHaveLength(1);
     });

@@ -494,7 +494,7 @@ export class IndexerClient {
    * Queries for all collections that an account has tokens for.
    *
    * @param ownerAddress the account address that owns the tokens
-   * @returns the collection address
+   * @returns GetCollectionsWithOwnedTokensQuery response type
    */
   async getCollectionsWithOwnedTokens(
     ownerAddress: MaybeHexString,
