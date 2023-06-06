@@ -437,12 +437,6 @@ pub enum EntryFunctionCall {
         owners_to_remove: Vec<AccountAddress>,
     },
 
-    /// Update the number of signatures required then remove owners, in a single operation.
-    MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
-        owners_to_remove: Vec<AccountAddress>,
-        new_num_signatures_required: u64,
-    },
-
     /// Swap an owner in for an old one, without changing required signatures.
     MultisigAccountSwapOwner {
         to_swap_in: AccountAddress,
@@ -1059,13 +1053,6 @@ impl EntryFunctionCall {
             MultisigAccountRemoveOwners { owners_to_remove } => {
                 multisig_account_remove_owners(owners_to_remove)
             },
-            MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
-                owners_to_remove,
-                new_num_signatures_required,
-            } => multisig_account_remove_owners_and_update_signatures_required(
-                owners_to_remove,
-                new_num_signatures_required,
-            ),
             MultisigAccountSwapOwner {
                 to_swap_in,
                 to_swap_out,
@@ -2416,28 +2403,6 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
         ident_str!("remove_owners").to_owned(),
         vec![],
         vec![bcs::to_bytes(&owners_to_remove).unwrap()],
-    ))
-}
-
-/// Update the number of signatures required then remove owners, in a single operation.
-pub fn multisig_account_remove_owners_and_update_signatures_required(
-    owners_to_remove: Vec<AccountAddress>,
-    new_num_signatures_required: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("multisig_account").to_owned(),
-        ),
-        ident_str!("remove_owners_and_update_signatures_required").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&owners_to_remove).unwrap(),
-            bcs::to_bytes(&new_num_signatures_required).unwrap(),
-        ],
     ))
 }
 
@@ -4272,21 +4237,6 @@ mod decoder {
         }
     }
 
-    pub fn multisig_account_remove_owners_and_update_signatures_required(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::MultisigAccountRemoveOwnersAndUpdateSignaturesRequired {
-                    owners_to_remove: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    new_num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
     pub fn multisig_account_swap_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountSwapOwner {
@@ -5198,10 +5148,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_remove_owners".to_string(),
             Box::new(decoder::multisig_account_remove_owners),
-        );
-        map.insert(
-            "multisig_account_remove_owners_and_update_signatures_required".to_string(),
-            Box::new(decoder::multisig_account_remove_owners_and_update_signatures_required),
         );
         map.insert(
             "multisig_account_swap_owner".to_string(),

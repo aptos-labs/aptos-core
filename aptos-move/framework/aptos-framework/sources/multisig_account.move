@@ -576,20 +576,6 @@ module aptos_framework::multisig_account {
         );
     }
 
-    /// Update the number of signatures required then remove owners, in a single operation.
-    entry fun remove_owners_and_update_signatures_required(
-        multisig_account: &signer,
-        owners_to_remove: vector<address>,
-        new_num_signatures_required: u64
-    ) acquires MultisigAccount {
-        update_owner_schema(
-            address_of(multisig_account),
-            vector[],
-            owners_to_remove,
-            option::some(new_num_signatures_required)
-        );
-    }
-
     /// Swap an owner in for an old one, without changing required signatures.
     entry fun swap_owner(
         multisig_account: &signer,
@@ -947,31 +933,15 @@ module aptos_framework::multisig_account {
         multisig_account_seed
     }
 
-    fun validate_owners(
-        owners_ref: &vector<address>,
-        multisig_address: address
-    ) {
-        assert!(
-            !vector::contains(owners_ref, &multisig_address),
-            EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF
-        );
-        validate_unique_owners(owners_ref);
-    }
-
-    fun validate_unique_owners(owners_ref: &vector<address>) {
-        let (i, n) = (0, vector::length(owners_ref));
-        while (i < n) {
-            let owner_i = *vector::borrow(owners_ref, i);
-            let j = i + 1;
-            while (j < n) {
-                assert!(
-                    owner_i != *vector::borrow(owners_ref, j),
-                    error::invalid_argument(EDUPLICATE_OWNER)
-                );
-                j = j + 1;
-            };
-            i = i + 1;
-        };
+    fun validate_owners(owners: &vector<address>, multisig_account: address) {
+        let distinct_owners: vector<address> = vector[];
+        vector::for_each_ref(owners, |owner| {
+            let owner = *owner;
+            assert!(owner != multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
+            let (found, _) = vector::index_of(&distinct_owners, &owner);
+            assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
+            vector::push_back(&mut distinct_owners, owner);
+        });
     }
 
     fun assert_is_owner(owner: &signer, multisig_account: &MultisigAccount) {
@@ -1039,10 +1009,12 @@ module aptos_framework::multisig_account {
             vector::for_each_ref(&owners_to_remove, |owner_to_remove_ref| {
                 let (found, index) =
                     vector::index_of(owners_ref_mut, owner_to_remove_ref);
-                if (found) vector::push_back(
-                    &mut owners_removed,
-                    vector::swap_remove(owners_ref_mut, index)
-                );
+                if (found) {
+                    vector::push_back(
+                        &mut owners_removed,
+                        vector::swap_remove(owners_ref_mut, index)
+                    );
+                }
             });
             // Only emit event if owner(s) actually removed.
             if (vector::length(&owners_removed) > 0) {
