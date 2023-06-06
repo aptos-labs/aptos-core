@@ -142,6 +142,8 @@ members = [
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
+    "testsuite/fuzzer",
+    "testsuite/fuzzer/fuzz",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -282,6 +284,7 @@ aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
+fuzzer = { path = "testsuite/fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
