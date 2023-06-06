@@ -24,9 +24,9 @@ impl ExecutorService {
     }
 
     pub fn handle_message(&self, execution_message: Vec<u8>) -> Result<Vec<u8>, Error> {
-        let input = serde_json::from_slice(&execution_message)?;
+        let input = bcs::from_bytes(&execution_message)?;
         let result = self.handle_execution_request(input)?;
-        Ok(serde_json::to_vec(&result)?)
+        Ok(bcs::to_bytes(&result)?)
     }
 
     pub fn handle_execution_request(
@@ -212,11 +212,11 @@ mod tests {
     #[test]
     fn test_sharded_remote_block_executor() {
         let executor_service = ThreadExecutorService::new(1000, 2);
+        let client = executor_service.client();
         // Uncomment for testing with a real server
         // let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
         // let client = RemoteExecutorClient::new(server_addr, 1000);
 
-        let client = executor_service.client();
         let sharded_block_executor = ShardedBlockExecutor::new(vec![client]);
         let mut executor = FakeExecutor::from_head_genesis();
         for _ in 0..5 {

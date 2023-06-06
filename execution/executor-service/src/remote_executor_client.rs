@@ -53,7 +53,7 @@ impl TBlockExecutorClient for RemoteExecutorClient {
             concurrency_level,
             maybe_block_gas_limit,
         });
-        let input_message = serde_json::to_vec(&input).map_err(|e| {
+        let input_message = bcs::to_bytes(&input).map_err(|e| {
             VMStatus::Error(
                 REMOTE_EXECUTION_SERVER_WRITE_ERROR,
                 Some(format!(
@@ -69,16 +69,15 @@ impl TBlockExecutorClient for RemoteExecutorClient {
                     error!("Failed to communicate with Executor service: {}", err)
                 },
                 Ok(value) => {
-                    let result =
-                        serde_json::from_slice::<BlockExecutionResult>(&value).map_err(|e| {
-                            VMStatus::Error(
-                                REMOTE_EXECUTION_SERVER_READ_ERROR,
-                                Some(format!(
+                    let result = bcs::from_bytes::<BlockExecutionResult>(&value).map_err(|e| {
+                        VMStatus::Error(
+                            REMOTE_EXECUTION_SERVER_READ_ERROR,
+                            Some(format!(
                                 "Failed to deserialize response from remote execution server: {}",
                                 e
                             )),
-                            )
-                        });
+                        )
+                    });
                     return result?.inner;
                 },
             }

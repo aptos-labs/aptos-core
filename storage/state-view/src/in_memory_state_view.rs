@@ -17,7 +17,6 @@ use std::collections::HashMap;
 // A State view backed by in-memory hashmap.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct InMemoryStateView {
-    #[serde(with = "map_to_vec")]
     state_data: HashMap<StateKey, StateValue>,
 }
 
@@ -48,26 +47,5 @@ impl TStateView for InMemoryStateView {
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {
         self.clone()
-    }
-}
-
-mod map_to_vec {
-    use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-    use serde::{Deserializer, Serializer};
-    use std::collections::HashMap;
-
-    pub(super) fn serialize<S: Serializer>(
-        map: &HashMap<StateKey, StateValue>,
-        ser: S,
-    ) -> Result<S::Ok, S::Error> {
-        let vec: Vec<_> = map.iter().collect();
-        serde::Serialize::serialize(&vec, ser)
-    }
-
-    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
-        des: D,
-    ) -> Result<HashMap<StateKey, StateValue>, D::Error> {
-        let vec: Vec<_> = serde::Deserialize::deserialize(des)?;
-        Ok(vec.into_iter().collect())
     }
 }

@@ -287,7 +287,6 @@ impl WriteSetV0 {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
-    #[serde(with = "map_to_vec")]
     write_set: BTreeMap<StateKey, WriteOp>,
 }
 
@@ -341,27 +340,6 @@ impl WriteSetMut {
         }
 
         Ok(self)
-    }
-}
-
-mod map_to_vec {
-    use crate::{state_store::state_key::StateKey, write_set::WriteOp};
-    use serde::{Deserializer, Serializer};
-    use std::collections::BTreeMap;
-
-    pub(super) fn serialize<S: Serializer>(
-        map: &BTreeMap<StateKey, WriteOp>,
-        ser: S,
-    ) -> Result<S::Ok, S::Error> {
-        let vec: Vec<_> = map.iter().collect();
-        serde::Serialize::serialize(&vec, ser)
-    }
-
-    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
-        des: D,
-    ) -> Result<BTreeMap<StateKey, WriteOp>, D::Error> {
-        let vec: Vec<_> = serde::Deserialize::deserialize(des)?;
-        Ok(vec.into_iter().collect())
     }
 }
 

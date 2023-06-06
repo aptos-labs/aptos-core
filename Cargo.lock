@@ -1101,6 +1101,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
+ "bcs 0.1.4",
  "clap 3.2.23",
  "itertools",
  "serde 1.0.149",

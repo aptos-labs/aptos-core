@@ -14,8 +14,8 @@ pub enum Error {
     SerializationError(String),
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(error: serde_json::Error) -> Self {
+impl From<bcs::Error> for Error {
+    fn from(error: bcs::Error) -> Self {
         Self::SerializationError(format!("{}", error))
     }
 }

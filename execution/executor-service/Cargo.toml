@@ -23,6 +23,7 @@ aptos-secure-net = { workspace = true }
 aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
