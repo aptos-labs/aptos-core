@@ -53,8 +53,8 @@ mod partitioning_shard;
 ///      - previously frozen transaction chunks (if any)
 ///      - read-write set index mapping from previous iteration (if any) - this contains the maximum absolute index
 ///        of the transaction that read/wrote to a storage location indexed by the storage location.
-///   2.1 Each shard creates a read-write set for all transactions in the chunk and broadcasts it to all other shards.
-///      Shard 0                          Shard 1                           Shard 2
+///   2.2 Each shard creates a read-write set for all transactions in the chunk and broadcasts it to all other shards.
+///              Shard 0                          Shard 1                           Shard 2
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
 ///    |        Read-Write Set      |  |         Read-Write Set         |  |         Read-Write Set         |
 ///    |                            |  |                               |  |                               |
@@ -62,32 +62,32 @@ mod partitioning_shard;
 ///    |   T2 {B, C}                |  |   T5 {E, F}                   |  |   T8 {H, I}                   |
 ///    |   T3 {C, D}                |  |   T6 {F, G}                   |  |   T9 {I, J}                   |
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
-///   2.2 Each shard collects read-write sets from all other shards and discards transactions that have cross-shard dependencies.
+///   2.3 Each shard collects read-write sets from all other shards and discards transactions that have cross-shard dependencies.
 ///              Shard 0                          Shard 1                           Shard 2
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
 ///    |        Discarded Txns      |  |         Discarded Txns         |  |         Discarded Txns         |
 ///    |                            |  |                               |  |                               |
 ///    |   - T3 (cross-shard dependency with T4) |  |   - T6 (cross-shard dependency with T7) |  | No discard |
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
-///   2.3 Each shard broadcasts the number of transactions that it plans to put in the current chunk.
-///      Shard 0                          Shard 1                           Shard 2
+///   2.4 Each shard broadcasts the number of transactions that it plans to put in the current chunk.
+///              Shard 0                          Shard 1                           Shard 2
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
 ///    |          Chunk Count       |  |          Chunk Count          |  |          Chunk Count          |
 ///    |                            |  |                               |  |                               |
 ///    |   2                        |  |   2                           |  |      3                        |
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
-///   2.4 Each shard collects the number of transactions that all other shards plan to put in the current chunk and based
+///   2.5 Each shard collects the number of transactions that all other shards plan to put in the current chunk and based
 ///      on that, it finalizes the absolute index offset of the current chunk. It uses this information to create a read-write set
 ///      index, which is a mapping of all the storage location to the maximum absolute index of the transaction that read/wrote to that location.
-///      Shard 0                          Shard 1                           Shard 2
+///             Shard 0                          Shard 1                           Shard 2
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
 ///    |          Index Offset      |  |          Index Offset         |  |          Index Offset         |
 ///    |                            |  |                               |  |                               |
 ///    |   0                        |  |   2                           |  |   4                           |
 ///    +----------------------------+  +-------------------------------+  +-------------------------------+
-///   2.5 It also uses the read-write set index mapping passed in previous iteration to add cross-shard dependencies to the transactions. This is
+///   2.6 It also uses the read-write set index mapping passed in previous iteration to add cross-shard dependencies to the transactions. This is
 ///     done by looking up the read-write set index for each storage location that a transaction reads/writes to and adding a cross-shard dependency
-///   2.6 Returns two lists of transactions: one list of transactions that are discarded and another list of transactions that are kept.
+///   2.7 Returns two lists of transactions: one list of transactions that are discarded and another list of transactions that are kept.
 /// 3. Use the discarded transactions to create new chunks and repeat the step 2 until N iterations.
 /// 4. For remaining transaction chunks, add cross-shard dependencies to the transactions. This is done as follows:
 ///   4.1 Create a read-write set with index mapping for all the transactions in the remaining chunks.
@@ -164,13 +164,11 @@ impl ShardedBlockPartitioner {
 
         for txn in txns {
             let sender = txn.sender().unwrap();
-            if !sender_to_txns.contains_key(&sender) {
+            let entry = sender_to_txns.entry(sender).or_insert_with(Vec::new);
+            entry.push(txn);
+            if entry.len() == 1 {
                 sender_order.push(sender); // Add sender to the order vector
             }
-            sender_to_txns
-                .entry(sender)
-                .or_insert_with(Vec::new)
-                .push(txn);
         }
 
         let mut result = Vec::new();
@@ -213,9 +211,9 @@ impl ShardedBlockPartitioner {
         let mut rejected_txns_vec = Vec::new();
         for rx in &self.result_rxs {
             let PartitioningBlockResponse {
-                frozen_chunk,
+                frozen_sub_block: frozen_chunk,
                 rw_set_with_index,
-                rejected_txns,
+                discarded_txns: rejected_txns,
             } = rx.recv().unwrap();
             frozen_chunks.push(frozen_chunk);
             frozen_rw_set_with_index.push(rw_set_with_index);
@@ -227,7 +225,7 @@ impl ShardedBlockPartitioner {
     fn discard_txns_with_cross_shard_dependencies(
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
-        frozen_chunks: Arc<Vec<SubBlock>>,
+        frozen_sub_blocks: Arc<Vec<SubBlock>>,
         frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
     ) -> (
         Vec<SubBlock>,
@@ -240,7 +238,7 @@ impl ShardedBlockPartitioner {
                 DiscardCrossShardDepReq(DiscardTxnsWithCrossShardDep::new(
                     txns,
                     frozen_rw_set_with_index.clone(),
-                    frozen_chunks.clone(),
+                    frozen_sub_blocks.clone(),
                 ))
             })
             .collect();
@@ -252,7 +250,6 @@ impl ShardedBlockPartitioner {
         &self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_chunks: Arc<Vec<SubBlock>>,
         frozen_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
     ) -> (
         Vec<SubBlock>,
@@ -267,7 +264,6 @@ impl ShardedBlockPartitioner {
                 let partitioning_msg = AddCrossShardDepReq(AddTxnsWithCrossShardDep::new(
                     remaining_txns,
                     index_offset,
-                    frozen_chunks.clone(),
                     frozen_rw_set_with_index.clone(),
                 ));
                 index_offset += remaining_txns_len;
@@ -294,46 +290,48 @@ impl ShardedBlockPartitioner {
         // First round, we filter all transactions with cross-shard dependencies
         let mut txns_to_partition = self.reorder_txns_by_senders(transactions);
         let mut frozen_rw_set_with_index = Arc::new(Vec::new());
-        let mut frozen_chunks = Arc::new(Vec::new());
+        let mut frozen_sub_blocks = Arc::new(Vec::new());
 
         for _ in 0..num_partitioning_round {
             let (
-                current_frozen_chunks_vec,
+                current_frozen_sub_blocks_vec,
                 current_frozen_rw_set_with_index_vec,
-                latest_txns_to_partition,
+                discarded_txns_to_partition,
             ) = self.discard_txns_with_cross_shard_dependencies(
                 txns_to_partition,
-                frozen_chunks.clone(),
+                frozen_sub_blocks.clone(),
                 frozen_rw_set_with_index.clone(),
             );
-            let mut prev_frozen_chunk = Arc::try_unwrap(frozen_chunks).unwrap();
+            let mut prev_frozen_sub_blocks = Arc::try_unwrap(frozen_sub_blocks).unwrap();
             let mut prev_frozen_rw_set_with_index =
                 Arc::try_unwrap(frozen_rw_set_with_index).unwrap();
-            prev_frozen_chunk.extend(current_frozen_chunks_vec);
+            prev_frozen_sub_blocks.extend(current_frozen_sub_blocks_vec);
             prev_frozen_rw_set_with_index.extend(current_frozen_rw_set_with_index_vec);
-            frozen_chunks = Arc::new(prev_frozen_chunk);
+            frozen_sub_blocks = Arc::new(prev_frozen_sub_blocks);
             frozen_rw_set_with_index = Arc::new(prev_frozen_rw_set_with_index);
-            txns_to_partition = latest_txns_to_partition;
+            txns_to_partition = discarded_txns_to_partition;
             if txns_to_partition
                 .iter()
                 .map(|txns| txns.len())
                 .sum::<usize>()
                 == 0
             {
-                return Arc::try_unwrap(frozen_chunks).unwrap();
+                return Arc::try_unwrap(frozen_sub_blocks).unwrap();
             }
         }
 
         // We just add cross shard dependencies for remaining transactions.
-        let index_offset = frozen_chunks.iter().map(|chunk| chunk.len()).sum::<usize>();
+        let index_offset = frozen_sub_blocks
+            .iter()
+            .map(|chunk| chunk.len())
+            .sum::<usize>();
         let (remaining_frozen_chunks, _, _) = self.add_cross_shard_dependencies(
             index_offset,
             txns_to_partition,
-            frozen_chunks.clone(),
             frozen_rw_set_with_index,
         );
 
-        Arc::try_unwrap(frozen_chunks)
+        Arc::try_unwrap(frozen_sub_blocks)
             .unwrap()
             .into_iter()
             .chain(remaining_frozen_chunks.into_iter())

@@ -75,7 +75,8 @@ impl CrossShardConflictDetector {
             for rw_set_with_index in current_round_rw_set_with_index
                 .iter()
                 .take(self.shard_id)
-                .chain(prev_rounds_rw_set_with_index.iter())
+                .rev()
+                .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
                 if rw_set_with_index.has_write_lock(read_location) {
                     cross_shard_dependencies.add_depends_on_txn(
@@ -110,7 +111,7 @@ impl CrossShardConflictDetector {
         cross_shard_dependencies
     }
 
-    pub fn get_frozen_chunk(
+    pub fn get_frozen_sub_block(
         &self,
         txns: Vec<AnalyzedTransaction>,
         current_round_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,

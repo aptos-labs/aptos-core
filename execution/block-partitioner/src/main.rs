@@ -6,7 +6,7 @@ use aptos_block_partitioner::{
 };
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use clap::Parser;
-use rand::{rngs::OsRng, Rng};
+use rand::rngs::OsRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{sync::Mutex, time::Instant};
 
@@ -41,10 +41,10 @@ fn main() {
         .map(|_| {
             // randomly select a sender and receiver from accounts
             let mut rng = OsRng;
-            let sender_index = rng.gen_range(0, num_accounts);
-            let receiver_index = rng.gen_range(0, num_accounts);
-            let receiver = accounts[receiver_index].lock().unwrap();
-            let mut sender = accounts[sender_index].lock().unwrap();
+
+            let indices = rand::seq::index::sample(&mut rng, num_accounts, 2);
+            let receiver = accounts[indices.index(1)].lock().unwrap();
+            let mut sender = accounts[indices.index(0)].lock().unwrap();
             create_signed_p2p_transaction(&mut sender, vec![&receiver]).remove(0)
         })
         .collect();

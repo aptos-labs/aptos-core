@@ -5,7 +5,7 @@ use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, Signing
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction, Script,
+        analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
         SignedTransaction, Transaction, TransactionPayload,
     },
     utility_coin::APTOS_COIN_TYPE,
@@ -35,34 +35,6 @@ pub fn generate_test_account_for_address(account_address: AccountAddress) -> Tes
         private_key: Ed25519PrivateKey::generate_for_testing(),
         sequence_number: 0,
     }
-}
-
-pub fn create_no_dependency_transaction(num_transactions: usize) -> Vec<AnalyzedTransaction> {
-    let private_key = Ed25519PrivateKey::generate_for_testing();
-    let public_key = private_key.public_key();
-    let sender = AccountAddress::random();
-
-    let mut transactions = Vec::new();
-
-    for i in 0..num_transactions {
-        let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
-        let raw_transaction = RawTransaction::new(
-            sender,
-            i as u64,
-            transaction_payload,
-            0,
-            0,
-            0,
-            ChainId::new(10),
-        );
-        let txn = Transaction::UserTransaction(SignedTransaction::new(
-            raw_transaction.clone(),
-            public_key.clone(),
-            private_key.sign(&raw_transaction).unwrap(),
-        ));
-        transactions.push(txn.into())
-    }
-    transactions
 }
 
 pub fn create_non_conflicting_p2p_transaction() -> AnalyzedTransaction {

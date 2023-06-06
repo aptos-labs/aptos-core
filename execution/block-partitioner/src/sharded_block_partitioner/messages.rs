@@ -25,19 +25,19 @@ pub struct DiscardTxnsWithCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,
     // The frozen dependencies in previous chunks.
     pub prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
-    pub prev_rounds_frozen_chunks: Arc<Vec<SubBlock>>,
+    pub prev_rounds_frozen_sub_blocks: Arc<Vec<SubBlock>>,
 }
 
 impl DiscardTxnsWithCrossShardDep {
     pub fn new(
         transactions: Vec<AnalyzedTransaction>,
         prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
-        prev_rounds_frozen_chunks: Arc<Vec<SubBlock>>,
+        prev_rounds_frozen_sub_blocks: Arc<Vec<SubBlock>>,
     ) -> Self {
         Self {
             transactions,
             prev_rounds_rw_set_with_index,
-            prev_rounds_frozen_chunks,
+            prev_rounds_frozen_sub_blocks,
         }
     }
 }
@@ -45,7 +45,6 @@ impl DiscardTxnsWithCrossShardDep {
 pub struct AddTxnsWithCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,
     pub index_offset: TxnIndex,
-    pub prev_rounds_frozen_chunks: Arc<Vec<SubBlock>>,
     // The frozen dependencies in previous chunks.
     pub prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
 }
@@ -54,34 +53,32 @@ impl AddTxnsWithCrossShardDep {
     pub fn new(
         transactions: Vec<AnalyzedTransaction>,
         index_offset: TxnIndex,
-        prev_rounds_frozen_chunks: Arc<Vec<SubBlock>>,
         prev_rounds_rw_set_with_index: Arc<Vec<RWSetWithTxnIndex>>,
     ) -> Self {
         Self {
             transactions,
             index_offset,
             prev_rounds_rw_set_with_index,
-            prev_rounds_frozen_chunks,
         }
     }
 }
 
 pub struct PartitioningBlockResponse {
-    pub frozen_chunk: SubBlock,
+    pub frozen_sub_block: SubBlock,
     pub rw_set_with_index: RWSetWithTxnIndex,
-    pub rejected_txns: Vec<AnalyzedTransaction>,
+    pub discarded_txns: Vec<AnalyzedTransaction>,
 }
 
 impl PartitioningBlockResponse {
     pub fn new(
-        frozen_chunk: SubBlock,
+        frozen_sub_block: SubBlock,
         frozen_dependencies: RWSetWithTxnIndex,
-        rejected_txns: Vec<AnalyzedTransaction>,
+        discarded_txns: Vec<AnalyzedTransaction>,
     ) -> Self {
         Self {
-            frozen_chunk,
+            frozen_sub_block,
             rw_set_with_index: frozen_dependencies,
-            rejected_txns,
+            discarded_txns,
         }
     }
 }

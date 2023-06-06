@@ -135,7 +135,7 @@ impl PartitioningShard {
         let DiscardTxnsWithCrossShardDep {
             transactions,
             prev_rounds_rw_set_with_index,
-            prev_rounds_frozen_chunks,
+            prev_rounds_frozen_sub_blocks,
         } = partition_msg;
         let num_shards = self.message_txs.len();
         let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, num_shards);
@@ -158,13 +158,14 @@ impl PartitioningShard {
         // Calculate the absolute index of accepted transactions in this shard, which is the sum of all accepted transactions
         // from other shards whose shard id is smaller than the current shard id and the number of accepted transactions in the
         // previous rounds
-        let mut index_offset = prev_rounds_frozen_chunks
+        // TODO(skedia): Evaluate if we can avoid this calculation by tracking it with a number across rounds.
+        let mut index_offset = prev_rounds_frozen_sub_blocks
             .iter()
             .map(|chunk| chunk.len())
             .sum::<usize>();
-        for num_accepted_txns in accepted_txns_vec.iter().take(self.shard_id) {
-            index_offset += num_accepted_txns;
-        }
+        drop(prev_rounds_frozen_sub_blocks);
+        let num_accepted_txns = accepted_txns_vec.iter().take(self.shard_id).sum::<usize>();
+        index_offset += num_accepted_txns;
 
         // Calculate the RWSetWithTxnIndex for the accepted transactions
         let current_rw_set_with_index = RWSetWithTxnIndex::new(&accepted_txns, index_offset);
@@ -175,12 +176,11 @@ impl PartitioningShard {
             .map(|(txn, dependencies)| TransactionWithDependencies::new(txn, dependencies))
             .collect::<Vec<TransactionWithDependencies>>();
 
-        let frozen_chunk = SubBlock::new(index_offset, accepted_txns_with_dependencies);
-        drop(prev_rounds_frozen_chunks);
+        let frozen_sub_block = SubBlock::new(index_offset, accepted_txns_with_dependencies);
         // send the result back to the controller
         self.result_tx
             .send(PartitioningBlockResponse::new(
-                frozen_chunk,
+                frozen_sub_block,
                 current_rw_set_with_index,
                 rejected_txns,
             ))
@@ -191,7 +191,6 @@ impl PartitioningShard {
         let AddTxnsWithCrossShardDep {
             transactions,
             index_offset,
-            prev_rounds_frozen_chunks,
             // The frozen dependencies in previous chunks.
             prev_rounds_rw_set_with_index,
         } = partition_msg;
@@ -204,18 +203,16 @@ impl PartitioningShard {
 
         self.broadcast_rw_set_with_index(rw_set_with_index_for_shard.clone());
         let current_round_rw_set_with_index = self.collect_rw_set_with_index();
-        let frozen_chunk = conflict_detector.get_frozen_chunk(
+        let frozen_sub_block = conflict_detector.get_frozen_sub_block(
             transactions,
             Arc::new(current_round_rw_set_with_index),
             prev_rounds_rw_set_with_index,
             index_offset,
         );
 
-        drop(prev_rounds_frozen_chunks);
-
         self.result_tx
             .send(PartitioningBlockResponse::new(
-                frozen_chunk,
+                frozen_sub_block,
                 rw_set_with_index_for_shard,
                 vec![],
             ))
