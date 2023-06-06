@@ -37,7 +37,6 @@ use econia_db::{
 };
 use econia_types::{
     book::{OrderBook, PriceLevelWithId},
-    events::{MakerEvent, TakerEvent},
     message::Update,
     order::{Fill, Order, OrderState, Side},
 };
@@ -162,6 +161,70 @@ struct RecognizedMarketEvent {
     trading_pair: TradingPair,
     recognized_market_info: Option<RecognizedMarketInfo>,
     time: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct MakerEvent {
+    custodian_id: String,
+    market_id: String,
+    market_order_id: String,
+    price: String,
+    side: bool,
+    size: String,
+    r#type: u8,
+    user: String,
+    time: String,
+}
+
+impl From<MakerEvent> for models::events::MakerEvent {
+    fn from(e: MakerEvent) -> Self {
+        Self {
+            custodian_id: e
+                .custodian_id
+                .is_empty()
+                .not()
+                .then_some(e.custodian_id.parse().unwrap()),
+            market_id: e.market_id.parse().unwrap(),
+            market_order_id: e.market_order_id.parse().unwrap(),
+            price: e.price.parse().unwrap(),
+            side: e.side.into(),
+            size: e.size.parse().unwrap(),
+            event_type: e.r#type.try_into().unwrap(),
+            user_address: e.user,
+            time: e.time.parse().unwrap(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct TakerEvent {
+    market_id: String,
+    side: bool,
+    market_order_id: String,
+    maker: String,
+    custodian_id: String,
+    size: String,
+    price: String,
+    time: String,
+}
+
+impl From<TakerEvent> for models::events::TakerEvent {
+    fn from(e: TakerEvent) -> Self {
+        Self {
+            custodian_id: e
+                .custodian_id
+                .is_empty()
+                .not()
+                .then_some(e.custodian_id.parse().unwrap()),
+            market_id: e.market_id.parse().unwrap(),
+            market_order_id: e.market_order_id.parse().unwrap(),
+            maker: e.maker.parse().unwrap(),
+            price: e.price.parse().unwrap(),
+            side: e.side.into(),
+            size: e.size.parse().unwrap(),
+            time: e.time.parse().unwrap(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -310,6 +373,9 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         e: MakerEvent,
     ) -> anyhow::Result<()> {
+        let e: models::events::MakerEvent = e.into();
+        let e: econia_types::events::MakerEvent = e.try_into()?;
+
         if !self.books.contains_key(&e.market_id) {
             panic!("invalid state, market is missing")
         };
@@ -390,6 +456,9 @@ impl EconiaRedisCacher {
         conn: &mut redis::Connection,
         e: TakerEvent,
     ) -> anyhow::Result<()> {
+        let e: models::events::TakerEvent = e.into();
+        let e: econia_types::events::TakerEvent = e.try_into()?;
+
         if !self.books.contains_key(&e.market_id) {
             panic!("invalid state, market is missing")
         };
@@ -425,7 +494,7 @@ impl EconiaRedisCacher {
         }
 
         self.send_fill(conn, &fill)?;
-        self.send_price_level_update(conn, e.market_id, e.side, e.price)
+        self.send_price_level_update(conn, e.market_id, e.side.into(), e.price)
     }
 
     fn start(&mut self, books: Vec<BigDecimal>) {
