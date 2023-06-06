@@ -30,22 +30,20 @@ module shared_account::SharedAccount {
 
     // Create and initialize a shared account
     public entry fun initialize(source: &signer, seed: vector<u8>, addresses: vector<address>, numerators: vector<u64>) {
-        let i = 0;
         let total = 0;
         let share_record = vector::empty<Share>();
 
-        while (i < vector::length(&addresses)) {
+        vector::enumerate_ref(&addresses, |i, addr|{
+            let addr = *addr;
             let num_shares = *vector::borrow(&numerators, i);
-            let addr = *vector::borrow(&addresses, i);
 
             // make sure that the account exists, so when we call disperse() it wouldn't fail
             // because one of the accounts does not exist
             assert!(account::exists_at(addr), error::invalid_argument(EACCOUNT_NOT_FOUND));
 
-            vector::push_back(&mut share_record, Share { share_holder: addr, num_shares: num_shares });
+            vector::push_back(&mut share_record, Share { share_holder: addr, num_shares });
             total = total + num_shares;
-            i = i + 1;
-        };
+        });
 
         let (resource_signer, resource_signer_cap) = account::create_resource_account(source, seed);
 
@@ -73,13 +71,11 @@ module shared_account::SharedAccount {
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
 
-        let i = 0;
-        while (i < vector::length(&shared_account.share_record)) {
-            let share_record = vector::borrow(&shared_account.share_record, i);
-            let current_amount = share_record.num_shares * total_balance / shared_account.total_shares;
-            coin::transfer<CoinType>(&resource_signer, share_record.share_holder, current_amount);
-            i = i + 1;
-        };
+        vector::for_each_ref(&shared_account.share_record, |shared_record|{
+            let shared_record: &Share = shared_record;
+            let current_amount = shared_record.num_shares * total_balance / shared_account.total_shares;
+            coin::transfer<CoinType>(&resource_signer, shared_record.share_holder, current_amount);
+        });
     }
 
     #[test_only]

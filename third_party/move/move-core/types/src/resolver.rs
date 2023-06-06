@@ -41,7 +41,14 @@ pub trait ResourceResolver {
         address: &AccountAddress,
         typ: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error>;
+    ) -> Result<Option<(Vec<u8>, u64)>, Error>;
+}
+
+pub fn resource_add_cost(buf: Option<Vec<u8>>, extra: u64) -> Option<(Vec<u8>, u64)> {
+    buf.map(|b| {
+        let len = b.len() as u64 + extra;
+        (b, len)
+    })
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
@@ -51,7 +58,9 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
         address: &AccountAddress,
         typ: &StructTag,
     ) -> Result<Option<Vec<u8>>, Error> {
-        self.get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))
+        Ok(self
+            .get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?
+            .map(|(buf, _)| buf))
     }
 }
 
@@ -63,7 +72,7 @@ impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> Result<Option<(Vec<u8>, u64)>, Error> {
         (**self).get_resource_with_metadata(address, tag, metadata)
     }
 }

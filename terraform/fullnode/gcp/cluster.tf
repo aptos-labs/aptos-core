@@ -74,6 +74,10 @@ resource "google_container_cluster" "aptos" {
         maximum       = resource_limits.value
       }
     }
+    auto_provisioning_defaults {
+      oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+      service_account = google_service_account.gke.email
+    }
   }
 }
 

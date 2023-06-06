@@ -41,7 +41,9 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `for_each`](#0x1_vector_for_each)
 -  [Function `for_each_reverse`](#0x1_vector_for_each_reverse)
 -  [Function `for_each_ref`](#0x1_vector_for_each_ref)
+-  [Function `enumerate_ref`](#0x1_vector_enumerate_ref)
 -  [Function `for_each_mut`](#0x1_vector_for_each_mut)
+-  [Function `enumerate_mut`](#0x1_vector_enumerate_mut)
 -  [Function `fold`](#0x1_vector_fold)
 -  [Function `foldr`](#0x1_vector_foldr)
 -  [Function `map_ref`](#0x1_vector_map_ref)
@@ -798,6 +800,36 @@ Apply the function to a reference of each element in the vector.
 
 </details>
 
+<a name="0x1_vector_enumerate_ref"></a>
+
+## Function `enumerate_ref`
+
+Apply the function to a reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_ref">enumerate_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
+        i = i + 1;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_for_each_mut"></a>
 
 ## Function `for_each_mut`
@@ -821,6 +853,36 @@ Apply the function to a mutable reference to each element in the vector.
         f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
         i = i + 1
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_enumerate_mut"></a>
+
+## Function `enumerate_mut`
+
+Apply the function to a mutable reference of each element in the vector with its index.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |(u64, &<b>mut</b> Element)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_enumerate_mut">enumerate_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |u64, &<b>mut</b> Element|) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
+    <b>while</b> (i &lt; len) {
+        f(i, <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1;
+    };
 }
 </code></pre>
 

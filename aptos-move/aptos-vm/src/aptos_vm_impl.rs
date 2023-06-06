@@ -163,7 +163,7 @@ impl AptosVMImpl {
             features,
         };
         vm.version = Version::fetch_config(&storage);
-        vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
+        vm.transaction_validation = Self::get_transaction_validation(&storage);
         vm
     }
 

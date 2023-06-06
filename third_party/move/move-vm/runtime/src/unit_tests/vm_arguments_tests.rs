@@ -265,7 +265,7 @@ impl ResourceResolver for RemoteStore {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
         Ok(None)
     }
 }
