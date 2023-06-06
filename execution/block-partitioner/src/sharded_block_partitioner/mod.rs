@@ -514,22 +514,25 @@ mod tests {
         let num_shards = 3;
         let mut account1 = generate_test_account_for_address(AccountAddress::new([0; 32]));
         let mut account2 = generate_test_account_for_address(AccountAddress::new([1; 32]));
-        let mut account3 = generate_test_account_for_address(AccountAddress::new([2; 32]));
+        let account3 = generate_test_account_for_address(AccountAddress::new([2; 32]));
         let mut account4 = generate_test_account_for_address(AccountAddress::new([4; 32]));
-        let mut account5 = generate_test_account_for_address(AccountAddress::new([5; 32]));
+        let account5 = generate_test_account_for_address(AccountAddress::new([5; 32]));
         let account6 = generate_test_account_for_address(AccountAddress::new([6; 32]));
+        let mut account7 = generate_test_account_for_address(AccountAddress::new([7; 32]));
+        let account8 = generate_test_account_for_address(AccountAddress::new([8; 32]));
+        let account9 = generate_test_account_for_address(AccountAddress::new([9; 32]));
 
         let txn0 = create_signed_p2p_transaction(&mut account1, vec![&account2]).remove(0); // txn 0
         let txn1 = create_signed_p2p_transaction(&mut account1, vec![&account3]).remove(0); // txn 1
-        let txn2 = create_signed_p2p_transaction(&mut account2, vec![&account4]).remove(0); // txn 2
+        let txn2 = create_signed_p2p_transaction(&mut account2, vec![&account3]).remove(0); // txn 2
                                                                                             // Should go in shard 1
-        let txn3 = create_signed_p2p_transaction(&mut account3, vec![&account4]).remove(0); // txn 3
-        let txn4 = create_signed_p2p_transaction(&mut account3, vec![&account1]).remove(0); // txn 4
-        let txn5 = create_signed_p2p_transaction(&mut account3, vec![&account2]).remove(0); // txn 5
+        let txn3 = create_signed_p2p_transaction(&mut account4, vec![&account5]).remove(0); // txn 3
+        let txn4 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 4
+        let txn5 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 5
                                                                                             // Should go in shard 2
-        let txn6 = create_signed_p2p_transaction(&mut account4, vec![&account1]).remove(0); // txn 6
-        let txn7 = create_signed_p2p_transaction(&mut account4, vec![&account2]).remove(0); // txn 7
-        let txn8 = create_signed_p2p_transaction(&mut account5, vec![&account6]).remove(0); // txn 8
+        let txn6 = create_signed_p2p_transaction(&mut account7, vec![&account8]).remove(0); // txn 6
+        let txn7 = create_signed_p2p_transaction(&mut account7, vec![&account9]).remove(0); // txn 7
+        let txn8 = create_signed_p2p_transaction(&mut account4, vec![&account7]).remove(0); // txn 8
 
         let transactions = vec![
             txn0.clone(),
@@ -548,10 +551,11 @@ mod tests {
         assert_eq!(partitioned_chunks.len(), 2 * num_shards);
 
         // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
-        // 0 in shard 1 and txn8 in shard 2
+        // txn3, txn4, txn5 and txn8 in shard 1 and 0 in shard 2. Please note that txn8 is moved to
+        // shard 1 because of sender based reordering.
         assert_eq!(partitioned_chunks[0].len(), 3);
-        assert_eq!(partitioned_chunks[1].len(), 0);
-        assert_eq!(partitioned_chunks[2].len(), 1);
+        assert_eq!(partitioned_chunks[1].len(), 4);
+        assert_eq!(partitioned_chunks[2].len(), 0);
 
         assert_eq!(
             partitioned_chunks[0]
@@ -562,27 +566,19 @@ mod tests {
             vec![txn0, txn1, txn2]
         );
         assert_eq!(
-            partitioned_chunks[2]
+            partitioned_chunks[1]
                 .transactions_with_deps()
                 .iter()
                 .map(|x| x.txn.clone())
                 .collect::<Vec<AnalyzedTransaction>>(),
-            vec![txn8]
+            vec![txn3, txn4, txn5, txn8]
         );
 
         // Rest of the transactions will be added in round 2 along with their dependencies
         assert_eq!(partitioned_chunks[3].len(), 0);
-        assert_eq!(partitioned_chunks[4].len(), 3);
+        assert_eq!(partitioned_chunks[4].len(), 0);
         assert_eq!(partitioned_chunks[5].len(), 2);
 
-        assert_eq!(
-            partitioned_chunks[4]
-                .transactions_with_deps()
-                .iter()
-                .map(|x| x.txn.clone())
-                .collect::<Vec<AnalyzedTransaction>>(),
-            vec![txn3, txn4, txn5]
-        );
         assert_eq!(
             partitioned_chunks[5]
                 .transactions_with_deps()
@@ -598,36 +594,10 @@ mod tests {
             partitioned_chunks[1].clone(),
             partitioned_chunks[2].clone(),
         ]);
-        // txn3 depends on txn1 (index 1) and txn2 (index 2)
-        assert!(partitioned_chunks[4].transactions_with_deps()[0]
-            .cross_shard_dependencies
-            .is_depends_on(1));
-        assert!(partitioned_chunks[4].transactions_with_deps()[0]
-            .cross_shard_dependencies
-            .is_depends_on(2));
-
-        // txn4 depends on txn1 (index 1)
-        assert!(partitioned_chunks[4].transactions_with_deps()[1]
-            .cross_shard_dependencies
-            .is_depends_on(1));
-        // txn5 depends on txn1 (index 1) and txn2 (index 2)
-        assert!(partitioned_chunks[4].transactions_with_deps()[2]
-            .cross_shard_dependencies
-            .is_depends_on(1));
-        assert!(partitioned_chunks[4].transactions_with_deps()[2]
-            .cross_shard_dependencies
-            .is_depends_on(2));
-        // txn6 depends on txn3 (index 4) and txn4 (index 5)
+        // txn6 and txn7 depends on txn8 (index 6)
         assert!(partitioned_chunks[5].transactions_with_deps()[0]
             .cross_shard_dependencies
-            .is_depends_on(4));
-        assert!(partitioned_chunks[5].transactions_with_deps()[0]
-            .cross_shard_dependencies
-            .is_depends_on(5));
-        // txn7 depends on txn3 (index 4) and txn5 (index 5)
-        assert!(partitioned_chunks[5].transactions_with_deps()[1]
-            .cross_shard_dependencies
-            .is_depends_on(4));
+            .is_depends_on(6));
         assert!(partitioned_chunks[5].transactions_with_deps()[1]
             .cross_shard_dependencies
             .is_depends_on(6));
