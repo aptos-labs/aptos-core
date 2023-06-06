@@ -3,7 +3,7 @@
 
 use crate::{
     aptos_vm_impl::AptosVMImpl,
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::StorageAdapter,
     move_vm_ext::{SessionExt, SessionId},
 };
 use anyhow::{bail, Result};
@@ -44,7 +44,13 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
         Ok(RespawnedSessionBuilder {
             state_view,
-            resolver_builder: |state_view| state_view.as_move_resolver(),
+            resolver_builder: |state_view| {
+                StorageAdapter::new_with_cached_config(
+                    state_view,
+                    vm.get_gas_feature_version(),
+                    vm.get_features(),
+                )
+            },
             session_builder: |resolver| Some(vm.new_session(resolver, session_id, true)),
         }
         .build())

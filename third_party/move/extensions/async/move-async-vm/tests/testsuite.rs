@@ -23,7 +23,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{resource_add_cost, ModuleResolver, ResourceResolver},
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use move_vm_test_utils::gas_schedule::GasStatus;
@@ -398,14 +398,14 @@ impl<'a> ResourceResolver for HarnessProxy<'a> {
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
         let res = self
             .harness
             .resource_store
             .borrow()
             .get(&(*address, typ.clone()))
             .cloned();
-        Ok(res)
+        Ok(resource_add_cost(res, 0))
     }
 }
 
