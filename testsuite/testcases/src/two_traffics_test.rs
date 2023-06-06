@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 pub struct TwoTrafficsTest {
     // cannot have 'static EmitJobRequest, like below, so need to have inner fields
     // pub inner_emit_job_request: EmitJobRequest,
-    pub inner_tps: usize,
+    pub inner_mode: EmitJobMode,
     pub inner_gas_price: u64,
     pub inner_init_gas_price_multiplier: u64,
     pub inner_transaction_type: TransactionType,
@@ -44,9 +44,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
         let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps {
-                    tps: self.inner_tps,
-                })
+                .mode(self.inner_mode.clone())
                 .gas_price(self.inner_gas_price)
                 .init_gas_price_multiplier(self.inner_init_gas_price_multiplier)
                 .transaction_type(self.inner_transaction_type),

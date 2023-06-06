@@ -231,6 +231,12 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
+    let suite_name = if suite_name == "land_blocking" {
+        "land_blocking_new"
+    } else {
+        panic!()
+    };
+
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -446,7 +452,7 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
         "land_blocking" => Ok(land_blocking_test_suite(duration)),
-        "land_blocking_three_region" => Ok(land_blocking_three_region_test_suite(duration)),
+        "land_blocking_new" => Ok(land_blocking_new_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
@@ -873,7 +879,7 @@ fn graceful_overload(config: ForgeConfig) -> ForgeConfig {
         // So having VFNs for all validators
         .with_initial_fullnode_count(10)
         .with_network_tests(vec![&TwoTrafficsTest {
-            inner_tps: 15000,
+            inner_mode: EmitJobMode::ConstTps { tps: 15000 },
             inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             inner_init_gas_price_multiplier: 20,
             // because it is static, cannot use TransactionTypeArg::materialize method
@@ -927,7 +933,7 @@ fn three_region_sim_graceful_overload(config: ForgeConfig) -> ForgeConfig {
         .with_network_tests(vec![&CompositeNetworkTest {
             wrapper: &ThreeRegionSameCloudSimulationTest,
             test: &TwoTrafficsTest {
-                inner_tps: 15000,
+                inner_mode: EmitJobMode::ConstTps { tps: 15000 },
                 inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
                 inner_init_gas_price_multiplier: 20,
                 // Cannot use TransactionTypeArg::materialize, as this needs to be static
@@ -1338,17 +1344,46 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'static> {
+fn land_blocking_new_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
-        .with_network_tests(vec![&ThreeRegionSameCloudSimulationTest])
+        .with_network_tests(vec![&CompositeNetworkTest {
+            wrapper: &MultiRegionNetworkEmulationTest {
+                override_config: None,
+            },
+            test: &CompositeNetworkTest {
+                wrapper: &CpuChaosTest {
+                    override_config: None,
+                },
+                test: &TwoTrafficsTest {
+                    inner_mode: EmitJobMode::MaxLoad {
+                        mempool_backlog: 40000,
+                    },
+                    inner_gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+                    inner_init_gas_price_multiplier: 20,
+                    // because it is static, cannot use TransactionTypeArg::materialize method
+                    inner_transaction_type: TransactionType::CoinTransfer {
+                        invalid_transaction_ratio: 0,
+                        sender_use_account_pool: false,
+                    },
+                    avg_tps: 4000,
+                    latency_thresholds: &[],
+                },
+            },
+        }])
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // Have single epoch change in land blocking
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
         }))
+        // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+        )
         .with_success_criteria(
-            SuccessCriteria::new(3500)
+            SuccessCriteria::new(95)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
@@ -1360,9 +1395,11 @@ fn land_blocking_three_region_test_suite(duration: Duration) -> ForgeConfig<'sta
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
+                .add_latency_threshold(5.0, LatencyType::P50)
+                .add_latency_threshold(10.0, LatencyType::P90)
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
+                    max_round_gap: 5,
                 }),
         )
 }
