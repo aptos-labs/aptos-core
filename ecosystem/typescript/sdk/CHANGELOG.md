@@ -10,7 +10,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 - Add `getCollectionsWithOwnedTokens` query to fetch all collections that an account has tokens for
 - Support `tokenStandard` param in `getOwnedTokens` and `getTokenOwnedFromCollectionAddress` queries
 - Add `FungibleAssetClient` plugin to support fungible assets
-- Support fungile assets in `CoinClient` class operations
+- Support fungible assets in `CoinClient` class operations
 
 ## 1.9.1 (2023-05-24)
 
