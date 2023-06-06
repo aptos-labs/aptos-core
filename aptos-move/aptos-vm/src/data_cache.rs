@@ -21,7 +21,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
+    resolver::{resource_add_cost, ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
@@ -42,16 +42,45 @@ pub(crate) fn get_resource_group_from_metadata(
 /// Adapter to convert a `StateView` into a `MoveResolverExt`.
 pub struct StorageAdapter<'a, S> {
     state_store: &'a S,
+    accurate_byte_count: bool,
+    max_binary_format_version: u32,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
 
 impl<'a, S: StateView> StorageAdapter<'a, S> {
-    pub fn new(state_store: &'a S) -> Self {
-        Self {
+    pub fn new_with_cached_config(
+        state_store: &'a S,
+        gas_feature_version: u64,
+        features: &Features,
+    ) -> Self {
+        let mut s = Self {
             state_store,
+            accurate_byte_count: false,
+            max_binary_format_version: 0,
             resource_group_cache: RefCell::new(BTreeMap::new()),
+        };
+        if gas_feature_version >= 9 {
+            s.accurate_byte_count = true;
         }
+        s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
+        s
+    }
+
+    pub fn new(state_store: &'a S) -> Self {
+        let mut s = Self {
+            state_store,
+            accurate_byte_count: false,
+            max_binary_format_version: 0,
+            resource_group_cache: RefCell::new(BTreeMap::new()),
+        };
+        let (_, gas_feature_version) = gas_config(&s);
+        let features = Features::fetch_config(&s).unwrap_or_default();
+        if gas_feature_version >= 9 {
+            s.accurate_byte_count = true;
+        }
+        s.max_binary_format_version = get_max_binary_format_version(&features, gas_feature_version);
+        s
     }
 
     pub fn get(&self, access_path: AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
@@ -65,7 +94,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, VMError> {
+    ) -> Result<Option<(Vec<u8>, u64)>, VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let mut cache = self.resource_group_cache.borrow_mut();
@@ -73,10 +102,16 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
             if let Some(group_data) = cache.get_mut(&resource_group) {
                 // This resource group is already cached for this address. So just return the
                 // cached value.
-                return Ok(group_data.get(struct_tag).cloned());
+                let buf = group_data.get(struct_tag).cloned();
+                return Ok(resource_add_cost(buf, 0));
             }
             let group_data = self.get_resource_group_data(address, &resource_group)?;
             if let Some(group_data) = group_data {
+                let len = if self.accurate_byte_count {
+                    group_data.len() as u64
+                } else {
+                    0
+                };
                 let group_data: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&group_data)
                     .map_err(|_| {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -84,13 +119,14 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                     })?;
                 let res = group_data.get(struct_tag).cloned();
                 cache.insert(resource_group, group_data);
-                Ok(res)
+                Ok(resource_add_cost(res, len))
             } else {
                 cache.insert(resource_group, BTreeMap::new());
                 Ok(None)
             }
         } else {
-            self.get_standard_resource(address, struct_tag)
+            let buf = self.get_standard_resource(address, struct_tag)?;
+            Ok(resource_add_cost(buf, 0))
         }
     }
 }
@@ -118,13 +154,8 @@ impl<'a, S: StateView> MoveResolverExt for StorageAdapter<'a, S> {
 
     fn release_resource_group_cache(
         &self,
-        address: &AccountAddress,
-        resource_group: &StructTag,
-    ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        self.resource_group_cache
-            .borrow_mut()
-            .get_mut(address)?
-            .remove(resource_group)
+    ) -> BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>> {
+        self.resource_group_cache.take()
     }
 }
 
@@ -134,7 +165,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, Error> {
+    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }
@@ -145,13 +176,9 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
             Ok(Some(bytes)) => bytes,
             _ => return vec![],
         };
-        let (_, gas_feature_version) = gas_config(self);
-        let features = Features::fetch_config(self).unwrap_or_default();
-        let max_binary_format_version =
-            get_max_binary_format_version(&features, gas_feature_version);
         let module = match CompiledModule::deserialize_with_max_version(
             &module_bytes,
-            max_binary_format_version,
+            self.max_binary_format_version,
         ) {
             Ok(module) => module,
             _ => return vec![],

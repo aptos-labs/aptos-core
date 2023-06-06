@@ -41,7 +41,7 @@ pub const DISTRIBUTE_STAKING_REWARDS_FUNCTION: &str = "distribute";
 
 // Delegation Pool Contract
 pub const DELEGATION_POOL_ADD_STAKE_FUNCTION: &str = "add_stake";
-pub const DELEGATION_POOL_UNLOCK_FUNCTTON: &str = "unlock";
+pub const DELEGATION_POOL_UNLOCK_FUNCTION: &str = "unlock";
 pub const DELEGATION_POOL_WITHDRAW_FUNCTION: &str = "withdraw";
 
 pub const DECIMALS_FIELD: &str = "decimal";
