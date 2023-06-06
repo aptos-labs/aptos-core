@@ -6,14 +6,11 @@ pub mod sharded_block_partitioner;
 pub mod test_utils;
 pub mod types;
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::transaction::Transaction;
 
 pub trait BlockPartitioner: Send + Sync {
-    fn partition(
-        &self,
-        transactions: Vec<AnalyzedTransaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<AnalyzedTransaction>>;
+    fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
+        -> Vec<Vec<Transaction>>;
 }
 
 /// An implementation of partitioner that splits the transactions into equal-sized chunks.
@@ -22,9 +19,9 @@ pub struct UniformPartitioner {}
 impl BlockPartitioner for UniformPartitioner {
     fn partition(
         &self,
-        transactions: Vec<AnalyzedTransaction>,
+        transactions: Vec<Transaction>,
         num_shards: usize,
-    ) -> Vec<Vec<AnalyzedTransaction>> {
+    ) -> Vec<Vec<Transaction>> {
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];

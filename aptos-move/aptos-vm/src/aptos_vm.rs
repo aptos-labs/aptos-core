@@ -33,10 +33,10 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, ExecutionError, ExecutionStatus,
-        ModuleBundle, Multisig, MultisigTransactionPayload, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, WriteSetPayload,
+        EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
+        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
     write_set::WriteSet,
@@ -1519,7 +1519,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
-        transactions: Vec<AnalyzedTransaction>,
+        transactions: Vec<Transaction>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

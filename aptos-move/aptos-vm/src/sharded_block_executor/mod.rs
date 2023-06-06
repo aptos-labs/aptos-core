@@ -6,9 +6,7 @@ use crate::sharded_block_executor::executor_shard::ExecutorShard;
 use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
-use aptos_types::transaction::{
-    analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput,
-};
+use aptos_types::transaction::{Transaction, TransactionOutput};
 use move_core_types::vm_status::VMStatus;
 use std::{
     marker::PhantomData,
@@ -77,7 +75,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
     pub fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<AnalyzedTransaction>,
+        block: Vec<Transaction>,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -89,10 +87,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
             self.command_txs[i]
                 .send(ExecutorShardCommand::ExecuteBlock(
                     state_view.clone(),
-                    transactions
-                        .into_iter()
-                        .map(|t| t.into())
-                        .collect::<Vec<Transaction>>(),
+                    transactions,
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 ))

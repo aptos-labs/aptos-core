@@ -16,10 +16,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    transaction::{
-        analyzed_transaction::AnalyzedTransaction, ExecutionStatus, Transaction, TransactionOutput,
-        TransactionStatus,
-    },
+    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{sharded_block_executor::ShardedBlockExecutor, AptosVM, VMExecutor};
 use fail::fail_point;
@@ -68,7 +65,7 @@ impl ChunkOutput {
     }
 
     pub fn by_transaction_execution_sharded<V: VMExecutor>(
-        transactions: Vec<AnalyzedTransaction>,
+        transactions: Vec<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
@@ -86,10 +83,7 @@ impl ChunkOutput {
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
 
         Ok(Self {
-            transactions: transactions
-                .into_iter()
-                .map(|t| t.into())
-                .collect::<Vec<Transaction>>(),
+            transactions,
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -158,7 +152,7 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        transactions: Vec<AnalyzedTransaction>,
+        transactions: Vec<Transaction>,
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
