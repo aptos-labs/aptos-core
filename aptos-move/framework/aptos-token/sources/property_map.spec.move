@@ -52,6 +52,18 @@ spec aptos_token::property_map {
         aborts_if false;
     }
 
+    spec keys(map: &PropertyMap): vector<String> {
+        pragma verify = false;
+    }
+
+    spec types(map: &PropertyMap): vector<String> {
+        pragma verify = false;
+    }
+
+    spec values(map: &PropertyMap): vector<vector<u8>> {
+        pragma verify = false;
+    }
+
     spec borrow(map: &PropertyMap, key: &String): &PropertyValue {
         use aptos_framework::simple_map;
         aborts_if !simple_map::spec_contains_key(map.map, key);
