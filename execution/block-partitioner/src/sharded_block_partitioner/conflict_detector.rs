@@ -4,9 +4,12 @@ use crate::{
     sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
     types::{CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIndex},
 };
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use std::sync::Arc;
+use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,
@@ -129,6 +132,12 @@ impl CrossShardConflictDetector {
         false
     }
 
+    fn get_anchor_shard_id(&self, storage_location: &StorageLocation) -> ShardId {
+        let mut hasher = DefaultHasher::new();
+        storage_location.hash(&mut hasher);
+        (hasher.finish() % self.num_shards as u64) as usize
+    }
+
     fn check_for_read_conflict(
         &self,
         current_shard_id: ShardId,
@@ -140,7 +149,7 @@ impl CrossShardConflictDetector {
             // During conflict resolution, shards starts scanning from the anchor shard id and
             // first shard id that has taken a read/write lock on this storage location is the owner of this storage location.
             // Please note another alternative is scan from first shard id, but this will result in non-uniform load across shards in case of conflicts.
-            let anchor_shard_id = read_location.hash().byte(0) as usize % self.num_shards;
+            let anchor_shard_id = self.get_anchor_shard_id(read_location);
             for offset in 0..self.num_shards {
                 let shard_id = (anchor_shard_id + offset) % self.num_shards;
                 // Ignore if this is from the same shard
@@ -163,7 +172,7 @@ impl CrossShardConflictDetector {
         cross_shard_rw_set: &[RWSet],
     ) -> bool {
         for write_location in txn.write_hints().iter() {
-            let anchor_shard_id = write_location.hash().byte(0) as usize % self.num_shards;
+            let anchor_shard_id = self.get_anchor_shard_id(write_location);
             for offset in 0..self.num_shards {
                 let shard_id = (anchor_shard_id + offset) % self.num_shards;
                 // Ignore if this is from the same shard

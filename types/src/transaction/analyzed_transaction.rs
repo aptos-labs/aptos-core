@@ -7,10 +7,7 @@ use crate::{
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{SignedTransaction, Transaction, TransactionPayload},
 };
-use aptos_crypto::{
-    hash::{CryptoHash, DummyHasher},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
@@ -36,6 +33,7 @@ pub struct AnalyzedTransaction {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+// TODO(skedia): Evaluate if we need to cache the HashValue for efficiency reasons.
 pub enum StorageLocation {
     // A specific storage location denoted by an address and a struct tag.
     Specific(StateKey),
@@ -44,17 +42,6 @@ pub enum StorageLocation {
     WildCardStruct(StructTag),
     // Storage location denoted by a table handle and any arbitrary item in the table.
     WildCardTable(TableHandle),
-}
-
-impl CryptoHash for StorageLocation {
-    type Hasher = DummyHasher;
-
-    fn hash(&self) -> HashValue {
-        match self {
-            StorageLocation::Specific(state_key) => CryptoHash::hash(state_key),
-            _ => todo!("hashing of wildcard storage location is not supported yet"),
-        }
-    }
 }
 
 impl AnalyzedTransaction {
