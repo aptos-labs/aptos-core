@@ -13,10 +13,7 @@ use crate::{
         TxnPointer,
     },
     counters,
-    counters::{
-        BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL, E2E_LABEL,
-        LOCAL_LABEL,
-    },
+    counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
@@ -386,14 +383,12 @@ impl TransactionStore {
             if broadcast_ready {
                 counters::core_mempool_txn_commit_latency(
                     CONSENSUS_READY_LABEL,
-                    E2E_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,
                 );
                 counters::core_mempool_txn_commit_latency(
                     BROADCAST_READY_LABEL,
-                    E2E_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,
@@ -401,7 +396,6 @@ impl TransactionStore {
             } else {
                 counters::core_mempool_txn_commit_latency(
                     CONSENSUS_READY_LABEL,
-                    LOCAL_LABEL,
                     submitted_by,
                     bucket,
                     time_delta,

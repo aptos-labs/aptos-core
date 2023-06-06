@@ -119,7 +119,6 @@ impl Mempool {
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             counters::core_mempool_txn_commit_latency(
                 stage,
-                insertion_info.validator_scope_label(),
                 insertion_info.submitted_by_label(),
                 bucket,
                 time_delta,

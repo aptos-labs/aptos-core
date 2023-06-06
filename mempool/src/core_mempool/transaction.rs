@@ -45,11 +45,7 @@ impl MempoolTransaction {
             expiration_time,
             ranking_score,
             timeline_state,
-            insertion_info: InsertionInfo {
-                insertion_time,
-                client_submitted,
-                validator_end_to_end: timeline_state != TimelineState::NonQualified,
-            },
+            insertion_info: InsertionInfo::new(insertion_time, client_submitted, timeline_state),
             was_parked: false,
         }
     }
@@ -90,36 +86,55 @@ pub struct SequenceInfo {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct InsertionInfo {
-    pub insertion_time: SystemTime,
+pub enum SubmittedBy {
     /// The transaction was received from a client REST API submission, rather than a mempool
     /// broadcast. This can be used as the time a transaction first entered the network,
     /// to measure end-to-end latency within the entire network. However, if a transaction is
     /// submitted to multiple nodes (by the client) then the end-to-end latency measured will not
     /// be accurate.
-    pub client_submitted: bool,
-    /// At a validator, whether the transaction was received from a VFN, rather than from another
-    /// validator. This can be used as the time a transaction first entered the validator network,
-    /// to measure end-to-end latency within the validator network. However, if a transaction enters
-    /// via multiple validators (due to duplication outside of the validator network) then the
-    /// validator end-to-end latency measured will not be accurate.
-    pub validator_end_to_end: bool,
+    Client,
+    /// The transaction was received from a downstream peer, i.e., not a client or a peer validator.
+    /// At a validator, a transaction from downstream can be used as the time a transaction first
+    /// entered the validator network, to measure end-to-end latency within the validator network.
+    /// However, if a transaction enters via multiple validators (due to duplication outside of the
+    /// validator network) then the validator end-to-end latency measured will not be accurate.
+    Downstream,
+    /// The transaction was received at a validator from another validator, rather than from the
+    /// downstream VFN. This transaction should not be used to measure end-to-end latency within the
+    /// validator network (see Downstream).
+    PeerValidator,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct InsertionInfo {
+    pub insertion_time: SystemTime,
+    pub submitted_by: SubmittedBy,
 }
 
 impl InsertionInfo {
-    pub fn submitted_by_label(&self) -> &'static str {
-        if self.client_submitted {
-            counters::SUBMITTED_BY_CLIENT_LABEL
+    pub fn new(
+        insertion_time: SystemTime,
+        client_submitted: bool,
+        timeline_state: TimelineState,
+    ) -> Self {
+        let submitted_by = if client_submitted {
+            SubmittedBy::Client
+        } else if timeline_state == TimelineState::NonQualified {
+            SubmittedBy::PeerValidator
         } else {
-            counters::SUBMITTED_BY_BROADCAST_LABEL
+            SubmittedBy::Downstream
+        };
+        Self {
+            insertion_time,
+            submitted_by,
         }
     }
 
-    pub fn validator_scope_label(&self) -> &'static str {
-        if self.validator_end_to_end {
-            counters::E2E_LABEL
-        } else {
-            counters::LOCAL_LABEL
+    pub fn submitted_by_label(&self) -> &'static str {
+        match self.submitted_by {
+            SubmittedBy::Client => counters::SUBMITTED_BY_CLIENT_LABEL,
+            SubmittedBy::Downstream => counters::SUBMITTED_BY_DOWNSTREAM_LABEL,
+            SubmittedBy::PeerValidator => counters::SUBMITTED_BY_PEER_VALIDATOR_LABEL,
         }
     }
 }

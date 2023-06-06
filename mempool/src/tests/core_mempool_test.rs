@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    core_mempool::{CoreMempool, MempoolTransaction, TimelineState},
+    core_mempool::{CoreMempool, MempoolTransaction, SubmittedBy, TimelineState},
     tests::common::{
         add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool,
         setup_mempool_with_broadcast_buckets, TestTransaction,
@@ -75,7 +75,7 @@ fn test_transaction_metrics() {
         TimelineState::NotReady,
         false,
     );
-    let txn = TestTransaction::new(1, 0, 2).make_signed_transaction();
+    let txn = TestTransaction::new(1, 0, 1).make_signed_transaction();
     mempool.add_txn(
         txn.clone(),
         txn.gas_unit_price(),
@@ -83,20 +83,34 @@ fn test_transaction_metrics() {
         TimelineState::NonQualified,
         false,
     );
+    let txn = TestTransaction::new(2, 0, 1).make_signed_transaction();
+    mempool.add_txn(
+        txn.clone(),
+        txn.gas_unit_price(),
+        0,
+        TimelineState::NotReady,
+        true,
+    );
 
     // Check timestamp returned as end-to-end for broadcast-able transaction
     let (insertion_info, _bucket) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(0), 0)
         .unwrap();
-    assert!(insertion_info.validator_end_to_end);
+    assert_eq!(insertion_info.submitted_by, SubmittedBy::Downstream);
 
     // Check timestamp returned as not end-to-end for non-broadcast-able transaction
     let (insertion_info, _bucket) = mempool
         .get_transaction_store()
         .get_insertion_info_and_bucket(&TestTransaction::get_address(1), 0)
         .unwrap();
-    assert!(!insertion_info.validator_end_to_end);
+    assert_eq!(insertion_info.submitted_by, SubmittedBy::PeerValidator);
+
+    let (insertion_info, _bucket) = mempool
+        .get_transaction_store()
+        .get_insertion_info_and_bucket(&TestTransaction::get_address(2), 0)
+        .unwrap();
+    assert_eq!(insertion_info.submitted_by, SubmittedBy::Client);
 }
 
 #[test]
