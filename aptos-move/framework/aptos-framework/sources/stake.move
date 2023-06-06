@@ -1040,23 +1040,17 @@ module aptos_framework::stake {
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
 
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
-        let i = 0;
-        let len = vector::length(&validator_set.active_validators);
-        while (i < len) {
-            let validator = vector::borrow(&validator_set.active_validators, i);
+        vector::for_each_ref(&validator_set.active_validators, |validator| {
+            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
-            i = i + 1;
-        };
+        });
 
         // Process pending stake and distribute transaction fees and rewards for each currently pending_inactive validator
         // (requested to leave but not removed yet).
-        let i = 0;
-        let len = vector::length(&validator_set.pending_inactive);
-        while (i < len) {
-            let validator = vector::borrow(&validator_set.pending_inactive, i);
+        vector::for_each_ref(&validator_set.pending_inactive, |validator| {
+            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
-            i = i + 1;
-        };
+        });
 
         // Activate currently pending_active validators.
         append(&mut validator_set.active_validators, &mut validator_set.pending_active);
@@ -2586,15 +2580,12 @@ module aptos_framework::stake {
     #[test_only]
     public fun set_validator_perf_at_least_one_block() acquires ValidatorPerformance {
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
-        let len = vector::length(&validator_perf.validators);
-        let i = 0;
-        while (i < len) {
-            let validator = vector::borrow_mut(&mut validator_perf.validators, i);
+        vector::for_each_mut(&mut validator_perf.validators, |validator|{
+            let validator: &mut IndividualValidatorPerformance = validator;
             if (validator.successful_proposals + validator.failed_proposals < 1) {
                 validator.successful_proposals = 1;
             };
-            i = i + 1;
-        };
+        });
     }
 
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]

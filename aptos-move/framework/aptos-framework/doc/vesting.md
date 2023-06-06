@@ -1557,18 +1557,17 @@ This returns 0x0 if no shareholder is found for the given beneficiary / the addr
         <b>return</b> shareholder_or_beneficiary
     };
     <b>let</b> vesting_contract = <b>borrow_global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(vesting_contract_address);
-    <b>let</b> i = 0;
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
-        // This will still <b>return</b> the shareholder <b>if</b> shareholder == beneficiary.
-        <b>if</b> (shareholder_or_beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder)) {
-            <b>return</b> shareholder
-        };
-        i = i + 1;
-    };
+    <b>let</b> result = @0x0;
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_any">vector::any</a>(shareholders, |shareholder| {
+        <b>if</b> (shareholder_or_beneficiary == <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, *shareholder)) {
+            result = *shareholder;
+            <b>true</b>
+        } <b>else</b> {
+            <b>false</b>
+        }
+    });
 
-    @0x0
+    result
 }
 </code></pre>
 
@@ -1660,22 +1659,18 @@ Create a vesting contract with a given configurations.
     <b>let</b> grant = <a href="coin.md#0x1_coin_zero">coin::zero</a>&lt;AptosCoin&gt;();
     <b>let</b> grant_amount = 0;
     <b>let</b> grant_pool = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_create">pool_u64::create</a>(<a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>);
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(shareholders, |shareholder| {
+        <b>let</b> shareholder: <b>address</b> = *shareholder;
         <b>let</b> (_, buy_in) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> buy_ins, &shareholder);
         <b>let</b> buy_in_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(&buy_in);
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> grant, buy_in);
         <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_buy_in">pool_u64::buy_in</a>(
             &<b>mut</b> grant_pool,
-            *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i),
+            shareholder,
             buy_in_amount,
         );
         grant_amount = grant_amount + buy_in_amount;
-
-        i = i + 1;
-    };
+    });
     <b>assert</b>!(grant_amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EZERO_GRANT">EZERO_GRANT</a>));
 
     // If this is the first time this admin <a href="account.md#0x1_account">account</a> <b>has</b> created a <a href="vesting.md#0x1_vesting">vesting</a> contract, initialize the admin store.
@@ -1789,12 +1784,10 @@ Call <code>unlock_rewards</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address: <b>address</b> = *contract_address;
         <a href="vesting.md#0x1_vesting_unlock_rewards">unlock_rewards</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
@@ -1896,12 +1889,10 @@ Call <code>vest</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address = *contract_address;
         <a href="vesting.md#0x1_vesting_vest">vest</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
@@ -1939,18 +1930,14 @@ Distribute any withdrawable stake from the stake pool.
     // Distribute coins <b>to</b> all shareholders in the <a href="vesting.md#0x1_vesting">vesting</a> contract.
     <b>let</b> grant_pool = &vesting_contract.grant_pool;
     <b>let</b> shareholders = &<a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shareholders">pool_u64::shareholders</a>(grant_pool);
-    <b>let</b> len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(shareholders);
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> shareholder = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(shareholders, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(shareholders, |shareholder| {
+        <b>let</b> shareholder = *shareholder;
         <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(grant_pool, shareholder);
         <b>let</b> amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount_with_total_coins">pool_u64::shares_to_amount_with_total_coins</a>(grant_pool, shares, total_distribution_amount);
         <b>let</b> share_of_coins = <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> coins, amount);
         <b>let</b> recipient_address = <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder);
         <a href="aptos_account.md#0x1_aptos_account_deposit_coins">aptos_account::deposit_coins</a>(recipient_address, share_of_coins);
-
-        i = i + 1;
-    };
+    });
 
     // Send <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> remaining "dust" (leftover due <b>to</b> rounding <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>) <b>to</b> the withdrawal <b>address</b>.
     <b>if</b> (<a href="coin.md#0x1_coin_value">coin::value</a>(&coins) &gt; 0) {
@@ -1995,12 +1982,10 @@ Call <code>distribute</code> for many vesting contracts.
 
     <b>assert</b>!(len != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="vesting.md#0x1_vesting_EVEC_EMPTY_FOR_MANY_FUNCTION">EVEC_EMPTY_FOR_MANY_FUNCTION</a>));
 
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; len) {
-        <b>let</b> contract_address = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&contract_addresses, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&contract_addresses, |contract_address| {
+        <b>let</b> contract_address = *contract_address;
         <a href="vesting.md#0x1_vesting_distribute">distribute</a>(contract_address);
-        i = i + 1;
-    };
+    });
 }
 </code></pre>
 
