@@ -303,22 +303,9 @@ module aptos_framework::account {
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        let account_resource = borrow_global_mut<Account>(addr);
-
-        // Verify the given `from_public_key_bytes` matches this account's current authentication key.
-        if (from_scheme == ED25519_SCHEME) {
-            let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
-            let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
-            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
-        } else if (from_scheme == MULTI_ED25519_SCHEME) {
-            let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
-            let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
-            assert!(account_resource.authentication_key == from_auth_key, error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        };
 
         // Construct a valid `RotationProofChallenge` that `cap_rotate_key` and `cap_update_table` will validate against.
+        let account_resource = borrow_global<Account>(addr);
         let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
         let challenge = RotationProofChallenge {
             sequence_number: account_resource.sequence_number,
@@ -328,10 +315,21 @@ module aptos_framework::account {
         };
 
         // Assert the challenges signed by the current and new keys are valid
-        assert_valid_rotation_proof_signature_and_get_auth_key(from_scheme, from_public_key_bytes, cap_rotate_key, &challenge);
-        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, &challenge);
+        verify_signed_message(addr, from_scheme, from_public_key_bytes, cap_rotate_key, challenge);
+        // We don't need to check that the new key is the auth key of the account with the matching address in order
+        // to maintain backward compatibility (not a requirement before).
+        verify_signed_message_with_optional_matching_auth_key(
+            addr,
+            to_scheme,
+            to_public_key_bytes,
+            cap_update_table,
+            challenge,
+            false,
+        );
 
         // Update the `OriginatingAddress` table.
+        let account_resource = borrow_global_mut<Account>(addr);
+        let new_auth_key = create_auth_key_from_unvalidated_pubkey(to_scheme, to_public_key_bytes);
         update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
     }
 
@@ -358,10 +356,20 @@ module aptos_framework::account {
         };
 
         // Verifies that the `RotationProofChallenge` from above is signed under the new public key that we are rotating to.        l
-        let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, &challenge);
+        // We don't need to check that the new key is the auth key of the account with the matching address in order
+        // to maintain backward compatibility (not a requirement before).
+        verify_signed_message_with_optional_matching_auth_key(
+            rotation_cap_offerer_address,
+            new_scheme,
+            new_public_key_bytes,
+            cap_update_table,
+            challenge,
+            false,
+        );
 
         // Update the `OriginatingAddress` table, so we can find the originating address using the new address.
         let offerer_account_resource = borrow_global_mut<Account>(rotation_cap_offerer_address);
+        let new_auth_key = create_auth_key_from_unvalidated_pubkey(new_scheme, new_public_key_bytes);
         update_auth_key_and_originating_address_table(rotation_cap_offerer_address, offerer_account_resource, new_auth_key);
     }
 
@@ -393,34 +401,25 @@ module aptos_framework::account {
         assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
 
         // proof that this account intends to delegate its rotation capability to another account
-        let account_resource = borrow_global_mut<Account>(addr);
         let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: account_resource.sequence_number,
+            sequence_number: get_sequence_number(addr),
             source_address: addr,
             recipient_address,
         };
 
         // verify the signature on `RotationCapabilityOfferProofChallengeV2` by the account owner
-        if (account_scheme == ED25519_SCHEME) {
-            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
+        verify_signed_message(
+            addr,
+            account_scheme,
+            account_public_key_bytes,
+            rotation_capability_sig_bytes,
+            proof_challenge,
+        );
 
-            let rotation_capability_sig = ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
-            assert!(ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else if (account_scheme == MULTI_ED25519_SCHEME) {
-            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
-            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(account_resource.authentication_key == expected_auth_key, error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY));
-
-            let rotation_capability_sig = multi_ed25519::new_signature_from_bytes(rotation_capability_sig_bytes);
-            assert!(multi_ed25519::signature_verify_strict_t(&rotation_capability_sig, &pubkey, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        };
-
-        // update the existing rotation capability offer or put in a new rotation capability offer for the current account
+        // Update the existing rotation capability offer or put in a new rotation capability offer for the current
+        // account.
+        let account_resource = borrow_global_mut<Account>(addr);
         option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
     }
 
@@ -514,25 +513,6 @@ module aptos_framework::account {
         assert!(option::contains(&account_resource.signer_capability_offer.for, &addr), error::not_found(ENO_SUCH_SIGNER_CAPABILITY));
 
         create_signer(offerer_address)
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    /// Helper functions for authentication key rotation.
-    ///////////////////////////////////////////////////////////////////////////
-    fun assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        if (scheme == ED25519_SCHEME) {
-            let pk = ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = ed25519::new_signature_from_bytes(signature);
-            assert!(ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else if (scheme == MULTI_ED25519_SCHEME) {
-            let pk = multi_ed25519::new_unvalidated_public_key_from_bytes(public_key_bytes);
-            let sig = multi_ed25519::new_signature_from_bytes(signature);
-            assert!(multi_ed25519::signature_verify_strict_t(&sig, &pk, *challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
-            multi_ed25519::unvalidated_public_key_to_authentication_key(&pk)
-        } else {
-            abort error::invalid_argument(EINVALID_SCHEME)
-        }
     }
 
     /// Update the `OriginatingAddress` table, so that we can find the originating address using the latest address
@@ -720,15 +700,37 @@ module aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) acquires Account {
+        verify_signed_message_with_optional_matching_auth_key(
+            account,
+            account_scheme,
+            account_public_key,
+            signed_message_bytes,
+            message,
+            true,
+        )
+    }
+
+    /// Allow verifying that a message has been signed by the given key without requiring that this key is an auth key
+    /// of the account with matching address.
+    public fun verify_signed_message_with_optional_matching_auth_key<T: drop>(
+        account: address,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        signed_message_bytes: vector<u8>,
+        message: T,
+        require_matching_auth_key: bool,
+    ) acquires Account {
         let account_resource = borrow_global_mut<Account>(account);
         // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
         if (account_scheme == ED25519_SCHEME) {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
-            let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(
-                account_resource.authentication_key == expected_auth_key,
-                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
-            );
+            if (require_matching_auth_key) {
+                let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+                assert!(
+                    account_resource.authentication_key == expected_auth_key,
+                    error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+                );
+            };
 
             let signer_capability_sig = ed25519::new_signature_from_bytes(signed_message_bytes);
             assert!(
@@ -737,11 +739,13 @@ module aptos_framework::account {
             );
         } else if (account_scheme == MULTI_ED25519_SCHEME) {
             let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
-            let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
-            assert!(
-                account_resource.authentication_key == expected_auth_key,
-                error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
-            );
+            if (require_matching_auth_key) {
+                let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
+                assert!(
+                    account_resource.authentication_key == expected_auth_key,
+                    error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
+                );
+            };
 
             let signer_capability_sig = multi_ed25519::new_signature_from_bytes(signed_message_bytes);
             assert!(
@@ -751,6 +755,18 @@ module aptos_framework::account {
         } else {
             abort error::invalid_argument(EINVALID_SCHEME)
         };
+    }
+
+    fun create_auth_key_from_unvalidated_pubkey(account_scheme: u8, pubkey: vector<u8>): vector<u8> {
+        if (account_scheme == ED25519_SCHEME) {
+            let pubkey = ed25519::new_unvalidated_public_key_from_bytes(pubkey);
+            ed25519::unvalidated_public_key_to_authentication_key(&pubkey)
+        } else if (account_scheme == MULTI_ED25519_SCHEME) {
+            let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(pubkey);
+            multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey)
+        } else {
+            abort error::invalid_argument(EINVALID_SCHEME)
+        }
     }
 
     #[test_only]
@@ -903,7 +919,7 @@ module aptos_framework::account {
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 262151, location = Self)]
+    #[expected_failure(abort_code = 65543, location = Self)]
     public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
         let test_signature = vector::empty<u8>();

@@ -73,37 +73,6 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
-    spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
-
-    spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {
-        pragma opaque;
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf;
-        ensures [abstract] result == spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme, public_key_bytes, signature, challenge);
-    }
-    spec schema AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-        scheme: u8;
-        public_key_bytes: vector<u8>;
-        signature: vector<u8>;
-        challenge: RotationProofChallenge;
-
-        include scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: public_key_bytes };
-        include scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signature };
-        aborts_if scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
-            ed25519::Signature { bytes: signature },
-            ed25519::UnvalidatedPublicKey { bytes: public_key_bytes },
-            challenge
-        );
-
-        include scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: public_key_bytes };
-        include scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signature };
-        aborts_if scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
-            multi_ed25519::Signature { bytes: signature },
-            multi_ed25519::UnvalidatedPublicKey { bytes: public_key_bytes },
-            challenge
-        );
-        aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
-    }
-
     /// The Account existed under the signer
     /// The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME
     spec rotate_authentication_key(
@@ -140,21 +109,6 @@ spec aptos_framework::account {
             current_auth_key: curr_auth_key,
             new_public_key: to_public_key_bytes,
         };
-
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: from_scheme,
-            public_key_bytes: from_public_key_bytes,
-            signature: cap_rotate_key,
-            challenge: challenge,
-        };
-
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: to_scheme,
-            public_key_bytes: to_public_key_bytes,
-            signature: cap_update_table,
-            challenge: challenge,
-        };
-
         // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
         // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
@@ -189,12 +143,6 @@ spec aptos_framework::account {
             new_public_key: new_public_key_bytes,
         };
         aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: new_scheme,
-            public_key_bytes: new_public_key_bytes,
-            signature: cap_update_table,
-            challenge: challenge,
-        };
         // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
         // TODO: Need to investigate the issue of including UpdateAuthKeyAndOriginatingAddressTableAbortsIf here.
         // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
