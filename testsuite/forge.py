@@ -1223,6 +1223,7 @@ def test(
 
     # XXX: manual override testing in CI
     # forge_cluster_name = "aptos-forge-0"
+    forge_test_suite = "setup_test"
 
     # # for performance
     # forge_enable_performance = "true"
