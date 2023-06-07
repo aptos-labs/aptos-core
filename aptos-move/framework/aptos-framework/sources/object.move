@@ -225,7 +225,13 @@ module aptos_framework::object {
     fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
         let bytes = bcs::to_bytes(&guid);
         vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        spec {
+            assume from_bcs::deserializable<address>(hash::sha3_256(bytes));
+        };
         let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
+        spec {
+            assume !exists<ObjectCore>(obj_addr);
+        };
         create_object_internal(creator_address, obj_addr, true)
     }
 
@@ -464,9 +470,14 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address) {
+        while (owner != current_address)
+        {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
+
+            spec {
+                assume destination == current_address;
+            };
 
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
@@ -481,6 +492,7 @@ module aptos_framework::object {
             );
 
             current_address = object.owner;
+
         };
     }
 
