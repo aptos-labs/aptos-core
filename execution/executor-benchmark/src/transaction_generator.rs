@@ -268,14 +268,12 @@ impl TransactionGenerator {
         block_size: usize,
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
-        non_conflicting_txns_per_block: bool,
     ) {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
             block_size,
             num_transfer_blocks,
             transactions_per_sender,
-            non_conflicting_txns_per_block,
         );
     }
 
@@ -412,23 +410,11 @@ impl TransactionGenerator {
         block_size: usize,
         num_blocks: usize,
         transactions_per_sender: usize,
-        non_conflicting_txns: bool,
     ) {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
             let mut random_account_generator: Box<dyn RandomAccountGenerator> =
-                if non_conflicting_txns {
-                    let generator = Box::new(NoConflictsAccountCache::new(
-                        self.main_signer_accounts.as_ref().unwrap(),
-                    ));
-                    assert!(
-                        generator.len() > block_size,
-                        "Not enough accounts to generate non-conflicting transactions."
-                    );
-                    generator
-                } else {
-                    Box::new(self.main_signer_accounts.as_mut().unwrap())
-                };
+                Box::new(self.main_signer_accounts.as_mut().unwrap());
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
                 .into_iter()
                 .flat_map(|_| {

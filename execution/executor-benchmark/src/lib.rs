@@ -46,7 +46,7 @@ use std::{
 };
 use tokio::runtime::Runtime;
 use aptos_sdk::types::LocalAccount;
-use aptos_transaction_generator_lib::TransactionType::CoinTransfer;
+use aptos_transaction_generator_lib::TransactionType::{CoinTransfer, NonConflictingCoinTransfer};
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -92,7 +92,6 @@ pub fn run_benchmark<V>(
     num_blocks: usize,
     transaction_type: Option<TransactionType>,
     mut transactions_per_sender: usize,
-    non_conflicting_txns_per_block: bool,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -126,16 +125,14 @@ pub fn run_benchmark<V>(
         );
 
         let mut num_accounts_to_skip = 0;
-        if let CoinTransfer{..} = transaction_type {
-            if non_conflicting_txns_per_block {
-                // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
-                // `3*block_size` addresses is required:
-                // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
-                if num_accounts_to_be_loaded < block_size * 3 {
-                    panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
-                }
-                num_accounts_to_skip = block_size;
+        if let NonConflictingCoinTransfer{..} = transaction_type {
+            // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+            // `3*block_size` addresses is required:
+            // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+            if num_accounts_to_be_loaded < block_size * 3 {
+                panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
             }
+            num_accounts_to_skip = block_size;
         }
 
         let accounts_cache =
@@ -166,12 +163,16 @@ pub fn run_benchmark<V>(
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
-    if let Some(CoinTransfer{..}) = transaction_type {
+    if let Some(NonConflictingCoinTransfer{..}) = transaction_type {
         // In case of non-conflicting coin transfer,
         // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
         // at least `block_size` number of accounts, all as signer only.
-        if non_conflicting_txns_per_block {
-            num_accounts_to_load = block_size;
+        num_accounts_to_load = block_size;
+        if transactions_per_sender > 1 {
+            warn!(
+            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+        );
+            transactions_per_sender = 1;
         }
     }
 
@@ -183,13 +184,6 @@ pub fn run_benchmark<V>(
         version,
         Some(num_accounts_to_load),
     );
-
-    if non_conflicting_txns_per_block && transactions_per_sender > 1 {
-        warn!(
-            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
-        );
-        transactions_per_sender = 1;
-    }
 
     let mut start_time = Instant::now();
     let start_gas = TXN_GAS_USAGE.get_sample_sum();
@@ -237,7 +231,6 @@ pub fn run_benchmark<V>(
             block_size,
             num_blocks,
             transactions_per_sender,
-            non_conflicting_txns_per_block,
         );
     }
     if pipeline_config.delay_execution_start {
@@ -518,7 +511,6 @@ mod tests {
             5, /* num_blocks */
             transaction_type.map(|t| t.materialize(2, false)),
             2,     /* transactions per sender */
-            false, /* randomized accounts with potential conflicts */
             25,    /* num_main_signer_accounts */
             30,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),

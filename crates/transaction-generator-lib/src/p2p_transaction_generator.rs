@@ -12,14 +12,21 @@ use std::{cmp::max, sync::Arc};
 use std::cmp::min;
 use std::collections::HashSet;
 
+type SubPoolSize = usize;
 
+pub enum SamplingMode {
+    /// See `BasicSampler`.
+    Basic,
+    /// See `BurnAndRecycleSampler`.
+    BurnAndRecycle(SubPoolSize),
+}
 /// Specifies how to get a given number of samples from an item pool.
-trait Sampler: Send + Sync {
+pub trait Sampler: Send + Sync {
     fn sample(&mut self, rng: &mut StdRng, count: usize) -> Vec<usize>;
 }
 
 /// A sampler that samples a random subset of the pool. Samples are replaced immediately.
-struct BasicSampler {
+pub struct BasicSampler {
     pool_size: usize,
 }
 
@@ -34,7 +41,7 @@ impl Sampler for BasicSampler {
 /// The pool is divided into sub-pools, one of the them being the primary:
 /// it will keep serving the sample requests *without replacement*, until it's depleted.
 /// When the current primary is depleted, another sub-pool takes over and the current one resets.
-struct BurnAndRecycleSampler {
+pub struct BurnAndRecycleSampler {
     /// We store all sub-pools together in 1 Vec: `item_pool[segment_size * x..segment_size * (x+1)]` being the x-th sub-pool.
     item_pool: Vec<usize>,
     next_index: usize,
@@ -244,6 +251,7 @@ pub struct P2PTransactionGeneratorCreator {
     amount: u64,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
     invalid_transaction_ratio: usize,
+    sampling_mode: SamplingMode,
 }
 
 impl P2PTransactionGeneratorCreator {
@@ -252,12 +260,14 @@ impl P2PTransactionGeneratorCreator {
         amount: u64,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         invalid_transaction_ratio: usize,
+        sampling_mode: SamplingMode,
     ) -> Self {
         Self {
             txn_factory,
             amount,
             all_addresses,
             invalid_transaction_ratio,
+            sampling_mode,
         }
     }
 }
@@ -266,7 +276,14 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
     fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         let mut rng = StdRng::from_entropy();
         let num_addresses = self.all_addresses.read().len();
-        let sampler = Box::new(BurnAndRecycleSampler::new(num_addresses, (num_addresses + 1) / 2));
+        let sampler: Box<dyn Sampler> = match self.sampling_mode {
+            SamplingMode::Basic => {
+                Box::new(BasicSampler{ pool_size: num_addresses })
+            }
+            SamplingMode::BurnAndRecycle(sub_pool_size) => {
+                Box::new(BurnAndRecycleSampler::new(num_addresses, (num_addresses + 1) / 2))
+            }
+        };
         Box::new(P2PTransactionGenerator::new(
             rng,
             self.amount,

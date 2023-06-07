@@ -115,9 +115,6 @@ struct Opt {
     transactions_per_sender: usize,
 
     #[clap(long)]
-    non_conflicting_txns_per_block: bool,
-
-    #[clap(long)]
     concurrency_level: Option<usize>,
 
     #[clap(long, default_value = "1")]
@@ -251,7 +248,6 @@ where
                 blocks,
                 transaction_type.map(|t| t.materialize(module_working_set_size, false)),
                 opt.transactions_per_sender,
-                opt.non_conflicting_txns_per_block,
                 main_signer_accounts,
                 additional_dst_pool_accounts,
                 data_dir,
