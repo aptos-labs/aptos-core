@@ -73,7 +73,7 @@ export class CoinClient {
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      const txnHash = await fungibleAsset.transferFromPrimaryFungibleStore(
+      const txnHash = await fungibleAsset.transfer(
         from,
         extraArgs?.coinType,
         getAddressFromAccountOrAddress(to),
@@ -133,7 +133,7 @@ export class CoinClient {
         indexerUrl: NetworkToIndexerAPI[NodeAPIToNetwork[this.aptosClient.nodeUrl]] ?? this.aptosClient.nodeUrl,
       });
       const fungibleAsset = new FungibleAssetClient(provider);
-      const balance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
+      const balance = await fungibleAsset.getPrimaryBalance(
         getAddressFromAccountOrAddress(account),
         extraArgs?.coinType,
       );

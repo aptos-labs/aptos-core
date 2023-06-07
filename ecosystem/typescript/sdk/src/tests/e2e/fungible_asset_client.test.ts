@@ -50,7 +50,7 @@ describe("fungible asset", () => {
     );
     await provider.waitForTransaction(txnHash);
 
-    // Mint fungible asset to Alice
+    // Mint 5 fungible assets to Alice
     const payload: Gen.EntryFunctionPayload = {
       function: `${publisher.address().hex()}::managed_fungible_token::mint`,
       type_arguments: [],
@@ -79,33 +79,19 @@ describe("fungible asset", () => {
     async () => {
       const fungibleAsset = new FungibleAssetClient(provider);
       // Alice has 5 amounts of the fungible asset
-      const aliceInitialBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        alice.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const aliceInitialBalance = await fungibleAsset.getPrimaryBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceInitialBalance).toEqual(BigInt(5));
 
       // Alice transfers 2 amounts of the fungible asset to Bob
-      const transactionHash = await fungibleAsset.transferFromPrimaryFungibleStore(
-        alice,
-        fungibleAssetMetadataAddress,
-        bob.address(),
-        2,
-      );
+      const transactionHash = await fungibleAsset.transfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
       await provider.waitForTransaction(transactionHash);
 
       // Alice has 3 amounts of the fungible asset
-      const aliceCurrentBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        alice.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const aliceCurrentBalance = await fungibleAsset.getPrimaryBalance(alice.address(), fungibleAssetMetadataAddress);
       expect(aliceCurrentBalance).toEqual(BigInt(3));
 
       // Bob has 2 amounts of the fungible asset
-      const bobBalance = await fungibleAsset.getBalanceFromPrimaryFungibleStore(
-        bob.address(),
-        fungibleAssetMetadataAddress,
-      );
+      const bobBalance = await fungibleAsset.getPrimaryBalance(bob.address(), fungibleAssetMetadataAddress);
       expect(bobBalance).toEqual(BigInt(2));
     },
     longTestTimeout,
@@ -135,12 +121,7 @@ describe("fungible asset", () => {
 
   test("it generates and returns a transferFromPrimaryFungibleStore raw transaction", async () => {
     const fungibleAsset = new FungibleAssetClient(provider);
-    const rawTxn = await fungibleAsset.generateTransferFromPrimaryFungibleStore(
-      alice,
-      fungibleAssetMetadataAddress,
-      bob.address(),
-      2,
-    );
+    const rawTxn = await fungibleAsset.generateTransfer(alice, fungibleAssetMetadataAddress, bob.address(), 2);
     expect(rawTxn instanceof RawTransaction).toBeTruthy();
     expect(rawTxn.sender.toHexString()).toEqual(alice.address().hex());
   });

@@ -31,14 +31,14 @@ export class FungibleAssetClient {
    * @param amount Number of assets to transfer
    * @returns The hash of the transaction submitted to the API
    */
-  async transferFromPrimaryFungibleStore(
+  async transfer(
     sender: AptosAccount,
     fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,
     amount: number | bigint,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
-    const rawTransaction = await this.generateTransferFromPrimaryFungibleStore(
+    const rawTransaction = await this.generateTransfer(
       sender,
       fungibleAssetMetadataAddress,
       recipient,
@@ -56,10 +56,7 @@ export class FungibleAssetClient {
    * @param fungibleAssetMetadataAddress The fungible asset address you want to check the balance of
    * @returns Promise that resolves to the balance
    */
-  async getBalanceFromPrimaryFungibleStore(
-    account: MaybeHexString,
-    fungibleAssetMetadataAddress: MaybeHexString,
-  ): Promise<bigint> {
+  async getPrimaryBalance(account: MaybeHexString, fungibleAssetMetadataAddress: MaybeHexString): Promise<bigint> {
     const payload: Gen.ViewRequest = {
       function: "0x1::primary_fungible_store::balance",
       type_arguments: [this.assetType],
@@ -84,7 +81,7 @@ export class FungibleAssetClient {
    * @param amount Number of assets to transfer
    * @returns Raw Transaction
    */
-  async generateTransferFromPrimaryFungibleStore(
+  async generateTransfer(
     sender: AptosAccount,
     fungibleAssetMetadataAddress: MaybeHexString,
     recipient: MaybeHexString,
