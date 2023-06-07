@@ -91,13 +91,14 @@ pub enum SubmittedBy {
     /// broadcast. This can be used as the time a transaction first entered the network,
     /// to measure end-to-end latency within the entire network. However, if a transaction is
     /// submitted to multiple nodes (by the client) then the end-to-end latency measured will not
-    /// be accurate.
+    /// be accurate (the measured value will be lower than the correct value).
     Client,
     /// The transaction was received from a downstream peer, i.e., not a client or a peer validator.
     /// At a validator, a transaction from downstream can be used as the time a transaction first
     /// entered the validator network, to measure end-to-end latency within the validator network.
     /// However, if a transaction enters via multiple validators (due to duplication outside of the
-    /// validator network) then the validator end-to-end latency measured will not be accurate.
+    /// validator network) then the validator end-to-end latency measured will not be accurate
+    /// (the measured value will be lower than the correct value).
     Downstream,
     /// The transaction was received at a validator from another validator, rather than from the
     /// downstream VFN. This transaction should not be used to measure end-to-end latency within the
