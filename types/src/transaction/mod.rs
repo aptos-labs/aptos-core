@@ -35,6 +35,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
+pub mod analyzed_transaction;
 pub mod authenticator;
 mod change_set;
 mod module;
