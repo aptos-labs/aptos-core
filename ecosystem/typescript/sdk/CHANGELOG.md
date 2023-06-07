@@ -9,6 +9,8 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 - Change `indexerUrl` param on `Provider` class to an optional parameter
 - Add `getCollectionsWithOwnedTokens` query to fetch all collections that an account has tokens for
 - Support `tokenStandard` param in `getOwnedTokens` and `getTokenOwnedFromCollectionAddress` queries
+- Add `FungibleAssetClient` plugin to support fungible assets
+- Support fungible assets in `CoinClient` class operations
 
 ## 1.9.1 (2023-05-24)
 
