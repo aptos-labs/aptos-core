@@ -7,7 +7,7 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
+use aptos_executor_types::{ExecutableTransactions, ExecutedBlock, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
@@ -45,6 +45,27 @@ pub struct ChunkOutput {
 
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
+        transactions: ExecutableTransactions,
+        state_view: CachedStateView,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Self> {
+        match transactions {
+            ExecutableTransactions::Unsharded(txns) => {
+                Self::by_transaction_execution_unsharded::<V>(
+                    txns,
+                    state_view,
+                    maybe_block_gas_limit,
+                )
+            },
+            ExecutableTransactions::Sharded(_) => {
+                // TODO(skedia): Change this into sharded once we move partitioner out of the
+                // sharded block executor.
+                todo!("sharded execution integration is not yet done")
+            },
+        }
+    }
+
+    fn by_transaction_execution_unsharded<V: VMExecutor>(
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
