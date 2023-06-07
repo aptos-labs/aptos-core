@@ -22,8 +22,8 @@ use crate::{
     options::ModelBuilderOptions,
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_ABSTRACT_PROP,
-        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_INJECTED_PROP,
-        OPAQUE_PRAGMA, VERIFY_PRAGMA,
+        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP,
+        CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
@@ -2951,8 +2951,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     et.get_type_params()
                 };
                 // Create a property marking this as injected.
-                let context_properties =
+                let mut context_properties =
                     self.add_bool_property(PropertyBag::default(), CONDITION_INJECTED_PROP, true);
+                context_properties =
+                    self.add_bool_property(context_properties, CONDITION_EXPORT_PROP, true);
                 self.def_ana_schema_inclusion_outside_schema(
                     loc,
                     &SpecBlockContext::Function(fun_name),
