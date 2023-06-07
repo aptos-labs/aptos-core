@@ -76,7 +76,7 @@ impl ChunkOutput {
             maybe_block_gas_limit,
         )?;
 
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+        // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
