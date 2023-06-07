@@ -22,6 +22,8 @@ This module provides a solution for sorted maps, that is it has the properties t
 -  [Function `destroy_empty`](#0x1_simple_map_destroy_empty)
 -  [Function `add`](#0x1_simple_map_add)
 -  [Function `upsert`](#0x1_simple_map_upsert)
+-  [Function `keys`](#0x1_simple_map_keys)
+-  [Function `values`](#0x1_simple_map_values)
 -  [Function `to_vec_pair`](#0x1_simple_map_to_vec_pair)
 -  [Function `destroy`](#0x1_simple_map_destroy)
 -  [Function `remove`](#0x1_simple_map_remove)
@@ -36,6 +38,8 @@ This module provides a solution for sorted maps, that is it has the properties t
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `upsert`](#@Specification_1_upsert)
+    -  [Function `keys`](#@Specification_1_keys)
+    -  [Function `values`](#@Specification_1_values)
     -  [Function `to_vec_pair`](#@Specification_1_to_vec_pair)
     -  [Function `remove`](#@Specification_1_remove)
     -  [Function `find`](#@Specification_1_find)
@@ -363,6 +367,62 @@ Insert key/value pair or update an existing key to a new value
     };
     <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> map.data, <a href="simple_map.md#0x1_simple_map_Element">Element</a> { key, value });
     (std::option::none(), std::option::none())
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_keys"></a>
+
+## Function `keys`
+
+Return all keys in the map. This requires keys to be copyable.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_keys">keys</a>&lt;Key: <b>copy</b>, Value&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Key&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_keys">keys</a>&lt;Key: <b>copy</b>, Value&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Key&gt; {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_map_ref">vector::map_ref</a>(&map.data, |e| {
+        <b>let</b> e: &<a href="simple_map.md#0x1_simple_map_Element">Element</a>&lt;Key, Value&gt; = e;
+        e.key
+    })
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_simple_map_values"></a>
+
+## Function `values`
+
+Return all values in the map. This requires values to be copyable.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_values">values</a>&lt;Key, Value: <b>copy</b>&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Value&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_values">values</a>&lt;Key, Value: <b>copy</b>&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Value&gt; {
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_map_ref">vector::map_ref</a>(&map.data, |e| {
+        <b>let</b> e: &<a href="simple_map.md#0x1_simple_map_Element">Element</a>&lt;Key, Value&gt; = e;
+        e.value
+    })
 }
 </code></pre>
 
@@ -720,6 +780,38 @@ using lambdas to destroy the individual keys and values.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="simple_map.md#0x1_simple_map_SimpleMap">SimpleMap</a>&lt;K, V&gt;, k: K): V;
+</code></pre>
+
+
+
+<a name="@Specification_1_keys"></a>
+
+### Function `keys`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_keys">keys</a>&lt;Key: <b>copy</b>, Value&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Key&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_values"></a>
+
+### Function `values`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_values">values</a>&lt;Key, Value: <b>copy</b>&gt;(map: &<a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Value&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 

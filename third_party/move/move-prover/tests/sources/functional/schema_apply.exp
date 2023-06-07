@@ -1,0 +1,8 @@
+Move prover returns: exiting with verification errors
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/schema_apply.move:16:9
+   │
+16 │         requires false;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_apply.move:16
