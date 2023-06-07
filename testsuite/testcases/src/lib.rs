@@ -351,17 +351,48 @@ impl dyn NetworkLoadTest {
 pub struct CompositeNetworkTest {
     // Wrapper tests - their setup and finish methods are called, before the test ones.
     // TODO don't know how to make this array, and have forge/main.rs work
-    pub wrapper: &'static dyn NetworkLoadTest,
+    pub wrappers: Vec<Box<dyn NetworkLoadTest>>,
     // This is the main test, return values from this test are used in setup, and
     // only it's test function is called.
-    pub test: &'static dyn NetworkTest,
+    pub test: Box<dyn NetworkTest>,
+}
+
+impl CompositeNetworkTest {
+    pub fn new<W: NetworkLoadTest + 'static, T: NetworkTest + 'static>(
+        wrapper: W,
+        test: T,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper)],
+            test: Box::new(test),
+        }
+    }
+
+    pub fn new_with_two_wrappers<
+        T1: NetworkLoadTest + 'static,
+        T2: NetworkLoadTest + 'static,
+        W: NetworkTest + 'static,
+    >(
+        wrapper1: T1,
+        wrapper2: T2,
+        test: W,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper1), Box::new(wrapper2)],
+            test: Box::new(test),
+        }
+    }
 }
 
 impl NetworkTest for CompositeNetworkTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
-        self.wrapper.setup(ctx)?;
+        for wrapper in &self.wrappers {
+            wrapper.setup(ctx)?;
+        }
         self.test.run(ctx)?;
-        self.wrapper.finish(ctx.swarm())?;
+        for wrapper in &self.wrappers {
+            wrapper.finish(ctx.swarm())?;
+        }
         Ok(())
     }
 }
