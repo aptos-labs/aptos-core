@@ -54,7 +54,7 @@ use std::collections::BTreeMap;
 //   - Storage charges:
 //     - Distinguish between new and existing resources
 //     - One item write comes with 1K free bytes
-//     - abort with STORATGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
+//     - abort with STORAGE_WRITE_LIMIT_REACHED if WriteOps or Events are too large
 // - V2
 //   - Table
 //     - Fix the gas formula for loading resources so that they are consistent with other
