@@ -157,7 +157,7 @@ impl<'r> TransactionDataCache<'r> {
         map.get_mut(k).unwrap()
     }
 
-    // Retrieve data from the local cache or loads it from the remote cache into the local cache.
+    // Retrieves data from the local cache or loads it from the remote cache into the local cache.
     // All operations on the global data are based on this API and they all load the data
     // into the cache.
     pub(crate) fn load_resource(
@@ -165,7 +165,7 @@ impl<'r> TransactionDataCache<'r> {
         loader: &Loader,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         let account_cache = Self::get_mut_or_insert_with(&mut self.account_map, &addr, || {
             (addr, AccountDataCache::new())
         });
@@ -189,12 +189,17 @@ impl<'r> TransactionDataCache<'r> {
                 None => &[],
             };
 
-            let gv = match self
+            let (data, bytes_loaded) = self
                 .remote
                 .get_resource_with_metadata(&addr, &ty_tag, metadata)
-            {
-                Ok(Some((blob, bytes))) => {
-                    load_res = Some(Some(NumBytes::new(bytes)));
+                .map_err(|err| {
+                    let msg = format!("Unexpected storage error: {:?}", err);
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
+                })?;
+            load_res = Some(NumBytes::new(bytes_loaded as u64));
+
+            let gv = match data {
+                Some(blob) => {
                     let val = match Value::simple_deserialize(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
@@ -209,14 +214,7 @@ impl<'r> TransactionDataCache<'r> {
 
                     GlobalValue::cached(val)?
                 },
-                Ok(None) => {
-                    load_res = Some(None);
-                    GlobalValue::none()
-                },
-                Err(err) => {
-                    let msg = format!("Unexpected storage error: {:?}", err);
-                    return Err(PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg));
-                },
+                None => GlobalValue::none(),
             };
 
             account_cache.data_map.insert(ty.clone(), (ty_layout, gv));
