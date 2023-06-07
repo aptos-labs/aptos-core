@@ -31,7 +31,7 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
     phantom: PhantomData<S>,
 }
 
-pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
+pub enum ExecutorShardCommand<S> {
     ExecuteBlock(Arc<S>, Vec<Transaction>, usize, Option<u64>),
     Stop,
 }

@@ -14,7 +14,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 /// A remote block executor that receives transactions from a channel and executes them in parallel.
 /// Currently it runs in the local machine and it will be further extended to run in a remote machine.
-pub struct ExecutorShard<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> {
+pub struct ExecutorShard<S, E> {
     shard_id: usize,
     executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,

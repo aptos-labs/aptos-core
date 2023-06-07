@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::{remote_executor_service, remote_executor_service::RemoteExecutorService};
+use crate::{
+    remote_executor_service,
+    remote_executor_service::{ExecutorService, RemoteExecutorService},
+};
+use aptos_logger::info;
+use aptos_secure_net::NetworkServer;
 use std::net::SocketAddr;
 
 /// An implementation of the remote executor service that runs in a standalone process.
@@ -20,11 +25,17 @@ impl ProcessExecutorService {
     }
 
     pub fn run(&self) {
-        remote_executor_service::execute(
+        info!(
+            "Starting process remote executor service on {}",
+            self.server_addr
+        );
+        let network_server = NetworkServer::new(
+            "process-executor-service",
             self.server_addr,
             self.network_timeout_ms,
-            self.num_executor_threads,
         );
+        let executor_service = ExecutorService::new(self.num_executor_threads);
+        remote_executor_service::execute(network_server, executor_service);
     }
 }
 

@@ -44,7 +44,6 @@ impl RemoteExecutorClient {
     fn execute_block_with_retry(
         &self,
         execution_request: BlockExecutionRequest,
-
     ) -> BlockExecutionResult {
         retry(fixed_retry_strategy(5, 20), || {
             let res = self.execute_block_inner(execution_request.clone());

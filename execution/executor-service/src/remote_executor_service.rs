@@ -60,13 +60,7 @@ pub trait RemoteExecutorService {
     fn executor_threads(&self) -> usize;
 }
 
-pub fn execute(listen_addr: SocketAddr, network_timeout_ms: u64, num_executor_threads: usize) {
-    info!("Starting remote executor service on {}", listen_addr);
-    let mut network_server =
-        NetworkServer::new("thread-executor-service", listen_addr, network_timeout_ms);
-
-    let executor_service = ExecutorService::new(num_executor_threads);
-
+pub fn execute(mut network_server: NetworkServer, executor_service: ExecutorService) {
     loop {
         if let Err(e) = process_one_message(&mut network_server, &executor_service) {
             error!("Failed to process message: {}", e);
@@ -191,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_remote_block_execute() {
-        let executor_service = ThreadExecutorService::new(1000, 2);
+        let executor_service = ThreadExecutorService::new(5000, 2);
         // Uncomment for testing with a real server
         // let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
         // let client = RemoteExecutorClient::new(server_addr, 1000);
@@ -210,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_sharded_remote_block_executor() {
-        let executor_service = ThreadExecutorService::new(1000, 2);
+        let executor_service = ThreadExecutorService::new(5000, 2);
         let client = executor_service.client();
         // Uncomment for testing with a real server
         // let server_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
