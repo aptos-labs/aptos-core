@@ -83,8 +83,10 @@ service:
 ingress:
   # -- The ACM certificate to install on the ingress
   acm_certificate:
-  # -- The GCP certificate to install on the ingress
-  gcp_certificate:
+  # -- The GCE static IP to install on the ingress
+  gce_static_ip:
+  # -- The GCE certificate to install on the ingress
+  gce_managed_certificate:
   # -- The ARN of the WAF ACL to install on the ingress
   wafAclArn:
   # -- List of CIDRs to accept traffic from
