@@ -293,9 +293,22 @@ jobs:
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-land-blocking-new-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-max-throughput-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
       FORGE_RUNNER_DURATION_SECS: 600
       FORGE_TEST_SUITE: realistic_env_max_throughput
+      POST_TO_SLACK: true
+
+  run-forge-realistic-env-load-sweep:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_NAMESPACE: forge-realistic-env-load-sweep-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      # 5 tests, each 300s
+      FORGE_RUNNER_DURATION_SECS: 1500
+      FORGE_TEST_SUITE: realistic_env_load_sweep
       POST_TO_SLACK: true
 
   run-forge-three-region-graceful-overload:
