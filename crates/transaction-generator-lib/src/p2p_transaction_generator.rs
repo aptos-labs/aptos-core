@@ -7,21 +7,94 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
-use rand::{
-    distributions::{Distribution, Standard},
-    prelude::SliceRandom,
-    rngs::StdRng,
-    Rng, RngCore, SeedableRng,
-};
+use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{cmp::max, sync::Arc};
+use std::cmp::min;
+use std::collections::HashSet;
+
+
+/// Specifies how to get a given number of samples from an item pool.
+trait Sampler: Send + Sync {
+    fn sample(&mut self, rng: &mut StdRng, count: usize) -> Vec<usize>;
+}
+
+/// A sampler that samples a random subset of the pool. Samples are replaced immediately.
+struct BasicSampler {
+    pool_size: usize,
+}
+
+impl Sampler for BasicSampler {
+    fn sample(&mut self, rng: &mut StdRng, count: usize) -> Vec<usize> {
+        rand::seq::index::sample(rng, self.pool_size, count).into_vec()
+    }
+}
+
+
+/// A samplers designed for generating a block of P2P transfers without read-write conflicts.
+/// The pool is divided into sub-pools, one of the them being the primary:
+/// it will keep serving the sample requests *without replacement*, until it's depleted.
+/// When the current primary is depleted, another sub-pool takes over and the current one resets.
+struct BurnAndRecycleSampler {
+    /// We store all sub-pools together in 1 Vec: `item_pool[segment_size * x..segment_size * (x+1)]` being the x-th sub-pool.
+    item_pool: Vec<usize>,
+    next_index: usize,
+    segment_size: usize,
+    init_shuffle_done: bool
+}
+
+impl BurnAndRecycleSampler {
+    fn new(num_items: usize, segment_size: usize) -> Self {
+        Self {
+            item_pool: (0..num_items).collect(),
+            next_index: 0,
+            segment_size,
+            init_shuffle_done: false,
+        }
+    }
+
+    fn sample_one(&mut self, rng: &mut StdRng) -> usize {
+        if !self.init_shuffle_done {
+            self.item_pool.shuffle(rng);
+            self.init_shuffle_done = true;
+        }
+        if self.next_index % self.segment_size == 0 {
+            // Switching to a new sub-pool: shuffle it first.
+            let segment_end = min(self.item_pool.len(), self.next_index + self.segment_size);
+            self.item_pool[self.next_index..segment_end].shuffle(rng);
+        }
+        let sampled = self.item_pool[self.next_index];
+        self.next_index = (self.next_index + 1) % self.item_pool.len();
+        sampled
+    }
+}
+
+impl Sampler for BurnAndRecycleSampler {
+    fn sample(&mut self, rng: &mut StdRng, count: usize) -> Vec<usize> {
+        (0..count).map(|_| self.sample_one(rng)).collect()
+    }
+}
+
+#[test]
+fn test_burn_and_recycle_sampler() {
+    let mut rng = StdRng::from_entropy();
+    let mut sampler = BurnAndRecycleSampler::new(6, 3);
+    let samples = (0..12).map(|_| sampler.sample_one(&mut rng)).collect::<Vec<_>>();
+    // `samples[0..3]` and `samples[6..9]` are 2 permutations of sub-pool 0.
+    assert_eq!(samples[0..3].iter().collect::<HashSet<_>>(), samples[6..9].iter().collect::<HashSet<_>>());
+    // `samples[3..6]` and `samples[9..12]` are 2 permutations of sub-pool 1.
+    assert_eq!(samples[3..6].iter().collect::<HashSet<_>>(), samples[9..12].iter().collect::<HashSet<_>>());
+}
+
 
 pub struct P2PTransactionGenerator {
     rng: StdRng,
     send_amount: u64,
     txn_factory: TransactionFactory,
     all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
+    sampler: Box<dyn Sampler>,
     invalid_transaction_ratio: usize,
 }
+
 
 impl P2PTransactionGenerator {
     pub fn new(
@@ -30,12 +103,14 @@ impl P2PTransactionGenerator {
         txn_factory: TransactionFactory,
         all_addresses: Arc<RwLock<Vec<AccountAddress>>>,
         invalid_transaction_ratio: usize,
+        sampler: Box<dyn Sampler>,
     ) -> Self {
         Self {
             rng,
             send_amount,
             txn_factory,
             all_addresses,
+            sampler,
             invalid_transaction_ratio,
         }
     }
@@ -53,7 +128,7 @@ impl P2PTransactionGenerator {
     }
 
     fn generate_invalid_transaction(
-        &self,
+        &mut self,
         rng: &mut StdRng,
         sender: &mut LocalAccount,
         receiver: &AccountAddress,
@@ -131,12 +206,14 @@ impl TransactionGenerator for P2PTransactionGenerator {
         };
         let mut num_valid_tx = num_to_create * (1 - invalid_size);
 
-        let receivers = self
-            .all_addresses
-            .read()
-            .choose_multiple(&mut self.rng, num_to_create)
-            .cloned()
-            .collect::<Vec<_>>();
+        let receivers: Vec<AccountAddress> = {
+            let all_addrs = self.all_addresses.read();
+            self.sampler.sample(&mut self.rng, num_to_create)
+                .into_iter()
+                .map(|i| all_addrs[i])
+                .collect()
+        };
+
         assert!(
             receivers.len() >= num_to_create,
             "failed: {} >= {}",
@@ -187,12 +264,16 @@ impl P2PTransactionGeneratorCreator {
 
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
     fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+        let mut rng = StdRng::from_entropy();
+        let num_addresses = self.all_addresses.read().len();
+        let sampler = Box::new(BurnAndRecycleSampler::new(num_addresses, (num_addresses + 1) / 2));
         Box::new(P2PTransactionGenerator::new(
-            StdRng::from_entropy(),
+            rng,
             self.amount,
             self.txn_factory.clone(),
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
+            sampler,
         ))
     }
 }

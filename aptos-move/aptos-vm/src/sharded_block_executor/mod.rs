@@ -2,6 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::sharded_block_executor::{
+    counters::NUM_EXECUTOR_SHARDS,
+};
 use crate::sharded_block_executor::executor_shard::ExecutorShard;
 use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
@@ -17,6 +20,7 @@ use std::{
     thread,
 };
 
+mod counters;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
@@ -79,6 +83,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        NUM_EXECUTOR_SHARDS.set(self.num_executor_shards as i64);
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
         // Number of partitions might be smaller than the number of executor shards in case of
         // block size is smaller than number of executor shards.
