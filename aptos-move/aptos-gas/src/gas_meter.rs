@@ -491,11 +491,12 @@ impl MoveGasMeter for StandardGasMeter {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         if self.feature_version != 0 {
             // TODO(Gas): Rewrite this in a better way.
-            if let Some((_, val)) = &loaded {
+            if let Some(val) = &val {
                 self.use_heap_memory(
                     self.gas_params
                         .misc
@@ -504,10 +505,13 @@ impl MoveGasMeter for StandardGasMeter {
                 )?;
             }
         }
+        if self.feature_version <= 8 && val.is_none() && bytes_loaded != 0.into() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
+        }
         let cost = self
             .storage_gas_params
             .pricing
-            .calculate_read_gas(loaded.map(|(num_bytes, _)| num_bytes));
+            .calculate_read_gas(val.is_some(), bytes_loaded);
         self.charge_io(cost)
     }
 

@@ -311,7 +311,7 @@ impl<'r, 'l> Session<'r, 'l> {
         &mut self,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         self.data_cache
             .load_resource(self.move_vm.runtime.loader(), addr, ty)
     }
