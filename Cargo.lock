@@ -3545,9 +3545,9 @@ checksum = "db55d72333851e17d572bec876e390cd3b11eb1ef53ae821dd9f3b653d2b4569"
 
 [[package]]
 name = "arbitrary"
-version = "1.1.7"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d86fd10d912cab78764cc44307d9cd5f164e09abbeb87fb19fb6d95937e8da5f"
+checksum = "e2d098ff73c1ca148721f37baad5ea6a465a13f9573aba8641fbbbae8164a54e"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -4393,7 +4393,7 @@ checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 name = "bytecode-verifier-libfuzzer"
 version = "0.0.0"
 dependencies = [
- "arbitrary 1.1.7",
+ "arbitrary 1.3.0",
  "libfuzzer-sys 0.4.6",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -5356,13 +5356,13 @@ dependencies = [
 
 [[package]]
 name = "derive_arbitrary"
-version = "1.1.6"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "226ad66541d865d7a7173ad6a9e691c33fdb910ac723f4bc734b3e5294a1f931"
+checksum = "53e0efad4403bfc52dc201159c4b842a246a14b98c64b55dfd0f2d89729dfeb8"
 dependencies = [
  "proc-macro2 1.0.59",
  "quote 1.0.28",
- "syn 1.0.105",
+ "syn 2.0.18",
 ]
 
 [[package]]
@@ -6186,6 +6186,28 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "fuzzer"
+version = "0.1.0"
+
+[[package]]
+name = "fuzzer-fuzz"
+version = "0.0.0"
+dependencies = [
+ "aptos-consensus",
+ "aptos-consensus-types",
+ "aptos-types",
+ "arbitrary 1.3.0",
+ "bcs 0.1.4",
+ "libfuzzer-sys 0.4.6",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -7472,7 +7494,7 @@ version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "beb09950ae85a0a94b27676cccf37da5ff13f27076aa1adbc6545dd0d0e1bd4e"
 dependencies = [
- "arbitrary 1.1.7",
+ "arbitrary 1.3.0",
  "cc",
  "once_cell",
 ]
@@ -8040,7 +8062,7 @@ name = "move-binary-format"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "arbitrary 1.1.7",
+ "arbitrary 1.3.0",
  "indexmap",
  "move-core-types",
  "once_cell",
@@ -8217,7 +8239,7 @@ name = "move-core-types"
 version = "0.0.4"
 dependencies = [
  "anyhow",
- "arbitrary 1.1.7",
+ "arbitrary 1.3.0",
  "bcs 0.1.4",
  "ethnum",
  "hex",
