@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::core_mempool::TXN_INDEX_ESTIMATED_BYTES;
+use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ pub struct MempoolTransaction {
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
     pub sequence_info: SequenceInfo,
-    pub insertion_time: SystemTime,
+    pub insertion_info: InsertionInfo,
     pub was_parked: bool,
 }
 
@@ -34,6 +34,7 @@ impl MempoolTransaction {
         timeline_state: TimelineState,
         seqno: u64,
         insertion_time: SystemTime,
+        client_submitted: bool,
     ) -> Self {
         Self {
             sequence_info: SequenceInfo {
@@ -44,7 +45,7 @@ impl MempoolTransaction {
             expiration_time,
             ranking_score,
             timeline_state,
-            insertion_time,
+            insertion_info: InsertionInfo::new(insertion_time, client_submitted, timeline_state),
             was_parked: false,
         }
     }
@@ -84,6 +85,62 @@ pub struct SequenceInfo {
     pub account_sequence_number: u64,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum SubmittedBy {
+    /// The transaction was received from a client REST API submission, rather than a mempool
+    /// broadcast. This can be used as the time a transaction first entered the network,
+    /// to measure end-to-end latency within the entire network. However, if a transaction is
+    /// submitted to multiple nodes (by the client) then the end-to-end latency measured will not
+    /// be accurate (the measured value will be lower than the correct value).
+    Client,
+    /// The transaction was received from a downstream peer, i.e., not a client or a peer validator.
+    /// At a validator, a transaction from downstream can be used as the time a transaction first
+    /// entered the validator network, to measure end-to-end latency within the validator network.
+    /// However, if a transaction enters via multiple validators (due to duplication outside of the
+    /// validator network) then the validator end-to-end latency measured will not be accurate
+    /// (the measured value will be lower than the correct value).
+    Downstream,
+    /// The transaction was received at a validator from another validator, rather than from the
+    /// downstream VFN. This transaction should not be used to measure end-to-end latency within the
+    /// validator network (see Downstream).
+    /// Note, with Quorum Store enabled, no transactions will be classified as PeerValidator.
+    PeerValidator,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct InsertionInfo {
+    pub insertion_time: SystemTime,
+    pub submitted_by: SubmittedBy,
+}
+
+impl InsertionInfo {
+    pub fn new(
+        insertion_time: SystemTime,
+        client_submitted: bool,
+        timeline_state: TimelineState,
+    ) -> Self {
+        let submitted_by = if client_submitted {
+            SubmittedBy::Client
+        } else if timeline_state == TimelineState::NonQualified {
+            SubmittedBy::PeerValidator
+        } else {
+            SubmittedBy::Downstream
+        };
+        Self {
+            insertion_time,
+            submitted_by,
+        }
+    }
+
+    pub fn submitted_by_label(&self) -> &'static str {
+        match self.submitted_by {
+            SubmittedBy::Client => counters::SUBMITTED_BY_CLIENT_LABEL,
+            SubmittedBy::Downstream => counters::SUBMITTED_BY_DOWNSTREAM_LABEL,
+            SubmittedBy::PeerValidator => counters::SUBMITTED_BY_PEER_VALIDATOR_LABEL,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::core_mempool::{MempoolTransaction, TimelineState};
@@ -113,6 +170,7 @@ mod test {
             TimelineState::NotReady,
             0,
             SystemTime::now(),
+            false,
         )
     }
 

@@ -7,7 +7,7 @@
 use crate::{
     core_mempool::{
         index::TxnPointer,
-        transaction::{MempoolTransaction, TimelineState},
+        transaction::{InsertionInfo, MempoolTransaction, TimelineState},
         transaction_store::TransactionStore,
     },
     counters,
@@ -111,19 +111,27 @@ impl Mempool {
             .reject_transaction(sender, sequence_number, hash);
     }
 
+    pub(crate) fn log_txn_commit_latency(
+        insertion_info: InsertionInfo,
+        bucket: &str,
+        stage: &'static str,
+    ) {
+        if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
+            counters::core_mempool_txn_commit_latency(
+                stage,
+                insertion_info.submitted_by_label(),
+                bucket,
+                time_delta,
+            );
+        }
+    }
+
     fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_time, is_end_to_end, bucket)) = self
+        if let Some((&insertion_info, bucket)) = self
             .transactions
-            .get_insertion_time_and_bucket(&account, sequence_number)
+            .get_insertion_info_and_bucket(&account, sequence_number)
         {
-            if let Ok(time_delta) = SystemTime::now().duration_since(insertion_time) {
-                let scope = if is_end_to_end {
-                    counters::E2E_LABEL
-                } else {
-                    counters::LOCAL_LABEL
-                };
-                counters::core_mempool_txn_commit_latency(stage, scope, bucket, time_delta);
-            }
+            Self::log_txn_commit_latency(insertion_info, bucket, stage);
         }
     }
 
@@ -139,6 +147,7 @@ impl Mempool {
         ranking_score: u64,
         db_sequence_number: u64,
         timeline_state: TimelineState,
+        client_submitted: bool,
     ) -> MempoolStatus {
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -166,6 +175,7 @@ impl Mempool {
             timeline_state,
             db_sequence_number,
             now,
+            client_submitted,
         );
 
         let status = self.transactions.insert(txn_info);
