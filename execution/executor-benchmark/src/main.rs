@@ -117,6 +117,9 @@ struct Opt {
     #[clap(long)]
     concurrency_level: Option<usize>,
 
+    #[clap(long, default_value = "1")]
+    num_executor_shards: usize,
+
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
 
@@ -144,10 +147,11 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level = num_cpus::get();
+                let level =
+                    (num_cpus::get() as f64 / self.num_executor_shards as f64).ceil() as usize;
                 println!(
-                    "\nVM concurrency level defaults to num of cpus: {}\n",
-                    level
+                    "\nVM concurrency level defaults to {} for number of shards {} \n",
+                    level, self.num_executor_shards
                 );
                 level
             },
@@ -293,6 +297,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
+    AptosVM::set_num_shards_once(opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
     if opt.use_native_executor {
