@@ -8,7 +8,7 @@ use crate::{
 use aptos_logger::{error, info};
 use aptos_secure_net::NetworkServer;
 use aptos_vm::sharded_block_executor::block_executor_client::{
-    LocalExecutorClient, TBlockExecutorClient,
+    BlockExecutorClient, LocalExecutorClient,
 };
 use std::net::SocketAddr;
 
@@ -99,7 +99,7 @@ mod tests {
         transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
     };
     use aptos_vm::sharded_block_executor::{
-        block_executor_client::TBlockExecutorClient, ShardedBlockExecutor,
+        block_executor_client::BlockExecutorClient, ShardedBlockExecutor,
     };
     use std::sync::Arc;
 

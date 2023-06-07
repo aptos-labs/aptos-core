@@ -30,15 +30,11 @@ impl TStateView for InMemoryStateView {
     }
 
     fn is_genesis(&self) -> bool {
-        false
+        unimplemented!("is_genesis is not implemented for InMemoryStateView")
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        let mut usage = StateStorageUsage::new_untracked();
-        for (k, v) in self.state_data.iter() {
-            usage.add_item(k.size() + v.size())
-        }
-        Ok(usage)
+        Ok(StateStorageUsage::new_untracked())
     }
 
     fn as_in_memory_state_view(&self) -> InMemoryStateView {

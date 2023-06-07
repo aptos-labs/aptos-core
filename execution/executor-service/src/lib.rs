@@ -11,7 +11,8 @@ mod error;
 pub mod process_executor_service;
 pub mod remote_executor_client;
 pub mod remote_executor_service;
-pub mod thread_executor_service;
+#[cfg(test)]
+mod thread_executor_service;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BlockExecutionResult {

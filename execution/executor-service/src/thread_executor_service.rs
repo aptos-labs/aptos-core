@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 use crate::{remote_executor_service, remote_executor_service::RemoteExecutorService};
 use aptos_config::utils;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    thread::{self, JoinHandle},
+    thread,
+    thread::JoinHandle,
 };
 
 /// This is a simple implementation of RemoteExecutorService that runs the executor service in a

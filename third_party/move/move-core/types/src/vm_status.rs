@@ -756,12 +756,6 @@ pub enum StatusCode {
     RESERVED_RUNTIME_ERROR_4 = 4036,
     RESERVED_RUNTIME_ERROR_5 = 4037,
 
-    // Error happens due to error in communicating to the remote executor service
-    REMOTE_EXECUTION_SERVER_READ_ERROR = 5000,
-    REMOTE_EXECUTION_SERVER_WRITE_ERROR = 5001,
-    REMOTE_REQUEST_SERIALIZATION_ERROR = 5002,
-    REMOTE_RESPONSE_DESERIALIZATION_ERROR = 5003,
-
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in
     UNKNOWN_STATUS = 18446744073709551615,

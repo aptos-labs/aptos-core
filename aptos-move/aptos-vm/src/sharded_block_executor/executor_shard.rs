@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    block_executor_client::TBlockExecutorClient, ExecutorShardCommand,
+    block_executor_client::BlockExecutorClient, ExecutorShardCommand,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -14,14 +14,14 @@ use std::sync::mpsc::{Receiver, Sender};
 
 /// A remote block executor that receives transactions from a channel and executes them in parallel.
 /// Currently it runs in the local machine and it will be further extended to run in a remote machine.
-pub struct ExecutorShard<S: StateView + Sync + Send + 'static, E: TBlockExecutorClient> {
+pub struct ExecutorShard<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> {
     shard_id: usize,
     executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
 }
 
-impl<S: StateView + Sync + Send + 'static, E: TBlockExecutorClient> ExecutorShard<S, E> {
+impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard<S, E> {
     pub fn new(
         num_executor_shards: usize,
         executor_client: E,

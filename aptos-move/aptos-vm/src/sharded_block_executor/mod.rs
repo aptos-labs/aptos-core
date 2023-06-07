@@ -7,7 +7,7 @@ use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
-use block_executor_client::TBlockExecutorClient;
+use block_executor_client::BlockExecutorClient;
 use move_core_types::vm_status::VMStatus;
 use std::{
     marker::PhantomData,
@@ -37,7 +37,7 @@ pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
-    pub fn new<E: TBlockExecutorClient + Sync + Send + 'static>(executor_clients: Vec<E>) -> Self {
+    pub fn new<E: BlockExecutorClient + Sync + Send + 'static>(executor_clients: Vec<E>) -> Self {
         let mut command_txs = vec![];
         let mut result_rxs = vec![];
         let mut shard_join_handles = vec![];
@@ -124,7 +124,7 @@ impl<S: StateView + Sync + Send + 'static> Drop for ShardedBlockExecutor<S> {
 
 fn spawn_executor_shard<
     S: StateView + Sync + Send + 'static,
-    E: TBlockExecutorClient + Sync + Send + 'static,
+    E: BlockExecutorClient + Sync + Send + 'static,
 >(
     num_executor_shards: usize,
     executor_client: E,

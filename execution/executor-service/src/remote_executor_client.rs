@@ -3,19 +3,17 @@
 
 use crate::{error::Error, BlockExecutionRequest, BlockExecutionResult, ExecuteBlockCommand};
 use aptos_logger::error;
+use aptos_retrier::{fixed_retry_strategy, retry};
 use aptos_secure_net::NetworkClient;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{Transaction, TransactionOutput},
-    vm_status::{
-        StatusCode::{REMOTE_EXECUTION_SERVER_READ_ERROR, REMOTE_EXECUTION_SERVER_WRITE_ERROR},
-        VMStatus,
-    },
+    vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::block_executor_client::TBlockExecutorClient;
+use aptos_vm::sharded_block_executor::block_executor_client::BlockExecutorClient;
 use std::{net::SocketAddr, sync::Mutex};
 
-/// An implementation of [`TBlockExecutorClient`] that supports executing blocks remotely.
+/// An implementation of [`BlockExecutorClient`] that supports executing blocks remotely.
 pub struct RemoteExecutorClient {
     network_client: Mutex<NetworkClient>,
 }
@@ -32,14 +30,33 @@ impl RemoteExecutorClient {
         }
     }
 
-    fn process_one_message(&self, input: &[u8]) -> Result<Vec<u8>, Error> {
+    fn execute_block_inner(
+        &self,
+        execution_request: BlockExecutionRequest,
+    ) -> Result<BlockExecutionResult, Error> {
+        let input_message = bcs::to_bytes(&execution_request)?;
         let mut network_client = self.network_client.lock().unwrap();
-        network_client.write(input)?;
-        Ok(network_client.read()?)
+        network_client.write(&input_message)?;
+        let bytes = network_client.read()?;
+        Ok(bcs::from_bytes(&bytes)?)
+    }
+
+    fn execute_block_with_retry(
+        &self,
+        execution_request: BlockExecutionRequest,
+    ) -> BlockExecutionResult {
+        retry(fixed_retry_strategy(0, 10), || {
+            let res = self.execute_block_inner(execution_request.clone());
+            if let Err(e) = &res {
+                error!("Failed to execute block: {:?}", e);
+            }
+            res
+        })
+        .unwrap()
     }
 }
 
-impl TBlockExecutorClient for RemoteExecutorClient {
+impl BlockExecutorClient for RemoteExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
         transactions: Vec<Transaction>,
@@ -53,33 +70,6 @@ impl TBlockExecutorClient for RemoteExecutorClient {
             concurrency_level,
             maybe_block_gas_limit,
         });
-        let input_message = bcs::to_bytes(&input).map_err(|e| {
-            VMStatus::Error(
-                REMOTE_EXECUTION_SERVER_WRITE_ERROR,
-                Some(format!(
-                    "Failed to serialize request to remote execution server: {}",
-                    e
-                )),
-            )
-        })?;
-        loop {
-            match self.process_one_message(&input_message) {
-                Err(err) => {
-                    error!("Failed to communicate with Executor service: {}", err)
-                },
-                Ok(value) => {
-                    let result = bcs::from_bytes::<BlockExecutionResult>(&value).map_err(|e| {
-                        VMStatus::Error(
-                            REMOTE_EXECUTION_SERVER_READ_ERROR,
-                            Some(format!(
-                                "Failed to deserialize response from remote execution server: {}",
-                                e
-                            )),
-                        )
-                    });
-                    return result?.inner;
-                },
-            }
-        }
+        self.execute_block_with_retry(input).inner
     }
 }

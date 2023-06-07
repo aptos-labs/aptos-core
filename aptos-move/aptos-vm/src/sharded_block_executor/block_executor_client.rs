@@ -6,7 +6,7 @@ use aptos_types::transaction::{Transaction, TransactionOutput};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
-pub trait TBlockExecutorClient {
+pub trait BlockExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
         transactions: Vec<Transaction>,
@@ -16,7 +16,7 @@ pub trait TBlockExecutorClient {
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 
-impl TBlockExecutorClient for LocalExecutorClient {
+impl BlockExecutorClient for LocalExecutorClient {
     fn execute_block<S: StateView + Sync>(
         &self,
         transactions: Vec<Transaction>,
