@@ -124,13 +124,8 @@ impl DBPruner for LedgerPruner {
         self.min_readable_version
             .store(min_readable_version, Ordering::Relaxed);
         PRUNER_VERSIONS
-            .with_label_values(&["ledger_pruner", "min_readable"])
+            .with_label_values(&["ledger_pruner", "progress"])
             .set(min_readable_version as i64);
-    }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
     }
 }
 

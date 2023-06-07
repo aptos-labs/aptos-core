@@ -61,7 +61,4 @@ pub trait DBPruner: Send + Sync {
     fn is_pruning_pending(&self) -> bool {
         self.target_version() > self.min_readable_version()
     }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version);
 }

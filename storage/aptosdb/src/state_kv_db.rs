@@ -141,6 +141,13 @@ impl StateKvDb {
         )
     }
 
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.state_kv_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateKvPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
     pub(crate) fn create_checkpoint(
         db_root_path: impl AsRef<Path>,
         cp_root_path: impl AsRef<Path>,
