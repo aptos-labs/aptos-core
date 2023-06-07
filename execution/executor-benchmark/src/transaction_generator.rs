@@ -297,7 +297,6 @@ impl TransactionGenerator {
                 .map(Transaction::UserTransaction)
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
-
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
@@ -446,7 +445,7 @@ impl TransactionGenerator {
             return;
         }
 
-        let num_accounts_in_cache = self.main_signer_accounts.as_ref().unwrap().accounts.len();
+        let num_accounts_in_cache = self.main_signer_accounts.as_ref().unwrap().len();
         println!(
             "[{}] verify {} account sequence numbers.",
             now_fmt!(),

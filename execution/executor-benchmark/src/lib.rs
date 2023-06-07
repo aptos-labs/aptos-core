@@ -317,9 +317,9 @@ where
         None,
     );
 
+    let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
 
-    let runtime = Runtime::new().unwrap();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let phase = Arc::new(AtomicUsize::new(0));
 
@@ -510,9 +510,9 @@ mod tests {
             6, /* block_size */
             5, /* num_blocks */
             transaction_type.map(|t| t.materialize(2, false)),
-            2,     /* transactions per sender */
-            25,    /* num_main_signer_accounts */
-            30,    /* num_dst_pool_accounts */
+            2,  /* transactions per sender */
+            25, /* num_main_signer_accounts */
+            30, /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
