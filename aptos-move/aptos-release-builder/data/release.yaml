@@ -2,20 +2,23 @@
 remote_endpoint: ~
 name: "v1.5"
 proposals:
-  - name: upgrade_framework
+  - name: step_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.4.0"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.4.0. Struct constructor, generic cryptography algebra, ed25519 returns false if wrong length, and transaction shuffling will be enabled in separate proposals."
+      title: "Multi-step proposal to upgrade mainnet framework to v1.5.0"
+      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.5.0. bls12381, crytography algebra natives, and charging for invariant violations will be enabled in separate proposals."
+      source_code_url: ""
+      discussion_url: "https://github.com/aptos-labs/aptos-core/issues/8574"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_bls12381
+  - name: step_2_enable_bls12381
     metadata:
       title: "Enable bls12381"
       description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
+      source_code_url: ""
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
     execution_mode: MultiStep
     update_sequence:
@@ -23,12 +26,12 @@ proposals:
         enabled:
           - cryptography_algebra_natives
           - bls12381_structures
-  - name: enable_charge_invariant_violation
+  - name: step_3_enable_charge_invariant_violation
     metadata:
       title: "Enable charge_invariant_violation"
-      description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      source_code_url: "https://github.com/aptos-labs/aptos-core/pull/8213"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-35.md"
+      description: "AIP-35: Charge transactions that triggered invariant violation error instead of discarding them."
+      source_code_url: ""
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/144"
     execution_mode: MultiStep
     update_sequence:
     - FeatureFlag:
