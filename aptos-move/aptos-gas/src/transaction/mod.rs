@@ -18,7 +18,7 @@ use move_core_types::gas_algebra::{
 
 mod storage;
 
-pub use storage::{ChangeSetConfigs, StorageGasParameters};
+pub use storage::{ChangeSetConfigs, StorageGasParameters, StoragePricing};
 
 const GAS_SCALING_FACTOR: u64 = 1_000_000;
 
