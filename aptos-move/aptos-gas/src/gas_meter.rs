@@ -33,7 +33,7 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
-// - V10
+// - V9
 //   - Added create_uuid and get_txn_hash native functions
 // - V8
 //   - Added BLS12-381 operations.
@@ -61,7 +61,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 9;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
