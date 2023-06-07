@@ -7,11 +7,17 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
 };
-use rand::{distributions::{Distribution, Standard}, prelude::SliceRandom, rngs::StdRng, Rng, RngCore, SeedableRng};
-use std::{cmp::max, sync::Arc};
-use std::cmp::min;
-use std::collections::HashSet;
-use std::marker::PhantomData;
+use rand::{
+    distributions::{Distribution, Standard},
+    prelude::SliceRandom,
+    rngs::StdRng,
+    Rng, RngCore, SeedableRng,
+};
+use std::{
+    cmp::{max, min},
+    marker::PhantomData,
+    sync::Arc,
+};
 
 pub enum SamplingMode {
     /// See `BasicSampler`.
@@ -22,7 +28,12 @@ pub enum SamplingMode {
 
 /// Specifies how to get a given number of samples from an item pool.
 pub trait Sampler<T>: Send + Sync {
-    fn sample_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>, num_samples: usize) -> Vec<T>;
+    fn sample_from_pool(
+        &mut self,
+        rng: &mut StdRng,
+        pool: &mut Vec<T>,
+        num_samples: usize,
+    ) -> Vec<T>;
 }
 
 /// A sampler that samples a random subset of the pool. Samples are replaced immediately.
@@ -32,12 +43,19 @@ pub struct BasicSampler<T> {
 
 impl<T> BasicSampler<T> {
     fn new() -> Self {
-        Self { phantom: PhantomData }
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
 impl<T: Clone + Send + Sync> Sampler<T> for BasicSampler<T> {
-    fn sample_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>, num_samples: usize) -> Vec<T> {
+    fn sample_from_pool(
+        &mut self,
+        rng: &mut StdRng,
+        pool: &mut Vec<T>,
+        num_samples: usize,
+    ) -> Vec<T> {
         let mut samples = Vec::with_capacity(num_samples);
         let num_available = pool.len();
         for _ in 0..num_samples {
@@ -75,7 +93,7 @@ impl<T: Clone + Send + Sync> BurnAndRecycleSampler<T> {
     }
 
     fn sample_one_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>) -> T {
-        if pool.len() == 0 {
+        if pool.is_empty() {
             let num_addresses = self.to_be_replaced.len();
             for replace_batch_start in (0..num_addresses).step_by(self.replace_batch_size) {
                 let end = min(replace_batch_start + self.replace_batch_size, num_addresses);
@@ -92,25 +110,43 @@ impl<T: Clone + Send + Sync> BurnAndRecycleSampler<T> {
 }
 
 impl<T: Clone + Send + Sync> Sampler<T> for BurnAndRecycleSampler<T> {
-    fn sample_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>, num_samples: usize) -> Vec<T> {
-        (0..num_samples).map(|_| self.sample_one_from_pool(rng, pool)).collect()
+    fn sample_from_pool(
+        &mut self,
+        rng: &mut StdRng,
+        pool: &mut Vec<T>,
+        num_samples: usize,
+    ) -> Vec<T> {
+        (0..num_samples)
+            .map(|_| self.sample_one_from_pool(rng, pool))
+            .collect()
     }
 }
 
 #[test]
 fn test_burn_and_recycle_sampler() {
+    use std::collections::HashSet;
     let mut rng = StdRng::from_entropy();
     let mut sampler = BurnAndRecycleSampler::new(3);
     let mut pool: Vec<u8> = (0..8).collect();
-    let samples = (0..16).map(|_| sampler.sample_one_from_pool(&mut rng, &mut pool)).collect::<Vec<_>>();
+    let samples = (0..16)
+        .map(|_| sampler.sample_one_from_pool(&mut rng, &mut pool))
+        .collect::<Vec<_>>();
     // `samples[0..3]` and `samples[8..11]` are 2 permutations of sub-pool 0.
-    assert_eq!(samples[0..3].iter().collect::<HashSet<_>>(), samples[8..11].iter().collect::<HashSet<_>>());
+    assert_eq!(
+        samples[0..3].iter().collect::<HashSet<_>>(),
+        samples[8..11].iter().collect::<HashSet<_>>()
+    );
     // `samples[3..6]` and `samples[11..14]` are 2 permutations of sub-pool 1.
-    assert_eq!(samples[3..6].iter().collect::<HashSet<_>>(), samples[11..14].iter().collect::<HashSet<_>>());
+    assert_eq!(
+        samples[3..6].iter().collect::<HashSet<_>>(),
+        samples[11..14].iter().collect::<HashSet<_>>()
+    );
     // `samples[6..8]` and `samples[14..16]` are 2 permutations of sub-pool 1.
-    assert_eq!(samples[6..8].iter().collect::<HashSet<_>>(), samples[14..16].iter().collect::<HashSet<_>>());
+    assert_eq!(
+        samples[6..8].iter().collect::<HashSet<_>>(),
+        samples[14..16].iter().collect::<HashSet<_>>()
+    );
 }
-
 
 pub struct P2PTransactionGenerator {
     rng: StdRng,
@@ -120,7 +156,6 @@ pub struct P2PTransactionGenerator {
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
 }
-
 
 impl P2PTransactionGenerator {
     pub fn new(
@@ -235,7 +270,8 @@ impl TransactionGenerator for P2PTransactionGenerator {
 
         let receivers: Vec<AccountAddress> = {
             let mut all_addrs = self.all_addresses.write();
-            self.sampler.sample_from_pool(&mut self.rng, all_addrs.as_mut(), num_to_create)
+            self.sampler
+                .sample_from_pool(&mut self.rng, all_addrs.as_mut(), num_to_create)
         };
 
         assert!(
@@ -293,12 +329,10 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
     fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<AccountAddress>> = match self.sampling_mode {
-            SamplingMode::Basic => {
-                Box::new(BasicSampler::new())
-            }
+            SamplingMode::Basic => Box::new(BasicSampler::new()),
             SamplingMode::BurnAndRecycle(recycle_batch_size) => {
                 Box::new(BurnAndRecycleSampler::new(recycle_batch_size))
-            }
+            },
         };
         Box::new(P2PTransactionGenerator::new(
             rng,

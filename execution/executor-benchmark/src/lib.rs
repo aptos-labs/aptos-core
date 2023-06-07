@@ -30,9 +30,11 @@ use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
+use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
+    TransactionType::NonConflictingCoinTransfer,
 };
 use aptos_vm::counters::TXN_GAS_USAGE;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
@@ -45,8 +47,6 @@ use std::{
     time::Instant,
 };
 use tokio::runtime::Runtime;
-use aptos_sdk::types::LocalAccount;
-use aptos_transaction_generator_lib::TransactionType::{CoinTransfer, NonConflictingCoinTransfer};
 
 pub fn init_db_and_executor<V>(config: &NodeConfig) -> (DbReaderWriter, BlockExecutor<V>)
 where
@@ -163,7 +163,7 @@ pub fn run_benchmark<V>(
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
 
     let mut num_accounts_to_load = num_main_signer_accounts;
-    if let Some(NonConflictingCoinTransfer{..}) = transaction_type {
+    if let Some(NonConflictingCoinTransfer { .. }) = transaction_type {
         // In case of non-conflicting coin transfer,
         // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
         // at least `block_size` number of accounts, all as signer only.
@@ -227,11 +227,7 @@ pub fn run_benchmark<V>(
             transactions_per_sender,
         );
     } else {
-        generator.run_transfer(
-            block_size,
-            num_blocks,
-            transactions_per_sender,
-        );
+        generator.run_transfer(block_size, num_blocks, transactions_per_sender);
     }
     if pipeline_config.delay_execution_start {
         start_time = Instant::now();
@@ -246,7 +242,7 @@ pub fn run_benchmark<V>(
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
         "VM execution TPS {} txn/s",
-        (delta_v as f64 / delta_vm_time) as usize
+        (delta_v / delta_vm_time) as usize
     );
     info!(
         "Executed workload {}",

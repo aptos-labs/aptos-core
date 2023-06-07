@@ -1,13 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_infallible::RwLock;
 use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
-use rand::{rngs::StdRng, seq::SliceRandom, RngCore, SeedableRng};
-use std::{
-    collections::VecDeque,
-    sync::{mpsc, Arc},
-};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
+use std::{collections::VecDeque, sync::mpsc};
 
 type Seed = [u8; 32];
 
@@ -119,5 +115,4 @@ impl AccountCache {
         let sender = &mut self.accounts[sender_idx];
         (sender, receivers)
     }
-
 }
