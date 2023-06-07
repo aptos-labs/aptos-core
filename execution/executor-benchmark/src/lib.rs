@@ -231,7 +231,6 @@ pub fn run_benchmark<V>(
             num_blocks,
             transaction_generator_creator,
             transactions_per_sender,
-            // TODO add support for non_conflicting_txns_per_block in workload generator
         );
     } else {
         generator.run_transfer(

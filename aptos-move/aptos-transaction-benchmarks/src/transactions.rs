@@ -146,6 +146,7 @@ where
                     run_seq,
                     no_conflict_txn,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 );
             } else {
                 let tps = state.execute_blockstm_benchmark(
@@ -153,6 +154,7 @@ where
                     run_seq,
                     no_conflict_txn,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 );
                 par_tps.push(tps.0);
                 seq_tps.push(tps.1);

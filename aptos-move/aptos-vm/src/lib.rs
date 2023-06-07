@@ -163,6 +163,7 @@ pub trait VMExecutor: Send + Sync {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
+
 /*
 /// Get the AccessPath to a resource stored under `address` with type name `tag`
 /// DNS
