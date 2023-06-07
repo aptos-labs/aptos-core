@@ -58,7 +58,8 @@ impl ChunkOutput {
                 )
             },
             ExecutableTransactions::Sharded(_) => {
-                // TODO(skedia) Change this into sharded once we move partitioner out of the
+                // TODO(skedia): Change this into sharded once we move partitioner out of the
+                // sharded block executor.
                 todo!("sharded execution integration is not yet done")
             },
         }
