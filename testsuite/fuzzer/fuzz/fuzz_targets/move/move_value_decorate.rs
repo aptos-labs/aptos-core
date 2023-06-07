@@ -18,7 +18,7 @@ fuzz_target!(|fuzz_data: FuzzData| {
     if !utils::is_valid_layout(&fuzz_data.layout) {
         return;
     }
-    
+
     // Undecorate value
     let move_value = fuzz_data.move_value.clone();
     let undecorated_move_value = move_value.undecorate();
