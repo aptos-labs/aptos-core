@@ -264,8 +264,6 @@ pub trait GasMeter {
 
     /// Charges for loading a resource from storage. This is only called when the resource is not
     /// cached.
-    /// - `Some(n)` means `n` bytes are loaded.
-    /// - `None` means a load operation is performed but the resource does not exist.
     ///
     /// WARNING: This can be dangerous if you execute multiple user transactions in the same
     /// session -- identical transactions can have different gas costs. Use at your own risk.
@@ -273,7 +271,8 @@ pub trait GasMeter {
         &mut self,
         addr: AccountAddress,
         ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()>;
 
     /// Charge for executing a native function.
@@ -501,7 +500,8 @@ impl GasMeter for UnmeteredGasMeter {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        _loaded: Option<(NumBytes, impl ValueView)>,
+        _val: Option<impl ValueView>,
+        _bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         Ok(())
     }
