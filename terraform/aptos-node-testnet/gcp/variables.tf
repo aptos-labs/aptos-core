@@ -50,6 +50,16 @@ variable "image_tag" {
 
 ### DNS config
 
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
 variable "zone_name" {
   description = "Zone name of GCP Cloud DNS zone to create records in"
   default     = ""
@@ -63,6 +73,16 @@ variable "zone_project" {
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
   default     = "<workspace>.aptos"
+}
+
+variable "create_dns_records" {
+  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
+}
+
+variable "dns_ttl" {
+  description = "Time-to-Live for the Validator and Fullnode DNS records"
+  default     = 300
 }
 
 ### Testnet config
@@ -134,7 +154,7 @@ variable "enable_forge" {
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 variable "monitoring_helm_values" {
@@ -145,7 +165,7 @@ variable "monitoring_helm_values" {
 
 variable "enable_prometheus_node_exporter" {
   description = "Enable prometheus-node-exporter within monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 ### Autoscaling

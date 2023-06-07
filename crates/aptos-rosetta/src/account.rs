@@ -94,6 +94,46 @@ async fn get_balances(
     maybe_filter_currencies: Option<Vec<Currency>>,
 ) -> ApiResult<(u64, Option<Vec<AccountAddress>>, Vec<Amount>, u64)> {
     let owner_address = account.account_address()?;
+    let pool_address = account.pool_address()?;
+
+    let mut balances = vec![];
+    let mut lockup_expiration: u64 = 0;
+    let mut total_requested_balance: Option<u64> = None;
+
+    if pool_address.is_some() {
+        match get_delegation_stake_balances(
+            rest_client,
+            &account,
+            owner_address,
+            pool_address.unwrap(),
+            version,
+        )
+        .await
+        {
+            Ok(Some(balance_result)) => {
+                if let Some(balance) = balance_result.balance {
+                    total_requested_balance = Some(
+                        total_requested_balance.unwrap_or_default()
+                            + u64::from_str(&balance.value).unwrap_or_default(),
+                    );
+                }
+                lockup_expiration = balance_result.lockup_expiration;
+                if let Some(balance) = total_requested_balance {
+                    balances.push(Amount {
+                        value: balance.to_string(),
+                        currency: native_coin(),
+                    })
+                }
+            },
+            result => {
+                warn!(
+                    "Failed to retrieve requested balance for delegator_address: {}, pool_address: {}: {:?}",
+                    owner_address, pool_address.unwrap(), result
+                )
+            },
+        }
+    }
+
     // Retrieve all account resources
     if let Ok(response) = rest_client
         .get_account_resources_at_version_bcs(owner_address, version)
@@ -102,8 +142,6 @@ async fn get_balances(
         let resources = response.into_inner();
         let mut maybe_sequence_number = None;
         let mut maybe_operators = None;
-        let mut balances = vec![];
-        let mut lockup_expiration: u64 = 0;
 
         // Iterate through resources, converting balances
         for (struct_tag, bytes) in resources {
@@ -132,12 +170,11 @@ async fn get_balances(
                     }
                 },
                 (AccountAddress::ONE, STAKING_CONTRACT_MODULE, STORE_RESOURCE) => {
-                    if account.is_base_account() {
+                    if account.is_base_account() || pool_address.is_some() {
                         continue;
                     }
 
                     let store: Store = bcs::from_bytes(&bytes)?;
-                    let mut total_requested_balance: Option<u64> = None;
                     maybe_operators = Some(vec![]);
                     for (operator, contract) in store.staking_contracts {
                         // Keep track of operators

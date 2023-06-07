@@ -9,7 +9,10 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{executable::ModulePath, write_set::TransactionWrite};
+use aptos_types::{
+    executable::{ExecutableTestType, ModulePath},
+    write_set::TransactionWrite,
+};
 use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
 use std::{
@@ -37,11 +40,12 @@ where
             .unwrap(),
     );
 
-    let output = BlockExecutor::<Transaction<K, V>, Task<K, V>, DeltaDataView<K, V>>::new(
-        num_cpus::get(),
-        executor_thread_pool,
-        None,
-    )
+    let output = BlockExecutor::<
+        Transaction<K, V>,
+        Task<K, V>,
+        DeltaDataView<K, V>,
+        ExecutableTestType,
+    >::new(num_cpus::get(), executor_thread_pool, None)
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);

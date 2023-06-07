@@ -4,18 +4,22 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)]
 
-use crate::db_options::{
-    event_db_column_families, gen_event_cfds, gen_ledger_cfds, gen_ledger_metadata_cfds,
-    gen_transaction_accumulator_cfds, gen_transaction_cfds, gen_transaction_info_cfds,
-    gen_write_set_cfds, ledger_db_column_families, ledger_metadata_db_column_families,
-    transaction_accumulator_db_column_families, transaction_db_column_families,
-    transaction_info_db_column_families, write_set_db_column_families,
+use crate::{
+    db_options::{
+        event_db_column_families, gen_event_cfds, gen_ledger_cfds, gen_ledger_metadata_cfds,
+        gen_transaction_accumulator_cfds, gen_transaction_cfds, gen_transaction_info_cfds,
+        gen_write_set_cfds, ledger_db_column_families, ledger_metadata_db_column_families,
+        transaction_accumulator_db_column_families, transaction_db_column_families,
+        transaction_info_db_column_families, write_set_db_column_families,
+    },
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -134,6 +138,13 @@ impl LedgerDb {
     ) -> Result<()> {
         // TODO(grao): Implement this function.
         todo!()
+    }
+
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.ledger_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::LedgerPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
     }
 
     pub fn metadata_db(&self) -> &DB {

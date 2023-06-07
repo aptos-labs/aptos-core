@@ -109,11 +109,6 @@ where
         let (min_readable_version, fully_pruned) = *self.progress.lock();
         self.target_version() > min_readable_version || !fully_pruned
     }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version) {
-        self.record_progress_impl(version, true /* is_fully_pruned */);
-    }
 }
 
 impl<S: StaleNodeIndexSchemaTrait> StateMerklePruner<S>
@@ -187,7 +182,7 @@ where
     fn record_progress_impl(&self, min_readable_version: Version, is_fully_pruned: bool) {
         *self.progress.lock() = (min_readable_version, is_fully_pruned);
         PRUNER_VERSIONS
-            .with_label_values(&[S::name(), "min_readable"])
+            .with_label_values(&[S::name(), "progress"])
             .set(min_readable_version as i64);
     }
 

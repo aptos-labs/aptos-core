@@ -557,17 +557,13 @@ Disclaimer: This function is costly. Use it at your own discretion.
 
     <b>while</b> (num_buckets_left &gt; 0) {
         <b>let</b> pop_bucket = <a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> v.buckets, num_buckets_left - 1);
-        <b>let</b> pop_bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&pop_bucket);
-        <b>let</b> i = 0;
-        <b>while</b>(i &lt; pop_bucket_length){
-            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> push_bucket, <a href="../../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> pop_bucket));
+        <a href="../../move-stdlib/doc/vector.md#0x1_vector_for_each_reverse">vector::for_each_reverse</a>(pop_bucket, |val| {
+            <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> push_bucket, val);
             <b>if</b> (<a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&push_bucket) == v.bucket_size) {
                 <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> new_buckets, push_bucket);
                 push_bucket = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
             };
-            i = i + 1;
-        };
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_destroy_empty">vector::destroy_empty</a>(pop_bucket);
+        });
         num_buckets_left = num_buckets_left - 1;
     };
 

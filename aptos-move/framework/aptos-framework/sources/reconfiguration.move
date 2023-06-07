@@ -92,12 +92,6 @@ module aptos_framework::reconfiguration {
         !exists<DisableReconfiguration>(@aptos_framework)
     }
 
-    /// Signal validators to start using new configuration. Must be called from aptos_framework signer.
-    public fun reconfigure_with_signer(aptos_framework: &signer) acquires Configuration {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        reconfigure();
-    }
-
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         // Do not do anything if genesis has not finished.
