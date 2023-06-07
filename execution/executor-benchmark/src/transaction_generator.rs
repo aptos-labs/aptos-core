@@ -4,7 +4,7 @@
 
 use crate::{
     account_generator::{
-        AccountCache, AccountGenerator, NoConflictsAccountCache, RandomAccountGenerator,
+        AccountCache, AccountGenerator,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
@@ -129,7 +129,6 @@ impl TransactionGenerator {
     ) -> AccountCache {
         let mut updated = 0;
         for account in &mut accounts.accounts {
-            let mut account = account.write();
             let seq_num = get_sequence_number(account.address(), reader.clone());
             if seq_num > 0 {
                 updated += 1;
@@ -292,8 +291,8 @@ impl TransactionGenerator {
         for _ in 0..num_blocks {
             let transactions: Vec<_> = rand::seq::index::sample(&mut thread_rng(), account_pool_size, num_senders_per_block).into_iter()
                 .flat_map(|idx|{
-                    let mut sender = self.main_signer_accounts.as_mut().unwrap().accounts[idx].write();
-                    transaction_generator.generate_transactions(&mut sender, transactions_per_sender)
+                    let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[idx];
+                    transaction_generator.generate_transactions(sender, transactions_per_sender)
                 })
                 .map(Transaction::UserTransaction)
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
@@ -336,11 +335,10 @@ impl TransactionGenerator {
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
-                    let account = new_account.read();
                     let txn = self.root_account.sign_with_transaction_builder(
                         self.transaction_factory
                             .implicitly_create_user_account_and_transfer(
-                                account.public_key(),
+                                new_account.public_key(),
                                 seed_account_balance,
                             ),
                     );
@@ -381,7 +379,6 @@ impl TransactionGenerator {
             let transactions: Vec<_> = chunk
                 .map(|_| {
                     let sender = self.seed_accounts_cache.as_mut().unwrap().get_random();
-                    let mut sender = sender.write();
                     let new_account = generator.generate();
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory
@@ -413,18 +410,18 @@ impl TransactionGenerator {
     ) {
         for _ in 0..num_blocks {
             // TODO: handle when block_size isn't divisible by transactions_per_sender
-            let mut random_account_generator: Box<dyn RandomAccountGenerator> =
-                Box::new(self.main_signer_accounts.as_mut().unwrap());
             let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
                 .into_iter()
                 .flat_map(|_| {
-                    let (sender, receivers) =
-                        random_account_generator.get_random_transfer_batch(transactions_per_sender);
+                    let (sender, receivers) = self
+                        .main_signer_accounts
+                        .as_mut()
+                        .unwrap()
+                        .get_random_transfer_batch(transactions_per_sender);
                     receivers
                         .into_iter()
                         .map(|receiver| {
                             let amount = 1;
-                            let mut sender = sender.write();
                             let txn = sender.sign_with_transaction_builder(
                                 self.transaction_factory.transfer(receiver, amount),
                             );
@@ -462,7 +459,6 @@ impl TransactionGenerator {
             .accounts()
             .par_iter()
             .for_each(|account| {
-                let account = account.read();
                 let address = account.address();
                 let db_state_view = db.latest_state_checkpoint_view().unwrap();
                 let address_account_view = db_state_view.as_account_with_state_view(&address);

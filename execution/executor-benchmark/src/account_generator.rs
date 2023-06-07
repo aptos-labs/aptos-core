@@ -63,22 +63,9 @@ impl AccountGenerator {
     }
 }
 
-pub trait RandomAccountGenerator {
-    // Returns the number of accounts in the cache.
-    fn len(&self) -> usize;
-    // Returns a random account from the cache.
-    fn get_random(&mut self) -> Arc<RwLock<LocalAccount>>;
-
-    // Returns a random sender and a vector of random receivers.
-    fn get_random_transfer_batch(
-        &mut self,
-        batch_size: usize,
-    ) -> (Arc<RwLock<LocalAccount>>, Vec<AccountAddress>);
-}
-
 pub struct AccountCache {
     generator: AccountGenerator,
-    pub accounts: VecDeque<Arc<RwLock<LocalAccount>>>,
+    pub accounts: VecDeque<LocalAccount>,
     pub rng: StdRng,
 }
 
@@ -95,102 +82,42 @@ impl AccountCache {
 
     pub fn split(mut self, index: usize) -> (Vec<LocalAccount>, Vec<LocalAccount>) {
         let other = self.accounts.split_off(index);
-        let accounts: Vec<LocalAccount> = self
-            .accounts
-            .into_iter()
-            .map(|a| Arc::try_unwrap(a).unwrap().into_inner())
-            .collect();
-        let other: Vec<LocalAccount> = other
-            .into_iter()
-            .map(|a| Arc::try_unwrap(a).unwrap().into_inner())
-            .collect();
-        (accounts, other)
+        (self.accounts.into(), other.into())
     }
 
-    pub fn accounts(&self) -> &VecDeque<Arc<RwLock<LocalAccount>>> {
+    pub fn len(&self) -> usize {
+        self.accounts.len()
+    }
+
+    pub fn accounts(&self) -> &VecDeque<LocalAccount> {
         &self.accounts
     }
 
     pub fn grow(&mut self, n: usize) {
-        let accounts: Vec<_> = (0..n)
-            .map(|_| Arc::new(RwLock::new(self.generator.generate())))
-            .collect();
+        let accounts: Vec<_> = (0..n).map(|_| self.generator.generate()).collect();
         self.accounts.extend(accounts);
     }
-}
 
-impl RandomAccountGenerator for &mut AccountCache {
-    fn get_random_transfer_batch(
+    pub fn get_random(&mut self) -> &mut LocalAccount {
+        let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 1);
+        let index = indices.index(0);
+
+        &mut self.accounts[index]
+    }
+
+    pub fn get_random_transfer_batch(
         &mut self,
         batch_size: usize,
-    ) -> (Arc<RwLock<LocalAccount>>, Vec<AccountAddress>) {
+    ) -> (&mut LocalAccount, Vec<AccountAddress>) {
         let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), batch_size + 1);
         let sender_idx = indices.index(0);
         let receivers = indices
             .iter()
             .skip(1)
-            .map(|i| self.accounts[i].read().address())
+            .map(|i| self.accounts[i].address())
             .collect();
-        let sender = self.accounts[sender_idx].clone();
-
+        let sender = &mut self.accounts[sender_idx];
         (sender, receivers)
     }
 
-    fn get_random(&mut self) -> Arc<RwLock<LocalAccount>> {
-        let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 1);
-        let index = indices.index(0);
-
-        self.accounts[index].clone()
-    }
-
-    fn len(&self) -> usize {
-        self.accounts.len()
-    }
-}
-
-pub struct NoConflictsAccountCache {
-    pub accounts: VecDeque<Arc<RwLock<LocalAccount>>>,
-}
-
-impl NoConflictsAccountCache {
-    const SEED: Seed = [1; 32];
-
-    pub fn new(account_cache: &AccountCache) -> Self {
-        let mut rng = StdRng::from_seed(Self::SEED);
-        let mut accounts = account_cache.accounts.clone();
-        accounts.make_contiguous().shuffle(&mut rng);
-        Self { accounts }
-    }
-}
-
-impl RandomAccountGenerator for NoConflictsAccountCache {
-    fn len(&self) -> usize {
-        self.accounts.len()
-    }
-
-    fn get_random(&mut self) -> Arc<RwLock<LocalAccount>> {
-        // Since the accounts are already shuffled, we can just pop the first one.
-        self.accounts.pop_front().unwrap()
-    }
-
-    fn get_random_transfer_batch(
-        &mut self,
-        batch_size: usize,
-    ) -> (Arc<RwLock<LocalAccount>>, Vec<AccountAddress>) {
-        let sender = self
-            .accounts
-            .pop_front()
-            .expect("Not enough accounts to create non-conflicting transactions");
-        let mut receivers = Vec::new();
-        for _ in 0..batch_size {
-            receivers.push(
-                self.accounts
-                    .pop_front()
-                    .expect("Not enough accounts to create non-conflicting transactions")
-                    .read()
-                    .address(),
-            );
-        }
-        (sender, receivers)
-    }
 }
