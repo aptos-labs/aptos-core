@@ -2,11 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_generator::{
-        AccountCache, AccountGenerator,
-    },
-};
+use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
@@ -22,6 +18,7 @@ use aptos_types::{
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
+use rand::thread_rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -31,7 +28,6 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
-use rand::thread_rng;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -146,7 +142,11 @@ impl TransactionGenerator {
         accounts
     }
 
-    pub fn gen_user_account_cache(reader: Arc<dyn DbReader>, num_accounts: usize, num_to_skip: usize) -> AccountCache {
+    pub fn gen_user_account_cache(
+        reader: Arc<dyn DbReader>,
+        num_accounts: usize,
+        num_to_skip: usize,
+    ) -> AccountCache {
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
@@ -269,11 +269,7 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
     ) {
         assert!(self.block_sender.is_some());
-        self.gen_transfer_transactions(
-            block_size,
-            num_transfer_blocks,
-            transactions_per_sender,
-        );
+        self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
     }
 
     pub fn run_workload(
@@ -284,19 +280,25 @@ impl TransactionGenerator {
         transactions_per_sender: usize,
     ) {
         assert!(self.block_sender.is_some());
-        let num_senders_per_block = (block_size + transactions_per_sender - 1) / transactions_per_sender;
+        let num_senders_per_block =
+            (block_size + transactions_per_sender - 1) / transactions_per_sender;
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let mut transaction_generator =
             transaction_generator_creator.create_transaction_generator();
         for _ in 0..num_blocks {
-            let transactions: Vec<_> = rand::seq::index::sample(&mut thread_rng(), account_pool_size, num_senders_per_block).into_iter()
-                .flat_map(|idx|{
-                    let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[idx];
-                    transaction_generator.generate_transactions(sender, transactions_per_sender)
-                })
-                .map(Transaction::UserTransaction)
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
-                .collect();
+            let transactions: Vec<_> = rand::seq::index::sample(
+                &mut thread_rng(),
+                account_pool_size,
+                num_senders_per_block,
+            )
+            .into_iter()
+            .flat_map(|idx| {
+                let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[idx];
+                transaction_generator.generate_transactions(sender, transactions_per_sender)
+            })
+            .map(Transaction::UserTransaction)
+            .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+            .collect();
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {

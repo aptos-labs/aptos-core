@@ -42,10 +42,9 @@ use self::{
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     batch_transfer::BatchTransferTransactionGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator,
+    entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
 };
 pub use publishing::module_simple::EntryPoints;
-use crate::p2p_transaction_generator::SamplingMode;
 
 pub const SEND_AMOUNT: u64 = 1;
 

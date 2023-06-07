@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    counters::NUM_EXECUTOR_SHARDS,
-};
-use crate::sharded_block_executor::executor_shard::ExecutorShard;
+use crate::sharded_block_executor::{counters::NUM_EXECUTOR_SHARDS, executor_shard::ExecutorShard};
 use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
