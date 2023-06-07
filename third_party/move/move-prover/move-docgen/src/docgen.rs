@@ -9,7 +9,7 @@ use log::{debug, info, warn};
 use move_compiler::parser::keywords::{BUILTINS, CONTEXTUAL_KEYWORDS, KEYWORDS};
 use move_core_types::account_address::AccountAddress;
 use move_model::{
-    ast::{Address, ModuleName, SpecBlockInfo, SpecBlockTarget},
+    ast::{Address, Attribute, AttributeValue, ModuleName, SpecBlockInfo, SpecBlockTarget},
     code_writer::{CodeWriter, CodeWriterLabel},
     emit, emitln,
     model::{
@@ -123,8 +123,8 @@ pub struct Docgen<'env> {
     /// Mapping from module id to the set of schemas defined in this module.
     /// We currently do not have this information in the environment.
     declared_schemas: BTreeMap<ModuleId, BTreeSet<Symbol>>,
-    /// A list of file names and output generated for those files.
-    output: Vec<(String, String)>,
+    /// A map of file names to output generated for each file.
+    output: BTreeMap<String, String>,
     /// Map from module id to information about this module.
     infos: BTreeMap<ModuleId, ModuleInfo>,
     /// Current code writer.
@@ -237,7 +237,15 @@ impl<'env> Docgen<'env> {
             if !info.is_included && m.is_target() {
                 self.gen_module(&m, &info);
                 let path = self.make_file_in_out_dir(&info.target_file);
-                self.output.push((path, self.writer.extract_result()));
+                match self.output.get_mut(&path) {
+                    Some(out) => {
+                        out.push_str("\n\n");
+                        out.push_str(&self.writer.extract_result());
+                    },
+                    None => {
+                        self.output.insert(path, self.writer.extract_result());
+                    },
+                }
             }
         }
 
@@ -250,7 +258,7 @@ impl<'env> Docgen<'env> {
             {
                 let trimmed_content = content.trim();
                 if !trimmed_content.is_empty() {
-                    for (_, out) in self.output.iter_mut() {
+                    for out in self.output.values_mut() {
                         out.push_str("\n\n");
                         out.push_str(trimmed_content);
                         out.push('\n');
@@ -265,6 +273,9 @@ impl<'env> Docgen<'env> {
         }
 
         self.output
+            .iter()
+            .map(|(a, b)| (a.clone(), b.clone()))
+            .collect()
     }
 
     /// Compute the schemas declared in all modules. This information is currently not directly
@@ -372,10 +383,10 @@ impl<'env> Docgen<'env> {
         }
 
         // Add result to output.
-        self.output.push((
+        self.output.insert(
             self.make_file_in_out_dir(output_file_name),
             self.writer.extract_result(),
-        ));
+        );
     }
 
     /// Compute ModuleInfo for all modules, considering root template content.
@@ -501,6 +512,65 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    /// Get a readable version of an attribute.
+    fn gen_attribute(&self, attribute: &Attribute) -> String {
+        let annotation_body: String = match *attribute {
+            Attribute::Apply(ref _node_id, ref symbol, ref attribute_vector) => {
+                let symbol_string = self.name_string(*symbol).to_string();
+                if attribute_vector.is_empty() {
+                    symbol_string
+                } else {
+                    let value_string = self.gen_attributes_recursive(&attribute_vector[..]);
+                    format!("{}({})", symbol_string, value_string)
+                }
+            },
+            Attribute::Assign(ref _node_id, ref symbol, ref attribute_value) => {
+                let symbol_string = self.name_string(*symbol).to_string();
+                match *attribute_value {
+                    AttributeValue::Value(ref _node_id, ref value) => {
+                        let value_string = self.env.display(value);
+                        format!("{} = {}", symbol_string, value_string)
+                    },
+                    AttributeValue::Name(ref _node_id, ref module_name_option, ref symbol2) => {
+                        let symbol2_name = self.name_string(*symbol2).to_string();
+                        let module_prefix = match module_name_option {
+                            None => "".to_string(),
+                            Some(module_name) => {
+                                format!("{}::", module_name.display_full(self.env))
+                            },
+                        };
+                        format!("{} = {}{}", symbol_string, module_prefix, symbol2_name)
+                    },
+                }
+            },
+        };
+        annotation_body
+    }
+
+    fn gen_attributes_recursive(&self, attributes: &[Attribute]) -> String {
+        if !attributes.is_empty() {
+            attributes
+                .iter()
+                .map(|attr| self.gen_attribute(attr))
+                .collect::<Vec<String>>()
+                .join(", ")
+        } else {
+            "".to_string()
+        }
+    }
+
+    fn gen_attributes(&self, attributes: &[Attribute]) -> String {
+        if !attributes.is_empty() {
+            attributes
+                .iter()
+                .map(|attr| format!("`#[{}]`<br>", self.gen_attribute(attr)))
+                .collect::<Vec<String>>()
+                .join("")
+        } else {
+            "".to_string()
+        }
+    }
+
     /// Generates documentation for a module. The result is written into the current code
     /// writer. Writer and other state is initialized if this module is standalone.
     fn gen_module(&mut self, module_env: &ModuleEnv<'env>, info: &ModuleInfo) {
@@ -527,7 +597,8 @@ impl<'env> Docgen<'env> {
         // Print header
         self.section_header(
             &format!(
-                "{} `{}`",
+                "{}{} `{}`",
+                self.gen_attributes(module_env.get_attributes()),
                 Self::module_modifier(module_env.get_name()),
                 module_env.get_name().display_full(module_env.env)
             ),
@@ -945,7 +1016,8 @@ impl<'env> Docgen<'env> {
         // depends on the `is_resource()` predicate to add additional functions to structs declared
         // with the `key` ability.
         format!(
-            "{} `{}`",
+            "{}{} `{}`",
+            self.gen_attributes(struct_env.get_attributes()),
             if struct_env.has_memory() {
                 "Resource"
             } else {
@@ -1007,7 +1079,11 @@ impl<'env> Docgen<'env> {
         let name = func_env.get_name();
         if !is_script {
             self.section_header(
-                &format!("Function `{}`", self.name_string(name)),
+                &format!(
+                    "{}Function `{}`",
+                    self.gen_attributes(func_env.get_attributes()),
+                    self.name_string(name)
+                ),
                 &self.label_for_module_item(&func_env.module_env, name),
             );
             self.increment_section_nest();
