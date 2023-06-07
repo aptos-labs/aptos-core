@@ -7,7 +7,8 @@ use crate::{
 use anyhow::{bail, Ok};
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TransactionType,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TestReport,
+    TransactionType,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -16,7 +17,7 @@ use std::time::{Duration, Instant};
 pub struct TwoTrafficsTest {
     // cannot have 'static EmitJobRequest, like below, so need to have inner fields
     // pub inner_emit_job_request: EmitJobRequest,
-    pub inner_tps: usize,
+    pub inner_mode: EmitJobMode,
     pub inner_gas_price: u64,
     pub inner_init_gas_price_multiplier: u64,
     pub inner_transaction_type: TransactionType,
@@ -32,7 +33,12 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        swarm: &mut dyn Swarm,
+        report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
@@ -44,9 +50,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
         let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps {
-                    tps: self.inner_tps,
-                })
+                .mode(self.inner_mode.clone())
                 .gas_price(self.inner_gas_price)
                 .init_gas_price_multiplier(self.inner_init_gas_price_multiplier)
                 .transaction_type(self.inner_transaction_type),
@@ -83,6 +87,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
                 rate,
             )
         }
+
+        report.report_txn_stats(format!("{}: inner traffic", self.name()), &stats);
 
         SuccessCriteriaChecker::check_latency(
             &self

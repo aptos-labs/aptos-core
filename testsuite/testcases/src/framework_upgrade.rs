@@ -122,7 +122,6 @@ impl NetworkTest for FrameworkUpgrade {
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
-            duration,
         );
 
         ctx.swarm().fork_check()?;

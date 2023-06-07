@@ -284,18 +284,18 @@ jobs:
       FORGE_TEST_SUITE: state_sync_perf_fullnodes_apply_outputs
       POST_TO_SLACK: ${{ needs.determine-test-metadata.outputs.BRANCH == 'main' }} # only post to slack on main branch
 
-  ### Additional three-region tests. Eventually all consensus-related tests should migrate to three-regions.
+  ### Additional real-world-network tests. Eventually all consensus-related tests should migrate to real-world-network.
 
-  run-forge-land-blocking-three-region:
+  run-forge-realistic-env-max-throughput:
     if: ${{ github.event_name != 'pull_request' }}
     needs: determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       IMAGE_TAG: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_NAMESPACE: forge-land-blocking-three-region-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
-      FORGE_RUNNER_DURATION_SECS: 1800
-      FORGE_TEST_SUITE: land_blocking_three_region
+      FORGE_NAMESPACE: forge-land-blocking-new-${{ needs.determine-test-metadata.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 600
+      FORGE_TEST_SUITE: realistic_env_max_throughput
       POST_TO_SLACK: true
 
   run-forge-three-region-graceful-overload:
