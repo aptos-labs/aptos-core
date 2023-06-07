@@ -50,5 +50,3 @@ fuzz_target!(|fuzz_data: FuzzData| {
         &mut gas,
     );
  });
-
-
