@@ -77,26 +77,26 @@ impl<T: Clone + Send + Sync> Sampler<T> for BasicSampler<T> {
 /// A possible state of the pool is `[K, I, J, Y, X, Z]`.
 ///
 /// This behavior helps generate a block of non-conflicting coin transfer transactions,
-/// when `block_size <= sub_pool_size` and there are 2+ sub-pools.
+/// when there are 2+ sub-pools of size larger than or equal to the block size.
 pub struct BurnAndRecycleSampler<T> {
     /// We store all sub-pools together in 1 Vec: `item_pool[segment_size * x..segment_size * (x+1)]` being the x-th sub-pool.
     to_be_replaced: Vec<T>,
-    replace_batch_size: usize,
+    sub_pool_size: usize,
 }
 
 impl<T: Clone + Send + Sync> BurnAndRecycleSampler<T> {
     fn new(replace_batch_size: usize) -> Self {
         Self {
             to_be_replaced: vec![],
-            replace_batch_size,
+            sub_pool_size: replace_batch_size,
         }
     }
 
     fn sample_one_from_pool(&mut self, rng: &mut StdRng, pool: &mut Vec<T>) -> T {
         if pool.is_empty() {
             let num_addresses = self.to_be_replaced.len();
-            for replace_batch_start in (0..num_addresses).step_by(self.replace_batch_size) {
-                let end = min(replace_batch_start + self.replace_batch_size, num_addresses);
+            for replace_batch_start in (0..num_addresses).step_by(self.sub_pool_size) {
+                let end = min(replace_batch_start + self.sub_pool_size, num_addresses);
                 self.to_be_replaced[replace_batch_start..end].shuffle(rng);
             }
             for _ in 0..num_addresses {
