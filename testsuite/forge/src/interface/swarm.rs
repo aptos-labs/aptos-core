@@ -117,7 +117,7 @@ impl<T: ?Sized> SwarmExt for T where T: Swarm {}
 pub trait SwarmExt: Swarm {
     async fn liveness_check(&self, deadline: Instant) -> Result<()> {
         let liveness_check_seconds = 10;
-        let validators = self.validators().skip(1).collect::<Vec<_>>();
+        let validators = self.validators().collect::<Vec<_>>();
         let full_nodes = self.full_nodes().collect::<Vec<_>>();
 
         while try_join_all(
@@ -145,13 +145,13 @@ pub trait SwarmExt: Swarm {
 
     /// Waits for the swarm to achieve connectivity
     async fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
-        let validators = self.validators().skip(1).collect::<Vec<_>>();
+        let validators = self.validators().collect::<Vec<_>>();
         let full_nodes = self.full_nodes().collect::<Vec<_>>();
 
         while !try_join_all(
             validators
                 .iter()
-                .map(|node| node.check_connectivity(validators.len() - 2))
+                .map(|node| node.check_connectivity(validators.len() - 1))
                 .chain(full_nodes.iter().map(|node| node.check_connectivity())),
         )
         .await
