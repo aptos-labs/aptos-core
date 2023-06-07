@@ -17,6 +17,7 @@ use crate::{
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
+    utils::get_progress,
     EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
 use anyhow::Result;
@@ -37,15 +38,15 @@ use std::{
 };
 
 pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_commit_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
+    get_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
 }
 
 pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_commit_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
+    get_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
 }
 
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
-    get_commit_progress(
+    get_progress(
         state_kv_db.metadata_db(),
         &DbMetadataKey::StateKvCommitProgress,
     )
@@ -54,21 +55,9 @@ pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Op
 pub(crate) fn get_state_merkle_commit_progress(
     state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
-    get_commit_progress(
+    get_progress(
         state_merkle_db.metadata_db(),
         &DbMetadataKey::StateMerkleCommitProgress,
-    )
-}
-
-fn get_commit_progress(db: &DB, progress_key: &DbMetadataKey) -> Result<Option<Version>> {
-    Ok(
-        if let Some(DbMetadataValue::Version(overall_commit_progress)) =
-            db.get::<DbMetadataSchema>(progress_key)?
-        {
-            Some(overall_commit_progress)
-        } else {
-            None
-        },
     )
 }
 
