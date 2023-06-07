@@ -14,11 +14,12 @@ use aptos_crypto::{
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
@@ -246,6 +247,7 @@ pub enum Scheme {
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
     /// when a their address matches matches an existing address of a MultiEd25519 wallet.
+    DeriveUuid = 251,
     DeriveObjectAddressFromObject = 252,
     DeriveObjectAddressFromGuid = 253,
     DeriveObjectAddressFromSeed = 254,
@@ -257,6 +259,7 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
+            Scheme::DeriveUuid => "DeriveUuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
             Scheme::DeriveObjectAddressFromSeed => "DeriveObjectAddressFromSeed",
@@ -441,6 +444,12 @@ impl ValidCryptoMaterial for AuthenticationKey {
     }
 }
 
+#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct TransactionDerivedUUID {
+    pub txn_hash: Vec<u8>,
+    pub uuid_counter: u64,
+}
+
 /// A value that can be hashed to produce an authentication key
 pub struct AuthenticationKeyPreimage(Vec<u8>);
 
@@ -459,6 +468,13 @@ impl AuthenticationKeyPreimage {
     /// Construct a preimage from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> AuthenticationKeyPreimage {
         Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
+    }
+
+    pub fn uuid(transaction_derived_uuid: TransactionDerivedUUID) -> AuthenticationKeyPreimage {
+        let mut hash_arg = Vec::new();
+        hash_arg.push(Scheme::DeriveUuid as u8);
+        hash_arg.extend(transaction_derived_uuid.hash().to_vec());
+        Self(Sha256::digest(hash_arg.as_slice()).to_vec())
     }
 
     /// Construct a vector from this authentication key

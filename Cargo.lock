@@ -3288,6 +3288,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
+ "sha2 0.9.9",
  "thiserror",
  "tiny-keccak",
 ]

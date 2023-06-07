@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::{
+    on_chain_config::{Features, TimedFeatures},
+    transaction::authenticator::{AuthenticationKeyPreimage, TransactionDerivedUUID},
+};
 use better_any::{Tid, TidAble};
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use sha2::{Digest, Sha256};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
@@ -89,15 +91,14 @@ fn native_create_uuid(
         .extensions_mut()
         .get_mut::<NativeTransactionContext>();
     transaction_context.uuid_counter += 1;
-    const OBJECT_FROM_TRANSACTION_UUID_ADDRESS_SCHEME: u8 = 0xFB;
 
-    let mut hash_arg = Vec::new();
-    hash_arg.push(OBJECT_FROM_TRANSACTION_UUID_ADDRESS_SCHEME);
-    hash_arg.extend(transaction_context.txn_hash.clone());
-    hash_arg.extend(transaction_context.uuid_counter.to_le_bytes().to_vec());
-    let hash_vec = Sha256::digest(hash_arg.as_slice()).to_vec();
+    let hash_vec = AuthenticationKeyPreimage::uuid(TransactionDerivedUUID {
+        txn_hash: transaction_context.txn_hash.clone(),
+        uuid_counter: transaction_context.uuid_counter,
+    });
     Ok(smallvec![Value::address(AccountAddress::new(
         hash_vec
+            .into_vec()
             .try_into()
             .expect("Unable to convert hash vector into [u8]")
     ))])
