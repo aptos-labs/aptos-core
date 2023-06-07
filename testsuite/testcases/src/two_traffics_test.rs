@@ -7,7 +7,8 @@ use crate::{
 use anyhow::{bail, Ok};
 use aptos_forge::{
     success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TransactionType,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TestReport,
+    TransactionType,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -32,7 +33,12 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        swarm: &mut dyn Swarm,
+        report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
@@ -81,6 +87,8 @@ impl NetworkLoadTest for TwoTrafficsTest {
                 rate,
             )
         }
+
+        report.report_txn_stats(format!("{}: inner traffic", self.name()), &stats);
 
         SuccessCriteriaChecker::check_latency(
             &self

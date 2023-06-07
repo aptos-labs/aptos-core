@@ -21,7 +21,7 @@ pub trait NetworkTest: Test {
 
 pub struct NetworkContext<'t> {
     core: CoreContext,
-    swarm: &'t mut dyn Swarm,
+    pub swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
     pub global_duration: Duration,
     pub emit_job: EmitJobRequest,
@@ -70,6 +70,7 @@ impl<'t> NetworkContext<'t> {
             .block_on(SuccessCriteriaChecker::check_for_success(
                 &self.success_criteria,
                 self.swarm,
+                self.report,
                 stats,
                 window,
                 start_time,

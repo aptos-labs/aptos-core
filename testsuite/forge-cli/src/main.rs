@@ -231,12 +231,6 @@ fn main() -> Result<()> {
     let duration = Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
-    let suite_name = if suite_name == "land_blocking" {
-        "land_blocking_new"
-    } else {
-        panic!()
-    };
-
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
@@ -451,15 +445,13 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
 
 fn get_test_suite(suite_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking" => Ok(land_blocking_test_suite(duration)),
-        "land_blocking_new" => Ok(land_blocking_new_test_suite(duration)),
         "local_test_suite" => Ok(local_test_suite()),
         "pre_release" => Ok(pre_release_suite()),
         "run_forever" => Ok(run_forever()),
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
         "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test),
+        single_test => single_test_suite(single_test, duration),
     }
 }
 
@@ -491,10 +483,16 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         ])
 }
 
-fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
+fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
+        // Land-blocking tests to be run on every PR:
+        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
+        "realistic_env_max_throughput" => realistic_env_max_throughput_test_suite(duration),
+        "compat" => compat(config),
+        "framework_upgrade" => upgrade(config),
+        // Rest of the tests:
         "epoch_changer_performance" => epoch_changer_performance(config),
         "state_sync_perf_fullnodes_apply_outputs" => {
             state_sync_perf_fullnodes_apply_outputs(config)
@@ -505,8 +503,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(config),
         "state_sync_perf_validators" => state_sync_perf_validators(config),
         "validators_join_and_leave" => validators_join_and_leave(config),
-        "compat" => compat(config),
-        "framework_upgrade" => upgrade(config),
         "config" => config.with_network_tests(vec![&ReconfigurationTest]),
         "network_partition" => network_partition(config),
         "three_region_simulation" => three_region_simulation(config),
@@ -1343,8 +1339,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig<'static> {
         )
 }
 
-// TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn land_blocking_new_test_suite(duration: Duration) -> ForgeConfig<'static> {
+fn realistic_env_max_throughput_test_suite(duration: Duration) -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
@@ -1367,7 +1362,7 @@ fn land_blocking_new_test_suite(duration: Duration) -> ForgeConfig<'static> {
                         invalid_transaction_ratio: 0,
                         sender_use_account_pool: false,
                     },
-                    avg_tps: 4000,
+                    avg_tps: 5000,
                     latency_thresholds: &[],
                 },
             },
@@ -1395,11 +1390,11 @@ fn land_blocking_new_test_suite(duration: Duration) -> ForgeConfig<'static> {
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
                 ))
-                .add_latency_threshold(5.0, LatencyType::P50)
-                .add_latency_threshold(10.0, LatencyType::P90)
+                .add_latency_threshold(4.0, LatencyType::P50)
+                .add_latency_threshold(8.0, LatencyType::P90)
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
-                    max_round_gap: 5,
+                    max_round_gap: 4,
                 }),
         )
 }
@@ -1848,8 +1843,7 @@ impl NetworkTest for EmitTransaction {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
         let stats = generate_traffic(ctx, &all_validators, duration).unwrap();
-        ctx.report
-            .report_txn_stats(self.name().to_string(), &stats, duration);
+        ctx.report.report_txn_stats(self.name().to_string(), &stats);
 
         Ok(())
     }

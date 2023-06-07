@@ -27,7 +27,7 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TxnEmitter, TxnStats, Version,
+    TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
@@ -141,7 +141,12 @@ pub trait NetworkLoadTest: Test {
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
-    fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        _swarm: &mut dyn Swarm,
+        _report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         std::thread::sleep(duration);
         Ok(())
     }
@@ -174,7 +179,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 rng,
             )?;
         ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
+            .report_txn_stats(self.name().to_string(), &txn_stat);
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -272,7 +277,7 @@ impl dyn NetworkLoadTest {
             }
             let phase_start = Instant::now();
 
-            self.test(ctx.swarm(), phase_duration)
+            self.test(ctx.swarm, ctx.report, phase_duration)
                 .context("test NetworkLoadTest")?;
             actual_phase_durations.push(phase_start.elapsed());
         }
