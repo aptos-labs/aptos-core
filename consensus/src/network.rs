@@ -493,7 +493,7 @@ impl NetworkTask {
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
-            10,
+            1000,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
         );
         let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(

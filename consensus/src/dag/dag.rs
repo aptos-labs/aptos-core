@@ -522,7 +522,9 @@ impl Dag {
             MissingDagNodeStatus::Pending(info) => info.missing_parents().clone(),
         };
 
-        // debug!("adding peers recursively for digest: {}; missing_parents {:?}", digest, missing_parents);
+        // if !missing_parents.is_empty() {
+        //     debug!("adding peers recursively for digest: {}; missing_parents {:?}", digest, missing_parents);
+        // }
 
         for parent_digest in missing_parents {
             match self.missing_nodes.entry(parent_digest) {
@@ -540,6 +542,7 @@ impl Dag {
         certified_node: CertifiedNode, // assumption that node not pending.
         missing_parents: HashSet<NodeMetaData>,
     ) {
+        debug!("adding to pending: {:?}", certified_node.node().digest());
         let pending_peer_id = certified_node.node().source();
         let pending_digest = certified_node.node().digest();
         let missing_parents_digest = missing_parents
@@ -565,7 +568,7 @@ impl Dag {
             status.add_dependency(pending_digest);
             status.add_peer_to_request(pending_peer_id);
 
-            self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
+            // self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
         }
     }
 
@@ -581,6 +584,9 @@ impl Dag {
         }
         if timeout {
             return true;
+        } else {
+            // FIXME(ibalajiarun): Add timeouts to tolerate adverse situations.
+            // return true;
         }
 
         let wave = self.current_round / 2;
@@ -704,12 +710,14 @@ impl Dag {
                 status.add_dependency(pending_digest);
                 status.add_peer_to_request(pending_peer_id);
 
-                self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
+                // self.add_peers_recursively(digest, pending_peer_id); // Recursively update source_peers.
             }
         }
 
         if let Some(node_status) = maybe_node_status {
             self.add_to_dag_and_update_pending(node_status).await;
         }
+
+        debug!("DAG: added node: my_id {}, round {}, peer_id {}", self.my_id, certified_node.round(), certified_node.source());
     }
 }

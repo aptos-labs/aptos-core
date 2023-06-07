@@ -24,6 +24,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::{executor::block_on, FutureExt, SinkExt, StreamExt};
 use futures_channel::oneshot;
+use tokio::time::{MissedTickBehavior, Instant};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -154,7 +155,9 @@ impl StateMachineLoop {
                     ),
                     Box::new(move |committed_blocks, ledger_info| {
                         match block_on(commit_tx.send(ledger_info)) {
-                            Ok(_) => {},
+                            Ok(_) => {
+                                debug!("commit notification sent: {:?}", committed_blocks);
+                            },
                             Err(e) => {
                                 warn!("Failed to send commit notification: {:?}", e);
                             },
@@ -181,20 +184,25 @@ impl StateMachineLoop {
     }
 
     pub async fn run(mut self, close_rx: oneshot::Receiver<oneshot::Sender<()>>) {
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(10));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
         let mut close_rx = close_rx.into_stream();
 
         loop {
+            let start_time = Instant::now();
+
             tokio::select! {
                 biased;
 
                 _ = interval.tick() => {
+                    debug!("DAG: tick");
+
                     self.dag_driver.tick().await;
                     self.rb.tick().await;
                 },
 
                 Some(commit_ledger_info) = self.commit_ledger_info_rx.next() => {
                     // TODO(ibalajiarun) think about making this a command
+                    debug!("committing ledger info: {}", commit_ledger_info);
                     self.dag_driver.notify_commit(commit_ledger_info).await;
                 }
 
@@ -241,6 +249,9 @@ impl StateMachineLoop {
                     break;
                 }
             }
+
+            let elapsed = start_time.elapsed();
+            debug!("DAG: elapsed: {:?}", elapsed);
         }
     }
 }

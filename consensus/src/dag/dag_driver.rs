@@ -26,7 +26,7 @@ use aptos_consensus_types::{
     node::{CertifiedNode, CertifiedNodeAck, CertifiedNodeRequest, Node, NodeMetaData},
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, error, spawn_named};
+use aptos_logger::{debug, error, spawn_named, prelude::{sample, SampleRate}};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
@@ -35,11 +35,23 @@ use async_trait::async_trait;
 use claims::assert_some;
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
-use std::{collections::HashSet, mem, ops::Deref, sync::Arc, time::Duration};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashSet,
+    mem,
+    ops::Deref,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
     sync::{mpsc::Sender, Mutex},
     time,
 };
+
+const ROOT_NODE_FILE: &str = "root_node";
 
 #[derive(PartialEq)]
 pub enum Mode {
@@ -82,10 +94,12 @@ pub struct DagDriver {
     highest_commit_info: LedgerInfoWithSignatures,
 
     validator_verifier: ValidatorVerifier,
+
+    root_node_path: PathBuf,
 }
 
 impl DagDriver {
-    pub fn new(
+    pub async fn new(
         epoch: u64,
         author: Author,
         config: DagConfig,
@@ -98,6 +112,7 @@ impl DagDriver {
         time_service: Arc<dyn TimeService>,
         genesis_block_id: HashValue,
         root_commit_ledger_info: LedgerInfoWithSignatures,
+        root_node_path: PathBuf,
     ) -> Self {
         let proposer_election = Arc::new(RoundRobinAnchorElection::new(&verifier));
         let bullshark = Bullshark::new(
@@ -145,8 +160,8 @@ impl DagDriver {
             next_round_payload_filter: None,
             next_round_parents: None,
 
-            interval_timer: TickingTimer::new(50),
-            remote_fetch_timer: TickingTimer::new(20),
+            interval_timer: TickingTimer::new(5),
+            remote_fetch_timer: TickingTimer::new(1),
             rb_command: None,
             highest_commit_info: root_commit_ledger_info,
 
@@ -154,14 +169,23 @@ impl DagDriver {
 
             mode: Mode::Normal,
             state_sync_in_progress: false,
+            root_node_path,
         };
-        dag_driver.init();
+        dag_driver.init().await;
 
         dag_driver
     }
 
     async fn remote_fetch_missing_nodes(&mut self) {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(1)),
+            debug!("trying remote_fetch_missing_nodes");
+        );
         for (node_meta_data, nodes_to_request) in self.dag.missing_nodes_metadata() {
+            debug!(
+                "requesting missing node: {:?} from {:?}",
+                node_meta_data, nodes_to_request
+            );
             let request = CertifiedNodeRequest::new(node_meta_data, self.author);
             self.send_certified_node_request(request, nodes_to_request)
                 .await;
@@ -170,12 +194,18 @@ impl DagDriver {
 
     async fn handle_node_request(&mut self, node_request: CertifiedNodeRequest) {
         if let Some(certified_node) = self.dag.get_node(&node_request) {
+            debug!("received node request: {:?}", node_request);
             self.send_certified_node(
                 certified_node.clone(),
                 Some(vec![node_request.requester()]),
                 false,
             )
             .await
+        } else {
+            debug!(
+                "received node request for node not in dag: {:?}",
+                node_request
+            );
         }
     }
 
@@ -256,10 +286,32 @@ impl DagDriver {
         }
     }
 
-    fn advance_round(&mut self, payload: Payload) {
-        // FIXME(ibalajiarun): Fix the unwrap
-        let parents = self.next_round_parents.take().unwrap();
-        let node = self.create_node(parents, payload);
+    async fn advance_round(&mut self, payload: Payload) {
+        let node = if self.round == 0 {
+            let epoch_root_node = format!("{}_{}", ROOT_NODE_FILE, self.epoch);
+            // Decide if we need to create a new node or read from file.
+            let path = self.root_node_path.join(epoch_root_node);
+            // read the path file and create a node
+            let node = if path.exists() {
+                let mut file = File::open(path).await.unwrap();
+                let mut buffer = Vec::new();
+                file.read_to_end(&mut buffer).await.unwrap();
+                bcs::from_bytes(buffer.as_slice()).unwrap()
+            } else {
+                let node = self.create_node(HashSet::new(), payload);
+                // write the node to file
+                let mut file = File::create(path).await.unwrap();
+                let serialized = bcs::to_bytes(&node).unwrap();
+                file.write_all(serialized.as_slice()).await.unwrap();
+                node
+            };
+            node
+        } else {
+            // FIXME(ibalajiarun): Fix the unwrap
+            let parents = self.next_round_parents.take().unwrap();
+            self.create_node(parents, payload)
+        };
+
         self.rb_command = Some(ReliableBroadcastCommand::BroadcastRequest(node));
         // self.timeout = false;
         self.interval_timer.reset();
@@ -271,7 +323,7 @@ impl DagDriver {
                 debug!("DAG: proposing {}", payload);
                 assert!(self.awaiting_proposal);
                 self.awaiting_proposal = false;
-                self.advance_round(payload)
+                self.advance_round(payload).await
             },
             Command::DagStateSyncNotification => {
                 self.state_sync_in_progress = false;
@@ -281,7 +333,11 @@ impl DagDriver {
         }
     }
 
-    pub fn init(&mut self) {
+    pub async fn init(&mut self) {
+        if self.round == 0 {
+            self.advance_round(Payload::empty(true)).await;
+            return;
+        }
         self.awaiting_proposal = true;
         self.next_round_parents = Some(HashSet::new());
         self.next_round_payload_filter = Some(PayloadFilter::Empty);
@@ -328,7 +384,7 @@ impl DagDriver {
     ) {
         self.messages.push(OutgoingMessage {
             message: ConsensusMsg::CertifiedNodeRequestMsg(Box::new(req)),
-            maybe_recipients: Some(recipients),
+            maybe_recipients: None,
         });
     }
 

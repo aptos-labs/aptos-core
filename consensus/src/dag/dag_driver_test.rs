@@ -37,6 +37,7 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_temppath::TempPath;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
     validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
@@ -44,7 +45,7 @@ use aptos_types::{
 use futures::{channel::mpsc, stream::select, FutureExt, Stream, StreamExt};
 use futures_channel::oneshot;
 use maplit::hashmap;
-use std::{iter::FromIterator, sync::Arc};
+use std::{iter::FromIterator, sync::Arc, env::temp_dir};
 use tokio::runtime::Runtime;
 
 /// Auxiliary struct that is setting up node environment for the test.
@@ -63,7 +64,7 @@ pub struct NodeSetup {
 }
 
 impl NodeSetup {
-    fn create_nodes(
+    async fn create_nodes(
         playground: &mut NetworkPlayground,
         runtime: &Runtime,
         num_nodes: usize,
@@ -96,13 +97,13 @@ impl NodeSetup {
                 storage,
                 id,
                 recovery_data,
-            ));
+            ).await);
         }
 
         nodes
     }
 
-    fn new(
+    async fn new(
         playground: &mut NetworkPlayground,
         runtime: &Runtime,
         signer: ValidatorSigner,
@@ -158,6 +159,16 @@ impl NodeSetup {
         let (rb_network_msg_tx, rb_network_msg_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (network_msg_tx, network_msg_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
 
+        // Create and use a temp directory for the data directory
+        let temp_dir = TempPath::new();
+        temp_dir.create_as_dir().unwrap_or_else(|error| {
+            panic!(
+                "Failed to create a temporary directory at {}! Error: {:?}",
+                temp_dir.path().display(),
+                error
+            )
+        });
+
         let dag_driver = DagDriver::new(
             epoch_state.epoch,
             author.clone(),
@@ -169,7 +180,8 @@ impl NodeSetup {
             time_service,
             HashValue::zero(),
             recovery_data.take().0 .3.ledger_info().clone(),
-        );
+            temp_dir.path().to_path_buf(),
+        ).await;
         let rb = ReliableBroadcast::new(
             author,
             epoch_state.epoch,
@@ -273,7 +285,7 @@ async fn basic_dag_driver_test() {
     println!("Created runtime. Starting nodes...");
 
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
-    let nodes = NodeSetup::create_nodes(&mut playground, &runtime, 7);
+    let nodes = NodeSetup::create_nodes(&mut playground, &runtime, 7).await;
     runtime.spawn(playground.start());
     let mut receivers = Vec::new();
     for mut node in nodes {

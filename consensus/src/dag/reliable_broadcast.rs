@@ -73,7 +73,7 @@ impl ReliableBroadcast {
             validator_signer,
 
             messages: Vec::new(),
-            broadcast_timer: TickingTimer::new(100),
+            broadcast_timer: TickingTimer::new(2),
         }
     }
 

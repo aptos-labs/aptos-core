@@ -37,6 +37,10 @@ pub fn spawn_named_runtime(thread_name: String, num_worker_threads: Option<usize
         builder.worker_threads(num_worker_threads);
     }
 
+    if thread_name.contains("consensus") {
+        builder.thread_stack_size(8 * 1024 * 1024);
+    }
+
     // Spawn and return the runtime
     builder.build().unwrap_or_else(|error| {
         panic!(

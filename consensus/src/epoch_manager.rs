@@ -99,7 +99,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::Duration, path::PathBuf,
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -152,6 +152,7 @@ pub struct EpochManager {
     bounded_executor: BoundedExecutor,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
+    db_path: PathBuf,
 }
 
 #[allow(dead_code)]
@@ -201,6 +202,7 @@ impl EpochManager {
             batch_retrieval_tx: None,
             bounded_executor,
             recovery_mode: false,
+            db_path: node_config.storage.dir(),
         }
     }
 
@@ -781,7 +783,8 @@ impl EpochManager {
             self.time_service.clone(),
             genesis_block_id,
             root.3.ledger_info().clone(),
-        );
+            self.db_path.clone(),
+        ).await;
         let rb = ReliableBroadcast::new(self.author, epoch, epoch_state.verifier.clone(), signer);
 
         let (close_tx, close_rx) = oneshot::channel();
