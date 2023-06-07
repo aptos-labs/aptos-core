@@ -15,7 +15,7 @@ struct FuzzData {
 }
 
 fuzz_target!(|fuzz_data: FuzzData| {
-    if fuzz_data.data.len() <= 0  || !utils::is_valid_layout(&fuzz_data.layout) {
+    if fuzz_data.data.is_empty() || !utils::is_valid_layout(&fuzz_data.layout) {
         return;
     }
     let _ = MoveValue::simple_deserialize(&fuzz_data.data, &fuzz_data.layout);

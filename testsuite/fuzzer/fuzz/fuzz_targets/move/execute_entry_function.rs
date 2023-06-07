@@ -6,9 +6,7 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::IdentStr,
-    language_storage::TypeTag,
+    account_address::AccountAddress, identifier::IdentStr, language_storage::TypeTag,
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
@@ -37,11 +35,15 @@ fuzz_target!(|fuzz_data: FuzzData| {
     let mut session = vm.new_session(&storage);
     let mut gas = GasStatus::new_unmetered();
 
-    if session.publish_module(cm_serialized, fuzz_data.account_address, &mut gas).is_err() {
+    if session
+        .publish_module(cm_serialized, fuzz_data.account_address, &mut gas)
+        .is_err()
+    {
         return;
     }
 
-    let ident = IdentStr::new(fuzz_data.ident.as_str()).unwrap_or(IdentStr::new("f").unwrap());
+    let ident =
+        IdentStr::new(fuzz_data.ident.as_str()).unwrap_or_else(|_| IdentStr::new("f").unwrap());
     let _ = session.execute_entry_function(
         &fuzz_data.cm.self_id(),
         ident,
@@ -49,4 +51,4 @@ fuzz_target!(|fuzz_data: FuzzData| {
         fuzz_data.args,
         &mut gas,
     );
- });
+});
