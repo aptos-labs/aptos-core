@@ -547,7 +547,8 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<pre><code><b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source);
 <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(account_addr_source);
 <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
 <b>requires</b> <b>forall</b> i in 0..len(recipients):
@@ -611,7 +612,8 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 
 
 
-<pre><code><b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
 <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
 <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
 <b>requires</b> <b>forall</b> i in 0..len(recipients):
