@@ -260,18 +260,18 @@ module veiled_coin::sigma_protocols {
             &proof.x3);
 
         let g_alpha1 = ristretto255::basepoint_mul(&proof.alpha1);
-        // \rho * c_1 + X_1 =? \alpha_1 * g
-        let c1_acc = ristretto255::point_mul(c1, &rho);
-        ristretto255::point_add_assign(&mut c1_acc, &proof.x1);
-        assert!(ristretto255::point_equals(&c1_acc, &g_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        // \rho * c_2 + X_1 =? \alpha_1 * g
+        let c2_acc = ristretto255::point_mul(c2, &rho);
+        ristretto255::point_add_assign(&mut c2_acc, &proof.x1);
+        assert!(ristretto255::point_equals(&c2_acc, &g_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         let g_alpha2 = ristretto255::basepoint_mul(&proof.alpha2);
-        // \rho * c_2 + X_2 =? \alpha_2 * g + \alpha_1 * y
-        let c2_acc = ristretto255::point_mul(c2, &rho);
-        ristretto255::point_add_assign(&mut c2_acc, &proof.x2);
+        // \rho * c_1 + X_2 =? \alpha_2 * g + \alpha_1 * y
+        let c1_acc = ristretto255::point_mul(c1, &rho);
+        ristretto255::point_add_assign(&mut c1_acc, &proof.x2);
         let y_alpha1 = ristretto255::point_mul(&sender_pk_point, &proof.alpha1);
         ristretto255::point_add_assign(&mut y_alpha1, &g_alpha2);
-        assert!(ristretto255::point_equals(&c2_acc, &y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
+        assert!(ristretto255::point_equals(&c1_acc, &y_alpha1), error::invalid_argument(ESIGMA_PROTOCOL_VERIFY_FAILED));
 
         // \rho * c + X_3 =? \alpha_2 * g + \alpha_1 * h
         let c_acc = ristretto255::point_mul(c, &rho);
