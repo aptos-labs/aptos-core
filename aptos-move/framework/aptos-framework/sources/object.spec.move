@@ -30,7 +30,6 @@ spec aptos_framework::object {
         ensures [abstract] result == spec_create_user_derived_object_address(source, derive_from);
     }
 
-   
     spec create_guid_object_address(source: address, creation_num: u64): address {
         pragma opaque;
         pragma aborts_if_is_strict = false;
@@ -74,7 +73,7 @@ spec aptos_framework::object {
     }
 
     spec create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
-        //TODO: We assume the sha3_256 is reachable
+        //We assume the sha3_256 is reachable
     }
 
     spec create_object_internal(
@@ -93,14 +92,12 @@ spec aptos_framework::object {
         aborts_if !exists<ObjectCore>(ref.self);
     }
 
-
-
     spec object_from_constructor_ref<T: key>(ref: &ConstructorRef): Object<T> {
         aborts_if !exists<ObjectCore>(ref.self);
         aborts_if !spec_exists_at<T>(ref.self);
     }
 
-    spec create_guid(object: &signer): guid::GUID{  
+    spec create_guid(object: &signer): guid::GUID{
         aborts_if !exists<ObjectCore>(signer::address_of(object));
         //Guid properties
         let object_data = global<ObjectCore>(signer::address_of(object));
@@ -224,9 +221,9 @@ spec aptos_framework::object {
 
     // Helper function
     spec fun spec_create_object_address(source: address, seed: vector<u8>): address;
-    
+
     spec fun spec_create_user_derived_object_address(source: address, derive_from: address): address;
-    
+
     spec fun spec_create_guid_object_address(source: address, creation_num: u64): address;
 
 }
