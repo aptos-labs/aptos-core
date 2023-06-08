@@ -10,12 +10,16 @@ use crate::{
         state_kv_pruner::StateKvPruner,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
+    schema::{db_metadata::DbMetadataKey, version_data::VersionDataSchema},
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
+    utils::get_progress,
     EventStore, TransactionStore,
 };
+use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::schema::KeyCodec;
+use aptos_schemadb::{schema::KeyCodec, ReadOptions};
+use aptos_types::transaction::Version;
 use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner
@@ -40,4 +44,41 @@ pub(crate) fn create_ledger_pruner(ledger_db: Arc<LedgerDb>) -> Arc<LedgerPruner
 /// A utility function to instantiate the state kv pruner.
 pub(crate) fn create_state_kv_pruner(state_kv_db: Arc<StateKvDb>) -> Arc<StateKvPruner> {
     Arc::new(StateKvPruner::new(state_kv_db))
+}
+
+pub(crate) fn get_ledger_pruner_progress(ledger_db: &LedgerDb) -> Result<Version> {
+    Ok(
+        if let Some(version) = get_progress(
+            ledger_db.metadata_db(),
+            &DbMetadataKey::LedgerPrunerProgress,
+        )? {
+            version
+        } else {
+            let mut iter = ledger_db
+                .metadata_db()
+                .iter::<VersionDataSchema>(ReadOptions::default())?;
+            iter.seek_to_first();
+            match iter.next().transpose()? {
+                Some((version, _)) => version,
+                None => 0,
+            }
+        },
+    )
+}
+
+pub(crate) fn get_state_kv_pruner_progress(state_kv_db: &StateKvDb) -> Result<Version> {
+    Ok(get_progress(
+        state_kv_db.metadata_db(),
+        &DbMetadataKey::StateKvPrunerProgress,
+    )?
+    .unwrap_or(0))
+}
+
+pub(crate) fn get_state_merkle_pruner_progress<S: StaleNodeIndexSchemaTrait>(
+    state_merkle_db: &StateMerkleDb,
+) -> Result<Version>
+where
+    StaleNodeIndex: KeyCodec<S>,
+{
+    Ok(get_progress(state_merkle_db.metadata_db(), &S::tag())?.unwrap_or(0))
 }

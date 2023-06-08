@@ -604,7 +604,7 @@ impl TestContext {
         let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
-            .execute_block((metadata.id(), txns.clone()), parent_id, None)
+            .execute_block((metadata.id(), txns.clone()).into(), parent_id, None)
             .unwrap();
         let mut compute_status = result.compute_status().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);

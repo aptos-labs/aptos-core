@@ -9,7 +9,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_add_cost, ModuleResolver, MoveResolver, ResourceResolver},
+    resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
@@ -44,8 +44,8 @@ impl ResourceResolver for BlankStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<(Vec<u8>, u64)>> {
-        Ok(None)
+    ) -> Result<(Option<Vec<u8>>, usize)> {
+        Ok((None, 0))
     }
 }
 
@@ -90,11 +90,12 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<(Vec<u8>, u64)>> {
+    ) -> Result<(Option<Vec<u8>>, usize)> {
         if let Some(account_storage) = self.delta.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
                 let buf = blob_opt.clone().ok();
-                return Ok(resource_add_cost(buf, 0));
+                let buf_size = resource_size(&buf);
+                return Ok((buf, buf_size));
             }
         }
 
@@ -304,12 +305,13 @@ impl ResourceResolver for InMemoryStorage {
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<(Vec<u8>, u64)>> {
+    ) -> Result<(Option<Vec<u8>>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
-            return Ok(resource_add_cost(buf, 0));
+            let buf_size = resource_size(&buf);
+            return Ok((buf, buf_size));
         }
-        Ok(None)
+        Ok((None, 0))
     }
 }
 
