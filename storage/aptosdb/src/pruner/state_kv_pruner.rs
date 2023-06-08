@@ -12,6 +12,7 @@ use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataValue},
     state_kv_db::StateKvDb,
 };
+use anyhow::Result;
 use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};
@@ -32,7 +33,7 @@ impl DBPruner for StateKvPruner {
         STATE_KV_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: usize) -> anyhow::Result<Version> {
+    fn prune(&self, max_versions: usize) -> Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
@@ -46,11 +47,7 @@ impl DBPruner for StateKvPruner {
         Ok(current_target_version)
     }
 
-    fn save_min_readable_version(
-        &self,
-        version: Version,
-        batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
+    fn save_min_readable_version(&self, version: Version, batch: &SchemaBatch) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvPrunerProgress,
             &DbMetadataValue::Version(version),
@@ -84,13 +81,8 @@ impl DBPruner for StateKvPruner {
         self.min_readable_version
             .store(min_readable_version, Ordering::Relaxed);
         PRUNER_VERSIONS
-            .with_label_values(&["state_kv_pruner", "min_readable"])
+            .with_label_values(&["state_kv_pruner", "progress"])
             .set(min_readable_version as i64);
-    }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
     }
 }
 

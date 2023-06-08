@@ -21,7 +21,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
-    resolver::{resource_add_cost, ModuleResolver, ResourceResolver},
+    resolver::{resource_size, ModuleResolver, ResourceResolver},
     vm_status::StatusCode,
 };
 use move_table_extension::{TableHandle, TableResolver};
@@ -94,7 +94,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<Option<(Vec<u8>, u64)>, VMError> {
+    ) -> Result<(Option<Vec<u8>>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let mut cache = self.resource_group_cache.borrow_mut();
@@ -103,12 +103,13 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                 // This resource group is already cached for this address. So just return the
                 // cached value.
                 let buf = group_data.get(struct_tag).cloned();
-                return Ok(resource_add_cost(buf, 0));
+                let buf_size = resource_size(&buf);
+                return Ok((buf, buf_size));
             }
             let group_data = self.get_resource_group_data(address, &resource_group)?;
             if let Some(group_data) = group_data {
                 let len = if self.accurate_byte_count {
-                    group_data.len() as u64
+                    group_data.len()
                 } else {
                     0
                 };
@@ -118,15 +119,17 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
                             .finish(Location::Undefined)
                     })?;
                 let res = group_data.get(struct_tag).cloned();
+                let res_size = resource_size(&res);
                 cache.insert(resource_group, group_data);
-                Ok(resource_add_cost(res, len))
+                Ok((res, res_size + len))
             } else {
                 cache.insert(resource_group, BTreeMap::new());
-                Ok(None)
+                Ok((None, 0))
             }
         } else {
             let buf = self.get_standard_resource(address, struct_tag)?;
-            Ok(resource_add_cost(buf, 0))
+            let buf_size = resource_size(&buf);
+            Ok((buf, buf_size))
         }
     }
 }
@@ -165,7 +168,7 @@ impl<'a, S: StateView> ResourceResolver for StorageAdapter<'a, S> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(self.get_any_resource(address, struct_tag, metadata)?)
     }
 }

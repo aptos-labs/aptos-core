@@ -201,3 +201,15 @@ variable "cluster_ipv4_cidr_block" {
   description = "The IP address range of the container pods in this cluster, in CIDR notation. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#cluster_ipv4_cidr_block"
   default     = ""
 }
+
+variable "gke_maintenance_policy" {
+  description = "The maintenance policy to use for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#maintenance_policy"
+  type = object({
+    recurring_window = object({
+      start_time = string
+      end_time   = string
+      recurrence = string
+    })
+  })
+  default = null
+}
