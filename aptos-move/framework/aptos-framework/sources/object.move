@@ -217,13 +217,11 @@ module aptos_framework::object {
         create_object_internal(signer::address_of(creator), uuid, true)
     }
 
-    /// Deprectated. 
     /// Create a new object by generating a random UUID based on transaction hash.
     public fun create_object_from_account(creator: &signer): ConstructorRef {
         create_object(creator)
     }
 
-    /// Deprectated. 
     /// Create a new object by generating a random UUID based on transaction hash.
     public fun create_object_from_object(creator: &signer): ConstructorRef {
         create_object(creator)
