@@ -8,7 +8,7 @@
 /// needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
 /// track proposal creation and proposal ids.
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
-/// on a proposal multiple times as long as the total voting power of these votes don't exceed its total voting power.
+/// on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
 module aptos_framework::aptos_governance {
     use std::error;
     use std::option;
@@ -17,6 +17,7 @@ module aptos_framework::aptos_governance {
     use std::vector;
     use std::features;
 
+    use aptos_std::math64::max;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
 
@@ -423,9 +424,8 @@ module aptos_framework::aptos_governance {
         // If a stake pool has already voted on a proposal before partial governance voting is enabled,
         // `get_remaining_voting_power` returns 0.
         let staking_pool_voting_power = get_remaining_voting_power(stake_pool, proposal_id);
-        if (staking_pool_voting_power < voting_power) {
-            voting_power = staking_pool_voting_power;
-        };
+        voting_power= max(voting_power, staking_pool_voting_power);
+
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 

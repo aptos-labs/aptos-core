@@ -13,7 +13,7 @@ It provides the following flow:
 needs to have the minimum proposer stake required. Off-chain components can subscribe to CreateProposalEvent to
 track proposal creation and proposal ids.
 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
-on a proposal multiple times as long as the total voting power of these votes don't exceed its total voting power.
+on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
 
 
 -  [Resource `GovernanceResponsbility`](#0x1_aptos_governance_GovernanceResponsbility)
@@ -91,6 +91,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="governance_proposal.md#0x1_governance_proposal">0x1::governance_proposal</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -1234,9 +1235,8 @@ cannot vote on the proposal even after partial governance voting is enabled.
     // If a <a href="stake.md#0x1_stake">stake</a> pool <b>has</b> already voted on a proposal before partial governance <a href="voting.md#0x1_voting">voting</a> is enabled,
     // `get_remaining_voting_power` returns 0.
     <b>let</b> staking_pool_voting_power = <a href="aptos_governance.md#0x1_aptos_governance_get_remaining_voting_power">get_remaining_voting_power</a>(stake_pool, proposal_id);
-    <b>if</b> (staking_pool_voting_power &lt; voting_power) {
-        voting_power = staking_pool_voting_power;
-    };
+    voting_power= max(voting_power, staking_pool_voting_power);
+
     // Short-circuit <b>if</b> the voter <b>has</b> no <a href="voting.md#0x1_voting">voting</a> power.
     <b>assert</b>!(voting_power &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_ENO_VOTING_POWER">ENO_VOTING_POWER</a>));
 
@@ -2476,20 +2476,6 @@ pool_address must exist in StakePool.
 
 
 <pre><code><b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_GetSignerAbortsIf">GetSignerAbortsIf</a>;
-</code></pre>
-
-
-
-
-<a name="0x1_aptos_governance_GetSignerAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_GetSignerAbortsIf">GetSignerAbortsIf</a> {
-    signer_address: <b>address</b>;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework);
-    <b>let</b> cap_map = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a>&gt;(@aptos_framework).signer_caps;
-    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(cap_map, signer_address);
-}
 </code></pre>
 
 
