@@ -1049,7 +1049,9 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.0.new_session(resolver, SessionId::txn(txn), aggregator_enabled);
+            session = self
+                .0
+                .new_session(resolver, SessionId::txn(txn), aggregator_enabled);
         }
 
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
@@ -1695,10 +1697,11 @@ impl VMAdapter for AptosVM {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        resolver: &impl MoveResolverExt,
+        view: &impl StateView,
         log_context: &AdapterLogSchema,
         aggregator_enabled: bool,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        let resolver = &self.as_move_resolver(view);
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
@@ -1771,7 +1774,7 @@ impl VMAdapter for AptosVM {
         view: &impl StateView,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
-        match self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, true) {
+        match self.execute_single_transaction(txn, &view, log_context, true) {
             Ok((vm_status, vm_output, sender)) => match vm_output.try_materialize(view) {
                 Ok(vm_output) => {
                     return Ok((vm_status, vm_output, sender));
@@ -1790,7 +1793,7 @@ impl VMAdapter for AptosVM {
                 }
             },
         }
-        self.execute_single_transaction(txn, &view.as_move_resolver(), log_context, false)
+        self.execute_single_transaction(txn, &view, log_context, false)
     }
 }
 

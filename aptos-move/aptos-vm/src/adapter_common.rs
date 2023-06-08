@@ -52,7 +52,7 @@ pub(crate) trait VMAdapter {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &impl MoveResolverExt,
+        data_cache: &impl StateView,
         log_context: &AdapterLogSchema,
         aggregator_enabled: bool,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;

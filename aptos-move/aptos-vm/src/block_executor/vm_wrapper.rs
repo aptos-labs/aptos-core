@@ -63,12 +63,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         aggregator_enabled: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        match self.vm.execute_single_transaction(
-            txn,
-            &view.as_move_resolver(),
-            &log_context,
-            aggregator_enabled,
-        ) {
+        match self
+            .vm
+            .execute_single_transaction(txn, &view, &log_context, aggregator_enabled)
+        {
             Ok((vm_status, vm_output, sender)) => {
                 process_vm_output(vm_status, vm_output, sender, log_context)
             },
