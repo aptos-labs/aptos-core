@@ -161,7 +161,7 @@ impl<V: TransactionWrite> VersionedValue<V> {
                         // other deltas. Merge two deltas together. If Delta application
                         // fails, we record an error, but continue processing (to e.g.
                         // account for the case when the aggregator was deleted).
-                        if a.merge_onto(*delta).is_err() {
+                        if a.merge_with_previous_delta(*delta).is_err() {
                             Err(())
                         } else {
                             Ok(a)
@@ -217,8 +217,8 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         assert_eq!(*v.aggregator_base_value.get_or_insert(value), value);
     }
 
-    pub(crate) fn add_delta(&self, key: &K, txn_idx: TxnIndex, delta: DeltaOp) {
-        let mut v = self.values.entry(key.clone()).or_default();
+    pub(crate) fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
+        let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_delta_from(delta)));
     }
@@ -251,10 +251,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::NotFound))
     }
 
-    pub(crate) fn write(&self, key: &K, version: Version, data: V) {
+    pub(crate) fn write(&self, key: K, version: Version, data: V) {
         let (txn_idx, incarnation) = version;
 
-        let mut v = self.values.entry(key.clone()).or_default();
+        let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             txn_idx,
             CachePadded::new(Entry::new_write_from(incarnation, data)),

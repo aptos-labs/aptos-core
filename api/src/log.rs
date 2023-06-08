@@ -17,7 +17,7 @@ use std::time::Duration;
 
 const REQUEST_SOURCE_CLIENT_UNKNOWN: &str = "unknown";
 static REQUEST_SOURCE_CLIENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"aptos-[a-zA-Z]+/[0-9A-Za-z\.\-]+").unwrap());
+    Lazy::new(|| Regex::new(r"aptos-[a-zA-Z\-]+/[0-9A-Za-z\.\-]+").unwrap());
 
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.

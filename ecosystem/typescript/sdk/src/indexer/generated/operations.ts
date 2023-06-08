@@ -56,6 +56,15 @@ export type GetCollectionDataQueryVariables = Types.Exact<{
 
 export type GetCollectionDataQuery = { __typename?: 'query_root', current_collections_v2: Array<{ __typename?: 'current_collections_v2', collection_id: string, token_standard: string, collection_name: string, creator_address: string, current_supply: any, description: string, uri: string }> };
 
+export type GetCollectionsWithOwnedTokensQueryVariables = Types.Exact<{
+  where_condition: Types.Current_Collection_Ownership_V2_View_Bool_Exp;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
+
+
+export type GetCollectionsWithOwnedTokensQuery = { __typename?: 'query_root', current_collection_ownership_v2_view: Array<{ __typename?: 'current_collection_ownership_v2_view', distinct_tokens?: any | null, last_transaction_version?: any | null, current_collection?: { __typename?: 'current_collections_v2', creator_address: string, collection_name: string, token_standard: string, collection_id: string, description: string, table_handle_v1?: string | null, uri: string, total_minted_v2?: any | null, max_supply?: any | null } | null }> };
+
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
   poolAddress?: Types.InputMaybe<Types.Scalars['String']>;
@@ -77,7 +86,7 @@ export type GetNumberOfDelegatorsQueryVariables = Types.Exact<{
 export type GetNumberOfDelegatorsQuery = { __typename?: 'query_root', num_active_delegator_per_pool: Array<{ __typename?: 'num_active_delegator_per_pool', num_active_delegator?: any | null }> };
 
 export type GetOwnedTokensQueryVariables = Types.Exact<{
-  address: Types.Scalars['String'];
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;
@@ -109,8 +118,7 @@ export type GetTokenDataQueryVariables = Types.Exact<{
 export type GetTokenDataQuery = { __typename?: 'query_root', current_token_datas: Array<{ __typename?: 'current_token_datas', token_data_id_hash: string, name: string, collection_name: string, creator_address: string, default_properties: any, largest_property_version: any, maximum: any, metadata_uri: string, payee_address: string, royalty_points_denominator: any, royalty_points_numerator: any, supply: any }> };
 
 export type GetTokenOwnedFromCollectionQueryVariables = Types.Exact<{
-  collection_id: Types.Scalars['String'];
-  owner_address: Types.Scalars['String'];
+  where_condition: Types.Current_Token_Ownerships_V2_Bool_Exp;
   offset?: Types.InputMaybe<Types.Scalars['Int']>;
   limit?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;

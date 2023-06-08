@@ -35,6 +35,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
+pub mod analyzed_transaction;
 pub mod authenticator;
 mod change_set;
 mod module;
@@ -42,9 +43,7 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-#[cfg(any(test, feature = "fuzzing"))]
-pub use change_set::NoOpChangeSetChecker;
-pub use change_set::{ChangeSet, CheckChangeSet};
+pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
@@ -555,12 +554,20 @@ impl SignedTransaction {
         self.authenticator.clone()
     }
 
+    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
+        &self.authenticator
+    }
+
     pub fn sender(&self) -> AccountAddress {
         self.raw_txn.sender
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
         self.raw_txn
+    }
+
+    pub fn raw_transaction_ref(&self) -> &RawTransaction {
+        &self.raw_txn
     }
 
     pub fn sequence_number(&self) -> u64 {

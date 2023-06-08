@@ -3,11 +3,9 @@
 
 use crate::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
-    on_chain_config::StorageGasSchedule,
-    state_store::state_key::StateKey,
-    transaction::{ChangeSet, CheckChangeSet},
-    write_set::WriteOp,
+    on_chain_config::StorageGasSchedule, state_store::state_key::StateKey, write_set::WriteOp,
 };
+use aptos_vm_types::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes},
     vm_status::{StatusCode, VMStatus},
@@ -145,12 +143,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
-        self.per_item_read * (NumArgs::from(1))
-            + match loaded {
-                Some(num_bytes) => self.per_byte_read * num_bytes,
-                None => 0.into(),
-            }
+    fn calculate_read_gas(&self, loaded: NumBytes) -> InternalGas {
+        self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
     fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
@@ -177,12 +171,18 @@ pub enum StoragePricing {
 }
 
 impl StoragePricing {
-    pub fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
+    pub fn calculate_read_gas(&self, resource_exists: bool, bytes_loaded: NumBytes) -> InternalGas {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_read_gas(loaded),
-            V2(v2) => v2.calculate_read_gas(loaded),
+            V1(v1) => v1.calculate_read_gas(
+                if resource_exists {
+                    Some(bytes_loaded)
+                } else {
+                    None
+                },
+            ),
+            V2(v2) => v2.calculate_read_gas(bytes_loaded),
         }
     }
 
@@ -266,7 +266,7 @@ impl ChangeSetConfigs {
 }
 
 impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &ChangeSet) -> Result<(), VMStatus> {
+    fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
 
         let mut write_set_size = 0;

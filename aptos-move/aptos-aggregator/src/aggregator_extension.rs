@@ -298,7 +298,7 @@ pub struct AggregatorData {
 
 impl AggregatorData {
     /// Returns a mutable reference to an aggregator with `id` and a `limit`.
-    /// If transaction that is currently executing did not initilize it, a new aggregator instance is created.
+    /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
     /// The state of the new aggregator instance depends on the `aggregator_enabled` flag.
     /// If the `aggregator_enabled` flag is true, the new aggregator instance
     /// is initialized with zero and in a delta state.

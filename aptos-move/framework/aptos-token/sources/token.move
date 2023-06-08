@@ -1,5 +1,5 @@
 /// This module provides the foundation for Tokens.
-/// Checkout our developer doc on our token standard https://aptos.dev/concepts/coin-and-token/aptos-token
+/// Checkout our developer doc on our token standard https://aptos.dev/standards
 module aptos_token::token {
     use std::error;
     use std::option::{Self, Option};
@@ -1660,17 +1660,14 @@ module aptos_token::token {
     }
 
     fun assert_non_standard_reserved_property(keys: &vector<String>) {
-        let len = vector::length(keys);
-        let i = 0;
-        while ( i < len) {
-            let key = vector::borrow(keys, i);
+        vector::for_each_ref(keys, |key| {
+            let key: &String = key;
             let length = string::length(key);
             if (length >= 6) {
                 let prefix = string::sub_string(&*key, 0, 6);
                 assert!(prefix != string::utf8(b"TOKEN_"), error::permission_denied(EPROPERTY_RESERVED_BY_STANDARD));
             };
-            i = i + 1;
-        };
+        });
     }
 
     // ****************** TEST-ONLY FUNCTIONS **************

@@ -210,36 +210,10 @@ Batch version of APT transfer.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
-    <b>let</b> i = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> i &lt;= recipients_len;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) ==&gt; !<a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(recipients[j])) &&
-                    (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) ==&gt; (recipients[j] != @vm_reserved && recipients[j] != @aptos_framework && recipients[j] != @aptos_token));
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source));
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                !<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source)).frozen;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(recipients[j]) ==&gt; !<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(recipients[j]).frozen;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(source)).<a href="coin.md#0x1_coin">coin</a>.value &gt;= amounts[j];
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(recipients[j]) ==&gt; <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(recipients[j]).guid_creation_num + 2 &lt; <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(recipients[j]) ==&gt; <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(recipients[j]).guid_creation_num + 2 &gt;= MAX_U64;
-            };
-        (i &lt; recipients_len)
-    }) {
-        <b>let</b> <b>to</b> = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&recipients, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source, <b>to</b>, amount);
-        <b>spec</b> {
-            <b>assume</b> amounts[i] == 0;
-        };
-        i = i + 1;
-    };
+        <a href="aptos_account.md#0x1_aptos_account_transfer">transfer</a>(source, *<b>to</b>, amount);
+    });
 }
 </code></pre>
 
@@ -305,41 +279,10 @@ Batch version of transfer_coins.
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_account.md#0x1_aptos_account_EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH">EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH</a>),
     );
 
-    <b>let</b> i = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>use</b> aptos_std::type_info;
-            <b>invariant</b> i &lt;= recipients_len;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) ==&gt; !<a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(recipients[j])) &&
-                    (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) ==&gt; (recipients[j] != @vm_reserved && recipients[j] != @aptos_framework && recipients[j] != @aptos_token));
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from));
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                !<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from)).frozen;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(recipients[j]) ==&gt; !<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(recipients[j]).frozen;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from)).<a href="coin.md#0x1_coin">coin</a>.value &gt;= amounts[j];
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(recipients[j]) ==&gt; <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(recipients[j]).guid_creation_num + 2 &lt; <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                <a href="account.md#0x1_account_exists_at">account::exists_at</a>(recipients[j]) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(recipients[j]) ==&gt; <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(recipients[j]).guid_creation_num + 2 &gt;= MAX_U64;
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                !<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;CoinType&gt;(recipients[j]) ==&gt; <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
-            <b>invariant</b> <b>forall</b> j in 0..i:
-                !<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;CoinType&gt;(recipients[j]) ==&gt; <a href="aptos_account.md#0x1_aptos_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(recipients[j]);
-            };
-        (i &lt; recipients_len)
-    }) {
-        <b>let</b> <b>to</b> = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&recipients, i);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_enumerate_ref">vector::enumerate_ref</a>(&recipients, |i, <b>to</b>| {
         <b>let</b> amount = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&amounts, i);
-        <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, <b>to</b>, amount);
-        <b>spec</b> {
-            <b>assume</b> amounts[i] == 0;
-        };
-        i = i + 1;
-    };
+        <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(from, *<b>to</b>, amount);
+    });
 }
 </code></pre>
 

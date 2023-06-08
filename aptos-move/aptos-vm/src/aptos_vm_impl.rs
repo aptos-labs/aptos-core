@@ -10,7 +10,6 @@ use crate::{
     system_module_names::{MULTISIG_ACCOUNT_MODULE, VALIDATE_MULTISIG_TRANSACTION},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
@@ -25,10 +24,11 @@ use aptos_types::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
         GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
     },
-    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionOutput, TransactionStatus},
+    transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
@@ -163,7 +163,7 @@ impl AptosVMImpl {
             features,
         };
         vm.version = Version::fetch_config(&storage);
-        vm.transaction_validation = Self::get_transaction_validation(&StorageAdapter::new(state));
+        vm.transaction_validation = Self::get_transaction_validation(&storage);
         vm
     }
 
@@ -663,24 +663,19 @@ pub(crate) fn get_transaction_output<A: AccessPathCache>(
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
-) -> Result<TransactionOutputExt, VMStatus> {
+) -> Result<VMOutput, VMStatus> {
     let gas_used = txn_data
         .max_gas_amount()
         .checked_sub(gas_left)
         .expect("Balance should always be less than or equal to max gas amount");
 
-    let change_set_ext = session.finish(ap_cache, change_set_configs)?;
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
-    let (write_set, events) = change_set.into_inner();
+    let change_set = session.finish(ap_cache, change_set_configs)?;
 
-    let txn_output = TransactionOutput::new(
-        write_set,
-        events,
+    Ok(VMOutput::new(
+        change_set,
         gas_used.into(),
         TransactionStatus::Keep(status),
-    );
-
-    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
+    ))
 }
 
 #[test]

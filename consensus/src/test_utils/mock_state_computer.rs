@@ -8,6 +8,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
+    transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::{format_err, Result};
@@ -139,6 +140,7 @@ impl StateComputer for MockStateComputer {
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
+        _: Arc<dyn TransactionDeduper>,
     ) {
     }
 
@@ -176,6 +178,7 @@ impl StateComputer for EmptyStateComputer {
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
+        _: Arc<dyn TransactionDeduper>,
     ) {
     }
 
@@ -237,6 +240,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<PayloadManager>,
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
+        _: Arc<dyn TransactionDeduper>,
     ) {
     }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, Test};
+use aptos_forge::{NetworkContext, NetworkTest, Result, Swarm, Test, TestReport};
 use rand::{seq::SliceRandom, thread_rng};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time::Instant};
@@ -20,7 +20,12 @@ impl NetworkLoadTest for FullNodeRebootStressTest {
         Ok(LoadDestination::AllFullnodes)
     }
 
-    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        swarm: &mut dyn Swarm,
+        _report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         let start = Instant::now();
         let runtime = Runtime::new().unwrap();
 

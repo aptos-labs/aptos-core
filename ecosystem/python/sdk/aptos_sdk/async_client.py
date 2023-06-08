@@ -11,6 +11,7 @@ from .account import Account
 from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
+from .metadata import Metadata
 from .transactions import (
     EntryFunction,
     MultiAgentRawTransaction,
@@ -49,8 +50,10 @@ class RestClient:
         # Default timeouts but do not set a pool timeout, since the idea is that jobs will wait as
         # long as progress is being made.
         timeout = httpx.Timeout(60.0, pool=None)
+        # Default headers
+        headers = {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
         self.client = httpx.AsyncClient(
-            http2=client_config.http2, limits=limits, timeout=timeout
+            http2=client_config.http2, limits=limits, timeout=timeout, headers=headers
         )
         self.client_config = client_config
         self._chain_id = None

@@ -54,9 +54,8 @@ use crate::{
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
     pruner::{
-        db_pruner::DBPruner, ledger_pruner_manager::LedgerPrunerManager,
-        pruner_manager::PrunerManager, pruner_utils, state_kv_pruner::StateKvPruner,
-        state_kv_pruner_manager::StateKvPrunerManager,
+        ledger_pruner_manager::LedgerPrunerManager, pruner_manager::PrunerManager, pruner_utils,
+        state_kv_pruner::StateKvPruner, state_kv_pruner_manager::StateKvPrunerManager,
         state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
     },
     schema::*,
@@ -2114,34 +2113,17 @@ impl DbWriter for AptosDB {
                 &DbMetadataValue::Version(version),
             )?;
 
-            self.ledger_pruner
-                .pruner()
-                .save_min_readable_version(version, &batch)?;
-
             let mut state_merkle_batch = SchemaBatch::new();
             StateMerklePruner::prune_genesis(
                 self.state_merkle_db.clone(),
                 &mut state_merkle_batch,
             )?;
 
-            self.state_store
-                .state_merkle_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_merkle_batch)?;
-            self.state_store
-                .epoch_snapshot_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_merkle_batch)?;
-
             let mut state_kv_batch = SchemaBatch::new();
             StateKvPruner::prune_genesis(
                 self.state_store.state_kv_db.clone(),
                 &mut state_kv_batch,
             )?;
-            self.state_store
-                .state_kv_pruner
-                .pruner()
-                .save_min_readable_version(version, &state_kv_batch)?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
             //
@@ -2154,18 +2136,19 @@ impl DbWriter for AptosDB {
                 .commit_nonsharded(version, state_kv_batch)?;
             self.ledger_db.metadata_db_arc().write_schemas(batch)?;
 
-            restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
-            self.state_store.reset();
-
-            self.ledger_pruner.pruner().record_progress(version);
+            self.ledger_pruner.save_min_readable_version(version)?;
             self.state_store
                 .state_merkle_pruner
-                .pruner()
-                .record_progress(version);
+                .save_min_readable_version(version)?;
             self.state_store
                 .epoch_snapshot_pruner
-                .pruner()
-                .record_progress(version);
+                .save_min_readable_version(version)?;
+            self.state_store
+                .state_kv_pruner
+                .save_min_readable_version(version)?;
+
+            restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
+            self.state_store.reset();
 
             Ok(())
         })

@@ -137,7 +137,7 @@ impl AggregatorChangeSet {
                             // `delta1` occurred before `delta2`, therefore we must ensure we merge the latter
                             // one to the initial delta.
                             delta2
-                                .merge_onto(delta1)
+                                .merge_with_previous_delta(delta1)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Merge(delta2)
                         },

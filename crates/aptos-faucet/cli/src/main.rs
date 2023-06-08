@@ -74,7 +74,8 @@ impl FaucetCliArgs {
             Duration::from_secs(30),
             None,
             self.max_gas_amount,
-            30,
+            25, // transaction_expiration_secs
+            30, // wait_for_outstanding_txns_secs
             true,
         );
 

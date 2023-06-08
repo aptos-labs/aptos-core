@@ -2588,6 +2588,15 @@ impl GlobalValue {
         self.0.into_effect().map(|op| op.map(Value))
     }
 
+    pub fn into_effect_with_layout(
+        self,
+        layout: MoveTypeLayout,
+    ) -> Option<Op<(Value, MoveTypeLayout)>> {
+        self.0
+            .into_effect()
+            .map(|op| op.map(|v| (Value(v), layout)))
+    }
+
     pub fn is_mutated(&self) -> bool {
         self.0.is_mutated()
     }

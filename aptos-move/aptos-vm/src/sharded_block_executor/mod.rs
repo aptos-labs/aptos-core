@@ -2,10 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    block_partitioner::{BlockPartitioner, UniformPartitioner},
-    executor_shard::ExecutorShard,
-};
+use crate::sharded_block_executor::executor_shard::ExecutorShard;
+use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
@@ -19,7 +17,6 @@ use std::{
     thread,
 };
 
-mod block_partitioner;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.
@@ -33,16 +30,12 @@ pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static> {
 }
 
 pub enum ExecutorShardCommand<S: StateView + Sync + Send + 'static> {
-    ExecuteBlock(Arc<S>, Vec<Transaction>, usize),
+    ExecuteBlock(Arc<S>, Vec<Transaction>, usize, Option<u64>),
     Stop,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
-    pub fn new(
-        num_executor_shards: usize,
-        executor_threads_per_shard: Option<usize>,
-        maybe_gas_limit: Option<u64>,
-    ) -> Self {
+    pub fn new(num_executor_shards: usize, executor_threads_per_shard: Option<usize>) -> Self {
         assert!(num_executor_shards > 0, "num_executor_shards must be > 0");
         let executor_threads_per_shard = executor_threads_per_shard.unwrap_or_else(|| {
             (num_cpus::get() as f64 / num_executor_shards as f64).ceil() as usize
@@ -61,7 +54,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
                 executor_threads_per_shard,
                 transactions_rx,
                 result_tx,
-                maybe_gas_limit,
             ));
         }
         info!(
@@ -85,6 +77,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
         state_view: Arc<S>,
         block: Vec<Transaction>,
         concurrency_level_per_shard: usize,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let block_partitions = self.partitioner.partition(block, self.num_executor_shards);
         // Number of partitions might be smaller than the number of executor shards in case of
@@ -96,6 +89,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedBlockExecutor<S> {
                     state_view.clone(),
                     transactions,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 ))
                 .unwrap();
         }
@@ -135,7 +129,6 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
     concurrency_level: usize,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-    maybe_gas_limit: Option<u64>,
 ) -> thread::JoinHandle<()> {
     // create and start a new executor shard in a separate thread
     thread::Builder::new()
@@ -147,7 +140,6 @@ fn spawn_executor_shard<S: StateView + Sync + Send + 'static>(
                 concurrency_level,
                 command_rx,
                 result_tx,
-                maybe_gas_limit,
             );
             executor_shard.start();
         })

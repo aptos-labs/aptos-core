@@ -8,7 +8,7 @@ data:
 {{ (.Files.Glob "files/backup/*.yaml").AsConfig | indent 2 }}
 
 ---
-
+{{ $backup_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (print (include "backup.fullname" .) "-backup")}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -35,7 +35,11 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: backup
+        {{- if and $backup_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+        image: {{ (first $backup_statefulset.spec.template.spec.containers).image }}
+        {{- else }}
         image: {{ .Values.backup.image.repo }}:{{ .Values.backup.image.tag | default .Values.imageTag }}
+        {{- end }}
         imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
         resources:
           {{- toYaml .Values.backup.resources | nindent 10 }}

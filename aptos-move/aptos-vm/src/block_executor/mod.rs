@@ -13,7 +13,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
     errors::Error,
     executor::BlockExecutor,
@@ -23,13 +23,15 @@ use aptos_block_executor::{
     },
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::StateView;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    executable::ExecutableTestType,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::{WriteOp, WriteSet},
+    write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
+use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
@@ -43,14 +45,14 @@ impl BlockExecutorTransaction for PreprocessedTransaction {
 // Wrapper to avoid orphan rule
 #[derive(Debug)]
 pub(crate) struct AptosTransactionOutput {
-    output_ext: Mutex<Option<TransactionOutputExt>>,
+    vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
 
 impl AptosTransactionOutput {
-    pub(crate) fn new(output: TransactionOutputExt) -> Self {
+    pub(crate) fn new(output: VMOutput) -> Self {
         Self {
-            output_ext: Mutex::new(Some(output)),
+            vm_output: Mutex::new(Some(output)),
             committed_output: OnceCell::new(),
         }
     }
@@ -59,7 +61,7 @@ impl AptosTransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
             None => self
-                .output_ext
+                .vm_output
                 .lock()
                 .take()
                 .expect("Output must be set")
@@ -73,32 +75,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self::new(TransactionOutputExt::from(TransactionOutput::new(
-            WriteSet::default(),
-            vec![],
-            0,
-            TransactionStatus::Retry,
-        )))
+        Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
-    /// Should never be called after incorporate_delta_writes, as it will consume
-    /// output_ext to prepare an output with deltas.
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.output_ext
+        self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
-            .txn_output()
             .write_set()
             .iter()
             .map(|(key, op)| (key.clone(), op.clone()))
             .collect()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it will consume
-    /// output_ext to prepare an output with deltas.
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
     fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
-        self.output_ext
+        self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
@@ -114,14 +110,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         assert!(
             self.committed_output
                 .set(
-                    self.output_ext
+                    self.vm_output
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
                         .output_with_delta_writes(delta_writes),
                 )
                 .is_ok(),
-            "Could not combine TransactionOutputExt with deltas"
+            "Could not combine VMOutput with deltas"
         );
     }
 
@@ -141,12 +137,13 @@ impl BlockAptosVM {
         transactions: Vec<Transaction>,
         state_view: &S,
         concurrency_level: usize,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
+        // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
         let signature_verified_block: Vec<PreprocessedTransaction> =
@@ -160,13 +157,22 @@ impl BlockAptosVM {
         drop(signature_verification_timer);
 
         let num_txns = signature_verified_block.len();
-        init_speculative_logs(num_txns);
+        if state_view.id() != StateViewId::Miscellaneous {
+            // Speculation is disabled in Miscellaneous context, which is used by testing and
+            // can even lead to concurrent execute_block invocations, leading to errors on flush.
+            init_speculative_logs(num_txns);
+        }
 
         BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
-        let executor = BlockExecutor::<PreprocessedTransaction, AptosExecutorTask<S>, S>::new(
+        let executor = BlockExecutor::<
+            PreprocessedTransaction,
+            AptosExecutorTask<S>,
+            S,
+            ExecutableTestType,
+        >::new(
             concurrency_level,
             executor_thread_pool,
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
@@ -181,7 +187,11 @@ impl BlockAptosVM {
                 // Flush the speculative logs of the committed transactions.
                 let pos = output_vec.partition_point(|o| !o.status().is_retry());
 
-                flush_speculative_logs(pos);
+                if state_view.id() != StateViewId::Miscellaneous {
+                    // Speculation is disabled in Miscellaneous context, which is used by testing and
+                    // can even lead to concurrent execute_block invocations, leading to errors on flush.
+                    flush_speculative_logs(pos);
+                }
 
                 Ok(output_vec)
             },
