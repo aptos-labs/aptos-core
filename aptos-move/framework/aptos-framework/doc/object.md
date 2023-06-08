@@ -225,8 +225,7 @@ This is a one time ability given to the creator to configure the object as neces
 <code>can_delete: bool</code>
 </dt>
 <dd>
- Set to true so long as deleting the object is possible. For example, the object was
- created via create_object_from_guid.
+ Set to true so long as deleting the object is possible.
 </dd>
 </dl>
 
@@ -860,7 +859,6 @@ never be regenerated with future txs.
 
 ## Function `create_object_from_account`
 
-Deprectated.
 Create a new object by generating a random UUID based on transaction hash.
 
 
@@ -886,7 +884,6 @@ Create a new object by generating a random UUID based on transaction hash.
 
 ## Function `create_object_from_object`
 
-Deprectated.
 Create a new object by generating a random UUID based on transaction hash.
 
 
