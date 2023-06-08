@@ -1,12 +1,22 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
+
+from __future__ import annotations
+
 import asyncio
 import logging
-import time
-from typing import Optional
+from typing import Callable, Optional
 
 from aptos_sdk.account_address import AccountAddress
-from aptos_sdk.async_client import RestClient
+from aptos_sdk.async_client import ApiError, RestClient
+
+
+class AccountSequenceNumberConfig:
+    """Common configuration for account number generation"""
+
+    maximum_in_flight: int = 100
+    maximum_wait_time: int = 30
+    sleep_time: float = 0.01
 
 
 class AccountSequenceNumber:
@@ -46,13 +56,22 @@ class AccountSequenceNumber:
     _last_committed_number: Optional[int]
     _current_number: Optional[int]
 
-    def __init__(self, client: RestClient, account: AccountAddress):
+    def __init__(
+        self,
+        client: RestClient,
+        account: AccountAddress,
+        config: AccountSequenceNumberConfig = AccountSequenceNumberConfig(),
+    ):
         self._client = client
         self._account = account
         self._lock = asyncio.Lock()
 
         self._last_uncommitted_number = None
         self._current_number = None
+
+        self._maximum_in_flight = config.maximum_in_flight
+        self._maximum_wait_time = config.maximum_wait_time
+        self._sleep_time = config.sleep_time
 
     async def next_sequence_number(self, block: bool = True) -> Optional[int]:
         """
@@ -69,22 +88,16 @@ class AccountSequenceNumber:
                 >= self._maximum_in_flight
             ):
                 await self._update()
-                start_time = time.time()
-                while (
+                if (
                     self._current_number - self._last_uncommitted_number
                     >= self._maximum_in_flight
                 ):
                     if not block:
                         return None
-
-                    await asyncio.sleep(self._sleep_time)
-                    if time.time() - start_time > self._maximum_wait_time:
-                        logging.warn(
-                            f"Waited over {self._maximum_wait_time} seconds for a transaction to commit, resyncing {self._account}"
-                        )
-                        await self._initialize()
-                    else:
-                        await self._update()
+                    await self._resync(
+                        lambda acn: acn._current_number - acn._last_uncommitted_number
+                        >= acn._maximum_in_flight
+                    )
 
             next_number = self._current_number
             self._current_number += 1
@@ -103,16 +116,42 @@ class AccountSequenceNumber:
         """
         async with self._lock:
             await self._update()
-            start_time = time.time()
-            while self._last_uncommitted_number != self._current_number:
-                if time.time() - start_time > self._maximum_wait_time:
-                    logging.warn(
-                        f"Waited over {self._maximum_wait_time} seconds for a transaction to commit, resyncing {self._account}"
+            await self._resync(
+                lambda acn: acn._last_uncommitted_number != acn._current_number
+            )
+
+    async def _resync(self, check: Callable[[AccountSequenceNumber], bool]):
+        """Forces a resync with the upstream, this should be called within the lock"""
+        start_time = await self._client.current_timestamp()
+        failed = False
+        while check(self):
+            ledger_time = await self._client.current_timestamp()
+            if ledger_time - start_time > self._maximum_wait_time:
+                logging.warn(
+                    f"Waited over {self._maximum_wait_time} seconds for a transaction to commit, resyncing {self._account}"
+                )
+                failed = True
+                break
+            else:
+                await asyncio.sleep(self._sleep_time)
+                await self._update()
+        if not failed:
+            return
+        for seq_num in range(self._last_uncommitted_number + 1, self._current_number):
+            while True:
+                try:
+                    result = (
+                        await self._client.account_transaction_sequence_number_status(
+                            self._account, seq_num
+                        )
                     )
-                    await self._initialize()
-                else:
-                    await asyncio.sleep(self._sleep_time)
-                    await self._update()
+                    if result:
+                        break
+                except ApiError as error:
+                    if error.status_code == 404:
+                        break
+                    raise
+        await self._initialize()
 
     async def _update(self):
         self._last_uncommitted_number = await self._current_sequence_number()
