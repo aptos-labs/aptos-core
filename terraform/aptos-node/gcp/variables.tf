@@ -250,5 +250,11 @@ variable "gke_maintenance_policy" {
       recurrence = string
     })
   })
-  default = null
+  default = {
+    recurring_window = {
+      start_time = "2023-06-01T14:00:00Z"
+      end_time   = "2023-06-01T18:00:00Z"
+      recurrence = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+    }
+  }
 }
