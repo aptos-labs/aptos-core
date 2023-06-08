@@ -35,6 +35,7 @@ from cases.account import (
     test_account_lookup_address,
 )
 from cases.init import test_init, test_metrics_accessible
+from cases.move import test_move_publish
 from common import Network
 from local_testnet import run_node, stop_node, wait_for_startup
 from test_helpers import RunHelper
@@ -110,6 +111,9 @@ def run_tests(run_helper):
     test_account_fund_with_faucet(run_helper)
     test_account_create(run_helper)
     test_account_lookup_address(run_helper)
+
+    # Run move subcommand group tests.
+    test_move_publish(run_helper)
 
 
 def main():
