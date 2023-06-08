@@ -19,7 +19,6 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, DeserializeKey, Serialize
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
@@ -470,11 +469,12 @@ impl AuthenticationKeyPreimage {
         Self::new(public_key.to_bytes(), Scheme::MultiEd25519)
     }
 
+    /// Construct a preimage from a transaction-derived UUID as (txn_hash || uuid_scheme_id)
     pub fn uuid(transaction_derived_uuid: TransactionDerivedUUID) -> AuthenticationKeyPreimage {
         let mut hash_arg = Vec::new();
-        hash_arg.push(Scheme::DeriveUuid as u8);
         hash_arg.extend(transaction_derived_uuid.hash().to_vec());
-        Self(Sha256::digest(hash_arg.as_slice()).to_vec())
+        hash_arg.push(Scheme::DeriveUuid as u8);
+        Self(hash_arg)
     }
 
     /// Construct a vector from this authentication key
