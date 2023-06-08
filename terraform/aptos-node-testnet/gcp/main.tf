@@ -68,6 +68,8 @@ module "validator" {
   enable_monitoring      = var.enable_monitoring
   enable_node_exporter   = var.enable_prometheus_node_exporter
   monitoring_helm_values = var.monitoring_helm_values
+
+  gke_maintenance_policy = var.gke_maintenance_policy
 }
 
 locals {
