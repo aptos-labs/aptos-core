@@ -2,10 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{
-    block_partitioner::{BlockPartitioner, UniformPartitioner},
-    executor_shard::ExecutorShard,
-};
+use crate::sharded_block_executor::executor_shard::ExecutorShard;
+use aptos_block_partitioner::{BlockPartitioner, UniformPartitioner};
 use aptos_logger::{error, info, trace};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
@@ -19,7 +17,6 @@ use std::{
     thread,
 };
 
-mod block_partitioner;
 mod executor_shard;
 
 /// A wrapper around sharded block executors that manages multiple shards and aggregates the results.

@@ -5,13 +5,11 @@
 pub(crate) mod db_pruner;
 pub(crate) mod db_sub_pruner;
 pub(crate) mod event_store;
-pub(crate) mod ledger_pruner_worker;
 pub(crate) mod ledger_store;
 pub(crate) mod pruner_manager;
 pub mod pruner_utils;
+pub(crate) mod pruner_worker;
 pub(crate) mod state_kv_pruner;
-pub(crate) mod state_kv_pruner_worker;
-pub(crate) mod state_merkle_pruner_worker;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
 

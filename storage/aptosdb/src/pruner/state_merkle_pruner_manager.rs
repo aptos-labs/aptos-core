@@ -5,22 +5,24 @@
 //! meant to be triggered by other threads as they commit new data to the DB.
 
 use crate::{
-    metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
+    metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
-        db_pruner::DBPruner,
         pruner_manager::PrunerManager,
-        state_merkle_pruner_worker::StateMerklePrunerWorker,
+        pruner_worker::PrunerWorker,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
     pruner_utils,
     state_merkle_db::StateMerkleDb,
 };
+use anyhow::Result;
 use aptos_config::config::StateMerklePrunerConfig;
-use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::schema::KeyCodec;
-use aptos_types::transaction::Version;
-use std::{sync::Arc, thread::JoinHandle};
+use aptos_types::transaction::{AtomicVersion, Version};
+use std::{
+    marker::PhantomData,
+    sync::{atomic::Ordering, Arc},
+};
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.
@@ -28,29 +30,20 @@ use std::{sync::Arc, thread::JoinHandle};
 /// If the state pruner is enabled, it creates a worker thread on construction and joins it on
 /// destruction. When destructed, it quits the worker thread eagerly without waiting for all
 /// pending work to be done.
-#[derive(Debug)]
 pub struct StateMerklePrunerManager<S: StaleNodeIndexSchemaTrait>
 where
     StaleNodeIndex: KeyCodec<S>,
 {
-    pruner_enabled: bool,
+    state_merkle_db: Arc<StateMerkleDb>,
     /// DB version window, which dictates how many versions of state store
     /// to keep.
     prune_window: Version,
-    /// State pruner. Is always initialized regardless if the pruner is enabled to keep tracks
-    /// of the min_readable_version.
-    pruner: Arc<StateMerklePruner<S>>,
-    /// Wrapper class of the state pruner.
-    pub(crate) pruner_worker: Arc<StateMerklePrunerWorker<S>>,
-    /// The worker thread handle for state_merkle_pruner, created upon Pruner instance construction and
-    /// joined upon its destruction. It is `None` when state pruner is not enabled or it only
-    /// becomes `None` after joined in `drop()`.
-    worker_thread: Option<JoinHandle<()>>,
-    /// We send a batch of version to the underlying pruners for performance reason. This tracks the
-    /// last version we sent to the pruner. Will only be set if the pruner is enabled.
-    last_version_sent_to_pruner: Arc<Mutex<Version>>,
-    /// latest version
-    latest_version: Arc<Mutex<Version>>,
+    /// It is None iff the pruner is not enabled.
+    pruner_worker: Option<PrunerWorker>,
+    /// The minimal readable version for the ledger data.
+    min_readable_version: AtomicVersion,
+
+    _phantom: PhantomData<S>,
 }
 
 impl<S: StaleNodeIndexSchemaTrait> PrunerManager for StateMerklePrunerManager<S>
@@ -59,12 +52,8 @@ where
 {
     type Pruner = StateMerklePruner<S>;
 
-    fn pruner(&self) -> &Self::Pruner {
-        &self.pruner
-    }
-
     fn is_pruner_enabled(&self) -> bool {
-        self.pruner_enabled
+        self.pruner_worker.is_some()
     }
 
     fn get_prune_window(&self) -> Version {
@@ -72,29 +61,41 @@ where
     }
 
     fn get_min_readable_version(&self) -> Version {
-        self.pruner.as_ref().min_readable_version()
-    }
-
-    fn get_min_viable_version(&self) -> Version {
-        unimplemented!()
+        self.min_readable_version.load(Ordering::SeqCst)
     }
 
     /// Sets pruner target version when necessary.
     fn maybe_set_pruner_target_db_version(&self, latest_version: Version) {
-        *self.latest_version.lock() = latest_version;
-
         // Always wake up the state pruner.
-        if self.pruner_enabled {
+        if self.is_pruner_enabled() {
             self.set_pruner_target_db_version(latest_version);
-            *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
         }
     }
 
-    fn set_pruner_target_db_version(&self, latest_version: Version) {
-        assert!(self.pruner_enabled);
+    fn save_min_readable_version(&self, min_readable_version: Version) -> Result<()> {
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+
+        PRUNER_VERSIONS
+            .with_label_values(&[S::name(), "min_readable"])
+            .set(min_readable_version as i64);
+
+        self.state_merkle_db
+            .write_pruner_progress(min_readable_version)
+    }
+
+    fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()
-            .set_target_db_version(latest_version.saturating_sub(self.prune_window));
+            .map_or(false, |w| w.is_pruning_pending())
+    }
+
+    #[cfg(test)]
+    fn set_worker_target_version(&self, target_version: Version) {
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(target_version);
     }
 }
 
@@ -103,65 +104,61 @@ where
     StaleNodeIndex: KeyCodec<S>,
 {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(state_merkle_db: Arc<StateMerkleDb>, config: StateMerklePrunerConfig) -> Self {
-        let state_db_clone = Arc::clone(&state_merkle_db);
-        let pruner = pruner_utils::create_state_merkle_pruner(state_db_clone);
-
-        if config.enable {
-            PRUNER_WINDOW
-                .with_label_values(&[S::name()])
-                .set(config.prune_window as i64);
-
-            PRUNER_BATCH_SIZE
-                .with_label_values(&[S::name()])
-                .set(config.batch_size as i64);
-        }
-
-        let pruner_worker = Arc::new(StateMerklePrunerWorker::new(Arc::clone(&pruner), config));
-        let state_merkle_pruner_worker_clone = Arc::clone(&pruner_worker);
-
-        let worker_thread = if config.enable {
-            Some(
-                std::thread::Builder::new()
-                    .name("aptosdb_state_merkle_pruner".into())
-                    .spawn(move || state_merkle_pruner_worker_clone.as_ref().work())
-                    .expect("Creating state pruner thread should succeed."),
-            )
+    pub fn new(
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_merkle_pruner_config: StateMerklePrunerConfig,
+    ) -> Self {
+        let pruner_worker = if state_merkle_pruner_config.enable {
+            Some(Self::init_pruner(
+                Arc::clone(&state_merkle_db),
+                state_merkle_pruner_config,
+            ))
         } else {
             None
         };
 
-        let min_readable_version = pruner.as_ref().min_readable_version();
+        let min_readable_version = pruner_utils::get_state_merkle_pruner_progress(&state_merkle_db)
+            .expect("Must succeed.");
+
+        PRUNER_VERSIONS
+            .with_label_values(&[S::name(), "min_readable"])
+            .set(min_readable_version as i64);
+
         Self {
-            pruner_enabled: config.enable,
-            prune_window: config.prune_window,
-            pruner,
+            state_merkle_db,
+            prune_window: state_merkle_pruner_config.prune_window,
             pruner_worker,
-            worker_thread,
-            last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
-            latest_version: Arc::new(Mutex::new(min_readable_version)),
+            min_readable_version: AtomicVersion::new(min_readable_version),
+            _phantom: PhantomData,
         }
     }
 
-    #[cfg(test)]
-    pub fn testonly_update_min_version(&self, version: Version) {
-        self.pruner.testonly_update_min_version(version);
-    }
-}
+    fn init_pruner(
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_merkle_pruner_config: StateMerklePrunerConfig,
+    ) -> PrunerWorker {
+        let pruner = pruner_utils::create_state_merkle_pruner::<S>(state_merkle_db);
 
-impl<S: StaleNodeIndexSchemaTrait> Drop for StateMerklePrunerManager<S>
-where
-    StaleNodeIndex: KeyCodec<S>,
-{
-    fn drop(&mut self) {
-        if self.pruner_enabled {
-            self.pruner_worker.stop_pruning();
-            assert!(self.worker_thread.is_some());
-            self.worker_thread
-                .take()
-                .expect("State merkle pruner worker thread must exist.")
-                .join()
-                .expect("State merkle pruner worker thread should join peacefully.");
-        }
+        PRUNER_WINDOW
+            .with_label_values(&[S::name()])
+            .set(state_merkle_pruner_config.prune_window as i64);
+
+        PRUNER_BATCH_SIZE
+            .with_label_values(&[S::name()])
+            .set(state_merkle_pruner_config.batch_size as i64);
+
+        PrunerWorker::new(
+            pruner,
+            state_merkle_pruner_config.batch_size,
+            "state_merkle",
+        )
+    }
+
+    fn set_pruner_target_db_version(&self, latest_version: Version) {
+        assert!(self.pruner_worker.is_some());
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(latest_version.saturating_sub(self.prune_window));
     }
 }

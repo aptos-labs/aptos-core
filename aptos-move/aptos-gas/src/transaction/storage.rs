@@ -143,12 +143,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
-        self.per_item_read * (NumArgs::from(1))
-            + match loaded {
-                Some(num_bytes) => self.per_byte_read * num_bytes,
-                None => 0.into(),
-            }
+    fn calculate_read_gas(&self, loaded: NumBytes) -> InternalGas {
+        self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
     fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
@@ -175,12 +171,18 @@ pub enum StoragePricing {
 }
 
 impl StoragePricing {
-    pub fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
+    pub fn calculate_read_gas(&self, resource_exists: bool, bytes_loaded: NumBytes) -> InternalGas {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_read_gas(loaded),
-            V2(v2) => v2.calculate_read_gas(loaded),
+            V1(v1) => v1.calculate_read_gas(
+                if resource_exists {
+                    Some(bytes_loaded)
+                } else {
+                    None
+                },
+            ),
+            V2(v2) => v2.calculate_read_gas(bytes_loaded),
         }
     }
 

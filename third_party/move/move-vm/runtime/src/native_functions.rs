@@ -128,7 +128,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         &mut self,
         address: AccountAddress,
         type_: &Type,
-    ) -> VMResult<(bool, Option<Option<NumBytes>>)> {
+    ) -> VMResult<(bool, Option<NumBytes>)> {
         let (value, num_bytes) = self
             .data_store
             .load_resource(self.resolver.loader(), address, type_)

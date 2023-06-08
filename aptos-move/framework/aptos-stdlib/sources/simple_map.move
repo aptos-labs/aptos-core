@@ -100,6 +100,22 @@ module aptos_std::simple_map {
         (std::option::none(), std::option::none())
     }
 
+    /// Return all keys in the map. This requires keys to be copyable.
+    public fun keys<Key: copy, Value>(map: &SimpleMap<Key, Value>): vector<Key> {
+        vector::map_ref(&map.data, |e| {
+            let e: &Element<Key, Value> = e;
+            e.key
+        })
+    }
+
+    /// Return all values in the map. This requires values to be copyable.
+    public fun values<Key, Value: copy>(map: &SimpleMap<Key, Value>): vector<Value> {
+        vector::map_ref(&map.data, |e| {
+            let e: &Element<Key, Value> = e;
+            e.value
+        })
+    }
+
     /// Transform the map into two vectors with the keys and values respectively
     /// Primarily used to destroy a map
     public fun to_vec_pair<Key: store, Value: store>(
@@ -181,6 +197,26 @@ module aptos_std::simple_map {
         assert!(!contains_key(&map, &3), 15);
 
         destroy_empty(map);
+    }
+
+    #[test]
+    public fun test_keys() {
+        let map = create<u64, u64>();
+        assert!(keys(&map) == vector[], 0);
+        add(&mut map, 2, 1);
+        add(&mut map, 3, 1);
+
+        assert!(keys(&map) == vector[2, 3], 0);
+    }
+
+    #[test]
+    public fun test_values() {
+        let map = create<u64, u64>();
+        assert!(values(&map) == vector[], 0);
+        add(&mut map, 2, 1);
+        add(&mut map, 3, 2);
+
+        assert!(values(&map) == vector[1, 2], 0);
     }
 
     #[test]

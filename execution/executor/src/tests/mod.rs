@@ -53,7 +53,7 @@ fn execute_and_commit_block(
 
     let output = executor
         .execute_block(
-            (id, block(vec![txn], BLOCK_GAS_LIMIT)),
+            (id, block(vec![txn], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -152,7 +152,7 @@ fn test_executor_status() {
 
     let output = executor
         .execute_block(
-            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)),
+            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -182,7 +182,7 @@ fn test_executor_status_consensus_only() {
 
     let output = executor
         .execute_block(
-            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)),
+            (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
         )
         .unwrap();
@@ -211,7 +211,7 @@ fn test_executor_one_block() {
         .collect::<Vec<_>>();
     let output = executor
         .execute_block(
-            (block_id, block(txns, BLOCK_GAS_LIMIT)),
+            (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -257,14 +257,14 @@ fn test_executor_two_blocks_with_failed_txns() {
         .collect::<Vec<_>>();
     let _output1 = executor
         .execute_block(
-            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)),
+            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
         .unwrap();
     let output2 = executor
         .execute_block(
-            (block2_id, block(block2_txns, BLOCK_GAS_LIMIT)),
+            (block2_id, block(block2_txns, BLOCK_GAS_LIMIT)).into(),
             block1_id,
             BLOCK_GAS_LIMIT,
         )
@@ -286,7 +286,7 @@ fn test_executor_commit_twice() {
     let block1_id = gen_block_id(1);
     let output1 = executor
         .execute_block(
-            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)),
+            (block1_id, block(block1_txns, BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -316,7 +316,7 @@ fn test_executor_execute_same_block_multiple_times() {
     for _i in 0..100 {
         let output = executor
             .execute_block(
-                (block_id, block(txns.clone(), BLOCK_GAS_LIMIT)),
+                (block_id, block(txns.clone(), BLOCK_GAS_LIMIT)).into(),
                 parent_block_id,
                 BLOCK_GAS_LIMIT,
             )
@@ -363,7 +363,7 @@ fn create_transaction_chunks(
 
     let output = executor
         .execute_block(
-            (id, txns.clone()),
+            (id, txns.clone()).into(),
             executor.committed_block_id(),
             BLOCK_GAS_LIMIT,
         )
@@ -403,7 +403,7 @@ fn test_noop_block_after_reconfiguration() {
     let first_block_id = gen_block_id(1);
     let output1 = executor
         .execute_block(
-            (first_block_id, vec![first_txn]),
+            (first_block_id, vec![first_txn]).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -412,7 +412,7 @@ fn test_noop_block_after_reconfiguration() {
     let second_block = TestBlock::new(10, 10, gen_block_id(2), BLOCK_GAS_LIMIT);
     let output2 = executor
         .execute_block(
-            (second_block.id, second_block.txns),
+            (second_block.id, second_block.txns).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -596,16 +596,32 @@ fn test_reconfig_suffix_empty_blocks() {
     block_b.txns.push(encode_reconfiguration_transaction());
     let parent_block_id = executor.committed_block_id();
     executor
-        .execute_block((block_a.id, block_a.txns), parent_block_id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block_a.id, block_a.txns).into(),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     let output = executor
-        .execute_block((block_b.id, block_b.txns), block_a.id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block_b.id, block_b.txns).into(),
+            block_a.id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     executor
-        .execute_block((block_c.id, block_c.txns), block_b.id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block_c.id, block_c.txns).into(),
+            block_b.id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     executor
-        .execute_block((block_d.id, block_d.txns), block_c.id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block_d.id, block_d.txns).into(),
+            block_c.id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
 
     let ledger_info = gen_ledger_info(20002, output.root_hash(), block_d.id, 1);
@@ -655,7 +671,7 @@ fn run_transactions_naive(
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
-            vec![txn],
+            vec![txn].into(),
             ledger_view
                 .verified_state_view(
                     StateViewId::Miscellaneous,
@@ -703,7 +719,7 @@ proptest! {
 
             let parent_block_id = executor.committed_block_id();
             let output = executor.execute_block(
-                (block_id, block.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT
+                (block_id, block.txns.clone()).into(), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
 
             // assert: txns after the reconfiguration are with status "Retry"
@@ -722,7 +738,7 @@ proptest! {
             // retry txns after reconfiguration
             let retry_block_id = gen_block_id(2);
             let retry_output = executor.execute_block(
-                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()), parent_block_id, BLOCK_GAS_LIMIT
+                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()).into(), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
@@ -768,7 +784,7 @@ proptest! {
         {
             parent_block_id = executor.committed_block_id();
             let output_a = executor.execute_block(
-                (block_a.id, block_a.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT
+                (block_a.id, block_a.txns.clone()).into(), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
             root_hash = output_a.root_hash();
             let ledger_info = gen_ledger_info(ledger_version_from_block_size(block_a.txns.len(), BLOCK_GAS_LIMIT) as u64, root_hash, block_a.id, 1);
@@ -779,7 +795,7 @@ proptest! {
         // Now we construct a new executor and run one more block.
         {
             let executor = BlockExecutor::<MockVM>::new(db);
-            let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), parent_block_id, BLOCK_GAS_LIMIT).unwrap();
+            let output_b = executor.execute_block((block_b.id, block_b.txns.clone()).into(), parent_block_id, BLOCK_GAS_LIMIT).unwrap();
             root_hash = output_b.root_hash();
             let ledger_info = gen_ledger_info(
                 (ledger_version_from_block_size(block_a.txns.len(), BLOCK_GAS_LIMIT) + ledger_version_from_block_size(block_b.txns.len(), BLOCK_GAS_LIMIT)) as u64,
@@ -836,13 +852,13 @@ proptest! {
         let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(
-            (first_block_id, first_block_txns),
+            (first_block_id, first_block_txns).into(),
             parent_block_id, BLOCK_GAS_LIMIT
         ).unwrap();
 
         let second_block_id = gen_block_id(2);
         let output2 = executor.execute_block(
-            (second_block_id, block(second_block_txns, BLOCK_GAS_LIMIT)),
+            (second_block_id, block(second_block_txns, BLOCK_GAS_LIMIT)).into(),
             first_block_id, BLOCK_GAS_LIMIT
         ).unwrap();
 
