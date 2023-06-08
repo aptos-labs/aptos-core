@@ -136,7 +136,6 @@ class Worker:
         asyncio.run(worker.async_run())
 
     async def async_run(self):
-        print(f"hello from {self._account.address()}")
         try:
             self._txn_worker.start()
 
@@ -145,12 +144,16 @@ class Worker:
 
             await self._txn_generator.increase_transaction_count(num_txns)
 
-            print(f"Increase txns from {self._account.address()}")
+            logging.info(f"Increase txns from {self._account.address()}")
             self._conn.send(True)
             self._conn.recv()
 
             txn_hashes = []
             while num_txns != 0:
+                if num_txns % 100 == 0:
+                    logging.info(
+                        f"{self._txn_worker.address()} remaining transactions {num_txns}"
+                    )
                 num_txns -= 1
                 (
                     sequence_number,
@@ -165,7 +168,7 @@ class Worker:
                 else:
                     txn_hashes.append(txn_hash)
 
-            print(f"Submitted txns from {self._account.address()}", flush=True)
+            logging.info(f"Submitted txns from {self._account.address()}")
             self._conn.send(True)
             self._conn.recv()
 
@@ -173,7 +176,7 @@ class Worker:
                 await self._rest_client.wait_for_transaction(txn_hash)
 
             await self._rest_client.close()
-            print(f"Verified txns from {self._account.address()}", flush=True)
+            logging.info(f"Verified txns from {self._account.address()}")
             self._conn.send(True)
         except Exception as e:
             logging.error(
@@ -338,9 +341,11 @@ async def main():
     client_config.http2 = True
     rest_client = RestClient(NODE_URL, client_config)
 
-    num_accounts = 16
-    transactions = 10000
+    num_accounts = 64
+    transactions = 100000
     start = time.time()
+
+    logging.getLogger().setLevel(20)
 
     print("Starting...")
 

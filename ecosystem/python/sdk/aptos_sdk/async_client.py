@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import asyncio
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
@@ -53,7 +54,10 @@ class RestClient:
         # Default headers
         headers = {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
         self.client = httpx.AsyncClient(
-            http2=client_config.http2, limits=limits, timeout=timeout, headers=headers
+            http2=client_config.http2,
+            limits=limits,
+            timeout=timeout,
+            headers=headers,
         )
         self.client_config = client_config
         self._chain_id = None
@@ -139,6 +143,10 @@ class RestClient:
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
+
+    async def current_timestamp(self) -> float:
+        info = await self.info()
+        return float(info["ledger_timestamp"]) / 1_000_000
 
     async def get_table_item(
         self,
@@ -331,6 +339,20 @@ class RestClient:
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
+
+    async def account_transaction_sequence_number_status(
+        self, address: AccountAddress, sequence_number: int
+    ) -> bool:
+        """Retrieve the state of a transaction by account and sequence number."""
+
+        response = await self.client.get(
+            f"{self.base_url}/accounts/{address}/transactions?limit=1&start={sequence_number}"
+        )
+        if response.status_code >= 400:
+            logging.info(f"k {response}")
+            raise ApiError(response.text, response.status_code)
+        data = response.json()
+        return len(data) == 1 and data[0]["type"] != "pending_transaction"
 
     #
     # Transaction helpers
