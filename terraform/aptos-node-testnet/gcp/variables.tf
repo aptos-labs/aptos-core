@@ -154,7 +154,7 @@ variable "enable_forge" {
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 variable "monitoring_helm_values" {
@@ -165,7 +165,7 @@ variable "monitoring_helm_values" {
 
 variable "enable_prometheus_node_exporter" {
   description = "Enable prometheus-node-exporter within monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 ### Autoscaling
@@ -200,4 +200,16 @@ variable "gke_autoscaling_max_node_count" {
 variable "cluster_ipv4_cidr_block" {
   description = "The IP address range of the container pods in this cluster, in CIDR notation. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#cluster_ipv4_cidr_block"
   default     = ""
+}
+
+variable "gke_maintenance_policy" {
+  description = "The maintenance policy to use for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#maintenance_policy"
+  type = object({
+    recurring_window = object({
+      start_time = string
+      end_time   = string
+      recurrence = string
+    })
+  })
+  default = null
 }

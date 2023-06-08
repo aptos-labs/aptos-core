@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt};
+use crate::{system_metrics::SystemMetricsThreshold, Swarm, SwarmExt, TestReport};
 use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
@@ -78,6 +78,7 @@ impl SuccessCriteriaChecker {
     pub async fn check_for_success(
         success_criteria: &SuccessCriteria,
         swarm: &mut dyn Swarm,
+        report: &mut TestReport,
         stats: &TxnStats,
         window: Duration,
         start_time: i64,
@@ -86,7 +87,7 @@ impl SuccessCriteriaChecker {
         end_version: u64,
     ) -> anyhow::Result<()> {
         println!(
-            "End to end duration: {}s, while txn emitter lasted: {}s",
+            "End to end duration: {}s, performance measured for: {}s",
             window.as_secs(),
             stats.lasted.as_secs()
         );
@@ -131,9 +132,15 @@ impl SuccessCriteriaChecker {
         }
 
         if let Some(chain_progress_threshold) = &success_criteria.chain_progress_check {
-            Self::check_chain_progress(swarm, chain_progress_threshold, start_version, end_version)
-                .await
-                .context("Failed check chain progress")?;
+            Self::check_chain_progress(
+                swarm,
+                report,
+                chain_progress_threshold,
+                start_version,
+                end_version,
+            )
+            .await
+            .context("Failed check chain progress")?;
         }
 
         Ok(())
@@ -141,6 +148,7 @@ impl SuccessCriteriaChecker {
 
     async fn check_chain_progress(
         swarm: &mut dyn Swarm,
+        report: &mut TestReport,
         chain_progress_threshold: &StateProgressThreshold,
         start_version: u64,
         end_version: u64,
@@ -212,28 +220,24 @@ impl SuccessCriteriaChecker {
         }
 
         let max_time_gap_secs = Duration::from_micros(max_time_gap).as_secs_f32();
+
+        let gap_text = format!(
+            "Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
+            max_round_gap,
+            chain_progress_threshold.max_round_gap,
+            max_round_gap_version,
+            max_time_gap_secs,
+            chain_progress_threshold.max_no_progress_secs,
+            max_time_gap_version,
+        );
+
         if max_round_gap > chain_progress_threshold.max_round_gap
             || max_time_gap_secs > chain_progress_threshold.max_no_progress_secs
         {
-            bail!(
-                "Failed chain progress check. Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
-                max_round_gap,
-                chain_progress_threshold.max_round_gap,
-                max_round_gap_version,
-                max_time_gap_secs,
-                chain_progress_threshold.max_no_progress_secs,
-                max_time_gap_version,
-            )
+            bail!("Failed chain progress check. {}", gap_text);
         } else {
-            println!(
-                "Passed progress check. Max round gap was {} [limit {}] at version {}. Max no progress secs was {} [limit {}] at version {}.",
-                max_round_gap,
-                chain_progress_threshold.max_round_gap,
-                max_round_gap_version,
-                max_time_gap_secs,
-                chain_progress_threshold.max_no_progress_secs,
-                max_time_gap_version,
-            )
+            println!("Passed progress check. {}", gap_text);
+            report.report_text(gap_text);
         }
 
         Ok(())
@@ -261,6 +265,13 @@ impl SuccessCriteriaChecker {
                         latency_threshold.as_secs_f32()
                     )
                     .to_string(),
+                );
+            } else {
+                println!(
+                    "{:?} latency is {}s and is within limit of {}s",
+                    latency_type,
+                    latency.as_secs_f32(),
+                    latency_threshold.as_secs_f32()
                 );
             }
         }

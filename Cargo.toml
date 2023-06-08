@@ -100,6 +100,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
+    "execution/block-partitioner",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
@@ -147,6 +148,8 @@ members = [
     "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
+    "testsuite/fuzzer",
+    "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
     "testsuite/module-publish",
     "testsuite/smoke-test",
@@ -272,6 +275,7 @@ aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
+aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
@@ -282,6 +286,7 @@ aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
+fuzzer = { path = "testsuite/fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }

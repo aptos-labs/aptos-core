@@ -130,25 +130,6 @@ resource "google_compute_global_address" "testnet-addons-ingress" {
   name    = "aptos-${local.workspace_name}-testnet-addons-ingress"
 }
 
-# This kind of certificate is a GCE resource, and has to be
-# added to the ingress using ingress.gcp.kubernetes.io/pre-shared-cert.
-# K8s ManagedCertificate resources use
-# networking.gke.io/managed-certificates instead.
-resource "google_compute_managed_ssl_certificate" "testnet-addons" {
-  count   = var.zone_name != "" ? 1 : 0
-  project = var.project
-  name    = "aptos-${local.workspace_name}-testnet-addons"
-  lifecycle {
-    create_before_destroy = true
-  }
-  managed {
-    domains = [
-      "${local.domain}.",
-      "api.${local.domain}.",
-    ]
-  }
-}
-
 resource "helm_release" "testnet-addons" {
   count       = var.enable_forge ? 0 : 1
   name        = "testnet-addons"
@@ -171,8 +152,8 @@ resource "helm_release" "testnet-addons" {
         domain = local.domain
       }
       ingress = {
-        gcp_static_ip   = "aptos-${local.workspace_name}-testnet-addons-ingress"
-        gcp_certificate = "aptos-${local.workspace_name}-testnet-addons"
+        gce_static_ip           = "aptos-${local.workspace_name}-testnet-addons-ingress"
+        gce_managed_certificate = "aptos-${local.workspace_name}-testnet-addons"
       }
       load_test = {
         fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])

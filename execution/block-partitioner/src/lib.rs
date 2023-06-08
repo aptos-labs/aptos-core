@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
+
+pub mod sharded_block_partitioner;
+pub mod test_utils;
+pub mod types;
+
 use aptos_types::transaction::Transaction;
 
 pub trait BlockPartitioner: Send + Sync {

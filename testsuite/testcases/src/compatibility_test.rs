@@ -61,11 +61,8 @@ impl NetworkTest for SimpleValidatorUpgrade {
 
         // Generate some traffic
         let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
-        ctx.report.report_txn_stats(
-            format!("{}::liveness-check", self.name()),
-            &txn_stat,
-            duration,
-        );
+        ctx.report
+            .report_txn_stats(format!("{}::liveness-check", self.name()), &txn_stat);
 
         // Update the first Validator
         let msg = format!(
@@ -81,7 +78,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_txn_stats(
             format!("{}::single-validator-upgrade", self.name()),
             &txn_stat,
-            duration,
         );
 
         // Update the rest of the first batch
@@ -98,7 +94,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_txn_stats(
             format!("{}::half-validator-upgrade", self.name()),
             &txn_stat,
-            duration,
         );
 
         ctx.swarm().fork_check()?;
@@ -114,7 +109,6 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_txn_stats(
             format!("{}::rest-validator-upgrade", self.name()),
             &txn_stat,
-            duration,
         );
 
         let msg = "5. check swarm health".to_string();
