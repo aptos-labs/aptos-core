@@ -84,13 +84,13 @@ spec aptos_framework::aptos_account {
             global<coin::CoinStore<AptosCoin>>(account_addr_source).coin.value < amounts[i];
 
         // deposit properties
-        aborts_if exists i in 0..len(recipients): 
+        aborts_if exists i in 0..len(recipients):
             exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<coin::CoinStore<AptosCoin>>(recipients[i]).frozen;
 
         // guid properties
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             account::exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
     }
 
@@ -138,19 +138,19 @@ spec aptos_framework::aptos_account {
             global<coin::CoinStore<CoinType>>(account_addr_source).coin.value < amounts[i];
 
         // deposit properties
-        aborts_if exists i in 0..len(recipients): 
+        aborts_if exists i in 0..len(recipients):
             exists<coin::CoinStore<CoinType>>(recipients[i]) && global<coin::CoinStore<CoinType>>(recipients[i]).frozen;
 
         // guid properties
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             account::exists_at(recipients[i]) && !exists<coin::CoinStore<CoinType>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
 
         // register_coin properties
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             !coin::is_account_registered<CoinType>(recipients[i]) && !type_info::spec_is_struct<CoinType>();
-        aborts_if exists i in 0..len(recipients):  
+        aborts_if exists i in 0..len(recipients):
             !coin::is_account_registered<CoinType>(recipients[i]) && !can_receive_direct_coin_transfers(recipients[i]);
 
     }
