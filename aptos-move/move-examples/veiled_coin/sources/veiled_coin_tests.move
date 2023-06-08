@@ -227,7 +227,12 @@ module veiled_coin::veiled_coin_tests {
         let new_balance_comm = pedersen::new_commitment_for_bulletproof(&sender_new_balance, &zero_randomness);
         let new_balance_comm_bytes = pedersen::commitment_to_bytes(&new_balance_comm);
 
-        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(&sender_pk, &new_balance_ct, &new_balance_comm, &zero_randomness, &sender_new_balance);
+        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(
+            &sender_pk,
+            &new_balance_ct,
+            &new_balance_comm,
+            &zero_randomness,
+            &sender_new_balance);
         let sigma_proof_bytes = serialize_unveil_sigma_proof(&sigma_proof);
 
         println(b"about to unveil");

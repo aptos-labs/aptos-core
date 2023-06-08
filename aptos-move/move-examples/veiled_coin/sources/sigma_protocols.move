@@ -37,6 +37,7 @@ module veiled_coin::sigma_protocols {
 
     /// A $\Sigma$-protocol proof used as part of a `UnveiledWithdrawalProof`.
     /// (A more detailed description can be found in `unveil_sigma_protocol_verify`.)
+    /// TODO: rename more clearly
     struct ElGamalToPedSigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint,
@@ -48,6 +49,7 @@ module veiled_coin::sigma_protocols {
     /// A $\Sigma$-protocol proof used as part of a `VeiledTransferProof`.
     /// This proof encompasses the $\Sigma$-protocol from `ElGamalToPedSigmaProof`.
     /// (A more detailed description can be found in `verify_withdrawal_sigma_protocol`.)
+    /// TODO: rename more clearly
     struct FullSigmaProof<phantom CoinType> has drop {
         x1: RistrettoPoint,
         x2: RistrettoPoint,
@@ -201,10 +203,11 @@ module veiled_coin::sigma_protocols {
     }
 
     /// Verifies a $\Sigma$-protocol proof necessary to ensure correctness of a veiled-to-unveiled transfer.
-    /// Specifically, this proof proves that `sender_updated_balance_ct` and `sender_updated_balance_comm` encode the same amount $v$ using the same
-    /// randomness $r$, with `sender_pk` being used in `sender_updated_balance_ct`. This is necessary to prevent
-    /// the forgery of range proofs, as computing a range proof over the left half of an ElGamal ciphertext allows
-    /// a user with their secret key to create range proofs over false values.
+    /// Specifically, this proof proves that `sender_updated_balance_ct` and `sender_updated_balance_comm` encode the
+    /// same amount $v$ using the same randomness $r$, with `sender_pk` being used in `sender_updated_balance_ct`.
+    ///
+    /// This is necessary to prevent the forgery of range proofs, as computing a range proof over the left half of an
+    /// ElGamal ciphertext allows a user with their secret key to create range proofs over false values.
     ///
     /// # Cryptographic details
     ///
@@ -220,10 +223,11 @@ module veiled_coin::sigma_protocols {
     /// The public statement $x$ in this relation consists of:
     ///  - $G$, the basepoint of a given elliptic curve
     ///  - $Y$, the sender's PK
-    ///  - $(c1, c2)$, the ElGamal ecnryption of the sender's updated balance $b$ with updated randomness $r$ after their transaction is sent
+    ///  - $(c1, c2)$, the ElGamal ecnryption of the sender's updated balance $b$ with updated randomness $r$ after
+    ///    their transaction is sent
     ///  - $c$, the Pedersen commitment to $b$ with randomness $r$, using fixed randomness base $H$
     ///
-    /// The previse relation being proved is as follows:
+    /// The relation being proved is as follows:
     ///
     /// ```
     /// R(
@@ -231,11 +235,12 @@ module veiled_coin::sigma_protocols {
     ///     w = [ b, r ]
     /// ) = {
     ///     c1 = r * G
-    ///     c2 = b * g + r * y
-    ///     c = b * g + r * h
+    ///     c2 = b * G + r * Y
+    ///     c = b * G + r * H
     /// }
     /// ```
-    public fun verify_unveil_sigma_prof<CoinType>(
+    /// TODO: remove the "sigma" from the name, since it's already in the module name
+    public fun verify_unveil_sigma_proof<CoinType>(
         sender_pk: &elgamal::CompressedPubkey,
         sender_updated_balance_ct: &elgamal::Ciphertext,
         sender_updated_balance_comm: &pedersen::Commitment,
@@ -773,7 +778,7 @@ module veiled_coin::sigma_protocols {
     }
 
     //
-    // Full sigma proof verification tests
+    // Sigma proof verification tests
     //
 
     #[test]
@@ -852,6 +857,36 @@ module veiled_coin::sigma_protocols {
         sigma_proof.x1 = random_point;
 
         verify_full_sigma_proof(&source_pk, &dest_pk, &withdraw_ct, &deposit_ct, &updated_balance_ct, &updated_balance_comm, &value_comm, &sigma_proof);
+    }
+
+    #[test]
+    fun verify_unveil_sigma_proof_test()
+    {
+        // Pick a keypair for the sender
+        let (_, sender_pk) = generate_elgamal_keypair();
+
+        // Set the transferred amount to 50
+        let balance = ristretto255::new_scalar_from_u32(50);
+        let rand = ristretto255::random_scalar();
+        // Encrypt the amount under the sender's PK
+        let balance_ct = elgamal::new_ciphertext_with_basepoint(&balance, &rand, &sender_pk);
+
+        let balance_comm = pedersen::new_commitment_for_bulletproof(&balance, &rand);
+
+        let sigma_proof = prove_unveil_sigma_proof<coin::FakeMoney>(
+            &sender_pk,
+            &balance_ct,
+            &balance_comm,
+            &rand,
+            &balance,
+        );
+
+        verify_unveil_sigma_proof(
+            &sender_pk,
+            &balance_ct,
+            &balance_comm,
+            &sigma_proof
+        );
     }
 
     //

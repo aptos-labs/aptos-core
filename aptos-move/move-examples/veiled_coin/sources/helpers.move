@@ -30,10 +30,10 @@ module veiled_coin::helpers {
 
     /// Returns an encryption of `amount`, without any randomness (i.e., $r=0$), under any ElGamal PK.
     /// WARNING: This is not a proper ciphertext: the value `amount` can be easily bruteforced.
-    public fun amount_to_veiled_balance_ciphertext(amount: u32): (ristretto255::Scalar, elgamal::Ciphertext) {
+    public fun public_amount_to_veiled_balance(amount: u32): elgamal::Ciphertext {
         let scalar = ristretto255::new_scalar_from_u32(amount);
 
-        (scalar, elgamal::new_ciphertext_no_randomness(&scalar))
+        elgamal::new_ciphertext_no_randomness(&scalar)
     }
 
     #[test_only]

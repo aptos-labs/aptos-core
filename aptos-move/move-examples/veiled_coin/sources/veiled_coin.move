@@ -38,6 +38,9 @@
 /// 5. *Veiled balance*: unlike a normal balance, a veiled balance is secret; i.e., it is encrypted under the account's
 ///    public key.
 ///
+/// 6. *ZKRP*: zero-knowledge range proofs; one of the key cryptographic ingredient in veiled coins which ensures users
+///    can withdraw secretely from their veiled balance without over-withdrawing.
+///
 /// ## Limitations
 ///
 /// **WARNING:** This module is **experimental**! It is *NOT* production-ready. Specifically:
@@ -112,11 +115,9 @@ module veiled_coin::veiled_coin {
     use aptos_framework::event::{Self, EventHandle};
 
     use veiled_coin::helpers;
-    use veiled_coin::sigma_protocols::{
-        ElGamalToPedSigmaProof, FullSigmaProof,
-        deserialize_full_sigma_proof, deserialize_unveil_sigma_proof,
-        verify_full_sigma_proof, // TODO: verify_unveil_sigma_proof,
-    };
+
+    // TODO: import Self, remove "sigma" from a lot of these names and use in this module as "sigma_protos::<bla>" (or "sigmas::") for clarity
+    use veiled_coin::sigma_protocols::{ElGamalToPedSigmaProof, FullSigmaProof, deserialize_full_sigma_proof, deserialize_unveil_sigma_proof, verify_full_sigma_proof, verify_unveil_sigma_proof};
 
     //
     // Errors
@@ -198,16 +199,18 @@ module veiled_coin::veiled_coin {
     }
 
     /// A cryptographic proof that ensures correctness of a veiled-to-veiled coin transfer.
+    /// TODO: rename to TransferProof
     struct VeiledTransferProof<phantom CoinType> has drop {
         sigma_proof: FullSigmaProof<CoinType>,
-        new_balance_proof: RangeProof,
-        veiled_amount_proof: RangeProof,
+        zkrp_new_balance: RangeProof,
+        zkrp_amount: RangeProof,
     }
 
     /// A cryptographic proof that ensures correctness of a veiled-to-*unveiled* coin transfer.
+    /// TODO: rename to WithdrawalProof
     struct UnveiledWithdrawalProof<phantom CoinType> has drop {
         sigma_proof: ElGamalToPedSigmaProof<CoinType>,
-        new_balance_proof: RangeProof,
+        zkrp_new_balance: RangeProof,
     }
 
     /// Event emitted when some amount of veiled coins were deposited into an account.
@@ -284,8 +287,8 @@ module veiled_coin::veiled_coin {
     /// Takes a *public* `amount` of `VeiledCoin<CoinType>` coins from `sender`, unwraps them to a `coin::Coin<CoinType>`,
     /// and sends them to `recipient`. Maintains secrecy of `sender`'s new balance.
     ///
-    /// Requires a range proof on the new balance of the sender, to ensure the sender has enough money to send.
-    /// No range proof is necessary for the `amount`, which is given as a public `u32` value.
+    /// Requires a ZK range proof on the new balance of the sender, to ensure the sender has enough money to send.
+    /// No ZK range proof is necessary for the `amount`, which is given as a public `u32` value.
     ///
     /// **WARNING:** This *leaks* the transferred `amount`, since it is a public `u32` argument.
     public entry fun unveil_to<CoinType>(
@@ -293,70 +296,67 @@ module veiled_coin::veiled_coin {
         recipient: address,
         amount: u32,
         comm_new_balance: vector<u8>,
-        range_proof_new_balance: vector<u8>,
+        zkrp_new_balance: vector<u8>,
         unveil_sigma_proof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
         // Deserialize all the proofs into their proper Move structs
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
         assert!(std::option::is_some(&comm_new_balance), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        let new_balance_proof = bulletproofs::range_proof_from_bytes(range_proof_new_balance);
         let sigma_proof = deserialize_unveil_sigma_proof<CoinType>(unveil_sigma_proof);
         assert!(std::option::is_some(&sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
 
+        let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
+
         let unveil_proof = UnveiledWithdrawalProof {
             sigma_proof: std::option::extract(&mut sigma_proof),
-            new_balance_proof,
+            zkrp_new_balance,
         };
 
         let comm_new_balance = std::option::extract(&mut comm_new_balance);
 
-        // Using the proofs parsed above, attempt to withdraw a normal coin from the veiled balance of `sender`.
-        let c = unveiled_withdraw<CoinType>(
-            sender,
-            amount,
-            &comm_new_balance,
-            &unveil_proof);
-
-        // If the widthrawal of a normal coin succeed, deposit it in the recipient's
-        coin::deposit<CoinType>(recipient, c);
+        // Do the actual work
+        unveil_to_internal(sender, recipient, amount, comm_new_balance, unveil_proof);
     }
 
     /// Like `unveil_to`, except the `sender` is also the recipient.
     public entry fun unveil<CoinType>(
         sender: &signer,
         amount: u32,
-        pedersen_comm_new_balance: vector<u8>,
-        range_proof_new_balance: vector<u8>,
+        comm_new_balance: vector<u8>,
+        zkrp_new_balance: vector<u8>,
         unveil_sigma_proof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-        unveil_to<CoinType>(sender, signer::address_of(sender), amount, pedersen_comm_new_balance, range_proof_new_balance, unveil_sigma_proof)
+        unveil_to<CoinType>(sender, signer::address_of(sender), amount, comm_new_balance, zkrp_new_balance, unveil_sigma_proof)
     }
 
-    /// Sends a *veiled* `amount` from `sender` to `recipient`. After this call, the balance of the `sender`
+    /// Sends a *veiled* amount from `sender` to `recipient`. After this call, the balance of the `sender`
     /// and `recipient` remains (or becomes) secret.
     ///
     /// The sent amount remains secret; It is encrypted both under the sender's PK (in `withdraw_ct`) and under the
-    /// recipient's PK (in `deposit_ct`) using the *same* ElGamal randomness.
+    /// recipient's PK (in `deposit_ct`) using the *same* ElGamal randomness, so as to allow for efficiently updating both
+    /// the sender's & recipient's veiled balances. It is also committed under `comm_amount`, so as to allow for a ZK
+    /// range proof.
     ///
     /// Requires a `VeiledTransferProof`; i.e.:
-    /// 1. A range proof on the new balance of the sender, to ensure the sender has enough money to send (in
-    ///    `range_proof_new_balance`),
-    /// 2. A range proof on the transferred amount in `withdraw_ct`, to ensure the sender won't create coins out of thin
-    ///    air (in `range_proof_veiled_amount`),
-    /// 3. A $\Sigma$-protocol to prove that 'veiled_withdraw_amount' encrypts the same veiled amount as
-    ///    'veiled_deposit_amount' with the same randomness (in `sigma_proof_bytes`).
+    /// 1. A range proof `zkrp_new_balance` on the new balance of the sender, to ensure the sender has enough money to
+    ///    send.
+    /// 2. A range proof `zkrp_amount` on the transferred amount in `comm_amount`, to ensure the sender won't create
+    ///    coins out of thin air.
+    /// 3. A $\Sigma$-protocol proof  `full_sigma_proof` which prove that 'withdraw_ct' encrypts the same veiled amount
+    ///    as in 'deposit_ct' (with the same randomness) and as in `comm_amount`.
     public entry fun fully_veiled_transfer<CoinType>(
         sender: &signer,
         recipient: address,
         withdraw_ct: vector<u8>,
         deposit_ct: vector<u8>,
         comm_new_balance: vector<u8>,
-        transfer_value_comm: vector<u8>,
-        range_proof_new_balance: vector<u8>,
-        range_proof_veiled_amount: vector<u8>,
-        sigma_proof_bytes: vector<u8>) acquires VeiledCoinStore
+        comm_amount: vector<u8>,
+        zkrp_new_balance: vector<u8>,
+        zkrp_amount: vector<u8>,
+        full_sigma_proof: vector<u8>) acquires VeiledCoinStore
     {
+        // Deserialize everything into their proper Move structs
         let veiled_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
         assert!(std::option::is_some(&veiled_withdraw_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
 
@@ -366,34 +366,27 @@ module veiled_coin::veiled_coin {
         let comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
         assert!(std::option::is_some(&comm_new_balance), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        let transfer_value = pedersen::new_commitment_from_bytes(transfer_value_comm);
-        assert!(std::option::is_some(&transfer_value), error::invalid_argument(EDESERIALIZATION_FAILED));
+        let comm_amount = pedersen::new_commitment_from_bytes(comm_amount);
+        assert!(std::option::is_some(&comm_amount), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        // This $\Sigma$-protocol proofs proves that `veiled_withdraw_amount` encrypts the same value using the same
-        // randomness as `veiled_deposit_amount` (i.e., the amount being transferred). These two ciphertexts are
-        // required as we need to update both the sender's and the recipient's balances, which use different public keys
-        // and so must be updated with ciphertexts encrypted under their respective public keys.
-        let sigma_proof = deserialize_full_sigma_proof<CoinType>(sigma_proof_bytes);
-        assert!(std::option::is_some(&sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
+        let full_sigma_proof = deserialize_full_sigma_proof<CoinType>(full_sigma_proof);
+        assert!(std::option::is_some(&full_sigma_proof), error::invalid_argument(EDESERIALIZATION_FAILED));
 
-        // Requires a range proof on the new balance of the sender, to ensure the sender has enough money to send, in
-        // addition to a  range proof on the transferred amount.
-        let new_balance_proof = bulletproofs::range_proof_from_bytes(range_proof_new_balance);
-        let veiled_amount_proof = bulletproofs::range_proof_from_bytes(range_proof_veiled_amount);
 
         let transfer_proof = VeiledTransferProof {
-            new_balance_proof,
-            veiled_amount_proof,
-            sigma_proof: std::option::extract(&mut sigma_proof)
+            zkrp_new_balance: bulletproofs::range_proof_from_bytes(zkrp_new_balance),
+            zkrp_amount: bulletproofs::range_proof_from_bytes(zkrp_amount),
+            sigma_proof: std::option::extract(&mut full_sigma_proof)
         };
 
+        // Do the actual work
         fully_veiled_transfer_internal<CoinType>(
             sender,
             recipient,
             std::option::extract(&mut veiled_withdraw_amount),
             std::option::extract(&mut veiled_deposit_amount),
             std::option::extract(&mut comm_new_balance),
-            std::option::extract(&mut transfer_value),
+            std::option::extract(&mut comm_amount),
             &transfer_proof,
         )
     }
@@ -513,14 +506,14 @@ module veiled_coin::veiled_coin {
         // Fetch the veiled balance
         let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
-        // Subtract the veiled amount from it, homomorphically
+        // Add the veiled amount to the veiled balance (leverages the homomorphism of the encryption scheme)
         elgamal::ciphertext_add_assign(&mut veiled_balance, &coin.veiled_amount);
 
         // Update the veiled balance
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Make sure the veiled coin is dropped so it cannot be double spent
-        drop_veiled_coin(coin);
+        let VeiledCoin<CoinType> { veiled_amount: _ } = coin;
 
         // Once successful, emit an event that a veiled deposit occurred.
         event::emit_event<DepositEvent>(
@@ -529,108 +522,54 @@ module veiled_coin::veiled_coin {
         );
     }
 
-    /// Removes a *public* `amount` of veiled coins from `sender` and returns them as a normal `coin::Coin`.
-    ///
-    /// Requires a ZK range proof on the new balance of the `sender`, to ensure the `sender` has enough money to send.
-    /// Since the `amount` is public, no ZK range proof on it is required.
-    ///
-    /// **WARNING:** This function *leaks* the public `amount`.
-    public fun unveiled_withdraw<CoinType>(
+    /// Like `unveil_to`, except the proofs have been deserialized into their respective structs.
+    public fun unveil_to_internal<CoinType>(
         sender: &signer,
+        recipient: address,
         amount: u32,
-        comm_new_balance: &pedersen::Commitment,
-        unveil_proof: &UnveiledWithdrawalProof<CoinType>): Coin<CoinType> acquires VeiledCoinStore, VeiledCoinMinter
-    {
+        comm_new_balance: pedersen::Commitment,
+        unveil_proof: UnveiledWithdrawalProof<CoinType>
+    ) acquires VeiledCoinStore, VeiledCoinMinter {
+        // Fetch the sender's PK and veild balance
         let addr = signer::address_of(sender);
-
         assert!(has_veiled_coin_store<CoinType>(addr), error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED));
+        let veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
+        let sender_pk = veiled_coin_store.pk;
+        let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
 
         // Create a (not-yet-secure) encryption of `amount`, since `amount` is a public argument here.
-        let (scalar_amount, veiled_amount) = helpers::amount_to_veiled_balance_ciphertext(amount);
-        let veiled_amount_comm = pedersen::new_commitment_for_bulletproof(&scalar_amount, &ristretto255::scalar_zero());
+        let veiled_amount = helpers::public_amount_to_veiled_balance(amount);
 
-        // Withdraw this public encrypted `amount` from the veiled balance.
-        let veiled_coin_store = borrow_global_mut<VeiledCoinStore<CoinType>>(addr);
-
-        let veiled_balance = elgamal::decompress_ciphertext(&veiled_coin_store.veiled_balance);
+        // Withdraw `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
         elgamal::ciphertext_sub_assign(&mut veiled_balance, &veiled_amount);
 
-        // Since `veiled_amount` was created from a `u32` public `amount`, no ZK range proof is needed for it.
-        veiled_withdraw(&veiled_amount_comm, veiled_coin_store, &veiled_balance, comm_new_balance,
-            &unveil_proof.new_balance_proof, &std::option::none());
+        // Verify that `comm_new_balance` is a commitment to the remaing balance after withdrawing `amount`.
+        verify_unveil_sigma_proof(
+            &sender_pk,
+            &veiled_balance,
+            &comm_new_balance,
+            &unveil_proof.sigma_proof);
 
-        // Note: If the above `withdraw` aborts, the whole TXN aborts, so there are no atomicity issues.
-        coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount))
-    }
-
-    /// Withdraws a `veiled_amount` of coins from the specified coin store. Let `balance` denote its current
-    /// *veiled* balance.
-    ///
-    /// **WARNING:** This function assumes that `veiled_amount` is correctly encrypted under the sender's PK. This
-    /// is the case when either (1) the amount was veiled correctly from a public value or (2) a $\Sigma$-protocol proof
-    /// over `veiled_amount` verified successfully.
-    /// TODO: comment update `veiled_amount`
-    ///
-    /// Always requires a ZK range proof `new_balance_proof` on `balance - amount`. When the veiled amount was NOT
-    /// created from a public value, additionally requires a ZK range proof `veiled_amount_proof` on `amount`.
-    public fun veiled_withdraw<CoinType>(
-        veiled_amount_comm: &pedersen::Commitment,
-        coin_store: &mut VeiledCoinStore<CoinType>,
-        updated_veiled_balance: &elgamal::Ciphertext,
-        comm_new_balance: &pedersen::Commitment,
-        new_balance_proof: &RangeProof,
-        veiled_amount_proof: &Option<RangeProof>)
-    {
-        // This function checks if it is possible to withdraw a veiled `amount` from a veiled `bal`, obtaining a new
-        // veiled balance `new_bal = bal - amount`. It maintains an invariant that `new_bal \in [0, 2^{32})` as follows.
-        //
-        //  1. We assume (by the invariant) that `bal \in [0, 2^{32})`.
-        //
-        //  2. We verify a ZK range proof that `amount \in [0, 2^{32})`. Otherwise, a sender could set `amount = p-1`
-        //     where `p` is the order of the scalar field, which would give `new_bal = bal - (p-1) mod p = bal + 1`.
-        //     Therefore, a malicious spender could create coins out of thin air for themselves.
-        //
-        //  3. We verify a ZK range proof that `new_bal \in [0, 2^{32})`. Otherwise, a sender could set `amount = bal + 1`,
-        //     which would satisfy condition (2) from above but would give `new_bal = bal - (bal + 1) = -1`. Therefore,
-        //     a malicious spender could spend more coins than they have.
-        //
-        // Altogether, these checks ensure that `bal - amount >= 0` (as integers) and therefore that `bal >= amount`
-        // (again, as integers).
-        //
-        // When the caller of this function created the `veiled_amount` from a public `u32` value, the
-        // `veiled_amount_proof` range proof is no longer necessary since the caller guarantees that condition (2) from
-        // above holds.
-
-        // Checks range condition (3)
-        assert!(
-            bulletproofs::verify_range_proof_pedersen(
-                comm_new_balance,
-                new_balance_proof,
-                MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
-            ),
-            error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
-        );
-
-        // Checks range condition (2), if the veiled amount did not originate from a public amount
-        if (std::option::is_some(veiled_amount_proof)) {
-            assert!(
-                bulletproofs::verify_range_proof_pedersen(
-                    veiled_amount_comm,
-                    std::option::borrow(veiled_amount_proof),
-                    MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
-                ),
-                error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
-            );
-        };
+        // Verify a ZK range proof on `comm_new_balance`
+        verify_range_proofs(
+            &comm_new_balance,
+            &unveil_proof.zkrp_new_balance,
+            &std::option::none(),
+            &std::option::none());
 
         // Update the veiled balance to reflect the veiled withdrawal
-        coin_store.veiled_balance = elgamal::compress_ciphertext(updated_veiled_balance);
+        veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
-        // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
+        // Emit event to indicate a veiled withdrawal occurred
         event::emit_event<WithdrawEvent>(
-            &mut coin_store.withdraw_events,
+            &mut veiled_coin_store.withdraw_events,
             WithdrawEvent { },
         );
+
+        // Withdraw as normal `Coin`'s from the resource account and deposit it in the recipient's
+        let c = coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount));
+
+        coin::deposit<CoinType>(recipient, c);
     }
 
     /// Like `fully_veiled_transfer`, except the ciphertext and proofs have been deserialized into their respective structs.
@@ -640,7 +579,7 @@ module veiled_coin::veiled_coin {
         veiled_withdraw_amount: elgamal::Ciphertext,
         veiled_deposit_amount: elgamal::Ciphertext,
         comm_new_balance: pedersen::Commitment,
-        veiled_amount_comm: pedersen::Commitment,
+        comm_amount: pedersen::Commitment,
         transfer_proof: &VeiledTransferProof<CoinType>) acquires VeiledCoinStore
     {
         let sender_addr = signer::address_of(sender);
@@ -665,17 +604,24 @@ module veiled_coin::veiled_coin {
             &veiled_deposit_amount,
             &veiled_balance,
             &comm_new_balance,
-            &veiled_amount_comm,
+            &comm_amount,
             &transfer_proof.sigma_proof);
 
-        // Verifies the range proofs in `transfer_proof` and withdraws `veiled_withdraw_amount` from the `sender`'s account.
-        veiled_withdraw<CoinType>(
-            &veiled_amount_comm,
-            sender_veiled_coin_store,
-            &veiled_balance,
+        // Verifies the range proofs in `transfer_proof`
+        verify_range_proofs(
             &comm_new_balance,
-            &transfer_proof.new_balance_proof,
-            &std::option::some(transfer_proof.veiled_amount_proof));
+            &transfer_proof.zkrp_new_balance,
+            &std::option::some(comm_amount),
+            &std::option::some(transfer_proof.zkrp_amount));
+
+        // Update the veiled balance to reflect the veiled withdrawal
+        sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
+
+        // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
+        event::emit_event<WithdrawEvent>(
+            &mut sender_veiled_coin_store.withdraw_events,
+            WithdrawEvent { },
+        );
 
         // Creates a new veiled coin for the recipient.
         let vc = VeiledCoin<CoinType> { veiled_amount: veiled_deposit_amount };
@@ -685,9 +631,70 @@ module veiled_coin::veiled_coin {
         veiled_deposit(recipient_addr, vc);
     }
 
+    /// Verifies range proofs on the transferred amount committed inside `comm_amount` and the remaining balance of an
+    /// account committed in `comm_new_balance`.
+    public fun verify_range_proofs(
+        comm_new_balance: &pedersen::Commitment,
+        zkrp_new_balance: &RangeProof,
+        comm_amount: &Option<pedersen::Commitment>,
+        zkrp_amount: &Option<RangeProof>
+    ) {
+        // Let `amount` denote the amount committed in `comm_amount` and `new_bal` the balance committed in `comm_new_balance`.
+        //
+        // This function checks if it is possible to withdraw a veiled `amount` from a veiled `bal`, obtaining a new
+        // veiled balance `new_bal = bal - amount`. This function is used to maintains a key safety invariant throughout
+        // the veild coin code: i.e., that every account has `new_bal \in [0, 2^{32})`.
+        //
+        // This invariant is enforced as follows:
+        //
+        //  1. We assume (by the invariant) that `bal \in [0, 2^{32})`.
+        //
+        //  2. We verify a ZK range proof that `amount \in [0, 2^{32})`. Otherwise, a sender could set `amount = p-1`
+        //     where `p` is the order of the scalar field, which would give `new_bal = bal - (p-1) mod p = bal + 1`.
+        //     Therefore, a malicious spender could create coins out of thin air for themselves.
+        //
+        //  3. We verify a ZK range proof that `new_bal \in [0, 2^{32})`. Otherwise, a sender could set `amount = bal + 1`,
+        //     which would satisfy condition (2) from above but would give `new_bal = bal - (bal + 1) = -1`. Therefore,
+        //     a malicious spender could spend more coins than they have.
+        //
+        // Altogether, these checks ensure that `bal - amount >= 0` (as integers) and therefore that `bal >= amount`
+        // (again, as integers).
+        //
+        // When the caller of this function created the `comm_amount` from a public `u32` value, it is guaranteed that
+        // condition (2) from above holds, so no range proof is necessary. This happens when withdrawing a public
+        // amount from a veiled balance via `unveil_to` or `unveil`.
+
+        // Checks that the remaining balance is >= 0; i.e., range condition (3)
+        assert!(
+            bulletproofs::verify_range_proof_pedersen(
+                comm_new_balance,
+                zkrp_new_balance,
+                MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
+            ),
+            error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
+        );
+
+        // Checks that the transferred amount is in range (when this amount did not originate from a public amount); i.e., range condition (2)
+        if (std::option::is_some(zkrp_amount)) {
+            assert!(
+                bulletproofs::verify_range_proof_pedersen(
+                    std::option::borrow(comm_amount),
+                    std::option::borrow(zkrp_amount),
+                    MAX_BITS_IN_VEILED_COIN_VALUE, VEILED_COIN_BULLETPROOFS_DST
+                ),
+                error::out_of_range(ERANGE_PROOF_VERIFICATION_FAILED)
+            );
+        };
+    }
+
     //
     // Private functions.
     //
+
+    /// Returns a signer for the resource account storing all the normal coins that have been veiled.
+    fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
+        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
+    }
 
     /// Mints a veiled coin from a normal coin, shelving the normal coin into the resource account's coin store.
     ///
@@ -713,20 +720,9 @@ module veiled_coin::veiled_coin {
         coin::deposit(rsrc_acc_addr, c);
 
         // ...and mint a veiled coin, which is backed by the normal coin
-        let (_, ctxt) = helpers::amount_to_veiled_balance_ciphertext(value_u32);
         VeiledCoin<CoinType> {
-            veiled_amount: ctxt
+            veiled_amount: helpers::public_amount_to_veiled_balance(value_u32)
         }
-    }
-
-    /// Returns a signer for the resource account storing all the normal coins that have been veiled.
-    fun get_resource_account_signer(): signer acquires VeiledCoinMinter {
-        account::create_signer_with_capability(&borrow_global<VeiledCoinMinter>(@veiled_coin).signer_cap)
-    }
-
-    /// Used internally to drop veiled coins that were split or joined.
-    fun drop_veiled_coin<CoinType>(c: VeiledCoin<CoinType>) {
-        let VeiledCoin<CoinType> { veiled_amount: _ } = c;
     }
 
     //
