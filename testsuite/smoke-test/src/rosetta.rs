@@ -1647,7 +1647,7 @@ async fn parse_operations(
                     panic!("Not a user transaction");
                 }
             },
-            OperationType::WithdrawUndelegated => {
+            OperationType::WithdrawUndelegatedFunds => {
                 if actual_successful {
                     assert_eq!(
                         OperationStatusType::Success,
