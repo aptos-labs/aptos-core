@@ -246,13 +246,24 @@ fn put_txn_in_store(
         .write_schemas(transaction_batch)
         .unwrap();
     let transaction_info_batch = SchemaBatch::new();
+    let transaction_accumulator_batch = SchemaBatch::new();
     ledger_store
-        .put_transaction_infos(0, txn_infos, &transaction_info_batch)
+        .put_transaction_infos(
+            0,
+            txn_infos,
+            &transaction_info_batch,
+            &transaction_accumulator_batch,
+        )
         .unwrap();
     aptos_db
         .ledger_db
         .transaction_info_db()
         .write_schemas(transaction_info_batch)
+        .unwrap();
+    aptos_db
+        .ledger_db
+        .transaction_accumulator_db()
+        .write_schemas(transaction_accumulator_batch)
         .unwrap();
 }
 

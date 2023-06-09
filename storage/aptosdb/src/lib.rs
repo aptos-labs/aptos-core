@@ -277,6 +277,16 @@ impl Drop for RocksdbPropertyReporter {
     }
 }
 
+#[derive(Default)]
+struct LedgerSchemaBatches {
+    ledger_metadata_batch: SchemaBatch,
+    event_batch: SchemaBatch,
+    transaction_batch: SchemaBatch,
+    transaction_info_batch: SchemaBatch,
+    transaction_accumulator_batch: SchemaBatch,
+    write_set_batch: SchemaBatch,
+}
+
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 pub struct AptosDB {
@@ -833,12 +843,13 @@ impl AptosDB {
         first_version: u64,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<(SchemaBatch, ShardedStateKvSchemaBatch, HashValue)> {
+    ) -> Result<(LedgerSchemaBatches, ShardedStateKvSchemaBatch, HashValue)> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_impl"])
             .start_timer();
 
-        let ledger_batch = SchemaBatch::new();
+        let ledger_schema_batches = LedgerSchemaBatches::default();
+
         let sharded_state_kv_batches = new_sharded_kv_schema_batch();
 
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -861,7 +872,7 @@ impl AptosDB {
                     first_version,
                     expected_state_db_usage,
                     sharded_state_cache,
-                    &ledger_batch,
+                    &ledger_schema_batches.ledger_metadata_batch,
                     &sharded_state_kv_batches,
                 )
             });
@@ -876,7 +887,7 @@ impl AptosDB {
                         self.event_store.put_events(
                             ver,
                             txn_to_commit.borrow().events(),
-                            &ledger_batch,
+                            &ledger_schema_batches.event_batch,
                         )
                     })
                     .collect::<Result<Vec<_>>>()
@@ -892,12 +903,12 @@ impl AptosDB {
                         self.transaction_store.put_transaction(
                             ver,
                             txn_to_commit.borrow().transaction(),
-                            &ledger_batch,
+                            &ledger_schema_batches.transaction_batch,
                         )?;
                         self.transaction_store.put_write_set(
                             ver,
                             txn_to_commit.borrow().write_set(),
-                            &ledger_batch,
+                            &ledger_schema_batches.write_set_batch,
                         )
                     },
                 )?;
@@ -907,14 +918,23 @@ impl AptosDB {
                     .map(|t| t.borrow().transaction_info())
                     .cloned()
                     .collect();
-                self.ledger_store
-                    .put_transaction_infos(first_version, &txn_infos, &ledger_batch)
+                self.ledger_store.put_transaction_infos(
+                    first_version,
+                    &txn_infos,
+                    &ledger_schema_batches.transaction_info_batch,
+                    &ledger_schema_batches.transaction_accumulator_batch,
+                )
             });
             t0.join().unwrap()?;
             t1.join().unwrap()?;
             t2.join().unwrap()
         });
-        Ok((ledger_batch, sharded_state_kv_batches, new_root_hash?))
+
+        Ok((
+            ledger_schema_batches,
+            sharded_state_kv_batches,
+            new_root_hash?,
+        ))
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
@@ -995,7 +1015,7 @@ impl AptosDB {
     fn commit_ledger_and_state_kv_db(
         &self,
         last_version: Version,
-        ledger_batch: SchemaBatch,
+        ledger_schema_batches: LedgerSchemaBatches,
         sharded_state_kv_batches: ShardedStateKvSchemaBatch,
         new_root_hash: HashValue,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -1005,10 +1025,6 @@ impl AptosDB {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["save_transactions_commit"])
             .start_timer();
-        ledger_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerCommitProgress,
-            &DbMetadataValue::Version(last_version),
-        )?;
 
         COMMIT_POOL.scope(|s| {
             // TODO(grao): Consider propagating the error instead of panic, if necessary.
@@ -1020,16 +1036,70 @@ impl AptosDB {
                     .commit(last_version, sharded_state_kv_batches)
                     .unwrap();
             });
-            // To the best of our current understanding, these tasks are scheduled in
-            // LIFO order, so put the ledger commit at the end since it's slower.
             s.spawn(|_| {
                 let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___ledger_commit"])
+                    .with_label_values(&["save_transactions_commit___ledger_metadata_commit"])
                     .start_timer();
-                // TODO(grao): Support splitted ledger DBs here.
+                ledger_schema_batches
+                    .ledger_metadata_batch
+                    .put::<DbMetadataSchema>(
+                        &DbMetadataKey::LedgerCommitProgress,
+                        &DbMetadataValue::Version(last_version),
+                    )
+                    .unwrap();
                 self.ledger_db
                     .metadata_db()
-                    .write_schemas(ledger_batch)
+                    .write_schemas(ledger_schema_batches.ledger_metadata_batch)
+                    .unwrap();
+            });
+
+            // TODO(grao): Write progress for each of the following databases, and handle the
+            // inconsistency at the startup time.
+            s.spawn(|_| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_commit___event_commit"])
+                    .start_timer();
+                self.ledger_db
+                    .event_db()
+                    .write_schemas(ledger_schema_batches.event_batch)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_commit___write_set_commit"])
+                    .start_timer();
+                self.ledger_db
+                    .write_set_db()
+                    .write_schemas(ledger_schema_batches.write_set_batch)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_commit___transaction_commit"])
+                    .start_timer();
+                self.ledger_db
+                    .transaction_db()
+                    .write_schemas(ledger_schema_batches.transaction_batch)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["save_transactions_commit___transaction_info_commit"])
+                    .start_timer();
+                self.ledger_db
+                    .transaction_info_db()
+                    .write_schemas(ledger_schema_batches.transaction_info_batch)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&[
+                        "save_transactions_commit___transaction_accumulator_commit",
+                    ])
+                    .start_timer();
+                self.ledger_db
+                    .transaction_accumulator_db()
+                    .write_schemas(ledger_schema_batches.transaction_accumulator_batch)
                     .unwrap();
             });
         });
@@ -1911,7 +1981,7 @@ impl DbWriter for AptosDB {
                 &latest_in_memory_state,
             )?;
 
-            let (ledger_batch, sharded_state_kv_batches, new_root_hash) = self
+            let (ledger_schema_batches, sharded_state_kv_batches, new_root_hash) = self
                 .save_transactions_impl(
                     txns_to_commit,
                     first_version,
@@ -1924,7 +1994,7 @@ impl DbWriter for AptosDB {
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
                 self.commit_ledger_and_state_kv_db(
                     last_version,
-                    ledger_batch,
+                    ledger_schema_batches,
                     sharded_state_kv_batches,
                     new_root_hash,
                     ledger_info_with_sigs,
@@ -1978,7 +2048,9 @@ impl DbWriter for AptosDB {
                 &latest_in_memory_state,
             )?;
 
-            let (ledger_batch, sharded_state_kv_batches, new_root_hash) = self
+            // TODO(grao): Schedule tasks in save_transactions_impl and
+            // commit_ledger_and_state_kv_db in a different way to make them more parallelizable.
+            let (ledger_schema_batches, sharded_state_kv_batches, new_root_hash) = self
                 .save_transactions_impl(
                     txns_to_commit,
                     first_version,
@@ -1989,9 +2061,10 @@ impl DbWriter for AptosDB {
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
+
                 self.commit_ledger_and_state_kv_db(
                     last_version,
-                    ledger_batch,
+                    ledger_schema_batches,
                     sharded_state_kv_batches,
                     new_root_hash,
                     ledger_info_with_sigs,

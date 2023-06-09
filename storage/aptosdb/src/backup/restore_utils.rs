@@ -223,10 +223,11 @@ pub(crate) fn save_transactions_impl(
     state_kv_batches: &mut ShardedStateKvSchemaBatch,
     kv_replay: bool,
 ) -> Result<()> {
+    // TODO(grao): Support splited ledger db here.
     for (idx, txn) in txns.iter().enumerate() {
         transaction_store.put_transaction(first_version + idx as Version, txn, batch)?;
     }
-    ledger_store.put_transaction_infos(first_version, txn_infos, batch)?;
+    ledger_store.put_transaction_infos(first_version, txn_infos, batch, batch)?;
     event_store.put_events_multiple_versions(first_version, events, batch)?;
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
