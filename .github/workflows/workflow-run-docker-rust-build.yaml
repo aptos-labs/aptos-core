@@ -26,7 +26,7 @@ on:
         type: boolean
         description: Whether to build additional testing images. If not specified, only the base release images will be built
       TARGET_REGISTRY:
-        default: remote
+        default: gcp
         required: false
         type: string
         description: The target docker registry to push to
@@ -52,7 +52,7 @@ on:
         type: boolean
         description: Whether to build additional testing images. If not specified, only the base release images will be built
       TARGET_REGISTRY:
-        default: remote
+        default: gcp
         required: false
         type: string
         description: The target docker registry to push to
