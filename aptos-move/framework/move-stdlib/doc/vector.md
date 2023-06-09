@@ -41,13 +41,19 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `for_each`](#0x1_vector_for_each)
 -  [Function `for_each_reverse`](#0x1_vector_for_each_reverse)
 -  [Function `for_each_ref`](#0x1_vector_for_each_ref)
+-  [Function `zip`](#0x1_vector_zip)
+-  [Function `zip_reverse`](#0x1_vector_zip_reverse)
+-  [Function `zip_ref`](#0x1_vector_zip_ref)
 -  [Function `enumerate_ref`](#0x1_vector_enumerate_ref)
 -  [Function `for_each_mut`](#0x1_vector_for_each_mut)
+-  [Function `zip_mut`](#0x1_vector_zip_mut)
 -  [Function `enumerate_mut`](#0x1_vector_enumerate_mut)
 -  [Function `fold`](#0x1_vector_fold)
 -  [Function `foldr`](#0x1_vector_foldr)
 -  [Function `map_ref`](#0x1_vector_map_ref)
+-  [Function `zip_map_ref`](#0x1_vector_zip_map_ref)
 -  [Function `map`](#0x1_vector_map)
+-  [Function `zip_map`](#0x1_vector_zip_map)
 -  [Function `filter`](#0x1_vector_filter)
 -  [Function `partition`](#0x1_vector_partition)
 -  [Function `rotate`](#0x1_vector_rotate)
@@ -101,6 +107,16 @@ The index into the vector is out of bounds
 
 
 <pre><code><b>const</b> <a href="vector.md#0x1_vector_EINVALID_RANGE">EINVALID_RANGE</a>: u64 = 131073;
+</code></pre>
+
+
+
+<a name="0x1_vector_EVECTORS_LENGTH_MISMATCH"></a>
+
+The length of the vectors are not equal.
+
+
+<pre><code><b>const</b> <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a>: u64 = 131074;
 </code></pre>
 
 
@@ -800,6 +816,111 @@ Apply the function to a reference of each element in the vector.
 
 </details>
 
+<a name="0x1_vector_zip"></a>
+
+## Function `zip`
+
+Apply the function to each pair of elements in the two given vectors, consuming them.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip">zip</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |Element1, Element2|) {
+    // We need <b>to</b> reverse the vectors <b>to</b> consume it efficiently
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v1);
+    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v2);
+    <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>(v1, v2, |e1, e2| f(e1, e2));
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_reverse"></a>
+
+## Function `zip_reverse`
+
+Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_reverse">zip_reverse</a>&lt;Element1, Element2&gt;(
+    v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |Element1, Element2|,
+) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(&v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(&v2), 0x20002);
+    <b>while</b> (len &gt; 0) {
+        f(<a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v1), <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v2));
+        len = len - 1;
+    };
+    <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(v1);
+    <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>(v2);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_ref"></a>
+
+## Function `zip_ref`
+
+Apply the function to the references of each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>&lt;Element1, Element2&gt;(
+    v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&Element1, &Element2|,
+) {
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v1, i), <a href="vector.md#0x1_vector_borrow">borrow</a>(v2, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vector_enumerate_ref"></a>
 
 ## Function `enumerate_ref`
@@ -851,6 +972,44 @@ Apply the function to a mutable reference to each element in the vector.
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
     <b>while</b> (i &lt; len) {
         f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
+        i = i + 1
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_mut"></a>
+
+## Function `zip_mut`
+
+Apply the function to mutable references to each pair of elements in the two given vectors.
+This errors out if the vectors are not of the same length.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(v1: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&<b>mut</b> Element1, &<b>mut</b> Element2)|())
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_mut">zip_mut</a>&lt;Element1, Element2&gt;(
+    v1: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&<b>mut</b> Element1, &<b>mut</b> Element2|,
+) {
+    <b>let</b> i = 0;
+    <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v1);
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(len == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+    <b>while</b> (i &lt; len) {
+        f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v1, i), <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v2, i));
         i = i + 1
     }
 }
@@ -959,7 +1118,7 @@ Fold right like fold above but working right to left. For example, <code><a href
 ## Function `map_ref`
 
 Map the function over the references of the elements of the vector, producing a new vector without modifying the
-original map.
+original vector.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_map_ref">map_ref</a>&lt;Element, NewElement&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
@@ -977,6 +1136,42 @@ original map.
 ): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
     <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
     <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_map_ref"></a>
+
+## Function `zip_map_ref`
+
+Map the function over the references of the element pairs of two vectors, producing a new vector from the return
+values without modifying the original vectors.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(&Element1, &Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_map_ref">zip_map_ref</a>&lt;Element1, Element2, NewElement&gt;(
+    v1: &<a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: &<a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |&Element1, &Element2|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">length</a>(v1) == <a href="vector.md#0x1_vector_length">length</a>(v2), 0x20002);
+
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_zip_ref">zip_ref</a>(v1, v2, |e1, e2| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
     result
 }
 </code></pre>
@@ -1007,6 +1202,41 @@ Map the function over the elements of the vector, producing a new vector.
 ): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
     <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
     <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
+    result
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_vector_zip_map"></a>
+
+## Function `zip_map`
+
+Map the function over the element pairs of the two vectors, producing a new vector.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;, f: |(Element1, Element2)|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_zip_map">zip_map</a>&lt;Element1, Element2, NewElement&gt;(
+    v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element1&gt;,
+    v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element2&gt;,
+    f: |Element1, Element2|NewElement
+): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
+    // We can't <b>use</b> the constant <a href="vector.md#0x1_vector_EVECTORS_LENGTH_MISMATCH">EVECTORS_LENGTH_MISMATCH</a> here <b>as</b> all calling code would then need <b>to</b> define it
+    // due <b>to</b> how inline functions work.
+    <b>assert</b>!(<a href="vector.md#0x1_vector_length">length</a>(&v1) == <a href="vector.md#0x1_vector_length">length</a>(&v2), 0x20002);
+
+    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
+    <a href="vector.md#0x1_vector_zip">zip</a>(v1, v2, |e1, e2| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(e1, e2)));
     result
 }
 </code></pre>

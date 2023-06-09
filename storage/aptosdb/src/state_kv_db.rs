@@ -95,20 +95,6 @@ impl StateKvDb {
         Ok(state_kv_db)
     }
 
-    // TODO(grao): Remove this function.
-    pub(crate) fn commit_nonsharded(
-        &self,
-        version: Version,
-        state_kv_batch: SchemaBatch,
-    ) -> Result<()> {
-        state_kv_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvCommitProgress,
-            &DbMetadataValue::Version(version),
-        )?;
-
-        self.commit_raw_batch(state_kv_batch)
-    }
-
     pub(crate) fn commit(
         &self,
         version: Version,
