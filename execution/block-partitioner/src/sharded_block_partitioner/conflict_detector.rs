@@ -3,8 +3,8 @@
 use crate::{
     sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
     types::{
-        CrossShardDependencies, CrossShardDependency, ShardId, SubBlock,
-        TransactionWithDependencies, TxnIndex,
+        CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId,
+        TxnIndex,
     },
 };
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
@@ -91,10 +91,13 @@ impl CrossShardConflictDetector {
                 .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
                 if rw_set_with_index.has_write_lock(storage_location) {
-                    cross_shard_dependencies.add_required_txn(CrossShardDependency::new(
-                        rw_set_with_index.get_write_lock_txn_index(storage_location),
-                        current_shard_id,
-                    ));
+                    cross_shard_dependencies.add_required_edge(
+                        TxnIdxWithShardId::new(
+                            rw_set_with_index.get_write_lock_txn_index(storage_location),
+                            current_shard_id,
+                        ),
+                        storage_location.clone(),
+                    );
                     break;
                 }
                 // perform a wrapping substraction

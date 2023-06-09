@@ -399,7 +399,7 @@ mod tests {
             create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
             generate_test_account, generate_test_account_for_address, TestAccount,
         },
-        types::{CrossShardDependency, SubBlock},
+        types::{SubBlock, TxnIdxWithShardId},
     };
     use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
     use move_core_types::account_address::AccountAddress;
@@ -409,7 +409,7 @@ mod tests {
     fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock>) {
         for sub_blocks in sub_blocks_for_shards {
             for txn in sub_blocks.iter() {
-                assert_eq!(txn.cross_shard_dependencies().len(), 0);
+                assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
             }
         }
     }
@@ -442,7 +442,7 @@ mod tests {
         // dependencies are empty.
         for (i, txn) in sub_blocks[0].iter().enumerate() {
             assert_eq!(txn.txn(), &transactions[i]);
-            assert_eq!(txn.cross_shard_dependencies().len(), 0);
+            assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
         }
     }
 
@@ -466,7 +466,7 @@ mod tests {
             assert_eq!(sub_blocks_for_shard.num_txns(), num_txns / num_shards);
             for txn in sub_blocks_for_shard.iter() {
                 assert_eq!(txn.txn(), &transactions[current_index]);
-                assert_eq!(txn.cross_shard_dependencies().len(), 0);
+                assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);
                 current_index += 1;
             }
         }
@@ -643,21 +643,38 @@ mod tests {
             .unwrap()
             .iter()
             .for_each(|txn| {
-                assert!(txn
+                let required_deps = txn
                     .cross_shard_dependencies
-                    .is_required_txn(CrossShardDependency::new(6, 1)));
+                    .get_required_edge_for(TxnIdxWithShardId::new(6, 1))
+                    .unwrap();
+                // txn (6, 7) and 8 has conflict only on the coin store of account 7 as txn (6,7) are sending
+                // from account 7 and txn 8 is receiving in account 7
+                assert_eq!(required_deps.len(), 1);
+                assert_eq!(
+                    required_deps[0],
+                    AnalyzedTransaction::coin_store_location(account7.account_address)
+                );
             });
 
-        // Verify the dependent edges
-        assert!(
-            partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
-                .cross_shard_dependencies
-                .is_dependent_txn(CrossShardDependency::new(7, 2))
+        // Verify the dependent edges, again the conflict is only on the coin store of account 7
+        let required_deps = partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+            .cross_shard_dependencies
+            .get_dependent_edge_for(TxnIdxWithShardId::new(7, 2))
+            .unwrap();
+        assert_eq!(required_deps.len(), 1);
+        assert_eq!(
+            required_deps[0],
+            AnalyzedTransaction::coin_store_location(account7.account_address)
         );
-        assert!(
-            partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
-                .cross_shard_dependencies
-                .is_dependent_txn(CrossShardDependency::new(8, 2))
+
+        let required_deps = partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+            .cross_shard_dependencies
+            .get_dependent_edge_for(TxnIdxWithShardId::new(8, 2))
+            .unwrap();
+        assert_eq!(required_deps.len(), 1);
+        assert_eq!(
+            required_deps[0],
+            AnalyzedTransaction::coin_store_location(account7.account_address)
         );
     }
 

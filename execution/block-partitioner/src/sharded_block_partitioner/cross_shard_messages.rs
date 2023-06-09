@@ -6,12 +6,9 @@ use crate::{
         cross_shard_messages::CrossShardMsg::CrossShardDependentEdgesMsg,
         dependency_analysis::{RWSet, WriteSetWithTxnIndex},
     },
-    types::{ShardId, TxnIndex},
+    types::{CrossShardEdges, ShardId, TxnIndex},
 };
-use std::{
-    collections::HashSet,
-    sync::mpsc::{Receiver, Sender},
-};
+use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Clone, Debug)]
 pub enum CrossShardMsg {
@@ -25,14 +22,14 @@ pub enum CrossShardMsg {
 #[derive(Clone, Debug, Default)]
 pub struct CrossShardDependentEdges {
     pub source_txn_index: TxnIndex,
-    pub dependent_txn_indices: HashSet<TxnIndex>,
+    pub dependent_edges: CrossShardEdges,
 }
 
 impl CrossShardDependentEdges {
-    pub fn new(source_txn_index: TxnIndex, dependent_txn_indices: HashSet<TxnIndex>) -> Self {
+    pub fn new(source_txn_index: TxnIndex, dependent_edges: CrossShardEdges) -> Self {
         Self {
             source_txn_index,
-            dependent_txn_indices,
+            dependent_edges,
         }
     }
 }

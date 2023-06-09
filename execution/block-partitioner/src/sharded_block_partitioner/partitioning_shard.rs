@@ -78,6 +78,7 @@ impl PartitioningShard {
 
         // Now that we have finalized the global transaction index, we can add the dependent txn edges.
         let mut dependent_edge_creator = DependentEdgeCreator::new(
+            self.shard_id,
             self.cross_shard_client.clone(),
             frozen_sub_blocks,
             self.num_shards,
@@ -135,6 +136,7 @@ impl PartitioningShard {
         frozen_sub_blocks.add_sub_block(current_frozen_sub_block);
 
         let mut dependent_edge_creator = DependentEdgeCreator::new(
+            self.shard_id,
             self.cross_shard_client.clone(),
             frozen_sub_blocks,
             self.num_shards,

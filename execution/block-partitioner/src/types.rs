@@ -1,19 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use std::collections::HashSet;
+use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
+use std::collections::HashMap;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct CrossShardDependency {
+pub struct TxnIdxWithShardId {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
 }
 
-impl CrossShardDependency {
+impl TxnIdxWithShardId {
     pub fn new(txn_index: TxnIndex, shard_id: ShardId) -> Self {
         Self {
             shard_id,
@@ -22,45 +22,111 @@ impl CrossShardDependency {
     }
 }
 
-#[derive(Default, Debug, Clone)]
-/// Represents the dependencies of a transaction on other transactions across shards. Two types
-/// of dependencies are supported:
-/// 1. `required_txns`: The transaction depends on the execution of the transactions in the set. In this
-/// case, the transaction can only be executed after the transactions in the set have been executed.
-/// 2. `dependent_txns`: The transactions in the set depend on the execution of the transaction. In this
-/// case, the transactions in the set can only be executed after the transaction has been executed.
-pub struct CrossShardDependencies {
-    required_txns: HashSet<CrossShardDependency>,
-    dependent_txns: HashSet<CrossShardDependency>,
+#[derive(Debug, Default, Clone)]
+/// Denotes a set of cross shard edges, which contains the set (required or dependent) transaction
+/// indices and the relevant storage locations that are conflicting.
+pub struct CrossShardEdges {
+    edges: HashMap<TxnIdxWithShardId, Vec<StorageLocation>>,
 }
 
-impl CrossShardDependencies {
+impl CrossShardEdges {
+    pub fn add_edge(
+        &mut self,
+        txn_idx: TxnIdxWithShardId,
+        storage_locations: Vec<StorageLocation>,
+    ) {
+        self.edges
+            .entry(txn_idx)
+            .or_insert_with(Vec::new)
+            .extend(storage_locations.into_iter());
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&TxnIdxWithShardId, &Vec<StorageLocation>)> {
+        self.edges.iter()
+    }
+
     pub fn len(&self) -> usize {
-        self.required_txns.len()
+        self.edges.len()
+    }
+
+    pub fn contains_idx(&self, txn_idx: &TxnIdxWithShardId) -> bool {
+        self.edges.contains_key(txn_idx)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.required_txns.is_empty()
+        self.edges.is_empty()
+    }
+}
+
+impl IntoIterator for CrossShardEdges {
+    type IntoIter = std::collections::hash_map::IntoIter<TxnIdxWithShardId, Vec<StorageLocation>>;
+    type Item = (TxnIdxWithShardId, Vec<StorageLocation>);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.edges.into_iter()
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+/// Represents the dependencies of a transaction on other transactions across shards. Two types
+/// of dependencies are supported:
+/// 1. `required_edges`: The transaction depends on the execution of the transactions in the set. In this
+/// case, the transaction can only be executed after the transactions in the set have been executed.
+/// 2. `dependent_edges`: The transactions in the set depend on the execution of the transaction. In this
+/// case, the transactions in the set can only be executed after the transaction has been executed.
+pub struct CrossShardDependencies {
+    required_edges: CrossShardEdges,
+    dependent_edges: CrossShardEdges,
+}
+
+impl CrossShardDependencies {
+    pub fn num_required_edges(&self) -> usize {
+        self.required_edges.len()
     }
 
-    pub fn required_txns(&self) -> &HashSet<CrossShardDependency> {
-        &self.required_txns
+    pub fn required_edges_iter(
+        &self,
+    ) -> impl Iterator<Item = (&TxnIdxWithShardId, &Vec<StorageLocation>)> {
+        self.required_edges.iter()
     }
 
-    pub fn is_required_txn(&self, dep: CrossShardDependency) -> bool {
-        self.required_txns.contains(&dep)
+    pub fn has_required_txn(&self, txn_idx: TxnIdxWithShardId) -> bool {
+        self.required_edges.contains_idx(&txn_idx)
     }
 
-    pub fn is_dependent_txn(&self, dep: CrossShardDependency) -> bool {
-        self.dependent_txns.contains(&dep)
+    pub fn get_required_edge_for(
+        &self,
+        txn_idx: TxnIdxWithShardId,
+    ) -> Option<&Vec<StorageLocation>> {
+        self.required_edges.edges.get(&txn_idx)
     }
 
-    pub fn add_required_txn(&mut self, dep: CrossShardDependency) {
-        self.required_txns.insert(dep);
+    pub fn get_dependent_edge_for(
+        &self,
+        txn_idx: TxnIdxWithShardId,
+    ) -> Option<&Vec<StorageLocation>> {
+        self.dependent_edges.edges.get(&txn_idx)
     }
 
-    pub fn add_dependent_txn(&mut self, dep: CrossShardDependency) {
-        self.dependent_txns.insert(dep);
+    pub fn has_dependent_txn(&self, txn_ids: TxnIdxWithShardId) -> bool {
+        self.dependent_edges.contains_idx(&txn_ids)
+    }
+
+    pub fn add_required_edge(
+        &mut self,
+        txn_idx: TxnIdxWithShardId,
+        storage_location: StorageLocation,
+    ) {
+        self.required_edges
+            .add_edge(txn_idx, vec![storage_location]);
+    }
+
+    pub fn add_dependent_edge(
+        &mut self,
+        txn_idx: TxnIdxWithShardId,
+        storage_locations: Vec<StorageLocation>,
+    ) {
+        self.dependent_edges.add_edge(txn_idx, storage_locations);
     }
 }
 
@@ -112,16 +178,17 @@ impl SubBlock {
         &self.transactions
     }
 
-    pub fn add_dependent_txn(
+    pub fn add_dependent_edge(
         &mut self,
         source_index: TxnIndex,
-        txn_idx_with_shard_id: CrossShardDependency,
+        txn_idx: TxnIdxWithShardId,
+        storage_locations: Vec<StorageLocation>,
     ) {
         let source_txn = self
             .transactions
             .get_mut(source_index - self.start_index)
             .unwrap();
-        source_txn.add_dependent_txn(txn_idx_with_shard_id);
+        source_txn.add_dependent_edge(txn_idx, storage_locations);
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies> {
@@ -206,8 +273,12 @@ impl TransactionWithDependencies {
         &self.cross_shard_dependencies
     }
 
-    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: CrossShardDependency) {
+    pub fn add_dependent_edge(
+        &mut self,
+        txn_idx: TxnIdxWithShardId,
+        storage_locations: Vec<StorageLocation>,
+    ) {
         self.cross_shard_dependencies
-            .add_dependent_txn(txn_idx_with_shard_id);
+            .add_dependent_edge(txn_idx, storage_locations);
     }
 }
