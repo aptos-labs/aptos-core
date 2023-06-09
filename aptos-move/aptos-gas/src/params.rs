@@ -9,6 +9,7 @@ macro_rules! define_gas_parameters_extract_key_at_version {
     ({ $($ver: pat => $key: literal),+ }, $cur_ver: expr) => {
         match $cur_ver {
             $($ver => Some($key)),+,
+            #[allow(unreachable_patterns)]
             _ => None,
         }
     }
