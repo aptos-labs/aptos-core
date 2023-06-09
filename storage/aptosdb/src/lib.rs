@@ -55,8 +55,8 @@ use crate::{
     },
     pruner::{
         ledger_pruner_manager::LedgerPrunerManager, pruner_manager::PrunerManager, pruner_utils,
-        state_kv_pruner::StateKvPruner, state_kv_pruner_manager::StateKvPrunerManager,
-        state_merkle_pruner_manager::StateMerklePrunerManager, state_store::StateMerklePruner,
+        state_kv_pruner_manager::StateKvPrunerManager,
+        state_merkle_pruner_manager::StateMerklePrunerManager,
     },
     schema::*,
     stale_node_index::StaleNodeIndexSchema,
@@ -2113,28 +2113,10 @@ impl DbWriter for AptosDB {
                 &DbMetadataValue::Version(version),
             )?;
 
-            let mut state_merkle_batch = SchemaBatch::new();
-            StateMerklePruner::prune_genesis(
-                self.state_merkle_db.clone(),
-                &mut state_merkle_batch,
-            )?;
-
-            let mut state_kv_batch = SchemaBatch::new();
-            StateKvPruner::prune_genesis(
-                self.state_store.state_kv_db.clone(),
-                &mut state_kv_batch,
-            )?;
-
             // Apply the change set writes to the database (atomically) and update in-memory state
             //
             // TODO(grao): Support sharding here.
-            self.state_merkle_db
-                .metadata_db()
-                .write_schemas(state_merkle_batch)?;
-            self.state_kv_db
-                .clone()
-                .commit_nonsharded(version, state_kv_batch)?;
-            self.ledger_db.metadata_db_arc().write_schemas(batch)?;
+            self.ledger_db.metadata_db().write_schemas(batch)?;
 
             self.ledger_pruner.save_min_readable_version(version)?;
             self.state_store
