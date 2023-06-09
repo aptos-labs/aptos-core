@@ -4,7 +4,7 @@ import { AptosClient, Provider } from "../../providers";
 import { TxnBuilderTypes } from "../../transaction_builder";
 import { HexString } from "../../utils";
 import { getFaucetClient, longTestTimeout, PROVIDER_LOCAL_NETWORK_CONFIG } from "../unit/test_helper.test";
-import { CoinClient, FungibleAssetClient } from "../../plugins";
+import { AptosToken, CoinClient, FungibleAssetClient } from "../../plugins";
 import { RawTransaction } from "../../aptos_types";
 
 const provider = new Provider(PROVIDER_LOCAL_NETWORK_CONFIG);
@@ -109,24 +109,55 @@ maybe("fungible asset", () => {
   /**
    * Test `transferFromPrimaryFungibleStore` and `checkBalance` functions in `CoinClient` class
    */
-  test("coin client supports fungible assets operations", async () => {
-    const coinClient = new CoinClient(provider.aptosClient);
-    // Test `transferFromPrimaryFungibleStore` and `checkBalance`
+  test(
+    "coin client supports fungible assets operations",
+    async () => {
+      const coinClient = new CoinClient(provider.aptosClient);
+      // Test `transferFromPrimaryFungibleStore` and `checkBalance`
 
-    // Alice transfers 2 more amount of fungible asset to Bob
-    await provider.waitForTransaction(
-      await coinClient.transfer(alice, bob, 2, {
-        coinType: fungibleAssetMetadataAddress,
-      }),
-      { checkSuccess: true },
-    );
-    // Bob balance is now 4
-    expect(
-      await coinClient.checkBalance(bob, {
-        coinType: fungibleAssetMetadataAddress,
-      }),
-    ).toEqual(BigInt(4));
-  });
+      // Alice transfers 2 more amount of fungible asset to Bob
+      await provider.waitForTransaction(
+        await coinClient.transfer(alice, bob, 2, {
+          coinType: fungibleAssetMetadataAddress,
+        }),
+        { checkSuccess: true },
+      );
+      // Bob balance is now 4
+      expect(
+        await coinClient.checkBalance(bob, {
+          coinType: fungibleAssetMetadataAddress,
+        }),
+      ).toEqual(BigInt(4));
+    },
+    longTestTimeout,
+  );
+
+  /**
+   *
+   */
+  test(
+    "aptos_token supports transfer fungible token",
+    async () => {
+      const aptosToken = new AptosToken(provider);
+      await provider.waitForTransaction(
+        await aptosToken.transfer({
+          owner: alice,
+          tokenAddress: fungibleAssetMetadataAddress,
+          recipient: bob.address(),
+          amount: 1,
+        }),
+        {
+          checkSuccess: true,
+        },
+      );
+
+      // Bob balance is now 5
+      const fungibleAsset = new FungibleAssetClient(provider);
+      const bobBalance = await fungibleAsset.getPrimaryBalance(bob.address(), fungibleAssetMetadataAddress);
+      expect(bobBalance).toEqual(BigInt(5));
+    },
+    longTestTimeout,
+  );
 
   test("it generates and returns a transferFromPrimaryFungibleStore raw transaction", async () => {
     const fungibleAsset = new FungibleAssetClient(provider);

@@ -19,6 +19,7 @@ describe("token objects", () => {
   beforeAll(async () => {
     // Fund Alice's Account
     await faucetClient.fundAccount(alice.address(), 100000000);
+    await faucetClient.fundAccount(bob.address(), 100000000);
   }, longTestTimeout);
 
   test(
@@ -186,34 +187,18 @@ describe("token objects", () => {
   test(
     "transfer token ownership",
     async () => {
-      await provider.waitForTransaction(
-        await aptosToken.transferTokenOwnership({ owner: alice, token: tokenAddress, recipient: bob.address() }),
-        {
-          checkSuccess: true,
-        },
-      );
+      await provider.waitForTransaction(await aptosToken.transferTokenOwnership(alice, tokenAddress, bob.address()), {
+        checkSuccess: true,
+      });
     },
     longTestTimeout,
   );
 
   test(
-    "transfer token ownership",
+    "transfer non fungible token",
     async () => {
       await provider.waitForTransaction(
-        await aptosToken.transfer({ owner: alice, token: tokenAddress, recipient: bob.address() }),
-        {
-          checkSuccess: true,
-        },
-      );
-    },
-    longTestTimeout,
-  );
-
-  test(
-    "transfer token ownership",
-    async () => {
-      await provider.waitForTransaction(
-        await aptosToken.transfer({ owner: alice, token: tokenAddress, recipient: bob.address(), amount: 1 }),
+        await aptosToken.transfer({ owner: bob, tokenAddress, recipient: alice.address() }),
         {
           checkSuccess: true,
         },

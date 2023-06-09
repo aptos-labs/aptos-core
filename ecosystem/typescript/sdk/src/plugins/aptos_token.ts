@@ -11,6 +11,7 @@ import { AptosClient, OptionalTransactionArgs } from "../providers/aptos_client"
 import { TransactionBuilderRemoteABI } from "../transaction_builder";
 import { HexString, MaybeHexString } from "../utils";
 import { getPropertyValueRaw, getSinglePropertyValueRaw } from "../utils/property_map_serde";
+import { FungibleAssetClient } from "./fungible_asset_client";
 
 export interface CreateCollectionOptions {
   royaltyNumerator?: number;
@@ -43,16 +44,15 @@ export type PropertyType = keyof typeof PropertyTypeMap;
 
 type FungibleTokenParameters = {
   owner: AptosAccount;
-  token: MaybeHexString;
+  tokenAddress: MaybeHexString;
   recipient: MaybeHexString;
   amount: number | bigint;
-  tokenType?: string;
   extraArgs?: OptionalTransactionArgs;
 };
 
 type NonFungibleTokenParameters = {
   owner: AptosAccount;
-  token: MaybeHexString;
+  tokenAddress: MaybeHexString;
   recipient: MaybeHexString;
   tokenType?: string;
   extraArgs?: OptionalTransactionArgs;
@@ -476,24 +476,6 @@ export class AptosToken {
     );
   }
 
-  async transfer(data: NonFungibleTokenParameters): Promise<string>;
-  async transfer(data: FungibleTokenParameters): Promise<string>;
-
-  async transfer(data: NonFungibleTokenParameters | FungibleTokenParameters, isFungible?: boolean): Promise<string> {
-    // fungible token
-    if (isFungible === undefined) {
-      // query token data by `token` property (token ddress)
-      // and check if it is a fungible or non-fungible
-      const tokenData = await this.provider.getTokenData(HexString.ensure(data.token).hex());
-    }
-    if ("amount" in data) {
-      // TODO use FungibleAsset transfer() method
-      return await this.transferTokenOwnership(data);
-    } else {
-      return await this.transferTokenOwnership(data);
-    }
-  }
-
   /**
    * Transfer a non fungible token ownership.
    * We can transfer a token only when the token is not frozen (i.e. owner transfer is not disabled such as for soul bound tokens)
@@ -502,18 +484,52 @@ export class AptosToken {
    * @param recipient Recipient address
    * @returns The hash of the transaction submitted to the API
    */
-  async transferTokenOwnership(data: NonFungibleTokenParameters): Promise<string> {
-    const builder = new TransactionBuilderRemoteABI(this.provider.aptosClient, {
-      sender: data.owner.address(),
-      ...data.extraArgs,
+  async transferTokenOwnership(
+    owner: AptosAccount,
+    token: MaybeHexString,
+    recipient: MaybeHexString,
+    tokenType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    const builder = new TransactionBuilderRemoteABI(this.provider, {
+      sender: owner.address(),
+      ...extraArgs,
     });
     const rawTxn = await builder.build(
       "0x1::object::transfer",
-      [data.tokenType || this.tokenType],
-      [HexString.ensure(data.token).hex(), HexString.ensure(data.recipient).hex()],
+      [tokenType || this.tokenType],
+      [HexString.ensure(token).hex(), HexString.ensure(recipient).hex()],
     );
-    const bcsTxn = AptosClient.generateBCSTransaction(data.owner, rawTxn);
-    const pendingTransaction = await this.provider.aptosClient.submitSignedBCSTransaction(bcsTxn);
+    const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
+  }
+
+  async transfer(data: NonFungibleTokenParameters): Promise<string>;
+  async transfer(data: FungibleTokenParameters): Promise<string>;
+
+  /**
+   * Transfer a token. This function supports transfer non-fungible token and fungible token.
+   *
+   * We use the `amount` property to distinguish between fungible and non-fungible token.
+   * To transfer a fungible token, make sure to pass an `amount` property. Since non-fungible asset amount
+   * is always 1, no need to include the `amount` property.
+   *
+   * @param data NonFungibleTokenParameters | FungibleTokenParameters type
+   * @returns The hash of the transaction submitted to the API
+   */
+  async transfer(data: NonFungibleTokenParameters | FungibleTokenParameters): Promise<string> {
+    if ("amount" in data) {
+      const fungibleAsset = new FungibleAssetClient(this.provider);
+      return await fungibleAsset.transfer(data.owner, data.tokenAddress, data.recipient, data.amount, data.extraArgs);
+    } else {
+      return await this.transferTokenOwnership(
+        data.owner,
+        data.tokenAddress,
+        data.recipient,
+        data.tokenType,
+        data.extraArgs,
+      );
+    }
   }
 }
