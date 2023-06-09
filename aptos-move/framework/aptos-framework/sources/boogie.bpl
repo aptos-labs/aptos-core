@@ -6288,13 +6288,13 @@ axiom (forall object: int ::
 (var $$res := $1_object_spec_exists_at'#1'(object);
 $IsValid'bool'($$res)));
 
-// spec fun at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:242:10+75
+// spec fun at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:257:10+75
 function  $1_object_spec_create_object_address(source: int, seed: Vec (int)): int;
 axiom (forall source: int, seed: Vec (int) ::
 (var $$res := $1_object_spec_create_object_address(source, seed);
 $IsValid'address'($$res)));
 
-// spec fun at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:244:10+92
+// spec fun at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:259:10+92
 function  $1_object_spec_create_user_derived_object_address(source: int, derive_from: int): int;
 axiom (forall source: int, derive_from: int ::
 (var $$res := $1_object_spec_create_user_derived_object_address(source, derive_from);
@@ -6476,27 +6476,13 @@ function {:inline} $IsEqual'$1_object_TransferRef'(s1: $1_object_TransferRef, s2
 procedure {:timeLimit 40} $1_object_new_event_handle$verify(_$t0: $signer) returns ($ret0: $1_event_EventHandle'#0')
 {
     // declare local variables
-    var $t1: int;
+    var $t1: $1_object_ObjectCore;
     var $t2: $1_object_ObjectCore;
-    var $t3: $1_object_ObjectCore;
-    var $t4: $1_object_ObjectCore;
-    var $t5: $1_object_ObjectCore;
-    var $t6: $1_guid_GUID;
-    var $t7: int;
-    var $t8: $1_event_EventHandle'#0';
-    var $t9: int;
-    var $t10: bool;
-    var $t11: bool;
-    var $t12: bool;
-    var $t13: int;
-    var $t14: bool;
-    var $t15: bool;
-    var $t16: bool;
+    var $t3: $1_guid_GUID;
+    var $t4: int;
+    var $t5: $1_event_EventHandle'#0';
     var $t0: $signer;
     var $temp_0'$1_event_EventHandle'#0'': $1_event_EventHandle'#0';
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
-    var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#40: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -6513,33 +6499,9 @@ procedure {:timeLimit 40} $1_object_new_event_handle$verify(_$t0: $signer) retur
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:65+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:65+6
-    assume {:print "$at(3,4965,4971)"} true;
-    assume {:print "$track_exp_sub(25935):", $t0} true;
-
-    // assume Identical($t1, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:46+26
-    assume ($t1 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:46+26]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:46+26
-    assume {:print "$track_exp_sub(25936):", $t1} true;
-
-    // assume Identical($t2, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:27+46
-    assume ($t2 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:27+46]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:27+46
-    assume {:print "$track_exp_sub(25937):", $t2} true;
-
-    // assume Identical($t3, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+65
-    assume ($t3 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+65]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+65
-    assume {:print "$track_exp(25938):", $t3} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+65
-    assume {:print "$track_global_mem(27218):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t4, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+65
-    assume ($t4 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t1, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:146:9+65
+    assume {:print "$at(3,5383,5448)"} true;
+    assume ($t1 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
     // @40 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:311:5+1
     assume {:print "$at(2,13396,13397)"} true;
@@ -6548,136 +6510,61 @@ procedure {:timeLimit 40} $1_object_new_event_handle$verify(_$t0: $signer) retur
     // trace_local[object]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:311:5+1
     assume {:print "$track_local(52,29,0):", $t0} $t0 == $t0;
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:33+19
-    assume {:print "$at(2,13550,13569)"} true;
-    assume {:print "$track_global_mem(27219):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t2, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+65
+    assume {:print "$at(3,5047,5112)"} true;
+    assume ($t2 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
-    // assume Identical($t5, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume {:print "$at(3,4573,4638)"} true;
-    assume ($t5 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // $t6 := object::create_guid($t0) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:33+19
+    // $t3 := object::create_guid($t0) on_abort goto L2 with $t4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:33+19
     assume {:print "$at(2,13550,13569)"} true;
-    call $t6 := $1_object_create_guid($t0);
+    call $t3 := $1_object_create_guid($t0);
     if ($abort_flag) {
         assume {:print "$at(2,13550,13569)"} true;
-        $t7 := $abort_code;
-        assume {:print "$track_abort(52,29):", $t7} $t7 == $t7;
+        $t4 := $abort_code;
+        assume {:print "$track_abort(52,29):", $t4} $t4 == $t4;
         goto L2;
     }
 
-    // $t8 := event::new_event_handle<#0>($t6) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:9+44
-    call $t8 := $1_event_new_event_handle'#0'($t6);
+    // $t5 := event::new_event_handle<#0>($t3) on_abort goto L2 with $t4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:9+44
+    call $t5 := $1_event_new_event_handle'#0'($t3);
     if ($abort_flag) {
         assume {:print "$at(2,13526,13570)"} true;
-        $t7 := $abort_code;
-        assume {:print "$track_abort(52,29):", $t7} $t7 == $t7;
+        $t4 := $abort_code;
+        assume {:print "$track_abort(52,29):", $t4} $t4 == $t4;
         goto L2;
     }
 
-    // trace_return[0]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:9+44
-    assume {:print "$track_return(52,29,0):", $t8} $t8 == $t8;
+    // trace_return[0]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:314:9+44
+    assume {:print "$track_return(52,29,0):", $t5} $t5 == $t5;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:315:5+1
     assume {:print "$at(2,13575,13576)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:58+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:58+6
-    assume {:print "$at(3,4865,4871)"} true;
-    assume {:print "$track_exp_sub(25944):", $t0} true;
-
-    // assume Identical($t9, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26
-    assume ($t9 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26
-    assume {:print "$track_exp_sub(25945):", $t9} true;
-
-    // assume Identical($t10, exists[@40]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46
-    assume ($t10 == $ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46
-    assume {:print "$track_exp_sub(25946):", $t10} true;
-
-    // assume Identical($t11, Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assume ($t11 == !$ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assume {:print "$track_exp(25947):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assume {:print "$track_global_mem(27220):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assert {:msg "assert_failed(3,4816,4874): function does not abort under this condition"}
+    // assert Not(Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:144:9+58
+    assume {:print "$at(3,5290,5348)"} true;
+    assert {:msg "assert_failed(3,5290,5348): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:19+11]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:19+11
-    assume {:print "$at(3,4993,5004)"} true;
-    assume {:print "$track_exp_sub(25951):", $t4} true;
+    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t1), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:147:9+54
+    assume {:print "$at(3,5457,5511)"} true;
+    assert {:msg "assert_failed(3,5457,5511): function does not abort under this condition"}
+      !(($guid_creation_num#$1_object_ObjectCore($t1) + 1) > 18446744073709551615);
 
-    // assume Identical($t12, Gt(Add(select object::ObjectCore.guid_creation_num($t4), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume ($t12 == (($guid_creation_num#$1_object_ObjectCore($t4) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume {:print "$track_exp(25952):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume {:print "$track_global_mem(27221):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t4), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assert {:msg "assert_failed(3,4983,5037): function does not abort under this condition"}
-      !(($guid_creation_num#$1_object_ObjectCore($t4) + 1) > 18446744073709551615);
-
-    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    $ret0 := $t8;
+    // return $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:147:9+54
+    $ret0 := $t5;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:315:5+1
     assume {:print "$at(2,13575,13576)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:58+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:58+6
-    assume {:print "$at(3,4865,4871)"} true;
-    assume {:print "$track_exp_sub(25944):", $t0} true;
+    // assert Or(Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t1), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:5+330
+    assume {:print "$at(3,5187,5517)"} true;
+    assert {:msg "assert_failed(3,5187,5517): abort not covered by any of the `aborts_if` clauses"}
+      (!$ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t1) + 1) > 18446744073709551615));
 
-    // assume Identical($t13, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26
-    assume ($t13 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:39+26
-    assume {:print "$track_exp_sub(25945):", $t13} true;
-
-    // assume Identical($t14, exists[@40]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46
-    assume ($t14 == $ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:20+46
-    assume {:print "$track_exp_sub(25946):", $t14} true;
-
-    // assume Identical($t15, Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assume ($t15 == !$ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:9+58
-    assume {:print "$track_exp(25947):", $t15} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:19+11]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:19+11
-    assume {:print "$at(3,4993,5004)"} true;
-    assume {:print "$track_exp_sub(25951):", $t4} true;
-
-    // assume Identical($t16, Gt(Add(select object::ObjectCore.guid_creation_num($t4), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume ($t16 == (($guid_creation_num#$1_object_ObjectCore($t4) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume {:print "$track_exp(25952):", $t16} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:132:9+54
-    assume {:print "$track_global_mem(27222):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@40]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t4), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:126:5+330
-    assume {:print "$at(3,4713,5043)"} true;
-    assert {:msg "assert_failed(3,4713,5043): abort not covered by any of the `aborts_if` clauses"}
-      (!$ResourceExists($1_object_ObjectCore_$memory#40, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t4) + 1) > 18446744073709551615));
-
-    // abort($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:126:5+330
-    $abort_code := $t7;
+    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:5+330
+    $abort_code := $t4;
     $abort_flag := true;
     return;
 
@@ -6703,8 +6590,8 @@ procedure {:inline 1} $1_object_create_guid(_$t0: $signer) returns ($ret0: $1_gu
     $t0 := _$t0;
 
     // bytecode translation starts here
-    // assume Identical($t3, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume {:print "$at(3,4573,4638)"} true;
+    // assume Identical($t3, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+65
+    assume {:print "$at(3,5047,5112)"} true;
     assume ($t3 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
     // trace_local[object]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:304:5+1
@@ -6791,28 +6678,16 @@ procedure {:timeLimit 40} $1_object_create_guid$verify(_$t0: $signer) returns ($
     // declare local variables
     var $t1: int;
     var $t2: $Mutation ($1_object_ObjectCore);
-    var $t3: int;
-    var $t4: $1_object_ObjectCore;
-    var $t5: $1_object_ObjectCore;
-    var $t6: $1_object_ObjectCore;
-    var $t7: int;
-    var $t8: int;
-    var $t9: $Mutation ($1_object_ObjectCore);
-    var $t10: $Mutation (int);
-    var $t11: $1_guid_GUID;
-    var $t12: int;
-    var $t13: bool;
-    var $t14: bool;
-    var $t15: bool;
-    var $t16: int;
-    var $t17: bool;
-    var $t18: bool;
-    var $t19: bool;
+    var $t3: $1_object_ObjectCore;
+    var $t4: int;
+    var $t5: int;
+    var $t6: $Mutation ($1_object_ObjectCore);
+    var $t7: $Mutation (int);
+    var $t8: $1_guid_GUID;
     var $t0: $signer;
     var $temp_0'$1_guid_GUID': $1_guid_GUID;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#29: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -6829,33 +6704,9 @@ procedure {:timeLimit 40} $1_object_create_guid$verify(_$t0: $signer) returns ($
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:65+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:65+6
-    assume {:print "$at(3,4629,4635)"} true;
-    assume {:print "$track_exp_sub(25536):", $t0} true;
-
-    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:46+26
-    assume ($t3 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:46+26]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:46+26
-    assume {:print "$track_exp_sub(25537):", $t3} true;
-
-    // assume Identical($t4, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:27+46
-    assume ($t4 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:27+46]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:27+46
-    assume {:print "$track_exp_sub(25538):", $t4} true;
-
-    // assume Identical($t5, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume ($t5 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume {:print "$track_exp(25539):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume {:print "$track_global_mem(27223):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t6, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume ($t6 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t3, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+65
+    assume {:print "$at(3,5047,5112)"} true;
+    assume ($t3 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
     // @29 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:304:5+1
     assume {:print "$at(2,13101,13102)"} true;
@@ -6864,160 +6715,89 @@ procedure {:timeLimit 40} $1_object_create_guid$verify(_$t0: $signer) returns ($
     // trace_local[object]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:304:5+1
     assume {:print "$track_local(52,6,0):", $t0} $t0 == $t0;
 
-    // $t7 := signer::address_of($t0) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:305:20+26
+    // $t4 := signer::address_of($t0) on_abort goto L2 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:305:20+26
     assume {:print "$at(2,13194,13220)"} true;
-    call $t7 := $1_signer_address_of($t0);
+    call $t4 := $1_signer_address_of($t0);
     if ($abort_flag) {
         assume {:print "$at(2,13194,13220)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,6):", $t8} $t8 == $t8;
+        $t5 := $abort_code;
+        assume {:print "$track_abort(52,6):", $t5} $t5 == $t5;
         goto L2;
     }
 
-    // trace_local[addr]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:305:13+4
-    assume {:print "$track_local(52,6,1):", $t7} $t7 == $t7;
+    // trace_local[addr]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:305:13+4
+    assume {:print "$track_local(52,6,1):", $t4} $t4 == $t4;
 
-    // $t9 := borrow_global<object::ObjectCore>($t7) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:306:27+17
+    // $t6 := borrow_global<object::ObjectCore>($t4) on_abort goto L2 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:306:27+17
     assume {:print "$at(2,13248,13265)"} true;
-    if (!$ResourceExists($1_object_ObjectCore_$memory, $t7)) {
+    if (!$ResourceExists($1_object_ObjectCore_$memory, $t4)) {
         call $ExecFailureAbort();
     } else {
-        $t9 := $Mutation($Global($t7), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t7));
+        $t6 := $Mutation($Global($t4), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t4));
     }
     if ($abort_flag) {
         assume {:print "$at(2,13248,13265)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,6):", $t8} $t8 == $t8;
+        $t5 := $abort_code;
+        assume {:print "$track_abort(52,6):", $t5} $t5 == $t5;
         goto L2;
     }
 
-    // trace_local[object_data]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:306:13+11
-    $temp_0'$1_object_ObjectCore' := $Dereference($t9);
+    // trace_local[object_data]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:306:13+11
+    $temp_0'$1_object_ObjectCore' := $Dereference($t6);
     assume {:print "$track_local(52,6,2):", $temp_0'$1_object_ObjectCore'} $temp_0'$1_object_ObjectCore' == $temp_0'$1_object_ObjectCore';
 
-    // $t10 := borrow_field<object::ObjectCore>.guid_creation_num($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:28+34
+    // $t7 := borrow_field<object::ObjectCore>.guid_creation_num($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:28+34
     assume {:print "$at(2,13312,13346)"} true;
-    $t10 := $ChildMutation($t9, 0, $guid_creation_num#$1_object_ObjectCore($Dereference($t9)));
+    $t7 := $ChildMutation($t6, 0, $guid_creation_num#$1_object_ObjectCore($Dereference($t6)));
 
-    // $t11 := guid::create($t7, $t10) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
-    call $t11,$t10 := $1_guid_create($t7, $t10);
+    // $t8 := guid::create($t4, $t7) on_abort goto L2 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
+    call $t8,$t7 := $1_guid_create($t4, $t7);
     if ($abort_flag) {
         assume {:print "$at(2,13293,13347)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,6):", $t8} $t8 == $t8;
+        $t5 := $abort_code;
+        assume {:print "$track_abort(52,6):", $t5} $t5 == $t5;
         goto L2;
     }
 
-    // write_back[Reference($t9).guid_creation_num (u64)]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
-    $t9 := $UpdateMutation($t9, $Update'$1_object_ObjectCore'_guid_creation_num($Dereference($t9), $Dereference($t10)));
+    // write_back[Reference($t6).guid_creation_num (u64)]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
+    $t6 := $UpdateMutation($t6, $Update'$1_object_ObjectCore'_guid_creation_num($Dereference($t6), $Dereference($t7)));
 
-    // write_back[object::ObjectCore@]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
-    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t9),
-        $Dereference($t9));
+    // write_back[object::ObjectCore@]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
+    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t6),
+        $Dereference($t6));
 
-    // trace_return[0]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
-    assume {:print "$track_return(52,6,0):", $t11} $t11 == $t11;
+    // trace_return[0]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:307:9+54
+    assume {:print "$track_return(52,6,0):", $t8} $t8 == $t8;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:308:5+1
     assume {:print "$at(2,13352,13353)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:58+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:58+6
-    assume {:print "$at(3,4529,4535)"} true;
-    assume {:print "$track_exp_sub(25545):", $t0} true;
-
-    // assume Identical($t12, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26
-    assume ($t12 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26
-    assume {:print "$track_exp_sub(25546):", $t12} true;
-
-    // assume Identical($t13, exists[@29]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46
-    assume ($t13 == $ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46
-    assume {:print "$track_exp_sub(25547):", $t13} true;
-
-    // assume Identical($t14, Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assume ($t14 == !$ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assume {:print "$track_exp(25548):", $t14} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assume {:print "$track_global_mem(27224):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assert {:msg "assert_failed(3,4480,4538): function does not abort under this condition"}
+    // assert Not(Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:135:9+58
+    assume {:print "$at(3,4954,5012)"} true;
+    assert {:msg "assert_failed(3,4954,5012): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:19+11]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:19+11
-    assume {:print "$at(3,4657,4668)"} true;
-    assume {:print "$track_exp_sub(25552):", $t6} true;
+    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t3), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:138:9+54
+    assume {:print "$at(3,5121,5175)"} true;
+    assert {:msg "assert_failed(3,5121,5175): function does not abort under this condition"}
+      !(($guid_creation_num#$1_object_ObjectCore($t3) + 1) > 18446744073709551615);
 
-    // assume Identical($t15, Gt(Add(select object::ObjectCore.guid_creation_num($t6), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume ($t15 == (($guid_creation_num#$1_object_ObjectCore($t6) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume {:print "$track_exp(25553):", $t15} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume {:print "$track_global_mem(27225):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t6), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assert {:msg "assert_failed(3,4647,4701): function does not abort under this condition"}
-      !(($guid_creation_num#$1_object_ObjectCore($t6) + 1) > 18446744073709551615);
-
-    // return $t11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    $ret0 := $t11;
+    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:138:9+54
+    $ret0 := $t8;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:308:5+1
     assume {:print "$at(2,13352,13353)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:58+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:58+6
-    assume {:print "$at(3,4529,4535)"} true;
-    assume {:print "$track_exp_sub(25545):", $t0} true;
+    // assert Or(Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t3), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:134:5+282
+    assume {:print "$at(3,4899,5181)"} true;
+    assert {:msg "assert_failed(3,4899,5181): abort not covered by any of the `aborts_if` clauses"}
+      (!$ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t3) + 1) > 18446744073709551615));
 
-    // assume Identical($t16, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26
-    assume ($t16 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:39+26
-    assume {:print "$track_exp_sub(25546):", $t16} true;
-
-    // assume Identical($t17, exists[@29]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46
-    assume ($t17 == $ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:20+46
-    assume {:print "$track_exp_sub(25547):", $t17} true;
-
-    // assume Identical($t18, Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assume ($t18 == !$ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:120:9+58
-    assume {:print "$track_exp(25548):", $t18} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:19+11]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:19+11
-    assume {:print "$at(3,4657,4668)"} true;
-    assume {:print "$track_exp_sub(25552):", $t6} true;
-
-    // assume Identical($t19, Gt(Add(select object::ObjectCore.guid_creation_num($t6), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume ($t19 == (($guid_creation_num#$1_object_ObjectCore($t6) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume {:print "$track_exp(25553):", $t19} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:123:9+54
-    assume {:print "$track_global_mem(27226):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@29]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t6), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:119:5+282
-    assume {:print "$at(3,4425,4707)"} true;
-    assert {:msg "assert_failed(3,4425,4707): abort not covered by any of the `aborts_if` clauses"}
-      (!$ResourceExists($1_object_ObjectCore_$memory#29, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t6) + 1) > 18446744073709551615));
-
-    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:119:5+282
-    $abort_code := $t8;
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:134:5+282
+    $abort_code := $t5;
     $abort_flag := true;
     return;
 
@@ -7265,14 +7045,9 @@ procedure {:timeLimit 40} $1_object_owner$verify(_$t0: $1_object_Object'#0') ret
     var $t6: int;
     var $t7: $1_object_ObjectCore;
     var $t8: int;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
-    var $t12: bool;
     var $t0: $1_object_Object'#0';
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#21: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -7371,30 +7146,12 @@ L2:
     assume {:print "$at(2,20390,20391)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:39+6
-    assume {:print "$at(3,9073,9079)"} true;
-    assume {:print "$track_exp_sub(25236):", $t0} true;
-
-    // assume Identical($t9, exists[@21]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32
-    assume {:print "$track_exp_sub(25237):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume {:print "$track_exp(25238):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume {:print "$track_global_mem(27227):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assert {:msg "assert_failed(3,9043,9087): function does not abort under this condition"}
+    // assert Not(Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:249:9+44
+    assume {:print "$at(3,9517,9561)"} true;
+    assert {:msg "assert_failed(3,9517,9561): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0));
 
-    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
+    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:249:9+44
     $ret0 := $t8;
     return;
 
@@ -7402,31 +7159,12 @@ L3:
     assume {:print "$at(2,20390,20391)"} true;
 L4:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:39+6
-    assume {:print "$at(3,9073,9079)"} true;
-    assume {:print "$track_exp_sub(25236):", $t0} true;
-
-    // assume Identical($t11, exists[@21]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32
-    assume ($t11 == $ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:20+32
-    assume {:print "$track_exp_sub(25237):", $t11} true;
-
-    // assume Identical($t12, Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume ($t12 == !$ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume {:print "$track_exp(25238):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+44
-    assume {:print "$track_global_mem(27228):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:233:5+106
-    assume {:print "$at(3,8987,9093)"} true;
-    assert {:msg "assert_failed(3,8987,9093): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@21]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:248:5+106
+    assume {:print "$at(3,9461,9567)"} true;
+    assert {:msg "assert_failed(3,9461,9567): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#21, $inner#$1_object_Object'#0'($t0));
 
-    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:233:5+106
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:248:5+106
     $abort_code := $t5;
     $abort_flag := true;
     return;
@@ -7453,12 +7191,12 @@ procedure {:inline 1} $1_object_transfer'#0'(_$t0: $signer, _$t1: $1_object_Obje
     $t2 := _$t2;
 
     // bytecode translation starts here
-    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume {:print "$at(3,6446,6492)"} true;
+    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
+    assume {:print "$at(3,6920,6966)"} true;
     assume ($t3 == $1_signer_$address_of($t0));
 
-    // assume Identical($t4, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume {:print "$at(3,6501,6535)"} true;
+    // assume Identical($t4, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+34
+    assume {:print "$at(3,6975,7009)"} true;
     assume ($t4 == $inner#$1_object_Object'#0'($t1));
 
     // trace_local[owner]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:406:5+1
@@ -7475,8 +7213,8 @@ procedure {:inline 1} $1_object_transfer'#0'(_$t0: $signer, _$t1: $1_object_Obje
     assume {:print "$at(2,16805,16817)"} true;
     $t5 := $inner#$1_object_Object'#0'($t1);
 
-    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$at(3,7098,7144)"} true;
+    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+46
+    assume {:print "$at(3,7572,7618)"} true;
     assume ($t6 == $1_signer_$address_of($t0));
 
     // object::transfer_raw($t0, $t5, $t2) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:9+37
@@ -7517,32 +7255,11 @@ procedure {:timeLimit 40} $1_object_transfer$verify(_$t0: $signer, _$t1: $1_obje
     var $t5: int;
     var $t6: int;
     var $t7: int;
-    var $t8: int;
-    var $t9: int;
-    var $t10: int;
-    var $t11: bool;
-    var $t12: bool;
-    var $t13: $1_object_ObjectCore;
-    var $t14: bool;
-    var $t15: bool;
-    var $t16: bool;
-    var $t17: $1_object_ObjectCore;
-    var $t18: bool;
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: $1_object_ObjectCore;
-    var $t22: bool;
-    var $t23: bool;
-    var $t24: bool;
-    var $t25: $1_object_ObjectCore;
-    var $t26: bool;
     var $t0: $signer;
     var $t1: $1_object_Object'#0';
     var $t2: int;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#41: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -7567,43 +7284,13 @@ procedure {:timeLimit 40} $1_object_transfer$verify(_$t0: $signer, _$t1: $1_obje
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:48+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:48+5
-    assume {:print "$at(3,6485,6490)"} true;
-    assume {:print "$track_exp_sub(25987):", $t0} true;
-
-    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:29+25
+    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
+    assume {:print "$at(3,6920,6966)"} true;
     assume ($t3 == $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:29+25]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:29+25
-    assume {:print "$track_exp_sub(25988):", $t3} true;
-
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume ($t4 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume {:print "$track_exp(25989):", $t4} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume {:print "$track_global_mem(27229):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume ($t5 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:30+6
-    assume {:print "$at(3,6522,6528)"} true;
-    assume {:print "$track_exp_sub(25992):", $t1} true;
-
-    // assume Identical($t6, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume ($t6 == $inner#$1_object_Object'#0'($t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume {:print "$track_exp(25993):", $t6} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume {:print "$track_global_mem(27230):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t7, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume ($t7 == $inner#$1_object_Object'#0'($t1));
+    // assume Identical($t4, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+34
+    assume {:print "$at(3,6975,7009)"} true;
+    assume ($t4 == $inner#$1_object_Object'#0'($t1));
 
     // @41 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:406:5+1
     assume {:print "$at(2,16642,16643)"} true;
@@ -7618,24 +7305,21 @@ procedure {:timeLimit 40} $1_object_transfer$verify(_$t0: $signer, _$t1: $1_obje
     // trace_local[to]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:406:5+1
     assume {:print "$track_local(52,35,2):", $t2} $t2 == $t2;
 
-    // $t8 := get_field<object::Object<#0>>.inner($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:29+12
+    // $t5 := get_field<object::Object<#0>>.inner($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:29+12
     assume {:print "$at(2,16805,16817)"} true;
-    $t8 := $inner#$1_object_Object'#0'($t1);
+    $t5 := $inner#$1_object_Object'#0'($t1);
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:9+37
-    assume {:print "$track_global_mem(27231):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+46
+    assume {:print "$at(3,7572,7618)"} true;
+    assume ($t6 == $1_signer_$address_of($t0));
 
-    // assume Identical($t9, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$at(3,7098,7144)"} true;
-    assume ($t9 == $1_signer_$address_of($t0));
-
-    // object::transfer_raw($t0, $t8, $t2) on_abort goto L2 with $t10 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:9+37
+    // object::transfer_raw($t0, $t5, $t2) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:411:9+37
     assume {:print "$at(2,16785,16822)"} true;
-    call $1_object_transfer_raw($t0, $t8, $t2);
+    call $1_object_transfer_raw($t0, $t5, $t2);
     if ($abort_flag) {
         assume {:print "$at(2,16785,16822)"} true;
-        $t10 := $abort_code;
-        assume {:print "$track_abort(52,35):", $t10} $t10 == $t10;
+        $t7 := $abort_code;
+        assume {:print "$track_abort(52,35):", $t7} $t7 == $t7;
         goto L2;
     }
 
@@ -7643,215 +7327,44 @@ procedure {:timeLimit 40} $1_object_transfer$verify(_$t0: $signer, _$t1: $1_obje
     assume {:print "$at(2,16827,16828)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:39+14
-    assume {:print "$at(3,6574,6588)"} true;
-    assume {:print "$track_exp_sub(25998):", $t7} true;
+    // assert Not(Not(exists[@41]<object::ObjectCore>($t4))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+46
+    assume {:print "$at(3,7018,7064)"} true;
+    assert {:msg "assert_failed(3,7018,7064): function does not abort under this condition"}
+      !!$ResourceExists($1_object_ObjectCore_$memory#41, $t4);
 
-    // assume Identical($t11, exists[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34
-    assume ($t11 == $ResourceExists($1_object_ObjectCore_$memory#41, $t7));
+    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t4)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+69
+    assume {:print "$at(3,7073,7142)"} true;
+    assert {:msg "assert_failed(3,7073,7142): function does not abort under this condition"}
+      !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t4));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34
-    assume {:print "$track_exp_sub(25999):", $t11} true;
-
-    // assume Identical($t12, Not(exists[@41]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assume ($t12 == !$ResourceExists($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assume {:print "$track_exp(26000):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assume {:print "$track_global_mem(27232):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@41]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assert {:msg "assert_failed(3,6544,6590): function does not abort under this condition"}
-      !!$ResourceExists($1_object_ObjectCore_$memory#41, $t7);
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:39+14
-    assume {:print "$at(3,6629,6643)"} true;
-    assume {:print "$track_exp_sub(26005):", $t7} true;
-
-    // assume Identical($t13, global[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34
-    assume ($t13 == $ResourceValue($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34
-    assume {:print "$track_exp_sub(26006):", $t13} true;
-
-    // assume Identical($t14, Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assume ($t14 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assume {:print "$track_exp(26007):", $t14} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assume {:print "$track_global_mem(27233):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assert {:msg "assert_failed(3,6599,6668): function does not abort under this condition"}
-      !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:13+13
-    assume {:print "$at(3,6742,6755)"} true;
-    assume {:print "$track_exp_sub(26014):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:30+14
-    assume {:print "$track_exp_sub(26016):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:68+14
-    assume {:print "$track_exp_sub(26018):", $t7} true;
-
-    // assume Identical($t15, exists[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34
-    assume ($t15 == $ResourceExists($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34
-    assume {:print "$track_exp_sub(26019):", $t15} true;
-
-    // assume Identical($t16, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assume {:print "$at(3,6677,6813)"} true;
-    assume ($t16 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t7)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assume {:print "$track_exp(26020):", $t16} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assume {:print "$track_global_mem(27234):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assert {:msg "assert_failed(3,6677,6813): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(exists[@41]<object::ObjectCore>($t4)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:9+136
+    assume {:print "$at(3,7151,7287)"} true;
+    assert {:msg "assert_failed(3,7151,7287): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t7))))));
+    ((!$IsEqual'address'($t3, $t4) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t4))))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:13+13
-    assume {:print "$at(3,6887,6900)"} true;
-    assume {:print "$track_exp_sub(26027):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:30+14
-    assume {:print "$track_exp_sub(26029):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:68+14
-    assume {:print "$track_exp_sub(26031):", $t7} true;
-
-    // assume Identical($t17, global[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34
-    assume ($t17 == $ResourceValue($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34
-    assume {:print "$track_exp_sub(26032):", $t17} true;
-
-    // assume Identical($t18, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$at(3,6822,6981)"} true;
-    assume ($t18 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$track_exp(26033):", $t18} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$track_global_mem(27235):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assert {:msg "assert_failed(3,6822,6981): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t4))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:9+159
+    assume {:print "$at(3,7296,7455)"} true;
+    assert {:msg "assert_failed(3,7296,7455): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7)))))));
+    ((!$IsEqual'address'($t3, $t4) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t4)))))));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:9+159
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:412:5+1
     assume {:print "$at(2,16827,16828)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:39+14
-    assume {:print "$at(3,6574,6588)"} true;
-    assume {:print "$track_exp_sub(25998):", $t7} true;
+    // assert Or(Or(Or(Not(exists[@41]<object::ObjectCore>($t4)), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t4)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(exists[@41]<object::ObjectCore>($t4)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t4))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:187:5+652
+    assume {:print "$at(3,6809,7461)"} true;
+    assert {:msg "assert_failed(3,6809,7461): abort not covered by any of the `aborts_if` clauses"}
+      (((!$ResourceExists($1_object_ObjectCore_$memory#41, $t4) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t4))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
+    ((!$IsEqual'address'($t3, $t4) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t4))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
+    ((!$IsEqual'address'($t3, $t4) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t4))))))));
 
-    // assume Identical($t19, exists[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34
-    assume ($t19 == $ResourceExists($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:20+34
-    assume {:print "$track_exp_sub(25999):", $t19} true;
-
-    // assume Identical($t20, Not(exists[@41]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assume ($t20 == !$ResourceExists($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+46
-    assume {:print "$track_exp(26000):", $t20} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:39+14
-    assume {:print "$at(3,6629,6643)"} true;
-    assume {:print "$track_exp_sub(26005):", $t7} true;
-
-    // assume Identical($t21, global[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34
-    assume ($t21 == $ResourceValue($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:20+34
-    assume {:print "$track_exp_sub(26006):", $t21} true;
-
-    // assume Identical($t22, Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assume ($t22 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+69
-    assume {:print "$track_exp(26007):", $t22} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:13+13
-    assume {:print "$at(3,6742,6755)"} true;
-    assume {:print "$track_exp_sub(26014):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:30+14
-    assume {:print "$track_exp_sub(26016):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:68+14
-    assume {:print "$track_exp_sub(26018):", $t7} true;
-
-    // assume Identical($t23, exists[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34
-    assume ($t23 == $ResourceExists($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:182:49+34
-    assume {:print "$track_exp_sub(26019):", $t23} true;
-
-    // assume Identical($t24, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@41]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assume {:print "$at(3,6677,6813)"} true;
-    assume ($t24 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t7)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+136
-    assume {:print "$track_exp(26020):", $t24} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:13+13
-    assume {:print "$at(3,6887,6900)"} true;
-    assume {:print "$track_exp_sub(26027):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:30+14
-    assume {:print "$track_exp_sub(26029):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:68+14
-    assume {:print "$track_exp_sub(26031):", $t7} true;
-
-    // assume Identical($t25, global[@41]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34
-    assume ($t25 == $ResourceValue($1_object_ObjectCore_$memory#41, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:184:49+34
-    assume {:print "$track_exp_sub(26032):", $t25} true;
-
-    // assume Identical($t26, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$at(3,6822,6981)"} true;
-    assume ($t26 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$track_exp(26033):", $t26} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+159
-    assume {:print "$track_global_mem(27236):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Or(Not(exists[@41]<object::ObjectCore>($t7)), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@41]<object::ObjectCore>($t7)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@41]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:172:5+652
-    assume {:print "$at(3,6335,6987)"} true;
-    assert {:msg "assert_failed(3,6335,6987): abort not covered by any of the `aborts_if` clauses"}
-      (((!$ResourceExists($1_object_ObjectCore_$memory#41, $t7) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#41, $t7))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#41, $t7))))))));
-
-    // abort($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:172:5+652
-    $abort_code := $t10;
+    // abort($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:187:5+652
+    $abort_code := $t7;
     $abort_flag := true;
     return;
 
@@ -8290,18 +7803,9 @@ procedure {:timeLimit 40} $1_object_address_to_object$verify(_$t0: int) returns 
     var $t6: int;
     var $t7: int;
     var $t8: $1_object_Object'#0';
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
-    var $t12: bool;
-    var $t13: bool;
-    var $t14: bool;
-    var $t15: bool;
-    var $t16: bool;
     var $t0: int;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#18: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -8374,9 +7878,6 @@ L2:
     // assume WellFormed($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:153:17+20
     assume $IsValid'bool'($t5);
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:153:17+20
-    assume {:print "$track_global_mem(27237):", $1_object_ObjectCore_$memory} true;
-
     // assume Eq<bool>($t5, object::spec_exists_at<#0>($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:153:17+20
     assume $IsEqual'bool'($t5, $1_object_spec_exists_at'#0'($t0));
 
@@ -8434,49 +7935,13 @@ L5:
     assume {:print "$at(2,6905,6906)"} true;
 L6:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:39+6
-    assume {:print "$at(3,403,409)"} true;
-    assume {:print "$track_exp_sub(25175):", $t0} true;
-
-    // assume Identical($t9, exists[@18]<object::ObjectCore>($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#18, $t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26
-    assume {:print "$track_exp_sub(25176):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@18]<object::ObjectCore>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#18, $t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
-    assume {:print "$track_exp(25177):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
-    assume {:print "$track_global_mem(27238):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(Not(exists[@18]<object::ObjectCore>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
+    assume {:print "$at(3,373,411)"} true;
     assert {:msg "assert_failed(3,373,411): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#18, $t0);
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:38+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:38+6
-    assume {:print "$at(3,449,455)"} true;
-    assume {:print "$track_exp_sub(25182):", $t0} true;
-
-    // assume Identical($t11, object::spec_exists_at[]<#0>($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25
-    assume ($t11 == $1_object_spec_exists_at'#0'($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25
-    assume {:print "$track_exp_sub(25183):", $t11} true;
-
-    // assume Identical($t12, Not(object::spec_exists_at[]<#0>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume ($t12 == !$1_object_spec_exists_at'#0'($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume {:print "$track_exp(25184):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume {:print "$track_global_mem(27239):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(Not(object::spec_exists_at[]<#0>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
+    assume {:print "$at(3,420,457)"} true;
     assert {:msg "assert_failed(3,420,457): function does not abort under this condition"}
       !!$1_object_spec_exists_at'#0'($t0);
 
@@ -8487,41 +7952,6 @@ L6:
     // label L7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:155:5+1
     assume {:print "$at(2,6905,6906)"} true;
 L7:
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:39+6
-    assume {:print "$at(3,403,409)"} true;
-    assume {:print "$track_exp_sub(25175):", $t0} true;
-
-    // assume Identical($t13, exists[@18]<object::ObjectCore>($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26
-    assume ($t13 == $ResourceExists($1_object_ObjectCore_$memory#18, $t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:20+26
-    assume {:print "$track_exp_sub(25176):", $t13} true;
-
-    // assume Identical($t14, Not(exists[@18]<object::ObjectCore>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
-    assume ($t14 == !$ResourceExists($1_object_ObjectCore_$memory#18, $t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:15:9+38
-    assume {:print "$track_exp(25177):", $t14} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:38+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:38+6
-    assume {:print "$at(3,449,455)"} true;
-    assume {:print "$track_exp_sub(25182):", $t0} true;
-
-    // assume Identical($t15, object::spec_exists_at[]<#0>($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25
-    assume ($t15 == $1_object_spec_exists_at'#0'($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:20+25
-    assume {:print "$track_exp_sub(25183):", $t15} true;
-
-    // assume Identical($t16, Not(object::spec_exists_at[]<#0>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume ($t16 == !$1_object_spec_exists_at'#0'($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume {:print "$track_exp(25184):", $t16} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:16:9+37
-    assume {:print "$track_global_mem(27240):", $1_object_ObjectCore_$memory} true;
 
     // assert Or(Not(exists[@18]<object::ObjectCore>($t0)), Not(object::spec_exists_at[]<#0>($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:14:5+159
     assume {:print "$at(3,304,463)"} true;
@@ -8585,18 +8015,9 @@ procedure {:timeLimit 40} $1_object_convert$verify(_$t0: $1_object_Object'#0') r
     var $t1: int;
     var $t2: $1_object_Object'#1';
     var $t3: int;
-    var $t4: bool;
-    var $t5: bool;
-    var $t6: bool;
-    var $t7: bool;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
     var $t0: $1_object_Object'#0';
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'$1_object_Object'#1'': $1_object_Object'#1';
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#31: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -8638,49 +8059,13 @@ procedure {:timeLimit 40} $1_object_convert$verify(_$t0: $1_object_Object'#0') r
     assume {:print "$at(2,8648,8649)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:39+6
-    assume {:print "$at(3,1518,1524)"} true;
-    assume {:print "$track_exp_sub(25597):", $t0} true;
-
-    // assume Identical($t4, exists[@31]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32
-    assume ($t4 == $ResourceExists($1_object_ObjectCore_$memory#31, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32
-    assume {:print "$track_exp_sub(25598):", $t4} true;
-
-    // assume Identical($t5, Not(exists[@31]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
-    assume ($t5 == !$ResourceExists($1_object_ObjectCore_$memory#31, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
-    assume {:print "$track_exp(25599):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
-    assume {:print "$track_global_mem(27241):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(Not(exists[@31]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
+    assume {:print "$at(3,1488,1532)"} true;
     assert {:msg "assert_failed(3,1488,1532): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#31, $inner#$1_object_Object'#0'($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:38+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:38+6
-    assume {:print "$at(3,1570,1576)"} true;
-    assume {:print "$track_exp_sub(25604):", $t0} true;
-
-    // assume Identical($t6, object::spec_exists_at[]<#1>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31
-    assume ($t6 == $1_object_spec_exists_at'#1'($inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31
-    assume {:print "$track_exp_sub(25605):", $t6} true;
-
-    // assume Identical($t7, Not(object::spec_exists_at[]<#1>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume ($t7 == !$1_object_spec_exists_at'#1'($inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume {:print "$track_exp(25606):", $t7} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume {:print "$track_global_mem(27242):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(Not(object::spec_exists_at[]<#1>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
+    assume {:print "$at(3,1541,1584)"} true;
     assert {:msg "assert_failed(3,1541,1584): function does not abort under this condition"}
       !!$1_object_spec_exists_at'#1'($inner#$1_object_Object'#0'($t0));
 
@@ -8691,41 +8076,6 @@ L1:
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:196:5+1
     assume {:print "$at(2,8648,8649)"} true;
 L2:
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:39+6
-    assume {:print "$at(3,1518,1524)"} true;
-    assume {:print "$track_exp_sub(25597):", $t0} true;
-
-    // assume Identical($t8, exists[@31]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32
-    assume ($t8 == $ResourceExists($1_object_ObjectCore_$memory#31, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:20+32
-    assume {:print "$track_exp_sub(25598):", $t8} true;
-
-    // assume Identical($t9, Not(exists[@31]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
-    assume ($t9 == !$ResourceExists($1_object_ObjectCore_$memory#31, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:45:9+44
-    assume {:print "$track_exp(25599):", $t9} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:38+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:38+6
-    assume {:print "$at(3,1570,1576)"} true;
-    assume {:print "$track_exp_sub(25604):", $t0} true;
-
-    // assume Identical($t10, object::spec_exists_at[]<#1>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31
-    assume ($t10 == $1_object_spec_exists_at'#1'($inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:20+31
-    assume {:print "$track_exp_sub(25605):", $t10} true;
-
-    // assume Identical($t11, Not(object::spec_exists_at[]<#1>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume ($t11 == !$1_object_spec_exists_at'#1'($inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume {:print "$track_exp(25606):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:46:9+43
-    assume {:print "$track_global_mem(27243):", $1_object_ObjectCore_$memory} true;
 
     // assert Or(Not(exists[@31]<object::ObjectCore>(select object::Object.inner($t0))), Not(object::spec_exists_at[]<#1>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:44:5+171
     assume {:print "$at(3,1419,1590)"} true;
@@ -8883,24 +8233,15 @@ procedure {:timeLimit 40} $1_object_create_named_object$verify(_$t0: $signer, _$
     var $t6: int;
     var $t7: int;
     var $t8: int;
-    var $t9: int;
-    var $t10: int;
-    var $t11: int;
-    var $t12: int;
-    var $t13: bool;
-    var $t14: $1_object_ConstructorRef;
-    var $t15: bool;
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: bool;
+    var $t9: bool;
+    var $t10: $1_object_ConstructorRef;
     var $t0: $signer;
     var $t1: Vec (int);
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $temp_0'vec'u8'': Vec (int);
-    var $1_object_ObjectCore_$memory#46: $Memory $1_object_ObjectCore;
+    var $1_object_ObjectCore_$memory#47: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
 
@@ -8919,56 +8260,17 @@ procedure {:timeLimit 40} $1_object_create_named_object$verify(_$t0: $signer, _$
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:50+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:50+7
-    assume {:print "$at(3,1724,1731)"} true;
-    assume {:print "$track_exp_sub(26395):", $t0} true;
-
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:31+27
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50
+    assume {:print "$at(3,1683,1733)"} true;
     assume ($t4 == $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:31+27]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:31+27
-    assume {:print "$track_exp_sub(26396):", $t4} true;
+    // assume Identical($t5, object::spec_create_object_address($t4, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65
+    assume {:print "$at(3,1742,1807)"} true;
+    assume ($t5 == $1_object_spec_create_object_address($t4, $t1));
 
-    // assume Identical($t5, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50
-    assume ($t5 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50
-    assume {:print "$track_exp(26397):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50
-    assume {:print "$track_global_mem(27244):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:50:9+50
-    assume ($t6 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:51+15]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:51+15
-    assume {:print "$at(3,1784,1799)"} true;
-    assume {:print "$track_exp_sub(26403):", $t6} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:68+4]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:68+4
-    assume {:print "$track_exp_sub(26404):", $t1} true;
-
-    // assume Identical($t7, object::spec_create_object_address($t6, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:24+49
-    assume ($t7 == $1_object_spec_create_object_address($t6, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:24+49]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:24+49
-    assume {:print "$track_exp_sub(26405):", $t7} true;
-
-    // assume Identical($t8, object::spec_create_object_address($t6, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65
-    assume ($t8 == $1_object_spec_create_object_address($t6, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65
-    assume {:print "$track_exp(26406):", $t8} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65
-    assume {:print "$track_global_mem(27245):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t9, object::spec_create_object_address($t6, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:51:9+65
-    assume ($t9 == $1_object_spec_create_object_address($t6, $t1));
-
-    // @46 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:200:5+1
+    // @47 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:200:5+1
     assume {:print "$at(2,8855,8856)"} true;
-    $1_object_ObjectCore_$memory#46 := $1_object_ObjectCore_$memory;
+    $1_object_ObjectCore_$memory#47 := $1_object_ObjectCore_$memory;
 
     // trace_local[creator]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:200:5+1
     assume {:print "$track_local(52,8,0):", $t0} $t0 == $t0;
@@ -8976,114 +8278,74 @@ procedure {:timeLimit 40} $1_object_create_named_object$verify(_$t0: $signer, _$
     // trace_local[seed]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:200:5+1
     assume {:print "$track_local(52,8,1):", $t1} $t1 == $t1;
 
-    // $t10 := signer::address_of($t0) on_abort goto L2 with $t11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:201:31+27
+    // $t6 := signer::address_of($t0) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:201:31+27
     assume {:print "$at(2,8970,8997)"} true;
-    call $t10 := $1_signer_address_of($t0);
+    call $t6 := $1_signer_address_of($t0);
     if ($abort_flag) {
         assume {:print "$at(2,8970,8997)"} true;
-        $t11 := $abort_code;
-        assume {:print "$track_abort(52,8):", $t11} $t11 == $t11;
+        $t7 := $abort_code;
+        assume {:print "$track_abort(52,8):", $t7} $t7 == $t7;
         goto L2;
     }
 
-    // trace_local[creator_address]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:201:13+15
-    assume {:print "$track_local(52,8,2):", $t10} $t10 == $t10;
+    // trace_local[creator_address]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:201:13+15
+    assume {:print "$track_local(52,8,2):", $t6} $t6 == $t6;
 
-    // $t12 := opaque begin: object::create_object_address($t10, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
+    // $t8 := opaque begin: object::create_object_address($t6, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
     assume {:print "$at(2,9022,9067)"} true;
 
-    // assume WellFormed($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
-    assume $IsValid'address'($t12);
+    // assume WellFormed($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
+    assume $IsValid'address'($t8);
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
-    assume {:print "$track_global_mem(27246):", $1_object_ObjectCore_$memory} true;
+    // assume Eq<address>($t8, object::spec_create_object_address($t6, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
+    assume $IsEqual'address'($t8, $1_object_spec_create_object_address($t6, $t1));
 
-    // assume Eq<address>($t12, object::spec_create_object_address($t10, $t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
-    assume $IsEqual'address'($t12, $1_object_spec_create_object_address($t10, $t1));
+    // $t8 := opaque end: object::create_object_address($t6, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
 
-    // $t12 := opaque end: object::create_object_address($t10, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:24+45
+    // trace_local[obj_addr]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:13+8
+    assume {:print "$track_local(52,8,3):", $t8} $t8 == $t8;
 
-    // trace_local[obj_addr]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:202:13+8
-    assume {:print "$track_local(52,8,3):", $t12} $t12 == $t12;
-
-    // $t13 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:59+5
+    // $t9 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:59+5
     assume {:print "$at(2,9127,9132)"} true;
-    $t13 := false;
-    assume $IsValid'bool'($t13);
+    $t9 := false;
+    assume $IsValid'bool'($t9);
 
-    // $t14 := object::create_object_internal($t10, $t12, $t13) on_abort goto L2 with $t11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:9+56
-    call $t14 := $1_object_create_object_internal($t10, $t12, $t13);
+    // $t10 := object::create_object_internal($t6, $t8, $t9) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:9+56
+    call $t10 := $1_object_create_object_internal($t6, $t8, $t9);
     if ($abort_flag) {
         assume {:print "$at(2,9077,9133)"} true;
-        $t11 := $abort_code;
-        assume {:print "$track_abort(52,8):", $t11} $t11 == $t11;
+        $t7 := $abort_code;
+        assume {:print "$track_abort(52,8):", $t7} $t7 == $t7;
         goto L2;
     }
 
-    // trace_return[0]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:9+56
-    assume {:print "$track_return(52,8,0):", $t14} $t14 == $t14;
+    // trace_return[0]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:203:9+56
+    assume {:print "$track_return(52,8,0):", $t10} $t10 == $t10;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:204:5+1
     assume {:print "$at(2,9138,9139)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:38+8]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:38+8
-    assume {:print "$at(3,1845,1853)"} true;
-    assume {:print "$track_exp_sub(26411):", $t9} true;
-
-    // assume Identical($t15, exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28
-    assume ($t15 == $ResourceExists($1_object_ObjectCore_$memory#46, $t9));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28
-    assume {:print "$track_exp_sub(26412):", $t15} true;
-
-    // assume Identical($t16, exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume ($t16 == $ResourceExists($1_object_ObjectCore_$memory#46, $t9));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume {:print "$track_exp(26413):", $t16} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume {:print "$track_global_mem(27247):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
+    // assert Not(exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
+    assume {:print "$at(3,1816,1855)"} true;
     assert {:msg "assert_failed(3,1816,1855): function does not abort under this condition"}
-      !$ResourceExists($1_object_ObjectCore_$memory#46, $t9);
+      !$ResourceExists($1_object_ObjectCore_$memory#47, $t5);
 
-    // return $t14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    $ret0 := $t14;
+    // return $t10 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
+    $ret0 := $t10;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:204:5+1
     assume {:print "$at(2,9138,9139)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:38+8]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:38+8
-    assume {:print "$at(3,1845,1853)"} true;
-    assume {:print "$track_exp_sub(26411):", $t9} true;
-
-    // assume Identical($t17, exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28
-    assume ($t17 == $ResourceExists($1_object_ObjectCore_$memory#46, $t9));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:19+28
-    assume {:print "$track_exp_sub(26412):", $t17} true;
-
-    // assume Identical($t18, exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume ($t18 == $ResourceExists($1_object_ObjectCore_$memory#46, $t9));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume {:print "$track_exp(26413):", $t18} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:52:9+39
-    assume {:print "$track_global_mem(27248):", $1_object_ObjectCore_$memory} true;
-
-    // assert exists[@46]<object::ObjectCore>($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:49:5+265
+    // assert exists[@47]<object::ObjectCore>($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:49:5+265
     assume {:print "$at(3,1596,1861)"} true;
     assert {:msg "assert_failed(3,1596,1861): abort not covered by any of the `aborts_if` clauses"}
-      $ResourceExists($1_object_ObjectCore_$memory#46, $t9);
+      $ResourceExists($1_object_ObjectCore_$memory#47, $t5);
 
-    // abort($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:49:5+265
-    $abort_code := $t11;
+    // abort($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:49:5+265
+    $abort_code := $t7;
     $abort_flag := true;
     return;
 
@@ -9230,47 +8492,31 @@ procedure {:timeLimit 40} $1_object_create_object_from_account$verify(_$t0: $sig
 {
     // declare local variables
     var $t1: $1_guid_GUID;
-    var $t2: int;
-    var $t3: $1_account_Account;
-    var $t4: $1_account_Account;
-    var $t5: $1_account_Account;
-    var $t6: int;
-    var $t7: int;
-    var $t8: int;
+    var $t2: $1_account_Account;
+    var $t3: int;
+    var $t4: int;
+    var $t5: $1_guid_GUID;
+    var $t6: Vec (int);
+    var $t7: Vec (int);
+    var $t8: Vec (int);
     var $t9: int;
     var $t10: int;
-    var $t11: $1_guid_GUID;
-    var $t12: $1_guid_GUID;
-    var $t13: int;
+    var $t11: int;
+    var $t12: $1_account_Account;
+    var $t13: $1_guid_GUID;
     var $t14: int;
-    var $t15: $1_account_Account;
-    var $t16: $1_guid_GUID;
-    var $t17: int;
-    var $t18: int;
-    var $t19: Vec (int);
-    var $t20: Vec (int);
-    var $t21: Vec (int);
-    var $t22: int;
-    var $t23: $1_object_ConstructorRef;
-    var $t24: int;
-    var $t25: bool;
-    var $t26: bool;
-    var $t27: bool;
-    var $t28: bool;
-    var $t29: int;
-    var $t30: bool;
-    var $t31: bool;
-    var $t32: bool;
-    var $t33: bool;
+    var $t15: int;
+    var $t16: Vec (int);
+    var $t17: Vec (int);
+    var $t18: Vec (int);
+    var $t19: int;
+    var $t20: $1_object_ConstructorRef;
     var $t0: $signer;
-    var $temp_0'$1_account_Account': $1_account_Account;
     var $temp_0'$1_guid_GUID': $1_guid_GUID;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
-    var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
-    var $temp_0'u64': int;
     var $1_account_Account_$memory#45: $Memory $1_account_Account;
+    var $1_object_ObjectCore_$memory#46: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
     // verification entrypoint assumptions
@@ -9289,358 +8535,151 @@ procedure {:timeLimit 40} $1_object_create_object_from_account$verify(_$t0: $sig
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:71+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:71+7
-    assume {:print "$at(3,2362,2369)"} true;
-    assume {:print "$track_exp_sub(26279):", $t0} true;
+    // assume Identical($t2, global<account::Account>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
+    assume {:print "$at(3,2300,2372)"} true;
+    assume ($t2 == $ResourceValue($1_account_Account_$memory, $1_signer_$address_of($t0)));
 
-    // assume Identical($t2, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:52+27
-    assume ($t2 == $1_signer_$address_of($t0));
+    // assume Identical($t3, select account::Account.guid_creation_num($t2)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
+    assume {:print "$at(3,2531,2580)"} true;
+    assume ($t3 == $guid_creation_num#$1_account_Account($t2));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:52+27]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:52+27
-    assume {:print "$track_exp_sub(26280):", $t2} true;
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
+    assume {:print "$at(3,2589,2628)"} true;
+    assume ($t4 == $1_signer_$address_of($t0));
 
-    // assume Identical($t3, global<account::Account>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:27+53
-    assume ($t3 == $ResourceValue($1_account_Account_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t5, pack guid::GUID(pack guid::ID($t3, $t4))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:69:9+127
+    assume {:print "$at(3,2638,2765)"} true;
+    assume ($t5 == $1_guid_GUID($1_guid_ID($t3, $t4)));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:27+53]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:27+53
-    assume {:print "$track_exp_sub(26281):", $t3} true;
+    // assume Identical($t6, bcs::$to_bytes<guid::GUID>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:76:9+37
+    assume {:print "$at(3,2775,2812)"} true;
+    assume ($t6 == $1_bcs_$to_bytes'$1_guid_GUID'($t5));
 
-    // assume Identical($t4, global<account::Account>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
-    assume ($t4 == $ResourceValue($1_account_Account_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t7, ConcatVec<u8>($t6, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+72
+    assume {:print "$at(3,2821,2893)"} true;
+    assume ($t7 == ConcatVec($t6, MakeVec1(253)));
 
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
-    assume {:print "$track_exp(26282):", $t4} true;
+    // assume Identical($t8, hash::$sha3_256($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:78:9+39
+    assume {:print "$at(3,2902,2941)"} true;
+    assume ($t8 == $1_hash_$sha3_256($t7));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
-    assume {:print "$track_global_mem(27249):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
-    assume {:print "$track_global_mem(27250):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, global<account::Account>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:63:9+72
-    assume ($t5 == $ResourceValue($1_account_Account_$memory, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:28+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:28+11
-    assume {:print "$at(3,2550,2561)"} true;
-    assume {:print "$track_exp_sub(26286):", $t5} true;
-
-    // assume Identical($t6, select account::Account.guid_creation_num($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
-    assume ($t6 == $guid_creation_num#$1_account_Account($t5));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
-    assume {:print "$track_exp(26287):", $t6} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
-    assume {:print "$track_global_mem(27251):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
-    assume {:print "$track_global_mem(27252):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t7, select account::Account.guid_creation_num($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:66:9+49
-    assume ($t7 == $guid_creation_num#$1_account_Account($t5));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:39+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:39+7
-    assume {:print "$at(3,2619,2626)"} true;
-    assume {:print "$track_exp_sub(26291):", $t0} true;
-
-    // assume Identical($t8, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:20+27
-    assume ($t8 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:20+27]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:20+27
-    assume {:print "$track_exp_sub(26292):", $t8} true;
-
-    // assume Identical($t9, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
-    assume ($t9 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
-    assume {:print "$track_exp(26293):", $t9} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
-    assume {:print "$track_global_mem(27253):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
-    assume {:print "$track_global_mem(27254):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t10, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:67:9+39
-    assume ($t10 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:70:17+12]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:70:17+12
-    assume {:print "$at(3,2701,2713)"} true;
-    assume {:print "$track_exp_sub(26298):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:71:17+4]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:71:17+4
-    assume {:print "$at(3,2731,2735)"} true;
-    assume {:print "$track_exp_sub(26300):", $t10} true;
-
-    // assume Identical($t11, pack guid::GUID(pack guid::ID($t7, $t10))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124
-    assume {:print "$at(3,2637,2761)"} true;
-    assume ($t11 == $1_guid_GUID($1_guid_ID($t7, $t10)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124
-    assume {:print "$track_exp(26301):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124
-    assume {:print "$track_global_mem(27255):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124
-    assume {:print "$track_global_mem(27256):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t12, pack guid::GUID(pack guid::ID($t7, $t10))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:68:9+124
-    assume ($t12 == $1_guid_GUID($1_guid_ID($t7, $t10)));
+    // assume Identical($t9, from_bcs::deserialize<address>($t8)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+58
+    assume {:print "$at(3,2950,3008)"} true;
+    assume ($t9 == $1_from_bcs_deserialize'address'($t8));
 
     // @45 := save_mem(account::Account) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:214:5+1
     assume {:print "$at(2,9673,9674)"} true;
     $1_account_Account_$memory#45 := $1_account_Account_$memory;
 
+    // @46 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:214:5+1
+    $1_object_ObjectCore_$memory#46 := $1_object_ObjectCore_$memory;
+
     // trace_local[creator]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:214:5+1
     assume {:print "$track_local(52,10,0):", $t0} $t0 == $t0;
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:20+29
-    assume {:print "$at(2,9766,9795)"} true;
-    assume {:print "$track_global_mem(27257):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:20+29
-    assume {:print "$track_global_mem(27258):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t13, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:416:9+46
+    // assume Identical($t10, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:416:9+46
     assume {:print "$at(73,20442,20488)"} true;
-    assume ($t13 == $1_signer_$address_of($t0));
+    assume ($t10 == $1_signer_$address_of($t0));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:416:9+46
-    assume {:print "$track_global_mem(27259):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:416:9+46
-    assume {:print "$track_global_mem(27260):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t14, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:430:9+39
+    // assume Identical($t11, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:430:9+39
     assume {:print "$at(73,20934,20973)"} true;
-    assume ($t14 == $1_signer_$address_of($t0));
+    assume ($t11 == $1_signer_$address_of($t0));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:430:9+39
-    assume {:print "$track_global_mem(27261):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:430:9+39
-    assume {:print "$track_global_mem(27262):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t15, global<account::Account>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:431:9+36
+    // assume Identical($t12, global<account::Account>($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/account.spec.move:431:9+36
     assume {:print "$at(73,20982,21018)"} true;
-    assume ($t15 == $ResourceValue($1_account_Account_$memory, $t14));
+    assume ($t12 == $ResourceValue($1_account_Account_$memory, $t11));
 
-    // $t16 := account::create_guid($t0) on_abort goto L2 with $t17 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:20+29
+    // $t13 := account::create_guid($t0) on_abort goto L2 with $t14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:20+29
     assume {:print "$at(2,9766,9795)"} true;
-    call $t16 := $1_account_create_guid($t0);
+    call $t13 := $1_account_create_guid($t0);
     if ($abort_flag) {
         assume {:print "$at(2,9766,9795)"} true;
-        $t17 := $abort_code;
-        assume {:print "$track_abort(52,10):", $t17} $t17 == $t17;
+        $t14 := $abort_code;
+        assume {:print "$track_abort(52,10):", $t14} $t14 == $t14;
         goto L2;
     }
 
-    // trace_local[guid]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:13+4
-    assume {:print "$track_local(52,10,1):", $t16} $t16 == $t16;
+    // trace_local[guid]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:215:13+4
+    assume {:print "$track_local(52,10,1):", $t13} $t13 == $t13;
 
-    // $t18 := signer::address_of($t0) on_abort goto L2 with $t17 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:33+27
+    // $t15 := signer::address_of($t0) on_abort goto L2 with $t14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:33+27
     assume {:print "$at(2,9829,9856)"} true;
-    call $t18 := $1_signer_address_of($t0);
+    call $t15 := $1_signer_address_of($t0);
     if ($abort_flag) {
         assume {:print "$at(2,9829,9856)"} true;
-        $t17 := $abort_code;
-        assume {:print "$track_abort(52,10):", $t17} $t17 == $t17;
+        $t14 := $abort_code;
+        assume {:print "$track_abort(52,10):", $t14} $t14 == $t14;
         goto L2;
     }
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
-    assume {:print "$track_global_mem(27263):", $1_account_Account_$memory} true;
+    // assume Identical($t16, bcs::$to_bytes<guid::GUID>($t13)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:9+37
+    assume {:print "$at(3,4010,4047)"} true;
+    assume ($t16 == $1_bcs_$to_bytes'$1_guid_GUID'($t13));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
-    assume {:print "$track_global_mem(27264):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t17, ConcatVec<u8>($t16, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+72
+    assume {:print "$at(3,4056,4128)"} true;
+    assume ($t17 == ConcatVec($t16, MakeVec1(253)));
 
-    // assume Identical($t19, bcs::$to_bytes<guid::GUID>($t16)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$at(3,3536,3573)"} true;
-    assume ($t19 == $1_bcs_$to_bytes'$1_guid_GUID'($t16));
+    // assume Identical($t18, hash::$sha3_256($t17)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:108:9+39
+    assume {:print "$at(3,4137,4176)"} true;
+    assume ($t18 == $1_hash_$sha3_256($t17));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$track_global_mem(27265):", $1_account_Account_$memory} true;
+    // assume Identical($t19, from_bcs::deserialize<address>($t18)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:109:9+58
+    assume {:print "$at(3,4185,4243)"} true;
+    assume ($t19 == $1_from_bcs_deserialize'address'($t18));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$track_global_mem(27266):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t20, ConcatVec<u8>($t19, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$at(3,3582,3654)"} true;
-    assume ($t20 == ConcatVec($t19, MakeVec1(253)));
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$track_global_mem(27267):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$track_global_mem(27268):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t21, hash::$sha3_256($t20)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$at(3,3663,3702)"} true;
-    assume ($t21 == $1_hash_$sha3_256($t20));
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$track_global_mem(27269):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$track_global_mem(27270):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t22, from_bcs::deserialize<address>($t21)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume {:print "$at(3,3711,3769)"} true;
-    assume ($t22 == $1_from_bcs_deserialize'address'($t21));
-
-    // $t23 := object::create_object_from_guid($t18, $t16) on_abort goto L2 with $t17 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
+    // $t20 := object::create_object_from_guid($t15, $t13) on_abort goto L2 with $t14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
     assume {:print "$at(2,9805,9863)"} true;
-    call $t23 := $1_object_create_object_from_guid($t18, $t16);
+    call $t20 := $1_object_create_object_from_guid($t15, $t13);
     if ($abort_flag) {
         assume {:print "$at(2,9805,9863)"} true;
-        $t17 := $abort_code;
-        assume {:print "$track_abort(52,10):", $t17} $t17 == $t17;
+        $t14 := $abort_code;
+        assume {:print "$track_abort(52,10):", $t14} $t14 == $t14;
         goto L2;
     }
 
-    // trace_return[0]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
-    assume {:print "$track_return(52,10,0):", $t23} $t23 == $t23;
+    // trace_return[0]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:216:9+58
+    assume {:print "$track_return(52,10,0):", $t20} $t20 == $t20;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:217:5+1
     assume {:print "$at(2,9868,9869)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:64+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:64+7
-    assume {:print "$at(3,2255,2262)"} true;
-    assume {:print "$track_exp_sub(26307):", $t0} true;
-
-    // assume Identical($t24, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27
-    assume ($t24 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27
-    assume {:print "$track_exp_sub(26308):", $t24} true;
-
-    // assume Identical($t25, exists[@45]<account::Account>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53
-    assume ($t25 == $ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53
-    assume {:print "$track_exp_sub(26309):", $t25} true;
-
-    // assume Identical($t26, Not(exists[@45]<account::Account>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume ($t26 == !$ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume {:print "$track_exp(26310):", $t26} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume {:print "$track_global_mem(27271):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume {:print "$track_global_mem(27272):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(Not(exists[@45]<account::Account>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
+    assume {:print "$at(3,2200,2265)"} true;
     assert {:msg "assert_failed(3,2200,2265): function does not abort under this condition"}
       !!$ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:19+11
-    assume {:print "$at(3,2391,2402)"} true;
-    assume {:print "$track_exp_sub(26314):", $t5} true;
-
-    // assume Identical($t27, Gt(Add(select account::Account.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume ($t27 == (($guid_creation_num#$1_account_Account($t5) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume {:print "$track_exp(26315):", $t27} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume {:print "$track_global_mem(27273):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume {:print "$track_global_mem(27274):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Gt(Add(select account::Account.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
+    // assert Not(Gt(Add(select account::Account.guid_creation_num($t2), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
+    assume {:print "$at(3,2381,2435)"} true;
     assert {:msg "assert_failed(3,2381,2435): function does not abort under this condition"}
-      !(($guid_creation_num#$1_account_Account($t5) + 1) > 18446744073709551615);
+      !(($guid_creation_num#$1_account_Account($t2) + 1) > 18446744073709551615);
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:19+11
-    assume {:print "$at(3,2454,2465)"} true;
-    assume {:print "$track_exp_sub(26319):", $t5} true;
-
-    // assume Identical($t28, Ge(Add(select account::Account.guid_creation_num($t5), 1), 1125899906842624)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume ($t28 == (($guid_creation_num#$1_account_Account($t5) + 1) >= 1125899906842624));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78]($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_exp(26320):", $t28} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_global_mem(27275):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_global_mem(27276):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Ge(Add(select account::Account.guid_creation_num($t5), 1), 1125899906842624)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
+    // assert Not(Ge(Add(select account::Account.guid_creation_num($t2), 1), 1125899906842624)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
+    assume {:print "$at(3,2444,2522)"} true;
     assert {:msg "assert_failed(3,2444,2522): function does not abort under this condition"}
-      !(($guid_creation_num#$1_account_Account($t5) + 1) >= 1125899906842624);
+      !(($guid_creation_num#$1_account_Account($t2) + 1) >= 1125899906842624);
 
-    // return $t23 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    $ret0 := $t23;
+    // assert Not(exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+39
+    assume {:print "$at(3,3017,3056)"} true;
+    assert {:msg "assert_failed(3,3017,3056): function does not abort under this condition"}
+      !$ResourceExists($1_object_ObjectCore_$memory#46, $t9);
+
+    // return $t20 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+39
+    $ret0 := $t20;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:217:5+1
     assume {:print "$at(2,9868,9869)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:64+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:64+7
-    assume {:print "$at(3,2255,2262)"} true;
-    assume {:print "$track_exp_sub(26307):", $t0} true;
+    // assert Or(Or(Or(Not(exists[@45]<account::Account>(signer::$address_of[]($t0))), Gt(Add(select account::Account.guid_creation_num($t2), 1), 18446744073709551615)), Ge(Add(select account::Account.guid_creation_num($t2), 1), 1125899906842624)), exists[@46]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:60:5+938
+    assume {:print "$at(3,2124,3062)"} true;
+    assert {:msg "assert_failed(3,2124,3062): abort not covered by any of the `aborts_if` clauses"}
+      (((!$ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_account_Account($t2) + 1) > 18446744073709551615)) || (($guid_creation_num#$1_account_Account($t2) + 1) >= 1125899906842624)) || $ResourceExists($1_object_ObjectCore_$memory#46, $t9));
 
-    // assume Identical($t29, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27
-    assume ($t29 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:45+27
-    assume {:print "$track_exp_sub(26308):", $t29} true;
-
-    // assume Identical($t30, exists[@45]<account::Account>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53
-    assume ($t30 == $ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53]($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:20+53
-    assume {:print "$track_exp_sub(26309):", $t30} true;
-
-    // assume Identical($t31, Not(exists[@45]<account::Account>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume ($t31 == !$ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65]($t31) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:61:9+65
-    assume {:print "$track_exp(26310):", $t31} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:19+11
-    assume {:print "$at(3,2391,2402)"} true;
-    assume {:print "$track_exp_sub(26314):", $t5} true;
-
-    // assume Identical($t32, Gt(Add(select account::Account.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume ($t32 == (($guid_creation_num#$1_account_Account($t5) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54]($t32) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:64:9+54
-    assume {:print "$track_exp(26315):", $t32} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:19+11
-    assume {:print "$at(3,2454,2465)"} true;
-    assume {:print "$track_exp_sub(26319):", $t5} true;
-
-    // assume Identical($t33, Ge(Add(select account::Account.guid_creation_num($t5), 1), 1125899906842624)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume ($t33 == (($guid_creation_num#$1_account_Account($t5) + 1) >= 1125899906842624));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78]($t33) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_exp(26320):", $t33} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_global_mem(27277):", $1_account_Account_$memory} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:65:9+78
-    assume {:print "$track_global_mem(27278):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Not(exists[@45]<account::Account>(signer::$address_of[]($t0))), Gt(Add(select account::Account.guid_creation_num($t5), 1), 18446744073709551615)), Ge(Add(select account::Account.guid_creation_num($t5), 1), 1125899906842624)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:60:5+643
-    assume {:print "$at(3,2124,2767)"} true;
-    assert {:msg "assert_failed(3,2124,2767): abort not covered by any of the `aborts_if` clauses"}
-      ((!$ResourceExists($1_account_Account_$memory#45, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_account_Account($t5) + 1) > 18446744073709551615)) || (($guid_creation_num#$1_account_Account($t5) + 1) >= 1125899906842624));
-
-    // abort($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:60:5+643
-    $abort_code := $t17;
+    // abort($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:60:5+938
+    $abort_code := $t14;
     $abort_flag := true;
     return;
 
@@ -9674,20 +8713,20 @@ procedure {:inline 1} $1_object_create_object_from_guid(_$t0: int, _$t1: $1_guid
     $t1 := _$t1;
 
     // bytecode translation starts here
-    // assume Identical($t4, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$at(3,3536,3573)"} true;
+    // assume Identical($t4, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:9+37
+    assume {:print "$at(3,4010,4047)"} true;
     assume ($t4 == $1_bcs_$to_bytes'$1_guid_GUID'($t1));
 
-    // assume Identical($t5, ConcatVec<u8>($t4, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$at(3,3582,3654)"} true;
+    // assume Identical($t5, ConcatVec<u8>($t4, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+72
+    assume {:print "$at(3,4056,4128)"} true;
     assume ($t5 == ConcatVec($t4, MakeVec1(253)));
 
-    // assume Identical($t6, hash::$sha3_256($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$at(3,3663,3702)"} true;
+    // assume Identical($t6, hash::$sha3_256($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:108:9+39
+    assume {:print "$at(3,4137,4176)"} true;
     assume ($t6 == $1_hash_$sha3_256($t5));
 
-    // assume Identical($t7, from_bcs::deserialize<address>($t6)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume {:print "$at(3,3711,3769)"} true;
+    // assume Identical($t7, from_bcs::deserialize<address>($t6)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:109:9+58
+    assume {:print "$at(3,4185,4243)"} true;
     assume ($t7 == $1_from_bcs_deserialize'address'($t6));
 
     // trace_local[creator_address]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:225:5+1
@@ -9808,35 +8847,20 @@ procedure {:timeLimit 40} $1_object_create_object_from_guid$verify(_$t0: int, _$
     var $t4: Vec (int);
     var $t5: Vec (int);
     var $t6: Vec (int);
-    var $t7: Vec (int);
-    var $t8: Vec (int);
-    var $t9: Vec (int);
-    var $t10: Vec (int);
+    var $t7: int;
+    var $t8: int;
+    var $t9: $Mutation (Vec (int));
+    var $t10: int;
     var $t11: Vec (int);
-    var $t12: int;
+    var $t12: Vec (int);
     var $t13: int;
-    var $t14: int;
-    var $t15: int;
-    var $t16: $Mutation (Vec (int));
-    var $t17: int;
-    var $t18: Vec (int);
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: Vec (int);
-    var $t22: Vec (int);
-    var $t23: int;
-    var $t24: bool;
-    var $t25: $1_object_ConstructorRef;
-    var $t26: bool;
-    var $t27: bool;
-    var $t28: bool;
-    var $t29: bool;
+    var $t14: bool;
+    var $t15: $1_object_ConstructorRef;
     var $t0: int;
     var $t1: $1_guid_GUID;
     var $temp_0'$1_guid_GUID': $1_guid_GUID;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'vec'u8'': Vec (int);
     var $1_object_ObjectCore_$memory#38: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -9857,87 +8881,21 @@ procedure {:timeLimit 40} $1_object_create_object_from_guid$verify(_$t0: int, _$
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:40+4]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:40+4
-    assume {:print "$at(3,3567,3571)"} true;
-    assume {:print "$track_exp_sub(25843):", $t1} true;
-
-    // assume Identical($t4, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:26+19
+    // assume Identical($t4, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:9+37
+    assume {:print "$at(3,4010,4047)"} true;
     assume ($t4 == $1_bcs_$to_bytes'$1_guid_GUID'($t1));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:26+19]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:26+19
-    assume {:print "$track_exp_sub(25844):", $t4} true;
+    // assume Identical($t5, ConcatVec<u8>($t4, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+72
+    assume {:print "$at(3,4056,4128)"} true;
+    assume ($t5 == ConcatVec($t4, MakeVec1(253)));
 
-    // assume Identical($t5, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume ($t5 == $1_bcs_$to_bytes'$1_guid_GUID'($t1));
+    // assume Identical($t6, hash::$sha3_256($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:108:9+39
+    assume {:print "$at(3,4137,4176)"} true;
+    assume ($t6 == $1_hash_$sha3_256($t5));
 
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$track_exp(25845):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$track_global_mem(27279):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t6, bcs::$to_bytes<guid::GUID>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume ($t6 == $1_bcs_$to_bytes'$1_guid_GUID'($t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:28+10]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:28+10
-    assume {:print "$at(3,3601,3611)"} true;
-    assume {:print "$track_exp_sub(25849):", $t6} true;
-
-    // assume Identical($t7, ConcatVec<u8>($t6, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume ($t7 == ConcatVec($t6, MakeVec1(253)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$track_exp(25850):", $t7} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$track_global_mem(27280):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t8, ConcatVec<u8>($t6, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume ($t8 == ConcatVec($t6, MakeVec1(253)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:41+5]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:41+5
-    assume {:print "$at(3,3695,3700)"} true;
-    assume {:print "$track_exp_sub(25855):", $t8} true;
-
-    // assume Identical($t9, hash::$sha3_256($t8)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:26+21
-    assume ($t9 == $1_hash_$sha3_256($t8));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:26+21]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:26+21
-    assume {:print "$track_exp_sub(25856):", $t9} true;
-
-    // assume Identical($t10, hash::$sha3_256($t8)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume ($t10 == $1_hash_$sha3_256($t8));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$track_exp(25857):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$track_global_mem(27281):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t11, hash::$sha3_256($t8)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume ($t11 == $1_hash_$sha3_256($t8));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:55+10]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:55+10
-    assume {:print "$at(3,3757,3767)"} true;
-    assume {:print "$track_exp_sub(25862):", $t11} true;
-
-    // assume Identical($t12, from_bcs::deserialize<address>($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:24+42
-    assume ($t12 == $1_from_bcs_deserialize'address'($t11));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:24+42]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:24+42
-    assume {:print "$track_exp_sub(25863):", $t12} true;
-
-    // assume Identical($t13, from_bcs::deserialize<address>($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume ($t13 == $1_from_bcs_deserialize'address'($t11));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume {:print "$track_exp(25864):", $t13} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume {:print "$track_global_mem(27282):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t14, from_bcs::deserialize<address>($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume ($t14 == $1_from_bcs_deserialize'address'($t11));
+    // assume Identical($t7, from_bcs::deserialize<address>($t6)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:109:9+58
+    assume {:print "$at(3,4185,4243)"} true;
+    assume ($t7 == $1_from_bcs_deserialize'address'($t6));
 
     // @38 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:225:5+1
     assume {:print "$at(2,10151,10152)"} true;
@@ -9949,173 +8907,112 @@ procedure {:timeLimit 40} $1_object_create_object_from_guid$verify(_$t0: int, _$
     // trace_local[guid]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:225:5+1
     assume {:print "$track_local(52,11,1):", $t1} $t1 == $t1;
 
-    // $t2 := bcs::to_bytes<guid::GUID>($t1) on_abort goto L2 with $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:226:21+20
+    // $t2 := bcs::to_bytes<guid::GUID>($t1) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:226:21+20
     assume {:print "$at(2,10261,10281)"} true;
     call $t2 := $1_bcs_to_bytes'$1_guid_GUID'($t1);
     if ($abort_flag) {
         assume {:print "$at(2,10261,10281)"} true;
-        $t15 := $abort_code;
-        assume {:print "$track_abort(52,11):", $t15} $t15 == $t15;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,11):", $t8} $t8 == $t8;
         goto L2;
     }
 
     // trace_local[bytes]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:226:13+5
     assume {:print "$track_local(52,11,2):", $t2} $t2 == $t2;
 
-    // $t16 := borrow_local($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:27+10
+    // $t9 := borrow_local($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:27+10
     assume {:print "$at(2,10309,10319)"} true;
-    $t16 := $Mutation($Local(2), EmptyVec(), $t2);
+    $t9 := $Mutation($Local(2), EmptyVec(), $t2);
 
-    // $t17 := 253 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:39+31
-    $t17 := 253;
-    assume $IsValid'u8'($t17);
+    // $t10 := 253 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:39+31
+    $t10 := 253;
+    assume $IsValid'u8'($t10);
 
-    // vector::push_back<u8>($t16, $t17) on_abort goto L2 with $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:9+62
-    call $t16 := $1_vector_push_back'u8'($t16, $t17);
+    // vector::push_back<u8>($t9, $t10) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:9+62
+    call $t9 := $1_vector_push_back'u8'($t9, $t10);
     if ($abort_flag) {
         assume {:print "$at(2,10291,10353)"} true;
-        $t15 := $abort_code;
-        assume {:print "$track_abort(52,11):", $t15} $t15 == $t15;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,11):", $t8} $t8 == $t8;
         goto L2;
     }
 
-    // write_back[LocalRoot($t2)@]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:9+62
-    $t2 := $Dereference($t16);
+    // write_back[LocalRoot($t2)@]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:9+62
+    $t2 := $Dereference($t9);
 
     // trace_local[bytes]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:227:9+62
     assume {:print "$track_local(52,11,2):", $t2} $t2 == $t2;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:69+5]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:69+5
-    assume {:print "$at(2,10438,10443)"} true;
-    assume {:print "$track_exp_sub(25876):", $t2} true;
-
-    // assume Identical($t18, hash::$sha3_256($t2)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:54+21
-    assume ($t18 == $1_hash_$sha3_256($t2));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:54+21]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:54+21
-    assume {:print "$track_exp_sub(25877):", $t18} true;
-
-    // assume Identical($t19, from_bcs::deserializable<address>(hash::$sha3_256($t2))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:20+56
-    assume ($t19 == $1_from_bcs_deserializable'address'($1_hash_$sha3_256($t2)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:20+56]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:20+56
-    assume {:print "$track_exp_sub(25878):", $t19} true;
-
-    // assume Identical($t20, from_bcs::deserializable<address>(hash::$sha3_256($t2))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:13+64
-    assume ($t20 == $1_from_bcs_deserializable'address'($1_hash_$sha3_256($t2)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:13+64]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:13+64
-    assume {:print "$track_exp(25879):", $t20} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:13+64
-    assume {:print "$track_global_mem(27283):", $1_object_ObjectCore_$memory} true;
-
     // assume from_bcs::deserializable<address>(hash::$sha3_256($t2)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:229:13+64
+    assume {:print "$at(2,10382,10446)"} true;
     assume $1_from_bcs_deserializable'address'($1_hash_$sha3_256($t2));
 
-    // $t21 := move($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:60+5
+    // $t11 := move($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:60+5
     assume {:print "$at(2,10517,10522)"} true;
-    $t21 := $t2;
+    $t11 := $t2;
 
-    // $t22 := hash::sha3_256($t21) on_abort goto L2 with $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:45+21
-    call $t22 := $1_hash_sha3_256($t21);
+    // $t12 := hash::sha3_256($t11) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:45+21
+    call $t12 := $1_hash_sha3_256($t11);
     if ($abort_flag) {
         assume {:print "$at(2,10502,10523)"} true;
-        $t15 := $abort_code;
-        assume {:print "$track_abort(52,11):", $t15} $t15 == $t15;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,11):", $t8} $t8 == $t8;
         goto L2;
     }
 
-    // $t23 := from_bcs::to_address($t22) on_abort goto L2 with $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:24+43
-    call $t23 := $1_from_bcs_to_address($t22);
+    // $t13 := from_bcs::to_address($t12) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:24+43
+    call $t13 := $1_from_bcs_to_address($t12);
     if ($abort_flag) {
         assume {:print "$at(2,10481,10524)"} true;
-        $t15 := $abort_code;
-        assume {:print "$track_abort(52,11):", $t15} $t15 == $t15;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,11):", $t8} $t8 == $t8;
         goto L2;
     }
 
-    // trace_local[obj_addr]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:13+8
-    assume {:print "$track_local(52,11,3):", $t23} $t23 == $t23;
+    // trace_local[obj_addr]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:231:13+8
+    assume {:print "$track_local(52,11,3):", $t13} $t13 == $t13;
 
-    // $t24 := true at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:59+4
+    // $t14 := true at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:59+4
     assume {:print "$at(2,10584,10588)"} true;
-    $t24 := true;
-    assume $IsValid'bool'($t24);
+    $t14 := true;
+    assume $IsValid'bool'($t14);
 
-    // $t25 := object::create_object_internal($t0, $t23, $t24) on_abort goto L2 with $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:9+55
-    call $t25 := $1_object_create_object_internal($t0, $t23, $t24);
+    // $t15 := object::create_object_internal($t0, $t13, $t14) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:9+55
+    call $t15 := $1_object_create_object_internal($t0, $t13, $t14);
     if ($abort_flag) {
         assume {:print "$at(2,10534,10589)"} true;
-        $t15 := $abort_code;
-        assume {:print "$track_abort(52,11):", $t15} $t15 == $t15;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,11):", $t8} $t8 == $t8;
         goto L2;
     }
 
-    // trace_return[0]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:9+55
-    assume {:print "$track_return(52,11,0):", $t25} $t25 == $t25;
+    // trace_return[0]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:232:9+55
+    assume {:print "$track_return(52,11,0):", $t15} $t15 == $t15;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:233:5+1
     assume {:print "$at(2,10594,10595)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:38+8]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:38+8
-    assume {:print "$at(3,3807,3815)"} true;
-    assume {:print "$track_exp_sub(25869):", $t14} true;
+    // assert Not(exists[@38]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:110:9+39
+    assume {:print "$at(3,4252,4291)"} true;
+    assert {:msg "assert_failed(3,4252,4291): function does not abort under this condition"}
+      !$ResourceExists($1_object_ObjectCore_$memory#38, $t7);
 
-    // assume Identical($t26, exists[@38]<object::ObjectCore>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28
-    assume ($t26 == $ResourceExists($1_object_ObjectCore_$memory#38, $t14));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28
-    assume {:print "$track_exp_sub(25870):", $t26} true;
-
-    // assume Identical($t27, exists[@38]<object::ObjectCore>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume ($t27 == $ResourceExists($1_object_ObjectCore_$memory#38, $t14));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume {:print "$track_exp(25871):", $t27} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume {:print "$track_global_mem(27284):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@38]<object::ObjectCore>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assert {:msg "assert_failed(3,3778,3817): function does not abort under this condition"}
-      !$ResourceExists($1_object_ObjectCore_$memory#38, $t14);
-
-    // return $t25 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    $ret0 := $t25;
+    // return $t15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:110:9+39
+    $ret0 := $t15;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:233:5+1
     assume {:print "$at(2,10594,10595)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:38+8]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:38+8
-    assume {:print "$at(3,3807,3815)"} true;
-    assume {:print "$track_exp_sub(25869):", $t14} true;
+    // assert exists[@38]<object::ObjectCore>($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:105:5+386
+    assume {:print "$at(3,3911,4297)"} true;
+    assert {:msg "assert_failed(3,3911,4297): abort not covered by any of the `aborts_if` clauses"}
+      $ResourceExists($1_object_ObjectCore_$memory#38, $t7);
 
-    // assume Identical($t28, exists[@38]<object::ObjectCore>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28
-    assume ($t28 == $ResourceExists($1_object_ObjectCore_$memory#38, $t14));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28]($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:19+28
-    assume {:print "$track_exp_sub(25870):", $t28} true;
-
-    // assume Identical($t29, exists[@38]<object::ObjectCore>($t14)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume ($t29 == $ResourceExists($1_object_ObjectCore_$memory#38, $t14));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume {:print "$track_exp(25871):", $t29} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:95:9+39
-    assume {:print "$track_global_mem(27285):", $1_object_ObjectCore_$memory} true;
-
-    // assert exists[@38]<object::ObjectCore>($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:90:5+386
-    assume {:print "$at(3,3437,3823)"} true;
-    assert {:msg "assert_failed(3,3437,3823): abort not covered by any of the `aborts_if` clauses"}
-      $ResourceExists($1_object_ObjectCore_$memory#38, $t14);
-
-    // abort($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:90:5+386
-    $abort_code := $t15;
+    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:105:5+386
+    $abort_code := $t8;
     $abort_flag := true;
     return;
 
@@ -10126,33 +9023,26 @@ procedure {:timeLimit 40} $1_object_create_object_from_object$verify(_$t0: $sign
 {
     // declare local variables
     var $t1: $1_guid_GUID;
-    var $t2: int;
-    var $t3: $1_object_ObjectCore;
-    var $t4: $1_object_ObjectCore;
-    var $t5: $1_object_ObjectCore;
-    var $t6: $1_object_ObjectCore;
-    var $t7: $1_guid_GUID;
-    var $t8: int;
+    var $t2: $1_object_ObjectCore;
+    var $t3: int;
+    var $t4: int;
+    var $t5: $1_guid_GUID;
+    var $t6: Vec (int);
+    var $t7: Vec (int);
+    var $t8: Vec (int);
     var $t9: int;
-    var $t10: Vec (int);
-    var $t11: Vec (int);
-    var $t12: Vec (int);
+    var $t10: $1_object_ObjectCore;
+    var $t11: $1_guid_GUID;
+    var $t12: int;
     var $t13: int;
-    var $t14: $1_object_ConstructorRef;
-    var $t15: int;
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: bool;
-    var $t19: int;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: bool;
+    var $t14: Vec (int);
+    var $t15: Vec (int);
+    var $t16: Vec (int);
+    var $t17: int;
+    var $t18: $1_object_ConstructorRef;
     var $t0: $signer;
     var $temp_0'$1_guid_GUID': $1_guid_GUID;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
-    var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#44: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -10169,33 +9059,37 @@ procedure {:timeLimit 40} $1_object_create_object_from_object$verify(_$t0: $sign
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:65+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:65+7
-    assume {:print "$at(3,2997,3004)"} true;
-    assume {:print "$track_exp_sub(26214):", $t0} true;
+    // assume Identical($t2, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:86:9+66
+    assume {:print "$at(3,3236,3302)"} true;
+    assume ($t2 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
-    // assume Identical($t2, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:46+27
-    assume ($t2 == $1_signer_$address_of($t0));
+    // assume Identical($t3, select object::ObjectCore.guid_creation_num($t2)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:88:9+49
+    assume {:print "$at(3,3374,3423)"} true;
+    assume ($t3 == $guid_creation_num#$1_object_ObjectCore($t2));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:46+27]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:46+27
-    assume {:print "$track_exp_sub(26215):", $t2} true;
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:89:9+39
+    assume {:print "$at(3,3432,3471)"} true;
+    assume ($t4 == $1_signer_$address_of($t0));
 
-    // assume Identical($t3, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:27+47
-    assume ($t3 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t5, pack guid::GUID(pack guid::ID($t3, $t4))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+127
+    assume {:print "$at(3,3481,3608)"} true;
+    assume ($t5 == $1_guid_GUID($1_guid_ID($t3, $t4)));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:27+47]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:27+47
-    assume {:print "$track_exp_sub(26216):", $t3} true;
+    // assume Identical($t6, bcs::$to_bytes<guid::GUID>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:98:9+37
+    assume {:print "$at(3,3618,3655)"} true;
+    assume ($t6 == $1_bcs_$to_bytes'$1_guid_GUID'($t5));
 
-    // assume Identical($t4, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+66
-    assume ($t4 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t7, ConcatVec<u8>($t6, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:99:9+72
+    assume {:print "$at(3,3664,3736)"} true;
+    assume ($t7 == ConcatVec($t6, MakeVec1(253)));
 
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+66]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+66
-    assume {:print "$track_exp(26217):", $t4} true;
+    // assume Identical($t8, hash::$sha3_256($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:100:9+39
+    assume {:print "$at(3,3745,3784)"} true;
+    assume ($t8 == $1_hash_$sha3_256($t7));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+66
-    assume {:print "$track_global_mem(27286):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:79:9+66
-    assume ($t5 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
+    // assume Identical($t9, from_bcs::deserialize<address>($t8)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:101:9+58
+    assume {:print "$at(3,3793,3851)"} true;
+    assume ($t9 == $1_from_bcs_deserialize'address'($t8));
 
     // @44 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:220:5+1
     assume {:print "$at(2,9939,9940)"} true;
@@ -10204,178 +9098,96 @@ procedure {:timeLimit 40} $1_object_create_object_from_object$verify(_$t0: $sign
     // trace_local[creator]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:220:5+1
     assume {:print "$track_local(52,12,0):", $t0} $t0 == $t0;
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:221:20+20
-    assume {:print "$at(2,10051,10071)"} true;
-    assume {:print "$track_global_mem(27287):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t10, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+65
+    assume {:print "$at(3,5047,5112)"} true;
+    assume ($t10 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
 
-    // assume Identical($t6, global<object::ObjectCore>(signer::$address_of($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+65
-    assume {:print "$at(3,4573,4638)"} true;
-    assume ($t6 == $ResourceValue($1_object_ObjectCore_$memory, $1_signer_$address_of($t0)));
-
-    // $t7 := object::create_guid($t0) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:221:20+20
+    // $t11 := object::create_guid($t0) on_abort goto L2 with $t12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:221:20+20
     assume {:print "$at(2,10051,10071)"} true;
-    call $t7 := $1_object_create_guid($t0);
+    call $t11 := $1_object_create_guid($t0);
     if ($abort_flag) {
         assume {:print "$at(2,10051,10071)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,12):", $t8} $t8 == $t8;
+        $t12 := $abort_code;
+        assume {:print "$track_abort(52,12):", $t12} $t12 == $t12;
         goto L2;
     }
 
-    // trace_local[guid]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:221:13+4
-    assume {:print "$track_local(52,12,1):", $t7} $t7 == $t7;
+    // trace_local[guid]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:221:13+4
+    assume {:print "$track_local(52,12,1):", $t11} $t11 == $t11;
 
-    // $t9 := signer::address_of($t0) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:33+27
+    // $t13 := signer::address_of($t0) on_abort goto L2 with $t12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:33+27
     assume {:print "$at(2,10105,10132)"} true;
-    call $t9 := $1_signer_address_of($t0);
+    call $t13 := $1_signer_address_of($t0);
     if ($abort_flag) {
         assume {:print "$at(2,10105,10132)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,12):", $t8} $t8 == $t8;
+        $t12 := $abort_code;
+        assume {:print "$track_abort(52,12):", $t12} $t12 == $t12;
         goto L2;
     }
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:9+58
-    assume {:print "$track_global_mem(27288):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t14, bcs::$to_bytes<guid::GUID>($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:9+37
+    assume {:print "$at(3,4010,4047)"} true;
+    assume ($t14 == $1_bcs_$to_bytes'$1_guid_GUID'($t11));
 
-    // assume Identical($t10, bcs::$to_bytes<guid::GUID>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$at(3,3536,3573)"} true;
-    assume ($t10 == $1_bcs_$to_bytes'$1_guid_GUID'($t7));
+    // assume Identical($t15, ConcatVec<u8>($t14, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+72
+    assume {:print "$at(3,4056,4128)"} true;
+    assume ($t15 == ConcatVec($t14, MakeVec1(253)));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:91:9+37
-    assume {:print "$track_global_mem(27289):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t16, hash::$sha3_256($t15)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:108:9+39
+    assume {:print "$at(3,4137,4176)"} true;
+    assume ($t16 == $1_hash_$sha3_256($t15));
 
-    // assume Identical($t11, ConcatVec<u8>($t10, SingleVec<u8>(253))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$at(3,3582,3654)"} true;
-    assume ($t11 == ConcatVec($t10, MakeVec1(253)));
+    // assume Identical($t17, from_bcs::deserialize<address>($t16)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:109:9+58
+    assume {:print "$at(3,4185,4243)"} true;
+    assume ($t17 == $1_from_bcs_deserialize'address'($t16));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:92:9+72
-    assume {:print "$track_global_mem(27290):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t12, hash::$sha3_256($t11)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$at(3,3663,3702)"} true;
-    assume ($t12 == $1_hash_$sha3_256($t11));
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:93:9+39
-    assume {:print "$track_global_mem(27291):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t13, from_bcs::deserialize<address>($t12)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:94:9+58
-    assume {:print "$at(3,3711,3769)"} true;
-    assume ($t13 == $1_from_bcs_deserialize'address'($t12));
-
-    // $t14 := object::create_object_from_guid($t9, $t7) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:9+58
+    // $t18 := object::create_object_from_guid($t13, $t11) on_abort goto L2 with $t12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:9+58
     assume {:print "$at(2,10081,10139)"} true;
-    call $t14 := $1_object_create_object_from_guid($t9, $t7);
+    call $t18 := $1_object_create_object_from_guid($t13, $t11);
     if ($abort_flag) {
         assume {:print "$at(2,10081,10139)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,12):", $t8} $t8 == $t8;
+        $t12 := $abort_code;
+        assume {:print "$track_abort(52,12):", $t12} $t12 == $t12;
         goto L2;
     }
 
-    // trace_return[0]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:9+58
-    assume {:print "$track_return(52,12,0):", $t14} $t14 == $t14;
+    // trace_return[0]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:222:9+58
+    assume {:print "$track_return(52,12,0):", $t18} $t18 == $t18;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:223:5+1
     assume {:print "$at(2,10144,10145)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:58+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:58+7
-    assume {:print "$at(3,2896,2903)"} true;
-    assume {:print "$track_exp_sub(26223):", $t0} true;
-
-    // assume Identical($t15, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27
-    assume ($t15 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27
-    assume {:print "$track_exp_sub(26224):", $t15} true;
-
-    // assume Identical($t16, exists[@44]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47
-    assume ($t16 == $ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47
-    assume {:print "$track_exp_sub(26225):", $t16} true;
-
-    // assume Identical($t17, Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assume ($t17 == !$ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assume {:print "$track_exp(26226):", $t17} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assume {:print "$track_global_mem(27292):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assert {:msg "assert_failed(3,2847,2906): function does not abort under this condition"}
+    // assert Not(Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:84:9+59
+    assume {:print "$at(3,3142,3201)"} true;
+    assert {:msg "assert_failed(3,3142,3201): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:19+11
-    assume {:print "$at(3,3026,3037)"} true;
-    assume {:print "$track_exp_sub(26230):", $t5} true;
+    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t2), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:87:9+54
+    assume {:print "$at(3,3311,3365)"} true;
+    assert {:msg "assert_failed(3,3311,3365): function does not abort under this condition"}
+      !(($guid_creation_num#$1_object_ObjectCore($t2) + 1) > 18446744073709551615);
 
-    // assume Identical($t18, Gt(Add(select object::ObjectCore.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume ($t18 == (($guid_creation_num#$1_object_ObjectCore($t5) + 1) > 18446744073709551615));
+    // assert Not(exists[@44]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:102:9+39
+    assume {:print "$at(3,3860,3899)"} true;
+    assert {:msg "assert_failed(3,3860,3899): function does not abort under this condition"}
+      !$ResourceExists($1_object_ObjectCore_$memory#44, $t9);
 
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume {:print "$track_exp(26231):", $t18} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume {:print "$track_global_mem(27293):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Gt(Add(select object::ObjectCore.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assert {:msg "assert_failed(3,3016,3070): function does not abort under this condition"}
-      !(($guid_creation_num#$1_object_ObjectCore($t5) + 1) > 18446744073709551615);
-
-    // return $t14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    $ret0 := $t14;
+    // return $t18 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:102:9+39
+    $ret0 := $t18;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:223:5+1
     assume {:print "$at(2,10144,10145)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:58+7]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:58+7
-    assume {:print "$at(3,2896,2903)"} true;
-    assume {:print "$track_exp_sub(26223):", $t0} true;
+    // assert Or(Or(Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t2), 1), 18446744073709551615)), exists[@44]<object::ObjectCore>($t9)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:83:5+837
+    assume {:print "$at(3,3068,3905)"} true;
+    assert {:msg "assert_failed(3,3068,3905): abort not covered by any of the `aborts_if` clauses"}
+      ((!$ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t2) + 1) > 18446744073709551615)) || $ResourceExists($1_object_ObjectCore_$memory#44, $t9));
 
-    // assume Identical($t19, signer::$address_of[]($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27
-    assume ($t19 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:39+27
-    assume {:print "$track_exp_sub(26224):", $t19} true;
-
-    // assume Identical($t20, exists[@44]<object::ObjectCore>(signer::$address_of[]($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47
-    assume ($t20 == $ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:20+47
-    assume {:print "$track_exp_sub(26225):", $t20} true;
-
-    // assume Identical($t21, Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assume ($t21 == !$ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:77:9+59
-    assume {:print "$track_exp(26226):", $t21} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:19+11]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:19+11
-    assume {:print "$at(3,3026,3037)"} true;
-    assume {:print "$track_exp_sub(26230):", $t5} true;
-
-    // assume Identical($t22, Gt(Add(select object::ObjectCore.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume ($t22 == (($guid_creation_num#$1_object_ObjectCore($t5) + 1) > 18446744073709551615));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume {:print "$track_exp(26231):", $t22} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:80:9+54
-    assume {:print "$track_global_mem(27294):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@44]<object::ObjectCore>(signer::$address_of[]($t0))), Gt(Add(select object::ObjectCore.guid_creation_num($t5), 1), 18446744073709551615)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:76:5+658
-    assume {:print "$at(3,2773,3431)"} true;
-    assert {:msg "assert_failed(3,2773,3431): abort not covered by any of the `aborts_if` clauses"}
-      (!$ResourceExists($1_object_ObjectCore_$memory#44, $1_signer_$address_of($t0)) || (($guid_creation_num#$1_object_ObjectCore($t5) + 1) > 18446744073709551615));
-
-    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:76:5+658
-    $abort_code := $t8;
+    // abort($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:83:5+837
+    $abort_code := $t12;
     $abort_flag := true;
     return;
 
@@ -10606,10 +9418,6 @@ procedure {:timeLimit 40} $1_object_create_object_internal$verify(_$t0: int, _$t
     var $t17: $1_event_EventHandle'$1_object_TransferEvent';
     var $t18: $1_object_ObjectCore;
     var $t19: $1_object_ConstructorRef;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: bool;
-    var $t23: bool;
     var $t0: int;
     var $t1: int;
     var $t2: bool;
@@ -10708,9 +9516,6 @@ L2:
     // assume WellFormed($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:242:29+21
     assume $IsValid'signer'($t11) && $1_signer_is_txn_signer($t11) && $1_signer_is_txn_signer_addr($addr#$signer($t11));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:242:29+21
-    assume {:print "$track_global_mem(27295):", $1_object_ObjectCore_$memory} true;
-
     // assume Eq<address>(signer::$address_of($t11), $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:242:29+21
     assume $IsEqual'address'($1_signer_$address_of($t11), $t1);
 
@@ -10800,30 +9605,12 @@ L2:
     assume {:print "$at(2,11366,11367)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:38+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:38+6
-    assume {:print "$at(3,4004,4010)"} true;
-    assume {:print "$track_exp_sub(25486):", $t1} true;
-
-    // assume Identical($t20, exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26
-    assume ($t20 == $ResourceExists($1_object_ObjectCore_$memory#26, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26
-    assume {:print "$track_exp_sub(25487):", $t20} true;
-
-    // assume Identical($t21, exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume ($t21 == $ResourceExists($1_object_ObjectCore_$memory#26, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume {:print "$track_exp(25488):", $t21} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume {:print "$track_global_mem(27296):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assert {:msg "assert_failed(3,3975,4012): function does not abort under this condition"}
+    // assert Not(exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:118:9+37
+    assume {:print "$at(3,4449,4486)"} true;
+    assert {:msg "assert_failed(3,4449,4486): function does not abort under this condition"}
       !$ResourceExists($1_object_ObjectCore_$memory#26, $t1);
 
-    // return $t19 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
+    // return $t19 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:118:9+37
     $ret0 := $t19;
     return;
 
@@ -10831,31 +9618,12 @@ L3:
     assume {:print "$at(2,11366,11367)"} true;
 L4:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:38+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:38+6
-    assume {:print "$at(3,4004,4010)"} true;
-    assume {:print "$track_exp_sub(25486):", $t1} true;
-
-    // assume Identical($t22, exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26
-    assume ($t22 == $ResourceExists($1_object_ObjectCore_$memory#26, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:19+26
-    assume {:print "$track_exp_sub(25487):", $t22} true;
-
-    // assume Identical($t23, exists[@26]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume ($t23 == $ResourceExists($1_object_ObjectCore_$memory#26, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume {:print "$track_exp(25488):", $t23} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:103:9+37
-    assume {:print "$track_global_mem(27297):", $1_object_ObjectCore_$memory} true;
-
-    // assert exists[@26]<object::ObjectCore>($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:98:5+189
-    assume {:print "$at(3,3829,4018)"} true;
-    assert {:msg "assert_failed(3,3829,4018): abort not covered by any of the `aborts_if` clauses"}
+    // assert exists[@26]<object::ObjectCore>($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:113:5+189
+    assume {:print "$at(3,4303,4492)"} true;
+    assert {:msg "assert_failed(3,4303,4492): abort not covered by any of the `aborts_if` clauses"}
       $ResourceExists($1_object_ObjectCore_$memory#26, $t1);
 
-    // abort($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:98:5+189
+    // abort($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:113:5+189
     $abort_code := $t10;
     $abort_flag := true;
     return;
@@ -10870,22 +9638,15 @@ procedure {:timeLimit 40} $1_object_create_user_derived_object$verify(_$t0: int,
     var $t3: int;
     var $t4: int;
     var $t5: int;
-    var $t6: int;
-    var $t7: int;
-    var $t8: bool;
-    var $t9: $1_object_ConstructorRef;
-    var $t10: int;
-    var $t11: bool;
-    var $t12: bool;
-    var $t13: bool;
-    var $t14: bool;
+    var $t6: bool;
+    var $t7: $1_object_ConstructorRef;
+    var $t8: int;
     var $t0: int;
     var $t1: $1_object_DeriveRef;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
     var $temp_0'$1_object_DeriveRef': $1_object_DeriveRef;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
-    var $1_object_ObjectCore_$memory#47: $Memory $1_object_ObjectCore;
+    var $1_object_ObjectCore_$memory#48: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
 
@@ -10904,34 +9665,13 @@ procedure {:timeLimit 40} $1_object_create_user_derived_object$verify(_$t0: int,
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:64+15]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:64+15
-    assume {:print "$at(3,2030,2045)"} true;
-    assume {:print "$track_exp_sub(26445):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:81+10]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:81+10
-    assume {:print "$track_exp_sub(26446):", $t1} true;
-
-    // assume Identical($t3, object::spec_create_user_derived_object_address($t0, select object::DeriveRef.self($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:24+73
+    // assume Identical($t3, object::spec_create_user_derived_object_address($t0, select object::DeriveRef.self($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89
+    assume {:print "$at(3,1975,2064)"} true;
     assume ($t3 == $1_object_spec_create_user_derived_object_address($t0, $self#$1_object_DeriveRef($t1)));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:24+73]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:24+73
-    assume {:print "$track_exp_sub(26447):", $t3} true;
-
-    // assume Identical($t4, object::spec_create_user_derived_object_address($t0, select object::DeriveRef.self($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89
-    assume ($t4 == $1_object_spec_create_user_derived_object_address($t0, $self#$1_object_DeriveRef($t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89
-    assume {:print "$track_exp(26448):", $t4} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89
-    assume {:print "$track_global_mem(27298):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, object::spec_create_user_derived_object_address($t0, select object::DeriveRef.self($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:56:9+89
-    assume ($t5 == $1_object_spec_create_user_derived_object_address($t0, $self#$1_object_DeriveRef($t1)));
-
-    // @47 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:208:5+1
+    // @48 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:208:5+1
     assume {:print "$at(2,9325,9326)"} true;
-    $1_object_ObjectCore_$memory#47 := $1_object_ObjectCore_$memory;
+    $1_object_ObjectCore_$memory#48 := $1_object_ObjectCore_$memory;
 
     // trace_local[creator_address]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:208:5+1
     assume {:print "$track_local(52,14,0):", $t0} $t0 == $t0;
@@ -10939,104 +9679,64 @@ procedure {:timeLimit 40} $1_object_create_user_derived_object$verify(_$t0: int,
     // trace_local[derive_ref]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:208:5+1
     assume {:print "$track_local(52,14,1):", $t1} $t1 == $t1;
 
-    // $t6 := get_field<object::DeriveRef>.self($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:76+15
+    // $t4 := get_field<object::DeriveRef>.self($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:76+15
     assume {:print "$at(2,9514,9529)"} true;
-    $t6 := $self#$1_object_DeriveRef($t1);
+    $t4 := $self#$1_object_DeriveRef($t1);
 
-    // $t7 := opaque begin: object::create_user_derived_object_address($t0, $t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
+    // $t5 := opaque begin: object::create_user_derived_object_address($t0, $t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
 
-    // assume WellFormed($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
-    assume $IsValid'address'($t7);
+    // assume WellFormed($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
+    assume $IsValid'address'($t5);
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
-    assume {:print "$track_global_mem(27299):", $1_object_ObjectCore_$memory} true;
+    // assume Eq<address>($t5, object::spec_create_user_derived_object_address($t0, $t4)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
+    assume $IsEqual'address'($t5, $1_object_spec_create_user_derived_object_address($t0, $t4));
 
-    // assume Eq<address>($t7, object::spec_create_user_derived_object_address($t0, $t6)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
-    assume $IsEqual'address'($t7, $1_object_spec_create_user_derived_object_address($t0, $t6));
+    // $t5 := opaque end: object::create_user_derived_object_address($t0, $t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
 
-    // $t7 := opaque end: object::create_user_derived_object_address($t0, $t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:24+68
+    // trace_local[obj_addr]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:13+8
+    assume {:print "$track_local(52,14,2):", $t5} $t5 == $t5;
 
-    // trace_local[obj_addr]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:209:13+8
-    assume {:print "$track_local(52,14,2):", $t7} $t7 == $t7;
-
-    // $t8 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:59+5
+    // $t6 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:59+5
     assume {:print "$at(2,9590,9595)"} true;
-    $t8 := false;
-    assume $IsValid'bool'($t8);
+    $t6 := false;
+    assume $IsValid'bool'($t6);
 
-    // $t9 := object::create_object_internal($t0, $t7, $t8) on_abort goto L2 with $t10 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:9+56
-    call $t9 := $1_object_create_object_internal($t0, $t7, $t8);
+    // $t7 := object::create_object_internal($t0, $t5, $t6) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:9+56
+    call $t7 := $1_object_create_object_internal($t0, $t5, $t6);
     if ($abort_flag) {
         assume {:print "$at(2,9540,9596)"} true;
-        $t10 := $abort_code;
-        assume {:print "$track_abort(52,14):", $t10} $t10 == $t10;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,14):", $t8} $t8 == $t8;
         goto L2;
     }
 
-    // trace_return[0]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:9+56
-    assume {:print "$track_return(52,14,0):", $t9} $t9 == $t9;
+    // trace_return[0]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:210:9+56
+    assume {:print "$track_return(52,14,0):", $t7} $t7 == $t7;
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:211:5+1
     assume {:print "$at(2,9601,9602)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:38+8]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:38+8
-    assume {:print "$at(3,2102,2110)"} true;
-    assume {:print "$track_exp_sub(26453):", $t5} true;
-
-    // assume Identical($t11, exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28
-    assume ($t11 == $ResourceExists($1_object_ObjectCore_$memory#47, $t5));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28
-    assume {:print "$track_exp_sub(26454):", $t11} true;
-
-    // assume Identical($t12, exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume ($t12 == $ResourceExists($1_object_ObjectCore_$memory#47, $t5));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume {:print "$track_exp(26455):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume {:print "$track_global_mem(27300):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
+    // assert Not(exists[@48]<object::ObjectCore>($t3)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
+    assume {:print "$at(3,2073,2112)"} true;
     assert {:msg "assert_failed(3,2073,2112): function does not abort under this condition"}
-      !$ResourceExists($1_object_ObjectCore_$memory#47, $t5);
+      !$ResourceExists($1_object_ObjectCore_$memory#48, $t3);
 
-    // return $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    $ret0 := $t9;
+    // return $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
+    $ret0 := $t7;
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:211:5+1
     assume {:print "$at(2,9601,9602)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:38+8]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:38+8
-    assume {:print "$at(3,2102,2110)"} true;
-    assume {:print "$track_exp_sub(26453):", $t5} true;
-
-    // assume Identical($t13, exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28
-    assume ($t13 == $ResourceExists($1_object_ObjectCore_$memory#47, $t5));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:19+28
-    assume {:print "$track_exp_sub(26454):", $t13} true;
-
-    // assume Identical($t14, exists[@47]<object::ObjectCore>($t5)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume ($t14 == $ResourceExists($1_object_ObjectCore_$memory#47, $t5));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume {:print "$track_exp(26455):", $t14} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:57:9+39
-    assume {:print "$track_global_mem(27301):", $1_object_ObjectCore_$memory} true;
-
-    // assert exists[@47]<object::ObjectCore>($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:55:5+251
+    // assert exists[@48]<object::ObjectCore>($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:55:5+251
     assume {:print "$at(3,1867,2118)"} true;
     assert {:msg "assert_failed(3,1867,2118): abort not covered by any of the `aborts_if` clauses"}
-      $ResourceExists($1_object_ObjectCore_$memory#47, $t5);
+      $ResourceExists($1_object_ObjectCore_$memory#48, $t3);
 
-    // abort($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:55:5+251
-    $abort_code := $t10;
+    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:55:5+251
+    $abort_code := $t8;
     $abort_flag := true;
     return;
 
@@ -11200,14 +9900,9 @@ procedure {:timeLimit 40} $1_object_delete$verify(_$t0: $1_object_DeleteRef) ret
     var $t6: int;
     var $t7: bool;
     var $t8: $1_event_EventHandle'$1_object_TransferEvent';
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
-    var $t12: bool;
     var $t0: $1_object_DeleteRef;
     var $temp_0'$1_event_EventHandle'$1_object_TransferEvent'': $1_event_EventHandle'$1_object_TransferEvent';
     var $temp_0'$1_object_DeleteRef': $1_object_DeleteRef;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#16: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -11281,61 +9976,24 @@ procedure {:timeLimit 40} $1_object_delete$verify(_$t0: $1_object_DeleteRef) ret
     assume {:print "$at(2,14338,14339)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:39+3
-    assume {:print "$at(3,5291,5294)"} true;
-    assume {:print "$track_exp_sub(25065):", $t0} true;
-
-    // assume Identical($t9, exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28
-    assume {:print "$track_exp_sub(25066):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume {:print "$track_exp(25067):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume {:print "$track_global_mem(27302):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assert {:msg "assert_failed(3,5261,5301): function does not abort under this condition"}
+    // assert Not(Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:156:9+40
+    assume {:print "$at(3,5735,5775)"} true;
+    assert {:msg "assert_failed(3,5735,5775): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:156:9+40
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:339:5+1
     assume {:print "$at(2,14338,14339)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:39+3
-    assume {:print "$at(3,5291,5294)"} true;
-    assume {:print "$track_exp_sub(25065):", $t0} true;
-
-    // assume Identical($t11, exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28
-    assume ($t11 == $ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:20+28
-    assume {:print "$track_exp_sub(25066):", $t11} true;
-
-    // assume Identical($t12, Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume ($t12 == !$ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume {:print "$track_exp(25067):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:141:9+40
-    assume {:print "$track_global_mem(27303):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:140:5+84
-    assume {:print "$at(3,5223,5307)"} true;
-    assert {:msg "assert_failed(3,5223,5307): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@16]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:5+84
+    assume {:print "$at(3,5697,5781)"} true;
+    assert {:msg "assert_failed(3,5697,5781): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#16, $self#$1_object_DeleteRef($t0));
 
-    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:140:5+84
+    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:5+84
     $abort_code := $t4;
     $abort_flag := true;
     return;
@@ -11352,14 +10010,9 @@ procedure {:timeLimit 40} $1_object_disable_ungated_transfer$verify(_$t0: $1_obj
     var $t4: int;
     var $t5: bool;
     var $t6: $Mutation (bool);
-    var $t7: bool;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
     var $t0: $1_object_TransferRef;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'$1_object_TransferRef': $1_object_TransferRef;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#15: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -11424,61 +10077,24 @@ procedure {:timeLimit 40} $1_object_disable_ungated_transfer$verify(_$t0: $1_obj
     assume {:print "$at(2,14971,14972)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:39+3
-    assume {:print "$at(3,4219,4222)"} true;
-    assume {:print "$track_exp_sub(25022):", $t0} true;
-
-    // assume Identical($t7, exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28
-    assume ($t7 == $ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28
-    assume {:print "$track_exp_sub(25023):", $t7} true;
-
-    // assume Identical($t8, Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume ($t8 == !$ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume {:print "$track_exp(25024):", $t8} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume {:print "$track_global_mem(27304):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assert {:msg "assert_failed(3,4189,4229): function does not abort under this condition"}
+    // assert Not(Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:126:9+40
+    assume {:print "$at(3,4663,4703)"} true;
+    assert {:msg "assert_failed(3,4663,4703): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:126:9+40
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:359:5+1
     assume {:print "$at(2,14971,14972)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:39+3
-    assume {:print "$at(3,4219,4222)"} true;
-    assume {:print "$track_exp_sub(25022):", $t0} true;
-
-    // assume Identical($t9, exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:20+28
-    assume {:print "$track_exp_sub(25023):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume {:print "$track_exp(25024):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:111:9+40
-    assume {:print "$track_global_mem(27305):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:110:5+105
-    assume {:print "$at(3,4130,4235)"} true;
-    assert {:msg "assert_failed(3,4130,4235): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@15]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:125:5+105
+    assume {:print "$at(3,4604,4709)"} true;
+    assert {:msg "assert_failed(3,4604,4709): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#15, $self#$1_object_TransferRef($t0));
 
-    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:110:5+105
+    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:125:5+105
     $abort_code := $t4;
     $abort_flag := true;
     return;
@@ -11495,14 +10111,9 @@ procedure {:timeLimit 40} $1_object_enable_ungated_transfer$verify(_$t0: $1_obje
     var $t4: int;
     var $t5: bool;
     var $t6: $Mutation (bool);
-    var $t7: bool;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
     var $t0: $1_object_TransferRef;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'$1_object_TransferRef': $1_object_TransferRef;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#14: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -11567,61 +10178,24 @@ procedure {:timeLimit 40} $1_object_enable_ungated_transfer$verify(_$t0: $1_obje
     assume {:print "$at(2,15198,15199)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:39+3
-    assume {:print "$at(3,5401,5404)"} true;
-    assume {:print "$track_exp_sub(25005):", $t0} true;
-
-    // assume Identical($t7, exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28
-    assume ($t7 == $ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28
-    assume {:print "$track_exp_sub(25006):", $t7} true;
-
-    // assume Identical($t8, Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume ($t8 == !$ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume {:print "$track_exp(25007):", $t8} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume {:print "$track_global_mem(27306):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assert {:msg "assert_failed(3,5371,5411): function does not abort under this condition"}
+    // assert Not(Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:160:9+40
+    assume {:print "$at(3,5845,5885)"} true;
+    assert {:msg "assert_failed(3,5845,5885): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:160:9+40
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:365:5+1
     assume {:print "$at(2,15198,15199)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:39+3
-    assume {:print "$at(3,5401,5404)"} true;
-    assume {:print "$track_exp_sub(25005):", $t0} true;
-
-    // assume Identical($t9, exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:20+28
-    assume {:print "$track_exp_sub(25006):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume {:print "$track_exp(25007):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:145:9+40
-    assume {:print "$track_global_mem(27307):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:144:5+104
-    assume {:print "$at(3,5313,5417)"} true;
-    assert {:msg "assert_failed(3,5313,5417): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@14]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:159:5+104
+    assume {:print "$at(3,5787,5891)"} true;
+    assert {:msg "assert_failed(3,5787,5891): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#14, $self#$1_object_TransferRef($t0));
 
-    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:144:5+104
+    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:159:5+104
     $abort_code := $t4;
     $abort_flag := true;
     return;
@@ -11638,12 +10212,9 @@ procedure {:timeLimit 40} $1_object_generate_delete_ref$verify(_$t0: $1_object_C
     var $t4: int;
     var $t5: int;
     var $t6: $1_object_DeleteRef;
-    var $t7: bool;
-    var $t8: bool;
     var $t0: $1_object_ConstructorRef;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
     var $temp_0'$1_object_DeleteRef': $1_object_DeleteRef;
-    var $temp_0'bool': bool;
     $t0 := _$t0;
 
     // verification entrypoint assumptions
@@ -11716,21 +10287,12 @@ L2:
     assume {:print "$at(2,11673,11674)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:20+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:20+3
-    assume {:print "$at(3,4103,4106)"} true;
-    assume {:print "$track_exp_sub(25121):", $t0} true;
-
-    // assume Identical($t7, Not(select object::ConstructorRef.can_delete($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
-    assume ($t7 == !$can_delete#$1_object_ConstructorRef($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
-    assume {:print "$track_exp(25122):", $t7} true;
-
-    // assert Not(Not(select object::ConstructorRef.can_delete($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
-    assert {:msg "assert_failed(3,4092,4118): function does not abort under this condition"}
+    // assert Not(Not(select object::ConstructorRef.can_delete($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+26
+    assume {:print "$at(3,4566,4592)"} true;
+    assert {:msg "assert_failed(3,4566,4592): function does not abort under this condition"}
       !!$can_delete#$1_object_ConstructorRef($t0);
 
-    // return $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
+    // return $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:122:9+26
     $ret0 := $t6;
     return;
 
@@ -11738,22 +10300,12 @@ L3:
     assume {:print "$at(2,11673,11674)"} true;
 L4:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:20+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:20+3
-    assume {:print "$at(3,4103,4106)"} true;
-    assume {:print "$track_exp_sub(25121):", $t0} true;
-
-    // assume Identical($t8, Not(select object::ConstructorRef.can_delete($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
-    assume ($t8 == !$can_delete#$1_object_ConstructorRef($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:107:9+26
-    assume {:print "$track_exp(25122):", $t8} true;
-
-    // assert Not(select object::ConstructorRef.can_delete($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:5+100
-    assume {:print "$at(3,4024,4124)"} true;
-    assert {:msg "assert_failed(3,4024,4124): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(select object::ConstructorRef.can_delete($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:121:5+100
+    assume {:print "$at(3,4498,4598)"} true;
+    assert {:msg "assert_failed(3,4498,4598): abort not covered by any of the `aborts_if` clauses"}
       !$can_delete#$1_object_ConstructorRef($t0);
 
-    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:106:5+100
+    // abort($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:121:5+100
     $abort_code := $t4;
     $abort_flag := true;
     return;
@@ -11865,15 +10417,10 @@ procedure {:timeLimit 40} $1_object_generate_linear_transfer_ref$verify(_$t0: $1
     var $t5: int;
     var $t6: int;
     var $t7: $1_object_LinearTransferRef;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
     var $t0: $1_object_TransferRef;
     var $temp_0'$1_object_LinearTransferRef': $1_object_LinearTransferRef;
     var $temp_0'$1_object_TransferRef': $1_object_TransferRef;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#34: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -11929,30 +10476,12 @@ procedure {:timeLimit 40} $1_object_generate_linear_transfer_ref$verify(_$t0: $1
     assume {:print "$at(2,15626,15627)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:39+3
-    assume {:print "$at(3,5534,5537)"} true;
-    assume {:print "$track_exp_sub(25703):", $t0} true;
-
-    // assume Identical($t8, exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28
-    assume ($t8 == $ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28
-    assume {:print "$track_exp_sub(25704):", $t8} true;
-
-    // assume Identical($t9, Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume ($t9 == !$ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume {:print "$track_exp(25705):", $t9} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume {:print "$track_global_mem(27308):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assert {:msg "assert_failed(3,5504,5544): function does not abort under this condition"}
+    // assert Not(Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+40
+    assume {:print "$at(3,5978,6018)"} true;
+    assert {:msg "assert_failed(3,5978,6018): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0));
 
-    // return $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
+    // return $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+40
     $ret0 := $t7;
     return;
 
@@ -11960,31 +10489,12 @@ L1:
     assume {:print "$at(2,15626,15627)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:39+3
-    assume {:print "$at(3,5534,5537)"} true;
-    assume {:print "$track_exp_sub(25703):", $t0} true;
-
-    // assume Identical($t10, exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28
-    assume ($t10 == $ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:20+28
-    assume {:print "$track_exp_sub(25704):", $t10} true;
-
-    // assume Identical($t11, Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume ($t11 == !$ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume {:print "$track_exp(25705):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:149:9+40
-    assume {:print "$track_global_mem(27309):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:148:5+127
-    assume {:print "$at(3,5423,5550)"} true;
-    assert {:msg "assert_failed(3,5423,5550): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@34]<object::ObjectCore>(select object::TransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:5+127
+    assume {:print "$at(3,5897,6024)"} true;
+    assert {:msg "assert_failed(3,5897,6024): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#34, $self#$1_object_TransferRef($t0));
 
-    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:148:5+127
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:5+127
     $abort_code := $t5;
     $abort_flag := true;
     return;
@@ -12182,11 +10692,8 @@ procedure {:timeLimit 40} $1_object_is_object$verify(_$t0: int) returns ($ret0: 
     assume {:print "$at(2,7074,7075)"} true;
 L1:
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:160:5+1
-    assume {:print "$at(2,7074,7075)"} true;
-    assume {:print "$track_global_mem(27310):", $1_object_ObjectCore_$memory} true;
-
     // assert Not(false) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:160:5+1
+    assume {:print "$at(2,7074,7075)"} true;
     assert {:msg "assert_failed(2,7074,7075): function does not abort under this condition"}
       !false;
 
@@ -12203,10 +10710,6 @@ procedure {:timeLimit 40} $1_object_is_owner$verify(_$t0: $1_object_Object'#0', 
     var $t2: int;
     var $t3: int;
     var $t4: bool;
-    var $t5: bool;
-    var $t6: bool;
-    var $t7: bool;
-    var $t8: bool;
     var $t0: $1_object_Object'#0';
     var $t1: int;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
@@ -12260,30 +10763,12 @@ procedure {:timeLimit 40} $1_object_is_owner$verify(_$t0: $1_object_Object'#0', 
     assume {:print "$at(2,20589,20590)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:39+6
-    assume {:print "$at(3,8961,8967)"} true;
-    assume {:print "$track_exp_sub(25721):", $t0} true;
-
-    // assume Identical($t5, exists[@35]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32
-    assume ($t5 == $ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32
-    assume {:print "$track_exp_sub(25722):", $t5} true;
-
-    // assume Identical($t6, Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume ($t6 == !$ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume {:print "$track_exp(25723):", $t6} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume {:print "$track_global_mem(27311):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assert {:msg "assert_failed(3,8931,8975): function does not abort under this condition"}
+    // assert Not(Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:245:9+44
+    assume {:print "$at(3,9405,9449)"} true;
+    assert {:msg "assert_failed(3,9405,9449): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0));
 
-    // return $t4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
+    // return $t4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:245:9+44
     $ret0 := $t4;
     return;
 
@@ -12291,31 +10776,12 @@ L1:
     assume {:print "$at(2,20589,20590)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:39+6
-    assume {:print "$at(3,8961,8967)"} true;
-    assume {:print "$track_exp_sub(25721):", $t0} true;
-
-    // assume Identical($t7, exists[@35]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32
-    assume ($t7 == $ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:20+32
-    assume {:print "$track_exp_sub(25722):", $t7} true;
-
-    // assume Identical($t8, Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume ($t8 == !$ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume {:print "$track_exp(25723):", $t8} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:230:9+44
-    assume {:print "$track_global_mem(27312):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:229:5+122
-    assume {:print "$at(3,8859,8981)"} true;
-    assert {:msg "assert_failed(3,8859,8981): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@35]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:244:5+122
+    assume {:print "$at(3,9333,9455)"} true;
+    assert {:msg "assert_failed(3,9333,9455): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#35, $inner#$1_object_Object'#0'($t0));
 
-    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:229:5+122
+    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:244:5+122
     $abort_code := $t3;
     $abort_flag := true;
     return;
@@ -12360,11 +10826,9 @@ procedure {:timeLimit 40} $1_object_object_address$verify(_$t0: $1_object_Object
 {
     // declare local variables
     var $t1: int;
-    var $t2: bool;
     var $t0: $1_object_Object'#0';
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     $t0 := _$t0;
 
     // verification entrypoint assumptions
@@ -12389,14 +10853,8 @@ procedure {:timeLimit 40} $1_object_object_address$verify(_$t0: $1_object_Object
     assume {:print "$at(2,8487,8488)"} true;
 L1:
 
-    // assume Identical($t2, false) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:41:9+16
-    assume {:print "$at(3,1391,1407)"} true;
-    assume ($t2 == false);
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:41:9+16]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:41:9+16
-    assume {:print "$track_exp(24989):", $t2} true;
-
     // assert Not(false) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:41:9+16
+    assume {:print "$at(3,1391,1407)"} true;
     assert {:msg "assert_failed(3,1391,1407): function does not abort under this condition"}
       !false;
 
@@ -12413,18 +10871,9 @@ procedure {:timeLimit 40} $1_object_object_from_constructor_ref$verify(_$t0: $1_
     var $t1: int;
     var $t2: $1_object_Object'#0';
     var $t3: int;
-    var $t4: bool;
-    var $t5: bool;
-    var $t6: bool;
-    var $t7: bool;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
     var $t0: $1_object_ConstructorRef;
     var $temp_0'$1_object_ConstructorRef': $1_object_ConstructorRef;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#33: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -12466,53 +10915,17 @@ procedure {:timeLimit 40} $1_object_object_from_constructor_ref$verify(_$t0: $1_
     assume {:print "$at(2,12815,12816)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:39+3
-    assume {:print "$at(3,4355,4358)"} true;
-    assume {:print "$track_exp_sub(25668):", $t0} true;
-
-    // assume Identical($t4, exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28
-    assume ($t4 == $ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28
-    assume {:print "$track_exp_sub(25669):", $t4} true;
-
-    // assume Identical($t5, Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assume ($t5 == !$ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assume {:print "$track_exp(25670):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assume {:print "$track_global_mem(27313):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assert {:msg "assert_failed(3,4325,4365): function does not abort under this condition"}
+    // assert Not(Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:130:9+40
+    assume {:print "$at(3,4799,4839)"} true;
+    assert {:msg "assert_failed(3,4799,4839): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:38+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:38+3
-    assume {:print "$at(3,4403,4406)"} true;
-    assume {:print "$track_exp_sub(25675):", $t0} true;
-
-    // assume Identical($t6, object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27
-    assume ($t6 == $1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27
-    assume {:print "$track_exp_sub(25676):", $t6} true;
-
-    // assume Identical($t7, Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume ($t7 == !$1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume {:print "$track_exp(25677):", $t7} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume {:print "$track_global_mem(27314):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assert {:msg "assert_failed(3,4374,4413): function does not abort under this condition"}
+    // assert Not(Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+39
+    assume {:print "$at(3,4848,4887)"} true;
+    assert {:msg "assert_failed(3,4848,4887): function does not abort under this condition"}
       !!$1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0));
 
-    // return $t2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
+    // return $t2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:131:9+39
     $ret0 := $t2;
     return;
 
@@ -12520,47 +10933,12 @@ L1:
     assume {:print "$at(2,12815,12816)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:39+3
-    assume {:print "$at(3,4355,4358)"} true;
-    assume {:print "$track_exp_sub(25668):", $t0} true;
-
-    // assume Identical($t8, exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28
-    assume ($t8 == $ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:20+28
-    assume {:print "$track_exp_sub(25669):", $t8} true;
-
-    // assume Identical($t9, Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assume ($t9 == !$ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:115:9+40
-    assume {:print "$track_exp(25670):", $t9} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:38+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:38+3
-    assume {:print "$at(3,4403,4406)"} true;
-    assume {:print "$track_exp_sub(25675):", $t0} true;
-
-    // assume Identical($t10, object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27
-    assume ($t10 == $1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:20+27
-    assume {:print "$track_exp_sub(25676):", $t10} true;
-
-    // assume Identical($t11, Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume ($t11 == !$1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume {:print "$track_exp(25677):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:116:9+39
-    assume {:print "$track_global_mem(27315):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0))), Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:114:5+178
-    assume {:print "$at(3,4241,4419)"} true;
-    assert {:msg "assert_failed(3,4241,4419): abort not covered by any of the `aborts_if` clauses"}
+    // assert Or(Not(exists[@33]<object::ObjectCore>(select object::ConstructorRef.self($t0))), Not(object::spec_exists_at[]<#0>(select object::ConstructorRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:5+178
+    assume {:print "$at(3,4715,4893)"} true;
+    assert {:msg "assert_failed(3,4715,4893): abort not covered by any of the `aborts_if` clauses"}
       (!$ResourceExists($1_object_ObjectCore_$memory#33, $self#$1_object_ConstructorRef($t0)) || !$1_object_spec_exists_at'#0'($self#$1_object_ConstructorRef($t0)));
 
-    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:114:5+178
+    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:129:5+178
     $abort_code := $t3;
     $abort_flag := true;
     return;
@@ -12574,18 +10952,9 @@ procedure {:timeLimit 40} $1_object_object_from_delete_ref$verify(_$t0: $1_objec
     var $t1: int;
     var $t2: $1_object_Object'#0';
     var $t3: int;
-    var $t4: bool;
-    var $t5: bool;
-    var $t6: bool;
-    var $t7: bool;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
     var $t0: $1_object_DeleteRef;
     var $temp_0'$1_object_DeleteRef': $1_object_DeleteRef;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#32: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
 
@@ -12627,53 +10996,17 @@ procedure {:timeLimit 40} $1_object_object_from_delete_ref$verify(_$t0: $1_objec
     assume {:print "$at(2,13927,13928)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:39+3
-    assume {:print "$at(3,5153,5156)"} true;
-    assume {:print "$track_exp_sub(25633):", $t0} true;
-
-    // assume Identical($t4, exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28
-    assume ($t4 == $ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28
-    assume {:print "$track_exp_sub(25634):", $t4} true;
-
-    // assume Identical($t5, Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assume ($t5 == !$ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assume {:print "$track_exp(25635):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assume {:print "$track_global_mem(27316):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assert {:msg "assert_failed(3,5123,5163): function does not abort under this condition"}
+    // assert Not(Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:151:9+40
+    assume {:print "$at(3,5597,5637)"} true;
+    assert {:msg "assert_failed(3,5597,5637): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:38+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:38+3
-    assume {:print "$at(3,5201,5204)"} true;
-    assume {:print "$track_exp_sub(25640):", $t0} true;
-
-    // assume Identical($t6, object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27
-    assume ($t6 == $1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27
-    assume {:print "$track_exp_sub(25641):", $t6} true;
-
-    // assume Identical($t7, Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume ($t7 == !$1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume {:print "$track_exp(25642):", $t7} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume {:print "$track_global_mem(27317):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assert {:msg "assert_failed(3,5172,5211): function does not abort under this condition"}
+    // assert Not(Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:152:9+39
+    assume {:print "$at(3,5646,5685)"} true;
+    assert {:msg "assert_failed(3,5646,5685): function does not abort under this condition"}
       !!$1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0));
 
-    // return $t2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
+    // return $t2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:152:9+39
     $ret0 := $t2;
     return;
 
@@ -12681,47 +11014,12 @@ L1:
     assume {:print "$at(2,13927,13928)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:39+3
-    assume {:print "$at(3,5153,5156)"} true;
-    assume {:print "$track_exp_sub(25633):", $t0} true;
-
-    // assume Identical($t8, exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28
-    assume ($t8 == $ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:20+28
-    assume {:print "$track_exp_sub(25634):", $t8} true;
-
-    // assume Identical($t9, Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assume ($t9 == !$ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:136:9+40
-    assume {:print "$track_exp(25635):", $t9} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:38+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:38+3
-    assume {:print "$at(3,5201,5204)"} true;
-    assume {:print "$track_exp_sub(25640):", $t0} true;
-
-    // assume Identical($t10, object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27
-    assume ($t10 == $1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:20+27
-    assume {:print "$track_exp_sub(25641):", $t10} true;
-
-    // assume Identical($t11, Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume ($t11 == !$1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume {:print "$track_exp(25642):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:137:9+39
-    assume {:print "$track_global_mem(27318):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0))), Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:135:5+168
-    assume {:print "$at(3,5049,5217)"} true;
-    assert {:msg "assert_failed(3,5049,5217): abort not covered by any of the `aborts_if` clauses"}
+    // assert Or(Not(exists[@32]<object::ObjectCore>(select object::DeleteRef.self($t0))), Not(object::spec_exists_at[]<#0>(select object::DeleteRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:150:5+168
+    assume {:print "$at(3,5523,5691)"} true;
+    assert {:msg "assert_failed(3,5523,5691): abort not covered by any of the `aborts_if` clauses"}
       (!$ResourceExists($1_object_ObjectCore_$memory#32, $self#$1_object_DeleteRef($t0)) || !$1_object_spec_exists_at'#0'($self#$1_object_DeleteRef($t0)));
 
-    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:135:5+168
+    // abort($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:150:5+168
     $abort_code := $t3;
     $abort_flag := true;
     return;
@@ -12745,38 +11043,22 @@ procedure {:timeLimit 40} $1_object_owns$verify(_$t0: $1_object_Object'#0', _$t1
     var $t12: $1_object_ObjectCore;
     var $t13: int;
     var $t14: bool;
-    var $t15: bool;
-    var $t16: bool;
-    var $t17: int;
+    var $t15: int;
+    var $t16: int;
+    var $t17: bool;
     var $t18: bool;
-    var $t19: int;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: bool;
-    var $t23: bool;
+    var $t19: bool;
+    var $t20: $1_object_ObjectCore;
+    var $t21: int;
+    var $t22: int;
+    var $t23: int;
     var $t24: bool;
     var $t25: bool;
-    var $t26: bool;
-    var $t27: $1_object_ObjectCore;
-    var $t28: bool;
-    var $t29: int;
-    var $t30: bool;
-    var $t31: bool;
-    var $t32: int;
-    var $t33: int;
-    var $t34: bool;
-    var $t35: bool;
-    var $t36: bool;
-    var $t37: bool;
-    var $t38: bool;
-    var $t39: bool;
     var $t0: $1_object_Object'#0';
     var $t1: int;
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
     var $temp_0'bool': bool;
-    var $temp_0'u8': int;
     var $1_object_ObjectCore_$memory#23: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
@@ -12923,186 +11205,69 @@ L13:
     assume {:print "$at(2,21195,21200)"} true;
     havoc $t3;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25264):", $t3} true;
-
-    // assume Identical($t14, WellFormed($t3)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t14 == $IsValid'address'($t3));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25265):", $t14} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27319):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     assume $IsValid'address'($t3);
+
+    // $t14 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    havoc $t14;
+
+    // assume WellFormed($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    assume $IsValid'bool'($t14);
 
     // $t15 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     havoc $t15;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25268):", $t15} true;
-
-    // assume Identical($t16, WellFormed($t15)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t16 == $IsValid'bool'($t15));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25269):", $t16} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27320):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'bool'($t15);
+    assume $IsValid'u8'($t15);
+
+    // $t16 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    havoc $t16;
+
+    // assume WellFormed($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    assume $IsValid'u8'($t16);
 
     // $t17 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     havoc $t17;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25272):", $t17} true;
-
-    // assume Identical($t18, WellFormed($t17)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t18 == $IsValid'u8'($t17));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25273):", $t18} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27321):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'u8'($t17);
+    assume $IsValid'bool'($t17);
+
+    // $t18 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    havoc $t18;
+
+    // assume WellFormed($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    assume $IsValid'bool'($t18);
 
     // $t19 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     havoc $t19;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25276):", $t19} true;
-
-    // assume Identical($t20, WellFormed($t19)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t20 == $IsValid'u8'($t19));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25277):", $t20} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27322):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'u8'($t19);
+    assume $IsValid'bool'($t19);
+
+    // $t20 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    havoc $t20;
+
+    // assume WellFormed($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
+    assume $IsValid'$1_object_ObjectCore'($t20);
 
     // $t21 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     havoc $t21;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25280):", $t21} true;
-
-    // assume Identical($t22, WellFormed($t21)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t22 == $IsValid'bool'($t21));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25281):", $t22} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27323):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'bool'($t21);
-
-    // $t23 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    havoc $t23;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25284):", $t23} true;
-
-    // assume Identical($t24, WellFormed($t23)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t24 == $IsValid'bool'($t23));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25285):", $t24} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27324):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'bool'($t23);
-
-    // $t25 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    havoc $t25;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25288):", $t25} true;
-
-    // assume Identical($t26, WellFormed($t25)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t26 == $IsValid'bool'($t25));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25289):", $t26} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27325):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'bool'($t25);
-
-    // $t27 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    havoc $t27;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25292):", $t27} true;
-
-    // assume Identical($t28, WellFormed($t27)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t28 == $IsValid'$1_object_ObjectCore'($t27));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25293):", $t28} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27326):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'$1_object_ObjectCore'($t27);
-
-    // $t29 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    havoc $t29;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp_sub(25296):", $t29} true;
-
-    // assume Identical($t30, WellFormed($t29)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t30 == $IsValid'address'($t29));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25297):", $t30} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27327):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume $IsValid'address'($t29);
+    assume $IsValid'address'($t21);
 
     // trace_local[current_address#2]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     assume {:print "$info(): enter loop, variable(s) current_address#2 havocked and reassigned"} true;
     assume {:print "$track_local(52,34,3):", $t3} $t3 == $t3;
 
-    // assume Identical($t31, Not(AbortFlag())) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume ($t31 == !$abort_flag);
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5]($t31) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_exp(25299):", $t31} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
-    assume {:print "$track_global_mem(27328):", $1_object_ObjectCore_$memory} true;
-
     // assume Not(AbortFlag()) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:16+5
     assume !$abort_flag;
 
-    // $t15 := !=($t1, $t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:22+2
-    $t15 := !$IsEqual'address'($t1, $t3);
+    // $t14 := !=($t1, $t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:22+2
+    $t14 := !$IsEqual'address'($t1, $t3);
 
-    // if ($t15) goto L6 else goto L5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:9+385
-    if ($t15) { goto L6; } else { goto L5; }
+    // if ($t14) goto L6 else goto L5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:9+385
+    if ($t14) { goto L6; } else { goto L5; }
 
     // label L6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:536:9+385
 L6:
@@ -13111,21 +11276,21 @@ L6:
     assume {:print "$at(2,21247,21256)"} true;
 L7:
 
-    // $t17 := 1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:537:25+9
+    // $t15 := 1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:537:25+9
     assume {:print "$at(2,21247,21256)"} true;
-    $t17 := 1;
-    assume $IsValid'u8'($t17);
+    $t15 := 1;
+    assume $IsValid'u8'($t15);
 
-    // $t19 := 8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:29+22
+    // $t16 := 8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:29+22
     assume {:print "$at(2,21286,21308)"} true;
-    $t19 := 8;
-    assume $IsValid'u8'($t19);
+    $t16 := 8;
+    assume $IsValid'u8'($t16);
 
-    // $t21 := <($t17, $t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:27+1
-    call $t21 := $Lt($t17, $t19);
+    // $t17 := <($t15, $t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:27+1
+    call $t17 := $Lt($t15, $t16);
 
-    // if ($t21) goto L9 else goto L8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
-    if ($t21) { goto L9; } else { goto L8; }
+    // if ($t17) goto L9 else goto L8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
+    if ($t17) { goto L9; } else { goto L8; }
 
     // label L9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
 L9:
@@ -13137,13 +11302,13 @@ L9:
     // label L8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:73+16
 L8:
 
-    // $t32 := 6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:73+16
+    // $t22 := 6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:73+16
     assume {:print "$at(2,21330,21346)"} true;
-    $t32 := 6;
-    assume $IsValid'u64'($t32);
+    $t22 := 6;
+    assume $IsValid'u64'($t22);
 
-    // $t33 := error::out_of_range($t32) on_abort goto L16 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:53+37
-    call $t33 := $1_error_out_of_range($t32);
+    // $t23 := error::out_of_range($t22) on_abort goto L16 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:53+37
+    call $t23 := $1_error_out_of_range($t22);
     if ($abort_flag) {
         assume {:print "$at(2,21310,21347)"} true;
         $t5 := $abort_code;
@@ -13151,12 +11316,12 @@ L8:
         goto L16;
     }
 
-    // trace_abort($t33) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
+    // trace_abort($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
     assume {:print "$at(2,21270,21348)"} true;
-    assume {:print "$track_abort(52,34):", $t33} $t33 == $t33;
+    assume {:print "$track_abort(52,34):", $t23} $t23 == $t23;
 
-    // $t5 := move($t33) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
-    $t5 := $t33;
+    // $t5 := move($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
+    $t5 := $t23;
 
     // goto L16 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:538:13+78
     goto L16;
@@ -13165,30 +11330,30 @@ L8:
     assume {:print "$at(2,21386,21401)"} true;
 L10:
 
-    // $t23 := exists<object::ObjectCore>($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:18+6
+    // $t18 := exists<object::ObjectCore>($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:18+6
     assume {:print "$at(2,21367,21373)"} true;
-    $t23 := $ResourceExists($1_object_ObjectCore_$memory, $t3);
+    $t18 := $ResourceExists($1_object_ObjectCore_$memory, $t3);
 
-    // $t25 := !($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:17+1
-    call $t25 := $Not($t23);
+    // $t19 := !($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:17+1
+    call $t19 := $Not($t18);
 
-    // if ($t25) goto L12 else goto L11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:13+86
-    if ($t25) { goto L12; } else { goto L11; }
+    // if ($t19) goto L12 else goto L11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:539:13+86
+    if ($t19) { goto L12; } else { goto L11; }
 
     // label L12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:24+5
     assume {:print "$at(2,21429,21434)"} true;
 L12:
 
-    // $t34 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:24+5
+    // $t24 := false at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:24+5
     assume {:print "$at(2,21429,21434)"} true;
-    $t34 := false;
-    assume $IsValid'bool'($t34);
+    $t24 := false;
+    assume $IsValid'bool'($t24);
 
-    // trace_return[0]($t34) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:17+12
-    assume {:print "$track_return(52,34,0):", $t34} $t34 == $t34;
+    // trace_return[0]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:17+12
+    assume {:print "$track_return(52,34,0):", $t24} $t24 == $t24;
 
-    // $t8 := move($t34) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:17+12
-    $t8 := $t34;
+    // $t8 := move($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:17+12
+    $t8 := $t24;
 
     // goto L15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:540:17+12
     goto L15;
@@ -13197,12 +11362,12 @@ L12:
     assume {:print "$at(2,21502,21517)"} true;
 L11:
 
-    // $t27 := get_global<object::ObjectCore>($t3) on_abort goto L16 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:543:26+13
+    // $t20 := get_global<object::ObjectCore>($t3) on_abort goto L16 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:543:26+13
     assume {:print "$at(2,21476,21489)"} true;
     if (!$ResourceExists($1_object_ObjectCore_$memory, $t3)) {
         call $ExecFailureAbort();
     } else {
-        $t27 := $ResourceValue($1_object_ObjectCore_$memory, $t3);
+        $t20 := $ResourceValue($1_object_ObjectCore_$memory, $t3);
     }
     if ($abort_flag) {
         assume {:print "$at(2,21476,21489)"} true;
@@ -13211,12 +11376,12 @@ L11:
         goto L16;
     }
 
-    // $t29 := get_field<object::ObjectCore>.owner($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:544:31+12
+    // $t21 := get_field<object::ObjectCore>.owner($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:544:31+12
     assume {:print "$at(2,21550,21562)"} true;
-    $t29 := $owner#$1_object_ObjectCore($t27);
+    $t21 := $owner#$1_object_ObjectCore($t20);
 
-    // trace_local[current_address#2]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:544:13+15
-    assume {:print "$track_local(52,34,3):", $t29} $t29 == $t29;
+    // trace_local[current_address#2]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:544:13+15
+    assume {:print "$track_local(52,34,3):", $t21} $t21 == $t21;
 
     // goto L14 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:544:43+1
     goto L14;
@@ -13225,16 +11390,16 @@ L11:
     assume {:print "$at(2,21583,21587)"} true;
 L5:
 
-    // $t35 := true at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
+    // $t25 := true at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
     assume {:print "$at(2,21583,21587)"} true;
-    $t35 := true;
-    assume $IsValid'bool'($t35);
+    $t25 := true;
+    assume $IsValid'bool'($t25);
 
-    // trace_return[0]($t35) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
-    assume {:print "$track_return(52,34,0):", $t35} $t35 == $t35;
+    // trace_return[0]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
+    assume {:print "$track_return(52,34,0):", $t25} $t25 == $t25;
 
-    // $t8 := move($t35) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
-    $t8 := $t35;
+    // $t8 := move($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
+    $t8 := $t25;
 
     // goto L15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:546:9+4
     goto L15;
@@ -13252,36 +11417,12 @@ L14:
     assume {:print "$at(2,21592,21593)"} true;
 L15:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:19+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:19+6
-    assume {:print "$at(3,9178,9184)"} true;
-    assume {:print "$track_exp_sub(25255):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:35+5]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:35+5
-    assume {:print "$track_exp_sub(25257):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:64+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:64+6
-    assume {:print "$track_exp_sub(25259):", $t0} true;
-
-    // assume Identical($t36, exists[@23]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32
-    assume ($t36 == $ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32]($t36) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32
-    assume {:print "$track_exp_sub(25260):", $t36} true;
-
-    // assume Identical($t37, And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume ($t37 == (!$IsEqual'address'($inner#$1_object_Object'#0'($t0), $t1) && !$ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69]($t37) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume {:print "$track_exp(25261):", $t37} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume {:print "$track_global_mem(27329):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assert {:msg "assert_failed(3,9168,9237): function does not abort under this condition"}
+    // assert Not(And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:253:9+69
+    assume {:print "$at(3,9642,9711)"} true;
+    assert {:msg "assert_failed(3,9642,9711): function does not abort under this condition"}
       !(!$IsEqual'address'($inner#$1_object_Object'#0'($t0), $t1) && !$ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0)));
 
-    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
+    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:253:9+69
     $ret0 := $t8;
     return;
 
@@ -13289,37 +11430,12 @@ L15:
     assume {:print "$at(2,21592,21593)"} true;
 L16:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:19+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:19+6
-    assume {:print "$at(3,9178,9184)"} true;
-    assume {:print "$track_exp_sub(25255):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:35+5]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:35+5
-    assume {:print "$track_exp_sub(25257):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:64+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:64+6
-    assume {:print "$track_exp_sub(25259):", $t0} true;
-
-    // assume Identical($t38, exists[@23]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32
-    assume ($t38 == $ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32]($t38) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:45+32
-    assume {:print "$track_exp_sub(25260):", $t38} true;
-
-    // assume Identical($t39, And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume ($t39 == (!$IsEqual'address'($inner#$1_object_Object'#0'($t0), $t1) && !$ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69]($t39) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume {:print "$track_exp(25261):", $t39} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:238:9+69
-    assume {:print "$track_global_mem(27330):", $1_object_ObjectCore_$memory} true;
-
-    // assert And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:237:5+144
-    assume {:print "$at(3,9099,9243)"} true;
-    assert {:msg "assert_failed(3,9099,9243): abort not covered by any of the `aborts_if` clauses"}
+    // assert And(Neq<address>(select object::Object.inner($t0), $t1), Not(exists[@23]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:252:5+144
+    assume {:print "$at(3,9573,9717)"} true;
+    assert {:msg "assert_failed(3,9573,9717): abort not covered by any of the `aborts_if` clauses"}
       (!$IsEqual'address'($inner#$1_object_Object'#0'($t0), $t1) && !$ResourceExists($1_object_ObjectCore_$memory#23, $inner#$1_object_Object'#0'($t0)));
 
-    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:237:5+144
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:252:5+144
     $abort_code := $t5;
     $abort_flag := true;
     return;
@@ -13333,30 +11449,10 @@ procedure {:timeLimit 40} $1_object_transfer_call$verify(_$t0: $signer, _$t1: in
     var $t3: int;
     var $t4: int;
     var $t5: int;
-    var $t6: int;
-    var $t7: int;
-    var $t8: bool;
-    var $t9: bool;
-    var $t10: $1_object_ObjectCore;
-    var $t11: bool;
-    var $t12: bool;
-    var $t13: bool;
-    var $t14: $1_object_ObjectCore;
-    var $t15: bool;
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: $1_object_ObjectCore;
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: $1_object_ObjectCore;
-    var $t23: bool;
     var $t0: $signer;
     var $t1: int;
     var $t2: int;
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#43: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -13381,27 +11477,9 @@ procedure {:timeLimit 40} $1_object_transfer_call$verify(_$t0: $signer, _$t1: in
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:48+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:48+5
-    assume {:print "$at(3,5918,5923)"} true;
-    assume {:print "$track_exp_sub(26118):", $t0} true;
-
-    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:29+25
+    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+46
+    assume {:print "$at(3,6353,6399)"} true;
     assume ($t3 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:29+25]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:29+25
-    assume {:print "$track_exp_sub(26119):", $t3} true;
-
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:9+46
-    assume ($t4 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:9+46]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:9+46
-    assume {:print "$track_exp(26120):", $t4} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:9+46
-    assume {:print "$track_global_mem(27331):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:163:9+46
-    assume ($t5 == $1_signer_$address_of($t0));
 
     // @43 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:396:5+1
     assume {:print "$at(2,16320,16321)"} true;
@@ -13416,21 +11494,17 @@ procedure {:timeLimit 40} $1_object_transfer_call$verify(_$t0: $signer, _$t1: in
     // trace_local[to]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:396:5+1
     assume {:print "$track_local(52,36,2):", $t2} $t2 == $t2;
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:401:9+31
-    assume {:print "$at(2,16458,16489)"} true;
-    assume {:print "$track_global_mem(27332):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+46
+    assume {:print "$at(3,7572,7618)"} true;
+    assume ($t4 == $1_signer_$address_of($t0));
 
-    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$at(3,7098,7144)"} true;
-    assume ($t6 == $1_signer_$address_of($t0));
-
-    // object::transfer_raw($t0, $t1, $t2) on_abort goto L2 with $t7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:401:9+31
+    // object::transfer_raw($t0, $t1, $t2) on_abort goto L2 with $t5 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:401:9+31
     assume {:print "$at(2,16458,16489)"} true;
     call $1_object_transfer_raw($t0, $t1, $t2);
     if ($abort_flag) {
         assume {:print "$at(2,16458,16489)"} true;
-        $t7 := $abort_code;
-        assume {:print "$track_abort(52,36):", $t7} $t7 == $t7;
+        $t5 := $abort_code;
+        assume {:print "$track_abort(52,36):", $t5} $t5 == $t5;
         goto L2;
     }
 
@@ -13438,215 +11512,44 @@ procedure {:timeLimit 40} $1_object_transfer_call$verify(_$t0: $signer, _$t1: in
     assume {:print "$at(2,16494,16495)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:39+6
-    assume {:print "$at(3,5964,5970)"} true;
-    assume {:print "$track_exp_sub(26125):", $t1} true;
-
-    // assume Identical($t8, exists[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26
-    assume ($t8 == $ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26]($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26
-    assume {:print "$track_exp_sub(26126):", $t8} true;
-
-    // assume Identical($t9, Not(exists[@43]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assume ($t9 == !$ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assume {:print "$track_exp(26127):", $t9} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assume {:print "$track_global_mem(27333):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@43]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assert {:msg "assert_failed(3,5934,5972): function does not abort under this condition"}
+    // assert Not(Not(exists[@43]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:179:9+38
+    assume {:print "$at(3,6408,6446)"} true;
+    assert {:msg "assert_failed(3,6408,6446): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#43, $t1);
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:39+6
-    assume {:print "$at(3,6011,6017)"} true;
-    assume {:print "$track_exp_sub(26132):", $t1} true;
-
-    // assume Identical($t10, global[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26
-    assume ($t10 == $ResourceValue($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26
-    assume {:print "$track_exp_sub(26133):", $t10} true;
-
-    // assume Identical($t11, Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assume ($t11 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assume {:print "$track_exp(26134):", $t11} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assume {:print "$track_global_mem(27334):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assert {:msg "assert_failed(3,5981,6042): function does not abort under this condition"}
+    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:180:9+61
+    assume {:print "$at(3,6455,6516)"} true;
+    assert {:msg "assert_failed(3,6455,6516): function does not abort under this condition"}
       !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:13+13
-    assume {:print "$at(3,6116,6129)"} true;
-    assume {:print "$track_exp_sub(26141):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:30+6
-    assume {:print "$track_exp_sub(26143):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:60+6
-    assume {:print "$track_exp_sub(26145):", $t1} true;
-
-    // assume Identical($t12, exists[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26
-    assume ($t12 == $ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26
-    assume {:print "$track_exp_sub(26146):", $t12} true;
-
-    // assume Identical($t13, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(exists[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assume {:print "$at(3,6051,6171)"} true;
-    assume ($t13 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assume {:print "$track_exp(26147):", $t13} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assume {:print "$track_global_mem(27335):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(exists[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assert {:msg "assert_failed(3,6051,6171): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t1), Not(exists[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:181:9+120
+    assume {:print "$at(3,6525,6645)"} true;
+    assert {:msg "assert_failed(3,6525,6645): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1))))));
+    ((!$IsEqual'address'($t3, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1))))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:13+13
-    assume {:print "$at(3,6245,6258)"} true;
-    assume {:print "$track_exp_sub(26154):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:30+6
-    assume {:print "$track_exp_sub(26156):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:60+6
-    assume {:print "$track_exp_sub(26158):", $t1} true;
-
-    // assume Identical($t14, global[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26
-    assume ($t14 == $ResourceValue($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26
-    assume {:print "$track_exp_sub(26159):", $t14} true;
-
-    // assume Identical($t15, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$at(3,6180,6323)"} true;
-    assume ($t15 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$track_exp(26160):", $t15} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$track_global_mem(27336):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assert {:msg "assert_failed(3,6180,6323): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+143
+    assume {:print "$at(3,6654,6797)"} true;
+    assert {:msg "assert_failed(3,6654,6797): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1)))))));
+    ((!$IsEqual'address'($t3, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1)))))));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:183:9+143
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:402:5+1
     assume {:print "$at(2,16494,16495)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:39+6
-    assume {:print "$at(3,5964,5970)"} true;
-    assume {:print "$track_exp_sub(26125):", $t1} true;
-
-    // assume Identical($t16, exists[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26
-    assume ($t16 == $ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:20+26
-    assume {:print "$track_exp_sub(26126):", $t16} true;
-
-    // assume Identical($t17, Not(exists[@43]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assume ($t17 == !$ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:164:9+38
-    assume {:print "$track_exp(26127):", $t17} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:39+6
-    assume {:print "$at(3,6011,6017)"} true;
-    assume {:print "$track_exp_sub(26132):", $t1} true;
-
-    // assume Identical($t18, global[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26
-    assume ($t18 == $ResourceValue($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:20+26
-    assume {:print "$track_exp_sub(26133):", $t18} true;
-
-    // assume Identical($t19, Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assume ($t19 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:165:9+61
-    assume {:print "$track_exp(26134):", $t19} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:13+13
-    assume {:print "$at(3,6116,6129)"} true;
-    assume {:print "$track_exp_sub(26141):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:30+6
-    assume {:print "$track_exp_sub(26143):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:60+6
-    assume {:print "$track_exp_sub(26145):", $t1} true;
-
-    // assume Identical($t20, exists[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26
-    assume ($t20 == $ResourceExists($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:41+26
-    assume {:print "$track_exp_sub(26146):", $t20} true;
-
-    // assume Identical($t21, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(exists[@43]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assume {:print "$at(3,6051,6171)"} true;
-    assume ($t21 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:166:9+120
-    assume {:print "$track_exp(26147):", $t21} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:13+13
-    assume {:print "$at(3,6245,6258)"} true;
-    assume {:print "$track_exp_sub(26154):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:30+6
-    assume {:print "$track_exp_sub(26156):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:60+6
-    assume {:print "$track_exp_sub(26158):", $t1} true;
-
-    // assume Identical($t22, global[@43]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26
-    assume ($t22 == $ResourceValue($1_object_ObjectCore_$memory#43, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:41+26
-    assume {:print "$track_exp_sub(26159):", $t22} true;
-
-    // assume Identical($t23, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$at(3,6180,6323)"} true;
-    assume ($t23 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$track_exp(26160):", $t23} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+143
-    assume {:print "$track_global_mem(27337):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Or(Not(exists[@43]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(exists[@43]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:158:5+556
-    assume {:print "$at(3,5773,6329)"} true;
-    assert {:msg "assert_failed(3,5773,6329): abort not covered by any of the `aborts_if` clauses"}
+    // assert Or(Or(Or(Not(exists[@43]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t1), Not(exists[@43]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@43]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:173:5+556
+    assume {:print "$at(3,6247,6803)"} true;
+    assert {:msg "assert_failed(3,6247,6803): abort not covered by any of the `aborts_if` clauses"}
       (((!$ResourceExists($1_object_ObjectCore_$memory#43, $t1) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
-    ((!$IsEqual'address'($t5, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1))))))));
+    ((!$IsEqual'address'($t3, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#43, $t1))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
+    ((!$IsEqual'address'($t3, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#43, $t1))))))));
 
-    // abort($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:158:5+556
-    $abort_code := $t7;
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:173:5+556
+    $abort_code := $t5;
     $abort_flag := true;
     return;
 
@@ -13678,8 +11581,8 @@ procedure {:inline 1} $1_object_transfer_raw(_$t0: $signer, _$t1: int, _$t2: int
     $t2 := _$t2;
 
     // bytecode translation starts here
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$at(3,7098,7144)"} true;
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+46
+    assume {:print "$at(3,7572,7618)"} true;
     assume ($t4 == $1_signer_$address_of($t0));
 
     // trace_local[owner]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:418:5+1
@@ -13815,37 +11718,18 @@ procedure {:timeLimit 40} $1_object_transfer_raw$verify(_$t0: $signer, _$t1: int
     var $t4: int;
     var $t5: int;
     var $t6: int;
-    var $t7: int;
+    var $t7: $Mutation ($1_object_ObjectCore);
     var $t8: int;
-    var $t9: $Mutation ($1_object_ObjectCore);
-    var $t10: int;
-    var $t11: bool;
-    var $t12: $Mutation ($1_event_EventHandle'$1_object_TransferEvent');
-    var $t13: int;
-    var $t14: $1_object_TransferEvent;
-    var $t15: $Mutation (int);
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: $1_object_ObjectCore;
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: $1_object_ObjectCore;
-    var $t23: bool;
-    var $t24: bool;
-    var $t25: bool;
-    var $t26: $1_object_ObjectCore;
-    var $t27: bool;
-    var $t28: bool;
-    var $t29: bool;
-    var $t30: $1_object_ObjectCore;
-    var $t31: bool;
+    var $t9: bool;
+    var $t10: $Mutation ($1_event_EventHandle'$1_object_TransferEvent');
+    var $t11: int;
+    var $t12: $1_object_TransferEvent;
+    var $t13: $Mutation (int);
     var $t0: $signer;
     var $t1: int;
     var $t2: int;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
     var $1_object_ObjectCore_$memory#36: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
@@ -13870,27 +11754,9 @@ procedure {:timeLimit 40} $1_object_transfer_raw$verify(_$t0: $signer, _$t1: int
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:48+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:48+5
-    assume {:print "$at(3,7137,7142)"} true;
-    assume {:print "$track_exp_sub(25736):", $t0} true;
-
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:29+25
+    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+46
+    assume {:print "$at(3,7572,7618)"} true;
     assume ($t4 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:29+25]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:29+25
-    assume {:print "$track_exp_sub(25737):", $t4} true;
-
-    // assume Identical($t5, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume ($t5 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$track_exp(25738):", $t5} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume {:print "$track_global_mem(27338):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
-    assume ($t6 == $1_signer_$address_of($t0));
 
     // @36 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:418:5+1
     assume {:print "$at(2,17129,17130)"} true;
@@ -13905,59 +11771,59 @@ procedure {:timeLimit 40} $1_object_transfer_raw$verify(_$t0: $signer, _$t1: int
     // trace_local[to]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:418:5+1
     assume {:print "$track_local(52,37,2):", $t2} $t2 == $t2;
 
-    // $t7 := signer::address_of($t0) on_abort goto L3 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:423:29+25
+    // $t5 := signer::address_of($t0) on_abort goto L3 with $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:423:29+25
     assume {:print "$at(2,17280,17305)"} true;
-    call $t7 := $1_signer_address_of($t0);
+    call $t5 := $1_signer_address_of($t0);
     if ($abort_flag) {
         assume {:print "$at(2,17280,17305)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,37):", $t8} $t8 == $t8;
+        $t6 := $abort_code;
+        assume {:print "$track_abort(52,37):", $t6} $t6 == $t6;
         goto L3;
     }
 
-    // object::verify_ungated_and_descendant($t7, $t1) on_abort goto L3 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:424:9+52
+    // object::verify_ungated_and_descendant($t5, $t1) on_abort goto L3 with $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:424:9+52
     assume {:print "$at(2,17315,17367)"} true;
-    call $1_object_verify_ungated_and_descendant($t7, $t1);
+    call $1_object_verify_ungated_and_descendant($t5, $t1);
     if ($abort_flag) {
         assume {:print "$at(2,17315,17367)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,37):", $t8} $t8 == $t8;
+        $t6 := $abort_code;
+        assume {:print "$track_abort(52,37):", $t6} $t6 == $t6;
         goto L3;
     }
 
-    // $t9 := borrow_global<object::ObjectCore>($t1) on_abort goto L3 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:426:27+17
+    // $t7 := borrow_global<object::ObjectCore>($t1) on_abort goto L3 with $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:426:27+17
     assume {:print "$at(2,17396,17413)"} true;
     if (!$ResourceExists($1_object_ObjectCore_$memory, $t1)) {
         call $ExecFailureAbort();
     } else {
-        $t9 := $Mutation($Global($t1), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t1));
+        $t7 := $Mutation($Global($t1), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t1));
     }
     if ($abort_flag) {
         assume {:print "$at(2,17396,17413)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,37):", $t8} $t8 == $t8;
+        $t6 := $abort_code;
+        assume {:print "$track_abort(52,37):", $t6} $t6 == $t6;
         goto L3;
     }
 
-    // trace_local[object_core]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:426:13+11
-    $temp_0'$1_object_ObjectCore' := $Dereference($t9);
+    // trace_local[object_core]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:426:13+11
+    $temp_0'$1_object_ObjectCore' := $Dereference($t7);
     assume {:print "$track_local(52,37,3):", $temp_0'$1_object_ObjectCore'} $temp_0'$1_object_ObjectCore' == $temp_0'$1_object_ObjectCore';
 
-    // $t10 := get_field<object::ObjectCore>.owner($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:13+17
+    // $t8 := get_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:13+17
     assume {:print "$at(2,17447,17464)"} true;
-    $t10 := $owner#$1_object_ObjectCore($Dereference($t9));
+    $t8 := $owner#$1_object_ObjectCore($Dereference($t7));
 
-    // $t11 := ==($t10, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:31+2
-    $t11 := $IsEqual'address'($t10, $t2);
+    // $t9 := ==($t8, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:31+2
+    $t9 := $IsEqual'address'($t8, $t2);
 
-    // if ($t11) goto L1 else goto L0 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:9+59
-    if ($t11) { goto L1; } else { goto L0; }
+    // if ($t9) goto L1 else goto L0 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:427:9+59
+    if ($t9) { goto L1; } else { goto L0; }
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:428:13+6
     assume {:print "$at(2,17486,17492)"} true;
 L1:
 
-    // destroy($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:428:13+6
+    // destroy($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:428:13+6
     assume {:print "$at(2,17486,17492)"} true;
 
     // goto L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:428:13+6
@@ -13967,253 +11833,82 @@ L1:
     assume {:print "$at(2,17549,17560)"} true;
 L0:
 
-    // $t12 := borrow_field<object::ObjectCore>.transfer_events($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:432:13+32
+    // $t10 := borrow_field<object::ObjectCore>.transfer_events($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:432:13+32
     assume {:print "$at(2,17544,17576)"} true;
-    $t12 := $ChildMutation($t9, 3, $transfer_events#$1_object_ObjectCore($Dereference($t9)));
+    $t10 := $ChildMutation($t7, 3, $transfer_events#$1_object_ObjectCore($Dereference($t7)));
 
-    // $t13 := get_field<object::ObjectCore>.owner($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:435:23+17
+    // $t11 := get_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:435:23+17
     assume {:print "$at(2,17660,17677)"} true;
-    $t13 := $owner#$1_object_ObjectCore($Dereference($t9));
+    $t11 := $owner#$1_object_ObjectCore($Dereference($t7));
 
-    // $t14 := pack object::TransferEvent($t1, $t13, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:433:13+122
+    // $t12 := pack object::TransferEvent($t1, $t11, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:433:13+122
     assume {:print "$at(2,17590,17712)"} true;
-    $t14 := $1_object_TransferEvent($t1, $t13, $t2);
+    $t12 := $1_object_TransferEvent($t1, $t11, $t2);
 
-    // opaque begin: event::emit_event<object::TransferEvent>($t12, $t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
+    // opaque begin: event::emit_event<object::TransferEvent>($t10, $t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
     assume {:print "$at(2,17513,17723)"} true;
 
-    // opaque end: event::emit_event<object::TransferEvent>($t12, $t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
+    // opaque end: event::emit_event<object::TransferEvent>($t10, $t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
 
-    // write_back[Reference($t9).transfer_events (event::EventHandle<object::TransferEvent>)]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
-    $t9 := $UpdateMutation($t9, $Update'$1_object_ObjectCore'_transfer_events($Dereference($t9), $Dereference($t12)));
+    // write_back[Reference($t7).transfer_events (event::EventHandle<object::TransferEvent>)]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:431:9+210
+    $t7 := $UpdateMutation($t7, $Update'$1_object_ObjectCore'_transfer_events($Dereference($t7), $Dereference($t10)));
 
-    // $t15 := borrow_field<object::ObjectCore>.owner($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+17
+    // $t13 := borrow_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+17
     assume {:print "$at(2,17733,17750)"} true;
-    $t15 := $ChildMutation($t9, 1, $owner#$1_object_ObjectCore($Dereference($t9)));
+    $t13 := $ChildMutation($t7, 1, $owner#$1_object_ObjectCore($Dereference($t7)));
 
-    // write_ref($t15, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
-    $t15 := $UpdateMutation($t15, $t2);
+    // write_ref($t13, $t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
+    $t13 := $UpdateMutation($t13, $t2);
 
-    // write_back[Reference($t9).owner (address)]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
-    $t9 := $UpdateMutation($t9, $Update'$1_object_ObjectCore'_owner($Dereference($t9), $Dereference($t15)));
+    // write_back[Reference($t7).owner (address)]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
+    $t7 := $UpdateMutation($t7, $Update'$1_object_ObjectCore'_owner($Dereference($t7), $Dereference($t13)));
 
-    // write_back[object::ObjectCore@]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
-    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t9),
-        $Dereference($t9));
+    // write_back[object::ObjectCore@]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:439:9+22
+    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t7),
+        $Dereference($t7));
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:440:5+1
     assume {:print "$at(2,17761,17762)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:39+6
-    assume {:print "$at(3,7183,7189)"} true;
-    assume {:print "$track_exp_sub(25743):", $t1} true;
-
-    // assume Identical($t16, exists[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26
-    assume ($t16 == $ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26
-    assume {:print "$track_exp_sub(25744):", $t16} true;
-
-    // assume Identical($t17, Not(exists[@36]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assume ($t17 == !$ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assume {:print "$track_exp(25745):", $t17} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assume {:print "$track_global_mem(27339):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@36]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assert {:msg "assert_failed(3,7153,7191): function does not abort under this condition"}
+    // assert Not(Not(exists[@36]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+38
+    assume {:print "$at(3,7627,7665)"} true;
+    assert {:msg "assert_failed(3,7627,7665): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#36, $t1);
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:39+6
-    assume {:print "$at(3,7230,7236)"} true;
-    assume {:print "$track_exp_sub(25750):", $t1} true;
-
-    // assume Identical($t18, global[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26
-    assume ($t18 == $ResourceValue($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26
-    assume {:print "$track_exp_sub(25751):", $t18} true;
-
-    // assume Identical($t19, Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assume ($t19 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assume {:print "$track_exp(25752):", $t19} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assume {:print "$track_global_mem(27340):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assert {:msg "assert_failed(3,7200,7261): function does not abort under this condition"}
+    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+61
+    assume {:print "$at(3,7674,7735)"} true;
+    assert {:msg "assert_failed(3,7674,7735): function does not abort under this condition"}
       !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:13+13]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:13+13
-    assume {:print "$at(3,7335,7348)"} true;
-    assume {:print "$track_exp_sub(25759):", $t6} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:30+6
-    assume {:print "$track_exp_sub(25761):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:60+6
-    assume {:print "$track_exp_sub(25763):", $t1} true;
-
-    // assume Identical($t20, exists[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26
-    assume ($t20 == $ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26
-    assume {:print "$track_exp_sub(25764):", $t20} true;
-
-    // assume Identical($t21, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(exists[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assume {:print "$at(3,7270,7390)"} true;
-    assume ($t21 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assume {:print "$track_exp(25765):", $t21} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assume {:print "$track_global_mem(27341):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(exists[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assert {:msg "assert_failed(3,7270,7390): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t4, $t1), Not(exists[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+120
+    assume {:print "$at(3,7744,7864)"} true;
+    assert {:msg "assert_failed(3,7744,7864): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1))))));
+    ((!$IsEqual'address'($t4, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1))))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:13+13]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:13+13
-    assume {:print "$at(3,7464,7477)"} true;
-    assume {:print "$track_exp_sub(25772):", $t6} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:30+6
-    assume {:print "$track_exp_sub(25774):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:60+6
-    assume {:print "$track_exp_sub(25776):", $t1} true;
-
-    // assume Identical($t22, global[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26
-    assume ($t22 == $ResourceValue($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26
-    assume {:print "$track_exp_sub(25777):", $t22} true;
-
-    // assume Identical($t23, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$at(3,7399,7542)"} true;
-    assume ($t23 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$track_exp(25778):", $t23} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$track_global_mem(27342):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assert {:msg "assert_failed(3,7399,7542): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t4, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+143
+    assume {:print "$at(3,7873,8016)"} true;
+    assert {:msg "assert_failed(3,7873,8016): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1)))))));
+    ((!$IsEqual'address'($t4, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1)))))));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+143
     return;
 
     // label L3 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:440:5+1
     assume {:print "$at(2,17761,17762)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:39+6
-    assume {:print "$at(3,7183,7189)"} true;
-    assume {:print "$track_exp_sub(25743):", $t1} true;
-
-    // assume Identical($t24, exists[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26
-    assume ($t24 == $ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:20+26
-    assume {:print "$track_exp_sub(25744):", $t24} true;
-
-    // assume Identical($t25, Not(exists[@36]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assume ($t25 == !$ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+38
-    assume {:print "$track_exp(25745):", $t25} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:39+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:39+6
-    assume {:print "$at(3,7230,7236)"} true;
-    assume {:print "$track_exp_sub(25750):", $t1} true;
-
-    // assume Identical($t26, global[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26
-    assume ($t26 == $ResourceValue($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:20+26
-    assume {:print "$track_exp_sub(25751):", $t26} true;
-
-    // assume Identical($t27, Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assume ($t27 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:194:9+61
-    assume {:print "$track_exp(25752):", $t27} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:13+13]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:13+13
-    assume {:print "$at(3,7335,7348)"} true;
-    assume {:print "$track_exp_sub(25759):", $t6} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:30+6
-    assume {:print "$track_exp_sub(25761):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:60+6
-    assume {:print "$track_exp_sub(25763):", $t1} true;
-
-    // assume Identical($t28, exists[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26
-    assume ($t28 == $ResourceExists($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26]($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:196:41+26
-    assume {:print "$track_exp_sub(25764):", $t28} true;
-
-    // assume Identical($t29, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(exists[@36]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assume {:print "$at(3,7270,7390)"} true;
-    assume ($t29 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:195:9+120
-    assume {:print "$track_exp(25765):", $t29} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:13+13]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:13+13
-    assume {:print "$at(3,7464,7477)"} true;
-    assume {:print "$track_exp_sub(25772):", $t6} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:30+6
-    assume {:print "$track_exp_sub(25774):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:60+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:60+6
-    assume {:print "$track_exp_sub(25776):", $t1} true;
-
-    // assume Identical($t30, global[@36]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26
-    assume ($t30 == $ResourceValue($1_object_ObjectCore_$memory#36, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26]($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:198:41+26
-    assume {:print "$track_exp_sub(25777):", $t30} true;
-
-    // assume Identical($t31, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$at(3,7399,7542)"} true;
-    assume ($t31 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143]($t31) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$track_exp(25778):", $t31} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:197:9+143
-    assume {:print "$track_global_mem(27343):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Or(Not(exists[@36]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(exists[@36]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t6, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:187:5+555
-    assume {:print "$at(3,6993,7548)"} true;
-    assert {:msg "assert_failed(3,6993,7548): abort not covered by any of the `aborts_if` clauses"}
+    // assert Or(Or(Or(Not(exists[@36]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t4, $t1), Not(exists[@36]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t4, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@36]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:202:5+555
+    assume {:print "$at(3,7467,8022)"} true;
+    assert {:msg "assert_failed(3,7467,8022): abort not covered by any of the `aborts_if` clauses"}
       (((!$ResourceExists($1_object_ObjectCore_$memory#36, $t1) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t6, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
-    ((!$IsEqual'address'($t6, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1))))))));
+    ((!$IsEqual'address'($t4, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#36, $t1))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
+    ((!$IsEqual'address'($t4, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#36, $t1))))))));
 
-    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:187:5+555
-    $abort_code := $t8;
+    // abort($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:202:5+555
+    $abort_code := $t6;
     $abort_flag := true;
     return;
 
@@ -14229,35 +11924,13 @@ procedure {:timeLimit 40} $1_object_transfer_to_object$verify(_$t0: $signer, _$t
     var $t6: int;
     var $t7: int;
     var $t8: int;
-    var $t9: int;
-    var $t10: int;
-    var $t11: int;
-    var $t12: bool;
-    var $t13: bool;
-    var $t14: $1_object_ObjectCore;
-    var $t15: bool;
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: $1_object_ObjectCore;
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: $1_object_ObjectCore;
-    var $t23: bool;
-    var $t24: bool;
-    var $t25: bool;
-    var $t26: $1_object_ObjectCore;
-    var $t27: bool;
     var $t0: $signer;
     var $t1: $1_object_Object'#0';
     var $t2: $1_object_Object'#1';
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'$1_object_Object'#1'': $1_object_Object'#1';
-    var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
-    var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $temp_0'signer': $signer;
-    var $1_object_ObjectCore_$memory#48: $Memory $1_object_ObjectCore;
+    var $1_object_ObjectCore_$memory#49: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
     $t2 := _$t2;
@@ -14280,47 +11953,17 @@ procedure {:timeLimit 40} $1_object_transfer_to_object$verify(_$t0: $signer, _$t
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:48+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:48+5
-    assume {:print "$at(3,7724,7729)"} true;
-    assume {:print "$track_exp_sub(26480):", $t0} true;
-
-    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:29+25
+    // assume Identical($t3, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+46
+    assume {:print "$at(3,8159,8205)"} true;
     assume ($t3 == $1_signer_$address_of($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:29+25]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:29+25
-    assume {:print "$track_exp_sub(26481):", $t3} true;
+    // assume Identical($t4, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:9+34
+    assume {:print "$at(3,8214,8248)"} true;
+    assume ($t4 == $inner#$1_object_Object'#0'($t1));
 
-    // assume Identical($t4, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:9+46
-    assume ($t4 == $1_signer_$address_of($t0));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:9+46]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:9+46
-    assume {:print "$track_exp(26482):", $t4} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:9+46
-    assume {:print "$track_global_mem(27344):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:206:9+46
-    assume ($t5 == $1_signer_$address_of($t0));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:30+6]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:30+6
-    assume {:print "$at(3,7761,7767)"} true;
-    assume {:print "$track_exp_sub(26485):", $t1} true;
-
-    // assume Identical($t6, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+34
-    assume ($t6 == $inner#$1_object_Object'#0'($t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+34]($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+34
-    assume {:print "$track_exp(26486):", $t6} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+34
-    assume {:print "$track_global_mem(27345):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t7, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:207:9+34
-    assume ($t7 == $inner#$1_object_Object'#0'($t1));
-
-    // @48 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:443:5+1
+    // @49 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:443:5+1
     assume {:print "$at(2,17858,17859)"} true;
-    $1_object_ObjectCore_$memory#48 := $1_object_ObjectCore_$memory;
+    $1_object_ObjectCore_$memory#49 := $1_object_ObjectCore_$memory;
 
     // trace_local[owner]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:443:5+1
     assume {:print "$track_local(52,38,0):", $t0} $t0 == $t0;
@@ -14331,31 +11974,25 @@ procedure {:timeLimit 40} $1_object_transfer_to_object$verify(_$t0: $signer, _$t
     // trace_local[to]($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:443:5+1
     assume {:print "$track_local(52,38,2):", $t2} $t2 == $t2;
 
-    // $t8 := get_field<object::Object<#1>>.inner($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:448:33+8
+    // $t5 := get_field<object::Object<#1>>.inner($t2) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:448:33+8
     assume {:print "$at(2,18045,18053)"} true;
-    $t8 := $inner#$1_object_Object'#1'($t2);
+    $t5 := $inner#$1_object_Object'#1'($t2);
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:448:9+33
-    assume {:print "$track_global_mem(27346):", $1_object_ObjectCore_$memory} true;
+    // assume Identical($t6, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:192:9+46
+    assume {:print "$at(3,6920,6966)"} true;
+    assume ($t6 == $1_signer_$address_of($t0));
 
-    // assume Identical($t9, signer::$address_of($t0)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume {:print "$at(3,6446,6492)"} true;
-    assume ($t9 == $1_signer_$address_of($t0));
+    // assume Identical($t7, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:193:9+34
+    assume {:print "$at(3,6975,7009)"} true;
+    assume ($t7 == $inner#$1_object_Object'#0'($t1));
 
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:177:9+46
-    assume {:print "$track_global_mem(27347):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t10, select object::Object.inner($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:178:9+34
-    assume {:print "$at(3,6501,6535)"} true;
-    assume ($t10 == $inner#$1_object_Object'#0'($t1));
-
-    // object::transfer<#0>($t0, $t1, $t8) on_abort goto L2 with $t11 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:448:9+33
+    // object::transfer<#0>($t0, $t1, $t5) on_abort goto L2 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:448:9+33
     assume {:print "$at(2,18021,18054)"} true;
-    call $1_object_transfer'#0'($t0, $t1, $t8);
+    call $1_object_transfer'#0'($t0, $t1, $t5);
     if ($abort_flag) {
         assume {:print "$at(2,18021,18054)"} true;
-        $t11 := $abort_code;
-        assume {:print "$track_abort(52,38):", $t11} $t11 == $t11;
+        $t8 := $abort_code;
+        assume {:print "$track_abort(52,38):", $t8} $t8 == $t8;
         goto L2;
     }
 
@@ -14363,215 +12000,44 @@ procedure {:timeLimit 40} $1_object_transfer_to_object$verify(_$t0: $signer, _$t
     assume {:print "$at(2,18059,18060)"} true;
 L1:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:39+14
-    assume {:print "$at(3,7813,7827)"} true;
-    assume {:print "$track_exp_sub(26491):", $t7} true;
+    // assert Not(Not(exists[@49]<object::ObjectCore>($t4))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:223:9+46
+    assume {:print "$at(3,8257,8303)"} true;
+    assert {:msg "assert_failed(3,8257,8303): function does not abort under this condition"}
+      !!$ResourceExists($1_object_ObjectCore_$memory#49, $t4);
 
-    // assume Identical($t12, exists[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34
-    assume ($t12 == $ResourceExists($1_object_ObjectCore_$memory#48, $t7));
+    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@49]<object::ObjectCore>($t4)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:224:9+69
+    assume {:print "$at(3,8312,8381)"} true;
+    assert {:msg "assert_failed(3,8312,8381): function does not abort under this condition"}
+      !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#49, $t4));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34
-    assume {:print "$track_exp_sub(26492):", $t12} true;
-
-    // assume Identical($t13, Not(exists[@48]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assume ($t13 == !$ResourceExists($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46]($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assume {:print "$track_exp(26493):", $t13} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assume {:print "$track_global_mem(27348):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@48]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assert {:msg "assert_failed(3,7783,7829): function does not abort under this condition"}
-      !!$ResourceExists($1_object_ObjectCore_$memory#48, $t7);
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:39+14
-    assume {:print "$at(3,7868,7882)"} true;
-    assume {:print "$track_exp_sub(26498):", $t7} true;
-
-    // assume Identical($t14, global[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34
-    assume ($t14 == $ResourceValue($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34
-    assume {:print "$track_exp_sub(26499):", $t14} true;
-
-    // assume Identical($t15, Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assume ($t15 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assume {:print "$track_exp(26500):", $t15} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assume {:print "$track_global_mem(27349):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assert {:msg "assert_failed(3,7838,7907): function does not abort under this condition"}
-      !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:13+13
-    assume {:print "$at(3,7981,7994)"} true;
-    assume {:print "$track_exp_sub(26507):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:30+14
-    assume {:print "$track_exp_sub(26509):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:68+14
-    assume {:print "$track_exp_sub(26511):", $t7} true;
-
-    // assume Identical($t16, exists[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34
-    assume ($t16 == $ResourceExists($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34
-    assume {:print "$track_exp_sub(26512):", $t16} true;
-
-    // assume Identical($t17, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assume {:print "$at(3,7916,8052)"} true;
-    assume ($t17 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#48, $t7)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assume {:print "$track_exp(26513):", $t17} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assume {:print "$track_global_mem(27350):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assert {:msg "assert_failed(3,7916,8052): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(exists[@49]<object::ObjectCore>($t4)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:225:9+136
+    assume {:print "$at(3,8390,8526)"} true;
+    assert {:msg "assert_failed(3,8390,8526): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#48, $t7))))));
+    ((!$IsEqual'address'($t3, $t4) && !$ResourceExists($1_object_ObjectCore_$memory#49, $t4))))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:13+13
-    assume {:print "$at(3,8126,8139)"} true;
-    assume {:print "$track_exp_sub(26520):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:30+14
-    assume {:print "$track_exp_sub(26522):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:68+14
-    assume {:print "$track_exp_sub(26524):", $t7} true;
-
-    // assume Identical($t18, global[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34
-    assume ($t18 == $ResourceValue($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34
-    assume {:print "$track_exp_sub(26525):", $t18} true;
-
-    // assume Identical($t19, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$at(3,8061,8220)"} true;
-    assume ($t19 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$track_exp(26526):", $t19} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$track_global_mem(27351):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assert {:msg "assert_failed(3,8061,8220): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(select object::ObjectCore.allow_ungated_transfer(global[@49]<object::ObjectCore>($t4))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:227:9+159
+    assume {:print "$at(3,8535,8694)"} true;
+    assert {:msg "assert_failed(3,8535,8694): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7)))))));
+    ((!$IsEqual'address'($t3, $t4) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#49, $t4)))))));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:227:9+159
     return;
 
     // label L2 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:449:5+1
     assume {:print "$at(2,18059,18060)"} true;
 L2:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:39+14
-    assume {:print "$at(3,7813,7827)"} true;
-    assume {:print "$track_exp_sub(26491):", $t7} true;
+    // assert Or(Or(Or(Not(exists[@49]<object::ObjectCore>($t4)), Not(select object::ObjectCore.allow_ungated_transfer(global[@49]<object::ObjectCore>($t4)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(exists[@49]<object::ObjectCore>($t4)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t3, $t4), Not(select object::ObjectCore.allow_ungated_transfer(global[@49]<object::ObjectCore>($t4))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:216:5+672
+    assume {:print "$at(3,8028,8700)"} true;
+    assert {:msg "assert_failed(3,8028,8700): abort not covered by any of the `aborts_if` clauses"}
+      (((!$ResourceExists($1_object_ObjectCore_$memory#49, $t4) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#49, $t4))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
+    ((!$IsEqual'address'($t3, $t4) && !$ResourceExists($1_object_ObjectCore_$memory#49, $t4))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
+    ((!$IsEqual'address'($t3, $t4) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#49, $t4))))))));
 
-    // assume Identical($t20, exists[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34
-    assume ($t20 == $ResourceExists($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:20+34
-    assume {:print "$track_exp_sub(26492):", $t20} true;
-
-    // assume Identical($t21, Not(exists[@48]<object::ObjectCore>($t7))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assume ($t21 == !$ResourceExists($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:208:9+46
-    assume {:print "$track_exp(26493):", $t21} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:39+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:39+14
-    assume {:print "$at(3,7868,7882)"} true;
-    assume {:print "$track_exp_sub(26498):", $t7} true;
-
-    // assume Identical($t22, global[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34
-    assume ($t22 == $ResourceValue($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:20+34
-    assume {:print "$track_exp_sub(26499):", $t22} true;
-
-    // assume Identical($t23, Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assume ($t23 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:209:9+69
-    assume {:print "$track_exp(26500):", $t23} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:13+13
-    assume {:print "$at(3,7981,7994)"} true;
-    assume {:print "$track_exp_sub(26507):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:30+14
-    assume {:print "$track_exp_sub(26509):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:68+14
-    assume {:print "$track_exp_sub(26511):", $t7} true;
-
-    // assume Identical($t24, exists[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34
-    assume ($t24 == $ResourceExists($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:211:49+34
-    assume {:print "$track_exp_sub(26512):", $t24} true;
-
-    // assume Identical($t25, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@48]<object::ObjectCore>($t7)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assume {:print "$at(3,7916,8052)"} true;
-    assume ($t25 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#48, $t7)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:210:9+136
-    assume {:print "$track_exp(26513):", $t25} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:13+13]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:13+13
-    assume {:print "$at(3,8126,8139)"} true;
-    assume {:print "$track_exp_sub(26520):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:30+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:30+14
-    assume {:print "$track_exp_sub(26522):", $t7} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:68+14]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:68+14
-    assume {:print "$track_exp_sub(26524):", $t7} true;
-
-    // assume Identical($t26, global[@48]<object::ObjectCore>($t7)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34
-    assume ($t26 == $ResourceValue($1_object_ObjectCore_$memory#48, $t7));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:213:49+34
-    assume {:print "$track_exp_sub(26525):", $t26} true;
-
-    // assume Identical($t27, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$at(3,8061,8220)"} true;
-    assume ($t27 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$track_exp(26526):", $t27} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:212:9+159
-    assume {:print "$track_global_mem(27352):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Or(Not(exists[@48]<object::ObjectCore>($t7)), Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(exists[@48]<object::ObjectCore>($t7)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t5, $t7), Not(select object::ObjectCore.allow_ungated_transfer(global[@48]<object::ObjectCore>($t7))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:201:5+672
-    assume {:print "$at(3,7554,8226)"} true;
-    assert {:msg "assert_failed(3,7554,8226): abort not covered by any of the `aborts_if` clauses"}
-      (((!$ResourceExists($1_object_ObjectCore_$memory#48, $t7) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t5, $t7) && !$ResourceExists($1_object_ObjectCore_$memory#48, $t7))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
-    ((!$IsEqual'address'($t5, $t7) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#48, $t7))))))));
-
-    // abort($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:201:5+672
-    $abort_code := $t11;
+    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:216:5+672
+    $abort_code := $t8;
     $abort_flag := true;
     return;
 
@@ -14583,33 +12049,24 @@ procedure {:timeLimit 40} $1_object_transfer_with_ref$verify(_$t0: $1_object_Lin
     // declare local variables
     var $t2: $Mutation ($1_object_ObjectCore);
     var $t3: $1_object_ObjectCore;
-    var $t4: $1_object_ObjectCore;
-    var $t5: $1_object_ObjectCore;
+    var $t4: int;
+    var $t5: $Mutation ($1_object_ObjectCore);
     var $t6: int;
-    var $t7: $Mutation ($1_object_ObjectCore);
+    var $t7: int;
     var $t8: int;
-    var $t9: int;
+    var $t9: bool;
     var $t10: int;
-    var $t11: bool;
-    var $t12: int;
+    var $t11: int;
+    var $t12: $Mutation ($1_event_EventHandle'$1_object_TransferEvent');
     var $t13: int;
-    var $t14: $Mutation ($1_event_EventHandle'$1_object_TransferEvent');
-    var $t15: int;
-    var $t16: int;
-    var $t17: $1_object_TransferEvent;
-    var $t18: $Mutation (int);
-    var $t19: bool;
-    var $t20: bool;
-    var $t21: bool;
-    var $t22: bool;
-    var $t23: bool;
-    var $t24: bool;
+    var $t14: int;
+    var $t15: $1_object_TransferEvent;
+    var $t16: $Mutation (int);
     var $t0: $1_object_LinearTransferRef;
     var $t1: int;
     var $temp_0'$1_object_LinearTransferRef': $1_object_LinearTransferRef;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
     var $1_object_ObjectCore_$memory#17: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
@@ -14629,27 +12086,9 @@ procedure {:timeLimit 40} $1_object_transfer_with_ref$verify(_$t0: $1_object_Lin
     assume (forall $a_0: int :: {$ResourceValue($1_object_ObjectCore_$memory, $a_0)}(var $rsc := $ResourceValue($1_object_ObjectCore_$memory, $a_0);
     ($IsValid'$1_object_ObjectCore'($rsc))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:41+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:41+3
-    assume {:print "$at(3,5657,5660)"} true;
-    assume {:print "$track_exp_sub(25131):", $t0} true;
-
-    // assume Identical($t3, global<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:22+28
+    // assume Identical($t3, global<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:168:9+42
+    assume {:print "$at(3,6099,6141)"} true;
     assume ($t3 == $ResourceValue($1_object_ObjectCore_$memory, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:22+28]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:22+28
-    assume {:print "$track_exp_sub(25132):", $t3} true;
-
-    // assume Identical($t4, global<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:9+42
-    assume ($t4 == $ResourceValue($1_object_ObjectCore_$memory, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:9+42]($t4) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:9+42
-    assume {:print "$track_exp(25133):", $t4} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:9+42
-    assume {:print "$track_global_mem(27353):", $1_object_ObjectCore_$memory} true;
-
-    // assume Identical($t5, global<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:153:9+42
-    assume ($t5 == $ResourceValue($1_object_ObjectCore_$memory, $self#$1_object_LinearTransferRef($t0)));
 
     // @17 := save_mem(object::ObjectCore) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:378:5+1
     assume {:print "$at(2,15704,15705)"} true;
@@ -14661,40 +12100,40 @@ procedure {:timeLimit 40} $1_object_transfer_with_ref$verify(_$t0: $1_object_Lin
     // trace_local[to]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:378:5+1
     assume {:print "$track_local(52,39,1):", $t1} $t1 == $t1;
 
-    // $t6 := get_field<object::LinearTransferRef>.self($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:52+8
+    // $t4 := get_field<object::LinearTransferRef>.self($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:52+8
     assume {:print "$at(2,15843,15851)"} true;
-    $t6 := $self#$1_object_LinearTransferRef($t0);
+    $t4 := $self#$1_object_LinearTransferRef($t0);
 
-    // $t7 := borrow_global<object::ObjectCore>($t6) on_abort goto L4 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:22+17
-    if (!$ResourceExists($1_object_ObjectCore_$memory, $t6)) {
+    // $t5 := borrow_global<object::ObjectCore>($t4) on_abort goto L4 with $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:22+17
+    if (!$ResourceExists($1_object_ObjectCore_$memory, $t4)) {
         call $ExecFailureAbort();
     } else {
-        $t7 := $Mutation($Global($t6), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t6));
+        $t5 := $Mutation($Global($t4), EmptyVec(), $ResourceValue($1_object_ObjectCore_$memory, $t4));
     }
     if ($abort_flag) {
         assume {:print "$at(2,15813,15830)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,39):", $t8} $t8 == $t8;
+        $t6 := $abort_code;
+        assume {:print "$track_abort(52,39):", $t6} $t6 == $t6;
         goto L4;
     }
 
-    // trace_local[object]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:13+6
-    $temp_0'$1_object_ObjectCore' := $Dereference($t7);
+    // trace_local[object]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:379:13+6
+    $temp_0'$1_object_ObjectCore' := $Dereference($t5);
     assume {:print "$track_local(52,39,2):", $temp_0'$1_object_ObjectCore'} $temp_0'$1_object_ObjectCore' == $temp_0'$1_object_ObjectCore';
 
-    // $t9 := get_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:13+12
+    // $t7 := get_field<object::ObjectCore>.owner($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:13+12
     assume {:print "$at(2,15883,15895)"} true;
-    $t9 := $owner#$1_object_ObjectCore($Dereference($t7));
+    $t7 := $owner#$1_object_ObjectCore($Dereference($t5));
 
-    // $t10 := get_field<object::LinearTransferRef>.owner($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:29+9
-    $t10 := $owner#$1_object_LinearTransferRef($t0);
+    // $t8 := get_field<object::LinearTransferRef>.owner($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:29+9
+    $t8 := $owner#$1_object_LinearTransferRef($t0);
 
-    // $t11 := ==($t9, $t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:26+2
-    $t11 := $IsEqual'address'($t9, $t10);
+    // $t9 := ==($t7, $t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:381:26+2
+    $t9 := $IsEqual'address'($t7, $t8);
 
-    // if ($t11) goto L1 else goto L0 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
+    // if ($t9) goto L1 else goto L0 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
     assume {:print "$at(2,15862,15976)"} true;
-    if ($t11) { goto L1; } else { goto L0; }
+    if ($t9) { goto L1; } else { goto L0; }
 
     // label L1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
 L1:
@@ -14706,29 +12145,29 @@ L1:
     // label L0 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
 L0:
 
-    // destroy($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
+    // destroy($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
     assume {:print "$at(2,15862,15976)"} true;
 
-    // $t12 := 4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:382:38+17
+    // $t10 := 4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:382:38+17
     assume {:print "$at(2,15947,15964)"} true;
-    $t12 := 4;
-    assume $IsValid'u64'($t12);
+    $t10 := 4;
+    assume $IsValid'u64'($t10);
 
-    // $t13 := error::permission_denied($t12) on_abort goto L4 with $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:382:13+43
-    call $t13 := $1_error_permission_denied($t12);
+    // $t11 := error::permission_denied($t10) on_abort goto L4 with $t6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:382:13+43
+    call $t11 := $1_error_permission_denied($t10);
     if ($abort_flag) {
         assume {:print "$at(2,15922,15965)"} true;
-        $t8 := $abort_code;
-        assume {:print "$track_abort(52,39):", $t8} $t8 == $t8;
+        $t6 := $abort_code;
+        assume {:print "$track_abort(52,39):", $t6} $t6 == $t6;
         goto L4;
     }
 
-    // trace_abort($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
+    // trace_abort($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
     assume {:print "$at(2,15862,15976)"} true;
-    assume {:print "$track_abort(52,39):", $t13} $t13 == $t13;
+    assume {:print "$track_abort(52,39):", $t11} $t11 == $t11;
 
-    // $t8 := move($t13) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
-    $t8 := $t13;
+    // $t6 := move($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
+    $t6 := $t11;
 
     // goto L4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:380:9+114
     goto L4;
@@ -14737,137 +12176,72 @@ L0:
     assume {:print "$at(2,16022,16028)"} true;
 L2:
 
-    // $t14 := borrow_field<object::ObjectCore>.transfer_events($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:385:13+27
+    // $t12 := borrow_field<object::ObjectCore>.transfer_events($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:385:13+27
     assume {:print "$at(2,16017,16044)"} true;
-    $t14 := $ChildMutation($t7, 3, $transfer_events#$1_object_ObjectCore($Dereference($t7)));
+    $t12 := $ChildMutation($t5, 3, $transfer_events#$1_object_ObjectCore($Dereference($t5)));
 
-    // $t15 := get_field<object::LinearTransferRef>.self($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:387:25+8
+    // $t13 := get_field<object::LinearTransferRef>.self($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:387:25+8
     assume {:print "$at(2,16098,16106)"} true;
-    $t15 := $self#$1_object_LinearTransferRef($t0);
+    $t13 := $self#$1_object_LinearTransferRef($t0);
 
-    // $t16 := get_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:388:23+12
+    // $t14 := get_field<object::ObjectCore>.owner($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:388:23+12
     assume {:print "$at(2,16130,16142)"} true;
-    $t16 := $owner#$1_object_ObjectCore($Dereference($t7));
+    $t14 := $owner#$1_object_ObjectCore($Dereference($t5));
 
-    // $t17 := pack object::TransferEvent($t15, $t16, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:386:13+119
+    // $t15 := pack object::TransferEvent($t13, $t14, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:386:13+119
     assume {:print "$at(2,16058,16177)"} true;
-    $t17 := $1_object_TransferEvent($t15, $t16, $t1);
+    $t15 := $1_object_TransferEvent($t13, $t14, $t1);
 
-    // opaque begin: event::emit_event<object::TransferEvent>($t14, $t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
+    // opaque begin: event::emit_event<object::TransferEvent>($t12, $t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
     assume {:print "$at(2,15986,16188)"} true;
 
-    // opaque end: event::emit_event<object::TransferEvent>($t14, $t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
+    // opaque end: event::emit_event<object::TransferEvent>($t12, $t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
 
-    // write_back[Reference($t7).transfer_events (event::EventHandle<object::TransferEvent>)]($t14) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
-    $t7 := $UpdateMutation($t7, $Update'$1_object_ObjectCore'_transfer_events($Dereference($t7), $Dereference($t14)));
+    // write_back[Reference($t5).transfer_events (event::EventHandle<object::TransferEvent>)]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:384:9+202
+    $t5 := $UpdateMutation($t5, $Update'$1_object_ObjectCore'_transfer_events($Dereference($t5), $Dereference($t12)));
 
-    // $t18 := borrow_field<object::ObjectCore>.owner($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+12
+    // $t16 := borrow_field<object::ObjectCore>.owner($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+12
     assume {:print "$at(2,16198,16210)"} true;
-    $t18 := $ChildMutation($t7, 1, $owner#$1_object_ObjectCore($Dereference($t7)));
+    $t16 := $ChildMutation($t5, 1, $owner#$1_object_ObjectCore($Dereference($t5)));
 
-    // write_ref($t18, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
-    $t18 := $UpdateMutation($t18, $t1);
+    // write_ref($t16, $t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
+    $t16 := $UpdateMutation($t16, $t1);
 
-    // write_back[Reference($t7).owner (address)]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
-    $t7 := $UpdateMutation($t7, $Update'$1_object_ObjectCore'_owner($Dereference($t7), $Dereference($t18)));
+    // write_back[Reference($t5).owner (address)]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
+    $t5 := $UpdateMutation($t5, $Update'$1_object_ObjectCore'_owner($Dereference($t5), $Dereference($t16)));
 
-    // write_back[object::ObjectCore@]($t7) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
-    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t7),
-        $Dereference($t7));
+    // write_back[object::ObjectCore@]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:392:9+17
+    $1_object_ObjectCore_$memory := $ResourceUpdate($1_object_ObjectCore_$memory, $GlobalLocationAddress($t5),
+        $Dereference($t5));
 
     // label L3 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:393:5+1
     assume {:print "$at(2,16221,16222)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:39+3
-    assume {:print "$at(3,5706,5709)"} true;
-    assume {:print "$track_exp_sub(25138):", $t0} true;
-
-    // assume Identical($t19, exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28
-    assume ($t19 == $ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28
-    assume {:print "$track_exp_sub(25139):", $t19} true;
-
-    // assume Identical($t20, Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assume ($t20 == !$ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assume {:print "$track_exp(25140):", $t20} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assume {:print "$track_global_mem(27354):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assert {:msg "assert_failed(3,5676,5716): function does not abort under this condition"}
+    // assert Not(Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:169:9+40
+    assume {:print "$at(3,6150,6190)"} true;
+    assert {:msg "assert_failed(3,6150,6190): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:19+6]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:19+6
-    assume {:print "$at(3,5735,5741)"} true;
-    assume {:print "$track_exp_sub(25145):", $t5} true;
+    // assert Not(Neq<address>(select object::ObjectCore.owner($t3), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:170:9+36
+    assume {:print "$at(3,6199,6235)"} true;
+    assert {:msg "assert_failed(3,6199,6235): function does not abort under this condition"}
+      !!$IsEqual'address'($owner#$1_object_ObjectCore($t3), $owner#$1_object_LinearTransferRef($t0));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:35+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:35+3
-    assume {:print "$track_exp_sub(25147):", $t0} true;
-
-    // assume Identical($t21, Neq<address>(select object::ObjectCore.owner($t5), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume ($t21 == !$IsEqual'address'($owner#$1_object_ObjectCore($t5), $owner#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume {:print "$track_exp(25148):", $t21} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume {:print "$track_global_mem(27355):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Neq<address>(select object::ObjectCore.owner($t5), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assert {:msg "assert_failed(3,5725,5761): function does not abort under this condition"}
-      !!$IsEqual'address'($owner#$1_object_ObjectCore($t5), $owner#$1_object_LinearTransferRef($t0));
-
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:170:9+36
     return;
 
     // label L4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:393:5+1
     assume {:print "$at(2,16221,16222)"} true;
 L4:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:39+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:39+3
-    assume {:print "$at(3,5706,5709)"} true;
-    assume {:print "$track_exp_sub(25138):", $t0} true;
+    // assert Or(Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0))), Neq<address>(select object::ObjectCore.owner($t3), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:5+211
+    assume {:print "$at(3,6030,6241)"} true;
+    assert {:msg "assert_failed(3,6030,6241): abort not covered by any of the `aborts_if` clauses"}
+      (!$ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)) || !$IsEqual'address'($owner#$1_object_ObjectCore($t3), $owner#$1_object_LinearTransferRef($t0)));
 
-    // assume Identical($t22, exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28
-    assume ($t22 == $ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:20+28
-    assume {:print "$track_exp_sub(25139):", $t22} true;
-
-    // assume Identical($t23, Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assume ($t23 == !$ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:154:9+40
-    assume {:print "$track_exp(25140):", $t23} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:19+6]($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:19+6
-    assume {:print "$at(3,5735,5741)"} true;
-    assume {:print "$track_exp_sub(25145):", $t5} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:35+3]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:35+3
-    assume {:print "$track_exp_sub(25147):", $t0} true;
-
-    // assume Identical($t24, Neq<address>(select object::ObjectCore.owner($t5), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume ($t24 == !$IsEqual'address'($owner#$1_object_ObjectCore($t5), $owner#$1_object_LinearTransferRef($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume {:print "$track_exp(25148):", $t24} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:155:9+36
-    assume {:print "$track_global_mem(27356):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Not(exists[@17]<object::ObjectCore>(select object::LinearTransferRef.self($t0))), Neq<address>(select object::ObjectCore.owner($t5), select object::LinearTransferRef.owner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:152:5+211
-    assume {:print "$at(3,5556,5767)"} true;
-    assert {:msg "assert_failed(3,5556,5767): abort not covered by any of the `aborts_if` clauses"}
-      (!$ResourceExists($1_object_ObjectCore_$memory#17, $self#$1_object_LinearTransferRef($t0)) || !$IsEqual'address'($owner#$1_object_ObjectCore($t5), $owner#$1_object_LinearTransferRef($t0)));
-
-    // abort($t8) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:152:5+211
-    $abort_code := $t8;
+    // abort($t6) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:167:5+211
+    $abort_code := $t6;
     $abort_flag := true;
     return;
 
@@ -14885,10 +12259,6 @@ procedure {:timeLimit 40} $1_object_ungated_transfer_allowed$verify(_$t0: $1_obj
     var $t6: int;
     var $t7: $1_object_ObjectCore;
     var $t8: bool;
-    var $t9: bool;
-    var $t10: bool;
-    var $t11: bool;
-    var $t12: bool;
     var $t0: $1_object_Object'#0';
     var $temp_0'$1_object_Object'#0'': $1_object_Object'#0';
     var $temp_0'bool': bool;
@@ -14990,30 +12360,12 @@ L2:
     assume {:print "$at(2,20088,20089)"} true;
 L3:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:39+6
-    assume {:print "$at(3,8833,8839)"} true;
-    assume {:print "$track_exp_sub(25220):", $t0} true;
-
-    // assume Identical($t9, exists[@20]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32
-    assume ($t9 == $ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32]($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32
-    assume {:print "$track_exp_sub(25221):", $t9} true;
-
-    // assume Identical($t10, Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume ($t10 == !$ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44]($t10) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume {:print "$track_exp(25222):", $t10} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume {:print "$track_global_mem(27357):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assert {:msg "assert_failed(3,8803,8847): function does not abort under this condition"}
+    // assert Not(Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:241:9+44
+    assume {:print "$at(3,9277,9321)"} true;
+    assert {:msg "assert_failed(3,9277,9321): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0));
 
-    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
+    // return $t8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:241:9+44
     $ret0 := $t8;
     return;
 
@@ -15021,31 +12373,12 @@ L3:
     assume {:print "$at(2,20088,20089)"} true;
 L4:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:39+6]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:39+6
-    assume {:print "$at(3,8833,8839)"} true;
-    assume {:print "$track_exp_sub(25220):", $t0} true;
-
-    // assume Identical($t11, exists[@20]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32
-    assume ($t11 == $ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32]($t11) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:20+32
-    assume {:print "$track_exp_sub(25221):", $t11} true;
-
-    // assume Identical($t12, Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume ($t12 == !$ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44]($t12) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume {:print "$track_exp(25222):", $t12} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:226:9+44
-    assume {:print "$track_global_mem(27358):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:225:5+123
-    assume {:print "$at(3,8730,8853)"} true;
-    assert {:msg "assert_failed(3,8730,8853): abort not covered by any of the `aborts_if` clauses"}
+    // assert Not(exists[@20]<object::ObjectCore>(select object::Object.inner($t0))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:240:5+123
+    assume {:print "$at(3,9204,9327)"} true;
+    assert {:msg "assert_failed(3,9204,9327): abort not covered by any of the `aborts_if` clauses"}
       !$ResourceExists($1_object_ObjectCore_$memory#20, $inner#$1_object_Object'#0'($t0));
 
-    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:225:5+123
+    // abort($t5) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:240:5+123
     $abort_code := $t5;
     $abort_flag := true;
     return;
@@ -15530,52 +12863,23 @@ procedure {:timeLimit 40} $1_object_verify_ungated_and_descendant$verify(_$t0: i
     var $t13: int;
     var $t14: int;
     var $t15: bool;
-    var $t16: bool;
-    var $t17: bool;
-    var $t18: int;
+    var $t16: int;
+    var $t17: int;
+    var $t18: bool;
     var $t19: bool;
-    var $t20: int;
+    var $t20: $1_object_ObjectCore;
     var $t21: bool;
-    var $t22: bool;
-    var $t23: bool;
-    var $t24: bool;
-    var $t25: bool;
-    var $t26: $1_object_ObjectCore;
-    var $t27: bool;
-    var $t28: bool;
-    var $t29: bool;
-    var $t30: int;
-    var $t31: bool;
-    var $t32: bool;
-    var $t33: int;
-    var $t34: int;
-    var $t35: bool;
-    var $t36: int;
-    var $t37: int;
-    var $t38: int;
-    var $t39: int;
-    var $t40: bool;
-    var $t41: bool;
-    var $t42: $1_object_ObjectCore;
-    var $t43: bool;
-    var $t44: bool;
-    var $t45: bool;
-    var $t46: $1_object_ObjectCore;
-    var $t47: bool;
-    var $t48: bool;
-    var $t49: bool;
-    var $t50: $1_object_ObjectCore;
-    var $t51: bool;
-    var $t52: bool;
-    var $t53: bool;
-    var $t54: $1_object_ObjectCore;
-    var $t55: bool;
+    var $t22: int;
+    var $t23: int;
+    var $t24: int;
+    var $t25: int;
+    var $t26: int;
+    var $t27: int;
+    var $t28: int;
     var $t0: int;
     var $t1: int;
     var $temp_0'$1_object_ObjectCore': $1_object_ObjectCore;
     var $temp_0'address': int;
-    var $temp_0'bool': bool;
-    var $temp_0'u8': int;
     var $1_object_ObjectCore_$memory#24: $Memory $1_object_ObjectCore;
     $t0 := _$t0;
     $t1 := _$t1;
@@ -15733,186 +13037,69 @@ L18:
     assume {:print "$at(2,18857,18862)"} true;
     havoc $t3;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25371):", $t3} true;
-
-    // assume Identical($t15, WellFormed($t3)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t15 == $IsValid'address'($t3));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25372):", $t15} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27359):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     assume $IsValid'address'($t3);
+
+    // $t15 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    havoc $t15;
+
+    // assume WellFormed($t15) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    assume $IsValid'bool'($t15);
 
     // $t16 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     havoc $t16;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25375):", $t16} true;
-
-    // assume Identical($t17, WellFormed($t16)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t17 == $IsValid'bool'($t16));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25376):", $t17} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27360):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t16) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'bool'($t16);
+    assume $IsValid'u8'($t16);
+
+    // $t17 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    havoc $t17;
+
+    // assume WellFormed($t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    assume $IsValid'u8'($t17);
 
     // $t18 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     havoc $t18;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25379):", $t18} true;
-
-    // assume Identical($t19, WellFormed($t18)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t19 == $IsValid'u8'($t18));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25380):", $t19} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27361):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t18) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'u8'($t18);
+    assume $IsValid'bool'($t18);
+
+    // $t19 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    havoc $t19;
+
+    // assume WellFormed($t19) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    assume $IsValid'bool'($t19);
 
     // $t20 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     havoc $t20;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25383):", $t20} true;
-
-    // assume Identical($t21, WellFormed($t20)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t21 == $IsValid'u8'($t20));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25384):", $t21} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27362):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'u8'($t20);
+    assume $IsValid'$1_object_ObjectCore'($t20);
+
+    // $t21 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    havoc $t21;
+
+    // assume WellFormed($t21) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
+    assume $IsValid'bool'($t21);
 
     // $t22 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     havoc $t22;
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25387):", $t22} true;
-
-    // assume Identical($t23, WellFormed($t22)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t23 == $IsValid'bool'($t22));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t23) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25388):", $t23} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27363):", $1_object_ObjectCore_$memory} true;
-
     // assume WellFormed($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'bool'($t22);
-
-    // $t24 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    havoc $t24;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25391):", $t24} true;
-
-    // assume Identical($t25, WellFormed($t24)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t25 == $IsValid'bool'($t24));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t25) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25392):", $t25} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27364):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'bool'($t24);
-
-    // $t26 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    havoc $t26;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25395):", $t26} true;
-
-    // assume Identical($t27, WellFormed($t26)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t27 == $IsValid'$1_object_ObjectCore'($t26));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t27) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25396):", $t27} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27365):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'$1_object_ObjectCore'($t26);
-
-    // $t28 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    havoc $t28;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25399):", $t28} true;
-
-    // assume Identical($t29, WellFormed($t28)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t29 == $IsValid'bool'($t28));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t29) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25400):", $t29} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27366):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'bool'($t28);
-
-    // $t30 := havoc[val]() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    havoc $t30;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp_sub(25403):", $t30} true;
-
-    // assume Identical($t31, WellFormed($t30)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t31 == $IsValid'address'($t30));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t31) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25404):", $t31} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27367):", $1_object_ObjectCore_$memory} true;
-
-    // assume WellFormed($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume $IsValid'address'($t30);
+    assume $IsValid'address'($t22);
 
     // trace_local[current_address#1]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     assume {:print "$info(): enter loop, variable(s) current_address#1 havocked and reassigned"} true;
     assume {:print "$track_local(52,41,3):", $t3} $t3 == $t3;
 
-    // assume Identical($t32, Not(AbortFlag())) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume ($t32 == !$abort_flag);
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5]($t32) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_exp(25406):", $t32} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
-    assume {:print "$track_global_mem(27368):", $1_object_ObjectCore_$memory} true;
-
     // assume Not(AbortFlag()) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:16+5
     assume !$abort_flag;
 
-    // $t16 := !=($t0, $t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:22+2
-    $t16 := !$IsEqual'address'($t0, $t3);
+    // $t15 := !=($t0, $t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:22+2
+    $t15 := !$IsEqual'address'($t0, $t3);
 
-    // if ($t16) goto L7 else goto L6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:9+861
-    if ($t16) { goto L7; } else { goto L6; }
+    // if ($t15) goto L7 else goto L6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:9+861
+    if ($t15) { goto L7; } else { goto L6; }
 
     // label L7 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:470:9+861
 L7:
@@ -15921,21 +13108,21 @@ L7:
     assume {:print "$at(2,18917,18926)"} true;
 L8:
 
-    // $t18 := 1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:472:25+9
+    // $t16 := 1 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:472:25+9
     assume {:print "$at(2,18917,18926)"} true;
-    $t18 := 1;
-    assume $IsValid'u8'($t18);
+    $t16 := 1;
+    assume $IsValid'u8'($t16);
 
-    // $t20 := 8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:29+22
+    // $t17 := 8 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:29+22
     assume {:print "$at(2,18956,18978)"} true;
-    $t20 := 8;
-    assume $IsValid'u8'($t20);
+    $t17 := 8;
+    assume $IsValid'u8'($t17);
 
-    // $t22 := <($t18, $t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:27+1
-    call $t22 := $Lt($t18, $t20);
+    // $t18 := <($t16, $t17) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:27+1
+    call $t18 := $Lt($t16, $t17);
 
-    // if ($t22) goto L10 else goto L9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
-    if ($t22) { goto L10; } else { goto L9; }
+    // if ($t18) goto L10 else goto L9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
+    if ($t18) { goto L10; } else { goto L9; }
 
     // label L10 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
 L10:
@@ -15947,13 +13134,13 @@ L10:
     // label L9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:73+16
 L9:
 
-    // $t33 := 6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:73+16
+    // $t23 := 6 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:73+16
     assume {:print "$at(2,19000,19016)"} true;
-    $t33 := 6;
-    assume $IsValid'u64'($t33);
+    $t23 := 6;
+    assume $IsValid'u64'($t23);
 
-    // $t34 := error::out_of_range($t33) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:53+37
-    call $t34 := $1_error_out_of_range($t33);
+    // $t24 := error::out_of_range($t23) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:53+37
+    call $t24 := $1_error_out_of_range($t23);
     if ($abort_flag) {
         assume {:print "$at(2,18980,19017)"} true;
         $t9 := $abort_code;
@@ -15961,12 +13148,12 @@ L9:
         goto L21;
     }
 
-    // trace_abort($t34) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
+    // trace_abort($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
     assume {:print "$at(2,18940,19018)"} true;
-    assume {:print "$track_abort(52,41):", $t34} $t34 == $t34;
+    assume {:print "$track_abort(52,41):", $t24} $t24 == $t24;
 
-    // $t9 := move($t34) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
-    $t9 := $t34;
+    // $t9 := move($t24) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
+    $t9 := $t24;
 
     // goto L21 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:473:13+78
     goto L21;
@@ -15975,32 +13162,17 @@ L9:
     assume {:print "$at(2,19033,19108)"} true;
 L11:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:24+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:24+11
-    assume {:print "$at(2,19063,19074)"} true;
-    assume {:print "$track_exp_sub(25410):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:39+15]($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:39+15
-    assume {:print "$track_exp_sub(25411):", $t3} true;
-
-    // assume Identical($t35, Eq<address>($t1, $t3)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:17+38
-    assume ($t35 == $IsEqual'address'($t1, $t3));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:17+38]($t35) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:17+38
-    assume {:print "$track_exp(25412):", $t35} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:17+38
-    assume {:print "$track_global_mem(27369):", $1_object_ObjectCore_$memory} true;
-
     // assume Eq<address>($t1, $t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:476:17+38
+    assume {:print "$at(2,19056,19094)"} true;
     assume $IsEqual'address'($t1, $t3);
 
-    // $t24 := exists<object::ObjectCore>($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:482:17+6
+    // $t19 := exists<object::ObjectCore>($t3) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:482:17+6
     assume {:print "$at(2,19326,19332)"} true;
-    $t24 := $ResourceExists($1_object_ObjectCore_$memory, $t3);
+    $t19 := $ResourceExists($1_object_ObjectCore_$memory, $t3);
 
-    // if ($t24) goto L13 else goto L12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
+    // if ($t19) goto L13 else goto L12 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
     assume {:print "$at(2,19301,19437)"} true;
-    if ($t24) { goto L13; } else { goto L12; }
+    if ($t19) { goto L13; } else { goto L12; }
 
     // label L13 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
 L13:
@@ -16013,13 +13185,13 @@ L13:
     assume {:print "$at(2,19404,19421)"} true;
 L12:
 
-    // $t36 := 4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:483:42+17
+    // $t25 := 4 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:483:42+17
     assume {:print "$at(2,19404,19421)"} true;
-    $t36 := 4;
-    assume $IsValid'u64'($t36);
+    $t25 := 4;
+    assume $IsValid'u64'($t25);
 
-    // $t37 := error::permission_denied($t36) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:483:17+43
-    call $t37 := $1_error_permission_denied($t36);
+    // $t26 := error::permission_denied($t25) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:483:17+43
+    call $t26 := $1_error_permission_denied($t25);
     if ($abort_flag) {
         assume {:print "$at(2,19379,19422)"} true;
         $t9 := $abort_code;
@@ -16027,12 +13199,12 @@ L12:
         goto L21;
     }
 
-    // trace_abort($t37) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
+    // trace_abort($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
     assume {:print "$at(2,19301,19437)"} true;
-    assume {:print "$track_abort(52,41):", $t37} $t37 == $t37;
+    assume {:print "$track_abort(52,41):", $t26} $t26 == $t26;
 
-    // $t9 := move($t37) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
-    $t9 := $t37;
+    // $t9 := move($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
+    $t9 := $t26;
 
     // goto L21 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:481:13+136
     goto L21;
@@ -16041,12 +13213,12 @@ L12:
     assume {:print "$at(2,19490,19505)"} true;
 L14:
 
-    // $t26 := get_global<object::ObjectCore>($t3) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:485:26+13
+    // $t20 := get_global<object::ObjectCore>($t3) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:485:26+13
     assume {:print "$at(2,19464,19477)"} true;
     if (!$ResourceExists($1_object_ObjectCore_$memory, $t3)) {
         call $ExecFailureAbort();
     } else {
-        $t26 := $ResourceValue($1_object_ObjectCore_$memory, $t3);
+        $t20 := $ResourceValue($1_object_ObjectCore_$memory, $t3);
     }
     if ($abort_flag) {
         assume {:print "$at(2,19464,19477)"} true;
@@ -16055,16 +13227,16 @@ L14:
         goto L21;
     }
 
-    // trace_local[object#3]($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:485:17+6
-    assume {:print "$track_local(52,41,5):", $t26} $t26 == $t26;
+    // trace_local[object#3]($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:485:17+6
+    assume {:print "$track_local(52,41,5):", $t20} $t20 == $t20;
 
-    // $t28 := get_field<object::ObjectCore>.allow_ungated_transfer($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:487:17+29
+    // $t21 := get_field<object::ObjectCore>.allow_ungated_transfer($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:487:17+29
     assume {:print "$at(2,19545,19574)"} true;
-    $t28 := $allow_ungated_transfer#$1_object_ObjectCore($t26);
+    $t21 := $allow_ungated_transfer#$1_object_ObjectCore($t20);
 
-    // if ($t28) goto L16 else goto L15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
+    // if ($t21) goto L16 else goto L15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
     assume {:print "$at(2,19520,19654)"} true;
-    if ($t28) { goto L16; } else { goto L15; }
+    if ($t21) { goto L16; } else { goto L15; }
 
     // label L16 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
 L16:
@@ -16076,13 +13248,13 @@ L16:
     // label L15 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
 L15:
 
-    // $t38 := 3 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:488:42+21
+    // $t27 := 3 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:488:42+21
     assume {:print "$at(2,19617,19638)"} true;
-    $t38 := 3;
-    assume $IsValid'u64'($t38);
+    $t27 := 3;
+    assume $IsValid'u64'($t27);
 
-    // $t39 := error::permission_denied($t38) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:488:17+47
-    call $t39 := $1_error_permission_denied($t38);
+    // $t28 := error::permission_denied($t27) on_abort goto L21 with $t9 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:488:17+47
+    call $t28 := $1_error_permission_denied($t27);
     if ($abort_flag) {
         assume {:print "$at(2,19592,19639)"} true;
         $t9 := $abort_code;
@@ -16090,12 +13262,12 @@ L15:
         goto L21;
     }
 
-    // trace_abort($t39) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
+    // trace_abort($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
     assume {:print "$at(2,19520,19654)"} true;
-    assume {:print "$track_abort(52,41):", $t39} $t39 == $t39;
+    assume {:print "$track_abort(52,41):", $t28} $t28 == $t28;
 
-    // $t9 := move($t39) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
-    $t9 := $t39;
+    // $t9 := move($t28) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
+    $t9 := $t28;
 
     // goto L21 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:486:13+134
     goto L21;
@@ -16104,12 +13276,12 @@ L15:
     assume {:print "$at(2,19687,19693)"} true;
 L17:
 
-    // $t30 := get_field<object::ObjectCore>.owner($t26) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:491:31+12
+    // $t22 := get_field<object::ObjectCore>.owner($t20) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:491:31+12
     assume {:print "$at(2,19687,19699)"} true;
-    $t30 := $owner#$1_object_ObjectCore($t26);
+    $t22 := $owner#$1_object_ObjectCore($t20);
 
-    // trace_local[current_address#1]($t30) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:491:13+15
-    assume {:print "$track_local(52,41,3):", $t30} $t30 == $t30;
+    // trace_local[current_address#1]($t22) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:491:13+15
+    assume {:print "$track_local(52,41,3):", $t22} $t22 == $t22;
 
     // goto L19 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:491:43+1
     goto L19;
@@ -16135,214 +13307,43 @@ L19:
     assume {:print "$at(2,19717,19718)"} true;
 L20:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:39+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:39+11
-    assume {:print "$at(3,8345,8356)"} true;
-    assume {:print "$track_exp_sub(25333):", $t1} true;
-
-    // assume Identical($t40, exists[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31
-    assume ($t40 == $ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31]($t40) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31
-    assume {:print "$track_exp_sub(25334):", $t40} true;
-
-    // assume Identical($t41, Not(exists[@24]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assume ($t41 == !$ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43]($t41) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assume {:print "$track_exp(25335):", $t41} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assume {:print "$track_global_mem(27370):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(exists[@24]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assert {:msg "assert_failed(3,8315,8358): function does not abort under this condition"}
+    // assert Not(Not(exists[@24]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:232:9+43
+    assume {:print "$at(3,8789,8832)"} true;
+    assert {:msg "assert_failed(3,8789,8832): function does not abort under this condition"}
       !!$ResourceExists($1_object_ObjectCore_$memory#24, $t1);
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:39+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:39+11
-    assume {:print "$at(3,8397,8408)"} true;
-    assume {:print "$track_exp_sub(25340):", $t1} true;
-
-    // assume Identical($t42, global[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31
-    assume ($t42 == $ResourceValue($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31]($t42) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31
-    assume {:print "$track_exp_sub(25341):", $t42} true;
-
-    // assume Identical($t43, Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assume ($t43 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66]($t43) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assume {:print "$track_exp(25342):", $t43} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assume {:print "$track_global_mem(27371):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assert {:msg "assert_failed(3,8367,8433): function does not abort under this condition"}
+    // assert Not(Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:233:9+66
+    assume {:print "$at(3,8841,8907)"} true;
+    assert {:msg "assert_failed(3,8841,8907): function does not abort under this condition"}
       !!$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:13+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:13+5
-    assume {:print "$at(3,8507,8512)"} true;
-    assume {:print "$track_exp_sub(25349):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:22+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:22+11
-    assume {:print "$track_exp_sub(25351):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:57+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:57+11
-    assume {:print "$track_exp_sub(25353):", $t1} true;
-
-    // assume Identical($t44, exists[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31
-    assume ($t44 == $ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31]($t44) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31
-    assume {:print "$track_exp_sub(25354):", $t44} true;
-
-    // assume Identical($t45, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assume {:print "$at(3,8442,8564)"} true;
-    assume ($t45 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t0, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#24, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122]($t45) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assume {:print "$track_exp(25355):", $t45} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assume {:print "$track_global_mem(27372):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assert {:msg "assert_failed(3,8442,8564): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:234:9+122
+    assume {:print "$at(3,8916,9038)"} true;
+    assert {:msg "assert_failed(3,8916,9038): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
     ((!$IsEqual'address'($t0, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#24, $t1))))));
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:13+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:13+5
-    assume {:print "$at(3,8638,8643)"} true;
-    assume {:print "$track_exp_sub(25362):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:22+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:22+11
-    assume {:print "$track_exp_sub(25364):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:57+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:57+11
-    assume {:print "$track_exp_sub(25366):", $t1} true;
-
-    // assume Identical($t46, global[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31
-    assume ($t46 == $ResourceValue($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31]($t46) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31
-    assume {:print "$track_exp_sub(25367):", $t46} true;
-
-    // assume Identical($t47, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$at(3,8573,8718)"} true;
-    assume ($t47 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t0, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145]($t47) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$track_exp(25368):", $t47} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$track_global_mem(27373):", $1_object_ObjectCore_$memory} true;
-
-    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assert {:msg "assert_failed(3,8573,8718): function does not abort under this condition"}
+    // assert Not(exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:236:9+145
+    assume {:print "$at(3,9047,9192)"} true;
+    assert {:msg "assert_failed(3,9047,9192): function does not abort under this condition"}
       !(var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
     ((!$IsEqual'address'($t0, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1)))))));
 
-    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
+    // return () at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:236:9+145
     return;
 
     // label L21 at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.move:494:5+1
     assume {:print "$at(2,19717,19718)"} true;
 L21:
 
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:39+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:39+11
-    assume {:print "$at(3,8345,8356)"} true;
-    assume {:print "$track_exp_sub(25333):", $t1} true;
-
-    // assume Identical($t48, exists[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31
-    assume ($t48 == $ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31]($t48) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:20+31
-    assume {:print "$track_exp_sub(25334):", $t48} true;
-
-    // assume Identical($t49, Not(exists[@24]<object::ObjectCore>($t1))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assume ($t49 == !$ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43]($t49) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:217:9+43
-    assume {:print "$track_exp(25335):", $t49} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:39+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:39+11
-    assume {:print "$at(3,8397,8408)"} true;
-    assume {:print "$track_exp_sub(25340):", $t1} true;
-
-    // assume Identical($t50, global[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31
-    assume ($t50 == $ResourceValue($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31]($t50) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:20+31
-    assume {:print "$track_exp_sub(25341):", $t50} true;
-
-    // assume Identical($t51, Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assume ($t51 == !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1)));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66]($t51) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:218:9+66
-    assume {:print "$track_exp(25342):", $t51} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:13+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:13+5
-    assume {:print "$at(3,8507,8512)"} true;
-    assume {:print "$track_exp_sub(25349):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:22+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:22+11
-    assume {:print "$track_exp_sub(25351):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:57+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:57+11
-    assume {:print "$track_exp_sub(25353):", $t1} true;
-
-    // assume Identical($t52, exists[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31
-    assume ($t52 == $ResourceExists($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31]($t52) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:220:38+31
-    assume {:print "$track_exp_sub(25354):", $t52} true;
-
-    // assume Identical($t53, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assume {:print "$at(3,8442,8564)"} true;
-    assume ($t53 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t0, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#24, $t1)))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122]($t53) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:219:9+122
-    assume {:print "$track_exp(25355):", $t53} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:13+5]($t0) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:13+5
-    assume {:print "$at(3,8638,8643)"} true;
-    assume {:print "$track_exp_sub(25362):", $t0} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:22+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:22+11
-    assume {:print "$track_exp_sub(25364):", $t1} true;
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:57+11]($t1) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:57+11
-    assume {:print "$track_exp_sub(25366):", $t1} true;
-
-    // assume Identical($t54, global[@24]<object::ObjectCore>($t1)) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31
-    assume ($t54 == $ResourceValue($1_object_ObjectCore_$memory#24, $t1));
-
-    // trace_exp[subauto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31]($t54) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:222:38+31
-    assume {:print "$track_exp_sub(25367):", $t54} true;
-
-    // assume Identical($t55, exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$at(3,8573,8718)"} true;
-    assume ($t55 == (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
-    ((!$IsEqual'address'($t0, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1))))))));
-
-    // trace_exp[auto, at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145]($t55) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$track_exp(25368):", $t55} true;
-
-    // trace_global_mem() at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:221:9+145
-    assume {:print "$track_global_mem(27374):", $1_object_ObjectCore_$memory} true;
-
-    // assert Or(Or(Or(Not(exists[@24]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:216:5+492
-    assume {:print "$at(3,8232,8724)"} true;
-    assert {:msg "assert_failed(3,8232,8724): abort not covered by any of the `aborts_if` clauses"}
+    // assert Or(Or(Or(Not(exists[@24]<object::ObjectCore>($t1)), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(exists[@24]<object::ObjectCore>($t1)))), exists i: Range(0, Sub(8, 1)): And(Neq<address>($t0, $t1), Not(select object::ObjectCore.allow_ungated_transfer(global[@24]<object::ObjectCore>($t1))))) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:231:5+492
+    assume {:print "$at(3,8706,9198)"} true;
+    assert {:msg "assert_failed(3,8706,9198): abort not covered by any of the `aborts_if` clauses"}
       (((!$ResourceExists($1_object_ObjectCore_$memory#24, $t1) || !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1))) || (var $range_0 := $Range(0, (8 - 1)); (exists $i_1: int :: $InRange($range_0, $i_1) && (var i := $i_1;
     ((!$IsEqual'address'($t0, $t1) && !$ResourceExists($1_object_ObjectCore_$memory#24, $t1))))))) || (var $range_2 := $Range(0, (8 - 1)); (exists $i_3: int :: $InRange($range_2, $i_3) && (var i := $i_3;
     ((!$IsEqual'address'($t0, $t1) && !$allow_ungated_transfer#$1_object_ObjectCore($ResourceValue($1_object_ObjectCore_$memory#24, $t1))))))));
 
-    // abort($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:216:5+492
+    // abort($t9) at /home/zr/Downloads/New/aptos-core/aptos-move/framework/aptos-framework/sources/object.spec.move:231:5+492
     $abort_code := $t9;
     $abort_flag := true;
     return;

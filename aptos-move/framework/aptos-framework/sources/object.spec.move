@@ -65,12 +65,19 @@ spec aptos_framework::object {
         aborts_if object_data.guid_creation_num + 1 >= account::MAX_GUID_CREATION_NUM;
         let creation_num = object_data.guid_creation_num;
         let addr = signer::address_of(creator);
-        let a = guid::GUID {
+
+        let guid = guid::GUID {
             id: guid::ID {
                 creation_num,
                 addr,
             }
         };
+
+        let bytes_spec = bcs::to_bytes(guid);
+        let bytes = concat(bytes_spec,vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
+        let hash_bytes = hash::sha3_256(bytes);
+        let obj_addr = from_bcs::deserialize<address>(hash_bytes);
+        aborts_if exists<ObjectCore>(obj_addr);
     }
 
     spec create_object_from_object(creator: &signer): ConstructorRef{
@@ -78,13 +85,21 @@ spec aptos_framework::object {
         //Guid properties
         let object_data = global<ObjectCore>(signer::address_of(creator));
         aborts_if object_data.guid_creation_num + 1 > MAX_U64;
+        let creation_num = object_data.guid_creation_num;
+        let addr = signer::address_of(creator);
 
-        // let guid = spec_create_guid(creator);
-        // let bytes_spec = bcs::to_bytes(guid);
-        // let bytes = concat(bytes_spec,vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
-        // let hash_bytes = hash::sha3_256(bytes);
-        // let obj_addr = from_bcs::deserialize<address>(hash_bytes);
-        // aborts_if exists<ObjectCore>(obj_addr);
+        let guid = guid::GUID {
+            id: guid::ID {
+                creation_num,
+                addr,
+            }
+        };
+
+        let bytes_spec = bcs::to_bytes(guid);
+        let bytes = concat(bytes_spec,vec<u8>(OBJECT_FROM_GUID_ADDRESS_SCHEME));
+        let hash_bytes = hash::sha3_256(bytes);
+        let obj_addr = from_bcs::deserialize<address>(hash_bytes);
+        aborts_if exists<ObjectCore>(obj_addr);
     }
 
     spec create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
