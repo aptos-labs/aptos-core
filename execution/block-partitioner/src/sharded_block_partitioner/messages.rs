@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 
-use std::collections::{HashMap, HashSet};
 use crate::{
     sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-    types::{SubBlock, TxnIndex},
+    types::{SubBlock, SubBlocksForShard, TxnIndex},
 };
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use std::sync::Arc;
-
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 pub struct DiscardCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,
@@ -16,7 +17,7 @@ pub struct DiscardCrossShardDep {
     pub current_round_start_index: TxnIndex,
     // This is the frozen sub block for the current shard and is passed because we want to modify
     // it to add dependency back edges.
-    pub frozen_sub_blocks: Vec<SubBlock>,
+    pub frozen_sub_blocks: SubBlocksForShard,
 }
 
 impl DiscardCrossShardDep {
@@ -24,7 +25,7 @@ impl DiscardCrossShardDep {
         transactions: Vec<AnalyzedTransaction>,
         prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         current_round_start_index: TxnIndex,
-        frozen_sub_blocks: Vec<SubBlock>,
+        frozen_sub_blocks: SubBlocksForShard,
     ) -> Self {
         Self {
             transactions,
@@ -40,7 +41,7 @@ pub struct AddWithCrossShardDep {
     pub index_offset: TxnIndex,
     // The frozen dependencies in previous chunks.
     pub prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
-    pub frozen_sub_blocks: Vec<SubBlock>,
+    pub frozen_sub_blocks: SubBlocksForShard,
 }
 
 impl AddWithCrossShardDep {
@@ -48,7 +49,7 @@ impl AddWithCrossShardDep {
         transactions: Vec<AnalyzedTransaction>,
         index_offset: TxnIndex,
         prev_rounds_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
-        frozen_sub_blocks: Vec<SubBlock>,
+        frozen_sub_blocks: SubBlocksForShard,
     ) -> Self {
         Self {
             transactions,
@@ -60,14 +61,14 @@ impl AddWithCrossShardDep {
 }
 
 pub struct PartitioningResp {
-    pub frozen_sub_blocks: Vec<SubBlock>,
+    pub frozen_sub_blocks: SubBlocksForShard,
     pub write_set_with_index: WriteSetWithTxnIndex,
     pub discarded_txns: Vec<AnalyzedTransaction>,
 }
 
 impl PartitioningResp {
     pub fn new(
-        frozen_sub_blocks: Vec<SubBlock>,
+        frozen_sub_blocks: SubBlocksForShard,
         write_set_with_index: WriteSetWithTxnIndex,
         discarded_txns: Vec<AnalyzedTransaction>,
     ) -> Self {

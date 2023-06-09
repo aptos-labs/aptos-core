@@ -1,26 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use std::collections::{HashMap, HashSet};
 use crate::{
     sharded_block_partitioner::{
         conflict_detector::CrossShardConflictDetector,
+        cross_shard_messages::{CrossShardClient, CrossShardDependentEdges, CrossShardMsg},
         dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-        messages::{
-            AddWithCrossShardDep, ControlMsg, DiscardCrossShardDep,
-            PartitioningResp,
-        },
+        dependent_edges::DependentEdgeCreator,
+        messages::{AddWithCrossShardDep, ControlMsg, DiscardCrossShardDep, PartitioningResp},
     },
-    types::{ShardId, SubBlock, TransactionWithDependencies},
+    types::{ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId, TxnIndex},
 };
 use aptos_logger::trace;
-use std::sync::{
-    mpsc::{Receiver, Sender},
-    Arc,
-};
 use itertools::Itertools;
-use crate::sharded_block_partitioner::cross_shard_messages::{CrossShardDependentEdges, CrossShardClient, CrossShardMsg};
-use crate::sharded_block_partitioner::dependent_edges::DependentEdgeCreator;
-use crate::types::{TxnIdxWithShardId, TxnIndex};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{
+        mpsc::{Receiver, Sender},
+        Arc,
+    },
+};
 
 pub struct PartitioningShard {
     num_shards: usize,
@@ -39,17 +37,16 @@ impl PartitioningShard {
         message_txs: Vec<Sender<CrossShardMsg>>,
     ) -> Self {
         let num_shards = message_txs.len();
-        let cross_shard_client = Arc::new(CrossShardClient::new(shard_id, message_rxs, message_txs));
+        let cross_shard_client =
+            Arc::new(CrossShardClient::new(shard_id, message_rxs, message_txs));
         Self {
             num_shards,
             shard_id,
             control_rx,
             result_tx,
-            cross_shard_client
+            cross_shard_client,
         }
     }
-
-
 
     fn discard_txns_with_cross_shard_deps(&self, partition_msg: DiscardCrossShardDep) {
         let DiscardCrossShardDep {
@@ -63,7 +60,9 @@ impl PartitioningShard {
         // Based on the dependency analysis received from other shards, we will reject transactions that are conflicting with
         // transactions in other shards
         let read_write_set = RWSet::new(&transactions);
-        let cross_shard_rw_set = self.cross_shard_client.broadcast_and_collect_rw_set(read_write_set);
+        let cross_shard_rw_set = self
+            .cross_shard_client
+            .broadcast_and_collect_rw_set(read_write_set);
         let (accepted_txns, accepted_cross_shard_dependencies, rejected_txns) = conflict_detector
             .discard_txns_with_cross_shard_deps(
                 transactions,
@@ -73,15 +72,22 @@ impl PartitioningShard {
 
         // Broadcast and collect the stats around number of accepted and rejected transactions from other shards
         // this will be used to determine the absolute index of accepted transactions in this shard.
-        let accepted_txns_vec = self.cross_shard_client.broadcast_and_collect_num_accepted_txns(accepted_txns.len());
+        let accepted_txns_vec = self
+            .cross_shard_client
+            .broadcast_and_collect_num_accepted_txns(accepted_txns.len());
         // Calculate the absolute index of accepted transactions in this shard, which is the sum of all accepted transactions
         // from other shards whose shard id is smaller than the current shard id and the current round start index
         let num_accepted_txns = accepted_txns_vec.iter().take(self.shard_id).sum::<usize>();
         let index_offset = current_round_start_index + num_accepted_txns;
 
         // Now that we have finalized the global transaction index, we can add the dependent txn edges.
-        let mut dependent_edge_creator = DependentEdgeCreator::new(self.cross_shard_client.clone(), frozen_sub_blocks, self.num_shards);
-        dependent_edge_creator.create_dependent_edges(&accepted_cross_shard_dependencies, index_offset);
+        let mut dependent_edge_creator = DependentEdgeCreator::new(
+            self.cross_shard_client.clone(),
+            frozen_sub_blocks,
+            self.num_shards,
+        );
+        dependent_edge_creator
+            .create_dependent_edges(&accepted_cross_shard_dependencies, index_offset);
 
         // Calculate the RWSetWithTxnIndex for the accepted transactions
         let current_rw_set_with_index = WriteSetWithTxnIndex::new(&accepted_txns, index_offset);
@@ -92,9 +98,9 @@ impl PartitioningShard {
             .map(|(txn, dependencies)| TransactionWithDependencies::new(txn, dependencies))
             .collect::<Vec<TransactionWithDependencies>>();
 
-        let mut frozen_sub_blocks = dependent_edge_creator.into_froze_sub_blocks();
+        let mut frozen_sub_blocks = dependent_edge_creator.into_frozen_sub_blocks();
         let current_frozen_sub_block = SubBlock::new(index_offset, accepted_txns_with_dependencies);
-        frozen_sub_blocks.push(current_frozen_sub_block);
+        frozen_sub_blocks.add_sub_block(current_frozen_sub_block);
         // send the result back to the controller
         self.result_tx
             .send(PartitioningResp::new(
@@ -119,22 +125,29 @@ impl PartitioningShard {
         // index with the index offset passed.
         let write_set_with_index_for_shard = WriteSetWithTxnIndex::new(&transactions, index_offset);
 
-        let current_round_rw_set_with_index = self.cross_shard_client.broadcast_and_collect_write_set_with_index(write_set_with_index_for_shard.clone());
-        let (current_frozen_sub_block, current_cross_shard_deps) = conflict_detector.add_deps_for_frozen_sub_block(
-            transactions,
-            Arc::new(current_round_rw_set_with_index),
-            prev_rounds_write_set_with_index,
-            index_offset,
+        let current_round_rw_set_with_index = self
+            .cross_shard_client
+            .broadcast_and_collect_write_set_with_index(write_set_with_index_for_shard.clone());
+        let (current_frozen_sub_block, current_cross_shard_deps) = conflict_detector
+            .add_deps_for_frozen_sub_block(
+                transactions,
+                Arc::new(current_round_rw_set_with_index),
+                prev_rounds_write_set_with_index,
+                index_offset,
+            );
+
+        frozen_sub_blocks.add_sub_block(current_frozen_sub_block);
+
+        let mut dependent_edge_creator = DependentEdgeCreator::new(
+            self.cross_shard_client.clone(),
+            frozen_sub_blocks,
+            self.num_shards,
         );
-
-        frozen_sub_blocks.push(current_frozen_sub_block);
-
-        let mut dependent_edge_creator = DependentEdgeCreator::new(self.cross_shard_client.clone(), frozen_sub_blocks, self.num_shards);
         dependent_edge_creator.create_dependent_edges(&current_cross_shard_deps, index_offset);
 
         self.result_tx
             .send(PartitioningResp::new(
-                dependent_edge_creator.into_froze_sub_blocks(),
+                dependent_edge_creator.into_frozen_sub_blocks(),
                 write_set_with_index_for_shard,
                 vec![],
             ))

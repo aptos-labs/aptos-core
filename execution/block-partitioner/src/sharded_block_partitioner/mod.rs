@@ -3,6 +3,7 @@
 
 use crate::{
     sharded_block_partitioner::{
+        cross_shard_messages::CrossShardMsg,
         dependency_analysis::WriteSetWithTxnIndex,
         messages::{
             AddWithCrossShardDep, ControlMsg,
@@ -11,10 +12,11 @@ use crate::{
         },
         partitioning_shard::PartitioningShard,
     },
-    types::{ShardId, SubBlock},
+    types::{ShardId, SubBlock, SubBlocksForShard, TxnIndex},
 };
 use aptos_logger::{error, info};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use itertools::Itertools;
 use std::{
     collections::HashMap,
     sync::{
@@ -23,16 +25,13 @@ use std::{
     },
     thread,
 };
-use itertools::Itertools;
-use crate::sharded_block_partitioner::cross_shard_messages::CrossShardMsg;
-use crate::types::TxnIndex;
 
 mod conflict_detector;
+mod cross_shard_messages;
 mod dependency_analysis;
+mod dependent_edges;
 mod messages;
 mod partitioning_shard;
-mod cross_shard_messages;
-mod dependent_edges;
 
 /// A sharded block partitioner that partitions a block into multiple transaction chunks.
 /// On a high level, the partitioning process is as follows:
@@ -207,7 +206,7 @@ impl ShardedBlockPartitioner {
     fn collect_partition_block_response(
         &self,
     ) -> (
-        Vec<Vec<SubBlock>>,
+        Vec<SubBlocksForShard>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -235,15 +234,16 @@ impl ShardedBlockPartitioner {
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
         current_round_start_index: TxnIndex,
-        frozen_sub_blocks_by_shard: Vec<Vec<SubBlock>>,
+        frozen_sub_blocks: Vec<SubBlocksForShard>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
-        Vec<Vec<SubBlock>>,
+        Vec<SubBlocksForShard>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let partition_block_msgs = txns_to_partition
-            .into_iter().zip_eq(frozen_sub_blocks_by_shard.into_iter())
+            .into_iter()
+            .zip_eq(frozen_sub_blocks.into_iter())
             .map(|(txns, sub_blocks)| {
                 DiscardCrossShardDepReq(DiscardCrossShardDep::new(
                     txns,
@@ -261,16 +261,17 @@ impl ShardedBlockPartitioner {
         &self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_sub_blocks_by_shard: Vec<Vec<SubBlock>>,
+        frozen_sub_blocks_by_shard: Vec<SubBlocksForShard>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
-        Vec<Vec<SubBlock>>,
+        Vec<SubBlocksForShard>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let mut index_offset = index_offset;
         let partition_block_msgs = remaining_txns_vec
-            .into_iter().zip_eq(frozen_sub_blocks_by_shard.into_iter())
+            .into_iter()
+            .zip_eq(frozen_sub_blocks_by_shard.into_iter())
             .map(|(remaining_txns, frozen_sub_blocks)| {
                 let remaining_txns_len = remaining_txns.len();
                 let partitioning_msg = AddCrossShardDepReq(AddWithCrossShardDep::new(
@@ -294,7 +295,7 @@ impl ShardedBlockPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
-    ) -> Vec<Vec<SubBlock>> {
+    ) -> Vec<SubBlocksForShard> {
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];
@@ -304,27 +305,30 @@ impl ShardedBlockPartitioner {
         let mut txns_to_partition = self.partition_by_senders(transactions);
         let mut frozen_write_set_with_index = Arc::new(Vec::new());
         let mut current_round_start_index = 0;
-        let mut frozen_sub_blocks_by_shard: Vec<Vec<SubBlock>> = vec![vec![]; self.num_shards];
+        let mut frozen_sub_blocks: Vec<SubBlocksForShard> = vec![];
+        for shard_id in 0..self.num_shards {
+            frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
+        }
 
         for _ in 0..num_partitioning_round {
             let (
-                updated_frozen_sub_blocks_by_shard,
+                updated_frozen_sub_blocks,
                 current_frozen_rw_set_with_index_vec,
                 discarded_txns_to_partition,
             ) = self.discard_txns_with_cross_shard_dependencies(
                 txns_to_partition,
                 current_round_start_index,
-                frozen_sub_blocks_by_shard,
+                frozen_sub_blocks,
                 frozen_write_set_with_index.clone(),
             );
             // Current round start index is the sum of the number of transactions in the frozen sub-blocks
-            current_round_start_index = updated_frozen_sub_blocks_by_shard
+            current_round_start_index = updated_frozen_sub_blocks
                 .iter()
-                .map(|sub_blocks_for_shard| sub_blocks_for_shard.iter().map(|sub_block| sub_block.len()).sum::<usize>())
+                .map(|sub_blocks| sub_blocks.num_txns())
                 .sum::<usize>();
             let mut prev_frozen_write_set_with_index =
                 Arc::try_unwrap(frozen_write_set_with_index).unwrap();
-            frozen_sub_blocks_by_shard = updated_frozen_sub_blocks_by_shard;
+            frozen_sub_blocks = updated_frozen_sub_blocks;
             prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
             frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
             txns_to_partition = discarded_txns_to_partition;
@@ -334,20 +338,19 @@ impl ShardedBlockPartitioner {
                 .sum::<usize>()
                 == 0
             {
-                return frozen_sub_blocks_by_shard
+                return frozen_sub_blocks;
             }
         }
 
         // We just add cross shard dependencies for remaining transactions.
-        let (frozen_sub_blocks_by_shard, _, _) = self.add_cross_shard_dependencies(
+        let (frozen_sub_blocks, _, _) = self.add_cross_shard_dependencies(
             current_round_start_index,
             txns_to_partition,
-            frozen_sub_blocks_by_shard,
+            frozen_sub_blocks,
             frozen_write_set_with_index,
         );
 
-        frozen_sub_blocks_by_shard
-
+        frozen_sub_blocks
     }
 }
 
@@ -396,17 +399,16 @@ mod tests {
             create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
             generate_test_account, generate_test_account_for_address, TestAccount,
         },
-        types::SubBlock,
+        types::{SubBlock, SubBlocksForShard, TxnIdxWithShardId},
     };
     use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::collections::HashMap;
-    use crate::types::TxnIdxWithShardId;
 
-    fn verify_no_cross_shard_dependency(partitioned_txns: Vec<SubBlock>) {
-        for chunk in partitioned_txns {
-            for txn in chunk.transactions {
+    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlocksForShard>) {
+        for sub_blocks in sub_blocks_for_shards {
+            for txn in sub_blocks.iter() {
                 assert_eq!(txn.cross_shard_dependencies().len(), 0);
             }
         }
@@ -428,95 +430,98 @@ mod tests {
             receivers.iter().collect::<Vec<&TestAccount>>(),
         );
         let partitioner = ShardedBlockPartitioner::new(4);
-        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
-        assert_eq!(partitioned_txns.len(), 4);
+        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+        assert_eq!(sub_blocks.len(), 4);
         // The first shard should contain all the transactions
-        assert_eq!(partitioned_txns[0][0].len(), num_txns);
+        assert_eq!(sub_blocks[0].num_txns(), num_txns);
         // The rest of the shards should be empty
-        for sub_blocks in partitioned_txns.iter().take(4).skip(1) {
-            assert_eq!(sub_blocks.iter().map(|sub_block| sub_block.len()).sum::<usize>(), 0);
+        for sub_blocks in sub_blocks.iter().take(4).skip(1) {
+            assert_eq!(sub_blocks.num_txns(), 0);
         }
         // Verify that the transactions are in the same order as the original transactions and cross shard
         // dependencies are empty.
-        for (i, txn) in partitioned_txns[0][0].transactions.iter().enumerate() {
+        for (i, txn) in sub_blocks[0].iter().enumerate() {
             assert_eq!(txn.txn(), &transactions[i]);
             assert_eq!(txn.cross_shard_dependencies().len(), 0);
         }
     }
 
-    //#[test]
+    #[test]
     // Test that the partitioner works correctly for no conflict transactions. In this case, the
     // expectation is that no transaction is reordered.
-    // fn test_non_conflicting_txns() {
-    //     let num_txns = 4;
-    //     let num_shards = 2;
-    //     let mut transactions = Vec::new();
-    //     for _ in 0..num_txns {
-    //         transactions.push(create_non_conflicting_p2p_transaction())
-    //     }
-    //     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    //     let partitioned_txns = partitioner.partition(transactions.clone(), 1);
-    //     assert_eq!(partitioned_txns.len(), num_shards);
-    //     // Verify that the transactions are in the same order as the original transactions and cross shard
-    //     // dependencies are empty.
-    //     let mut current_index = 0;
-    //     for sub_blocks_for_shard in partitioned_txns.into_iter() {
-    //         assert_eq!(sub_blocks_for_shard.len(), num_txns / num_shards);
-    //         for txn in sub_blocks_for_shard.transactions.iter() {
-    //             assert_eq!(txn.txn(), &transactions[current_index]);
-    //             assert_eq!(txn.cross_shard_dependencies().len(), 0);
-    //             current_index += 1;
-    //         }
-    //     }
-    // }
+    fn test_non_conflicting_txns() {
+        let num_txns = 4;
+        let num_shards = 2;
+        let mut transactions = Vec::new();
+        for _ in 0..num_txns {
+            transactions.push(create_non_conflicting_p2p_transaction())
+        }
+        let partitioner = ShardedBlockPartitioner::new(num_shards);
+        let partitioned_txns = partitioner.partition(transactions.clone(), 1);
+        assert_eq!(partitioned_txns.len(), num_shards);
+        // Verify that the transactions are in the same order as the original transactions and cross shard
+        // dependencies are empty.
+        let mut current_index = 0;
+        for sub_blocks_for_shard in partitioned_txns.into_iter() {
+            assert_eq!(sub_blocks_for_shard.num_txns(), num_txns / num_shards);
+            for txn in sub_blocks_for_shard.iter() {
+                assert_eq!(txn.txn(), &transactions[current_index]);
+                assert_eq!(txn.cross_shard_dependencies().len(), 0);
+                current_index += 1;
+            }
+        }
+    }
 
-    // #[test]
-    // fn test_same_sender_in_one_shard() {
-    //     let num_shards = 3;
-    //     let mut sender = generate_test_account();
-    //     let mut txns_from_sender = Vec::new();
-    //     for _ in 0..5 {
-    //         txns_from_sender.push(
-    //             create_signed_p2p_transaction(&mut sender, vec![&generate_test_account()])
-    //                 .remove(0),
-    //         );
-    //     }
-    //     let mut non_conflicting_transactions = Vec::new();
-    //     for _ in 0..5 {
-    //         non_conflicting_transactions.push(create_non_conflicting_p2p_transaction());
-    //     }
-    //
-    //     let mut transactions = Vec::new();
-    //     let mut txn_from_sender_index = 0;
-    //     let mut non_conflicting_txn_index = 0;
-    //     transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
-    //     non_conflicting_txn_index += 1;
-    //     transactions.push(txns_from_sender[txn_from_sender_index].clone());
-    //     txn_from_sender_index += 1;
-    //     transactions.push(txns_from_sender[txn_from_sender_index].clone());
-    //     txn_from_sender_index += 1;
-    //     transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
-    //     non_conflicting_txn_index += 1;
-    //     transactions.push(txns_from_sender[txn_from_sender_index].clone());
-    //     txn_from_sender_index += 1;
-    //     transactions.push(txns_from_sender[txn_from_sender_index].clone());
-    //     txn_from_sender_index += 1;
-    //     transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
-    //     transactions.push(txns_from_sender[txn_from_sender_index].clone());
-    //
-    //     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    //     let partitioned_txns = partitioner.partition(transactions.clone(), 1);
-    //     assert_eq!(partitioned_txns.len(), num_shards);
-    //     assert_eq!(partitioned_txns[0].len(), 6);
-    //     assert_eq!(partitioned_txns[1].len(), 2);
-    //     assert_eq!(partitioned_txns[2].len(), 0);
-    //
-    //     // verify that all transactions from the sender end up in shard 0
-    //     for (index, txn) in txns_from_sender.iter().enumerate() {
-    //         assert_eq!(partitioned_txns[0].transactions[index + 1].txn(), txn);
-    //     }
-    //     verify_no_cross_shard_dependency(partitioned_txns);
-    // }
+    #[test]
+    fn test_same_sender_in_one_shard() {
+        let num_shards = 3;
+        let mut sender = generate_test_account();
+        let mut txns_from_sender = Vec::new();
+        for _ in 0..5 {
+            txns_from_sender.push(
+                create_signed_p2p_transaction(&mut sender, vec![&generate_test_account()])
+                    .remove(0),
+            );
+        }
+        let mut non_conflicting_transactions = Vec::new();
+        for _ in 0..5 {
+            non_conflicting_transactions.push(create_non_conflicting_p2p_transaction());
+        }
+
+        let mut transactions = Vec::new();
+        let mut txn_from_sender_index = 0;
+        let mut non_conflicting_txn_index = 0;
+        transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
+        non_conflicting_txn_index += 1;
+        transactions.push(txns_from_sender[txn_from_sender_index].clone());
+        txn_from_sender_index += 1;
+        transactions.push(txns_from_sender[txn_from_sender_index].clone());
+        txn_from_sender_index += 1;
+        transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
+        non_conflicting_txn_index += 1;
+        transactions.push(txns_from_sender[txn_from_sender_index].clone());
+        txn_from_sender_index += 1;
+        transactions.push(txns_from_sender[txn_from_sender_index].clone());
+        txn_from_sender_index += 1;
+        transactions.push(non_conflicting_transactions[non_conflicting_txn_index].clone());
+        transactions.push(txns_from_sender[txn_from_sender_index].clone());
+
+        let partitioner = ShardedBlockPartitioner::new(num_shards);
+        let sub_blocks = partitioner.partition(transactions.clone(), 1);
+        assert_eq!(sub_blocks.len(), num_shards);
+        assert_eq!(sub_blocks[0].num_sub_blocks(), 1);
+        assert_eq!(sub_blocks[1].num_sub_blocks(), 1);
+        assert_eq!(sub_blocks[2].num_sub_blocks(), 1);
+        assert_eq!(sub_blocks[0].num_txns(), 6);
+        assert_eq!(sub_blocks[1].num_txns(), 2);
+        assert_eq!(sub_blocks[2].num_txns(), 0);
+
+        // verify that all transactions from the sender end up in shard 0
+        for (txn_from_sender, txn) in txns_from_sender.iter().zip(sub_blocks[0].iter().skip(1)) {
+            assert_eq!(txn.txn(), txn_from_sender);
+        }
+        verify_no_cross_shard_dependency(sub_blocks);
+    }
 
     // #[test]
     // fn test_cross_shard_dependencies() {

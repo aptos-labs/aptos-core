@@ -2,7 +2,10 @@
 
 use crate::{
     sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-    types::{CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIndex},
+    types::{
+        CrossShardDependencies, ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId,
+        TxnIndex,
+    },
 };
 use aptos_types::transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation};
 use std::{
@@ -10,7 +13,6 @@ use std::{
     hash::{Hash, Hasher},
     sync::Arc,
 };
-use crate::types::TxnIdxWithShardId;
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,
@@ -89,11 +91,10 @@ impl CrossShardConflictDetector {
                 .chain(prev_rounds_rw_set_with_index.iter().rev())
             {
                 if rw_set_with_index.has_write_lock(storage_location) {
-                    cross_shard_dependencies.add_depends_on_txn(
-                        TxnIdxWithShardId::new(
+                    cross_shard_dependencies.add_depends_on_txn(TxnIdxWithShardId::new(
                         rw_set_with_index.get_write_lock_txn_index(storage_location),
-                        current_shard_id)
-                    );
+                        current_shard_id,
+                    ));
                     break;
                 }
                 // perform a wrapping substraction
@@ -122,7 +123,10 @@ impl CrossShardConflictDetector {
             cross_shard_dependencies.push(dependency.clone());
             frozen_txns.push(TransactionWithDependencies::new(txn, dependency));
         }
-        (SubBlock::new(index_offset, frozen_txns), cross_shard_dependencies)
+        (
+            SubBlock::new(index_offset, frozen_txns),
+            cross_shard_dependencies,
+        )
     }
 
     fn check_for_cross_shard_conflict(

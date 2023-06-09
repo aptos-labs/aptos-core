@@ -52,13 +52,11 @@ impl CrossShardDependencies {
     }
 
     pub fn add_depends_on_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.depends_on
-            .insert(txn_idx_with_shard_id);
+        self.depends_on.insert(txn_idx_with_shard_id);
     }
 
     pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.dependencies
-            .insert(txn_idx_with_shard_id);
+        self.dependencies.insert(txn_idx_with_shard_id);
     }
 }
 
@@ -94,7 +92,7 @@ impl SubBlock {
         }
     }
 
-    pub fn len(&self) -> usize {
+    pub fn num_txns(&self) -> usize {
         self.transactions.len()
     }
 
@@ -103,16 +101,72 @@ impl SubBlock {
     }
 
     pub fn end_index(&self) -> TxnIndex {
-        self.start_index + self.len()
+        self.start_index + self.num_txns()
     }
 
     pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies> {
         &self.transactions
     }
 
-    pub fn add_dependent_txn(&mut self, source_index: TxnIndex, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        let source_txn = self.transactions.get_mut(source_index - self.start_index).unwrap();
+    pub fn add_dependent_txn(
+        &mut self,
+        source_index: TxnIndex,
+        txn_idx_with_shard_id: TxnIdxWithShardId,
+    ) {
+        let source_txn = self
+            .transactions
+            .get_mut(source_index - self.start_index)
+            .unwrap();
         source_txn.add_dependent_txn(txn_idx_with_shard_id);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies> {
+        self.transactions.iter()
+    }
+}
+
+// A set of sub blocks assigned to a shard.
+#[derive(Default)]
+pub struct SubBlocksForShard {
+    pub shard_id: ShardId,
+    pub sub_blocks: Vec<SubBlock>,
+}
+
+impl SubBlocksForShard {
+    pub fn empty(shard_id: ShardId) -> Self {
+        Self {
+            shard_id,
+            sub_blocks: Vec::new(),
+        }
+    }
+
+    pub fn add_sub_block(&mut self, sub_block: SubBlock) {
+        self.sub_blocks.push(sub_block);
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.sub_blocks
+            .iter()
+            .map(|sub_block| sub_block.num_txns())
+            .sum()
+    }
+
+    pub fn num_sub_blocks(&self) -> usize {
+        self.sub_blocks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sub_blocks.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &TransactionWithDependencies> {
+        self.sub_blocks
+            .iter()
+            .flat_map(|sub_block| sub_block.iter())
+    }
+
+    pub fn get_sub_block_mut(&mut self, index: usize) -> Option<&mut SubBlock> {
+        self.sub_blocks.get_mut(index)
     }
 }
 
@@ -141,7 +195,7 @@ impl TransactionWithDependencies {
     }
 
     pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.cross_shard_dependencies.add_dependent_txn(txn_idx_with_shard_id);
+        self.cross_shard_dependencies
+            .add_dependent_txn(txn_idx_with_shard_id);
     }
-
 }
