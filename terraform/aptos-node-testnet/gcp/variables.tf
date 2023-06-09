@@ -168,6 +168,12 @@ variable "enable_prometheus_node_exporter" {
   default     = false
 }
 
+variable "testnet_addons_helm_values" {
+  description = "Map of values to pass to testnet-addons helm chart"
+  type        = any
+  default     = {}
+}
+
 ### Autoscaling
 
 variable "gke_enable_node_autoprovisioning" {
