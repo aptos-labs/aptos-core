@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    sharded_block_partitioner::cross_shard_messages::{CrossShardClient, CrossShardDependentEdges},
-    types::{CrossShardDependencies, SubBlock, SubBlocksForShard, TxnIdxWithShardId, TxnIndex},
+    sharded_block_partitioner::cross_shard_messages::{
+        CrossShardClient, CrossShardClientInterface, CrossShardDependentEdges,
+    },
+    types::{CrossShardDependencies, CrossShardDependency, SubBlocksForShard, TxnIndex},
 };
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
@@ -60,13 +61,13 @@ impl DependentEdgeCreator {
         &mut self,
         dependent_index: TxnIndex,
         cross_shard_deps: &CrossShardDependencies,
-        back_edges: &mut Vec<HashMap<TxnIndex, HashSet<TxnIndex>>>,
+        back_edges: &mut [HashMap<TxnIndex, HashSet<TxnIndex>>],
     ) {
-        for index_with_shard in cross_shard_deps.depends_on().iter() {
+        for index_with_shard in cross_shard_deps.required_txns().iter() {
             let back_edges_for_shard = back_edges.get_mut(index_with_shard.shard_id).unwrap();
             let back_edges = back_edges_for_shard
                 .entry(index_with_shard.txn_index)
-                .or_insert_with(|| HashSet::new());
+                .or_insert_with(HashSet::new);
             back_edges.insert(dependent_index);
         }
     }
@@ -93,7 +94,7 @@ impl DependentEdgeCreator {
     fn group_dependent_edges_by_source(
         &self,
         back_edges_vec: Vec<Vec<CrossShardDependentEdges>>,
-    ) -> Vec<(TxnIndex, HashSet<TxnIdxWithShardId>)> {
+    ) -> Vec<(TxnIndex, HashSet<CrossShardDependency>)> {
         // combine the back edges from different shards by source txn index
         let mut back_edges_by_source_index = HashMap::new();
         for (shard_id, back_edges) in back_edges_vec.into_iter().enumerate() {
@@ -101,9 +102,9 @@ impl DependentEdgeCreator {
                 let source_index = back_edge.source_txn_index;
                 let back_edges = back_edges_by_source_index
                     .entry(source_index)
-                    .or_insert_with(|| HashSet::new());
+                    .or_insert_with(HashSet::new);
                 for dependent_idx in back_edge.dependent_txn_indices {
-                    back_edges.insert(TxnIdxWithShardId::new(dependent_idx, shard_id));
+                    back_edges.insert(CrossShardDependency::new(dependent_idx, shard_id));
                 }
             }
         }
@@ -115,7 +116,7 @@ impl DependentEdgeCreator {
 
     fn add_dependent_edges_to_sub_blocks(
         &mut self,
-        dependent_edges: Vec<(TxnIndex, HashSet<TxnIdxWithShardId>)>,
+        dependent_edges: Vec<(TxnIndex, HashSet<CrossShardDependency>)>,
     ) {
         let mut current_sub_block_index = 0;
         let mut current_sub_block = self.froze_sub_blocks.get_sub_block_mut(0).unwrap();

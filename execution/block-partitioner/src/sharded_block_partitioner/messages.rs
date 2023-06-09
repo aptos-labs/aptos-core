@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-    types::{SubBlock, SubBlocksForShard, TxnIndex},
+    sharded_block_partitioner::dependency_analysis::WriteSetWithTxnIndex,
+    types::{SubBlocksForShard, TxnIndex},
 };
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 pub struct DiscardCrossShardDep {
     pub transactions: Vec<AnalyzedTransaction>,

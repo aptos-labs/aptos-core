@@ -3,21 +3,17 @@
 use crate::{
     sharded_block_partitioner::{
         conflict_detector::CrossShardConflictDetector,
-        cross_shard_messages::{CrossShardClient, CrossShardDependentEdges, CrossShardMsg},
+        cross_shard_messages::{CrossShardClient, CrossShardClientInterface, CrossShardMsg},
         dependency_analysis::{RWSet, WriteSetWithTxnIndex},
         dependent_edges::DependentEdgeCreator,
         messages::{AddWithCrossShardDep, ControlMsg, DiscardCrossShardDep, PartitioningResp},
     },
-    types::{ShardId, SubBlock, TransactionWithDependencies, TxnIdxWithShardId, TxnIndex},
+    types::{ShardId, SubBlock, TransactionWithDependencies},
 };
 use aptos_logger::trace;
-use itertools::Itertools;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
+use std::sync::{
+    mpsc::{Receiver, Sender},
+    Arc,
 };
 
 pub struct PartitioningShard {

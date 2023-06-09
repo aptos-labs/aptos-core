@@ -12,7 +12,7 @@ use crate::{
         },
         partitioning_shard::PartitioningShard,
     },
-    types::{ShardId, SubBlock, SubBlocksForShard, TxnIndex},
+    types::{ShardId, SubBlocksForShard, TxnIndex},
 };
 use aptos_logger::{error, info};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
@@ -399,14 +399,14 @@ mod tests {
             create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
             generate_test_account, generate_test_account_for_address, TestAccount,
         },
-        types::{SubBlock, SubBlocksForShard, TxnIdxWithShardId},
+        types::{CrossShardDependency, SubBlock},
     };
     use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::collections::HashMap;
 
-    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlocksForShard>) {
+    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock>) {
         for sub_blocks in sub_blocks_for_shards {
             for txn in sub_blocks.iter() {
                 assert_eq!(txn.cross_shard_dependencies().len(), 0);
@@ -520,152 +520,197 @@ mod tests {
         for (txn_from_sender, txn) in txns_from_sender.iter().zip(sub_blocks[0].iter().skip(1)) {
             assert_eq!(txn.txn(), txn_from_sender);
         }
-        verify_no_cross_shard_dependency(sub_blocks);
+        verify_no_cross_shard_dependency(
+            sub_blocks
+                .iter()
+                .flat_map(|sub_blocks| sub_blocks.sub_block_iter())
+                .cloned()
+                .collect(),
+        );
     }
 
-    // #[test]
-    // fn test_cross_shard_dependencies() {
-    //     let num_shards = 3;
-    //     let mut account1 = generate_test_account_for_address(AccountAddress::new([0; 32]));
-    //     let mut account2 = generate_test_account_for_address(AccountAddress::new([1; 32]));
-    //     let account3 = generate_test_account_for_address(AccountAddress::new([2; 32]));
-    //     let mut account4 = generate_test_account_for_address(AccountAddress::new([4; 32]));
-    //     let account5 = generate_test_account_for_address(AccountAddress::new([5; 32]));
-    //     let account6 = generate_test_account_for_address(AccountAddress::new([6; 32]));
-    //     let mut account7 = generate_test_account_for_address(AccountAddress::new([7; 32]));
-    //     let account8 = generate_test_account_for_address(AccountAddress::new([8; 32]));
-    //     let account9 = generate_test_account_for_address(AccountAddress::new([9; 32]));
-    //
-    //     let txn0 = create_signed_p2p_transaction(&mut account1, vec![&account2]).remove(0); // txn 0
-    //     let txn1 = create_signed_p2p_transaction(&mut account1, vec![&account3]).remove(0); // txn 1
-    //     let txn2 = create_signed_p2p_transaction(&mut account2, vec![&account3]).remove(0); // txn 2
-    //                                                                                         // Should go in shard 1
-    //     let txn3 = create_signed_p2p_transaction(&mut account4, vec![&account5]).remove(0); // txn 3
-    //     let txn4 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 4
-    //     let txn5 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 5
-    //                                                                                         // Should go in shard 2
-    //     let txn6 = create_signed_p2p_transaction(&mut account7, vec![&account8]).remove(0); // txn 6
-    //     let txn7 = create_signed_p2p_transaction(&mut account7, vec![&account9]).remove(0); // txn 7
-    //     let txn8 = create_signed_p2p_transaction(&mut account4, vec![&account7]).remove(0); // txn 8
-    //
-    //     let transactions = vec![
-    //         txn0.clone(),
-    //         txn1.clone(),
-    //         txn2.clone(),
-    //         txn3.clone(),
-    //         txn4.clone(),
-    //         txn5.clone(),
-    //         txn6.clone(),
-    //         txn7.clone(),
-    //         txn8.clone(),
-    //     ];
-    //
-    //     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    //     let partitioned_chunks = partitioner.partition(transactions, 1);
-    //     assert_eq!(partitioned_chunks.len(), 2 * num_shards);
-    //
-    //     // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
-    //     // txn3, txn4, txn5 and txn8 in shard 1 and 0 in shard 2. Please note that txn8 is moved to
-    //     // shard 1 because of sender based reordering.
-    //     assert_eq!(partitioned_chunks[0].len(), 3);
-    //     assert_eq!(partitioned_chunks[1].len(), 4);
-    //     assert_eq!(partitioned_chunks[2].len(), 0);
-    //
-    //     assert_eq!(
-    //         partitioned_chunks[0]
-    //             .transactions_with_deps()
-    //             .iter()
-    //             .map(|x| x.txn.clone())
-    //             .collect::<Vec<AnalyzedTransaction>>(),
-    //         vec![txn0, txn1, txn2]
-    //     );
-    //     assert_eq!(
-    //         partitioned_chunks[1]
-    //             .transactions_with_deps()
-    //             .iter()
-    //             .map(|x| x.txn.clone())
-    //             .collect::<Vec<AnalyzedTransaction>>(),
-    //         vec![txn3, txn4, txn5, txn8]
-    //     );
-    //
-    //     // Rest of the transactions will be added in round 2 along with their dependencies
-    //     assert_eq!(partitioned_chunks[3].len(), 0);
-    //     assert_eq!(partitioned_chunks[4].len(), 0);
-    //     assert_eq!(partitioned_chunks[5].len(), 2);
-    //
-    //     assert_eq!(
-    //         partitioned_chunks[5]
-    //             .transactions_with_deps()
-    //             .iter()
-    //             .map(|x| x.txn.clone())
-    //             .collect::<Vec<AnalyzedTransaction>>(),
-    //         vec![txn6, txn7]
-    //     );
-    //
-    //     // Verify transaction dependencies
-    //     verify_no_cross_shard_dependency(vec![
-    //         partitioned_chunks[0].clone(),
-    //         partitioned_chunks[1].clone(),
-    //         partitioned_chunks[2].clone(),
-    //     ]);
-    //     // txn6 and txn7 depends on txn8 (index 6)
-    //     assert!(partitioned_chunks[5].transactions_with_deps()[0]
-    //         .cross_shard_dependencies
-    //         .is_depends_on(TxnIdxWithShardId::new(6, 1)));
-    //     assert!(partitioned_chunks[5].transactions_with_deps()[1]
-    //         .cross_shard_dependencies
-    //         .is_depends_on(TxnIdxWithShardId::new(6, 1)));
-    // }
+    #[test]
+    fn test_cross_shard_dependencies() {
+        let num_shards = 3;
+        let mut account1 = generate_test_account_for_address(AccountAddress::new([0; 32]));
+        let mut account2 = generate_test_account_for_address(AccountAddress::new([1; 32]));
+        let account3 = generate_test_account_for_address(AccountAddress::new([2; 32]));
+        let mut account4 = generate_test_account_for_address(AccountAddress::new([4; 32]));
+        let account5 = generate_test_account_for_address(AccountAddress::new([5; 32]));
+        let account6 = generate_test_account_for_address(AccountAddress::new([6; 32]));
+        let mut account7 = generate_test_account_for_address(AccountAddress::new([7; 32]));
+        let account8 = generate_test_account_for_address(AccountAddress::new([8; 32]));
+        let account9 = generate_test_account_for_address(AccountAddress::new([9; 32]));
 
-    // #[test]
+        let txn0 = create_signed_p2p_transaction(&mut account1, vec![&account2]).remove(0); // txn 0
+        let txn1 = create_signed_p2p_transaction(&mut account1, vec![&account3]).remove(0); // txn 1
+        let txn2 = create_signed_p2p_transaction(&mut account2, vec![&account3]).remove(0); // txn 2
+                                                                                            // Should go in shard 1
+        let txn3 = create_signed_p2p_transaction(&mut account4, vec![&account5]).remove(0); // txn 3
+        let txn4 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 4
+        let txn5 = create_signed_p2p_transaction(&mut account4, vec![&account6]).remove(0); // txn 5
+                                                                                            // Should go in shard 2
+        let txn6 = create_signed_p2p_transaction(&mut account7, vec![&account8]).remove(0); // txn 6
+        let txn7 = create_signed_p2p_transaction(&mut account7, vec![&account9]).remove(0); // txn 7
+        let txn8 = create_signed_p2p_transaction(&mut account4, vec![&account7]).remove(0); // txn 8
+
+        let transactions = vec![
+            txn0.clone(),
+            txn1.clone(),
+            txn2.clone(),
+            txn3.clone(),
+            txn4.clone(),
+            txn5.clone(),
+            txn6.clone(),
+            txn7.clone(),
+            txn8.clone(),
+        ];
+
+        let partitioner = ShardedBlockPartitioner::new(num_shards);
+        let partitioned_chunks = partitioner.partition(transactions, 1);
+        assert_eq!(partitioned_chunks.len(), num_shards);
+
+        // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
+        // txn3, txn4, txn5 and txn8 in shard 1 and 0 in shard 2. Please note that txn8 is moved to
+        // shard 1 because of sender based reordering.
+        assert_eq!(
+            partitioned_chunks[0].get_sub_block(0).unwrap().num_txns(),
+            3
+        );
+        assert_eq!(
+            partitioned_chunks[1].get_sub_block(0).unwrap().num_txns(),
+            4
+        );
+        assert_eq!(
+            partitioned_chunks[2].get_sub_block(0).unwrap().num_txns(),
+            0
+        );
+
+        assert_eq!(
+            partitioned_chunks[0]
+                .get_sub_block(0)
+                .unwrap()
+                .iter()
+                .map(|x| x.txn.clone())
+                .collect::<Vec<AnalyzedTransaction>>(),
+            vec![txn0, txn1, txn2]
+        );
+        assert_eq!(
+            partitioned_chunks[1]
+                .get_sub_block(0)
+                .unwrap()
+                .iter()
+                .map(|x| x.txn.clone())
+                .collect::<Vec<AnalyzedTransaction>>(),
+            vec![txn3, txn4, txn5, txn8]
+        );
+        //
+        // // Rest of the transactions will be added in round 2 along with their dependencies
+        assert_eq!(
+            partitioned_chunks[0].get_sub_block(1).unwrap().num_txns(),
+            0
+        );
+        assert_eq!(
+            partitioned_chunks[1].get_sub_block(1).unwrap().num_txns(),
+            0
+        );
+        assert_eq!(
+            partitioned_chunks[2].get_sub_block(1).unwrap().num_txns(),
+            2
+        );
+
+        assert_eq!(
+            partitioned_chunks[2]
+                .get_sub_block(1)
+                .unwrap()
+                .iter()
+                .map(|x| x.txn.clone())
+                .collect::<Vec<AnalyzedTransaction>>(),
+            vec![txn6, txn7]
+        );
+
+        // Verify transaction dependencies
+        verify_no_cross_shard_dependency(vec![
+            partitioned_chunks[0].get_sub_block(0).unwrap().clone(),
+            partitioned_chunks[1].get_sub_block(0).unwrap().clone(),
+            partitioned_chunks[2].get_sub_block(0).unwrap().clone(),
+        ]);
+        // Verify transaction depends_on and dependency list
+
+        // txn6 (index 7) and txn7 (index 8) depends on txn8 (index 6)
+        partitioned_chunks[2]
+            .get_sub_block(1)
+            .unwrap()
+            .iter()
+            .for_each(|txn| {
+                assert!(txn
+                    .cross_shard_dependencies
+                    .is_required_txn(CrossShardDependency::new(6, 1)));
+            });
+
+        // Verify the dependent edges
+        assert!(
+            partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+                .cross_shard_dependencies
+                .is_dependent_txn(CrossShardDependency::new(7, 2))
+        );
+        assert!(
+            partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+                .cross_shard_dependencies
+                .is_dependent_txn(CrossShardDependency::new(8, 2))
+        );
+    }
+
+    #[test]
     // Generates a bunch of random transactions and ensures that after the partitioning, there is
     // no conflict across shards.
-    // fn test_no_conflict_across_shards_in_first_round() {
-    //     let mut rng = OsRng;
-    //     let max_accounts = 500;
-    //     let max_txns = 2000;
-    //     let max_num_shards = 64;
-    //     let num_accounts = rng.gen_range(1, max_accounts);
-    //     let mut accounts = Vec::new();
-    //     for _ in 0..num_accounts {
-    //         accounts.push(generate_test_account());
-    //     }
-    //     let num_txns = rng.gen_range(1, max_txns);
-    //     let mut transactions = Vec::new();
-    //     let num_shards = rng.gen_range(1, max_num_shards);
-    //
-    //     for _ in 0..num_txns {
-    //         // randomly select a sender and receiver from accounts
-    //         let sender_index = rng.gen_range(0, accounts.len());
-    //         let mut sender = accounts.swap_remove(sender_index);
-    //         let receiver_index = rng.gen_range(0, accounts.len());
-    //         let receiver = accounts.get(receiver_index).unwrap();
-    //         transactions.push(create_signed_p2p_transaction(&mut sender, vec![receiver]).remove(0));
-    //         accounts.push(sender)
-    //     }
-    //     let partitioner = ShardedBlockPartitioner::new(num_shards);
-    //     let partitioned_txns = partitioner.partition(transactions, 1);
-    //     // Build a map of storage location to corresponding shards in first round
-    //     // and ensure that no storage location is present in more than one shard.
-    //     let mut storage_location_to_shard_map = HashMap::new();
-    //     for (shard_id, txns) in partitioned_txns.iter().enumerate().take(num_shards) {
-    //         for txn in txns.transactions_with_deps().iter() {
-    //             let storage_locations = txn
-    //                 .txn()
-    //                 .read_hints()
-    //                 .iter()
-    //                 .chain(txn.txn().write_hints().iter());
-    //             for storage_location in storage_locations {
-    //                 if storage_location_to_shard_map.contains_key(storage_location) {
-    //                     assert_eq!(
-    //                         storage_location_to_shard_map.get(storage_location).unwrap(),
-    //                         &shard_id
-    //                     );
-    //                 } else {
-    //                     storage_location_to_shard_map.insert(storage_location, shard_id);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    fn test_no_conflict_across_shards_in_first_round() {
+        let mut rng = OsRng;
+        let max_accounts = 500;
+        let max_txns = 2000;
+        let max_num_shards = 64;
+        let num_accounts = rng.gen_range(1, max_accounts);
+        let mut accounts = Vec::new();
+        for _ in 0..num_accounts {
+            accounts.push(generate_test_account());
+        }
+        let num_txns = rng.gen_range(1, max_txns);
+        let mut transactions = Vec::new();
+        let num_shards = rng.gen_range(1, max_num_shards);
+
+        for _ in 0..num_txns {
+            // randomly select a sender and receiver from accounts
+            let sender_index = rng.gen_range(0, accounts.len());
+            let mut sender = accounts.swap_remove(sender_index);
+            let receiver_index = rng.gen_range(0, accounts.len());
+            let receiver = accounts.get(receiver_index).unwrap();
+            transactions.push(create_signed_p2p_transaction(&mut sender, vec![receiver]).remove(0));
+            accounts.push(sender)
+        }
+        let partitioner = ShardedBlockPartitioner::new(num_shards);
+        let partitioned_txns = partitioner.partition(transactions, 1);
+        // Build a map of storage location to corresponding shards in first round
+        // and ensure that no storage location is present in more than one shard.
+        let mut storage_location_to_shard_map = HashMap::new();
+        for (shard_id, txns) in partitioned_txns.iter().enumerate() {
+            let first_round_sub_block = txns.get_sub_block(0).unwrap();
+            for txn in first_round_sub_block.iter() {
+                let storage_locations = txn
+                    .txn()
+                    .read_hints()
+                    .iter()
+                    .chain(txn.txn().write_hints().iter());
+                for storage_location in storage_locations {
+                    if storage_location_to_shard_map.contains_key(storage_location) {
+                        assert_eq!(
+                            storage_location_to_shard_map.get(storage_location).unwrap(),
+                            &shard_id
+                        );
+                    } else {
+                        storage_location_to_shard_map.insert(storage_location, shard_id);
+                    }
+                }
+            }
+        }
+    }
 }

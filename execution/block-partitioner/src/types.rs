@@ -8,12 +8,12 @@ pub type ShardId = usize;
 pub type TxnIndex = usize;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct TxnIdxWithShardId {
+pub struct CrossShardDependency {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
 }
 
-impl TxnIdxWithShardId {
+impl CrossShardDependency {
     pub fn new(txn_index: TxnIndex, shard_id: ShardId) -> Self {
         Self {
             shard_id,
@@ -25,38 +25,42 @@ impl TxnIdxWithShardId {
 #[derive(Default, Debug, Clone)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
-/// 1. `depends_on`: The transaction depends on the execution of the transactions in the set. In this
+/// 1. `required_txns`: The transaction depends on the execution of the transactions in the set. In this
 /// case, the transaction can only be executed after the transactions in the set have been executed.
-/// 2. `dependents`: The transactions in the set depend on the execution of the transaction. In this
+/// 2. `dependent_txns`: The transactions in the set depend on the execution of the transaction. In this
 /// case, the transactions in the set can only be executed after the transaction has been executed.
 pub struct CrossShardDependencies {
-    depends_on: HashSet<TxnIdxWithShardId>,
-    dependencies: HashSet<TxnIdxWithShardId>,
+    required_txns: HashSet<CrossShardDependency>,
+    dependent_txns: HashSet<CrossShardDependency>,
 }
 
 impl CrossShardDependencies {
     pub fn len(&self) -> usize {
-        self.depends_on.len()
+        self.required_txns.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.depends_on.is_empty()
+        self.required_txns.is_empty()
     }
 
-    pub fn depends_on(&self) -> &HashSet<TxnIdxWithShardId> {
-        &self.depends_on
+    pub fn required_txns(&self) -> &HashSet<CrossShardDependency> {
+        &self.required_txns
     }
 
-    pub fn is_depends_on(&self, txn_idx_with_shard_id: TxnIdxWithShardId) -> bool {
-        self.depends_on.contains(&txn_idx_with_shard_id)
+    pub fn is_required_txn(&self, dep: CrossShardDependency) -> bool {
+        self.required_txns.contains(&dep)
     }
 
-    pub fn add_depends_on_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.depends_on.insert(txn_idx_with_shard_id);
+    pub fn is_dependent_txn(&self, dep: CrossShardDependency) -> bool {
+        self.dependent_txns.contains(&dep)
     }
 
-    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.dependencies.insert(txn_idx_with_shard_id);
+    pub fn add_required_txn(&mut self, dep: CrossShardDependency) {
+        self.required_txns.insert(dep);
+    }
+
+    pub fn add_dependent_txn(&mut self, dep: CrossShardDependency) {
+        self.dependent_txns.insert(dep);
     }
 }
 
@@ -111,7 +115,7 @@ impl SubBlock {
     pub fn add_dependent_txn(
         &mut self,
         source_index: TxnIndex,
-        txn_idx_with_shard_id: TxnIdxWithShardId,
+        txn_idx_with_shard_id: CrossShardDependency,
     ) {
         let source_txn = self
             .transactions
@@ -165,8 +169,16 @@ impl SubBlocksForShard {
             .flat_map(|sub_block| sub_block.iter())
     }
 
-    pub fn get_sub_block_mut(&mut self, index: usize) -> Option<&mut SubBlock> {
-        self.sub_blocks.get_mut(index)
+    pub fn sub_block_iter(&self) -> impl Iterator<Item = &SubBlock> {
+        self.sub_blocks.iter()
+    }
+
+    pub fn get_sub_block(&self, round: usize) -> Option<&SubBlock> {
+        self.sub_blocks.get(round)
+    }
+
+    pub fn get_sub_block_mut(&mut self, round: usize) -> Option<&mut SubBlock> {
+        self.sub_blocks.get_mut(round)
     }
 }
 
@@ -194,7 +206,7 @@ impl TransactionWithDependencies {
         &self.cross_shard_dependencies
     }
 
-    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
+    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: CrossShardDependency) {
         self.cross_shard_dependencies
             .add_dependent_txn(txn_idx_with_shard_id);
     }

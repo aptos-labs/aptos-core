@@ -37,6 +37,20 @@ impl CrossShardDependentEdges {
     }
 }
 
+// Define the interface for CrossShardClient
+pub trait CrossShardClientInterface {
+    fn broadcast_and_collect_rw_set(&self, rw_set: RWSet) -> Vec<RWSet>;
+    fn broadcast_and_collect_write_set_with_index(
+        &self,
+        rw_set_with_index: WriteSetWithTxnIndex,
+    ) -> Vec<WriteSetWithTxnIndex>;
+    fn broadcast_and_collect_num_accepted_txns(&self, num_accepted_txns: usize) -> Vec<usize>;
+    fn broadcast_and_collect_dependent_edges(
+        &self,
+        dependent_edges: Vec<Vec<CrossShardDependentEdges>>,
+    ) -> Vec<Vec<CrossShardDependentEdges>>;
+}
+
 pub struct CrossShardClient {
     shard_id: ShardId,
     message_rxs: Vec<Receiver<CrossShardMsg>>,
@@ -80,8 +94,10 @@ impl CrossShardClient {
         }
         vec
     }
+}
 
-    pub fn broadcast_and_collect_rw_set(&self, rw_set: RWSet) -> Vec<RWSet> {
+impl CrossShardClientInterface for CrossShardClient {
+    fn broadcast_and_collect_rw_set(&self, rw_set: RWSet) -> Vec<RWSet> {
         self.broadcast_and_collect(
             || CrossShardMsg::RWSetMsg(rw_set.clone()),
             |msg| match msg {
@@ -91,7 +107,7 @@ impl CrossShardClient {
         )
     }
 
-    pub fn broadcast_and_collect_write_set_with_index(
+    fn broadcast_and_collect_write_set_with_index(
         &self,
         rw_set_with_index: WriteSetWithTxnIndex,
     ) -> Vec<WriteSetWithTxnIndex> {
@@ -106,7 +122,7 @@ impl CrossShardClient {
         )
     }
 
-    pub fn broadcast_and_collect_num_accepted_txns(&self, num_accepted_txns: usize) -> Vec<usize> {
+    fn broadcast_and_collect_num_accepted_txns(&self, num_accepted_txns: usize) -> Vec<usize> {
         self.broadcast_and_collect(
             || CrossShardMsg::AcceptedTxnsMsg(num_accepted_txns),
             |msg| match msg {
@@ -116,7 +132,7 @@ impl CrossShardClient {
         )
     }
 
-    pub fn broadcast_and_collect_dependent_edges(
+    fn broadcast_and_collect_dependent_edges(
         &self,
         dependent_edges: Vec<Vec<CrossShardDependentEdges>>,
     ) -> Vec<Vec<CrossShardDependentEdges>> {
@@ -146,5 +162,40 @@ impl CrossShardClient {
         }
 
         cross_shard_dependent_edges
+    }
+}
+
+// Create a mock implementation of CrossShardClientInterface for testing
+#[cfg(test)]
+pub struct MockCrossShardClient {
+    pub rw_set_results: Vec<RWSet>,
+    pub write_set_with_index_results: Vec<WriteSetWithTxnIndex>,
+    pub num_accepted_txns_results: Vec<usize>,
+    pub dependent_edges_results: Vec<Vec<CrossShardDependentEdges>>,
+}
+
+// Mock CrossShardClient used for testing purposes
+#[cfg(test)]
+impl CrossShardClientInterface for MockCrossShardClient {
+    fn broadcast_and_collect_rw_set(&self, _rw_set: RWSet) -> Vec<RWSet> {
+        self.rw_set_results.clone()
+    }
+
+    fn broadcast_and_collect_write_set_with_index(
+        &self,
+        _rw_set_with_index: WriteSetWithTxnIndex,
+    ) -> Vec<WriteSetWithTxnIndex> {
+        self.write_set_with_index_results.clone()
+    }
+
+    fn broadcast_and_collect_num_accepted_txns(&self, _num_accepted_txns: usize) -> Vec<usize> {
+        self.num_accepted_txns_results.clone()
+    }
+
+    fn broadcast_and_collect_dependent_edges(
+        &self,
+        _dependent_edges: Vec<Vec<CrossShardDependentEdges>>,
+    ) -> Vec<Vec<CrossShardDependentEdges>> {
+        self.dependent_edges_results.clone()
     }
 }
