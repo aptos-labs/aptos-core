@@ -15,7 +15,6 @@ use rand::{
 };
 use std::{
     cmp::{max, min},
-    marker::PhantomData,
     sync::Arc,
 };
 
