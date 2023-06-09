@@ -214,6 +214,16 @@ pub struct MultiRegionNetworkEmulationTest {
     pub override_config: Option<MultiRegionNetworkEmulationConfig>,
 }
 
+impl MultiRegionNetworkEmulationTest {
+    fn create_netem_chaos(&self, swarm: &mut dyn Swarm) -> SwarmNetEm {
+        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+        let config = self.override_config.clone().unwrap_or_default();
+
+        create_multi_region_swarm_network_chaos(all_validators, &config)
+    }
+}
+
 impl Test for MultiRegionNetworkEmulationTest {
     fn name(&self) -> &'static str {
         "network:multi-region-network-emulation"
@@ -241,23 +251,15 @@ fn create_multi_region_swarm_network_chaos(
 
 impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-
-        let config = self.override_config.as_ref().cloned().unwrap_or_default();
-
-        // inject netem chaos
-        let chaos = create_multi_region_swarm_network_chaos(all_validators, &config);
+        let chaos = self.create_netem_chaos(ctx.swarm());
         ctx.swarm().inject_chaos(SwarmChaos::NetEm(chaos))?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
     fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        swarm.remove_all_chaos()
+        let chaos = self.create_netem_chaos(swarm);
+        swarm.remove_chaos(SwarmChaos::NetEm(chaos))
     }
 }
 
