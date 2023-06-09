@@ -36,13 +36,11 @@ pub trait Sampler<T>: Send + Sync {
 }
 
 /// A sampler that samples a random subset of the pool. Samples are replaced immediately.
-pub struct BasicSampler {
-}
+pub struct BasicSampler {}
 
 impl BasicSampler {
     fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 
