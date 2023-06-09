@@ -104,6 +104,7 @@ members = [
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
+    "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
     "mempool",
@@ -276,6 +277,7 @@ aptos-event-notifications = { path = "state-sync/inter-component/event-notificat
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
+aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }

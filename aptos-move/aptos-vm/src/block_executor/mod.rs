@@ -176,7 +176,6 @@ impl BlockAptosVM {
         );
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
-
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs
