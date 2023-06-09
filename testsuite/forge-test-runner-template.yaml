@@ -11,7 +11,7 @@ spec:
   serviceAccountName: forge
   containers:
   - name: main
-    image: {FORGE_IMAGE_REPO}:{FORGE_IMAGE_TAG}
+    image: {FORGE_IMAGE}
     imagePullPolicy: Always
     command:
     - /bin/bash

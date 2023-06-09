@@ -18,7 +18,7 @@ mod tests;
 use anyhow::anyhow;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
@@ -328,19 +328,6 @@ where
     start(config, Some(log_file), false)
 }
 
-/// Merges node_config with the config override file
-fn merge_test_config_override(
-    node_config: NodeConfig,
-    test_config_override: serde_yaml::Value,
-) -> NodeConfig {
-    serde_merge::tmerge::<NodeConfig, serde_yaml::Value, NodeConfig>(
-        node_config,
-        test_config_override,
-    )
-    .map_err(|e| anyhow::anyhow!("Unable to merge default config with override. Error: {}", e))
-    .unwrap()
-}
-
 /// Creates a single node test config, with a few config tweaks to reduce
 /// the overhead of running the node on a local machine.
 fn create_single_node_test_config(
@@ -368,7 +355,7 @@ fn create_single_node_test_config(
                     e
                 )
             })?;
-            merge_test_config_override(NodeConfig::get_default_validator_config(), values)
+            merge_node_config(NodeConfig::get_default_validator_config(), values)?
         },
         None => NodeConfig::get_default_validator_config(),
     };

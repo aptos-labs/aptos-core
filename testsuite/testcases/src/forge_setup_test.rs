@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::generate_traffic;
+use anyhow::Context;
 use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
 use aptos_logger::info;
 use rand::{
@@ -8,7 +10,7 @@ use rand::{
     seq::IteratorRandom,
     Rng, SeedableRng,
 };
-use std::thread;
+use std::{thread, time::Duration};
 use tokio::runtime::Runtime;
 
 const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";
@@ -34,6 +36,7 @@ impl NetworkTest for ForgeSetupTest {
         info!("Pick one fullnode to stop and wipe");
         let fullnode = swarm.full_node_mut(*fullnode_id).unwrap();
         runtime.block_on(fullnode.clear_storage())?;
+        runtime.block_on(fullnode.start())?;
 
         let fullnode = swarm.full_node(*fullnode_id).unwrap();
         let fullnode_name = fullnode.name();
@@ -55,6 +58,25 @@ impl NetworkTest for ForgeSetupTest {
             }
             thread::sleep(std::time::Duration::from_secs(5));
         }
+
+        // add some PFNs and send load to them
+        let mut pfns = Vec::new();
+        let num_pfns = 5;
+        for _ in 0..num_pfns {
+            let pfn_version = swarm.versions().max().unwrap();
+            let pfn_node_config = swarm.get_default_pfn_node_config();
+            let pfn_peer_id =
+                runtime.block_on(swarm.add_full_node(&pfn_version, pfn_node_config))?;
+
+            let _pfn = swarm.full_node(pfn_peer_id).context("pfn not found")?;
+            pfns.push(pfn_peer_id);
+        }
+
+        let duration = Duration::from_secs(10 * num_pfns);
+        let txn_stat = generate_traffic(ctx, &pfns, duration)?;
+
+        ctx.report
+            .report_txn_stats(self.name().to_string(), &txn_stat);
 
         Ok(())
     }

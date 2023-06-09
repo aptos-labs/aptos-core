@@ -43,3 +43,8 @@ pub const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
 pub const VALIDATOR_HAPROXY_SERVICE_SUFFIX: &str = "validator-lb";
 pub const FULLNODE_HAPROXY_SERVICE_SUFFIX: &str = "fullnode-lb";
 pub const HAPROXY_SERVICE_SUFFIX: &str = "lb";
+
+// kubernetes resource names for validator 0, which may be used for templating
+pub const VALIDATOR_0_STATEFUL_SET_NAME: &str = "aptos-node-0-validator";
+pub const VALIDATOR_0_GENESIS_SECRET_PREFIX: &str = "aptos-node-0-genesis";
+pub const VALIDATOR_0_DATA_PERSISTENT_VOLUME_CLAIM_PREFIX: &str = "aptos-node-0-validator";
