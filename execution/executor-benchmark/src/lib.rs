@@ -73,6 +73,7 @@ where
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
 ) {
     // Create rocksdb checkpoint.
@@ -81,8 +82,13 @@ fn create_checkpoint(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::create_checkpoint(source_dir, checkpoint_dir, use_sharded_state_merkle_db)
-        .expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(
+        source_dir,
+        checkpoint_dir,
+        split_ledger_db,
+        use_sharded_state_merkle_db,
+    )
+    .expect("db checkpoint creation fails.");
 }
 
 /// Runs the benchmark with given parameters.
@@ -98,7 +104,7 @@ pub fn run_benchmark<V>(
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
@@ -107,13 +113,14 @@ pub fn run_benchmark<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
+        split_ledger_db,
         use_sharded_state_merkle_db,
     );
 
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
@@ -349,7 +356,7 @@ pub fn add_accounts<V>(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
@@ -359,6 +366,7 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
+        split_ledger_db,
         use_sharded_state_merkle_db,
     );
     add_accounts_impl::<V>(
@@ -369,7 +377,7 @@ pub fn add_accounts<V>(
         checkpoint_dir,
         pruner_config,
         verify_sequence_numbers,
-        use_state_kv_db,
+        split_ledger_db,
         use_sharded_state_merkle_db,
         pipeline_config,
     );
@@ -383,7 +391,7 @@ fn add_accounts_impl<V>(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
     use_sharded_state_merkle_db: bool,
     pipeline_config: PipelineConfig,
 ) where
@@ -392,7 +400,7 @@ fn add_accounts_impl<V>(
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.use_state_kv_db = use_state_kv_db;
+    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
