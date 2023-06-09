@@ -229,9 +229,6 @@ module aptos_framework::object {
             assume from_bcs::deserializable<address>(hash::sha3_256(bytes));
         };
         let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
-        spec {
-            assume !exists<ObjectCore>(obj_addr);
-        };
         create_object_internal(creator_address, obj_addr, true)
     }
 
