@@ -10,12 +10,12 @@ test-coverage:
 
 fmt:
 	find ./examples ./aptos_sdk *.py -type f -name "*.py" | xargs poetry run autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-	poetry run isort aptos_sdk examples setup.py
-	poetry run black aptos_sdk examples setup.py
+	poetry run isort aptos_sdk examples
+	poetry run black aptos_sdk examples
 
 lint:
 	- poetry run mypy aptos_sdk
-	- poetry run flake8 aptos_sdk examples setup.py
+	- poetry run flake8 aptos_sdk examples
 
 examples:
 	poetry run python -m examples.async-read-aggregator
