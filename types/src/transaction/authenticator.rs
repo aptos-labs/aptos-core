@@ -14,7 +14,7 @@ use aptos_crypto::{
     traits::Signature,
     CryptoMaterialError, HashValue, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, DeserializeKey, SerializeKey};
+use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
@@ -443,12 +443,6 @@ impl ValidCryptoMaterial for AuthenticationKey {
     }
 }
 
-#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct TransactionDerivedUUID {
-    pub txn_hash: Vec<u8>,
-    pub uuid_counter: u64,
-}
-
 /// A value that can be hashed to produce an authentication key
 pub struct AuthenticationKeyPreimage(Vec<u8>);
 
@@ -470,9 +464,10 @@ impl AuthenticationKeyPreimage {
     }
 
     /// Construct a preimage from a transaction-derived UUID as (txn_hash || uuid_scheme_id)
-    pub fn uuid(transaction_derived_uuid: TransactionDerivedUUID) -> AuthenticationKeyPreimage {
+    pub fn uuid(txn_hash: Vec<u8>, uuid_counter: u64) -> AuthenticationKeyPreimage {
         let mut hash_arg = Vec::new();
-        hash_arg.extend(transaction_derived_uuid.hash().to_vec());
+        hash_arg.extend(txn_hash);
+        hash_arg.extend(uuid_counter.to_le_bytes().to_vec());
         hash_arg.push(Scheme::DeriveUuid as u8);
         Self(hash_arg)
     }

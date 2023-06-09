@@ -4,9 +4,7 @@
 use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeResult};
 use aptos_types::{
     on_chain_config::{Features, TimedFeatures},
-    transaction::authenticator::{
-        AuthenticationKey, AuthenticationKeyPreimage, TransactionDerivedUUID,
-    },
+    transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
 };
 use better_any::{Tid, TidAble};
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
@@ -95,10 +93,8 @@ fn native_create_uuid(
     transaction_context.uuid_counter += 1;
 
     let hash_vec = AuthenticationKey::from_preimage(&AuthenticationKeyPreimage::uuid(
-        TransactionDerivedUUID {
-            txn_hash: transaction_context.txn_hash.clone(),
-            uuid_counter: transaction_context.uuid_counter,
-        },
+        transaction_context.txn_hash.clone(),
+        transaction_context.uuid_counter,
     ));
     Ok(smallvec![Value::address(AccountAddress::new(
         hash_vec
