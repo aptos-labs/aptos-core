@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::types::TxnIndex;
 use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
-use aptos_block_partitioner::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
-use aptos_block_partitioner::sharded_block_partitioner::messages::{AddTxnsWithCrossShardDep, DiscardTxnsWithCrossShardDep};
-use crate::sharded_block_partitioner::cross_shard_messages::CrossShardMsg::CrossShardBackEdgesMsg;
+use crate::sharded_block_partitioner::cross_shard_messages::CrossShardMsg::CrossShardDependentEdgesMsg;
 use crate::sharded_block_partitioner::dependency_analysis::{RWSet, WriteSetWithTxnIndex};
-use crate::types::TxnIndex;
+use crate::types::{ShardId, TxnIndex};
 
 #[derive(Clone, Debug)]
 pub enum CrossShardMsg {
@@ -16,15 +13,16 @@ pub enum CrossShardMsg {
     RWSetMsg(RWSet),
     // Number of accepted transactions in the shard for the current round.
     AcceptedTxnsMsg(usize),
-    CrossShardBackEdgesMsg(Vec<CrossShardBackEdges>),
+    CrossShardDependentEdgesMsg(Vec<CrossShardDependentEdges>),
 }
 
-pub struct CrossShardBackEdges {
+#[derive(Clone, Debug, Default)]
+pub struct CrossShardDependentEdges {
     pub source_txn_index: TxnIndex,
     pub dependent_txn_indices: HashSet<TxnIndex>,
 }
 
-impl CrossShardBackEdges {
+impl CrossShardDependentEdges {
     pub fn new(source_txn_index: TxnIndex, dependent_txn_indices: HashSet<TxnIndex>) -> Self {
         Self {
             source_txn_index,
@@ -34,6 +32,7 @@ impl CrossShardBackEdges {
 }
 
 pub struct CrossShardClient {
+    shard_id: ShardId,
     message_rxs: Vec<Receiver<CrossShardMsg>>,
     message_txs: Vec<Sender<CrossShardMsg>>,
 }
@@ -41,10 +40,12 @@ pub struct CrossShardClient {
 impl CrossShardClient {
 
     pub fn new(
+        shard_id: ShardId,
         message_rxs: Vec<Receiver<CrossShardMsg>>,
         message_txs: Vec<Sender<CrossShardMsg>>,
     ) -> Self {
         Self {
+            shard_id,
             message_rxs,
             message_txs,
         }
@@ -111,16 +112,16 @@ impl CrossShardClient {
     }
 
 
-    pub fn broadcast_and_collect_back_edges(&self, back_edges: Vec<Vec<CrossShardBackEdges>>) -> Vec<Vec<CrossShardBackEdges>> {
+    pub fn broadcast_and_collect_dependent_edges(&self, dependent_edges: Vec<Vec<CrossShardDependentEdges>>) -> Vec<Vec<CrossShardDependentEdges>> {
         let num_shards = self.message_txs.len();
 
-        for (shard_id, back_edges) in back_edges.into_iter().enumerate() {
-            if i != self.shard_id {
-                self.message_txs[i].send(CrossShardBackEdgesMsg(back_edges)).unwrap();
+        for (shard_id, dependent_edges) in dependent_edges.into_iter().enumerate() {
+            if shard_id != self.shard_id {
+                self.message_txs[shard_id].send(CrossShardDependentEdgesMsg(dependent_edges)).unwrap();
             }
         }
 
-        let mut cross_shard_back_edges = vec![CrossShardBackEdges::default(); num_shards];
+        let mut cross_shard_dependent_edges = vec![vec![]; num_shards];
 
         for (i, msg_rx) in self.message_rxs.iter().enumerate() {
             if i == self.shard_id {
@@ -128,14 +129,14 @@ impl CrossShardClient {
             }
             let msg = msg_rx.recv().unwrap();
             match msg {
-                CrossShardBackEdgesMsg(back_edges) => {
-                    cross_shard_back_edges[i] = back_edges;
-                },
+                CrossShardDependentEdgesMsg(dependent_edges) => {
+                    cross_shard_dependent_edges[i] = dependent_edges;
+                }
                 _ => panic!("Unexpected message")
             }
         }
 
-        cross_shard_back_edges
+        cross_shard_dependent_edges
     }
 
 }

@@ -10,6 +10,7 @@ use std::{
     hash::{Hash, Hasher},
     sync::Arc,
 };
+use crate::types::TxnIdxWithShardId;
 
 pub struct CrossShardConflictDetector {
     shard_id: ShardId,
@@ -89,8 +90,9 @@ impl CrossShardConflictDetector {
             {
                 if rw_set_with_index.has_write_lock(storage_location) {
                     cross_shard_dependencies.add_depends_on_txn(
+                        TxnIdxWithShardId::new(
                         rw_set_with_index.get_write_lock_txn_index(storage_location),
-                        current_shard_id,
+                        current_shard_id)
                     );
                     break;
                 }
@@ -108,17 +110,19 @@ impl CrossShardConflictDetector {
         current_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         prev_round_rw_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
         index_offset: TxnIndex,
-    ) -> SubBlock {
+    ) -> (SubBlock, Vec<CrossShardDependencies>) {
         let mut frozen_txns = Vec::new();
+        let mut cross_shard_dependencies = Vec::new();
         for txn in txns.into_iter() {
             let dependency = self.get_deps_for_frozen_txn(
                 &txn,
                 current_round_rw_set_with_index.clone(),
                 prev_round_rw_set_with_index.clone(),
             );
+            cross_shard_dependencies.push(dependency.clone());
             frozen_txns.push(TransactionWithDependencies::new(txn, dependency));
         }
-        SubBlock::new(index_offset, frozen_txns)
+        (SubBlock::new(index_offset, frozen_txns), cross_shard_dependencies)
     }
 
     fn check_for_cross_shard_conflict(

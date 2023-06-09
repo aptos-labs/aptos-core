@@ -31,7 +31,7 @@ impl TxnIdxWithShardId {
 /// case, the transactions in the set can only be executed after the transaction has been executed.
 pub struct CrossShardDependencies {
     depends_on: HashSet<TxnIdxWithShardId>,
-    dependents: HashSet<TxnIdxWithShardId>,
+    dependencies: HashSet<TxnIdxWithShardId>,
 }
 
 impl CrossShardDependencies {
@@ -57,7 +57,7 @@ impl CrossShardDependencies {
     }
 
     pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
-        self.dependents
+        self.dependencies
             .insert(txn_idx_with_shard_id);
     }
 }
@@ -66,7 +66,7 @@ impl CrossShardDependencies {
 /// A contiguous chunk of transactions (along with their dependencies) in a block.
 ///
 /// Each `SubBlock` represents a sequential section of transactions within a block.
-/// The chunk includes the index of the first transaction relative to the block and a vector
+/// The sub block includes the index of the first transaction relative to the block and a vector
 /// of `TransactionWithDependencies` representing the transactions included in the chunk.
 ///
 /// Illustration:
@@ -112,9 +112,8 @@ impl SubBlock {
 
     pub fn add_dependent_txn(&mut self, source_index: TxnIndex, txn_idx_with_shard_id: TxnIdxWithShardId) {
         let source_txn = self.transactions.get_mut(source_index - self.start_index).unwrap();
-        source_txn.add_dependents_txn(txn_idx_with_shard_id);
+        source_txn.add_dependent_txn(txn_idx_with_shard_id);
     }
-
 }
 
 #[derive(Debug, Clone)]
