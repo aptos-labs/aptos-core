@@ -42,7 +42,7 @@ use self::{
 use crate::{
     accounts_pool_wrapper::AccountsPoolWrapperCreator,
     batch_transfer::BatchTransferTransactionGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator,
+    entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
 };
 pub use publishing::module_simple::EntryPoints;
 
@@ -50,6 +50,10 @@ pub const SEND_AMOUNT: u64 = 1;
 
 #[derive(Debug, Copy, Clone)]
 pub enum TransactionType {
+    NonConflictingCoinTransfer {
+        invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
+    },
     CoinTransfer {
         invalid_transaction_ratio: usize,
         sender_use_account_pool: bool,
@@ -211,6 +215,20 @@ pub async fn create_txn_generator_creator(
         for (transaction_type, weight) in transaction_mix {
             let txn_generator_creator: Box<dyn TransactionGeneratorCreator> = match transaction_type
             {
+                TransactionType::NonConflictingCoinTransfer {
+                    invalid_transaction_ratio,
+                    sender_use_account_pool,
+                } => wrap_accounts_pool(
+                    Box::new(P2PTransactionGeneratorCreator::new(
+                        txn_factory.clone(),
+                        SEND_AMOUNT,
+                        addresses_pool.clone(),
+                        *invalid_transaction_ratio,
+                        SamplingMode::BurnAndRecycle(addresses_pool.read().len() / 2),
+                    )),
+                    *sender_use_account_pool,
+                    accounts_pool.clone(),
+                ),
                 TransactionType::CoinTransfer {
                     invalid_transaction_ratio,
                     sender_use_account_pool,
@@ -220,6 +238,7 @@ pub async fn create_txn_generator_creator(
                         SEND_AMOUNT,
                         addresses_pool.clone(),
                         *invalid_transaction_ratio,
+                        SamplingMode::Basic,
                     )),
                     *sender_use_account_pool,
                     accounts_pool.clone(),

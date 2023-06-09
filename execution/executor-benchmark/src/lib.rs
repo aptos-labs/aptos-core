@@ -29,10 +29,12 @@ use aptos_executor::{
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
-use aptos_logger::info;
+use aptos_logger::{info, warn};
+use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
+    TransactionType::NonConflictingCoinTransfer,
 };
 use aptos_vm::counters::TXN_GAS_USAGE;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
@@ -84,11 +86,12 @@ fn create_checkpoint(
 }
 
 /// Runs the benchmark with given parameters.
+#[allow(clippy::too_many_arguments)]
 pub fn run_benchmark<V>(
     block_size: usize,
     num_blocks: usize,
     transaction_type: Option<TransactionType>,
-    transactions_per_sender: usize,
+    mut transactions_per_sender: usize,
     num_main_signer_accounts: usize,
     num_additional_dst_pool_accounts: usize,
     source_dir: impl AsRef<Path>,
@@ -114,14 +117,34 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
-
     let transaction_generator_creator = transaction_type.map(|transaction_type| {
-        init_workload::<V, _>(
+        let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
+        let num_accounts_to_be_loaded = std::cmp::min(
+            num_existing_accounts,
+            num_main_signer_accounts + num_additional_dst_pool_accounts,
+        );
+
+        let mut num_accounts_to_skip = 0;
+        if let NonConflictingCoinTransfer{..} = transaction_type {
+            // In case of random non-conflicting coin transfer using `P2PTransactionGenerator`,
+            // `3*block_size` addresses is required:
+            // `block_size` number of signers, and 2 groups of burn-n-recycle recipients used alternatively.
+            if num_accounts_to_be_loaded < block_size * 3 {
+                panic!("Cannot guarantee random non-conflicting coin transfer using `P2PTransactionGenerator`.");
+            }
+            num_accounts_to_skip = block_size;
+        }
+
+        let accounts_cache =
+            TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_accounts_to_be_loaded, num_accounts_to_skip);
+        let (main_signer_accounts, burner_accounts) =
+            accounts_cache.split(num_main_signer_accounts);
+
+        init_workload::<V>(
             transaction_type,
-            num_main_signer_accounts,
-            num_additional_dst_pool_accounts,
+            main_signer_accounts,
+            burner_accounts,
             db.clone(),
-            &source_dir,
             // Initialization pipeline is temporary, so needs to be fully committed.
             // No discards/aborts allowed during initialization, even if they are allowed later.
             PipelineConfig {
@@ -138,13 +161,28 @@ pub fn run_benchmark<V>(
 
     let (pipeline, block_sender) =
         Pipeline::new(executor, version, pipeline_config.clone(), Some(num_blocks));
+
+    let mut num_accounts_to_load = num_main_signer_accounts;
+    if let Some(NonConflictingCoinTransfer { .. }) = transaction_type {
+        // In case of non-conflicting coin transfer,
+        // `aptos_executor_benchmark::transaction_generator::TransactionGenerator` needs to hold
+        // at least `block_size` number of accounts, all as signer only.
+        num_accounts_to_load = block_size;
+        if transactions_per_sender > 1 {
+            warn!(
+            "Overriding transactions_per_sender to 1 for non_conflicting_txns_per_block workload"
+        );
+            transactions_per_sender = 1;
+        }
+    }
+
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
         genesis_key,
         block_sender,
         source_dir,
         version,
-        Some(num_main_signer_accounts),
+        Some(num_accounts_to_load),
     );
 
     let mut start_time = Instant::now();
@@ -180,6 +218,7 @@ pub fn run_benchmark<V>(
         .collect::<HashMap<_, _>>();
     let start_commit_total = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum();
 
+    let start_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum();
     if let Some(transaction_generator_creator) = transaction_generator_creator {
         generator.run_workload(
             block_size,
@@ -200,6 +239,11 @@ pub fn run_benchmark<V>(
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
     let delta_gas = TXN_GAS_USAGE.get_sample_sum() - start_gas;
+    let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
+    info!(
+        "VM execution TPS {} txn/s",
+        (delta_v / delta_vm_time) as usize
+    );
     info!(
         "Executed workload {}",
         if let Some(ttype) = transaction_type {
@@ -251,12 +295,11 @@ pub fn run_benchmark<V>(
     }
 }
 
-fn init_workload<V, P: AsRef<Path>>(
+fn init_workload<V>(
     transaction_type: TransactionType,
-    num_main_signer_accounts: usize,
-    num_additional_dst_pool_accounts: usize,
+    mut main_signer_accounts: Vec<LocalAccount>,
+    burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
-    db_dir: &P,
     pipeline_config: PipelineConfig,
 ) -> Box<dyn TransactionGeneratorCreator>
 where
@@ -271,17 +314,6 @@ where
     );
 
     let runtime = Runtime::new().unwrap();
-
-    let num_existing_accounts = TransactionGenerator::read_meta(db_dir);
-    let num_cached_accounts = std::cmp::min(
-        num_existing_accounts,
-        num_main_signer_accounts + num_additional_dst_pool_accounts,
-    );
-    let accounts_cache =
-        TransactionGenerator::gen_user_account_cache(db.reader.clone(), num_cached_accounts);
-
-    let (mut main_signer_accounts, burner_accounts) =
-        accounts_cache.split(num_main_signer_accounts);
     let transaction_factory = TransactionGenerator::create_transaction_factory();
 
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {

@@ -13,6 +13,7 @@ pub enum TransactionTypeArg {
     NoOp5Signers,
     CoinTransfer,
     CoinTransferWithInvalid,
+    NonConflictingCoinTransfer,
     AccountGeneration,
     AccountGenerationLargePool,
     PublishPackage,
@@ -50,6 +51,12 @@ impl TransactionTypeArg {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
                 sender_use_account_pool,
+            },
+            TransactionTypeArg::NonConflictingCoinTransfer => {
+                TransactionType::NonConflictingCoinTransfer {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool,
+                }
             },
             TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 10,
