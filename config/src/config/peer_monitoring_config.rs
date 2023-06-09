@@ -37,7 +37,7 @@ impl Default for PeerMonitoringServiceConfig {
             metadata_update_interval_ms: 5000,  // 5 seconds
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
-            peer_monitor_interval_usec: 1_000_000, // 1 second
+            peer_monitor_interval_usec: 1_000, // .001 second
             performance_monitoring: PerformanceMonitoringConfig::default(),
         }
     }
@@ -98,12 +98,12 @@ pub struct PerformanceMonitoringConfig {
 impl Default for PerformanceMonitoringConfig {
     fn default() -> Self {
         Self {
-            enable_direct_send_testing: false,    // Disabled by default
+            enable_direct_send_testing: true,    // Disabled by default
             direct_send_data_size: 512 * 1024,    // 512 KB
-            direct_send_interval_usec: 2_000_000, // 2 seconds
-            enable_rpc_testing: false,            // Disabled by default
+            direct_send_interval_usec: 20_000, // .02 seconds
+            enable_rpc_testing: true,            // Disabled by default
             rpc_data_size: 512 * 1024,            // 512 KB
-            rpc_interval_usec: 2_000_000,         // 2 seconds
+            rpc_interval_usec: 20_000,         // .02 seconds
             rpc_timeout_ms: 10_000,               // 10 seconds
         }
     }

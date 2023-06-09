@@ -16,12 +16,13 @@ use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
 };
-use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_peer_monitoring_service_types::{PeerMonitoringServiceMessage, PeerMonitoringSharedState};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
+use std::sync::RwLock;
 use tokio::runtime::Runtime;
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -145,24 +146,26 @@ pub fn start_peer_monitoring_service(
 ) -> Runtime {
     // Get the network client and events
     let network_client = network_interfaces.network_client;
-    let network_service_events = network_interfaces.network_service_events;
+    //let network_service_events = network_interfaces.network_service_events;
 
     // Create a new runtime for the monitoring service
     let peer_monitoring_service_runtime =
         aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
 
+    let shared = Arc::new(RwLock::new(PeerMonitoringSharedState::new()));
     // Create and spawn the peer monitoring server
-    let peer_monitoring_network_events =
-        PeerMonitoringServiceNetworkEvents::new(network_service_events);
+    // let peer_monitoring_network_events =
+    //     PeerMonitoringServiceNetworkEvents::new(network_service_events);
     let peer_monitoring_server = PeerMonitoringServiceServer::new(
         node_config.clone(),
         peer_monitoring_service_runtime.handle().clone(),
-        peer_monitoring_network_events,
+        // network_interfaces.network_service_events, //peer_monitoring_network_events,
         network_client.get_peers_and_metadata(),
         StorageReader::new(db_reader),
         TimeService::real(),
+        shared.clone(),
     );
-    peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
+    peer_monitoring_service_runtime.spawn(peer_monitoring_server.start(network_interfaces.network_service_events, network_client.clone()));
 
     // Spawn the peer monitoring client
     if node_config
@@ -174,6 +177,7 @@ pub fn start_peer_monitoring_service(
                 node_config.clone(),
                 network_client,
                 Some(peer_monitoring_service_runtime.handle().clone()),
+                shared.clone(),
             ),
         );
     }

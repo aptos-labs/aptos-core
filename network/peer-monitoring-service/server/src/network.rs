@@ -7,10 +7,7 @@ use aptos_network::{
     protocols::network::{Event, RpcError},
     ProtocolId,
 };
-use aptos_peer_monitoring_service_types::{
-    request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse,
-    PeerMonitoringServiceMessage, Result,
-};
+use aptos_peer_monitoring_service_types::{request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse, PeerMonitoringServiceMessage, Result};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -36,6 +33,7 @@ pub struct PeerMonitoringServiceNetworkEvents {
     network_request_stream: BoxStream<'static, NetworkRequest>,
 }
 
+// TODO: dead code?
 impl PeerMonitoringServiceNetworkEvents {
     pub fn new(network_service_events: NetworkServiceEvents<PeerMonitoringServiceMessage>) -> Self {
         // Transform the event streams to also include the network ID
@@ -98,6 +96,7 @@ pub struct ResponseSender {
     response_tx: oneshot::Sender<Result<Bytes, RpcError>>,
 }
 
+// TODO: dead code?
 impl ResponseSender {
     pub fn new(response_tx: oneshot::Sender<Result<Bytes, RpcError>>) -> Self {
         Self { response_tx }

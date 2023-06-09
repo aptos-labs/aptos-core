@@ -14,7 +14,7 @@ use aptos_logger::{info, warn};
 use aptos_network::application::{
     interface::NetworkClient, metadata::PeerMetadata, storage::PeersAndMetadata,
 };
-use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
+use aptos_peer_monitoring_service_types::{DirectNetPerformanceMessage, PeerMonitoringMetadata, PeerMonitoringServiceMessage, PeerMonitoringSharedState, SendRecord};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::StreamExt;
@@ -60,6 +60,7 @@ pub async fn start_peer_monitor(
     node_config: NodeConfig,
     network_client: NetworkClient<PeerMonitoringServiceMessage>,
     runtime: Option<Handle>,
+    shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
 ) {
     // Create a new monitoring client and peer monitor state
     let peer_monitoring_client = PeerMonitoringServiceClient::new(network_client);
@@ -82,6 +83,7 @@ pub async fn start_peer_monitor(
         peer_monitor_state,
         time_service,
         runtime,
+        shared,
     )
     .await
 }
@@ -96,6 +98,7 @@ async fn start_peer_monitor_with_state(
     peer_monitor_state: PeerMonitorState,
     time_service: TimeService,
     runtime: Option<Handle>,
+    shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
 ) {
     // Get the peers and metadata
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
@@ -106,6 +109,14 @@ async fn start_peer_monitor_with_state(
         Duration::from_micros(monitoring_service_config.peer_monitor_interval_usec);
     let peer_monitor_ticker = time_service.interval(peer_monitor_duration);
     futures::pin_mut!(peer_monitor_ticker);
+
+    #[cfg(feature = "network-perf-test")] // Disabled by default
+    if node_config.peer_monitoring_service.performance_monitoring.enable_direct_send_testing {
+        let runtime = runtime.clone();
+        if let Some(runtime) = runtime {
+            runtime.spawn(directsend_sentwork_perf_worker(node_config.clone(), peer_monitoring_client.clone(), time_service.clone(), shared.clone()));
+        }
+    }
 
     // Start the peer monitoring loop
     info!(LogSchema::new(LogEntry::PeerMonitorLoop)
@@ -275,5 +286,63 @@ pub(crate) fn spawn_peer_metadata_updater(
         runtime.spawn(metadata_updater)
     } else {
         tokio::spawn(metadata_updater)
+    }
+}
+
+#[cfg(feature = "network-perf-test")] // Disabled by default
+async fn directsend_sentwork_perf_worker(
+    node_config: NodeConfig,
+    peer_monitoring_client: PeerMonitoringServiceClient<NetworkClient<PeerMonitoringServiceMessage>>,
+    time_service: TimeService,
+    shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
+) {
+    //TODO WRITEME
+    let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
+    let data_size= node_config.peer_monitoring_service.performance_monitoring.direct_send_data_size;
+    let interval = Duration::from_micros(node_config.peer_monitoring_service.performance_monitoring.direct_send_interval_usec);
+    let ticker = time_service.interval(interval);
+    futures::pin_mut!(ticker);
+
+    let mut counter : u64 = 0;
+    let blob = Vec::<u8>::with_capacity(data_size as usize);
+
+    loop {
+        ticker.next().await;
+
+        // Get all peers (TODO: limit to 10 times per second? TODO: change API to be generational and a fast NOP when no change)
+        let all_peers = match peers_and_metadata.get_all_peers() {
+            Ok(all_peers) => all_peers,
+            Err(error) => {
+                warn!(LogSchema::new(LogEntry::MetadataUpdateLoop)
+                        .event(LogEvent::UnexpectedErrorEncountered)
+                        .error(&error.into())
+                        .message("Failed to get all peers!"));
+                continue; // Move to the next loop iteration
+            },
+        };
+
+        // let now = time_service.now();
+        let nowu = time_service.now_unix_time();
+        for peer_network_id in all_peers {
+            counter += 1;
+            let msg = PeerMonitoringServiceMessage::DirectNetPerformance(DirectNetPerformanceMessage{
+                request_counter: counter,
+                send_micros: nowu.as_micros() as i64,
+                data: blob.clone(),
+            });
+            // TODO: log & count this send?
+            {
+                shared.write().unwrap().set(SendRecord{
+                    request_counter: counter,
+                    send_micros: nowu.as_micros() as i64,
+                    bytes_sent: blob.len(),
+                })
+            }
+            let result = peer_monitoring_client.send_direct(peer_network_id, msg).await;
+            if let Err(err) = result {
+                info!("PM direct send err: {}", err);
+            }
+        }
+        info!("PM direct sent counter={}", counter);
     }
 }

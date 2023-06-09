@@ -562,6 +562,7 @@ impl MockClient {
             peers_and_metadata.clone(),
             storage_reader,
             mock_time_service.clone(),
+            ,
         );
 
         // Create the client

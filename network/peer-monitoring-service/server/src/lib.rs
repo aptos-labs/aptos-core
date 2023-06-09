@@ -6,7 +6,7 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{increment_counter, start_timer},
-    network::PeerMonitoringServiceNetworkEvents,
+    // network::PeerMonitoringServiceNetworkEvents,
     storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -16,19 +16,23 @@ use aptos_config::{
 };
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
-use aptos_peer_monitoring_service_types::{
-    request::{LatencyPingRequest, PeerMonitoringServiceRequest},
-    response::{
-        ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
-        NodeInformationResponse, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
-    },
-    PeerMonitoringServiceError, Result, MAX_DISTANCE_FROM_VALIDATORS,
-};
+use aptos_peer_monitoring_service_types::{request::{LatencyPingRequest, PeerMonitoringServiceRequest}, response::{
+    ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
+    NodeInformationResponse, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
+}, PeerMonitoringServiceError, Result, MAX_DISTANCE_FROM_VALIDATORS, PeerMonitoringSharedState, PeerMonitoringServiceMessage, DirectNetPerformanceMessage};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::stream::StreamExt;
 use std::{cmp::min, sync::Arc, time::Instant};
+use std::sync::RwLock;
+use bytes::Bytes;
+use futures::channel::oneshot;
 use tokio::runtime::Handle;
+use aptos_config::network_id::PeerNetworkId;
+use aptos_network::application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents};
+use aptos_network::ProtocolId;
+use aptos_network::protocols::network::{Event, RpcError};
+use aptos_types::account_address::AccountAddress;
 
 mod error;
 mod logging;
@@ -46,21 +50,23 @@ pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
 pub struct PeerMonitoringServiceServer<T> {
     base_config: BaseConfig,
     bounded_executor: BoundedExecutor,
-    network_requests: PeerMonitoringServiceNetworkEvents,
+    //network_requests: NetworkServiceEvents<PeerMonitoringServiceMessage>,//PeerMonitoringServiceNetworkEvents,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
     time_service: TimeService,
+    shared: Arc<RwLock<PeerMonitoringSharedState>>,
 }
 
 impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
     pub fn new(
         node_config: NodeConfig,
         executor: Handle,
-        network_requests: PeerMonitoringServiceNetworkEvents,
+        //network_requests: NetworkServiceEvents<PeerMonitoringServiceMessage>, //PeerMonitoringServiceNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
         storage: T,
         time_service: TimeService,
+        shared: Arc<RwLock<PeerMonitoringSharedState>>,
     ) -> Self {
         let base_config = node_config.base;
         let bounded_executor = BoundedExecutor::new(
@@ -72,27 +78,100 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         Self {
             base_config,
             bounded_executor,
-            network_requests,
+            //network_requests,
             peers_and_metadata,
             start_time,
             storage,
             time_service,
+            shared,
         }
     }
 
     /// Starts the peer monitoring service server thread
-    pub async fn start(mut self) {
+    pub async fn start(
+        mut self,
+        network_requests: NetworkServiceEvents<PeerMonitoringServiceMessage>,
+        network_client: NetworkClient<PeerMonitoringServiceMessage>,
+    ) {
+        let network_events: Vec<_> = network_requests
+            .into_network_and_events()
+            .into_iter()
+            .map(|(network_id, events)| events.map(move |event| (network_id, event)))
+            .collect();
+        let mut network_events = futures::stream::select_all(network_events).fuse();
         // Handle the service requests
-        while let Some(network_request) = self.network_requests.next().await {
+        // while let Some(network_request) = self.network_requests.next().await {
+        loop {
+            let (network_id, event) = match network_events.next().await {
+                None => { return; }  // fused stream will never return more
+                Some(x) => { x }
+            };
+            match event {
+                Event::Message(peer_id, msg_wrapper) => {
+                    // TODO: counters, note blob size and increment message counter
+                    match msg_wrapper {
+                        PeerMonitoringServiceMessage::Request(_) => {}
+                        PeerMonitoringServiceMessage::Response(_) => {}
+                        PeerMonitoringServiceMessage::DirectNetPerformance(msg) => {
+                            if msg.data.is_empty() {
+                                // this is a reply, note the request_counter got back and round trip time
+                                let receive_time = self.time_service.now_unix_time().as_micros() as i64;
+                                    let rec = {
+                                        self.shared.read().unwrap().find(msg.request_counter)
+                                    };
+                                    if rec.request_counter == msg.request_counter {
+                                        info!("pmd[{}] {} bytes in {} micros", rec.request_counter, rec.bytes_sent, receive_time - rec.send_micros);
+                                    } else {
+                                        info!("pmd[{}] unk bytes in > {} micros", msg.request_counter, receive_time - rec.send_micros)
+                                    }
+                            } else {
+                                // make a reply, empty data, local time, request counter from source
+                                let reply = DirectNetPerformanceMessage{
+                                    request_counter: msg.request_counter,
+                                    send_micros: self.time_service.now_unix_time().as_micros() as i64,
+                                    data: vec![],
+                                };
+                                let reply = PeerMonitoringServiceMessage::DirectNetPerformance(reply);
+                                let send_ok = network_client.send_to_peer(reply, PeerNetworkId::new(network_id, peer_id)); // TODO: log&count error
+                                if let Err(err) = send_ok {
+                                    info!("pmd[{}] reply send failed: {}", msg.request_counter, err);
+                                }
+                            }
+                        }
+                    }
+                }
+                Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender) => {
+                    match msg_wrapper {
+                        PeerMonitoringServiceMessage::Request(request) => {
+                            self.handle_rpc(network_id, peer_id, request, protocol_id, sender).await;
+                        }
+                        PeerMonitoringServiceMessage::Response(_) => {}
+                        PeerMonitoringServiceMessage::DirectNetPerformance(_) => {}
+                    };
+                }
+                Event::NewPeer(_) => {}  // don't care
+                Event::LostPeer(_) => {}  // don't care
+            }
+        }
+    }
+
+    pub async fn handle_rpc(&mut self,
+                            network_id: NetworkId,
+                            peer_id: AccountAddress,
+                            peer_monitoring_service_request: PeerMonitoringServiceRequest,
+                            _protocol_id: ProtocolId,
+                            sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    ) {
             // Log the request
-            let peer_network_id = network_request.peer_network_id;
-            let peer_monitoring_service_request = network_request.peer_monitoring_service_request;
-            let response_sender = network_request.response_sender;
+            //let peer_network_id = network_request.peer_network_id;
+            //let peer_monitoring_service_request = network_request.peer_monitoring_service_request;
+            //let response_sender = network_request.response_sender;
+            //let response_sender = sender;
             trace!(LogSchema::new(LogEntry::ReceivedPeerMonitoringRequest)
                 .request(&peer_monitoring_service_request)
                 .message(&format!(
-                    "Received peer monitoring request. Peer: {:?}",
-                    peer_network_id,
+                    "Received peer monitoring request. Peer: {:?} {:?}",
+                    peer_id, network_id,
                 )));
 
             // All handler methods are currently CPU-bound so we want
@@ -112,14 +191,21 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                         time_service,
                     )
                     .call(
-                        peer_network_id.network_id(),
+                        network_id,
                         peer_monitoring_service_request,
                     );
                     log_monitoring_service_response(&response);
-                    response_sender.send(response);
+                    let msg = PeerMonitoringServiceMessage::Response(response);
+                    let result = bcs::to_bytes(&msg)
+                        .map(Bytes::from)
+                        .map_err(RpcError::BcsError);
+                    if let Err(_) = sender.send(result) {
+                        info!("PM rpc reply failed")
+                    }
+                    //response_sender.send(response);
                 })
                 .await;
-        }
+
     }
 }
 

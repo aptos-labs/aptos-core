@@ -38,6 +38,7 @@ pub enum PeerMonitoringServiceMessage {
     Request(PeerMonitoringServiceRequest),
     /// A response from the peer monitoring service
     Response(Result<PeerMonitoringServiceResponse>),
+    DirectNetPerformance(DirectNetPerformanceMessage),
 }
 
 /// The peer monitoring metadata for a peer
@@ -110,4 +111,66 @@ fn display_format_option<T: Display>(option: &Option<T>) -> String {
         .as_ref()
         .map(|value| format!("{}", value))
         .unwrap_or_else(|| "None".to_string())
+}
+
+/// Common to Client and Server tasks.
+/// Probably wrapped Arc<RwLock<PeerMonitoringSharedState>>
+pub struct PeerMonitoringSharedState {
+
+    // Circular buffer of sent records
+    sent: Vec<SendRecord>,
+    // sent[sent_pos] is the next index to write
+    sent_pos: usize,
+}
+
+impl PeerMonitoringSharedState {
+    pub fn new() -> Self {
+        PeerMonitoringSharedState {
+            sent: Vec::with_capacity(10000), // TODO: constant or config
+            sent_pos: 0,
+        }
+    }
+
+    pub fn set(&mut self, sent: SendRecord) {
+        if self.sent.len() < self.sent.capacity() {
+            self.sent.push(sent);
+        } else {
+            self.sent[self.sent_pos] = sent;
+        }
+        self.sent_pos = (self.sent_pos + 1) % self.sent.capacity();
+    }
+
+    /// return the record for the request_counter, or {0, oldest send_micros}
+    pub fn find(&self, request_counter: u64) -> SendRecord {
+        if self.sent.len() == 0 {
+            return SendRecord{request_counter: 0, send_micros: 0, bytes_sent: 0};
+        }
+        let mut oldest = self.sent[0].send_micros;
+        let capacity = self.sent.len();
+        for i in 0..capacity {
+            let pos = (self.sent_pos + capacity - (1+i)) % capacity;
+            let rec = self.sent[pos].clone();
+            if rec.request_counter == request_counter {
+                return rec;
+            }
+            if rec.send_micros < oldest {
+                oldest = rec.send_micros;
+            }
+        }
+        SendRecord{request_counter: 0, send_micros: oldest, bytes_sent: 0}
+    }
+}
+
+#[derive(Clone)]
+pub struct SendRecord {
+    pub request_counter: u64,
+    pub send_micros: i64,
+    pub bytes_sent: usize,
+}
+
+#[derive(Clone,Debug,Deserialize,Serialize)]
+pub struct DirectNetPerformanceMessage {
+    pub request_counter: u64, // A monotonically increasing counter to verify responses
+    pub send_micros: i64, //
+    pub data: Vec<u8>, // A vector of bytes to send in the request
 }

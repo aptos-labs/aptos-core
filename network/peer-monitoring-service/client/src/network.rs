@@ -16,6 +16,7 @@ use aptos_peer_monitoring_service_types::{
     PeerMonitoringServiceMessage,
 };
 use std::{sync::Arc, time::Duration};
+use aptos_peer_monitoring_service_types::PeerMonitoringServiceError::InvalidRequest;
 
 /// The interface for sending peer monitoring service requests
 /// and querying peer information.
@@ -56,7 +57,16 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
                 "Got peer monitoring request instead of response! Request: {:?}",
                 request
             ))),
+            PeerMonitoringServiceMessage::DirectNetPerformance(_) => {Err(Error::PeerMonitoringServiceError(InvalidRequest("got direct message in RPC channel".to_string())))},
         }
+    }
+
+    pub async fn send_direct(
+        &self,
+        recipient: PeerNetworkId,
+        message: PeerMonitoringServiceMessage,
+    ) -> Result<(), Error> {
+        self.network_client.send_to_peer(message, recipient).map_err(|error| Error::NetworkError(error.to_string()))
     }
 
     /// Returns the peers and metadata struct
