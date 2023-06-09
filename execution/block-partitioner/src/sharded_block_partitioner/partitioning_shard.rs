@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+use std::collections::{HashMap, HashSet};
 use crate::{
     sharded_block_partitioner::{
         conflict_detector::CrossShardConflictDetector,
@@ -18,13 +17,16 @@ use std::sync::{
     mpsc::{Receiver, Sender},
     Arc,
 };
+use itertools::Itertools;
+use crate::sharded_block_partitioner::cross_shard_messages::{CrossShardBackEdges, CrossShardClient, CrossShardMsg};
+use crate::sharded_block_partitioner::messages::CrossShardBackEdges;
+use crate::types::{TxnIdxWithShardId, TxnIndex};
 
 pub struct PartitioningShard {
     shard_id: ShardId,
     control_rx: Receiver<ControlMsg>,
     result_tx: Sender<PartitioningBlockResponse>,
-    message_rxs: Vec<Receiver<CrossShardMsg>>,
-    message_txs: Vec<Sender<CrossShardMsg>>,
+    cross_shard_client: CrossShardClient,
 }
 
 impl PartitioningShard {
@@ -33,110 +35,25 @@ impl PartitioningShard {
         control_rx: Receiver<ControlMsg>,
         result_tx: Sender<PartitioningBlockResponse>,
         message_rxs: Vec<Receiver<CrossShardMsg>>,
-        messages_txs: Vec<Sender<CrossShardMsg>>,
+        message_txs: Vec<Sender<CrossShardMsg>>,
     ) -> Self {
+        let cross_shard_client = CrossShardClient::new(message_rxs, message_txs);
         Self {
             shard_id,
             control_rx,
             result_tx,
-            message_rxs,
-            message_txs: messages_txs,
+            cross_shard_client
         }
     }
 
-    fn broadcast_rw_set(&self, rw_set: RWSet) {
-        let num_shards = self.message_txs.len();
-        for i in 0..num_shards {
-            if i != self.shard_id {
-                self.message_txs[i]
-                    .send(CrossShardMsg::RWSetMsg(rw_set.clone()))
-                    .unwrap();
-            }
-        }
-    }
 
-    fn collect_rw_set(&self) -> Vec<RWSet> {
-        let mut rw_set_vec = vec![RWSet::default(); self.message_txs.len()];
-        for (i, msg_rx) in self.message_rxs.iter().enumerate() {
-            if i == self.shard_id {
-                continue;
-            }
-
-            let msg = msg_rx.recv().unwrap();
-            match msg {
-                CrossShardMsg::RWSetMsg(rw_set) => {
-                    rw_set_vec[i] = rw_set;
-                },
-                _ => panic!("Unexpected message"),
-            }
-        }
-        rw_set_vec
-    }
-
-    fn broadcast_write_set_with_index(&self, rw_set_with_index: WriteSetWithTxnIndex) {
-        let num_shards = self.message_txs.len();
-        for i in 0..num_shards {
-            if i != self.shard_id {
-                self.message_txs[i]
-                    .send(CrossShardMsg::WriteSetWithTxnIndexMsg(
-                        rw_set_with_index.clone(),
-                    ))
-                    .unwrap();
-            }
-        }
-    }
-
-    fn collect_write_set_with_index(&self) -> Vec<WriteSetWithTxnIndex> {
-        let mut rw_set_with_index_vec =
-            vec![WriteSetWithTxnIndex::default(); self.message_txs.len()];
-        for (i, msg_rx) in self.message_rxs.iter().enumerate() {
-            if i == self.shard_id {
-                continue;
-            }
-            let msg = msg_rx.recv().unwrap();
-            match msg {
-                CrossShardMsg::WriteSetWithTxnIndexMsg(rw_set_with_index) => {
-                    rw_set_with_index_vec[i] = rw_set_with_index;
-                },
-                _ => panic!("Unexpected message"),
-            }
-        }
-        rw_set_with_index_vec
-    }
-
-    fn broadcast_num_accepted_txns(&self, num_accepted_txns: usize) {
-        let num_shards = self.message_txs.len();
-        for i in 0..num_shards {
-            if i != self.shard_id {
-                self.message_txs[i]
-                    .send(CrossShardMsg::AcceptedTxnsMsg(num_accepted_txns))
-                    .unwrap();
-            }
-        }
-    }
-
-    fn collect_num_accepted_txns(&self) -> Vec<usize> {
-        let mut accepted_txns_vec = vec![0; self.message_txs.len()];
-        for (i, msg_rx) in self.message_rxs.iter().enumerate() {
-            if i == self.shard_id {
-                continue;
-            }
-            let msg = msg_rx.recv().unwrap();
-            match msg {
-                CrossShardMsg::AcceptedTxnsMsg(num_accepted_txns) => {
-                    accepted_txns_vec[i] = num_accepted_txns;
-                },
-                _ => panic!("Unexpected message"),
-            }
-        }
-        accepted_txns_vec
-    }
 
     fn discard_txns_with_cross_shard_deps(&self, partition_msg: DiscardTxnsWithCrossShardDep) {
         let DiscardTxnsWithCrossShardDep {
             transactions,
             prev_rounds_write_set_with_index,
-            prev_rounds_frozen_sub_blocks,
+            current_round_start_index,
+            frozen_sub_blocks,
         } = partition_msg;
         let num_shards = self.message_txs.len();
         let mut conflict_detector = CrossShardConflictDetector::new(self.shard_id, num_shards);
@@ -144,31 +61,26 @@ impl PartitioningShard {
         // Based on the dependency analysis received from other shards, we will reject transactions that are conflicting with
         // transactions in other shards
         let read_write_set = RWSet::new(&transactions);
-        self.broadcast_rw_set(read_write_set);
-        let cross_shard_rw_set = self.collect_rw_set();
+        let cross_shard_rw_set = self.cross_shard_client.broadcast_and_collect_rw_set(read_write_set);
         let (accepted_txns, accepted_cross_shard_dependencies, rejected_txns) = conflict_detector
             .discard_txns_with_cross_shard_deps(
                 transactions,
                 &cross_shard_rw_set,
                 prev_rounds_write_set_with_index,
             );
+
         // Broadcast and collect the stats around number of accepted and rejected transactions from other shards
         // this will be used to determine the absolute index of accepted transactions in this shard.
-        self.broadcast_num_accepted_txns(accepted_txns.len());
-        let accepted_txns_vec = self.collect_num_accepted_txns();
+        let accepted_txns_vec = self.cross_shard_client.broadcast_and_collect_num_accepted_txns(accepted_txns.len());
         // Calculate the absolute index of accepted transactions in this shard, which is the sum of all accepted transactions
-        // from other shards whose shard id is smaller than the current shard id and the number of accepted transactions in the
-        // previous rounds
-        // TODO(skedia): Evaluate if we can avoid this calculation by tracking it with a number across rounds.
-        let mut index_offset = prev_rounds_frozen_sub_blocks
-            .iter()
-            .map(|chunk| chunk.len())
-            .sum::<usize>();
-        // Drop the previous rounds frozen sub blocks so that the reference count for this drops and
-        // the coordinator can unwrap the Arc after receiving the response
-        drop(prev_rounds_frozen_sub_blocks);
+        // from other shards whose shard id is smaller than the current shard id and the current round start index
         let num_accepted_txns = accepted_txns_vec.iter().take(self.shard_id).sum::<usize>();
-        index_offset += num_accepted_txns;
+        let index_offset = current_round_start_index + num_accepted_txns;
+
+        // Now that we have finalized the global transaction index, we can add the dependency back edges.
+        let current_index = index_offset;
+
+
 
         // Calculate the RWSetWithTxnIndex for the accepted transactions
         let current_rw_set_with_index = WriteSetWithTxnIndex::new(&accepted_txns, index_offset);
@@ -204,9 +116,8 @@ impl PartitioningShard {
         // index with the index offset passed.
         let write_set_with_index_for_shard = WriteSetWithTxnIndex::new(&transactions, index_offset);
 
-        self.broadcast_write_set_with_index(write_set_with_index_for_shard.clone());
-        let current_round_rw_set_with_index = self.collect_write_set_with_index();
-        let frozen_sub_block = conflict_detector.get_frozen_sub_block(
+        let current_round_rw_set_with_index = self.cross_shard_client.broadcast_and_collect_write_set_with_index(write_set_with_index_for_shard.clone());
+        let frozen_sub_block = conflict_detector.add_deps_for_frozen_sub_block(
             transactions,
             Arc::new(current_round_rw_set_with_index),
             prev_rounds_write_set_with_index,

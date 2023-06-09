@@ -23,11 +23,15 @@ use std::{
     },
     thread,
 };
+use itertools::Itertools;
+use crate::types::TxnIndex;
 
 mod conflict_detector;
 mod dependency_analysis;
 mod messages;
 mod partitioning_shard;
+mod cross_shard_messages;
+mod back_edges;
 
 /// A sharded block partitioner that partitions a block into multiple transaction chunks.
 /// On a high level, the partitioning process is as follows:
@@ -229,7 +233,8 @@ impl ShardedBlockPartitioner {
     fn discard_txns_with_cross_shard_dependencies(
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
-        frozen_sub_blocks: Arc<Vec<SubBlock>>,
+        current_round_start_index: TxnIndex,
+        frozen_sub_blocks_by_shard: Vec<Vec<SubBlock>>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
         Vec<SubBlock>,
@@ -237,12 +242,13 @@ impl ShardedBlockPartitioner {
         Vec<Vec<AnalyzedTransaction>>,
     ) {
         let partition_block_msgs = txns_to_partition
-            .into_iter()
-            .map(|txns| {
+            .into_iter().zip_eq(frozen_sub_blocks_by_shard.into_iter())
+            .map(|(txns, sub_blocks)| {
                 DiscardCrossShardDepReq(DiscardTxnsWithCrossShardDep::new(
                     txns,
                     frozen_write_set_with_index.clone(),
-                    frozen_sub_blocks.clone(),
+                    current_round_start_index,
+                    sub_blocks,
                 ))
             })
             .collect();
@@ -294,7 +300,9 @@ impl ShardedBlockPartitioner {
         // First round, we filter all transactions with cross-shard dependencies
         let mut txns_to_partition = self.partition_by_senders(transactions);
         let mut frozen_write_set_with_index = Arc::new(Vec::new());
-        let mut frozen_sub_blocks = Arc::new(Vec::new());
+        let mut frozen_sub_blocks = Vec::new();
+        let mut current_round_start_index = 0;
+        let mut frozen_sub_blocks_by_shard: Vec<Vec<SubBlock>> = vec![vec![]; self.num_shards];
 
         for _ in 0..num_partitioning_round {
             let (
@@ -303,15 +311,19 @@ impl ShardedBlockPartitioner {
                 discarded_txns_to_partition,
             ) = self.discard_txns_with_cross_shard_dependencies(
                 txns_to_partition,
-                frozen_sub_blocks.clone(),
+                current_round_start_index,
+                frozen_sub_blocks_by_shard,
                 frozen_write_set_with_index.clone(),
             );
-            let mut prev_frozen_sub_blocks = Arc::try_unwrap(frozen_sub_blocks).unwrap();
+            let num_frozen_txns = current_frozen_sub_blocks_vec
+                .iter()
+                .map(|sub_block| sub_block.len())
+                .sum::<usize>();
+            current_round_start_index += num_frozen_txns;
             let mut prev_frozen_write_set_with_index =
                 Arc::try_unwrap(frozen_write_set_with_index).unwrap();
-            prev_frozen_sub_blocks.extend(current_frozen_sub_blocks_vec);
+            frozen_sub_blocks.extend(current_frozen_sub_blocks_vec);
             prev_frozen_write_set_with_index.extend(current_frozen_rw_set_with_index_vec);
-            frozen_sub_blocks = Arc::new(prev_frozen_sub_blocks);
             frozen_write_set_with_index = Arc::new(prev_frozen_write_set_with_index);
             txns_to_partition = discarded_txns_to_partition;
             if txns_to_partition
@@ -320,7 +332,7 @@ impl ShardedBlockPartitioner {
                 .sum::<usize>()
                 == 0
             {
-                return Arc::try_unwrap(frozen_sub_blocks).unwrap();
+                return frozen_sub_blocks
             }
         }
 
@@ -329,16 +341,15 @@ impl ShardedBlockPartitioner {
             .iter()
             .map(|chunk| chunk.len())
             .sum::<usize>();
-        let (remaining_frozen_chunks, _, _) = self.add_cross_shard_dependencies(
+        let (remaining_frozen_sub_blocks, _, _) = self.add_cross_shard_dependencies(
             index_offset,
             txns_to_partition,
             frozen_write_set_with_index,
         );
 
-        Arc::try_unwrap(frozen_sub_blocks)
-            .unwrap()
+        frozen_sub_blocks
             .into_iter()
-            .chain(remaining_frozen_chunks.into_iter())
+            .chain(remaining_frozen_sub_blocks.into_iter())
             .collect::<Vec<SubBlock>>()
     }
 }
@@ -394,6 +405,7 @@ mod tests {
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::collections::HashMap;
+    use crate::types::TxnIdxWithShardId;
 
     fn verify_no_cross_shard_dependency(partitioned_txns: Vec<SubBlock>) {
         for chunk in partitioned_txns {
@@ -597,10 +609,10 @@ mod tests {
         // txn6 and txn7 depends on txn8 (index 6)
         assert!(partitioned_chunks[5].transactions_with_deps()[0]
             .cross_shard_dependencies
-            .is_depends_on(6));
+            .is_depends_on(TxnIdxWithShardId::new(6, 1)));
         assert!(partitioned_chunks[5].transactions_with_deps()[1]
             .cross_shard_dependencies
-            .is_depends_on(6));
+            .is_depends_on(TxnIdxWithShardId::new(6, 1)));
     }
 
     #[test]

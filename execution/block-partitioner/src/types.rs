@@ -7,6 +7,21 @@ use std::collections::HashSet;
 pub type ShardId = usize;
 pub type TxnIndex = usize;
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct TxnIdxWithShardId {
+    pub txn_index: TxnIndex,
+    pub shard_id: ShardId,
+}
+
+impl TxnIdxWithShardId {
+    pub fn new(txn_index: TxnIndex, shard_id: ShardId) -> Self {
+        Self {
+            shard_id,
+            txn_index,
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
@@ -15,9 +30,8 @@ pub type TxnIndex = usize;
 /// 2. `dependents`: The transactions in the set depend on the execution of the transaction. In this
 /// case, the transactions in the set can only be executed after the transaction has been executed.
 pub struct CrossShardDependencies {
-    depends_on: HashSet<TxnIndex>,
-    // TODO (skedia) add support for this.
-    _dependents: HashSet<TxnIndex>,
+    depends_on: HashSet<TxnIdxWithShardId>,
+    dependents: HashSet<TxnIdxWithShardId>,
 }
 
 impl CrossShardDependencies {
@@ -29,12 +43,22 @@ impl CrossShardDependencies {
         self.depends_on.is_empty()
     }
 
-    pub fn is_depends_on(&self, txn_index: TxnIndex) -> bool {
-        self.depends_on.contains(&txn_index)
+    pub fn depends_on(&self) -> &HashSet<TxnIdxWithShardId> {
+        &self.depends_on
     }
 
-    pub fn add_depends_on_txn(&mut self, txn_index: TxnIndex) {
-        self.depends_on.insert(txn_index);
+    pub fn is_depends_on(&self, txn_idx_with_shard_id: TxnIdxWithShardId) -> bool {
+        self.depends_on.contains(&txn_idx_with_shard_id)
+    }
+
+    pub fn add_depends_on_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
+        self.depends_on
+            .insert(txn_idx_with_shard_id);
+    }
+
+    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
+        self.dependents
+            .insert(txn_idx_with_shard_id);
     }
 }
 
@@ -78,9 +102,19 @@ impl SubBlock {
         self.transactions.is_empty()
     }
 
+    pub fn end_index(&self) -> TxnIndex {
+        self.start_index + self.len()
+    }
+
     pub fn transactions_with_deps(&self) -> &Vec<TransactionWithDependencies> {
         &self.transactions
     }
+
+    pub fn add_dependent_txn(&mut self, source_index: TxnIndex, txn_idx_with_shard_id: TxnIdxWithShardId) {
+        let source_txn = self.transactions.get_mut(source_index - self.start_index).unwrap();
+        source_txn.add_dependents_txn(txn_idx_with_shard_id);
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -106,4 +140,9 @@ impl TransactionWithDependencies {
     pub fn cross_shard_dependencies(&self) -> &CrossShardDependencies {
         &self.cross_shard_dependencies
     }
+
+    pub fn add_dependent_txn(&mut self, txn_idx_with_shard_id: TxnIdxWithShardId) {
+        self.cross_shard_dependencies.add_dependent_txn(txn_idx_with_shard_id);
+    }
+
 }
