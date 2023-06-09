@@ -1,4 +1,4 @@
-import { DEFAULT_NETWORK } from "./utils/const";
+import { DEFAULT_NETWORK } from "./utils";
 
 export class AptosConfig {
   readonly network: string;

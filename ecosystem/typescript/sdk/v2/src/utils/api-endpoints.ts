@@ -1,0 +1,28 @@
+export const NetworkToIndexerAPI: Record<string, string> = {
+  mainnet: "https://indexer.mainnet.aptoslabs.com/v1/graphql",
+  testnet: "https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql",
+  devnet: "https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql",
+};
+
+export const NetworkToNodeAPI: Record<string, string> = {
+  mainnet: "https://fullnode.mainnet.aptoslabs.com/v1",
+  testnet: "https://fullnode.testnet.aptoslabs.com/v1",
+  devnet: "https://fullnode.devnet.aptoslabs.com/v1",
+};
+
+export const NodeAPIToNetwork: Record<string, string> = {
+  "https://fullnode.mainnet.aptoslabs.com/v1": "mainnet",
+  "https://fullnode.testnet.aptoslabs.com/v1": "testnet",
+  "https://fullnode.devnet.aptoslabs.com/v1": "devnet",
+};
+
+export enum Network {
+  MAINNET = "mainnet",
+  TESTNET = "testnet",
+  DEVNET = "devnet",
+}
+
+export interface CustomEndpoints {
+  fullnodeUrl: string;
+  indexerUrl?: string;
+}
