@@ -159,10 +159,8 @@ impl SubmissionWorker {
                 // generally, we should never need to recheck, as we wait enough time
                 // before calling here, but in case of shutdown/or client we are talking
                 // to being stale (having stale transaction_version), we might need to wait.
-                Duration::from_millis(
-                    if self.skip_latency_stats { 10 } else { 1 }
-                        * self.params.check_account_sequence_sleep_millis,
-                ),
+                if self.skip_latency_stats { 10 } else { 1 }
+                    * self.params.check_account_sequence_sleep,
                 loop_stats,
             )
             .await;

@@ -361,7 +361,7 @@ fn ensure_state_sync_transaction_throughput(
     // TODO: we fetch the TPS requirement from the given success criteria.
     // But, we should probably make it more generic to avoid this.
     // Ensure we meet the success criteria.
-    let min_expected_tps = ctx.success_criteria.avg_tps as u64;
+    let min_expected_tps = ctx.success_criteria.min_avg_tps as u64;
     if state_sync_throughput < min_expected_tps {
         let error_message = format!(
             "State sync TPS requirement failed. Average TPS: {}, minimum required TPS: {}",

@@ -68,7 +68,7 @@ pub struct EmitModeParams {
     pub worker_offset_mode: WorkerOffsetMode,
     pub wait_millis: u64,
     pub check_account_sequence_only_once_fraction: f32,
-    pub check_account_sequence_sleep_millis: u64,
+    pub check_account_sequence_sleep: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +140,8 @@ pub struct EmitJobRequest {
     prompt_before_spending: bool,
 
     coordination_delay_between_instances: Duration,
+
+    latency_polling_interval: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -163,6 +165,7 @@ impl Default for EmitJobRequest {
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
+            latency_polling_interval: Duration::from_millis(300),
         }
     }
 }
@@ -257,6 +260,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn latency_polling_interval(mut self, latency_polling_interval: Duration) -> Self {
+        self.latency_polling_interval = latency_polling_interval;
+        self
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 
@@ -294,7 +302,7 @@ impl EmitJobRequest {
                     workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 0.0,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep: self.latency_polling_interval,
                 }
             },
             EmitJobMode::ConstTps { tps }
@@ -382,7 +390,7 @@ impl EmitJobRequest {
                     workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep: self.latency_polling_interval,
                 }
             },
         }
