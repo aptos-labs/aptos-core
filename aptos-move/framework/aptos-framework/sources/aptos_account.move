@@ -81,7 +81,7 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        vector::enumerate_ref(&recipients, |i, to| {
+        vector::    _ref(&recipients, |i, to| {
             let amount = *vector::borrow(&amounts, i);
             transfer_coins<CoinType>(from, *to, amount);
         });
