@@ -24,9 +24,10 @@ pub enum LatencyType {
 
 #[derive(Default, Clone, Debug)]
 pub struct SuccessCriteria {
-    pub avg_tps: usize,
+    pub min_avg_tps: usize,
     latency_thresholds: Vec<(Duration, LatencyType)>,
     check_no_restarts: bool,
+    max_expired_tps: Option<usize>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -34,11 +35,12 @@ pub struct SuccessCriteria {
 }
 
 impl SuccessCriteria {
-    pub fn new(tps: usize) -> Self {
+    pub fn new(min_avg_tps: usize) -> Self {
         Self {
-            avg_tps: tps,
+            min_avg_tps,
             latency_thresholds: Vec::new(),
             check_no_restarts: false,
+            max_expired_tps: None,
             wait_for_all_nodes_to_catchup: None,
             system_metrics_threshold: None,
             chain_progress_check: None,
@@ -47,6 +49,11 @@ impl SuccessCriteria {
 
     pub fn add_no_restarts(mut self) -> Self {
         self.check_no_restarts = true;
+        self
+    }
+
+    pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
+        self.max_expired_tps = Some(max_expired_tps);
         self
     }
 
@@ -75,6 +82,28 @@ impl SuccessCriteria {
 pub struct SuccessCriteriaChecker {}
 
 impl SuccessCriteriaChecker {
+    pub fn check_core_for_success(
+        success_criteria: &SuccessCriteria,
+        _report: &mut TestReport,
+        stats_rate: &TxnStatsRate,
+        traffic_name: Option<String>,
+    ) -> anyhow::Result<()> {
+        let traffic_name_addition = traffic_name
+            .map(|n| format!(" for {}", n))
+            .unwrap_or_else(|| "".to_string());
+        Self::check_tps(
+            success_criteria.min_avg_tps,
+            stats_rate,
+            &traffic_name_addition,
+        )?;
+        Self::check_latency(
+            &success_criteria.latency_thresholds,
+            stats_rate,
+            &traffic_name_addition,
+        )?;
+        Ok(())
+    }
+
     pub async fn check_for_success(
         success_criteria: &SuccessCriteria,
         swarm: &mut dyn Swarm,
@@ -92,17 +121,13 @@ impl SuccessCriteriaChecker {
             stats.lasted.as_secs()
         );
         let stats_rate = stats.rate();
-        // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
-        let avg_tps = stats_rate.committed;
-        if avg_tps < success_criteria.avg_tps as u64 {
-            bail!(
-                "TPS requirement failed. Average TPS {}, minimum TPS requirement {}",
-                avg_tps,
-                success_criteria.avg_tps,
-            )
-        }
 
-        Self::check_latency(&success_criteria.latency_thresholds, &stats_rate)?;
+        Self::check_tps(success_criteria.min_avg_tps, &stats_rate, &"".to_string())?;
+        Self::check_latency(
+            &success_criteria.latency_thresholds,
+            &stats_rate,
+            &"".to_string(),
+        )?;
 
         if let Some(timeout) = success_criteria.wait_for_all_nodes_to_catchup {
             swarm
@@ -243,9 +268,33 @@ impl SuccessCriteriaChecker {
         Ok(())
     }
 
+    pub fn check_tps(
+        min_avg_tps: usize,
+        stats_rate: &TxnStatsRate,
+        traffic_name_addition: &String,
+    ) -> anyhow::Result<()> {
+        let avg_tps = stats_rate.committed;
+        if avg_tps < min_avg_tps as u64 {
+            bail!(
+                "TPS requirement{} failed. Average TPS {}, minimum TPS requirement {}. Full stats: {}",
+                traffic_name_addition,
+                avg_tps,
+                min_avg_tps,
+                stats_rate,
+            )
+        } else {
+            println!(
+                "TPS is {} and is within limit of {}",
+                stats_rate.committed, min_avg_tps
+            );
+            Ok(())
+        }
+    }
+
     pub fn check_latency(
         latency_thresholds: &[(Duration, LatencyType)],
         stats_rate: &TxnStatsRate,
+        traffic_name_addition: &String,
     ) -> anyhow::Result<()> {
         let mut failures = Vec::new();
         for (latency_threshold, latency_type) in latency_thresholds {
@@ -259,8 +308,9 @@ impl SuccessCriteriaChecker {
             if latency > *latency_threshold {
                 failures.push(
                     format!(
-                        "{:?} latency is {}s and exceeds limit of {}s",
+                        "{:?} latency{} is {}s and exceeds limit of {}s",
                         latency_type,
+                        traffic_name_addition,
                         latency.as_secs_f32(),
                         latency_threshold.as_secs_f32()
                     )
@@ -268,8 +318,9 @@ impl SuccessCriteriaChecker {
                 );
             } else {
                 println!(
-                    "{:?} latency is {}s and is within limit of {}s",
+                    "{:?} latency{} is {}s and is within limit of {}s",
                     latency_type,
+                    traffic_name_addition,
                     latency.as_secs_f32(),
                     latency_threshold.as_secs_f32()
                 );
