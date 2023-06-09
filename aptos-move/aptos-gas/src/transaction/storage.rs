@@ -28,12 +28,12 @@ pub struct StoragePricingV1 {
 impl StoragePricingV1 {
     fn new(gas_params: &AptosGasParameters) -> Self {
         Self {
-            write_data_per_op: gas_params.txn.write_data_per_op,
+            write_data_per_op: gas_params.txn.storage_io_per_state_slot_write,
             write_data_per_new_item: gas_params.txn.write_data_per_new_item,
-            write_data_per_byte_in_key: gas_params.txn.write_data_per_byte_in_key,
+            write_data_per_byte_in_key: gas_params.txn.storage_io_per_state_byte_write,
             write_data_per_byte_in_val: gas_params.txn.write_data_per_byte_in_val,
-            load_data_base: gas_params.txn.load_data_base,
-            load_data_per_byte: gas_params.txn.load_data_per_byte,
+            load_data_base: gas_params.txn.storage_io_per_state_slot_read * NumArgs::new(1),
+            load_data_per_byte: gas_params.txn.storage_io_per_state_byte_read,
             load_data_failure: gas_params.txn.load_data_failure,
         }
     }
@@ -91,14 +91,10 @@ pub struct StoragePricingV2 {
 
 impl StoragePricingV2 {
     pub fn zeros() -> Self {
-        Self::new(
-            LATEST_GAS_FEATURE_VERSION,
-            &StorageGasSchedule::zeros(),
-            &AptosGasParameters::zeros(),
-        )
+        Self::new_without_storage_curves(LATEST_GAS_FEATURE_VERSION, &AptosGasParameters::zeros())
     }
 
-    pub fn new(
+    pub fn new_with_storage_curves(
         feature_version: u64,
         storage_gas_schedule: &StorageGasSchedule,
         gas_params: &AptosGasParameters,
@@ -112,6 +108,22 @@ impl StoragePricingV2 {
             per_byte_read: storage_gas_schedule.per_byte_read.into(),
             per_byte_create: storage_gas_schedule.per_byte_create.into(),
             per_byte_write: storage_gas_schedule.per_byte_write.into(),
+        }
+    }
+
+    pub fn new_without_storage_curves(
+        feature_version: u64,
+        gas_params: &AptosGasParameters,
+    ) -> Self {
+        Self {
+            feature_version,
+            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
+            per_item_read: gas_params.txn.storage_io_per_state_slot_read,
+            per_item_create: gas_params.txn.storage_io_per_state_slot_write,
+            per_item_write: gas_params.txn.storage_io_per_state_slot_write,
+            per_byte_read: gas_params.txn.storage_io_per_state_byte_read,
+            per_byte_create: gas_params.txn.storage_io_per_state_byte_write,
+            per_byte_write: gas_params.txn.storage_io_per_state_byte_write,
         }
     }
 
@@ -182,14 +194,18 @@ impl StoragePricing {
 
         match feature_version {
             0 => V1(StoragePricingV1::new(gas_params)),
-            1.. => match StorageGasSchedule::fetch_config(config_storage) {
+            1..=9 => match StorageGasSchedule::fetch_config(config_storage) {
                 None => V1(StoragePricingV1::new(gas_params)),
-                Some(schedule) => V2(StoragePricingV2::new(
+                Some(schedule) => V2(StoragePricingV2::new_with_storage_curves(
                     feature_version,
                     &schedule,
                     gas_params,
                 )),
             },
+            10.. => V2(StoragePricingV2::new_without_storage_curves(
+                feature_version,
+                gas_params,
+            )),
         }
     }
 

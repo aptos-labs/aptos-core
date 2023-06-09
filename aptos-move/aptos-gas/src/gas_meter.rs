@@ -33,6 +33,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V10
+//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
 //   - Accurate tracking of the cost of loading resource groups
 // - V8
@@ -61,7 +63,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 9;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
