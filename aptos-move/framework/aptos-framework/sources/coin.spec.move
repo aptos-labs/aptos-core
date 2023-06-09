@@ -3,22 +3,15 @@ spec aptos_framework::coin {
         pragma verify = true;
         global supply<CoinType>: num;
         global aggregate_supply<CoinType>: num;
-        apply TotalSupplyTracked<CoinType> to *<CoinType> except
-            initialize, initialize_internal, initialize_with_parallelizable_supply;
-        apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint,
-            burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
+        invariant<CoinType> [suspendable] spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+        global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
+        apply TotalSupplyNoChange<CoinType> to *<CoinType> except mint, mint_internal,
+            burn, burn_internal, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {
         option::spec_is_some(supply) ==> val == optional_aggregator::optional_aggregator_value
                 (option::spec_borrow(supply))
-    }
-
-    spec schema TotalSupplyTracked<CoinType> {
-        ensures old(spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
-            global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply)) ==>
-            spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
-                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
     }
 
     spec fun spec_fun_supply_no_change<CoinType>(old_supply: Option<OptionalAggregator>,
@@ -37,6 +30,19 @@ spec aptos_framework::coin {
     spec AggregatableCoin {
         use aptos_framework::aggregator;
         invariant aggregator::spec_get_limit(value) == MAX_U64;
+    }
+
+    spec mint_internal {
+        pragma opaque;
+        pragma delegate_invariants_to_caller;
+        let addr = type_info::type_of<CoinType>().account_address;
+        modifies global<CoinInfo<CoinType>>(addr);
+        aborts_if [abstract] false;
+        ensures old(spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+            global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply)) ==>
+            spec_fun_supply_tracked<CoinType>(supply<CoinType> + aggregate_supply<CoinType>,
+                global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply);
+        ensures [abstract] result.value == amount;
     }
 
     spec mint {
@@ -136,6 +142,19 @@ spec aptos_framework::coin {
         };
     }
 
+    spec burn_internal<CoinType>(
+    coin: Coin<CoinType>,
+    _cap: &BurnCapability<CoinType>,
+    ) {
+        pragma delegate_invariants_to_caller;
+        let addr =  type_info::type_of<CoinType>().account_address;
+        aborts_if !exists<CoinInfo<CoinType>>(addr);
+        modifies global<CoinInfo<CoinType>>(addr);
+        include AbortsIfNotExistCoinInfo<CoinType>;
+        aborts_if coin.value == 0;
+        include AbortsIfAggregator<CoinType>;
+    }
+
     spec burn<CoinType>(
         coin: Coin<CoinType>,
         _cap: &BurnCapability<CoinType>,
@@ -198,13 +217,27 @@ spec aptos_framework::coin {
 
     /// The value of `zero_coin` must be 0.
     spec destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
+        pragma disable_invariants_in_body;
         aborts_if zero_coin.value > 0;
+    }
+
+    spec extract_internal<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+        pragma delegate_invariants_to_caller;
+        aborts_if coin.value < amount;
+        ensures result.value == amount;
+        ensures coin.value == old(coin.value) - amount;
     }
 
     spec extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
         aborts_if coin.value < amount;
         ensures result.value == amount;
         ensures coin.value == old(coin.value) - amount;
+    }
+
+    spec extract_all_internal<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
+        pragma delegate_invariants_to_caller;
+        ensures result.value == old(coin).value;
+        ensures coin.value == 0;
     }
 
     spec extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
@@ -279,6 +312,7 @@ spec aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        pragma delegate_invariants_to_caller;
         pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
@@ -310,6 +344,7 @@ spec aptos_framework::coin {
         monitor_supply: bool,
         parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        pragma delegate_invariants_to_caller;
         include InitializeInternalSchema<CoinType>{
             name: name.bytes,
             symbol: symbol.bytes
@@ -335,6 +370,11 @@ spec aptos_framework::coin {
         ensures result_1 == BurnCapability<CoinType> {};
         ensures result_2 == FreezeCapability<CoinType> {};
         ensures result_3 == MintCapability<CoinType> {};
+    }
+
+    spec merge_internal<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        pragma delegate_invariants_to_caller;
+        ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
     }
 
     spec merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
@@ -415,11 +455,13 @@ spec aptos_framework::coin {
     }
 
     spec drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
+        pragma delegate_invariants_to_caller;
         aborts_if aggregator::spec_read(coin.value) > MAX_U64;
         ensures result.value == aggregator::spec_aggregator_get_val(old(coin).value);
     }
 
     spec merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
+        pragma delegate_invariants_to_caller;
         let aggr = dst_coin.value;
         aborts_if aggregator::spec_aggregator_get_val(aggr)
             + coin.value > aggregator::spec_get_limit(aggr);

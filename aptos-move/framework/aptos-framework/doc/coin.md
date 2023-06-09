@@ -35,11 +35,14 @@ This module provides the foundation for typesafe Coins.
 -  [Function `symbol`](#0x1_coin_symbol)
 -  [Function `decimals`](#0x1_coin_decimals)
 -  [Function `supply`](#0x1_coin_supply)
+-  [Function `burn_internal`](#0x1_coin_burn_internal)
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
 -  [Function `deposit`](#0x1_coin_deposit)
 -  [Function `destroy_zero`](#0x1_coin_destroy_zero)
+-  [Function `extract_internal`](#0x1_coin_extract_internal)
 -  [Function `extract`](#0x1_coin_extract)
+-  [Function `extract_all_internal`](#0x1_coin_extract_all_internal)
 -  [Function `extract_all`](#0x1_coin_extract_all)
 -  [Function `freeze_coin_store`](#0x1_coin_freeze_coin_store)
 -  [Function `unfreeze_coin_store`](#0x1_coin_unfreeze_coin_store)
@@ -47,7 +50,9 @@ This module provides the foundation for typesafe Coins.
 -  [Function `initialize`](#0x1_coin_initialize)
 -  [Function `initialize_with_parallelizable_supply`](#0x1_coin_initialize_with_parallelizable_supply)
 -  [Function `initialize_internal`](#0x1_coin_initialize_internal)
+-  [Function `merge_internal`](#0x1_coin_merge_internal)
 -  [Function `merge`](#0x1_coin_merge)
+-  [Function `mint_internal`](#0x1_coin_mint_internal)
 -  [Function `mint`](#0x1_coin_mint)
 -  [Function `register`](#0x1_coin_register)
 -  [Function `transfer`](#0x1_coin_transfer)
@@ -74,11 +79,14 @@ This module provides the foundation for typesafe Coins.
     -  [Function `symbol`](#@Specification_1_symbol)
     -  [Function `decimals`](#@Specification_1_decimals)
     -  [Function `supply`](#@Specification_1_supply)
+    -  [Function `burn_internal`](#@Specification_1_burn_internal)
     -  [Function `burn`](#@Specification_1_burn)
     -  [Function `burn_from`](#@Specification_1_burn_from)
     -  [Function `deposit`](#@Specification_1_deposit)
     -  [Function `destroy_zero`](#@Specification_1_destroy_zero)
+    -  [Function `extract_internal`](#@Specification_1_extract_internal)
     -  [Function `extract`](#@Specification_1_extract)
+    -  [Function `extract_all_internal`](#@Specification_1_extract_all_internal)
     -  [Function `extract_all`](#@Specification_1_extract_all)
     -  [Function `freeze_coin_store`](#@Specification_1_freeze_coin_store)
     -  [Function `unfreeze_coin_store`](#@Specification_1_unfreeze_coin_store)
@@ -86,7 +94,9 @@ This module provides the foundation for typesafe Coins.
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `initialize_with_parallelizable_supply`](#@Specification_1_initialize_with_parallelizable_supply)
     -  [Function `initialize_internal`](#@Specification_1_initialize_internal)
+    -  [Function `merge_internal`](#@Specification_1_merge_internal)
     -  [Function `merge`](#@Specification_1_merge)
+    -  [Function `mint_internal`](#@Specification_1_mint_internal)
     -  [Function `mint`](#@Specification_1_mint)
     -  [Function `register`](#@Specification_1_register)
     -  [Function `transfer`](#@Specification_1_transfer)
@@ -868,7 +878,7 @@ Collects a specified amount of coin form an account into aggregatable coin.
     };
 
     <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
     <a href="coin.md#0x1_coin_merge_aggregatable_coin">merge_aggregatable_coin</a>(dst_coin, <a href="coin.md#0x1_coin">coin</a>);
 }
 </code></pre>
@@ -1130,6 +1140,45 @@ Returns the amount of coin in existence.
 
 </details>
 
+<a name="0x1_coin_burn_internal"></a>
+
+## Function `burn_internal`
+
+Burn <code><a href="coin.md#0x1_coin">coin</a></code> with capability.
+The capability <code>_cap</code> should be passed as a reference to <code><a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;</code>.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_burn_internal">burn_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, _cap: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_burn_internal">burn_internal</a>&lt;CoinType&gt;(
+    <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;,
+    _cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - <a href="coin.md#0x1_coin">coin</a>.value;
+    };
+    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value: amount } = <a href="coin.md#0x1_coin">coin</a>;
+    <b>assert</b>!(amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_EZERO_COIN_AMOUNT">EZERO_COIN_AMOUNT</a>));
+
+    <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;()).<a href="coin.md#0x1_coin_supply">supply</a>;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
+        <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
+        <a href="optional_aggregator.md#0x1_optional_aggregator_sub">optional_aggregator::sub</a>(<a href="coin.md#0x1_coin_supply">supply</a>, (amount <b>as</b> u128));
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_coin_burn"></a>
 
 ## Function `burn`
@@ -1151,17 +1200,7 @@ The capability <code>_cap</code> should be passed as a reference to <code><a hre
     <a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;,
     _cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
 ) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - <a href="coin.md#0x1_coin">coin</a>.value;
-    };
-    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value: amount } = <a href="coin.md#0x1_coin">coin</a>;
-    <b>assert</b>!(amount &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_EZERO_COIN_AMOUNT">EZERO_COIN_AMOUNT</a>));
-
-    <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;()).<a href="coin.md#0x1_coin_supply">supply</a>;
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
-        <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
-        <a href="optional_aggregator.md#0x1_optional_aggregator_sub">optional_aggregator::sub</a>(<a href="coin.md#0x1_coin_supply">supply</a>, (amount <b>as</b> u128));
-    }
+    <a href="coin.md#0x1_coin_burn_internal">burn_internal</a>(<a href="coin.md#0x1_coin">coin</a>, _cap)
 }
 </code></pre>
 
@@ -1200,8 +1239,8 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     };
 
     <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
-    <a href="coin.md#0x1_coin_burn">burn</a>(coin_to_burn, burn_cap);
+    <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount);
+    <a href="coin.md#0x1_coin_burn_internal">burn_internal</a>(coin_to_burn, burn_cap);
 }
 </code></pre>
 
@@ -1242,7 +1281,7 @@ Deposit the coin balance into the recipient's account and emit an event.
         <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
     );
 
-    <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
+    <a href="coin.md#0x1_coin_merge_internal">merge_internal</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
 }
 </code></pre>
 
@@ -1281,6 +1320,38 @@ a <code><a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a></code> for 
 
 </details>
 
+<a name="0x1_coin_extract_internal"></a>
+
+## Function `extract_internal`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+    <b>assert</b>!(<a href="coin.md#0x1_coin">coin</a>.value &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - amount;
+    };
+    <a href="coin.md#0x1_coin">coin</a>.value = <a href="coin.md#0x1_coin">coin</a>.value - amount;
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + amount;
+    };
+    <a href="coin.md#0x1_coin_Coin">Coin</a> { value: amount }
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_coin_extract"></a>
 
 ## Function `extract`
@@ -1298,15 +1369,39 @@ Extracts <code>amount</code> from the passed-in <code><a href="coin.md#0x1_coin"
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_extract">extract</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
-    <b>assert</b>!(<a href="coin.md#0x1_coin">coin</a>.value &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
+    <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>(<a href="coin.md#0x1_coin">coin</a>, amount)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_extract_all_internal"></a>
+
+## Function `extract_all_internal`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_all_internal">extract_all_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_all_internal">extract_all_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+    <b>let</b> total_value = <a href="coin.md#0x1_coin">coin</a>.value;
     <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - amount;
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - <a href="coin.md#0x1_coin">coin</a>.value;
     };
-    <a href="coin.md#0x1_coin">coin</a>.value = <a href="coin.md#0x1_coin">coin</a>.value - amount;
+    <a href="coin.md#0x1_coin">coin</a>.value = 0;
     <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + amount;
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + total_value;
     };
-    <a href="coin.md#0x1_coin_Coin">Coin</a> { value: amount }
+    <a href="coin.md#0x1_coin_Coin">Coin</a> { value: total_value }
 }
 </code></pre>
 
@@ -1331,15 +1426,7 @@ Extracts the entire amount from the passed-in <code><a href="coin.md#0x1_coin">c
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_extract_all">extract_all</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
-    <b>let</b> total_value = <a href="coin.md#0x1_coin">coin</a>.value;
-    <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - <a href="coin.md#0x1_coin">coin</a>.value;
-    };
-    <a href="coin.md#0x1_coin">coin</a>.value = 0;
-    <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + total_value;
-    };
-    <a href="coin.md#0x1_coin_Coin">Coin</a> { value: total_value }
+    <a href="coin.md#0x1_coin_extract_all_internal">extract_all_internal</a>(<a href="coin.md#0x1_coin">coin</a>)
 }
 </code></pre>
 
@@ -1558,6 +1645,10 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&name) &lt;= <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_NAME_TOO_LONG">ECOIN_NAME_TOO_LONG</a>));
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&symbol) &lt;= <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_SYMBOL_TOO_LONG">ECOIN_SYMBOL_TOO_LONG</a>));
 
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = 0;
+        <b>update</b> <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt; = 0;
+    };
     <b>let</b> coin_info = <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt; {
         name,
         symbol,
@@ -1567,6 +1658,40 @@ Same as <code>initialize</code> but supply can be initialized to parallelizable 
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, coin_info);
 
     (<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt; {}, <a href="coin.md#0x1_coin_FreezeCapability">FreezeCapability</a>&lt;CoinType&gt; {}, <a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt; {})
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_merge_internal"></a>
+
+## Function `merge_internal`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_merge_internal">merge_internal</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, source_coin: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_merge_internal">merge_internal</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;, source_coin: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;) {
+    <b>spec</b> {
+        <b>assume</b> dst_coin.value + source_coin.<a href="coin.md#0x1_coin_value">value</a> &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+    };
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - source_coin.value;
+    };
+    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value } = source_coin;
+    <b>spec</b> {
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + value;
+    };
+    dst_coin.value = dst_coin.value + value;
 }
 </code></pre>
 
@@ -1592,17 +1717,48 @@ to the sum of the two tokens (<code>dst_coin</code> and <code>source_coin</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_merge">merge</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;, source_coin: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;) {
-    <b>spec</b> {
-        <b>assume</b> dst_coin.value + source_coin.<a href="coin.md#0x1_coin_value">value</a> &lt;= <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+    <a href="coin.md#0x1_coin_merge_internal">merge_internal</a>(dst_coin, source_coin)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_mint_internal"></a>
+
+## Function `mint_internal`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_mint_internal">mint_internal</a>&lt;CoinType&gt;(amount: u64, _cap: &<a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_mint_internal">mint_internal</a>&lt;CoinType&gt;(
+    amount: u64,
+    _cap: &<a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;,
+): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <b>if</b> (amount == 0) {
+        <b>return</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
+            value: 0
+        }
+    };
+
+    <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;()).<a href="coin.md#0x1_coin_supply">supply</a>;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
+        <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
+        <a href="optional_aggregator.md#0x1_optional_aggregator_add">optional_aggregator::add</a>(<a href="coin.md#0x1_coin_supply">supply</a>, (amount <b>as</b> u128));
     };
     <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; - source_coin.value;
+        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + amount;
     };
-    <b>let</b> <a href="coin.md#0x1_coin_Coin">Coin</a> { value } = source_coin;
-    <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + value;
-    };
-    dst_coin.value = dst_coin.value + value;
+    <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; { value: amount }
 }
 </code></pre>
 
@@ -1632,21 +1788,7 @@ Returns minted <code><a href="coin.md#0x1_coin_Coin">Coin</a></code>.
     amount: u64,
     _cap: &<a href="coin.md#0x1_coin_MintCapability">MintCapability</a>&lt;CoinType&gt;,
 ): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    <b>if</b> (amount == 0) {
-        <b>return</b> <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; {
-            value: 0
-        }
-    };
-
-    <b>let</b> maybe_supply = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;()).<a href="coin.md#0x1_coin_supply">supply</a>;
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(maybe_supply)) {
-        <b>let</b> <a href="coin.md#0x1_coin_supply">supply</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow_mut">option::borrow_mut</a>(maybe_supply);
-        <a href="optional_aggregator.md#0x1_optional_aggregator_add">optional_aggregator::add</a>(<a href="coin.md#0x1_coin_supply">supply</a>, (amount <b>as</b> u128));
-    };
-    <b>spec</b> {
-        <b>update</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; = <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + amount;
-    };
-    <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; { value: amount }
+    <a href="coin.md#0x1_coin_mint_internal">mint_internal</a>(amount, _cap)
 }
 </code></pre>
 
@@ -1783,7 +1925,7 @@ Withdraw specifed <code>amount</code> of coin <code>CoinType</code> from the sig
         <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount },
     );
 
-    <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount)
+    <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount)
 }
 </code></pre>
 
@@ -1907,10 +2049,10 @@ Destroy a burn capability.
 <b>global</b> <a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt;: num;
 <a name="0x1_coin_aggregate_supply"></a>
 <b>global</b> <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;: num;
-<b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyTracked">TotalSupplyTracked</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b>
-    initialize, initialize_internal, initialize_with_parallelizable_supply;
-<b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyNoChange">TotalSupplyNoChange</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b> mint,
-    burn, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
+<b>invariant</b>&lt;CoinType&gt; [suspendable] <a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;,
+<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).<a href="coin.md#0x1_coin_supply">supply</a>);
+<b>apply</b> <a href="coin.md#0x1_coin_TotalSupplyNoChange">TotalSupplyNoChange</a>&lt;CoinType&gt; <b>to</b> *&lt;CoinType&gt; <b>except</b> mint, mint_internal,
+    burn, burn_internal, burn_from, initialize, initialize_internal, initialize_with_parallelizable_supply;
 </code></pre>
 
 
@@ -1922,20 +2064,6 @@ Destroy a burn capability.
 <pre><code><b>fun</b> <a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(val: u64, <a href="coin.md#0x1_coin_supply">supply</a>: Option&lt;OptionalAggregator&gt;): bool {
    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="coin.md#0x1_coin_supply">supply</a>) ==&gt; val == <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>
            (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="coin.md#0x1_coin_supply">supply</a>))
-}
-</code></pre>
-
-
-
-
-<a name="0x1_coin_TotalSupplyTracked"></a>
-
-
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_TotalSupplyTracked">TotalSupplyTracked</a>&lt;CoinType&gt; {
-    <b>ensures</b> <b>old</b>(<a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;,
-        <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).<a href="coin.md#0x1_coin_supply">supply</a>)) ==&gt;
-        <a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;,
-            <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).<a href="coin.md#0x1_coin_supply">supply</a>);
 }
 </code></pre>
 
@@ -2083,7 +2211,8 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(<a href="coin.md#0x1_coin">coin</a>.value) &gt; <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_read">aggregator::spec_read</a>(<a href="coin.md#0x1_coin">coin</a>.value) &gt; <a href="coin.md#0x1_coin_MAX_U64">MAX_U64</a>;
 <b>ensures</b> result.value == <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(<b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value);
 </code></pre>
 
@@ -2100,7 +2229,8 @@ Can only be updated by <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>let</b> aggr = dst_coin.value;
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>let</b> aggr = dst_coin.value;
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
     + <a href="coin.md#0x1_coin">coin</a>.value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr)
@@ -2322,6 +2452,28 @@ Get address by reflection.
 
 
 
+<a name="@Specification_1_burn_internal"></a>
+
+### Function `burn_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_burn_internal">burn_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, _cap: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+<b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+<b>include</b> <a href="coin.md#0x1_coin_AbortsIfNotExistCoinInfo">AbortsIfNotExistCoinInfo</a>&lt;CoinType&gt;;
+<b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.value == 0;
+<b>include</b> <a href="coin.md#0x1_coin_AbortsIfAggregator">AbortsIfAggregator</a>&lt;CoinType&gt;;
+</code></pre>
+
+
+
 <a name="@Specification_1_burn"></a>
 
 ### Function `burn`
@@ -2425,7 +2577,27 @@ Get address by reflection.
 The value of <code>zero_coin</code> must be 0.
 
 
-<pre><code><b>aborts_if</b> zero_coin.value &gt; 0;
+<pre><code><b>pragma</b> disable_invariants_in_body;
+<b>aborts_if</b> zero_coin.value &gt; 0;
+</code></pre>
+
+
+
+<a name="@Specification_1_extract_internal"></a>
+
+### Function `extract_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_internal">extract_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, amount: u64): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.<a href="coin.md#0x1_coin_value">value</a> &lt; amount;
+<b>ensures</b> result.value == amount;
+<b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<a href="coin.md#0x1_coin">coin</a>.value) - amount;
 </code></pre>
 
 
@@ -2444,6 +2616,24 @@ The value of <code>zero_coin</code> must be 0.
 <pre><code><b>aborts_if</b> <a href="coin.md#0x1_coin">coin</a>.<a href="coin.md#0x1_coin_value">value</a> &lt; amount;
 <b>ensures</b> result.value == amount;
 <b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<a href="coin.md#0x1_coin">coin</a>.value) - amount;
+</code></pre>
+
+
+
+<a name="@Specification_1_extract_all_internal"></a>
+
+### Function `extract_all_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_extract_all_internal">extract_all_internal</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>ensures</b> result.value == <b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value;
+<b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value == 0;
 </code></pre>
 
 
@@ -2574,7 +2764,8 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>pragma</b> aborts_if_is_partial;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt;{
@@ -2617,7 +2808,8 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt;{
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt;{
     name: name.bytes,
     symbol: symbol.bytes
 };
@@ -2646,6 +2838,23 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 
+<a name="@Specification_1_merge_internal"></a>
+
+### Function `merge_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_merge_internal">merge_internal</a>&lt;CoinType&gt;(dst_coin: &<b>mut</b> <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;, source_coin: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>ensures</b> dst_coin.value == <b>old</b>(dst_coin.value) + source_coin.value;
+</code></pre>
+
+
+
 <a name="@Specification_1_merge"></a>
 
 ### Function `merge`
@@ -2658,6 +2867,31 @@ Only the creator of <code>CoinType</code> can initialize.
 
 
 <pre><code><b>ensures</b> dst_coin.value == <b>old</b>(dst_coin.value) + source_coin.value;
+</code></pre>
+
+
+
+<a name="@Specification_1_mint_internal"></a>
+
+### Function `mint_internal`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_mint_internal">mint_internal</a>&lt;CoinType&gt;(amount: u64, _cap: &<a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;CoinType&gt;): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> delegate_invariants_to_caller;
+<b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+<b>modifies</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> <b>old</b>(<a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;,
+    <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).<a href="coin.md#0x1_coin_supply">supply</a>)) ==&gt;
+    <a href="coin.md#0x1_coin_spec_fun_supply_tracked">spec_fun_supply_tracked</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin_supply">supply</a>&lt;CoinType&gt; + <a href="coin.md#0x1_coin_aggregate_supply">aggregate_supply</a>&lt;CoinType&gt;,
+        <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address).<a href="coin.md#0x1_coin_supply">supply</a>);
+<b>ensures</b> [abstract] result.value == amount;
 </code></pre>
 
 

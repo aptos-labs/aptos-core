@@ -1354,7 +1354,7 @@ Stores the transaction fee collected to the specified validator address.
     <b>let</b> fees_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>&gt;(@aptos_framework).fees_table;
     <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(fees_table, validator_addr)) {
         <b>let</b> collected_fee = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(fees_table, validator_addr);
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(collected_fee, fee);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(collected_fee, fee);
     } <b>else</b> {
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(fees_table, validator_addr, fee);
     }
@@ -2250,9 +2250,9 @@ Add <code>coins</code> into <code>pool_address</code>. this requires the corresp
     // Otherwise, the delegation can be added <b>to</b> active directly <b>as</b> the validator is also activated in the epoch.
     <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     <b>if</b> (<a href="stake.md#0x1_stake_is_current_epoch_validator">is_current_epoch_validator</a>(pool_address)) {
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.pending_active, coins);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.pending_active, coins);
     } <b>else</b> {
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.active, coins);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.active, coins);
     };
 
     <b>let</b> (_, maximum_stake) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(&<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
@@ -2328,8 +2328,8 @@ Move <code>amount</code> of coins from pending_inactive to active.
     // Since this does not count <b>as</b> a <a href="voting.md#0x1_voting">voting</a> power change (pending inactive still counts <b>as</b> <a href="voting.md#0x1_voting">voting</a> power in the
     // current epoch), <a href="stake.md#0x1_stake">stake</a> can be immediately moved from pending inactive <b>to</b> active.
     // We also don't need <b>to</b> check <a href="voting.md#0x1_voting">voting</a> power increase <b>as</b> there's none.
-    <b>let</b> reactivated_coins = <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> stake_pool.pending_inactive, amount);
-    <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.active, reactivated_coins);
+    <b>let</b> reactivated_coins = <a href="coin.md#0x1_coin_extract_internal">coin::extract_internal</a>(&<b>mut</b> stake_pool.pending_inactive, amount);
+    <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(&<b>mut</b> stake_pool.active, reactivated_coins);
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> stake_pool.reactivate_stake_events,
@@ -2671,8 +2671,8 @@ Unlock <code>amount</code> from the active stake. Only possible if the lockup ha
     <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     // Cap amount <b>to</b> unlock by maximum active <a href="stake.md#0x1_stake">stake</a>.
     <b>let</b> amount = <b>min</b>(amount, <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.active));
-    <b>let</b> unlocked_stake = <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> stake_pool.active, amount);
-    <a href="coin.md#0x1_coin_merge">coin::merge</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.pending_inactive, unlocked_stake);
+    <b>let</b> unlocked_stake = <a href="coin.md#0x1_coin_extract_internal">coin::extract_internal</a>(&<b>mut</b> stake_pool.active, amount);
+    <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>&lt;AptosCoin&gt;(&<b>mut</b> stake_pool.pending_inactive, unlocked_stake);
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> stake_pool.unlock_stake_events,
@@ -2748,8 +2748,8 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
     // This can leave their <a href="stake.md#0x1_stake">stake</a> stuck in pending_inactive even after the current lockup cycle expires.
     <b>if</b> (<a href="stake.md#0x1_stake_get_validator_state">get_validator_state</a>(pool_address) == <a href="stake.md#0x1_stake_VALIDATOR_STATUS_INACTIVE">VALIDATOR_STATUS_INACTIVE</a> &&
         <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= stake_pool.locked_until_secs) {
-        <b>let</b> pending_inactive_stake = <a href="coin.md#0x1_coin_extract_all">coin::extract_all</a>(&<b>mut</b> stake_pool.pending_inactive);
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.inactive, pending_inactive_stake);
+        <b>let</b> pending_inactive_stake = <a href="coin.md#0x1_coin_extract_all_internal">coin::extract_all_internal</a>(&<b>mut</b> stake_pool.pending_inactive);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(&<b>mut</b> stake_pool.inactive, pending_inactive_stake);
     };
 
     // Cap withdraw amount by total inactive coins.
@@ -2764,7 +2764,7 @@ Withdraw from <code>pool_address</code>'s inactive stake with the corresponding 
         },
     );
 
-    <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> stake_pool.inactive, withdraw_amount)
+    <a href="coin.md#0x1_coin_extract_internal">coin::extract_internal</a>(&<b>mut</b> stake_pool.inactive, withdraw_amount)
 }
 </code></pre>
 
@@ -3133,23 +3133,23 @@ This function shouldn't abort.
     };
     <b>let</b> rewards_amount = rewards_active + rewards_pending_inactive;
     // Pending active <a href="stake.md#0x1_stake">stake</a> can now be active.
-    <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.active, <a href="coin.md#0x1_coin_extract_all">coin::extract_all</a>(&<b>mut</b> stake_pool.pending_active));
+    <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(&<b>mut</b> stake_pool.active, <a href="coin.md#0x1_coin_extract_all_internal">coin::extract_all_internal</a>(&<b>mut</b> stake_pool.pending_active));
 
     // Additionally, distribute transaction fees.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
         <b>let</b> fees_table = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>&gt;(@aptos_framework).fees_table;
         <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(fees_table, pool_address)) {
             <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="../../aptos-stdlib/doc/table.md#0x1_table_remove">table::remove</a>(fees_table, pool_address);
-            <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> stake_pool.active, <a href="coin.md#0x1_coin">coin</a>);
+            <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(&<b>mut</b> stake_pool.active, <a href="coin.md#0x1_coin">coin</a>);
         };
     };
 
     // Pending inactive <a href="stake.md#0x1_stake">stake</a> is only fully unlocked and moved into inactive <b>if</b> the current lockup cycle <b>has</b> expired
     <b>let</b> current_lockup_expiration = stake_pool.locked_until_secs;
     <b>if</b> (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= current_lockup_expiration) {
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(
             &<b>mut</b> stake_pool.inactive,
-            <a href="coin.md#0x1_coin_extract_all">coin::extract_all</a>(&<b>mut</b> stake_pool.pending_inactive),
+            <a href="coin.md#0x1_coin_extract_all_internal">coin::extract_all_internal</a>(&<b>mut</b> stake_pool.pending_inactive),
         );
     };
 
@@ -3244,8 +3244,8 @@ Mint rewards corresponding to current epoch's <code><a href="stake.md#0x1_stake"
     };
     <b>if</b> (rewards_amount &gt; 0) {
         <b>let</b> mint_cap = &<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).mint_cap;
-        <b>let</b> rewards = <a href="coin.md#0x1_coin_mint">coin::mint</a>(rewards_amount, mint_cap);
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
+        <b>let</b> rewards = <a href="coin.md#0x1_coin_mint_internal">coin::mint_internal</a>(rewards_amount, mint_cap);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(<a href="stake.md#0x1_stake">stake</a>, rewards);
     };
     rewards_amount
 }

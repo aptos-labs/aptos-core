@@ -296,8 +296,8 @@ Burns a specified fraction of the coin.
     };
     <b>let</b> amount_to_burn = (burn_percentage <b>as</b> u64) * collected_amount / 100;
     <b>if</b> (amount_to_burn &gt; 0) {
-        <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">coin::extract</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
-        <a href="coin.md#0x1_coin_burn">coin::burn</a>(
+        <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract_internal">coin::extract_internal</a>(<a href="coin.md#0x1_coin">coin</a>, amount_to_burn);
+        <a href="coin.md#0x1_coin_burn_internal">coin::burn_internal</a>(
             coin_to_burn,
             &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap,
         );

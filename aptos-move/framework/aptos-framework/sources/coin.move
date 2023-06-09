@@ -17,6 +17,10 @@ module aptos_framework::coin {
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_fee;
+    friend aptos_framework::stake;
+    friend aptos_framework::managed_coin;
+    friend aptos_framework::staking_contract;
+    friend aptos_framework::vesting;
 
     //
     // Errors.
@@ -220,7 +224,7 @@ module aptos_framework::coin {
         };
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-        let coin = extract(&mut coin_store.coin, amount);
+        let coin = extract_internal(&mut coin_store.coin, amount);
         merge_aggregatable_coin(dst_coin, coin);
     }
 
@@ -301,13 +305,9 @@ module aptos_framework::coin {
         }
     }
 
-    //
-    // Public functions
-    //
-
     /// Burn `coin` with capability.
     /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
-    public fun burn<CoinType>(
+    public(friend) fun burn_internal<CoinType>(
         coin: Coin<CoinType>,
         _cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo {
@@ -322,6 +322,20 @@ module aptos_framework::coin {
             let supply = option::borrow_mut(maybe_supply);
             optional_aggregator::sub(supply, (amount as u128));
         }
+    }
+
+    //
+    // Public functions
+    //
+
+    // Public functions
+    /// Burn `coin` with capability.
+    /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
+    public fun burn<CoinType>(
+        coin: Coin<CoinType>,
+        _cap: &BurnCapability<CoinType>,
+    ) acquires CoinInfo {
+        burn_internal(coin, _cap)
     }
 
     /// Burn `coin` from the specified `account` with capability.
@@ -340,8 +354,8 @@ module aptos_framework::coin {
         };
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-        let coin_to_burn = extract(&mut coin_store.coin, amount);
-        burn(coin_to_burn, burn_cap);
+        let coin_to_burn = extract_internal(&mut coin_store.coin, amount);
+        burn_internal(coin_to_burn, burn_cap);
     }
 
     /// Deposit the coin balance into the recipient's account and emit an event.
@@ -362,7 +376,7 @@ module aptos_framework::coin {
             DepositEvent { amount: coin.value },
         );
 
-        merge(&mut coin_store.coin, coin);
+        merge_internal(&mut coin_store.coin, coin);
     }
 
     /// Destroys a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
@@ -376,8 +390,7 @@ module aptos_framework::coin {
         assert!(value == 0, error::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
     }
 
-    /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
-    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+    public(friend) fun extract_internal<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
         assert!(coin.value >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         spec {
             update supply<CoinType> = supply<CoinType> - amount;
@@ -389,8 +402,12 @@ module aptos_framework::coin {
         Coin { value: amount }
     }
 
-    /// Extracts the entire amount from the passed-in `coin`, where the original token is modified in place.
-    public fun extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
+    /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
+    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+        extract_internal(coin, amount)
+    }
+
+    public(friend) fun extract_all_internal<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
         let total_value = coin.value;
         spec {
             update supply<CoinType> = supply<CoinType> - coin.value;
@@ -400,6 +417,11 @@ module aptos_framework::coin {
             update supply<CoinType> = supply<CoinType> + total_value;
         };
         Coin { value: total_value }
+    }
+
+    /// Extracts the entire amount from the passed-in `coin`, where the original token is modified in place.
+    public fun extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
+        extract_all_internal(coin)
     }
 
     #[legacy_entry_fun]
@@ -498,6 +520,10 @@ module aptos_framework::coin {
         assert!(string::length(&name) <= MAX_COIN_NAME_LENGTH, error::invalid_argument(ECOIN_NAME_TOO_LONG));
         assert!(string::length(&symbol) <= MAX_COIN_SYMBOL_LENGTH, error::invalid_argument(ECOIN_SYMBOL_TOO_LONG));
 
+        spec {
+            update supply<CoinType> = 0;
+            update aggregate_supply<CoinType> = 0;
+        };
         let coin_info = CoinInfo<CoinType> {
             name,
             symbol,
@@ -509,9 +535,7 @@ module aptos_framework::coin {
         (BurnCapability<CoinType> {}, FreezeCapability<CoinType> {}, MintCapability<CoinType> {})
     }
 
-    /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
-    /// to the sum of the two tokens (`dst_coin` and `source_coin`).
-    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+    public(friend) fun merge_internal<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
         spec {
             assume dst_coin.value + source_coin.value <= MAX_U64;
         };
@@ -525,10 +549,13 @@ module aptos_framework::coin {
         dst_coin.value = dst_coin.value + value;
     }
 
-    /// Mint new `Coin` with capability.
-    /// The capability `_cap` should be passed as reference to `MintCapability<CoinType>`.
-    /// Returns minted `Coin`.
-    public fun mint<CoinType>(
+    /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
+    /// to the sum of the two tokens (`dst_coin` and `source_coin`).
+    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        merge_internal(dst_coin, source_coin)
+    }
+
+    public(friend) fun mint_internal<CoinType>(
         amount: u64,
         _cap: &MintCapability<CoinType>,
     ): Coin<CoinType> acquires CoinInfo {
@@ -547,6 +574,16 @@ module aptos_framework::coin {
             update supply<CoinType> = supply<CoinType> + amount;
         };
         Coin<CoinType> { value: amount }
+    }
+
+    /// Mint new `Coin` with capability.
+    /// The capability `_cap` should be passed as reference to `MintCapability<CoinType>`.
+    /// Returns minted `Coin`.
+    public fun mint<CoinType>(
+        amount: u64,
+        _cap: &MintCapability<CoinType>,
+    ): Coin<CoinType> acquires CoinInfo {
+        mint_internal(amount, _cap)
     }
 
     public fun register<CoinType>(account: &signer) {
@@ -603,7 +640,7 @@ module aptos_framework::coin {
             WithdrawEvent { amount },
         );
 
-        extract(&mut coin_store.coin, amount)
+        extract_internal(&mut coin_store.coin, amount)
     }
 
     /// Create a new `Coin<CoinType>` with a value of `0`.

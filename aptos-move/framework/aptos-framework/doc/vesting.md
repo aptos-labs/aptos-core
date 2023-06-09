@@ -1677,7 +1677,7 @@ Create a vesting contract with a given configurations.
         <b>let</b> shareholder: <b>address</b> = *shareholder;
         <b>let</b> (_, buy_in) = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_remove">simple_map::remove</a>(&<b>mut</b> buy_ins, &shareholder);
         <b>let</b> buy_in_amount = <a href="coin.md#0x1_coin_value">coin::value</a>(&buy_in);
-        <a href="coin.md#0x1_coin_merge">coin::merge</a>(&<b>mut</b> grant, buy_in);
+        <a href="coin.md#0x1_coin_merge_internal">coin::merge_internal</a>(&<b>mut</b> grant, buy_in);
         <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_buy_in">pool_u64::buy_in</a>(
             &<b>mut</b> grant_pool,
             shareholder,
@@ -1948,7 +1948,7 @@ Distribute any withdrawable stake from the stake pool.
         <b>let</b> shareholder = *shareholder;
         <b>let</b> shares = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares">pool_u64::shares</a>(grant_pool, shareholder);
         <b>let</b> amount = <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_shares_to_amount_with_total_coins">pool_u64::shares_to_amount_with_total_coins</a>(grant_pool, shares, total_distribution_amount);
-        <b>let</b> share_of_coins = <a href="coin.md#0x1_coin_extract">coin::extract</a>(&<b>mut</b> coins, amount);
+        <b>let</b> share_of_coins = <a href="coin.md#0x1_coin_extract_internal">coin::extract_internal</a>(&<b>mut</b> coins, amount);
         <b>let</b> recipient_address = <a href="vesting.md#0x1_vesting_get_beneficiary">get_beneficiary</a>(vesting_contract, shareholder);
         <a href="aptos_account.md#0x1_aptos_account_deposit_coins">aptos_account::deposit_coins</a>(recipient_address, share_of_coins);
     });

@@ -115,7 +115,7 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
     <b>let</b> capabilities = <b>borrow_global</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
 
     <b>let</b> to_burn = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>, amount);
-    <a href="coin.md#0x1_coin_burn">coin::burn</a>(to_burn, &capabilities.burn_cap);
+    <a href="coin.md#0x1_coin_burn_internal">coin::burn_internal</a>(to_burn, &capabilities.burn_cap);
 }
 </code></pre>
 
@@ -196,7 +196,7 @@ Create new coins <code>CoinType</code> and deposit them into dst_addr's account.
     );
 
     <b>let</b> capabilities = <b>borrow_global</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>let</b> coins_minted = <a href="coin.md#0x1_coin_mint">coin::mint</a>(amount, &capabilities.mint_cap);
+    <b>let</b> coins_minted = <a href="coin.md#0x1_coin_mint_internal">coin::mint_internal</a>(amount, &capabilities.mint_cap);
     <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(dst_addr, coins_minted);
 }
 </code></pre>

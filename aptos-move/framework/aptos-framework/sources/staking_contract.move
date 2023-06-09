@@ -612,7 +612,7 @@ module aptos_framework::staking_contract {
             let recipient = *vector::borrow(&mut recipients, 0);
             let current_shares = pool_u64::shares(distribution_pool, recipient);
             let amount_to_distribute = pool_u64::redeem_shares(distribution_pool, recipient, current_shares);
-            coin::deposit(recipient, coin::extract(&mut coins, amount_to_distribute));
+            coin::deposit(recipient, coin::extract_internal(&mut coins, amount_to_distribute));
 
             emit_event(
                 distribute_events,

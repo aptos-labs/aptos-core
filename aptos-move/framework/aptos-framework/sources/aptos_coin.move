@@ -78,7 +78,7 @@ module aptos_framework::aptos_coin {
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
         coin::register<AptosCoin>(core_resources);
-        let coins = coin::mint<AptosCoin>(
+        let coins = coin::mint_internal<AptosCoin>(
             18446744073709551615,
             &mint_cap,
         );
@@ -103,7 +103,7 @@ module aptos_framework::aptos_coin {
         );
 
         let mint_cap = &borrow_global<MintCapStore>(account_addr).mint_cap;
-        let coins_minted = coin::mint<AptosCoin>(amount, mint_cap);
+        let coins_minted = coin::mint_internal<AptosCoin>(amount, mint_cap);
         coin::deposit<AptosCoin>(dst_addr, coins_minted);
     }
 

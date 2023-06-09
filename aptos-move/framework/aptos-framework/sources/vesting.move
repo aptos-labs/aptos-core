@@ -467,7 +467,7 @@ module aptos_framework::vesting {
             let shareholder: address = *shareholder;
             let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);
             let buy_in_amount = coin::value(&buy_in);
-            coin::merge(&mut grant, buy_in);
+            coin::merge_internal(&mut grant, buy_in);
             pool_u64::buy_in(
                 &mut grant_pool,
                 shareholder,
@@ -638,7 +638,7 @@ module aptos_framework::vesting {
             let shareholder = *shareholder;
             let shares = pool_u64::shares(grant_pool, shareholder);
             let amount = pool_u64::shares_to_amount_with_total_coins(grant_pool, shares, total_distribution_amount);
-            let share_of_coins = coin::extract(&mut coins, amount);
+            let share_of_coins = coin::extract_internal(&mut coins, amount);
             let recipient_address = get_beneficiary(vesting_contract, shareholder);
             aptos_account::deposit_coins(recipient_address, share_of_coins);
         });

@@ -282,7 +282,7 @@ module aptos_framework::stake {
         let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
         if (table::contains(fees_table, validator_addr)) {
             let collected_fee = table::borrow_mut(fees_table, validator_addr);
-            coin::merge(collected_fee, fee);
+            coin::merge_internal(collected_fee, fee);
         } else {
             table::add(fees_table, validator_addr, fee);
         }
@@ -638,9 +638,9 @@ module aptos_framework::stake {
         // Otherwise, the delegation can be added to active directly as the validator is also activated in the epoch.
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         if (is_current_epoch_validator(pool_address)) {
-            coin::merge<AptosCoin>(&mut stake_pool.pending_active, coins);
+            coin::merge_internal<AptosCoin>(&mut stake_pool.pending_active, coins);
         } else {
-            coin::merge<AptosCoin>(&mut stake_pool.active, coins);
+            coin::merge_internal<AptosCoin>(&mut stake_pool.active, coins);
         };
 
         let (_, maximum_stake) = staking_config::get_required_stake(&staking_config::get());
@@ -676,8 +676,8 @@ module aptos_framework::stake {
         // Since this does not count as a voting power change (pending inactive still counts as voting power in the
         // current epoch), stake can be immediately moved from pending inactive to active.
         // We also don't need to check voting power increase as there's none.
-        let reactivated_coins = coin::extract(&mut stake_pool.pending_inactive, amount);
-        coin::merge(&mut stake_pool.active, reactivated_coins);
+        let reactivated_coins = coin::extract_internal(&mut stake_pool.pending_inactive, amount);
+        coin::merge_internal(&mut stake_pool.active, reactivated_coins);
 
         event::emit_event(
             &mut stake_pool.reactivate_stake_events,
@@ -859,8 +859,8 @@ module aptos_framework::stake {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         // Cap amount to unlock by maximum active stake.
         let amount = min(amount, coin::value(&stake_pool.active));
-        let unlocked_stake = coin::extract(&mut stake_pool.active, amount);
-        coin::merge<AptosCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
+        let unlocked_stake = coin::extract_internal(&mut stake_pool.active, amount);
+        coin::merge_internal<AptosCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
 
         event::emit_event(
             &mut stake_pool.unlock_stake_events,
@@ -896,8 +896,8 @@ module aptos_framework::stake {
         // This can leave their stake stuck in pending_inactive even after the current lockup cycle expires.
         if (get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE &&
             timestamp::now_seconds() >= stake_pool.locked_until_secs) {
-            let pending_inactive_stake = coin::extract_all(&mut stake_pool.pending_inactive);
-            coin::merge(&mut stake_pool.inactive, pending_inactive_stake);
+            let pending_inactive_stake = coin::extract_all_internal(&mut stake_pool.pending_inactive);
+            coin::merge_internal(&mut stake_pool.inactive, pending_inactive_stake);
         };
 
         // Cap withdraw amount by total inactive coins.
@@ -912,7 +912,7 @@ module aptos_framework::stake {
             },
         );
 
-        coin::extract(&mut stake_pool.inactive, withdraw_amount)
+        coin::extract_internal(&mut stake_pool.inactive, withdraw_amount)
     }
 
     /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
@@ -1181,23 +1181,23 @@ module aptos_framework::stake {
         };
         let rewards_amount = rewards_active + rewards_pending_inactive;
         // Pending active stake can now be active.
-        coin::merge(&mut stake_pool.active, coin::extract_all(&mut stake_pool.pending_active));
+        coin::merge_internal(&mut stake_pool.active, coin::extract_all_internal(&mut stake_pool.pending_active));
 
         // Additionally, distribute transaction fees.
         if (features::collect_and_distribute_gas_fees()) {
             let fees_table = &mut borrow_global_mut<ValidatorFees>(@aptos_framework).fees_table;
             if (table::contains(fees_table, pool_address)) {
                 let coin = table::remove(fees_table, pool_address);
-                coin::merge(&mut stake_pool.active, coin);
+                coin::merge_internal(&mut stake_pool.active, coin);
             };
         };
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
         if (timestamp::now_seconds() >= current_lockup_expiration) {
-            coin::merge(
+            coin::merge_internal(
                 &mut stake_pool.inactive,
-                coin::extract_all(&mut stake_pool.pending_inactive),
+                coin::extract_all_internal(&mut stake_pool.pending_inactive),
             );
         };
 
@@ -1252,8 +1252,8 @@ module aptos_framework::stake {
         };
         if (rewards_amount > 0) {
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-            let rewards = coin::mint(rewards_amount, mint_cap);
-            coin::merge(stake, rewards);
+            let rewards = coin::mint_internal(rewards_amount, mint_cap);
+            coin::merge_internal(stake, rewards);
         };
         rewards_amount
     }

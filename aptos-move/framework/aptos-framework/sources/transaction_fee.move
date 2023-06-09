@@ -98,8 +98,8 @@ module aptos_framework::transaction_fee {
         };
         let amount_to_burn = (burn_percentage as u64) * collected_amount / 100;
         if (amount_to_burn > 0) {
-            let coin_to_burn = coin::extract(coin, amount_to_burn);
-            coin::burn(
+            let coin_to_burn = coin::extract_internal(coin, amount_to_burn);
+            coin::burn_internal(
                 coin_to_burn,
                 &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
             );

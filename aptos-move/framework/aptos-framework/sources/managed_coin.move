@@ -46,7 +46,7 @@ module aptos_framework::managed_coin {
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
 
         let to_burn = coin::withdraw<CoinType>(account, amount);
-        coin::burn(to_burn, &capabilities.burn_cap);
+        coin::burn_internal(to_burn, &capabilities.burn_cap);
     }
 
     /// Initialize new coin `CoinType` in Aptos Blockchain.
@@ -87,7 +87,7 @@ module aptos_framework::managed_coin {
         );
 
         let capabilities = borrow_global<Capabilities<CoinType>>(account_addr);
-        let coins_minted = coin::mint(amount, &capabilities.mint_cap);
+        let coins_minted = coin::mint_internal(amount, &capabilities.mint_cap);
         coin::deposit(dst_addr, coins_minted);
     }
 
