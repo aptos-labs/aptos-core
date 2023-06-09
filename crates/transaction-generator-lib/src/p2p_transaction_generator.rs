@@ -37,19 +37,17 @@ pub trait Sampler<T>: Send + Sync {
 }
 
 /// A sampler that samples a random subset of the pool. Samples are replaced immediately.
-pub struct BasicSampler<T> {
-    phantom: PhantomData<T>,
+pub struct BasicSampler {
 }
 
-impl<T> BasicSampler<T> {
+impl BasicSampler {
     fn new() -> Self {
         Self {
-            phantom: PhantomData,
         }
     }
 }
 
-impl<T: Clone + Send + Sync> Sampler<T> for BasicSampler<T> {
+impl<T: Clone + Send + Sync> Sampler<T> for BasicSampler {
     fn sample_from_pool(
         &mut self,
         rng: &mut StdRng,
