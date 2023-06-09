@@ -13,7 +13,7 @@ use crate::{
 use aptos_framework::RuntimeModuleMetadataV1;
 use aptos_gas::{
     AbstractValueSizeGasParameters, AptosGasParameters, ChangeSetConfigs, FromOnChainGasSchedule,
-    Gas, NativeGasParameters, StorageGasParameters,
+    Gas, NativeGasParameters, StorageGasParameters, StoragePricing,
 };
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_state_view::StateView;
@@ -32,6 +32,7 @@ use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
+    gas_algebra::NumArgs,
     language_storage::ModuleId,
     move_resource::MoveStructType,
     value::{serialize_values, MoveValue},
@@ -82,40 +83,41 @@ impl AptosVMImpl {
         let (mut gas_params, gas_feature_version): (Option<AptosGasParameters>, u64) =
             gas_config(&storage);
 
-        let storage_gas_schedule = match gas_feature_version {
-            0 => None,
-            _ => StorageGasSchedule::fetch_config(&storage),
-        };
+        let storage_gas_params = if let Some(gas_params) = &mut gas_params {
+            let storage_gas_schedule = match gas_feature_version {
+                0 => None,
+                _ => StorageGasSchedule::fetch_config(&storage),
+            };
 
-        if let (Some(gas_params), Some(storage_gas_schedule)) =
-            (&mut gas_params, &storage_gas_schedule)
-        {
-            match gas_feature_version {
-                2..=6 => {
-                    gas_params.natives.table.common.load_base_legacy =
-                        storage_gas_schedule.per_item_read.into();
-                    gas_params.natives.table.common.load_base_new = 0.into();
-                    gas_params.natives.table.common.load_per_byte =
-                        storage_gas_schedule.per_byte_read.into();
-                    gas_params.natives.table.common.load_failure = 0.into();
-                },
-                7.. => {
-                    gas_params.natives.table.common.load_base_legacy = 0.into();
-                    gas_params.natives.table.common.load_base_new =
-                        storage_gas_schedule.per_item_read.into();
-                    gas_params.natives.table.common.load_per_byte =
-                        storage_gas_schedule.per_byte_read.into();
-                    gas_params.natives.table.common.load_failure = 0.into();
-                },
-                _ => (),
+            let storage_gas_params = StorageGasParameters::new(
+                gas_feature_version,
+                gas_params,
+                storage_gas_schedule.as_ref(),
+            );
+
+            if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
+                // Overwrite table io gas parameters with global io pricing.
+                let g = &mut gas_params.natives.table.common;
+                match gas_feature_version {
+                    0..=1 => (),
+                    2..=6 => {
+                        g.load_base_legacy = pricing.per_item_read * NumArgs::new(1);
+                        g.load_base_new = 0.into();
+                        g.load_per_byte = pricing.per_byte_read;
+                        g.load_failure = 0.into();
+                    },
+                    7.. => {
+                        g.load_base_legacy = 0.into();
+                        g.load_base_new = pricing.per_item_read * NumArgs::new(1);
+                        g.load_per_byte = pricing.per_byte_read;
+                        g.load_failure = 0.into();
+                    },
+                }
             }
-        }
-
-        let storage_gas_params = StorageGasParameters::new(
-            gas_feature_version,
-            gas_params.as_ref(),
-            storage_gas_schedule.as_ref(),
-        );
+            Some(storage_gas_params)
+        } else {
+            None
+        };
 
         // TODO(Gas): Right now, we have to use some dummy values for gas parameters if they are not found on-chain.
         //            This only happens in a edge case that is probably related to write set transactions or genesis,
@@ -143,7 +145,7 @@ impl AptosVMImpl {
             timed_features = timed_features.with_override_profile(profile)
         }
 
-        let inner = MoveVmExt::new(
+        let move_vm = MoveVmExt::new(
             native_gas_params,
             abs_val_size_gas_params,
             gas_feature_version,
@@ -153,18 +155,18 @@ impl AptosVMImpl {
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
-        let mut vm = Self {
-            move_vm: inner,
+        let version = Version::fetch_config(&storage);
+        let transaction_validation = Self::get_transaction_validation(&storage);
+
+        Self {
+            move_vm,
             gas_feature_version,
             gas_params,
             storage_gas_params,
-            version: None,
-            transaction_validation: None,
+            version,
+            transaction_validation,
             features,
-        };
-        vm.version = Version::fetch_config(&storage);
-        vm.transaction_validation = Self::get_transaction_validation(&storage);
-        vm
+        }
     }
 
     pub(crate) fn mark_loader_cache_as_invalid(&self) {

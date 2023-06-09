@@ -24,6 +24,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:

@@ -578,6 +578,7 @@ dependencies = [
  "poem-openapi",
  "rand 0.7.3",
  "serde 1.0.149",
+ "serde_merge",
  "serde_yaml 0.8.26",
  "thiserror",
  "url",
@@ -1011,6 +1012,7 @@ name = "aptos-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-cached-packages",
  "aptos-config",
  "aptos-consensus-types",
@@ -1036,6 +1038,7 @@ dependencies = [
  "fail 0.5.0",
  "itertools",
  "move-core-types",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -1087,6 +1090,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executor-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-executor-types",
+ "aptos-language-e2e-tests",
+ "aptos-logger",
+ "aptos-retrier",
+ "aptos-secure-net",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-vm",
+ "bcs 0.1.4",
+ "clap 3.2.23",
+ "itertools",
+ "serde 1.0.149",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-executor-test-helpers"
 version = "0.1.0"
 dependencies = [
@@ -1114,6 +1140,7 @@ name = "aptos-executor-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-scratchpad",
  "aptos-secure-net",
@@ -1243,6 +1270,7 @@ dependencies = [
  "aptos-retrier",
  "aptos-sdk",
  "aptos-secure-storage",
+ "aptos-short-hex-str",
  "aptos-state-sync-driver",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-generator-lib",
@@ -2321,7 +2349,6 @@ dependencies = [
  "rayon",
  "serde 1.0.149",
  "serde_json",
- "serde_merge",
  "serde_yaml 0.8.26",
  "tokio",
  "tokio-stream",
@@ -3156,6 +3183,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
+ "aptos-executor-service",
  "aptos-gas",
  "aptos-language-e2e-tests",
  "aptos-logger",
@@ -9176,9 +9204,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.13.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "074864da206b4973b84eb91683020dbefd6a8c3f0f38e054d93954e891935e4e"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "oorandom"
@@ -10360,10 +10388,11 @@ dependencies = [
 
 [[package]]
 name = "random_word"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b2bb830d03b36582fd6723a57d2451b9db74574d21c34db9d7122c96b24fa0"
+checksum = "1d0f7171155590e912ab907550240a5764c665388ab0a1e46d783a493e816ff3"
 dependencies = [
+ "once_cell",
  "rand 0.8.5",
 ]
 
