@@ -308,14 +308,9 @@ pub struct StorageGasParameters {
 impl StorageGasParameters {
     pub fn new(
         feature_version: u64,
-        gas_params: Option<&AptosGasParameters>,
+        gas_params: &AptosGasParameters,
         storage_gas_schedule: Option<&StorageGasSchedule>,
-    ) -> Option<Self> {
-        if feature_version == 0 || gas_params.is_none() {
-            return None;
-        }
-        let gas_params = gas_params.unwrap();
-
+    ) -> Self {
         let pricing = match storage_gas_schedule {
             Some(schedule) => {
                 StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params))
@@ -325,10 +320,10 @@ impl StorageGasParameters {
 
         let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
 
-        Some(Self {
+        Self {
             pricing,
             change_set_configs,
-        })
+        }
     }
 
     pub fn free_and_unlimited() -> Self {

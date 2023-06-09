@@ -6,7 +6,7 @@ use crate::{
         db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_ledger_subpruner_progress,
     },
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    EventStore,
+    TransactionStore,
 };
 use anyhow::Result;
 use aptos_schemadb::{SchemaBatch, DB};
@@ -14,39 +14,42 @@ use aptos_types::transaction::Version;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct EventStorePruner {
-    event_store: Arc<EventStore>,
-    event_db: Arc<DB>,
+pub struct TransactionInfoPruner {
+    transaction_store: Arc<TransactionStore>,
+    transaction_info_db: Arc<DB>,
 }
 
-impl DBSubPruner for EventStorePruner {
+impl DBSubPruner for TransactionInfoPruner {
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        self.event_store
-            .prune_events(current_progress, target_version, &batch)?;
+        self.transaction_store.prune_transaction_info_schema(
+            current_progress,
+            target_version,
+            &batch,
+        )?;
         batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::EventPrunerProgress,
+            &DbMetadataKey::TransactionInfoPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.event_db.write_schemas(batch)
+        self.transaction_info_db.write_schemas(batch)
     }
 }
 
-impl EventStorePruner {
+impl TransactionInfoPruner {
     pub(in crate::pruner) fn new(
-        event_store: Arc<EventStore>,
-        event_db: Arc<DB>,
+        transaction_store: Arc<TransactionStore>,
+        transaction_info_db: Arc<DB>,
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_ledger_subpruner_progress(
-            &event_db,
-            &DbMetadataKey::EventPrunerProgress,
+            &transaction_info_db,
+            &DbMetadataKey::TransactionInfoPrunerProgress,
             metadata_progress,
         )?;
 
-        let myself = EventStorePruner {
-            event_store,
-            event_db,
+        let myself = TransactionInfoPruner {
+            transaction_store,
+            transaction_info_db,
         };
 
         myself.prune(progress, metadata_progress)?;

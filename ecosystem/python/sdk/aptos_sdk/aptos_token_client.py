@@ -338,9 +338,7 @@ class AptosTokenClient:
                 resources[resource_obj] = resource_obj.parse(resource["data"])
         return ReadObject(resources)
 
-    async def create_collection(
-        self,
-        creator: Account,
+    def create_collection_payload(
         description: str,
         max_supply: int,
         name: str,
@@ -356,7 +354,7 @@ class AptosTokenClient:
         tokens_freezable_by_creator: bool,
         royalty_numerator: int,
         royalty_denominator: int,
-    ) -> str:
+    ) -> TransactionPayload:
         transaction_arguments = [
             TransactionArgument(description, Serializer.str),
             TransactionArgument(max_supply, Serializer.u64),
@@ -382,20 +380,56 @@ class AptosTokenClient:
             transaction_arguments,
         )
 
+        return TransactionPayload(payload)
+
+    async def create_collection(
+        self,
+        creator: Account,
+        description: str,
+        max_supply: int,
+        name: str,
+        uri: str,
+        mutable_description: bool,
+        mutable_royalty: bool,
+        mutable_uri: bool,
+        mutable_token_description: bool,
+        mutable_token_name: bool,
+        mutable_token_properties: bool,
+        mutable_token_uri: bool,
+        tokens_burnable_by_creator: bool,
+        tokens_freezable_by_creator: bool,
+        royalty_numerator: int,
+        royalty_denominator: int,
+    ) -> str:
+        payload = create_collection_payload(
+            description,
+            max_supply,
+            name,
+            uri,
+            mutable_description,
+            mutable_royalty,
+            mutable_uri,
+            mutable_token_description,
+            mutable_token_name,
+            mutable_token_properties,
+            mutable_token_uri,
+            tokens_burnable_by_creator,
+            tokens_freezable_by_creator,
+            royalty_numerator,
+            royalty_denominator,
+        )
         signed_transaction = await self.client.create_bcs_signed_transaction(
-            creator, TransactionPayload(payload)
+            creator, payload
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
-    async def mint_token(
-        self,
-        creator: Account,
+    def mint_token_payload(
         collection: str,
         description: str,
         name: str,
         uri: str,
         properties: PropertyMap,
-    ) -> str:
+    ) -> TransactionPayload:
         (property_names, property_types, property_values) = properties.to_tuple()
         transaction_arguments = [
             TransactionArgument(collection, Serializer.str),
@@ -420,8 +454,20 @@ class AptosTokenClient:
             transaction_arguments,
         )
 
+        return TransactionPayload(payload)
+
+    async def mint_token(
+        self,
+        creator: Account,
+        collection: str,
+        description: str,
+        name: str,
+        uri: str,
+        properties: PropertyMap,
+    ) -> str:
+        payload = mint_token_payload(collection, description, name, uri, properties)
         signed_transaction = await self.client.create_bcs_signed_transaction(
-            creator, TransactionPayload(payload)
+            creator, payload
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
 
