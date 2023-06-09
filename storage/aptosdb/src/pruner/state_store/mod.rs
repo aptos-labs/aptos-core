@@ -6,10 +6,9 @@ use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     metrics::PRUNER_VERSIONS,
     pruner::{db_pruner::DBPruner, state_store::generics::StaleNodeIndexSchemaTrait},
-    pruner_utils,
     schema::db_metadata::DbMetadataValue,
     state_merkle_db::StateMerkleDb,
-    StaleNodeIndexCrossEpochSchema, OTHER_TIMERS_SECONDS,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
@@ -50,12 +49,12 @@ where
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
         if !self.is_pruning_pending() {
-            return Ok(self.min_readable_version());
+            return Ok(self.progress());
         }
-        let min_readable_version = self.min_readable_version();
+        let progress = self.progress();
         let target_version = self.target_version();
 
-        match self.prune_state_merkle(min_readable_version, target_version, batch_size, None) {
+        match self.prune_state_merkle(progress, target_version, batch_size, None) {
             Ok(new_min_readable_version) => Ok(new_min_readable_version),
             Err(e) => {
                 error!(
@@ -68,14 +67,6 @@ where
         }
     }
 
-    fn save_min_readable_version(
-        &self,
-        version: Version,
-        batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
-        batch.put::<DbMetadataSchema>(&S::tag(), &DbMetadataValue::Version(version))
-    }
-
     fn initialize_min_readable_version(&self) -> Result<Version> {
         Ok(self
             .state_merkle_db
@@ -84,7 +75,7 @@ where
             .map_or(0, |v| v.expect_version()))
     }
 
-    fn min_readable_version(&self) -> Version {
+    fn progress(&self) -> Version {
         let (version, _) = *self.progress.lock();
         version
     }
@@ -165,7 +156,7 @@ where
                     batch.delete::<S>(&index)
                 })?;
 
-                self.save_min_readable_version(new_min_readable_version, &batch)?;
+                self.save_progress(new_min_readable_version, &batch)?;
 
                 // TODO(grao): Support sharding here.
                 self.state_merkle_db.metadata_db().write_schemas(batch)?;
@@ -222,31 +213,8 @@ where
         };
         Ok((indices, is_end_of_target_version))
     }
-}
 
-impl StateMerklePruner<StaleNodeIndexCrossEpochSchema> {
-    /// Prunes the genesis state and saves the db alterations to the given change set
-    pub fn prune_genesis(
-        state_merkle_db: Arc<StateMerkleDb>,
-        batch: &mut SchemaBatch,
-    ) -> Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let state_merkle_pruner = pruner_utils::create_state_merkle_pruner::<
-            StaleNodeIndexCrossEpochSchema,
-        >(state_merkle_db);
-        state_merkle_pruner.set_target_version(target_version);
-
-        let min_readable_version = state_merkle_pruner.min_readable_version();
-        let target_version = state_merkle_pruner.target_version();
-        state_merkle_pruner.prune_state_merkle(
-            min_readable_version,
-            target_version,
-            max_version,
-            Some(batch),
-        )?;
-
-        Ok(())
+    fn save_progress(&self, version: Version, batch: &SchemaBatch) -> anyhow::Result<()> {
+        batch.put::<DbMetadataSchema>(&S::tag(), &DbMetadataValue::Version(version))
     }
 }

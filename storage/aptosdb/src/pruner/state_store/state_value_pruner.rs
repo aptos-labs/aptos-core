@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    pruner::db_sub_pruner::DBSubPruner,
     schema::{stale_state_value_index::StaleStateValueIndexSchema, state_value::StateValueSchema},
     state_kv_db::StateKvDb,
 };
@@ -13,8 +12,12 @@ pub struct StateValuePruner {
     state_kv_db: Arc<StateKvDb>,
 }
 
-impl DBSubPruner for StateValuePruner {
-    fn prune(
+impl StateValuePruner {
+    pub(in crate::pruner) fn new(state_kv_db: Arc<StateKvDb>) -> Self {
+        StateValuePruner { state_kv_db }
+    }
+
+    pub(in crate::pruner) fn prune(
         &self,
         db_batch: &mut SchemaBatch,
         min_readable_version: u64,
@@ -35,11 +38,5 @@ impl DBSubPruner for StateValuePruner {
             db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
         }
         Ok(())
-    }
-}
-
-impl StateValuePruner {
-    pub(in crate::pruner) fn new(state_kv_db: Arc<StateKvDb>) -> Self {
-        StateValuePruner { state_kv_db }
     }
 }
