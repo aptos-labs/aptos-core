@@ -96,7 +96,7 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-parser",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
-     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
+    "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
@@ -430,7 +430,13 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.1.0", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel = { version = "2.1.0", features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -523,7 +529,12 @@ rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.5.5"
-reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
+reqwest = { version = "0.11.11", features = [
+    "blocking",
+    "cookies",
+    "json",
+    "stream",
+] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
@@ -619,9 +630,13 @@ move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
+    "table-extension",
+] }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
+    "table-extension",
+] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
