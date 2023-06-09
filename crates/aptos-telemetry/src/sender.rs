@@ -59,7 +59,9 @@ pub(crate) struct TelemetrySender {
 
 impl TelemetrySender {
     pub fn new(base_url: Url, chain_id: ChainId, node_config: &NodeConfig) -> Self {
-        let retry_policy = ExponentialBackoff::builder().build_with_total_retry_duration(Duration::from_secs(TELEMETRY_SERVICE_TOTAL_RETRY_DURATION_SECS));
+        let retry_policy = ExponentialBackoff::builder().build_with_total_retry_duration(
+            Duration::from_secs(TELEMETRY_SERVICE_TOTAL_RETRY_DURATION_SECS),
+        );
 
         let reqwest_client = reqwest::Client::new();
         let client = ClientBuilder::new(reqwest_client)
