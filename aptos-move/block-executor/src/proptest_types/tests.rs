@@ -7,10 +7,12 @@ use crate::{
     executor::BlockExecutor,
     proptest_types::types::{
         DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
-        TransactionGenParams, ValueType,
+        TransactionGenParams, ValueType, EventType
     },
 };
-use aptos_types::executable::ExecutableTestType;
+use anyhow::Context;
+use aptos_logger::Event;
+use aptos_types::{executable::ExecutableTestType, contract_event::ContractEvent};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -62,8 +64,8 @@ fn run_transactions<K, V>(
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
-            Transaction<KeyType<K>, ValueType<V>>,
-            Task<KeyType<K>, ValueType<V>>,
+            Transaction<KeyType<K>, ValueType<V>, EventType<ContractEvent>>,
+            Task<KeyType<K>, ValueType<V>, EventType<ContractEvent>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
             ExecutableTestType,
         >::new(
@@ -197,8 +199,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             ExecutableTestType,
         >::new(
@@ -248,8 +250,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
 
     for _ in 0..20 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             ExecutableTestType,
         >::new(
@@ -387,6 +389,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             incarnation,
             reads,
             writes_and_deltas,
+            events
         } => {
             let mut new_writes_and_deltas = vec![];
             for (incarnation_writes, incarnation_deltas) in writes_and_deltas {
@@ -402,6 +405,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 incarnation: incarnation.clone(),
                 reads: reads.clone(),
                 writes_and_deltas: new_writes_and_deltas,
+                events: events.clone()
             }
         },
         _ => {
@@ -422,8 +426,8 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     // Confirm still no intersection
     let output = BlockExecutor::<
-        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
@@ -437,6 +441,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             incarnation,
             reads,
             writes_and_deltas,
+            events
         } => {
             let mut new_reads = vec![];
             for incarnation_reads in reads {
@@ -450,6 +455,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 incarnation: incarnation.clone(),
                 reads: new_reads,
                 writes_and_deltas: writes_and_deltas.clone(),
+                events: events.clone()
             }
         },
         _ => {
@@ -466,8 +472,8 @@ fn publishing_fixed_params_with_block_gas_limit(
 
     for _ in 0..200 {
         let output = BlockExecutor::<
-            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             ExecutableTestType,
         >::new(

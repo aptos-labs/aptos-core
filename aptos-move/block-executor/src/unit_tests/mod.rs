@@ -4,7 +4,7 @@
 
 use crate::{
     executor::BlockExecutor,
-    proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
+    proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType, EventType},
     scheduler::{DependencyResult, Scheduler, SchedulerTask},
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
@@ -12,6 +12,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
     write_set::TransactionWrite,
+    contract_event::ContractEvent
 };
 use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
@@ -24,10 +25,11 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
+fn run_and_assert<K, V, E>(transactions: Vec<Transaction<K, V, E>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
+    E: Send + Sync + Debug + 'static
 {
     let data_view = DeltaDataView::<K, V> {
         phantom: PhantomData,
@@ -41,8 +43,8 @@ where
     );
 
     let output = BlockExecutor::<
-        Transaction<K, V>,
-        Task<K, V>,
+        Transaction<K, V, E>,
+        Task<K, V, E>,
         DeltaDataView<K, V>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None)
@@ -60,16 +62,17 @@ fn random_value(delete_value: bool) -> ValueType<Vec<u8>> {
 fn empty_block() {
     // This test checks that we do not trigger asserts due to an empty block, e.g. in the
     // scheduler. Instead, parallel execution should gracefully early return empty output.
-    run_and_assert::<KeyType<[u8; 32]>, ValueType<[u8; 32]>>(vec![]);
+    run_and_assert::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>>(vec![]);
 }
 
 #[test]
 fn delta_counters() {
     let key = KeyType(random::<[u8; 32]>(), false);
-    let mut transactions = vec![Transaction::Write {
+    let mut transactions = vec![Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
         incarnation: Arc::new(AtomicUsize::new(0)),
         reads: vec![vec![]],
         writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+        events: vec![]
     }];
 
     for _ in 0..50 {
@@ -77,6 +80,7 @@ fn delta_counters() {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![key]],
             writes_and_deltas: vec![(vec![], vec![(key, delta_add(5, u128::MAX))])],
+            events: vec![]
         });
     }
 
@@ -84,6 +88,7 @@ fn delta_counters() {
         incarnation: Arc::new(AtomicUsize::new(0)),
         reads: vec![vec![]],
         writes_and_deltas: vec![(vec![(key, random_value(false))], vec![])],
+        events: vec![]
     });
 
     for _ in 0..50 {
@@ -91,6 +96,7 @@ fn delta_counters() {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![key]],
             writes_and_deltas: vec![(vec![], vec![(key, delta_sub(2, u128::MAX))])],
+            events: vec![]
         });
     }
 
@@ -108,7 +114,7 @@ fn delta_chains() {
 
     for i in 0..500 {
         transactions.push(
-            Transaction::Write::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+            Transaction::Write::<KeyType<[u8; 32]>, ValueType<[u8; 32]>, EventType<ContractEvent>> {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![keys.clone()],
                 writes_and_deltas: vec![(
@@ -135,6 +141,7 @@ fn delta_chains() {
                         })
                         .collect(),
                 )],
+                events: vec![]
             },
         )
     }
@@ -153,10 +160,11 @@ fn cycle_transactions() {
     for _ in 0..TOTAL_KEY_NUM {
         let key = random::<[u8; 32]>();
         for _ in 0..WRITES_PER_KEY {
-            transactions.push(Transaction::Write {
+            transactions.push(Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![KeyType(key, false)]],
                 writes_and_deltas: vec![(vec![(KeyType(key, false), random_value(false))], vec![])],
+                events: vec![]
             })
         }
     }
@@ -174,10 +182,11 @@ fn one_reads_all_barrier() {
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(Transaction::Write {
+            transactions.push(Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
                 writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
+                events: vec![]
             })
         }
         // One transaction reading the write results of every prior transactions in the block.
@@ -185,6 +194,7 @@ fn one_reads_all_barrier() {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![keys.clone()],
             writes_and_deltas: vec![(vec![], vec![])],
+            events: vec![]
         })
     }
     run_and_assert(transactions)
@@ -198,10 +208,11 @@ fn one_writes_all_barrier() {
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(Transaction::Write {
+            transactions.push(Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
                 writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
+                events: vec![]
             })
         }
         // One transaction writing to the write results of every prior transactions in the block.
@@ -214,6 +225,7 @@ fn one_writes_all_barrier() {
                     .collect::<Vec<_>>(),
                 vec![],
             )],
+            events: vec![]
         })
     }
     run_and_assert(transactions)
@@ -228,10 +240,11 @@ fn early_aborts() {
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(Transaction::Write {
+            transactions.push(Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
                 writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
+                events: vec![]
             })
         }
         // One transaction that triggers an abort
@@ -249,10 +262,11 @@ fn early_skips() {
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(Transaction::Write {
+            transactions.push(Transaction::<KeyType<[u8; 32]>, ValueType<Vec<u8>>, EventType<ContractEvent>>::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
                 writes_and_deltas: vec![(vec![(*key, random_value(false))], vec![])],
+                events: vec![]
             })
         }
         // One transaction that triggers an abort
