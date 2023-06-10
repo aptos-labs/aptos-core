@@ -124,10 +124,10 @@ module veiled_coin::veiled_coin_tests {
         recipient: signer
     ) {
         println(b"Starting veil_test()...");
+        println(b"@veiled_coin:");
         print(&@veiled_coin);
+        println(b"@aptos_framework:");
         print(&@aptos_framework);
-        // TODO: This line seems to yield a strange, irreproducible invariant violation error...
-        //assert!(@veiled_coin != @aptos_framework, 1);
 
         // Split 500 and 500 between `sender` and `recipient`
         set_up_for_veiled_coin_test(
@@ -188,12 +188,10 @@ module veiled_coin::veiled_coin_tests {
         sender: signer,
     ) {
         println(b"Starting unveil_test()...");
+        println(b"@veiled_coin:");
         print(&@veiled_coin);
+        println(b"@aptos_framework:");
         print(&@aptos_framework);
-        // TODO: This line seems to yield a strange, irreproducible invariant violation error...
-        //assert!(@veiled_coin != @aptos_framework, 1);
-        // This line does not
-        //assert!(signer::address_of(&veiled_coin) != signer::address_of(&aptos_fx), 1);
 
         // Create a `sender` account with 500 `FakeCoin`'s
         set_up_for_veiled_coin_test(
@@ -272,9 +270,8 @@ module veiled_coin::veiled_coin_tests {
         veiled_coin::register<coin::FakeMoney>(&sender, elgamal::pubkey_to_bytes(&sender_pk));
         veiled_coin::veil<coin::FakeMoney>(&sender, 150);
         println(b"Veiled 150 coins to the `sender`");
-        // TODO: these throw an invariant violation
+        // TODO: This throws an invariant violation (INTERNAL_TYPE_ERROR (code 2009))
         //print(&sender);
-        //print(&signer::address_of(&sender));
 
         // Make sure we are correctly keeping track of the normal coins veiled in this module
         let total_veiled_coins = veiled_coin::cast_u32_to_u64_amount(150);
@@ -304,7 +301,7 @@ module veiled_coin::veiled_coin_tests {
         let (_, recipient_pk) = generate_elgamal_keypair();
         veiled_coin::register<coin::FakeMoney>(&recipient, elgamal::pubkey_to_bytes(&recipient_pk));
         println(b"Registered the `recipient` to receive veiled coins");
-        // TODO: this throws an invariant violation
+        // TODO: This throws an invariant violation (INTERNAL_TYPE_ERROR (code 2009))
         //print(&recipient);
 
         // Encrypt the transfered amount `v` under the `recipient`'s PK
