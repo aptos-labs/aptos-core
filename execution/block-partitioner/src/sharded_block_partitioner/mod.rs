@@ -567,27 +567,36 @@ mod tests {
         ];
 
         let partitioner = ShardedBlockPartitioner::new(num_shards);
-        let partitioned_chunks = partitioner.partition(transactions, 1);
-        assert_eq!(partitioned_chunks.len(), num_shards);
+        let partitioned_sub_blocks = partitioner.partition(transactions, 1);
+        assert_eq!(partitioned_sub_blocks.len(), num_shards);
 
         // In first round of the partitioning, we should have txn0, txn1 and txn2 in shard 0 and
         // txn3, txn4, txn5 and txn8 in shard 1 and 0 in shard 2. Please note that txn8 is moved to
         // shard 1 because of sender based reordering.
         assert_eq!(
-            partitioned_chunks[0].get_sub_block(0).unwrap().num_txns(),
+            partitioned_sub_blocks[0]
+                .get_sub_block(0)
+                .unwrap()
+                .num_txns(),
             3
         );
         assert_eq!(
-            partitioned_chunks[1].get_sub_block(0).unwrap().num_txns(),
+            partitioned_sub_blocks[1]
+                .get_sub_block(0)
+                .unwrap()
+                .num_txns(),
             4
         );
         assert_eq!(
-            partitioned_chunks[2].get_sub_block(0).unwrap().num_txns(),
+            partitioned_sub_blocks[2]
+                .get_sub_block(0)
+                .unwrap()
+                .num_txns(),
             0
         );
 
         assert_eq!(
-            partitioned_chunks[0]
+            partitioned_sub_blocks[0]
                 .get_sub_block(0)
                 .unwrap()
                 .iter()
@@ -596,7 +605,7 @@ mod tests {
             vec![txn0, txn1, txn2]
         );
         assert_eq!(
-            partitioned_chunks[1]
+            partitioned_sub_blocks[1]
                 .get_sub_block(0)
                 .unwrap()
                 .iter()
@@ -607,20 +616,29 @@ mod tests {
         //
         // // Rest of the transactions will be added in round 2 along with their dependencies
         assert_eq!(
-            partitioned_chunks[0].get_sub_block(1).unwrap().num_txns(),
+            partitioned_sub_blocks[0]
+                .get_sub_block(1)
+                .unwrap()
+                .num_txns(),
             0
         );
         assert_eq!(
-            partitioned_chunks[1].get_sub_block(1).unwrap().num_txns(),
+            partitioned_sub_blocks[1]
+                .get_sub_block(1)
+                .unwrap()
+                .num_txns(),
             0
         );
         assert_eq!(
-            partitioned_chunks[2].get_sub_block(1).unwrap().num_txns(),
+            partitioned_sub_blocks[2]
+                .get_sub_block(1)
+                .unwrap()
+                .num_txns(),
             2
         );
 
         assert_eq!(
-            partitioned_chunks[2]
+            partitioned_sub_blocks[2]
                 .get_sub_block(1)
                 .unwrap()
                 .iter()
@@ -631,14 +649,14 @@ mod tests {
 
         // Verify transaction dependencies
         verify_no_cross_shard_dependency(vec![
-            partitioned_chunks[0].get_sub_block(0).unwrap().clone(),
-            partitioned_chunks[1].get_sub_block(0).unwrap().clone(),
-            partitioned_chunks[2].get_sub_block(0).unwrap().clone(),
+            partitioned_sub_blocks[0].get_sub_block(0).unwrap().clone(),
+            partitioned_sub_blocks[1].get_sub_block(0).unwrap().clone(),
+            partitioned_sub_blocks[2].get_sub_block(0).unwrap().clone(),
         ]);
         // Verify transaction depends_on and dependency list
 
         // txn6 (index 7) and txn7 (index 8) depends on txn8 (index 6)
-        partitioned_chunks[2]
+        partitioned_sub_blocks[2]
             .get_sub_block(1)
             .unwrap()
             .iter()
@@ -657,7 +675,10 @@ mod tests {
             });
 
         // Verify the dependent edges, again the conflict is only on the coin store of account 7
-        let required_deps = partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+        let required_deps = partitioned_sub_blocks[1]
+            .get_sub_block(0)
+            .unwrap()
+            .transactions[3]
             .cross_shard_dependencies
             .get_dependent_edge_for(TxnIdxWithShardId::new(7, 2))
             .unwrap();
@@ -667,7 +688,10 @@ mod tests {
             AnalyzedTransaction::coin_store_location(account7.account_address)
         );
 
-        let required_deps = partitioned_chunks[1].get_sub_block(0).unwrap().transactions[3]
+        let required_deps = partitioned_sub_blocks[1]
+            .get_sub_block(0)
+            .unwrap()
+            .transactions[3]
             .cross_shard_dependencies
             .get_dependent_edge_for(TxnIdxWithShardId::new(8, 2))
             .unwrap();

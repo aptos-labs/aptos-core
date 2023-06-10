@@ -30,6 +30,12 @@ pub struct CrossShardEdges {
 }
 
 impl CrossShardEdges {
+    pub fn new(txn_idx: TxnIdxWithShardId, storage_locations: Vec<StorageLocation>) -> Self {
+        let mut edges = HashMap::new();
+        edges.insert(txn_idx, storage_locations);
+        Self { edges }
+    }
+
     pub fn add_edge(
         &mut self,
         txn_idx: TxnIdxWithShardId,
@@ -74,6 +80,8 @@ impl IntoIterator for CrossShardEdges {
 /// case, the transaction can only be executed after the transactions in the set have been executed.
 /// 2. `dependent_edges`: The transactions in the set depend on the execution of the transaction. In this
 /// case, the transactions in the set can only be executed after the transaction has been executed.
+/// Dependent edge is a reverse of required edge, for example if txn 20 in shard 2 requires txn 10 in shard 1,
+/// then txn 10 in shard 1 will have a dependent edge to txn 20 in shard 2.
 pub struct CrossShardDependencies {
     required_edges: CrossShardEdges,
     dependent_edges: CrossShardEdges,
