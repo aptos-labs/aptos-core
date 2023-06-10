@@ -10,7 +10,9 @@ use super::{
     token_utils::TokenWriteSet,
     tokens::TableHandleToOwner,
     v2_token_datas::TokenDataV2,
-    v2_token_utils::{ObjectCore, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned},
+    v2_token_utils::{
+        ObjectWithMetadata, TokenStandard, TokenV2AggregatedDataMapping, TokenV2Burned,
+    },
 };
 use crate::{
     database::PgPoolConnection,
@@ -51,6 +53,7 @@ pub struct TokenOwnershipV2 {
     pub token_standard: String,
     pub is_fungible_v2: Option<bool>,
     pub transaction_timestamp: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
@@ -69,6 +72,7 @@ pub struct CurrentTokenOwnershipV2 {
     pub is_fungible_v2: Option<bool>,
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
 }
 
 // Facilitate tracking when a token is burned
@@ -97,6 +101,7 @@ pub struct CurrentTokenOwnershipV2Query {
     pub last_transaction_version: i64,
     pub last_transaction_timestamp: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
+    pub non_transferrable_by_owner: Option<bool>,
 }
 
 impl TokenOwnershipV2 {
@@ -119,7 +124,7 @@ impl TokenOwnershipV2 {
         let metadata = token_v2_metadata
             .get(&token_data.token_data_id)
             .context("If token data exists objectcore must exist")?;
-        let object_core = metadata.object.clone();
+        let object_core = metadata.object.object_core.clone();
         let token_data_id = token_data.token_data_id.clone();
         let owner_address = object_core.get_owner_address();
         let storage_id = token_data_id.clone();
@@ -139,6 +144,7 @@ impl TokenOwnershipV2 {
             token_standard: TokenStandard::V2.to_string(),
             is_fungible_v2: token_data.is_fungible_v2,
             transaction_timestamp: token_data.transaction_timestamp,
+            non_transferrable_by_owner: Some(is_soulbound),
         };
         let current_ownership = CurrentTokenOwnershipV2 {
             token_data_id: token_data_id.clone(),
@@ -153,6 +159,7 @@ impl TokenOwnershipV2 {
             is_fungible_v2: token_data.is_fungible_v2,
             last_transaction_version: token_data.transaction_version,
             last_transaction_timestamp: token_data.transaction_timestamp,
+            non_transferrable_by_owner: Some(is_soulbound),
         };
 
         // check if token was transferred
@@ -177,6 +184,7 @@ impl TokenOwnershipV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: token_data.is_fungible_v2,
                     transaction_timestamp: token_data.transaction_timestamp,
+                    non_transferrable_by_owner: Some(is_soulbound),
                 }),
                 Some(CurrentTokenOwnershipV2 {
                     token_data_id,
@@ -193,6 +201,7 @@ impl TokenOwnershipV2 {
                     is_fungible_v2: token_data.is_fungible_v2,
                     last_transaction_version: token_data.transaction_version,
                     last_transaction_timestamp: token_data.transaction_timestamp,
+                    non_transferrable_by_owner: Some(is_soulbound),
                 }),
             )))
         } else {
@@ -211,9 +220,10 @@ impl TokenOwnershipV2 {
         if let Some(token_address) =
             tokens_burned.get(&standardize_address(&write_resource.address.to_string()))
         {
-            if let Some(object_core) =
-                &ObjectCore::from_write_resource(write_resource, txn_version)?
+            if let Some(object) =
+                &ObjectWithMetadata::from_write_resource(write_resource, txn_version)?
             {
+                let object_core = &object.object_core;
                 let token_data_id = token_address.clone();
                 let owner_address = object_core.get_owner_address();
                 let storage_id = token_data_id.clone();
@@ -234,6 +244,7 @@ impl TokenOwnershipV2 {
                         token_standard: TokenStandard::V2.to_string(),
                         is_fungible_v2: Some(false),
                         transaction_timestamp: txn_timestamp,
+                        non_transferrable_by_owner: Some(is_soulbound),
                     },
                     CurrentTokenOwnershipV2 {
                         token_data_id,
@@ -248,6 +259,7 @@ impl TokenOwnershipV2 {
                         is_fungible_v2: Some(false),
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
+                        non_transferrable_by_owner: Some(is_soulbound),
                     },
                 )));
             }
@@ -296,6 +308,7 @@ impl TokenOwnershipV2 {
                     token_standard: TokenStandard::V2.to_string(),
                     is_fungible_v2: Some(false),
                     transaction_timestamp: txn_timestamp,
+                    non_transferrable_by_owner: is_soulbound,
                 },
                 CurrentTokenOwnershipV2 {
                     token_data_id,
@@ -310,6 +323,7 @@ impl TokenOwnershipV2 {
                     is_fungible_v2: Some(false),
                     last_transaction_version: txn_version,
                     last_transaction_timestamp: txn_timestamp,
+                    non_transferrable_by_owner: is_soulbound,
                 },
             )));
         }
@@ -348,7 +362,7 @@ impl TokenOwnershipV2 {
             )?
         {
             if let Some(metadata) = token_v2_metadata.get(&resource.address) {
-                let object_core = metadata.object.clone();
+                let object_core = &metadata.object.object_core;
                 let token_data_id = inner.metadata.get_reference_address();
                 let storage_id = token_data_id.clone();
                 let is_soulbound = inner.frozen;
@@ -370,6 +384,7 @@ impl TokenOwnershipV2 {
                         token_standard: TokenStandard::V2.to_string(),
                         is_fungible_v2: Some(true),
                         transaction_timestamp: txn_timestamp,
+                        non_transferrable_by_owner: Some(is_soulbound),
                     },
                     CurrentTokenOwnershipV2 {
                         token_data_id,
@@ -384,6 +399,7 @@ impl TokenOwnershipV2 {
                         is_fungible_v2: Some(true),
                         last_transaction_version: txn_version,
                         last_transaction_timestamp: txn_timestamp,
+                        non_transferrable_by_owner: Some(is_soulbound),
                     },
                 )));
             }
@@ -438,6 +454,7 @@ impl TokenOwnershipV2 {
                             is_fungible_v2: None,
                             last_transaction_version: txn_version,
                             last_transaction_timestamp: txn_timestamp,
+                            non_transferrable_by_owner: None,
                         }),
                         Some(owner_address),
                         Some(tm.table_type.clone()),
@@ -469,6 +486,7 @@ impl TokenOwnershipV2 {
                     token_standard: TokenStandard::V1.to_string(),
                     is_fungible_v2: None,
                     transaction_timestamp: txn_timestamp,
+                    non_transferrable_by_owner: None,
                 },
                 curr_token_ownership,
             )))
@@ -522,6 +540,7 @@ impl TokenOwnershipV2 {
                             is_fungible_v2: None,
                             last_transaction_version: txn_version,
                             last_transaction_timestamp: txn_timestamp,
+                            non_transferrable_by_owner: None,
                         }),
                         Some(owner_address),
                         Some(tm.table_type.clone()),
@@ -553,6 +572,7 @@ impl TokenOwnershipV2 {
                     token_standard: TokenStandard::V1.to_string(),
                     is_fungible_v2: None,
                     transaction_timestamp: txn_timestamp,
+                    non_transferrable_by_owner: None,
                 },
                 curr_token_ownership,
             )))

@@ -322,6 +322,7 @@ diesel::table! {
         last_transaction_version -> Int8,
         last_transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        non_transferrable_by_owner -> Nullable<Bool>,
     }
 }
 
@@ -678,6 +679,7 @@ diesel::table! {
         is_fungible_v2 -> Nullable<Bool>,
         transaction_timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        non_transferrable_by_owner -> Nullable<Bool>,
     }
 }
 

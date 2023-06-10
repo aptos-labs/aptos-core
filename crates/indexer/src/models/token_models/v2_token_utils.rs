@@ -37,7 +37,7 @@ pub struct TokenV2AggregatedData {
     pub fixed_supply: Option<FixedSupply>,
     pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
     pub fungible_asset_supply: Option<FungibleAssetSupply>,
-    pub object: ObjectCore,
+    pub object: ObjectWithMetadata,
     pub property_map: Option<PropertyMap>,
     pub token: Option<TokenV2>,
     pub transfer_event: Option<(EventIndex, TransferEvent)>,
@@ -70,6 +70,18 @@ pub struct ObjectCore {
 }
 
 impl ObjectCore {
+    pub fn get_owner_address(&self) -> String {
+        standardize_address(&self.owner)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ObjectWithMetadata {
+    pub object_core: ObjectCore,
+    state_key_hash: String,
+}
+
+impl ObjectWithMetadata {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
@@ -88,14 +100,17 @@ impl ObjectCore {
             &serde_json::to_value(&write_resource.data.data).unwrap(),
             txn_version,
         )? {
-            Ok(Some(inner))
+            Ok(Some(Self {
+                object_core: inner,
+                state_key_hash: standardize_address(write_resource.state_key_hash.as_str()),
+            }))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_owner_address(&self) -> String {
-        standardize_address(&self.owner)
+    pub fn get_state_key_hash(&self) -> String {
+        standardize_address(&self.state_key_hash)
     }
 }
 

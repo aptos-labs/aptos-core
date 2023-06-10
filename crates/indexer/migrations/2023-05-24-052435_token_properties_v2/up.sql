@@ -26,3 +26,7 @@ ALTER TABLE token_datas_v2
 ADD COLUMN IF NOT EXISTS decimals BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE current_token_datas_v2
 ADD COLUMN IF NOT EXISTS decimals BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE token_ownerships_v2
+ADD COLUMN IF NOT EXISTS non_transferrable_by_owner BOOLEAN;
+ALTER TABLE current_token_ownerships_v2
+ADD COLUMN IF NOT EXISTS non_transferrable_by_owner BOOLEAN;

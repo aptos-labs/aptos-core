@@ -35,7 +35,7 @@ use crate::{
                 TokenOwnershipV2,
             },
             v2_token_utils::{
-                AptosCollection, BurnEvent, FixedSupply, ObjectCore, PropertyMap, TokenV2,
+                AptosCollection, BurnEvent, FixedSupply, ObjectWithMetadata, PropertyMap, TokenV2,
                 TokenV2AggregatedData, TokenV2AggregatedDataMapping, TokenV2Burned, TransferEvent,
                 UnlimitedSupply,
             },
@@ -675,6 +675,7 @@ fn insert_token_ownerships_v2(
                     is_fungible_v2.eq(excluded(is_fungible_v2)),
                     transaction_timestamp.eq(excluded(transaction_timestamp)),
                     inserted_at.eq(excluded(inserted_at)),
+                    non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
                 )),
             None,
         )?;
@@ -748,6 +749,7 @@ fn insert_current_token_datas_v2(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                     inserted_at.eq(excluded(inserted_at)),
+                    decimals.eq(excluded(decimals)),
                 )),
             Some(" WHERE current_token_datas_v2.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -783,6 +785,7 @@ fn insert_current_token_ownerships_v2(
                     last_transaction_version.eq(excluded(last_transaction_version)),
                     last_transaction_timestamp.eq(excluded(last_transaction_timestamp)),
                     inserted_at.eq(excluded(inserted_at)),
+                    non_transferrable_by_owner.eq(excluded(non_transferrable_by_owner)),
                 )),
             Some(" WHERE current_token_ownerships_v2.last_transaction_version <= excluded.last_transaction_version "),
         )?;
@@ -1087,15 +1090,15 @@ fn parse_v2_token(
             // Need to do a first pass to get all the objects
             for (_, wsc) in user_txn.info.changes.iter().enumerate() {
                 if let WriteSetChange::WriteResource(wr) = wsc {
-                    if let Some(object_core) =
-                        ObjectCore::from_write_resource(wr, txn_version).unwrap()
+                    if let Some(object) =
+                        ObjectWithMetadata::from_write_resource(wr, txn_version).unwrap()
                     {
                         token_v2_metadata_helper.insert(
                             standardize_address(&wr.address.to_string()),
                             TokenV2AggregatedData {
                                 aptos_collection: None,
                                 fixed_supply: None,
-                                object: object_core,
+                                object,
                                 unlimited_supply: None,
                                 property_map: None,
                                 transfer_event: None,

@@ -48,6 +48,12 @@ impl CurrentTokenV2Metadata {
                 }
 
                 let resource = MoveResource::from_write_resource(write_resource, 0, txn_version, 0);
+
+                let state_key_hash = metadata.object.get_state_key_hash();
+                if state_key_hash != resource.state_key_hash {
+                    return Ok(None);
+                }
+    
                 let resource_type = truncate_str(&resource.type_, NAME_LENGTH);
                 return Ok(Some(CurrentTokenV2Metadata {
                     object_address,
