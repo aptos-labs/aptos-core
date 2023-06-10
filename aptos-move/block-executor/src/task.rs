@@ -30,6 +30,7 @@ pub enum ExecutionStatus<T, E> {
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
+    type Event: Send + Sync + Debug;
 }
 
 /// Inference result of a transaction.
@@ -82,6 +83,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Get the deltas of a transaction from its output.
     fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
+
+    /// Get the events of a transaction from its output.
+    fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;

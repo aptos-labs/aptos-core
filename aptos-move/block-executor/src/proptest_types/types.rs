@@ -163,6 +163,13 @@ impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> Transactio
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+pub struct EventType<E: Send + Sync + Debug>(
+    pub E,
+    pub bool,
+);
+
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
     /// Each transaction's write-set consists of between 1 and write_size-1 many writes.
@@ -197,7 +204,7 @@ pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 's
 /// counter value. Each execution of the transaction increments the incarnation counter, and its
 /// value determines the index for choosing the read & write sets of the particular execution.
 #[derive(Debug, Clone)]
-pub enum Transaction<K, V> {
+pub enum Transaction<K, V, E> {
     Write {
         /// Incarnation counter for dynamic behavior i.e. incarnations differ in reads and writes.
         incarnation: Arc<AtomicUsize>,
@@ -208,6 +215,7 @@ pub enum Transaction<K, V> {
         /// Vector of all possible read-sets of the transaction execution (chosen round-robin depending
         /// on the incarnation counter value). Each read set is a vector of keys that are read.
         reads: Vec<Vec<K>>,
+        events: Vec<E>
     },
     /// Skip the execution of trailing transactions.
     SkipRest,
@@ -294,12 +302,12 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         ret
     }
 
-    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord>(
+    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
         self,
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> Transaction<KeyType<K>, ValueType<V>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
         let is_module_write = |_| -> bool { module_access.0 };
         let is_module_read = |_| -> bool { module_access.1 };
         let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
@@ -317,15 +325,16 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
+            events: vec![]
         }
     }
 
-    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord>(
+    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
         self,
         universe: &[K],
         delta_threshold: usize,
         allow_deletes: bool,
-    ) -> Transaction<KeyType<K>, ValueType<V>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
         let is_module_write = |_| -> bool { false };
         let is_module_read = |_| -> bool { false };
         let is_delta = |i, v: &V| -> Option<DeltaOp> {
@@ -355,10 +364,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 allow_deletes,
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
+            events: vec![]
         }
     }
 
-    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord>(
+    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord, E: Send + Sync + Debug>(
         self,
         universe: &[K],
         // keys generated with indices from read_threshold to write_threshold will be
@@ -367,7 +377,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> Transaction<KeyType<K>, ValueType<V>> {
+    ) -> Transaction<KeyType<K>, ValueType<V>, EventType<E>> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
@@ -386,17 +396,20 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 false, // Module deletion isn't allowed
             ),
             reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
+            events: vec![]
         }
     }
 }
 
-impl<K, V> TransactionType for Transaction<K, V>
+impl<K, V, E> TransactionType for Transaction<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
-    V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + 'static
 {
     type Key = K;
     type Value = V;
+    type Event = E;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -404,23 +417,24 @@ where
 ///////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub struct Task<K, V>(PhantomData<(K, V)>);
+pub struct Task<K, V, E>(PhantomData<(K, V, E)>);
 
-impl<K, V> Task<K, V> {
+impl<K, V, E> Task<K, V, E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<K, V> ExecutorTask for Task<K, V>
+impl<K, V, E> ExecutorTask for Task<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + Clone + 'static
 {
     type Argument = ();
     type Error = usize;
-    type Output = Output<K, V>;
-    type Txn = Transaction<K, V>;
+    type Output = Output<K, V, E>;
+    type Txn = Transaction<K, V, E>;
 
     fn init(_argument: Self::Argument) -> Self {
         Self::new()
@@ -438,6 +452,7 @@ where
                 incarnation,
                 reads,
                 writes_and_deltas,
+                events
             } => {
                 // Use incarnation counter value as an index to determine the read-
                 // and write-sets of the execution. Increment incarnation counter to
@@ -459,6 +474,7 @@ where
                 ExecutionStatus::Success(Output(
                     writes_and_deltas[write_idx].0.clone(),
                     writes_and_deltas[write_idx].1.clone(),
+                    vec![],
                     reads_result,
                     OnceCell::new(),
                 ))
@@ -470,33 +486,36 @@ where
 }
 
 #[derive(Debug)]
-pub struct Output<K, V>(
+pub struct Output<K, V, E>(
     Vec<(K, V)>,
     Vec<(K, DeltaOp)>,
+    Vec<E>,
     Vec<Option<Vec<u8>>>,
     pub(crate) OnceCell<Vec<(K, WriteOp)>>,
 );
 
-impl<K, V> Output<K, V>
+impl<K, V, E> Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + 'static
 {
     pub(crate) fn delta_writes(&self) -> Vec<(K, WriteOp)> {
-        if self.3.get().is_some() {
-            self.3.get().cloned().expect("Delta writes must be set")
+        if self.4.get().is_some() {
+            self.4.get().cloned().expect("Delta writes must be set")
         } else {
             Vec::new()
         }
     }
 }
 
-impl<K, V> TransactionOutput for Output<K, V>
+impl<K, V, E> TransactionOutput for Output<K, V, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    E: Send + Sync + Debug + Clone + 'static
 {
-    type Txn = Transaction<K, V>;
+    type Txn = Transaction<K, V, E>;
 
     fn get_writes(&self) -> Vec<(K, V)> {
         self.0.clone()
@@ -506,12 +525,16 @@ where
         self.1.clone()
     }
 
+    fn get_events(&self) -> Vec<E> {
+        self.2.clone()
+    }
+
     fn skip_output() -> Self {
-        Self(vec![], vec![], vec![], OnceCell::new())
+        Self(vec![], vec![], vec![], vec![], OnceCell::new())
     }
 
     fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.3.set(delta_writes));
+        assert_ok!(self.4.set(delta_writes));
     }
 
     fn gas_used(&self) -> u64 {
@@ -538,8 +561,8 @@ pub enum ExpectedOutput<V> {
 
 impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
-    pub fn generate_baseline<K: Hash + Clone + Eq>(
-        txns: &[Transaction<K, V>],
+    pub fn generate_baseline<K: Hash + Clone + Eq, E>(
+        txns: &[Transaction<K, V, E>],
         resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
@@ -565,6 +588,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     incarnation,
                     writes_and_deltas,
                     reads,
+                    events
                 } => {
                     // Determine the read and write sets of the latest incarnation
                     // of the transaction. The index for choosing the read and
@@ -685,7 +709,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
-    pub fn assert_output<K>(&self, results: &Result<Vec<Output<K, V>>, usize>) {
+    pub fn assert_output<K, E>(&self, results: &Result<Vec<Output<K, V, E>>, usize>) {
         match (self, results) {
             (Self::Aborted(i), Err(Error::UserError(idx))) => {
                 assert_eq!(i, idx);
@@ -696,14 +720,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .take(*skip_at)
                     .zip(expected_results.iter())
-                    .for_each(|(Output(_, _, result, _), expected_results)| {
+                    .for_each(|(Output(_, _, _, result, _), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
 
                 results
                     .iter()
                     .skip(*skip_at)
-                    .for_each(|Output(_, _, result, _)| assert!(result.is_empty()))
+                    .for_each(|Output(_, _, _, result, _)| assert!(result.is_empty()))
             },
             (Self::ExceedBlockGasLimit(last_committed, expected_results), Ok(results)) => {
                 // Check_result asserts internally, so no need to return a bool.
@@ -711,14 +735,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .take(*last_committed + 1)
                     .zip(expected_results.iter())
-                    .for_each(|(Output(_, _, result, _), expected_results)| {
+                    .for_each(|(Output(_, _, _, result, _), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
 
                 results
                     .iter()
                     .skip(*last_committed + 1)
-                    .for_each(|Output(_, _, result, _)| assert!(result.is_empty()))
+                    .for_each(|Output(_, _, _, result, _)| assert!(result.is_empty()))
             },
             (Self::DeltaFailure(fail_idx, expected_results), Ok(results)) => {
                 // Check_result asserts internally, so no need to return a bool.
@@ -726,14 +750,14 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                     .iter()
                     .take(*fail_idx)
                     .zip(expected_results.iter())
-                    .for_each(|(Output(_, _, result, _), expected_results)| {
+                    .for_each(|(Output(_, _, _, result, _), expected_results)| {
                         Self::check_result(expected_results, result)
                     });
             },
             (Self::Success(expected_results), Ok(results)) => results
                 .iter()
                 .zip(expected_results.iter())
-                .for_each(|(Output(_, _, result, _), expected_result)| {
+                .for_each(|(Output(_, _, _, result, _), expected_result)| {
                     Self::check_result(expected_result, result);
                 }),
             _ => panic!("Incomparable execution outcomes"),

@@ -33,7 +33,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::WriteOp, contract_event::ContractEvent,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
@@ -111,6 +111,17 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .iter()
             .map(|(key, op)| (key.clone(), *op))
             .collect()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn get_events(&self) -> Vec<ContractEvent> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get events")
+            .events()
+            .to_vec()
     }
 
     /// Can be called (at most) once after transaction is committed to internally
