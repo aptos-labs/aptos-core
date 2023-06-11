@@ -1,19 +1,13 @@
 module whitelist_example::mint {
-    use std::error;
     use std::signer;
-    use std::object;
+    use std::object::{Self};
     use std::option;
     use std::string::{Self, String};
     use std::string_utils;
-    use aptos_framework::account::{Self, SignerCapability};
-    use aptos_framework::resource_account;
+    use aptos_framework::account::{Self};
     use aptos_token_objects::aptos_token::{Self, AptosToken};
     use aptos_token_objects::collection::{Self, Collection};
     use whitelist_example::whitelist::{Self};
-
-    struct MintConfiguration has key {
-        signer_capability: SignerCapability,
-    }
 
     /// Action not authorized because the signer is not the owner of this module
     const ENOT_AUTHORIZED: u64 = 1;
@@ -46,23 +40,10 @@ module whitelist_example::mint {
     const PUBLIC_END_TIME: u64 = 18446744073709551615;
     const PUBLIC_PER_USER_LIMIT: u64 = 2;
 
-    fun init_module(resource_signer: &signer) {
-        let resource_signer_cap = resource_account::retrieve_resource_account_cap(resource_signer, @owner);
-        move_to(resource_signer, MintConfiguration {
-            signer_capability: resource_signer_cap,
-        });
-    }
-
-    public entry fun initialize_collection(
-        owner: &signer,
-    ) acquires MintConfiguration {
-        assert!(signer::address_of(owner) == @owner, error::permission_denied(ENOT_AUTHORIZED));
-
-        let mint_configuration = borrow_global<MintConfiguration>(@whitelist_example);
-        let resource_signer = &account::create_signer_with_capability(&mint_configuration.signer_capability);
-
+    fun init_module(owner: &signer) {
+        
         aptos_token::create_collection(
-            resource_signer,
+            owner,
             string::utf8(COLLECTION_DESCRIPTION),
             MAXIMUM_SUPPLY,
             string::utf8(COLLECTION_NAME),
@@ -80,10 +61,10 @@ module whitelist_example::mint {
             ROYALTY_DENOMINATOR,
         );
 
-        whitelist::init_tiers(resource_signer);
+        whitelist::init_tiers(owner);
 
         whitelist::upsert_tier_config(
-            resource_signer,
+            owner,
             string::utf8(b"public"),
             true, // open_to_public, users don't need to be registered in the list
             PUBLIC_PRICE,
@@ -93,7 +74,7 @@ module whitelist_example::mint {
         );
 
         whitelist::upsert_tier_config(
-            resource_signer,
+            owner,
             string::utf8(b"whitelist"),
             false, // open_to_public, users need to be registered in the whitelist
             WHITELIST_PRICE,
@@ -104,27 +85,23 @@ module whitelist_example::mint {
     }
 
     /// simple mint function to demonstrate how to call the whitelist functions
-    public entry fun mint(receiver: &signer, tier_name: String) acquires MintConfiguration {
-        // access the configuration resources stored on-chain at @whitelist_example's address
-        let mint_configuration = borrow_global<MintConfiguration>(@whitelist_example);
-        let signer_cap = &mint_configuration.signer_capability;
-        let resource_signer: &signer = &account::create_signer_with_capability(signer_cap);
-
-        whitelist::deduct_one_from_tier(receiver, resource_signer, tier_name);
+    public entry fun mint(owner: &signer, receiver: &signer, tier_name: String) {
+        let owner_addr = signer::address_of(owner);
+        whitelist::deduct_one_from_tier(owner, receiver, tier_name);
 
         // store next GUID to derive object address later
         let token_creation_num = account::get_guid_next_creation_num(@whitelist_example);
 
         // generate next token name based on current collection supply
         let token_name = next_token_name_from_supply(
-            signer::address_of(resource_signer),
+            owner_addr,
             string::utf8(BASE_TOKEN_NAME),
             string::utf8(COLLECTION_NAME),
         );
 
         // mint token and send it to the receiver
         aptos_token::mint(
-            resource_signer,
+            owner,
             string::utf8(COLLECTION_NAME),
             string::utf8(TOKEN_DESCRIPTION),
             token_name,
@@ -134,7 +111,7 @@ module whitelist_example::mint {
             vector<vector<u8>> [ ],
         );
         let token_object = object::address_to_object<AptosToken>(object::create_guid_object_address(@whitelist_example, token_creation_num));
-        object::transfer(resource_signer, token_object, signer::address_of(receiver));
+        object::transfer(owner, token_object, signer::address_of(receiver));
     }
 
     /// generates the next token name by concatenating the supply onto the base token name
@@ -157,29 +134,21 @@ module whitelist_example::mint {
         owner: &signer,
         tier_name: String,
         addresses: vector<address>,
-    ) acquires MintConfiguration {
-        assert!(signer::address_of(owner) == @owner, error::permission_denied(ENOT_AUTHORIZED));
-        let mint_configuration = borrow_global_mut<MintConfiguration>(@whitelist_example);
-        let resource_signer = &account::create_signer_with_capability(&mint_configuration.signer_capability);
-        whitelist::add_addresses_to_tier(resource_signer, tier_name, addresses);
+    ) {
+        whitelist::add_addresses_to_tier(owner, tier_name, addresses);
     }
 
     public entry fun remove_addresses_from_tier(
         owner: &signer,
         tier_name: String,
         addresses: vector<address>,
-    ) acquires MintConfiguration {
-        assert!(signer::address_of(owner) == @owner, error::permission_denied(ENOT_AUTHORIZED));
-        let mint_configuration = borrow_global_mut<MintConfiguration>(@whitelist_example);
-        let resource_signer = &account::create_signer_with_capability(&mint_configuration.signer_capability);
-        whitelist::remove_addresses_from_tier(resource_signer, tier_name, addresses);
+    ) {
+        whitelist::remove_addresses_from_tier(owner, tier_name, addresses);
     }
 
     // dependencies only used in test, if we link without #[test_only], the compiler will warn us
     #[test_only]
     use std::coin::{Self, MintCapability};
-    #[test_only]
-    use std::vector;
     #[test_only]
     use std::aptos_coin::{AptosCoin};
     #[test_only]
@@ -200,38 +169,34 @@ module whitelist_example::mint {
     #[test_only]
     public fun setup_test(
         owner: &signer,
-        resource_account: &signer,
         nft_receiver: &signer,
         nft_receiver2: &signer,
         aptos_framework: &signer,
         timestamp: u64,
-    ) acquires MintConfiguration {
+    ) {
         timestamp::set_time_has_started_for_testing(aptos_framework);
         timestamp::update_global_time_for_test_secs(timestamp);
         let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(aptos_framework);
 
         account::create_account_for_test(signer::address_of(owner));
-        resource_account::create_resource_account(owner, vector::empty<u8>(), vector::empty<u8>());
-        init_module(resource_account);
 
         setup_account<AptosCoin>(nft_receiver, 2, &mint);
         setup_account<AptosCoin>(nft_receiver2, 2, &mint);
         coin::destroy_burn_cap(burn);
         coin::destroy_mint_cap(mint);
 
-        initialize_collection(owner);
+        init_module(owner);
     }
 
     // The whitelist.move unit tests are more important for this Move example, but we display a happy path test here to convey the intended flow.
-    #[test(owner = @owner, resource_account = @whitelist_example, nft_receiver = @0xFB, nft_receiver2 = @0xFC, aptos_framework = @0x1)]
+    #[test(owner = @whitelist_example, nft_receiver = @0xFB, nft_receiver2 = @0xFC, aptos_framework = @0x1)]
     public fun test_happy_path(
         owner: &signer,
-        resource_account: &signer,
         nft_receiver: &signer,
         nft_receiver2: &signer,
         aptos_framework: &signer,
-    ) acquires MintConfiguration {
-        setup_test(owner, resource_account, nft_receiver, nft_receiver2, aptos_framework, 1000000000);
+    ) {
+        setup_test(owner, nft_receiver, nft_receiver2, aptos_framework, 1000000000);
         let collection_object_addr = collection::create_collection_address(&@whitelist_example, &string::utf8(COLLECTION_NAME));
         let collection_object = object::address_to_object<Collection>(collection_object_addr);
 
@@ -249,20 +214,20 @@ module whitelist_example::mint {
 
         // mint one token to nft_receiver through the whitelist
         let token_creation_num = account::get_guid_next_creation_num(@whitelist_example);
-        mint(nft_receiver, string::utf8(b"whitelist"));
+        mint(owner, nft_receiver, string::utf8(b"whitelist"));
         let token_object_addr = object::create_guid_object_address(@whitelist_example, token_creation_num);
         let token_object = object::address_to_object<AptosToken>(token_object_addr);
 
         // mint one token to nft_receiver2 through the public list
         let token_creation_num2 = account::get_guid_next_creation_num(@whitelist_example);
-        mint(nft_receiver2, string::utf8(b"public"));
+        mint(owner, nft_receiver2, string::utf8(b"public"));
         let token_object_addr2 = object::create_guid_object_address(@whitelist_example, token_creation_num2);
         let token_object2 = object::address_to_object<AptosToken>(token_object_addr2);
 
-        mint(nft_receiver, string::utf8(b"public"));
-        mint(nft_receiver, string::utf8(b"public"));
+        mint(owner, nft_receiver, string::utf8(b"public"));
+        mint(owner, nft_receiver, string::utf8(b"public"));
 
-        mint(nft_receiver2, string::utf8(b"public"));
+        mint(owner, nft_receiver2, string::utf8(b"public"));
 
         assert!(object::owner(token_object) == nft_receiver_addr, 5);
         assert!(object::owner(token_object2) == nft_receiver2_addr, 6);
