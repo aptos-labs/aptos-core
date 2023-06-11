@@ -228,7 +228,9 @@ impl GasParameters {
             transaction_context: transaction_context::GasParameters {
                 get_txn_hash: transaction_context::GetTxnHashGasParameters { base: 0.into() },
                 get_script_hash: transaction_context::GetScriptHashGasParameters { base: 0.into() },
-                create_uuid: transaction_context::CreateUUIDGasParameters { base: 0.into() },
+                create_unique_address: transaction_context::CreateUniqueAddressGasParameters {
+                    base: 0.into(),
+                },
             },
             code: code::GasParameters {
                 request_publish: code::RequestPublishGasParameters {

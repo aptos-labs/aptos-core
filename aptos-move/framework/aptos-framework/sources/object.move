@@ -212,7 +212,7 @@ module aptos_framework::object {
     /// The created object is deletable as we can guarantee the same UUID can 
     /// never be regenerated with future txs.
     public fun create_object(creator: &signer): ConstructorRef {
-        let uuid = aptos_framework::transaction_context::create_uuid();
+        let uuid = aptos_framework::transaction_context::create_unique_address();
         create_object_internal(signer::address_of(creator), uuid, true)
     }
 

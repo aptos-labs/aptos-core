@@ -75,12 +75,12 @@ fn native_get_txn_hash(
  *
  **************************************************************************************************/
 #[derive(Clone, Debug)]
-pub struct CreateUUIDGasParameters {
+pub struct CreateUniqueAddressGasParameters {
     pub base: InternalGas,
 }
 
-fn native_create_uuid(
-    gas_params: &CreateUUIDGasParameters,
+fn native_create_unique_address(
+    gas_params: &CreateUniqueAddressGasParameters,
     context: &mut SafeNativeContext,
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
@@ -138,7 +138,7 @@ fn native_get_script_hash(
 pub struct GasParameters {
     pub get_txn_hash: GetTxnHashGasParameters,
     pub get_script_hash: GetScriptHashGasParameters,
-    pub create_uuid: CreateUUIDGasParameters,
+    pub create_unique_address: CreateUniqueAddressGasParameters,
 }
 
 pub fn make_all(
@@ -159,10 +159,10 @@ pub fn make_all(
         (
             "create_uuid",
             make_safe_native(
-                gas_params.create_uuid,
+                gas_params.create_unique_address,
                 timed_features.clone(),
                 features.clone(),
-                native_create_uuid,
+                native_create_unique_address,
             ),
         ),
         (
