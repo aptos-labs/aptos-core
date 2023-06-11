@@ -36,7 +36,7 @@ impl NetworkTest for PartialNodesDown {
         // Generate some traffic
         let txn_stat = generate_traffic(ctx, &up_nodes, duration)?;
         ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat, duration);
+            .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {
             let node = ctx.swarm().validator_mut(*n).unwrap();
             println!("Node {} is going to restart", node.name());

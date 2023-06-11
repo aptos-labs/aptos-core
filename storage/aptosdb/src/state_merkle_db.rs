@@ -362,6 +362,13 @@ impl StateMerkleDb {
         &self.lru_cache
     }
 
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.state_merkle_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateMerklePrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
         if let Some(shard_id) = node_key.get_shard_id() {
             self.db_shard(shard_id)

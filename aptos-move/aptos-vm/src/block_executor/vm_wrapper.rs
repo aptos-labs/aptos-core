@@ -6,7 +6,6 @@ use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
     aptos_vm::AptosVM,
     block_executor::AptosTransactionOutput,
-    data_cache::{AsMoveResolver, StorageAdapter},
 };
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
@@ -43,7 +42,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &StorageAdapter::new(argument),
+            &vm.as_move_resolver(argument),
         );
 
         Self {
@@ -66,7 +65,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
         match self
             .vm
-            .execute_single_transaction(txn, &view.as_move_resolver(), &log_context)
+            .execute_single_transaction(txn, &self.vm.as_move_resolver(view), &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {

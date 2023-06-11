@@ -3,5 +3,7 @@
 
 #[cfg(test)]
 mod test;
-pub(crate) mod transaction_store_pruner;
+pub(crate) mod transaction_accumulator_pruner;
+pub(crate) mod transaction_info_pruner;
+pub(crate) mod transaction_pruner;
 pub(crate) mod write_set_pruner;

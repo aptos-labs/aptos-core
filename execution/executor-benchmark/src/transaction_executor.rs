@@ -61,7 +61,7 @@ where
         let block_id = HashValue::random();
         let output = self
             .executor
-            .execute_block((block_id, transactions), self.parent_block_id, None)
+            .execute_block((block_id, transactions).into(), self.parent_block_id, None)
             .unwrap();
 
         assert_eq!(output.compute_status().len(), num_txns);
