@@ -447,11 +447,13 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
+        /// For single-node blockstm, pass in [0, ..., n-1].
+        /// For a shard in distributed execution, pass in the global indices.
         txn_indices: &Vec<TxnIndex>,
         signature_verified_block: &Vec<T>,
         base_view: &S,
-        maybe_rx: Option<Receiver<InboundMessage<T, E>>>,
-        maybe_tx: Option<Sender<OutboundMessage<T, E>>>,
+        maybe_rx: Option<Receiver<InboundMessage<T, E>>>, /// Used for distributed execution.
+        maybe_tx: Option<Sender<OutboundMessage<T, E>>>, /// Used for distributed execution.
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
