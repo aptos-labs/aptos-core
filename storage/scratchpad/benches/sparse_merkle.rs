@@ -19,20 +19,13 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 struct Block {
     smt: SparseMerkleTree<StateValue>,
-    updates: Vec<Vec<(HashValue, Option<StateValue>)>>,
+    updates: Vec<(HashValue, Option<StateValue>)>,
     proof_reader: ProofReader,
 }
 
 impl Block {
-    fn updates(&self) -> Vec<Vec<(HashValue, Option<&StateValue>)>> {
-        self.updates
-            .iter()
-            .map(|small_batch| small_batch.iter().map(|(k, v)| (*k, v.as_ref())).collect())
-            .collect()
-    }
-
     fn updates_flat_batch(&self) -> Vec<(HashValue, Option<&StateValue>)> {
-        self.updates().iter().flatten().cloned().collect()
+        self.updates.iter().map(|(k, v)| (*k, v.as_ref())).collect()
     }
 }
 
@@ -49,7 +42,7 @@ impl Group {
             let block_size = block.updates.len();
             let one_large_batch = block.updates_flat_batch();
 
-            group.throughput(Throughput::Elements(block_size as u64));
+            group.throughput(Throughput::Elements((block_size * 2) as u64));
 
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
@@ -171,9 +164,9 @@ impl Benches {
         rng: &mut StdRng,
         keys: &[HashValue],
         block_size: usize,
-    ) -> Vec<Vec<(HashValue, Option<StateValue>)>> {
-        std::iter::repeat_with(|| vec![Self::gen_update(rng, keys), Self::gen_update(rng, keys)])
-            .take(block_size)
+    ) -> Vec<(HashValue, Option<StateValue>)> {
+        std::iter::repeat_with(|| Self::gen_update(rng, keys))
+            .take(block_size * 2)
             .collect()
     }
 
@@ -192,11 +185,10 @@ impl Benches {
 
     fn gen_proof_reader(
         naive_smt: &mut NaiveSmt,
-        updates: &[Vec<(HashValue, Option<StateValue>)>],
+        updates: &[(HashValue, Option<StateValue>)],
     ) -> ProofReader {
         let proofs = updates
             .iter()
-            .flatten()
             .map(|(key, _)| (*key, naive_smt.get_proof(key)))
             .collect();
         ProofReader::new(proofs)
