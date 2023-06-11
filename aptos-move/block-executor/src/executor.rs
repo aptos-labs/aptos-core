@@ -35,6 +35,25 @@ use std::{
     },
 };
 
+enum InboundMessage<T, E> {
+    RemoteTxnFinished(RemoteTxnFinishedMessage<T, E>)
+}
+
+enum OutboundMessage<T, E> {
+    LocalTxnFinished(LocalTxnFinishedMessage<T, E>)
+}
+
+struct LocalTxnFinishedMessage<T, E> {
+    local_txn_idx: TxnIndex,
+    txn_result: ExecutionStatus<T, E>,
+    consumer_txn_idx: TxnIndex,
+}
+
+struct RemoteTxnFinishedMessage<T, E> {
+    remote_txn_idx: TxnIndex,
+    txn_result: ExecutionStatus<T, E>,
+}
+
 #[derive(Debug)]
 enum CommitRole {
     Coordinator(Vec<Sender<TxnIndex>>),
@@ -428,8 +447,11 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
+        txn_indices: &Vec<TxnIndex>,
         signature_verified_block: &Vec<T>,
         base_view: &S,
+        maybe_rx: Option<Receiver<InboundMessage<T, E>>>,
+        maybe_tx: Option<Sender<OutboundMessage<T, E>>>,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -464,6 +486,17 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
+            if let Some(rx) = maybe_rx {
+                s.spawn(|_| {
+                    loop {
+                        match rx.recv().unwrap() {
+                            InboundMessage::LocalTxnFinished() => {
+                                todo!()
+                            }
+                        }
+                    }
+                });
+            }
             for _ in 0..self.concurrency_level {
                 let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
