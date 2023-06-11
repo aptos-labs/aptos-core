@@ -490,7 +490,7 @@ where
                 s.spawn(|_| {
                     loop {
                         match rx.recv().unwrap() {
-                            InboundMessage::LocalTxnFinished() => {
+                            InboundMessage::RemoteTxnFinished(msg) => {
                                 todo!()
                             }
                         }
