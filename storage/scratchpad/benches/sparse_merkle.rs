@@ -13,6 +13,10 @@ use itertools::zip_eq;
 use rand::{distributions::Standard, prelude::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use std::collections::HashSet;
 
+#[cfg(unix)]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 struct Block {
     smt: SparseMerkleTree<StateValue>,
     updates: Vec<Vec<(HashValue, Option<StateValue>)>>,
