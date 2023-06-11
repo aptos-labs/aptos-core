@@ -2,7 +2,7 @@ module aptos_framework::transaction_context {
 
     /// A wrapper denoting universally unique identifer (UUID)
     /// for storing an address
-    struct UUID {
+    struct UUID has drop, store {
         unique_address: address
     }
 
