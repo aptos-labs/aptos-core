@@ -11,7 +11,7 @@ use crate::{
     },
     safely_pop_arg,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
+use aptos_aggregator::aggregator_extension::{Promise, AggregatorID};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
@@ -107,33 +107,34 @@ fn native_read(
  *   gas cost: base_cost
  *
  **************************************************************************************************/
- #[derive(Debug, Clone)]
- pub struct DeferredReadGasParameters {
-     pub base: InternalGas,
- }
- 
- fn native_read(
-     gas_params: &DeferredReadGasParameters,
-     context: &mut SafeNativeContext,
-     _ty_args: Vec<Type>,
-     mut args: VecDeque<Value>,
- ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-     debug_assert_eq!(args.len(), 1);
- 
-     context.charge(gas_params.base)?;
- 
-     // Extract information from aggregator struct reference.
-     let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
- 
-     // Get aggregator.
-     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-     let promise = aggregator_data.deferred_read(
-         id,
-     )?;
-     Ok(smallvec![Value::u128(value)])
- }
- 
+#[derive(Debug, Clone)]
+pub struct DeferredReadGasParameters {
+    pub base: InternalGas,
+}
+
+fn native_deferred_read(
+    gas_params: &DeferredReadGasParameters,
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert_eq!(args.len(), 1);
+
+    context.charge(gas_params.base)?;
+
+    // Extract information from aggregator struct reference.
+    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+
+    let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let Promise {value, id} = aggregator_data.deferred_read(id)?;
+
+    // TODO: Use the correct syntax to return a promise. Handle the case where id is None.
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        Value::u128(value),
+        Value::address(id.unwrap().key.0)
+    ]))])
+}
 
 /***************************************************************************************************
  * native fun sub(aggregator: &mut Aggregator, value: u128);

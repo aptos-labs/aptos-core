@@ -360,13 +360,12 @@ impl AggregatorData {
         self.new_aggregators.insert(id);
     }
 
-
     fn create_aggregator_snapshot(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorID> {
         // TODO: Are we sure that id is in `self.aggregators` before calling `create_aggregator_snapshot`? 
         let aggregator = self.aggregators.get(&id).expect("Aggregator should exist to create a snapshot");
         let snapshot = Aggregator {
             value: aggregator.value,
-            state: aggregator.state.clone(),
+            state: aggregator.state,
             history: aggregator.history.clone(),
             limit: aggregator.limit,
             freeze_operations: false,
@@ -374,10 +373,11 @@ impl AggregatorData {
         };
         let snapshot_id = AggregatorID {
             handle: TableHandle(AccountAddress::ZERO),
+            // TODO: Generate a random key
             key: AggregatorHandle(AccountAddress::ZERO)
         };
         self.aggregators.insert(snapshot_id, snapshot);
-        return Ok(snapshot_id);
+        Ok(snapshot_id)
     }
 
     fn create_promise(&mut self, id: AggregatorID) -> Promise {
