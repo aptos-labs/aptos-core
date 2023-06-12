@@ -248,6 +248,78 @@ impl Container {
     fn signer(x: AccountAddress) -> Self {
         Container::Struct(Rc::new(RefCell::new(vec![ValueImpl::Address(x)])))
     }
+
+    /// Recusively count how many references are borrowed to all the sub-fields in total. This does
+    /// not include owned values themselves. e.g. value with no references will return 0
+    /// time complexity O(value size)
+    fn subtree_live_references(&self, include_root: bool) -> usize {
+        let subtrees_sum = match self {
+            Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => r
+                .borrow()
+                .iter()
+                .map(|entry| {
+                    if let ValueImpl::Container(c) = entry {
+                        c.subtree_live_references(true)
+                    } else {
+                        0
+                    }
+                })
+                .sum(),
+            _ => 0,
+        };
+        // We subtract one for the actual value owner
+        if include_root {
+            return subtrees_sum + self.rc_count() - 1;
+        } else {
+            return subtrees_sum;
+        }
+    }
+}
+
+impl ValueImpl {
+    /// checks and fails if there are _any_ live references to this value or its recursive sub-fields
+    /// time complexity O(value size)
+    pub fn deep_check_refs_before_move(&self) -> PartialVMResult<()> {
+        if let ValueImpl::Container(ref c) = self {
+            // check that there are no live references
+            if c.subtree_live_references(true) != 0 {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("moving value {:?} with live references to container or one of it's fields", self)),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// checks and fails if there are live references to the top level struct
+    /// time complexity O(1)
+    pub fn top_level_check_refs_before_move(&self) -> PartialVMResult<()> {
+        if let ValueImpl::Container(ref c) = self {
+            // check that there are no live references
+            if c.rc_count() > 1 {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("moving value {:?} with live reference to top-level container", self)),
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Value {
+    /// checks and fails if there are _any_ live references to this value or its recursive sub-fields
+    /// time complexity O(value size)
+    pub fn deep_check_refs_before_move(&self) -> PartialVMResult<()> {
+        self.0.deep_check_refs_before_move()
+    }
+
+    /// checks and fails if there are live references to the top level struct
+    /// time complexity O(1)
+    pub fn top_level_check_refs_before_move(&self) -> PartialVMResult<()> {
+        self.0.top_level_check_refs_before_move()
+    }
 }
 
 /***************************************************************************************
@@ -746,6 +818,15 @@ impl ContainerRef {
                     }};
                 }
 
+                // Only mutable reference that should to exist during `write_ref` are references to the top top-level
+                // container itself. Everything else is being dropped. i.e. No reference should exist to any of its children.
+                if c.subtree_live_references(false) != 0 {
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message("value being writtern over by `write_ref` has a live reference to one of its sub-fields".to_string()),
+                    );
+                }
+
                 match self.container() {
                     Container::Struct(r) => assign!(r, Struct),
                     Container::Vec(r) => assign!(r, Vec),
@@ -1010,6 +1091,8 @@ impl Locals {
                             ));
                         }
                     }
+                    // only check top-level as this might happen many times for a single big value
+                    v.top_level_check_refs_before_move()?;
                 }
                 Ok(Value(std::mem::replace(v, x.0)))
             },
@@ -1037,6 +1120,7 @@ impl Locals {
         x: Value,
         violation_check: bool,
     ) -> PartialVMResult<()> {
+        x.deep_check_refs_before_move()?;
         self.swap_loc(idx, x, violation_check)?;
         Ok(())
     }
@@ -2100,7 +2184,11 @@ impl VectorRef {
                 None => err_pop_empty_vec!(),
             },
             Container::Vec(r) => match r.borrow_mut().pop() {
-                Some(x) => Value(x),
+                Some(x) => {
+                    let v = Value(x);
+                    v.top_level_check_refs_before_move()?;
+                    v
+                },
                 None => err_pop_empty_vec!(),
             },
             Container::Locals(_) | Container::Struct(_) => unreachable!(),

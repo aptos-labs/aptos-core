@@ -885,6 +885,8 @@ impl Stack {
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     fn push(&mut self, value: Value) -> PartialVMResult<()> {
+        // prevent all container values being moved to stack with top-level live references!
+        value.top_level_check_refs_before_move()?;
         if self.value.len() < OPERAND_STACK_SIZE_LIMIT {
             self.value.push(value);
             Ok(())
@@ -1797,6 +1799,8 @@ impl Frame {
                 match instruction {
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
+                        // deep check on drop
+                        popped_val.deep_check_refs_before_move()?;
                         gas_meter.charge_pop(popped_val)?;
                     },
                     Bytecode::Ret => {
