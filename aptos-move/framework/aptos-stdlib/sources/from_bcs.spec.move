@@ -40,6 +40,4 @@ spec aptos_std::from_bcs {
         aborts_if !deserializable<T>(bytes);
         ensures result == deserialize<T>(bytes);
     }
-
 }
-
