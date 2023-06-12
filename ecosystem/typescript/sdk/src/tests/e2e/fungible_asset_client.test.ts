@@ -81,7 +81,7 @@ maybe("fungible asset", () => {
   }, longTestTimeout);
 
   /**
-   * Test `transferFromPrimaryFungibleStore` and `balance` functions in FungibleAssetClient class
+   * Test `transfer` and `getPrimaryBalance` functions in `FungibleAssetClient` class
    */
   test(
     "it trasfers amount of fungible asset and gets the correct balance",
@@ -107,7 +107,7 @@ maybe("fungible asset", () => {
   );
 
   /**
-   * Test `transferFromPrimaryFungibleStore` and `checkBalance` functions in `CoinClient` class
+   * Test `transfer` and `checkBalance` functions in `CoinClient` class
    */
   test(
     "coin client supports fungible assets operations",
@@ -133,7 +133,7 @@ maybe("fungible asset", () => {
   );
 
   /**
-   *
+   * Test `transfer` fungible token in `AptosToken` class
    */
   test(
     "aptos_token supports transfer fungible token",
