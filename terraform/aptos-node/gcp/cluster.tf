@@ -72,6 +72,17 @@ resource "google_container_cluster" "aptos" {
       }
     }
   }
+
+  maintenance_policy {
+    dynamic "recurring_window" {
+      for_each = var.gke_maintenance_policy.recurring_window != null ? [1] : []
+      content {
+        start_time = var.gke_maintenance_policy.recurring_window.start_time
+        end_time   = var.gke_maintenance_policy.recurring_window.end_time
+        recurrence = var.gke_maintenance_policy.recurring_window.recurrence
+      }
+    }
+  }
 }
 
 resource "google_container_node_pool" "utilities" {

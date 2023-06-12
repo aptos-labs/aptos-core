@@ -61,6 +61,8 @@ pub enum ConsensusMsg {
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes).
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
+    #[cfg(test)]
+    DAGTestMessage(Vec<u8>),
 }
 
 /// Network type for consensus
@@ -83,6 +85,8 @@ impl ConsensusMsg {
             ConsensusMsg::BatchResponse(_) => "BatchResponse",
             ConsensusMsg::SignedBatchInfo(_) => "SignedBatchInfo",
             ConsensusMsg::ProofOfStoreMsg(_) => "ProofOfStoreMsg",
+            #[cfg(test)]
+            ConsensusMsg::DAGTestMessage(_) => "DAGTestMessage",
         }
     }
 }

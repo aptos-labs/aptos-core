@@ -117,7 +117,7 @@ module aptos_token::property_map {
 
     public fun add(map: &mut PropertyMap, key: String, value: PropertyValue) {
         assert!(string::length(&key) <= MAX_PROPERTY_NAME_LENGTH, error::invalid_argument(EPROPERTY_MAP_NAME_TOO_LONG));
-        assert!(simple_map::length<String, PropertyValue>(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
+        assert!(simple_map::length(&map.map) < MAX_PROPERTY_MAP_SIZE, error::invalid_state(EPROPERTY_NUMBER_EXCEED_LIMIT));
         simple_map::add(&mut map.map, key, value);
     }
 
@@ -129,6 +129,27 @@ module aptos_token::property_map {
         let found = contains_key(map, key);
         assert!(found, EPROPERTY_NOT_EXIST);
         simple_map::borrow(&map.map, key)
+    }
+
+    /// Return all the keys in the property map in the order they are added.
+    public fun keys(map: &PropertyMap): vector<String> {
+        simple_map::keys(&map.map)
+    }
+
+    /// Return the types of all properties in the property map in the order they are added.
+    public fun types(map: &PropertyMap): vector<String> {
+        vector::map_ref(&simple_map::values(&map.map), |v| {
+            let v: &PropertyValue = v;
+            v.type
+        })
+    }
+
+    /// Return the values of all properties in the property map in the order they are added.
+    public fun values(map: &PropertyMap): vector<vector<u8>> {
+        vector::map_ref(&simple_map::values(&map.map), |v| {
+            let v: &PropertyValue = v;
+            v.value
+        })
     }
 
     public fun read_string(map: &PropertyMap, key: &String): String {
@@ -251,17 +272,30 @@ module aptos_token::property_map {
     }
 
     #[test_only]
+    use std::string::utf8;
+
+    #[test_only]
+    fun test_keys(): vector<String> {
+        vector[ utf8(b"attack"), utf8(b"durability"), utf8(b"type") ]
+    }
+
+    #[test_only]
+    fun test_values(): vector<vector<u8>> {
+        vector[ b"10", b"5", b"weapon" ]
+    }
+
+    #[test_only]
+    fun test_types(): vector<String> {
+        vector[ utf8(b"integer"), utf8(b"integer"), utf8(b"String") ]
+    }
+
+    #[test_only]
     fun create_property_list(): PropertyMap {
-        use std::string::utf8;
-        let keys = vector<String>[ utf8(b"attack"), utf8(b"durability"), utf8(b"type")];
-        let values = vector<vector<u8>>[ b"10", b"5", b"weapon" ];
-        let types = vector<String>[ utf8(b"integer"), utf8(b"integer"), utf8(b"String") ];
-        new(keys, values, types)
+        new(test_keys(), test_values(), test_types())
     }
 
     #[test]
     fun test_add_property(): PropertyMap {
-        use std::string::utf8;
         let properties = create_property_list();
         add(
             &mut properties, utf8(b"level"),
@@ -276,8 +310,22 @@ module aptos_token::property_map {
     }
 
     #[test]
+    fun test_get_property_keys() {
+        assert!(keys(&create_property_list()) == test_keys(), 0);
+    }
+
+    #[test]
+    fun test_get_property_types() {
+        assert!(types(&create_property_list()) == test_types(), 0);
+    }
+
+    #[test]
+    fun test_get_property_values() {
+        assert!(values(&create_property_list()) == test_values(), 0);
+    }
+
+    #[test]
     fun test_update_property(): PropertyMap {
-        use std::string::utf8;
         let properties = create_property_list();
         update_property_value(&mut properties, &utf8(b"attack"), PropertyValue { value: b"7", type: utf8(b"integer") });
         assert!(
@@ -289,7 +337,6 @@ module aptos_token::property_map {
 
     #[test]
     fun test_remove_property(): PropertyMap {
-        use std::string::utf8;
         let properties = create_property_list();
         assert!(length(&mut properties) == 3, 1);
         let (_, _) = remove(&mut properties, &utf8(b"attack"));
@@ -307,7 +354,6 @@ module aptos_token::property_map {
 
     #[test]
     fun test_read_value_with_type() {
-        use std::string::utf8;
         let keys = vector<String>[ utf8(b"attack"), utf8(b"mutable")];
         let values = vector<vector<u8>>[ bcs::to_bytes<u8>(&10), bcs::to_bytes<bool>(&false) ];
         let types = vector<String>[ utf8(b"u8"), utf8(b"bool")];

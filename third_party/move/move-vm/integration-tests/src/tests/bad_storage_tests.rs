@@ -526,7 +526,7 @@ impl ResourceResolver for BogusStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<Option<(Vec<u8>, u64)>> {
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

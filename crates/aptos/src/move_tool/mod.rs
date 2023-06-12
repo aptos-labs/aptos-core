@@ -662,7 +662,8 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
             );
-        let package = BuiltPackage::build(package_path, options)?;
+        let package = BuiltPackage::build(package_path, options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let compiled_units = package.extract_code();
         let metadata_serialized =
             bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS");

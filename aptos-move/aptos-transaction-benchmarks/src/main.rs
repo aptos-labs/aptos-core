@@ -9,7 +9,10 @@ use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
@@ -72,6 +75,9 @@ struct ExecuteOpt {
     #[clap(long, default_value = "1")]
     pub num_executor_shards: usize,
 
+    #[clap(long, min_values = 1, conflicts_with = "num_executor_shards")]
+    pub remote_executor_addresses: Option<Vec<SocketAddr>>,
+
     #[clap(long, default_value = "true")]
     pub no_conflict_txns: bool,
 
@@ -109,6 +115,7 @@ fn param_sweep(opt: ParamSweepOpt) {
                 opt.num_runs,
                 1,
                 concurrency_level,
+                None,
                 false,
                 maybe_block_gas_limit,
             );
@@ -170,6 +177,7 @@ fn execute(opt: ExecuteOpt) {
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
+        opt.remote_executor_addresses,
         opt.no_conflict_txns,
         opt.maybe_block_gas_limit,
     );

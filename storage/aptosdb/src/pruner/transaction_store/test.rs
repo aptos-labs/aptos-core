@@ -133,10 +133,6 @@ fn verify_txn_store_pruner(
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
-        assert_eq!(
-            *pruner.last_version_sent_to_pruner.as_ref().lock(),
-            i as u64
-        );
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
             // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
@@ -250,13 +246,24 @@ fn put_txn_in_store(
         .write_schemas(transaction_batch)
         .unwrap();
     let transaction_info_batch = SchemaBatch::new();
+    let transaction_accumulator_batch = SchemaBatch::new();
     ledger_store
-        .put_transaction_infos(0, txn_infos, &transaction_info_batch)
+        .put_transaction_infos(
+            0,
+            txn_infos,
+            &transaction_info_batch,
+            &transaction_accumulator_batch,
+        )
         .unwrap();
     aptos_db
         .ledger_db
         .transaction_info_db()
         .write_schemas(transaction_info_batch)
+        .unwrap();
+    aptos_db
+        .ledger_db
+        .transaction_accumulator_db()
+        .write_schemas(transaction_accumulator_batch)
         .unwrap();
 }
 

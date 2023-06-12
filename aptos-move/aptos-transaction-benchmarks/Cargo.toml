@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor-service = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
