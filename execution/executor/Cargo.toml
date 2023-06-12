@@ -33,6 +33,7 @@ dashmap = { workspace = true }
 fail = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
+num_cpus = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

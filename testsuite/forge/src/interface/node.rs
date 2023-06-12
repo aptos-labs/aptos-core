@@ -217,8 +217,10 @@ pub trait NodeExt: Node {
     }
 
     async fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {
+        let mut healthcheck_error =
+            HealthCheckError::Unknown(anyhow::anyhow!("No healthcheck performed yet"));
         while Instant::now() < deadline {
-            match self.health_check().await {
+            healthcheck_error = match self.health_check().await {
                 Ok(()) => return Ok(()),
                 Err(HealthCheckError::NotRunning(error)) => {
                     return Err(anyhow::anyhow!(
@@ -228,16 +230,17 @@ pub trait NodeExt: Node {
                         error,
                     ))
                 },
-                Err(_) => {}, // For other errors we'll retry
-            }
+                Err(e) => e, // For other errors we'll retry
+            };
 
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         Err(anyhow::anyhow!(
-            "Timed out waiting for Node {}:{} to be healthy",
+            "Timed out waiting for Node {}:{} to be healthy: Error: {:?}",
             self.name(),
-            self.peer_id()
+            self.peer_id(),
+            healthcheck_error
         ))
     }
 }

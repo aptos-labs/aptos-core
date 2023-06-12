@@ -162,6 +162,10 @@ impl FakeExecutor {
         )
     }
 
+    pub fn data_store(&self) -> &FakeDataStore {
+        &self.data_store
+    }
+
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
         let executor_thread_pool = Arc::new(
