@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::info;
 use aptos_transaction_emitter_lib::emitter::stats::TxnStats;
 use serde::Serialize;
 use std::fmt;
@@ -37,6 +38,7 @@ impl TestReport {
             self.text.push('\n');
         }
         self.text.push_str(&text);
+        info!("{}", text);
     }
 
     pub fn report_txn_stats(&mut self, test_name: String, stats: &TxnStats) {
