@@ -5,7 +5,7 @@ import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
 import { TokenClient } from "../../plugins/token_client";
 import { FAUCET_AUTH_TOKEN, longTestTimeout } from "../unit/test_helper.test";
-import { Network, NetworkToIndexerAPI, NetworkToNodeAPI, sleep } from "../../utils";
+import { Network, NetworkToIndexerAPI, sleep } from "../../utils";
 import { Provider } from "../../providers";
 import { AptosToken } from "../../plugins";
 
@@ -25,19 +25,22 @@ const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
 
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
+    const address1 = "702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address1);
+    }).rejects.toThrow(`${address1} is less than 66 chars long.`);
 
+    const address2 = "0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("0x702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).rejects.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address2);
+    }).rejects.toThrow(`${address2} is less than 66 chars long.`);
   });
 
   it("should not throw an error when account address is missing 0x", async () => {
+    const address = "790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc";
     expect(async () => {
-      await indexerClient.getAccountNFTs("790a34c702ca08576f66393140967fef983bb6bf160dafeb73de9c4ddac4d2dc");
-    }).not.toThrow("Address needs to be 66 chars long.");
+      await indexerClient.getAccountNFTs(address);
+    }).not.toThrow();
   });
 
   beforeAll(async () => {
@@ -232,6 +235,11 @@ describe("Indexer", () => {
       expect(tokens.current_token_ownerships_v2).toHaveLength(2);
     });
 
+    it("gets account current tokens from a specified token standard", async () => {
+      const tokens = await indexerClient.getOwnedTokens(alice.address().hex(), { tokenStandard: "v2" });
+      expect(tokens.current_token_ownerships_v2).toHaveLength(1);
+    });
+
     it("gets the collection data", async () => {
       const collectionData = await indexerClient.getCollectionData(alice.address().hex(), collectionName);
       expect(collectionData.current_collections_v2).toHaveLength(1);
@@ -278,6 +286,26 @@ describe("Indexer", () => {
         expect(tokensFromCollectionAddress.current_token_ownerships_v2).toEqual(
           tokensFromNameAndCreatorAddress.current_token_ownerships_v2,
         );
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex());
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(2);
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "queries for all v2 collections that an account has tokens for",
+      async () => {
+        const collections = await indexerClient.getCollectionsWithOwnedTokens(alice.address().hex(), {
+          tokenStandard: "v2",
+        });
+        expect(collections.current_collection_ownership_v2_view.length).toEqual(1);
       },
       longTestTimeout,
     );

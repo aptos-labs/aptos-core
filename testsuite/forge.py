@@ -676,14 +676,12 @@ class K8sForgeRunner(ForgeRunner):
 
         # determine the interal image repos based on the context of where the cluster is located
         if context.cloud == Cloud.AWS:
-            forge_image_repo = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge"
+            forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif (
             context.cloud == Cloud.GCP
         ):  # the GCP project for images is separate than the cluster
-            forge_image_repo = (
-                f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
-            )
+            forge_image_full = f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge:{context.forge_image_tag}"
             validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
@@ -695,7 +693,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
-            FORGE_IMAGE_REPO=forge_image_repo,
+            FORGE_IMAGE=forge_image_full,
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,

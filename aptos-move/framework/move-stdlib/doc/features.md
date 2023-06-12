@@ -997,18 +997,12 @@ Function to enable and disable features. Can only be called by a signer of @std.
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a>{<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[]})
     };
     <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
-    <b>let</b> i = 0;
-    <b>let</b> n = <a href="vector.md#0x1_vector_length">vector::length</a>(&enable);
-    <b>while</b> (i &lt; n) {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(&enable, i), <b>true</b>);
-        i = i + 1
-    };
-    <b>let</b> i = 0;
-    <b>let</b> n = <a href="vector.md#0x1_vector_length">vector::length</a>(&disable);
-    <b>while</b> (i &lt; n) {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(&disable, i), <b>false</b>);
-        i = i + 1
-    };
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
+    });
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
+    });
 }
 </code></pre>
 

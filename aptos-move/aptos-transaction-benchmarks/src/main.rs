@@ -9,7 +9,10 @@ use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_benchmarks::transactions::TransactionBencher;
 use clap::{Parser, Subcommand};
 use proptest::prelude::*;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    net::SocketAddr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 /// This is needed for filters on the Grafana dashboard working as its used to populate the filter
 /// variables.
@@ -49,7 +52,7 @@ struct ParamSweepOpt {
     pub num_runs: usize,
 
     #[clap(long)]
-    pub maybe_gas_limit: Option<u64>,
+    pub maybe_block_gas_limit: Option<u64>,
 }
 
 #[derive(Debug, Parser)]
@@ -72,11 +75,14 @@ struct ExecuteOpt {
     #[clap(long, default_value = "1")]
     pub num_executor_shards: usize,
 
+    #[clap(long, min_values = 1, conflicts_with = "num_executor_shards")]
+    pub remote_executor_addresses: Option<Vec<SocketAddr>>,
+
     #[clap(long, default_value = "true")]
     pub no_conflict_txns: bool,
 
     #[clap(long)]
-    pub maybe_gas_limit: Option<u64>,
+    pub maybe_block_gas_limit: Option<u64>,
 }
 
 fn param_sweep(opt: ParamSweepOpt) {
@@ -91,7 +97,7 @@ fn param_sweep(opt: ParamSweepOpt) {
     let run_parallel = !opt.skip_parallel;
     let run_sequential = !opt.skip_sequential;
 
-    let maybe_gas_limit = opt.maybe_gas_limit;
+    let maybe_block_gas_limit = opt.maybe_block_gas_limit;
 
     assert!(
         run_sequential || run_parallel,
@@ -109,8 +115,9 @@ fn param_sweep(opt: ParamSweepOpt) {
                 opt.num_runs,
                 1,
                 concurrency_level,
+                None,
                 false,
-                maybe_gas_limit,
+                maybe_block_gas_limit,
             );
             par_tps.sort();
             seq_tps.sort();
@@ -170,8 +177,9 @@ fn execute(opt: ExecuteOpt) {
         opt.num_blocks,
         opt.num_executor_shards,
         opt.concurrency_level_per_shard,
+        opt.remote_executor_addresses,
         opt.no_conflict_txns,
-        opt.maybe_gas_limit,
+        opt.maybe_block_gas_limit,
     );
 
     let sum: usize = par_tps.iter().sum();

@@ -10,6 +10,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 Once you have Poetry, you can install the dependencies for the testing framework like this:
 ```
+poetry config virtualenvs.in-project true  # This helps with IDE integration
 poetry install
 ```
 

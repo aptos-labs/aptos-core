@@ -1,3 +1,4 @@
+{{ $backup_verify_cronjob := lookup "batch/v1" "CronJob" $.Release.Namespace (print (include "backup.fullname" .) "-backup-verify")}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -23,8 +24,11 @@ spec:
           terminationGracePeriodSeconds: 0
           containers:
           - name: backup-verify
-            # use the same image with the backup sts
+            {{- if and $backup_verify_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
+            image: {{ (first $backup_verify_cronjob.spec.jobTemplate.spec.template.spec.containers).image }}
+            {{- else }}
             image: {{ .Values.backup.image.repo }}:{{ .Values.backup.image.tag | default .Values.imageTag }}
+            {{- end }}
             imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
             command:
             - /usr/local/bin/aptos-db-tool
@@ -74,15 +78,15 @@ spec:
             fsGroup: 6180
           {{- with .nodeSelector }}
           nodeSelector:
-            {{- toYaml . | nindent 8 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .affinity }}
           affinity:
-            {{- toYaml . | nindent 8 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .tolerations }}
           tolerations:
-            {{- toYaml . | nindent 8 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- end }}
           volumes:

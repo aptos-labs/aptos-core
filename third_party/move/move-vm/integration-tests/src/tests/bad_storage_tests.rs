@@ -106,7 +106,7 @@ fn test_malformed_resource() {
     let (changeset, _) = sess.finish().unwrap();
     storage.apply(changeset).unwrap();
 
-    // Execut the second script and make sure it succeeds. This script simply checks
+    // Execute the second script and make sure it succeeds. This script simply checks
     // that the published resource is what we expect it to be. This inital run is to ensure
     // the testing environment is indeed free of errors without external interference.
     let mut script_blob = vec![];
@@ -526,7 +526,7 @@ impl ResourceResolver for BogusStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

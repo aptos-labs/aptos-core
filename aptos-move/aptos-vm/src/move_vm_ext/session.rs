@@ -8,7 +8,6 @@ use crate::{
 use aptos_aggregator::{
     aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaChangeSet},
-    transaction::ChangeSetExt,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -22,9 +21,10 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata, table::TableHandle},
-    transaction::{ChangeSet, SignatureCheckedTransaction},
+    transaction::SignatureCheckedTransaction,
     write_set::{WriteOp, WriteSetMut},
 };
+use aptos_vm_types::change_set::VMChangeSet;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -38,6 +38,7 @@ use move_table_extension::{NativeTableContext, TableChangeSet};
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::BorrowMut,
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -127,7 +128,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> VMResult<ChangeSetExt> {
+    ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
         let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
 
@@ -143,7 +144,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context.into_change_set();
 
-        let change_set_ext = Self::convert_change_set(
+        let change_set = Self::convert_change_set(
             self.remote,
             self.new_slot_payer,
             self.features.is_storage_slot_metadata_enabled(),
@@ -158,7 +159,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         )
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
 
-        Ok(change_set_ext)
+        Ok(change_set)
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
@@ -199,19 +200,21 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut change_set_filtered = MoveChangeSet::new();
         let mut resource_group_change_set = MoveChangeSet::new();
 
+        let mut resource_group_cache = remote.release_resource_group_cache();
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
             for (struct_tag, blob_op) in resources {
-                let resource_group = runtime.with_module_metadata(&struct_tag.module_id(), |md| {
-                    get_resource_group_from_metadata(&struct_tag, md)
-                });
+                let resource_group_tag = runtime
+                    .with_module_metadata(&struct_tag.module_id(), |md| {
+                        get_resource_group_from_metadata(&struct_tag, md)
+                    });
 
-                if let Some(resource_group) = resource_group {
+                if let Some(resource_group_tag) = resource_group_tag {
                     resource_groups
-                        .entry(resource_group)
+                        .entry(resource_group_tag)
                         .or_insert_with(AccountChangeSet::new)
                         .add_resource_op(struct_tag, blob_op)
                         .map_err(|_| common_error())?;
@@ -227,9 +230,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 )
                 .map_err(|_| common_error())?;
 
-            for (resource_tag, resources) in resource_groups {
-                let mut source_data = remote
-                    .release_resource_group_cache(&addr, &resource_tag)
+            for (resource_group_tag, resources) in resource_groups {
+                let mut source_data = resource_group_cache
+                    .borrow_mut()
+                    .get_mut(&addr)
+                    .and_then(|t| t.remove(&resource_group_tag))
                     .unwrap_or_default();
                 let create = source_data.is_empty();
 
@@ -259,7 +264,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     MoveStorageOp::Modify(bcs::to_bytes(&source_data).map_err(|_| common_error())?)
                 };
                 resource_group_change_set
-                    .add_resource_op(addr, resource_tag, op)
+                    .add_resource_op(addr, resource_group_tag, op)
                     .map_err(|_| common_error())?;
             }
         }
@@ -279,7 +284,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
-    ) -> Result<ChangeSetExt, VMStatus> {
+    ) -> Result<VMChangeSet, VMStatus> {
         let mut write_set_mut = WriteSetMut::new(Vec::new());
         let mut delta_change_set = DeltaChangeSet::empty();
         let mut new_slot_metadata: Option<StateValueMetadata> = None;
@@ -364,13 +369,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
             })
             .collect::<Result<Vec<_>, VMStatus>>()?;
-
-        let change_set = ChangeSet::new(write_set, events, configs)?;
-        Ok(ChangeSetExt::new(
-            delta_change_set,
-            change_set,
-            Arc::new(configs.clone()),
-        ))
+        VMChangeSet::new(write_set, delta_change_set, events, configs)
     }
 }
 

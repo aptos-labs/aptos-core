@@ -5,14 +5,16 @@ metadata:
   labels:
     {{- include "testnet-addons.labels" . | nindent 4 }}
   annotations:
+    {{- if .Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ .Values.service.domain }}
+    {{- end }}
+    # EKS annotations
+    {{- if eq .Values.cloud "EKS" }}
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/tags: {{ .Values.service.aws_tags | quote }}
     {{- if .Values.ingress.loadBalancerSourceRanges }}
     alb.ingress.kubernetes.io/inbound-cidrs: {{ join "," .Values.ingress.loadBalancerSourceRanges }}
-    {{- end }}
-    {{- if .Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: {{ .Values.service.domain }}
     {{- end }}
     {{- if .Values.ingress.acm_certificate }}
     alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.acm_certificate }}
@@ -27,6 +29,16 @@ metadata:
     alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds={{ .Values.ingress.cookieDurationSeconds }}
     alb.ingress.kubernetes.io/target-type: ip
     {{- end }}
+    {{- end }} # "EKS"
+    # GKE annotations
+    {{- if eq .Values.cloud "GKE" }}
+    kubernetes.io/ingress.class: "gce"
+    # Allow HTTP but always return 301 because we have redirectToHttps enabled
+    kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.gce_static_ip }}
+    networking.gke.io/managed-certificates: {{ .Values.ingress.gce_managed_certificate }}
+    networking.gke.io/v1beta1.FrontendConfig: {{ include "testnet-addons.fullname" . }}
+    {{- end }} # "GKE"
 spec:
   rules:
   {{- if .Values.service.domain }}
@@ -41,7 +53,8 @@ spec:
             port:
               number: 80
   {{- end }}
-  - http:
+  - host: {{ .Values.service.domain }}
+    http:
       paths:
       - path: /waypoint.txt
         pathType: Exact
@@ -64,3 +77,23 @@ spec:
             name: {{ include "testnet-addons.fullname" . }}-api
             port:
               number: 80
+---
+{{- if eq .Values.cloud "GKE" }}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ include "testnet-addons.fullname" . }}
+spec:
+  redirectToHttps:
+    enabled: true
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.ingress.gce_managed_certificate }}
+spec:
+  domains:
+    - {{ .Values.service.domain }}
+    - api.{{ .Values.service.domain }}
+---
+{{- end }}

@@ -17,8 +17,8 @@ use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    test_helpers::transaction_test_helpers::block,
-    transaction::{Transaction, TransactionListWithProof, TransactionOutputListWithProof},
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use rand::Rng;
 
@@ -264,7 +264,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<MockVM, Transaction>::new(db);
+        let executor = BlockExecutor::<MockVM>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
 
@@ -274,15 +274,12 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
-                (block_id, block(txns, executor.get_block_gas_limit())),
+                (block_id, block(txns, BLOCK_GAS_LIMIT)).into(),
                 parent_block_id,
+                BLOCK_GAS_LIMIT,
             )
             .unwrap();
-        // With no block gas limit, StateCheckpoint txn is inserted to block before execution.
-        // So the ledger_info version needs to + 1 with no block gas limit.
-        let maybe_gas_limit = executor.get_block_gas_limit();
-        let diff = maybe_gas_limit.map(|_| 0).unwrap_or(1);
-        let ledger_info = tests::gen_ledger_info(5 + diff, output.root_hash(), block_id, 1);
+        let ledger_info = tests::gen_ledger_info(5 + 1, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();
     }
 
@@ -318,7 +315,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
 
     // commit 5 txns first.
     {
-        let executor = BlockExecutor::<MockVM, Transaction>::new(db);
+        let executor = BlockExecutor::<MockVM>::new(db);
         let parent_block_id = executor.committed_block_id();
         let block_id = tests::gen_block_id(1);
 
@@ -327,7 +324,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
             .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
-            .execute_block((block_id, block(txns)), parent_block_id)
+            .execute_block((block_id, block(txns)).into(), parent_block_id)
             .unwrap();
         let ledger_info = tests::gen_ledger_info(6, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();

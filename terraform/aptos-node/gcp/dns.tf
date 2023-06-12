@@ -10,13 +10,14 @@ resource "random_string" "validator-dns" {
 }
 
 locals {
+  dns_prefix  = var.workspace_dns ? "${local.workspace_name}." : ""
   record_name = replace(var.record_name, "<workspace>", local.workspace_name)
+  domain      = var.zone_name != "" ? "${local.dns_prefix}${data.google_dns_managed_zone.aptos[0].dns_name}" : null
 }
 
 data "kubernetes_service" "validator-lb" {
   count = var.zone_name != "" && var.create_dns_records ? 1 : 0
   metadata {
-    # This is the main validator LB service that is created by the aptos-node helm chart
     name = "${local.workspace_name}-aptos-node-0-validator-lb"
   }
   depends_on = [time_sleep.lb_creation]
@@ -25,7 +26,6 @@ data "kubernetes_service" "validator-lb" {
 data "kubernetes_service" "fullnode-lb" {
   count = var.zone_name != "" && var.create_dns_records ? 1 : 0
   metadata {
-    # This is the main fullnode LB service that is created by the aptos-node helm chart
     name = "${local.workspace_name}-aptos-node-0-fullnode-lb"
   }
   depends_on = [time_sleep.lb_creation]
@@ -43,7 +43,7 @@ resource "google_dns_record_set" "validator" {
   project      = data.google_dns_managed_zone.aptos[0].project
   name         = "${random_string.validator-dns.result}.${local.record_name}.${data.google_dns_managed_zone.aptos[0].dns_name}"
   type         = "A"
-  ttl          = 3600
+  ttl          = var.dns_ttl
   rrdatas      = [data.kubernetes_service.validator-lb[0].status[0].load_balancer[0].ingress[0].ip]
 }
 
@@ -53,7 +53,7 @@ resource "google_dns_record_set" "fullnode" {
   project      = data.google_dns_managed_zone.aptos[0].project
   name         = "${local.record_name}.${data.google_dns_managed_zone.aptos[0].dns_name}"
   type         = "A"
-  ttl          = 3600
+  ttl          = var.dns_ttl
   rrdatas      = [data.kubernetes_service.fullnode-lb[0].status[0].load_balancer[0].ingress[0].ip]
 }
 

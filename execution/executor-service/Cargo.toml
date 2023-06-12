@@ -1,0 +1,32 @@
+[package]
+name = "aptos-executor-service"
+description = "Aptos executor service"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-executor-types = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-retrier = { workspace = true }
+aptos-secure-net = { workspace = true }
+aptos-state-view = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+itertools = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

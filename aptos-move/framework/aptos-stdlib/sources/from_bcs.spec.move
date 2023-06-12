@@ -20,7 +20,7 @@ spec aptos_std::from_bcs {
 
         axiom<T> forall b1: vector<u8>, b2: vector<u8>:
             ( b1 == b2 ==> deserialize<T>(b1) == deserialize<T>(b2) );
-            
+
         // `deserialize` is an inverse function of `bcs::serialize`.
         // TODO: disabled because this generic axiom causes a timeout.
         // axiom<T> forall v: T: deserialize<T>(bcs::serialize(v)) == v;

@@ -48,8 +48,9 @@ spec aptos_framework::code {
     }
 
     spec get_module_names(pack: &PackageMetadata): vector<String> {
-        aborts_if false;
-        ensures len(result) == len(pack.modules);
-        ensures forall i in 0..len(result): result[i] == pack.modules[i].name;
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] len(result) == len(pack.modules);
+        ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
     }
 }

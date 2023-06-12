@@ -7,21 +7,26 @@
 
 #![deny(missing_docs)]
 
+pub use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
+pub use aptos_types::{
+    account_address::AccountAddress, transaction::authenticator::AuthenticationKey,
+};
 use hex::encode;
 use ledger_apdu::APDUCommand;
 use ledger_transport_hid::{hidapi::HidApi, LedgerHIDError, TransportNativeHID};
-use once_cell::sync::Lazy;
 use std::{
+    collections::HashMap,
     fmt,
     fmt::{Debug, Display},
+    ops::Range,
     str,
+    string::ToString,
 };
 use thiserror::Error;
 
 // A piece of data which tells a wallet how to derive a specific key within a tree of keys
 // 637 is the key for Aptos
-// TODO: Add support for multiple index
-const DERIVATIVE_PATH: &str = "m/44'/637'/0'/0'/0'";
+const DERIVATIVE_PATH: &str = "m/44'/637'/{index}'/0'/0'";
 
 const CLA_APTOS: u8 = 0x5B; // Aptos CLA Instruction class
 const INS_GET_VERSION: u8 = 0x03; // Get version instruction code
@@ -36,8 +41,6 @@ const P1_CONFIRM: u8 = 0x01;
 const P1_START: u8 = 0x00;
 const P2_MORE: u8 = 0x80;
 const P2_LAST: u8 = 0x00;
-
-static SERIALIZED_BIP32: Lazy<Vec<u8>> = Lazy::new(|| serialize_bip32(DERIVATIVE_PATH));
 
 #[derive(Debug, Error)]
 /// Aptos Ledger Error
@@ -143,17 +146,96 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
     }
 }
 
-/// Returns the public key of your Aptos account in Ledger device
+/// Returns the the batch/HashMap of the accounts for the account index in index_range
+/// Note: We only allow a range of 10 for performance purpose
+///
+/// # Arguments
+///
+/// * `index_range` - start(inclusive) - end(exclusive) acounts, that you want to fetch, if None default to 0-10
+pub fn fetch_batch_accounts(
+    index_range: Option<Range<u32>>,
+) -> Result<HashMap<String, AccountAddress>, AptosLedgerError> {
+    let range = if let Some(range) = index_range {
+        range
+    } else {
+        0..10
+    };
+
+    // Make sure the range is within 10 counts
+    if range.end - range.start > 10 {
+        return Err(AptosLedgerError::UnexpectedError(
+            "Unexpected Error: Make sure the range is less than or equal to 10".to_string(),
+            None,
+        ));
+    }
+
+    // Open connection to ledger
+    let transport = open_ledger_transport()?;
+
+    let mut accounts = HashMap::new();
+    for i in range {
+        let path = DERIVATIVE_PATH.replace("{index}", &i.to_string());
+        let cdata = serialize_bip32(&path);
+
+        match transport.exchange(&APDUCommand {
+            cla: CLA_APTOS,
+            ins: INS_GET_PUB_KEY,
+            p1: P1_NON_CONFIRM,
+            p2: P2_LAST,
+            data: cdata,
+        }) {
+            Ok(response) => {
+                // Got the response from ledger after user has confirmed on the ledger wallet
+                if response.retcode() == APDU_CODE_SUCCESS {
+                    // Extract the Public key from the response data
+                    let mut offset = 0;
+                    let response_buffer = response.data();
+                    let pub_key_len: usize = (response_buffer[offset] - 1).into();
+                    offset += 1;
+
+                    // Skipping weird 0x04 - because of how the Aptos Ledger parse works when return pub key
+                    offset += 1;
+
+                    let pub_key_buffer = response_buffer[offset..offset + pub_key_len].to_vec();
+                    let hex_string = encode(pub_key_buffer);
+                    let public_key = match Ed25519PublicKey::from_encoded_string(&hex_string) {
+                        Ok(pk) => Ok(pk),
+                        Err(err) => Err(AptosLedgerError::UnexpectedError(
+                            err.to_string(),
+                            Some(response.retcode()),
+                        )),
+                    };
+                    let account = account_address_from_public_key(&public_key?);
+                    accounts.insert(path, account);
+                } else {
+                    let error_string = response
+                        .error_code()
+                        .map(|error_code| error_code.to_string())
+                        .unwrap_or_else(|retcode| format!("Error with retcode: {:x}", retcode));
+                    return Err(AptosLedgerError::UnexpectedError(
+                        error_string,
+                        Option::from(response.retcode()),
+                    ));
+                }
+            },
+            Err(err) => return Err(AptosLedgerError::from(err)),
+        }
+    }
+
+    Ok(accounts)
+}
+
+/// Returns the public key of your Aptos account in Ledger device at index 0
 ///
 /// # Arguments
 ///
 /// * `display` - If true, the public key will be displayed on the Ledger device, and confirmation is needed
-pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
+pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, AptosLedgerError> {
     // Open connection to ledger
     let transport = open_ledger_transport()?;
 
     // Serialize the derivative path
-    let cdata = SERIALIZED_BIP32.clone();
+    let cdata = serialize_bip32(path);
 
     // APDU command's instruction parameter 1 or p1
     let p1: u8 = match display {
@@ -182,7 +264,10 @@ pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
 
                 let pub_key_buffer = response_buffer[offset..offset + pub_key_len].to_vec();
                 let hex_string = encode(pub_key_buffer);
-                Ok(hex_string)
+                match Ed25519PublicKey::from_encoded_string(&hex_string) {
+                    Ok(pk) => Ok(pk),
+                    Err(err) => Err(AptosLedgerError::UnexpectedError(err.to_string(), None)),
+                }
             } else {
                 let error_string = response
                     .error_code()
@@ -203,12 +288,12 @@ pub fn get_public_key(display: bool) -> Result<String, AptosLedgerError> {
 /// # Arguments
 ///
 /// * `raw_txn` - the serialized raw transaction that need to be signed
-pub fn sign_txn(raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
+pub fn sign_txn(path: &str, raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
     // open connection to ledger
     let transport = open_ledger_transport()?;
 
     // Serialize the derivative path
-    let derivative_path_bytes = SERIALIZED_BIP32.clone();
+    let derivative_path_bytes = serialize_bip32(path);
 
     // Send the derivative path over as first message
     let sign_start = transport.exchange(&APDUCommand {
@@ -306,4 +391,9 @@ fn open_ledger_transport() -> Result<TransportNativeHID, AptosLedgerError> {
     };
 
     Ok(transport)
+}
+
+fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
+    let auth_key = AuthenticationKey::ed25519(public_key);
+    AccountAddress::new(*auth_key.derived_address())
 }
