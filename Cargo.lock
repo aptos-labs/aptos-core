@@ -1553,6 +1553,7 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "regex",
+ "smallvec",
 ]
 
 [[package]]
@@ -2006,12 +2007,14 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
  "bcs 0.1.4",
  "goldenfile",
  "hex",
@@ -5673,6 +5676,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas",
+ "aptos-gas-profiling",
  "aptos-keygen",
  "aptos-language-e2e-tests",
  "aptos-logger",
