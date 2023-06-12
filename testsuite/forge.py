@@ -56,6 +56,9 @@ DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
 
 FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
+MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig/"
+MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
+
 
 @dataclass
 class RunResult:
@@ -698,6 +701,8 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
+            KUBECONFIG=MULTIREGION_KUBECONFIG_PATH if context.forge_cluster.region == "multiregion" else "",
+            MULTIREGION_KUBECONFIG_PATH=MULTIREGION_KUBECONFIG_PATH,
         )
 
         with ForgeResult.with_context(context) as forge_result:
