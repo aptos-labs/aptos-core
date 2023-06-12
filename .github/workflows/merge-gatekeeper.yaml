@@ -31,4 +31,5 @@ jobs:
         uses: upsidr/merge-gatekeeper@09af7a82c1666d0e64d2bd8c01797a0bcfd3bb5d # pin v1.2.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          interval: 60 # 1 minute
           timeout: 5400 # 1.5 hour
