@@ -24,7 +24,7 @@ struct Block {
 }
 
 impl Block {
-    fn updates_flat_batch(&self) -> Vec<(HashValue, Option<&StateValue>)> {
+    fn updates(&self) -> Vec<(HashValue, Option<&StateValue>)> {
         self.updates.iter().map(|(k, v)| (*k, v.as_ref())).collect()
     }
 }
@@ -40,9 +40,9 @@ impl Group {
 
         for block in &self.blocks {
             let block_size = block.updates.len();
-            let one_large_batch = block.updates_flat_batch();
+            let one_large_batch = block.updates();
 
-            group.throughput(Throughput::Elements((block_size * 2) as u64));
+            group.throughput(Throughput::Elements(block_size as u64));
 
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
@@ -138,7 +138,7 @@ impl Benches {
                     Block {
                         smt: base_block
                             .smt
-                            .batch_update(base_block.updates_flat_batch(), &base_block.proof_reader)
+                            .batch_update(base_block.updates(), &base_block.proof_reader)
                             .unwrap(),
                         updates,
                         proof_reader,
@@ -166,7 +166,7 @@ impl Benches {
         block_size: usize,
     ) -> Vec<(HashValue, Option<StateValue>)> {
         std::iter::repeat_with(|| Self::gen_update(rng, keys))
-            .take(block_size * 2)
+            .take(block_size)
             .collect()
     }
 
