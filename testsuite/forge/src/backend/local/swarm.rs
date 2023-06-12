@@ -465,6 +465,16 @@ impl Drop for LocalSwarm {
 #[async_trait::async_trait]
 impl Swarm for LocalSwarm {
     async fn health_check(&mut self) -> Result<()> {
+        for node in self.validators.values_mut() {
+            if let Err(e) = node.health_check().await {
+                return Err(anyhow!(e))
+            }
+        }
+        for node in self.fullnodes.values_mut() {
+            if let Err(e) = node.health_check().await {
+                return Err(anyhow!(e))
+            }
+        }
         Ok(())
     }
 
