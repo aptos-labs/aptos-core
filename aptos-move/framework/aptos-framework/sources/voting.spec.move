@@ -36,11 +36,11 @@ spec aptos_framework::voting {
         include CreateProposalAbortsIf<ProposalType>{is_multi_step_proposal: false};
     }
 
-    /// The min_vote_threshold lower thanearly_resolution_vote_threshold.
-    /// Make sure the execution script's hash is not empty.
-    /// VotingForum<ProposalType> existed under the voting_forum_address.
-    /// The next_proposal_id in VotingForum is up to MAX_U64.
-    /// CurrentTimeMicroseconds existed under the @aptos_framework.
+    // The min_vote_threshold lower thanearly_resolution_vote_threshold.
+    // Make sure the execution script's hash is not empty.
+    // VotingForum<ProposalType> existed under the voting_forum_address.
+    // The next_proposal_id in VotingForum is up to MAX_U64.
+    // CurrentTimeMicroseconds existed under the @aptos_framework.
     spec create_proposal_v2<ProposalType: store>(
         proposer: address,
         voting_forum_address: address,
@@ -90,7 +90,8 @@ spec aptos_framework::voting {
         should_pass: bool,
     ) {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
 
         aborts_if !exists<VotingForum<ProposalType>>(voting_forum_address);
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
@@ -115,7 +116,8 @@ spec aptos_framework::voting {
         proposal_id: u64,
     ) {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
         include AbortsIfNotContainProposalID<ProposalType>;
 
         let voting_forum =  global<VotingForum<ProposalType>>(voting_forum_address);
@@ -126,9 +128,9 @@ spec aptos_framework::voting {
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
-        /// Failed
+        // Avoid Overflow
         aborts_if voting_closed && (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
-        /// Pending
+        // Resolvable_time Properties
         aborts_if !voting_closed;
         aborts_if proposal.is_resolved;
         aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);
@@ -143,7 +145,8 @@ spec aptos_framework::voting {
         proposal_id: u64,
     ): ProposalType {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
 
         pragma aborts_if_is_partial;
         include AbortsIfNotContainProposalID<ProposalType>;
@@ -156,7 +159,8 @@ spec aptos_framework::voting {
         next_execution_hash: vector<u8>,
     ) {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
 
         pragma aborts_if_is_partial;
         include AbortsIfNotContainProposalID<ProposalType>;
@@ -170,7 +174,8 @@ spec aptos_framework::voting {
 
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
         use aptos_framework::chain_status;
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
         include AbortsIfNotContainProposalID<ProposalType>;
     }
 
@@ -184,8 +189,8 @@ spec aptos_framework::voting {
     ): u64 {
         use aptos_framework::chain_status;
         pragma addition_overflow_unchecked;
-
-        requires chain_status::is_operating(); // Ensures existence of Timestamp
+        // Ensures existence of Timestamp
+        requires chain_status::is_operating();
 
         include AbortsIfNotContainProposalID<ProposalType>;
 
@@ -197,14 +202,14 @@ spec aptos_framework::voting {
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
-        /// Succeeded or Failed
+        // Voting Succeeded or Failed
         ensures voting_closed ==> if (proposal.yes_votes > proposal.no_votes && proposal.yes_votes + proposal.no_votes >= proposal.min_vote_threshold) {
             result == PROPOSAL_STATE_SUCCEEDED
         } else {
             result == PROPOSAL_STATE_FAILED
         };
 
-        /// Pending
+        // Voting is Pending
         ensures !voting_closed ==> result == PROPOSAL_STATE_PENDING;
     }
 

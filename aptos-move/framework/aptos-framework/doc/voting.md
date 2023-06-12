@@ -1555,11 +1555,6 @@ Return true if the voting period of the given proposal has already ended.
 </code></pre>
 
 
-The min_vote_threshold lower thanearly_resolution_vote_threshold.
-Make sure the execution script's hash is not empty.
-VotingForum<ProposalType> existed under the voting_forum_address.
-The next_proposal_id in VotingForum is up to MAX_U64.
-CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
@@ -1646,20 +1641,8 @@ CurrentTimeMicroseconds existed under the @aptos_framework.
                             (proposal.yes_votes &gt;= early_resolution_threshold ||
                              proposal.no_votes &gt;= early_resolution_threshold);
 <b>let</b> voting_closed = voting_period_over || be_resolved_early;
-</code></pre>
-
-
-Failed
-
-
-<pre><code><b>aborts_if</b> voting_closed && (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
-</code></pre>
-
-
-Pending
-
-
-<pre><code><b>aborts_if</b> !voting_closed;
+<b>aborts_if</b> voting_closed && (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
+<b>aborts_if</b> !voting_closed;
 <b>aborts_if</b> proposal.is_resolved;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, std::string::spec_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>));
@@ -1780,24 +1763,12 @@ Pending
                             (proposal.yes_votes &gt;= early_resolution_threshold ||
                              proposal.no_votes &gt;= early_resolution_threshold);
 <b>let</b> voting_closed = voting_period_over || be_resolved_early;
-</code></pre>
-
-
-Succeeded or Failed
-
-
-<pre><code><b>ensures</b> voting_closed ==&gt; <b>if</b> (proposal.yes_votes &gt; proposal.no_votes && proposal.yes_votes + proposal.no_votes &gt;= proposal.min_vote_threshold) {
+<b>ensures</b> voting_closed ==&gt; <b>if</b> (proposal.yes_votes &gt; proposal.no_votes && proposal.yes_votes + proposal.no_votes &gt;= proposal.min_vote_threshold) {
     result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>
 } <b>else</b> {
     result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_FAILED">PROPOSAL_STATE_FAILED</a>
 };
-</code></pre>
-
-
-Pending
-
-
-<pre><code><b>ensures</b> !voting_closed ==&gt; result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_PENDING">PROPOSAL_STATE_PENDING</a>;
+<b>ensures</b> !voting_closed ==&gt; result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_PENDING">PROPOSAL_STATE_PENDING</a>;
 </code></pre>
 
 
