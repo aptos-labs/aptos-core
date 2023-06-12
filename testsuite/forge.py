@@ -634,18 +634,13 @@ class LocalForgeRunner(ForgeRunner):
 
 
 class K8sForgeRunner(ForgeRunner):
-    def run(self, context: ForgeContext) -> ForgeResult:
-        forge_pod_name = sanitize_forge_resource_name(
-            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}",
-            max_length=52 if context.forge_cluster.name == "multiregion" else 63,
-        )
-        log.info(f"Creating forge pod {forge_pod_name}")
-        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
+    def delete_forge_runner_pod(self, context: ForgeContext):
         context.shell.run(
             [
                 "kubectl",
                 "--kubeconfig",
                 context.forge_cluster.kubeconf,
+                context.forge_cluster.kubectl_create_context_arg,
                 "delete",
                 "pod",
                 "-n",
@@ -655,6 +650,15 @@ class K8sForgeRunner(ForgeRunner):
                 "--force",
             ]
         )
+
+    def run(self, context: ForgeContext) -> ForgeResult:
+        forge_pod_name = sanitize_forge_resource_name(
+            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}",
+            max_length=52 if context.forge_cluster.is_multiregion else 63,
+        )
+        log.info(f"Creating forge pod {forge_pod_name}")
+        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
+        self.delete_forge_runner_pod(context)
         context.shell.run(
             [
                 "kubectl",
@@ -704,7 +708,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_TRIGGERED_BY=forge_triggered_by,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH
-            if context.forge_cluster.region == "multiregion"
+            if context.forge_cluster.is_multiregion
             else "",
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
         )
@@ -717,6 +721,7 @@ class K8sForgeRunner(ForgeRunner):
                     "kubectl",
                     "--kubeconfig",
                     context.forge_cluster.kubeconf,
+                    context.forge_cluster.kubectl_create_context_arg,
                     "apply",
                     "-n",
                     "default",
@@ -746,7 +751,6 @@ class K8sForgeRunner(ForgeRunner):
                         "kubectl",
                         "--kubeconfig",
                         context.forge_cluster.kubeconf,
-                        current_context,
                         "logs",
                         "-n",
                         "default",
@@ -803,6 +807,9 @@ class K8sForgeRunner(ForgeRunner):
                     raise Exception("Exhausted attempt to get forge pod status")
 
             forge_result.set_state(state)
+
+        # cleanup the pod manually
+        self.delete_forge_runner_pod(context)
 
         return forge_result
 
@@ -1306,14 +1313,14 @@ def test(
     else:
         cloud_enum = Cloud.GCP
 
-    if forge_cluster_name == "multiregion":
+    if forge_cluster_name == "forge-multiregion":
         log.info("Using multiregion cluster")
         forge_cluster = ForgeCluster(
             name=forge_cluster_name,
             cloud=Cloud.GCP,
             region="multiregion",
             kubeconf=context.filesystem.mkstemp(),
-            runner_mode=forge_runner_mode,
+            is_multiregion=True,
         )
     else:
         log.info(

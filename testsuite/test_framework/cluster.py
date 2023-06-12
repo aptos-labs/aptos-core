@@ -52,7 +52,7 @@ class ForgeCluster:
     cloud: Cloud = Cloud.AWS
     region: Optional[str] = "us-west-2"
     kubeconf: Optional[str] = None
-    runner_mode: Optional[str] = None
+    is_multiregion: bool = False
 
     def __repr__(self) -> str:
         return f"{self.cloud}/{self.region}/{self.name}"
@@ -60,7 +60,11 @@ class ForgeCluster:
     def set_kubeconf(self, kubeconf: str) -> ForgeCluster:
         self.kubeconf = kubeconf
         return self
-
+    
+    @property
+    def kubectl_create_context_arg(self) -> str:
+        return f"--context=karmada-apiserver" if self.is_multiregion else ""
+        
     async def write(self, shell: Shell) -> None:
         assert self.kubeconf is not None, "kubeconf must be set"
         await self.write_cluster_config(shell, self.name, self.kubeconf)
@@ -149,14 +153,7 @@ class ForgeCluster:
     async def write_cluster_config(
         self, shell: Shell, cluster_name: str, temp: str
     ) -> None:
-        if cluster_name == "multiregion":
-            # Depending on the runner mode, we need to use either the aggregated API server or the 
-            # karmada API server. For k8s runner mode, we need to use the karmada API server because
-            # the aggregated API does not support creating individual Pods, which is needed for 
-            # creating the test runner pod in the remote cluster. For more information, see:
-            # https://karmada.io/docs/userguide/globalview/proxy-global-resource
-            assert self.runner_mode is not None, "runner_mode must be set"
-            secret_name = "karmada-kubeconfig-api" if self.runner_mode == "k8s" else "karmada-kubeconfig"
+        if self.is_multiregion:
             cmd = [
                 "gcloud",
                 "secrets",
@@ -164,7 +161,7 @@ class ForgeCluster:
                 "access",
                 "latest",
                 "--secret",
-                secret_name,
+                "karmada-kubeconfig",
                 "--project",
                 "forge-gcp-multiregion-test",
                 "--out-file",
