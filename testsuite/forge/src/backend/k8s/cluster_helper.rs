@@ -726,7 +726,7 @@ async fn make_kube_client_config() -> Result<Config> {
         Err(kubeconfig_err) => {
             Config::infer()
                 .await
-                .map_err(|infer_err| 
+                .map_err(|infer_err|
                     anyhow::anyhow!("Unable to construct Config. Failed to infer config {:?}. Failed to read KUBECONFIG {:?}", infer_err, kubeconfig_err)
                 )
         }

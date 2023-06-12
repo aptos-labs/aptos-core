@@ -635,6 +635,7 @@ class LocalForgeRunner(ForgeRunner):
 
 class K8sForgeRunner(ForgeRunner):
     def delete_forge_runner_pod(self, context: ForgeContext):
+        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
         context.shell.run(
             [
                 "kubectl",
