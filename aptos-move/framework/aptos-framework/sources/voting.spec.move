@@ -122,7 +122,7 @@ spec aptos_framework::voting {
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         let voting_period_over = timestamp::now_seconds() > proposal.expiration_secs;
-        let be_resolved_early = option::spec_is_some(proposal.early_resolution_vote_threshold) && 
+        let be_resolved_early = option::spec_is_some(proposal.early_resolution_vote_threshold) &&
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
@@ -130,7 +130,6 @@ spec aptos_framework::voting {
         aborts_if voting_closed && (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
         /// Pending
         aborts_if !voting_closed;
-
         aborts_if proposal.is_resolved;
         aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);
         aborts_if !simple_map::spec_contains_key(proposal.metadata, std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY));
@@ -198,9 +197,6 @@ spec aptos_framework::voting {
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
-
-        // aborts_if voting_closed && proposal.yes_votes > proposal.no_votes && proposal.yes_votes + proposal.no_votes > MAX_U128;
-
         /// Succeeded or Failed
         ensures voting_closed ==> if (proposal.yes_votes > proposal.no_votes && proposal.yes_votes + proposal.no_votes >= proposal.min_vote_threshold) {
             result == PROPOSAL_STATE_SUCCEEDED
