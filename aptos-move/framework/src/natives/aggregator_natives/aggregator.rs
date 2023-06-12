@@ -123,7 +123,7 @@ fn native_deferred_read(
     context.charge(gas_params.base)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, _limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();

@@ -76,8 +76,15 @@ impl<'a> NativeAggregatorContext<'a> {
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
-            let (value, state, limit, history) = aggregator.into();
+            let (value, state, limit, history, _, snapshot_of) = aggregator.into();
 
+            // If the aggregator is a snapshot of another aggregator, and
+            // if aggregator is already materialized (in data state), it means the
+            // promise created when generating the snapshot already has value set correctly.
+            // There is no need to include this aggregator snapshot in the AggregatorChangeSet.
+            if state == AggregatorState::Data && snapshot_of.is_some() {
+                continue;
+            }
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
@@ -86,7 +93,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
-                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
+                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative, snapshot_of);
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
@@ -95,7 +102,7 @@ impl<'a> NativeAggregatorContext<'a> {
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
-                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
+                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative, snapshot_of);
                     AggregatorChange::Merge(delta_op)
                 },
             };
@@ -288,12 +295,12 @@ mod test {
             changes.get(&aggregator_id_for_test(500)).unwrap(),
             AggregatorChange::Delete
         );
-        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0);
+        let delta_100 = DeltaOp::new(DeltaUpdate::Plus(100), 600, 100, 0, None);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(600)).unwrap(),
             AggregatorChange::Merge(delta_100)
         );
-        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0);
+        let delta_200 = DeltaOp::new(DeltaUpdate::Plus(200), 700, 200, 0, None);
         assert_eq!(
             *changes.get(&aggregator_id_for_test(700)).unwrap(),
             AggregatorChange::Merge(delta_200)

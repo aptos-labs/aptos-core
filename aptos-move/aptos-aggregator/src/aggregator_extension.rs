@@ -22,11 +22,11 @@ pub enum AggregatorState {
     NegativeDelta,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorID {
     // A handle that is shared across all aggregator instances created by the
     // same `AggregatorFactory` and which is used for fine-grained storage
@@ -153,7 +153,7 @@ impl Aggregator {
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
         if self.freeze_operations {
             return Err(abort_error(
-                format!("Cannot perform add operation after aggregator is frozen"),
+                "Cannot perform add operation after aggregator is frozen",
                 EFREEZE_AGG,
             ))
         }
@@ -192,7 +192,7 @@ impl Aggregator {
     pub fn sub(&mut self, value: u128) -> PartialVMResult<()> {
         if self.freeze_operations {
             return Err(abort_error(
-                format!("Cannot perform sub operation after aggregator is frozen"),
+                "Cannot perform sub operation after aggregator is frozen",
                 EFREEZE_AGG,
             ))
         }
@@ -303,8 +303,8 @@ impl Aggregator {
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
-        (self.value, self.state, self.limit, self.history)
+    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>, bool, Option<AggregatorID>) {
+        (self.value, self.state, self.limit, self.history, self.freeze_operations, self.snapshot_of)
     }
 }
 

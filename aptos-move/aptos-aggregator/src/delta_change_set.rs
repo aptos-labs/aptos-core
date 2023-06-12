@@ -12,6 +12,7 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
+use crate::aggregator_extension::AggregatorID;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -33,6 +34,8 @@ pub struct DeltaOp {
     limit: u128,
     /// Delta which is the result of the execution.
     update: DeltaUpdate,
+    /// This DeltaOp should be applied to this base_aggregator.
+    base_aggregator: Option<AggregatorID>
 }
 
 /// Different delta functions.
@@ -44,12 +47,13 @@ pub enum DeltaUpdate {
 
 impl DeltaOp {
     /// Creates a new delta op.
-    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128) -> Self {
+    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128, base_aggregator: Option<AggregatorID>) -> Self {
         Self {
             max_positive,
             min_negative,
             limit,
             update,
+            base_aggregator
         }
     }
 
@@ -241,7 +245,7 @@ pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
 
 /// Error for delta application. Can be used by delta partial functions
 /// to return descriptive error messages and an appropriate error code.
-fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
+pub fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::ABORTED)
         .with_message(message.to_string())
         .with_sub_status(code)
@@ -280,12 +284,12 @@ pub fn deserialize(value_bytes: &[u8]) -> u128 {
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_sub(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
+    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v, None)
 }
 
 // Helper for tests, #[cfg(test)] doesn't work for cross-crate.
 pub fn delta_add(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
+    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0, None)
 }
 
 /// `DeltaChangeSet` contains all access paths that one transaction wants to update with deltas.

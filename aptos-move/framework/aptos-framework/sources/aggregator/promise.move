@@ -1,6 +1,6 @@
 module aptos_framework::promise {
     use std::option::{Self, Option};
-    use aptos_framework::aggregator::{Self, Aggregator};
+    use aptos_framework::aggregator;
 
     struct Promise has store {
         value: u128,

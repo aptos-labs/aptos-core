@@ -11,7 +11,7 @@
 /// parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
 /// at the moment.**
 module aptos_framework::aggregator {
-    use aptos_framework::promise::{Self,Promise};
+    use aptos_framework::promise::Promise;
 
     /// The value of aggregator overflows. Raised by native code.
     const EAGGREGATOR_OVERFLOW: u64 = 1;
