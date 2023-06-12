@@ -28,6 +28,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
     fn test(
         &self,
         swarm: &mut dyn aptos_forge::Swarm,
+        _report: &mut aptos_forge::TestReport,
         duration: std::time::Duration,
     ) -> anyhow::Result<()> {
         let runtime = Runtime::new().unwrap();

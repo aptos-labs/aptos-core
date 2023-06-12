@@ -151,15 +151,19 @@ class ForgeResult:
         assert self._end_time is not None, "end_time is not set"
         return self._end_time
 
+    @property
+    def duration(self) -> float:
+        return (self.end_time - self.start_time).total_seconds()
+
     @classmethod
-    def from_args(cls, state: ForgeState, output: str) -> "ForgeResult":
+    def from_args(cls, state: ForgeState, output: str) -> ForgeResult:
         result = cls()
         result.state = state
         result.output = output
         return result
 
     @classmethod
-    def empty(cls) -> "ForgeResult":
+    def empty(cls) -> ForgeResult:
         return cls.from_args(ForgeState.EMPTY, "")
 
     @classmethod
@@ -207,7 +211,7 @@ class ForgeResult:
         self.debugging_output = output
 
     def format(self, context: ForgeContext) -> str:
-        output_lines = []
+        output_lines: List[str] = []
         if not self.succeeded():
             output_lines.append(self.debugging_output)
         output_lines.extend(
@@ -216,6 +220,13 @@ class ForgeResult:
                 f"Forge {self.state.value.lower()}ed",
             ]
         )
+        if self.state == ForgeState.FAIL and self.duration > 3600:
+            output_lines.append(
+                "Forge took longer than 1 hour to run. This can cause the job to"
+                " fail even when the test is successful because of gcp + github"
+                " auth expiration. If you think this is the case please check the"
+                " GCP_AUTH_DURATION in the github workflow."
+            )
         return "\n".join(output_lines)
 
     def succeeded(self) -> bool:
@@ -676,14 +687,12 @@ class K8sForgeRunner(ForgeRunner):
 
         # determine the interal image repos based on the context of where the cluster is located
         if context.cloud == Cloud.AWS:
-            forge_image_repo = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge"
+            forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif (
             context.cloud == Cloud.GCP
         ):  # the GCP project for images is separate than the cluster
-            forge_image_repo = (
-                f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge"
-            )
+            forge_image_full = f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge:{context.forge_image_tag}"
             validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
@@ -695,7 +704,7 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_IMAGE_TAG=context.forge_image_tag,
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
-            FORGE_IMAGE_REPO=forge_image_repo,
+            FORGE_IMAGE=forge_image_full,
             FORGE_NAMESPACE=context.forge_namespace,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,

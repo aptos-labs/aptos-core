@@ -52,13 +52,10 @@ module aptos_framework::aptos_account {
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        let i = 0;
-        while (i < recipients_len) {
-            let to = *vector::borrow(&recipients, i);
+        vector::enumerate_ref(&recipients, |i, to| {
             let amount = *vector::borrow(&amounts, i);
-            transfer(source, to, amount);
-            i = i + 1;
-        };
+            transfer(source, *to, amount);
+        });
     }
 
     /// Convenient function to transfer APT to a recipient account that might not exist.
@@ -78,30 +75,45 @@ module aptos_framework::aptos_account {
     /// Batch version of transfer_coins.
     public entry fun batch_transfer_coins<CoinType>(
         from: &signer, recipients: vector<address>, amounts: vector<u64>) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         let recipients_len = vector::length(&recipients);
         assert!(
             recipients_len == vector::length(&amounts),
             error::invalid_argument(EMISMATCHING_RECIPIENTS_AND_AMOUNTS_LENGTH),
         );
 
-        let i = 0;
-        while (i < recipients_len) {
-            let to = *vector::borrow(&recipients, i);
+        vector::enumerate_ref(&recipients, |i, to| {
             let amount = *vector::borrow(&amounts, i);
-            transfer_coins<CoinType>(from, to, amount);
-            i = i + 1;
-        };
+            transfer_coins<CoinType>(from, *to, amount);
+        });
     }
 
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
     public entry fun transfer_coins<CoinType>(from: &signer, to: address, amount: u64) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         deposit_coins(to, coin::withdraw<CoinType>(from, amount));
     }
 
     /// Convenient function to deposit a custom CoinType into a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
     public fun deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         if (!account::exists_at(to)) {
             create_account(to);
         };

@@ -91,7 +91,7 @@ pub fn generate_feature_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        "std::features",
+        &["std::features"],
         |writer| {
             emit!(writer, "let enabled_blob: vector<u64> = ");
             generate_features_blob(writer, &enabled);
@@ -106,11 +106,13 @@ pub fn generate_feature_upgrade_proposal(
                     writer,
                     "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
                     "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
         },
     );

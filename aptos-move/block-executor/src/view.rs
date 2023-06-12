@@ -11,18 +11,19 @@ use anyhow::Result;
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::error;
 use aptos_mvhashmap::{
-    types::{MVCodeError, MVCodeOutput, MVDataError, MVDataOutput, TxnIndex},
+    types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex},
+    unsync_map::UnsyncMap,
     MVHashMap,
 };
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    executable::{ExecutableTestType, ModulePath},
+    executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -31,8 +32,8 @@ use std::{cell::RefCell, collections::BTreeMap, fmt::Debug, hash::Hash, sync::Ar
 /// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
 /// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
 /// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
-pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite> {
-    versioned_map: &'a MVHashMap<K, V, ExecutableTestType>, // TODO: proper generic type
+pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite, X: Executable> {
+    versioned_map: &'a MVHashMap<K, V, X>,
     scheduler: &'a Scheduler,
     captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
 }
@@ -57,12 +58,10 @@ impl<
         'a,
         K: ModulePath + PartialOrd + Ord + Send + Clone + Debug + Hash + Eq,
         V: TransactionWrite + Send + Sync,
-    > MVHashMapView<'a, K, V>
+        X: Executable,
+    > MVHashMapView<'a, K, V, X>
 {
-    pub(crate) fn new(
-        versioned_map: &'a MVHashMap<K, V, ExecutableTestType>,
-        scheduler: &'a Scheduler,
-    ) -> Self {
+    pub(crate) fn new(versioned_map: &'a MVHashMap<K, V, X>, scheduler: &'a Scheduler) -> Self {
         Self {
             versioned_map,
             scheduler,
@@ -76,18 +75,18 @@ impl<
     }
 
     // TODO: Actually fill in the logic to record fetched executables, etc.
-    fn fetch_code(
+    fn fetch_module(
         &self,
         key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVCodeOutput<V, ExecutableTestType>, MVCodeError> {
+    ) -> anyhow::Result<MVModulesOutput<V, X>, MVModulesError> {
         // Add a fake read from storage to register in reads for now in order
         // for the read / write path intersection fallback for modules to still work.
         self.captured_reads
             .borrow_mut()
             .push(ReadDescriptor::from_storage(key.clone()));
 
-        self.versioned_map.fetch_code(key, txn_idx)
+        self.versioned_map.fetch_module(key, txn_idx)
     }
 
     fn set_aggregator_base_value(&self, key: &K, value: u128) {
@@ -170,23 +169,23 @@ impl<
     }
 }
 
-enum ViewMapKind<'a, T: Transaction> {
-    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value>),
-    BTree(&'a BTreeMap<T::Key, T::Value>),
+enum ViewMapKind<'a, T: Transaction, X: Executable> {
+    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value, X>),
+    Unsync(&'a UnsyncMap<T::Key, T::Value, X>),
 }
 
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
-    latest_view: ViewMapKind<'a, T>,
+    latest_view: ViewMapKind<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
-        map: &'a MVHashMapView<'a, T::Key, T::Value>,
+        map: &'a MVHashMapView<'a, T::Key, T::Value, X>,
         txn_idx: TxnIndex,
-    ) -> LatestView<'a, T, S> {
+    ) -> LatestView<'a, T, S, X> {
         LatestView {
             base_view,
             latest_view: ViewMapKind::MultiVersion(map),
@@ -196,12 +195,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
 
     pub(crate) fn new_btree_view(
         base_view: &'a S,
-        map: &'a BTreeMap<T::Key, T::Value>,
+        map: &'a UnsyncMap<T::Key, T::Value, X>,
         txn_idx: TxnIndex,
-    ) -> LatestView<'a, T, S> {
+    ) -> LatestView<'a, T, S, X> {
         LatestView {
             base_view,
-            latest_view: ViewMapKind::BTree(map),
+            latest_view: ViewMapKind::Unsync(map),
             txn_idx,
         }
     }
@@ -223,17 +222,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<'a, T, S> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
+    for LatestView<'a, T, S, X>
+{
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         match self.latest_view {
             ViewMapKind::MultiVersion(map) => match state_key.module_path() {
                 Some(_) => {
-                    use MVCodeError::*;
-                    use MVCodeOutput::*;
+                    use MVModulesError::*;
+                    use MVModulesOutput::*;
 
-                    match map.fetch_code(state_key, self.txn_idx) {
+                    match map.fetch_module(state_key, self.txn_idx) {
                         Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                         Ok(Module((v, _))) => Ok(v.as_state_value()),
                         Err(Dependency(_)) => {
@@ -280,7 +281,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> TStateView for LatestView<
                     }
                 },
             },
-            ViewMapKind::BTree(map) => map.get(state_key).map_or_else(
+            ViewMapKind::Unsync(map) => map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
                 |v| Ok(v.as_state_value()),
             ),

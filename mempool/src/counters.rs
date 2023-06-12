@@ -85,13 +85,14 @@ pub const SENT_LABEL: &str = "sent";
 // invalid ACK type labels
 pub const UNKNOWN_PEER: &str = "unknown_peer";
 
-// Inserted transaction scope labels
-pub const LOCAL_LABEL: &str = "local";
-pub const E2E_LABEL: &str = "e2e";
-
 // Event types for ranking_score
 pub const INSERT_LABEL: &str = "insert";
 pub const REMOVE_LABEL: &str = "remove";
+
+// The submission point where the transaction originated from
+pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
+pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
+pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
 
 // Histogram buckets that make more sense at larger timescales than DEFAULT_BUCKETS
 const LARGER_LATENCY_BUCKETS: &[f64; 11] = &[
@@ -179,12 +180,12 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 
 pub fn core_mempool_txn_commit_latency(
     stage: &'static str,
-    scope: &'static str,
+    submitted_by: &'static str,
     bucket: &str,
     latency: Duration,
 ) {
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, scope, bucket])
+        .with_label_values(&[stage, submitted_by, bucket])
         .observe(latency.as_secs_f64());
 }
 
@@ -196,7 +197,7 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "Latency of txn reaching various stages in core mempool after insertion",
         LARGER_LATENCY_BUCKETS.to_vec()
     );
-    register_histogram_vec!(histogram_opts, &["stage", "scope", "bucket"]).unwrap()
+    register_histogram_vec!(histogram_opts, &["stage", "submitted_by", "bucket"]).unwrap()
 });
 
 pub fn core_mempool_txn_ranking_score(

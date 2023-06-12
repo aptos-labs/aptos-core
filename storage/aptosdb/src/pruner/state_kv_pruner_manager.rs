@@ -2,51 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW},
+    metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
     pruner::{
-        db_pruner::DBPruner, pruner_manager::PrunerManager, state_kv_pruner::StateKvPruner,
-        state_kv_pruner_worker::StateKvPrunerWorker,
+        pruner_manager::PrunerManager, pruner_worker::PrunerWorker, state_kv_pruner::StateKvPruner,
     },
     pruner_utils,
     state_kv_db::StateKvDb,
 };
+use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
-use aptos_infallible::Mutex;
-use aptos_types::transaction::Version;
-use std::{sync::Arc, thread::JoinHandle};
+use aptos_types::transaction::{AtomicVersion, Version};
+use std::sync::{atomic::Ordering, Arc};
 
 /// The `PrunerManager` for `StateKvPruner`.
 pub(crate) struct StateKvPrunerManager {
-    pruner_enabled: bool,
+    state_kv_db: Arc<StateKvDb>,
     /// DB version window, which dictates how many version of state values to keep.
     prune_window: Version,
-    /// State kv pruner. Is always initialized regardless if the pruner is enabled to keep tracks
-    /// of the min_readable_version.
-    pruner: Arc<StateKvPruner>,
-    /// Wrapper class of the state kv pruner.
-    pruner_worker: Arc<StateKvPrunerWorker>,
-    /// The worker thread handle for state_kv_pruner, created upon Pruner instance construction and
-    /// joined upon its destruction. It is `None` when the state kv pruner is not enabled or it only
-    /// becomes `None` after joined in `drop()`.
-    worker_thread: Option<JoinHandle<()>>,
-    /// We send a batch of version to the underlying pruners for performance reason. This tracks the
-    /// last version we sent to the pruners. Will only be set if the pruner is enabled.
-    pub(crate) last_version_sent_to_pruner: Arc<Mutex<Version>>,
+    /// It is None iff the pruner is not enabled.
+    pruner_worker: Option<PrunerWorker>,
     /// Ideal batch size of the versions to be sent to the state kv pruner.
     pruning_batch_size: usize,
-    /// latest version
-    latest_version: Arc<Mutex<Version>>,
+    /// The minimal readable version for the ledger data.
+    min_readable_version: AtomicVersion,
 }
 
 impl PrunerManager for StateKvPrunerManager {
     type Pruner = StateKvPruner;
 
-    fn pruner(&self) -> &Self::Pruner {
-        &self.pruner
-    }
-
     fn is_pruner_enabled(&self) -> bool {
-        self.pruner_enabled
+        self.pruner_worker.is_some()
     }
 
     fn get_prune_window(&self) -> Version {
@@ -54,94 +39,99 @@ impl PrunerManager for StateKvPrunerManager {
     }
 
     fn get_min_readable_version(&self) -> Version {
-        self.pruner.as_ref().min_readable_version()
-    }
-
-    fn get_min_viable_version(&self) -> Version {
-        unimplemented!()
+        self.min_readable_version.load(Ordering::SeqCst)
     }
 
     /// Sets pruner target version when necessary.
     fn maybe_set_pruner_target_db_version(&self, latest_version: Version) {
-        *self.latest_version.lock() = latest_version;
-
-        if self.pruner_enabled
+        let min_readable_version = self.get_min_readable_version();
+        // Only wake up the state kv pruner if there are `ledger_pruner_pruning_batch_size` pending
+        if self.is_pruner_enabled()
             && latest_version
-                >= *self.last_version_sent_to_pruner.as_ref().lock()
-                    + self.pruning_batch_size as u64
+                >= min_readable_version + self.pruning_batch_size as u64 + self.prune_window
         {
             self.set_pruner_target_db_version(latest_version);
-            *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
         }
     }
 
-    fn set_pruner_target_db_version(&self, latest_version: Version) {
-        assert!(self.pruner_enabled);
+    fn save_min_readable_version(&self, min_readable_version: Version) -> Result<()> {
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+
+        PRUNER_VERSIONS
+            .with_label_values(&["state_kv_pruner", "min_readable"])
+            .set(min_readable_version as i64);
+
+        self.state_kv_db.write_pruner_progress(min_readable_version)
+    }
+
+    fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()
-            .set_target_db_version(latest_version.saturating_sub(self.prune_window));
+            .map_or(false, |w| w.is_pruning_pending())
+    }
+
+    #[cfg(test)]
+    fn set_worker_target_version(&self, target_version: Version) {
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(target_version);
     }
 }
 
 impl StateKvPrunerManager {
-    /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(state_kv_db: Arc<StateKvDb>, state_kv_pruner_config: LedgerPrunerConfig) -> Self {
-        let state_kv_pruner = pruner_utils::create_state_kv_pruner(state_kv_db);
-
-        if state_kv_pruner_config.enable {
-            PRUNER_WINDOW
-                .with_label_values(&["state_kv_pruner"])
-                .set(state_kv_pruner_config.prune_window as i64);
-
-            PRUNER_BATCH_SIZE
-                .with_label_values(&["state_kv_pruner"])
-                .set(state_kv_pruner_config.batch_size as i64);
-        }
-
-        let state_kv_pruner_worker = Arc::new(StateKvPrunerWorker::new(
-            Arc::clone(&state_kv_pruner),
-            state_kv_pruner_config,
-        ));
-
-        let state_kv_pruner_worker_clone = Arc::clone(&state_kv_pruner_worker);
-
-        let state_kv_pruner_worker_thread = if state_kv_pruner_config.enable {
-            Some(
-                std::thread::Builder::new()
-                    .name("aptosdb_state_kv_pruner".into())
-                    .spawn(move || state_kv_pruner_worker_clone.as_ref().work())
-                    .expect("Creating state kv pruner thread should succeed."),
-            )
+        let pruner_worker = if state_kv_pruner_config.enable {
+            Some(Self::init_pruner(
+                Arc::clone(&state_kv_db),
+                state_kv_pruner_config,
+            ))
         } else {
             None
         };
 
-        let min_readable_version = state_kv_pruner.min_readable_version();
+        let min_readable_version =
+            pruner_utils::get_state_kv_pruner_progress(&state_kv_db).expect("Must succeed.");
+
+        PRUNER_VERSIONS
+            .with_label_values(&["state_kv_pruner", "min_readable"])
+            .set(min_readable_version as i64);
 
         Self {
-            pruner_enabled: state_kv_pruner_config.enable,
+            state_kv_db,
             prune_window: state_kv_pruner_config.prune_window,
-            pruner: state_kv_pruner,
-            pruner_worker: state_kv_pruner_worker,
-            worker_thread: state_kv_pruner_worker_thread,
-            last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
+            pruner_worker,
             pruning_batch_size: state_kv_pruner_config.batch_size,
-            latest_version: Arc::new(Mutex::new(min_readable_version)),
+            min_readable_version: AtomicVersion::new(min_readable_version),
         }
     }
-}
 
-impl Drop for StateKvPrunerManager {
-    fn drop(&mut self) {
-        if self.pruner_enabled {
-            self.pruner_worker.stop_pruning();
+    fn init_pruner(
+        state_kv_db: Arc<StateKvDb>,
+        state_kv_pruner_config: LedgerPrunerConfig,
+    ) -> PrunerWorker {
+        let pruner = pruner_utils::create_state_kv_pruner(state_kv_db);
 
-            assert!(self.worker_thread.is_some());
-            self.worker_thread
-                .take()
-                .expect("State kv pruner worker thread must exist.")
-                .join()
-                .expect("State kv pruner worker thread should join peacefully.");
-        }
+        PRUNER_WINDOW
+            .with_label_values(&["state_kv_pruner"])
+            .set(state_kv_pruner_config.prune_window as i64);
+
+        PRUNER_BATCH_SIZE
+            .with_label_values(&["state_kv_pruner"])
+            .set(state_kv_pruner_config.batch_size as i64);
+
+        PrunerWorker::new(pruner, state_kv_pruner_config.batch_size, "state_kv")
+    }
+
+    fn set_pruner_target_db_version(&self, latest_version: Version) {
+        assert!(self.pruner_worker.is_some());
+        let min_readable_version = latest_version.saturating_sub(self.prune_window);
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+        self.pruner_worker
+            .as_ref()
+            .unwrap()
+            .set_target_db_version(min_readable_version);
     }
 }
