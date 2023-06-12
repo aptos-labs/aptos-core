@@ -194,7 +194,7 @@ spec aptos_framework::voting {
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         let voting_period_over = timestamp::now_seconds() > proposal.expiration_secs;
-        let be_resolved_early = option::spec_is_some(proposal.early_resolution_vote_threshold) && 
+        let be_resolved_early = option::spec_is_some(proposal.early_resolution_vote_threshold) &&
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
