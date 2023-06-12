@@ -153,7 +153,7 @@ resource "helm_release" "testnet-addons" {
       }
       ingress = {
         gce_static_ip           = "aptos-${local.workspace_name}-testnet-addons-ingress"
-        gce_managed_certificate = "aptos-${local.workspace_name}-testnet-addons"
+        gce_managed_certificate = "aptos-${local.workspace_name}-${var.zone_name}-testnet-addons"
       }
       load_test = {
         fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])

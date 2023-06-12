@@ -10,15 +10,17 @@ use crate::{
         state_kv_pruner::StateKvPruner,
         state_store::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
     },
-    schema::{db_metadata::DbMetadataKey, version_data::VersionDataSchema},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        version_data::VersionDataSchema,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     utils::get_progress,
-    EventStore, TransactionStore,
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{schema::KeyCodec, ReadOptions};
+use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
@@ -34,11 +36,7 @@ where
 
 /// A utility function to instantiate the ledger pruner
 pub(crate) fn create_ledger_pruner(ledger_db: Arc<LedgerDb>) -> Arc<LedgerPruner> {
-    Arc::new(LedgerPruner::new(
-        ledger_db.metadata_db_arc(),
-        Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),
-        Arc::new(EventStore::new(ledger_db.event_db_arc())),
-    ))
+    Arc::new(LedgerPruner::new(ledger_db).expect("Failed to create ledger pruner."))
 }
 
 /// A utility function to instantiate the state kv pruner.
@@ -81,4 +79,22 @@ where
     StaleNodeIndex: KeyCodec<S>,
 {
     Ok(get_progress(state_merkle_db.metadata_db(), &S::tag())?.unwrap_or(0))
+}
+
+pub(crate) fn get_or_initialize_ledger_subpruner_progress(
+    sub_db: &DB,
+    progress_key: &DbMetadataKey,
+    metadata_progress: Version,
+) -> Result<Version> {
+    Ok(
+        if let Some(v) = sub_db.get::<DbMetadataSchema>(progress_key)? {
+            v.expect_version()
+        } else {
+            sub_db.put::<DbMetadataSchema>(
+                progress_key,
+                &DbMetadataValue::Version(metadata_progress),
+            )?;
+            metadata_progress
+        },
+    )
 }

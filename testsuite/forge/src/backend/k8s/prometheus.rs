@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_k8s_client, Get, K8sApi, Result};
+use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use anyhow::bail;
 use aptos_logger::info;
 use k8s_openapi::api::core::v1::Secret;
@@ -20,7 +20,7 @@ pub async fn get_prometheus_client() -> Result<PrometheusClient> {
 }
 
 async fn create_prometheus_client_from_environment(
-    secrets_api: Arc<dyn Get<Secret>>,
+    secrets_api: Arc<dyn ReadWrite<Secret>>,
 ) -> Result<PrometheusClient> {
     let prom_url_env = std::env::var("PROMETHEUS_URL");
     let prom_token_env = std::env::var("PROMETHEUS_TOKEN");
@@ -135,39 +135,14 @@ pub async fn query_with_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
+    use crate::MockSecretApi;
     use k8s_openapi::ByteString;
-    use kube::{api::ObjectMeta, error::ErrorResponse, Error as KubeError};
+    use kube::api::ObjectMeta;
     use prometheus_http_query::Error as PrometheusError;
     use std::{
         env,
         time::{SystemTime, UNIX_EPOCH},
     };
-
-    struct MockSecretApi {
-        secret: Option<Secret>,
-    }
-
-    impl MockSecretApi {
-        fn from_secret(secret: Option<Secret>) -> Self {
-            MockSecretApi { secret }
-        }
-    }
-
-    #[async_trait]
-    impl Get<Secret> for MockSecretApi {
-        async fn get(&self, _name: &str) -> Result<Secret, KubeError> {
-            match self.secret {
-                Some(ref s) => Ok(s.clone()),
-                None => Err(KubeError::Api(ErrorResponse {
-                    status: "status".to_string(),
-                    message: "message".to_string(),
-                    reason: "reason".to_string(),
-                    code: 404,
-                })),
-            }
-        }
-    }
 
     #[tokio::test]
     async fn test_create_client_secret() {

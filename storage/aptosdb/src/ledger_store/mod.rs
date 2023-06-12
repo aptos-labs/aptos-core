@@ -288,13 +288,15 @@ impl LedgerStore {
         &self,
         first_version: u64,
         txn_infos: &[TransactionInfo],
-        batch: &SchemaBatch,
+        // TODO(grao): Consider split this function to two functions.
+        transaction_info_batch: &SchemaBatch,
+        transaction_accumulator_batch: &SchemaBatch,
     ) -> Result<HashValue> {
         // write txn_info
         (first_version..first_version + txn_infos.len() as u64)
             .zip_eq(txn_infos.iter())
             .try_for_each(|(version, txn_info)| {
-                batch.put::<TransactionInfoSchema>(&version, txn_info)
+                transaction_info_batch.put::<TransactionInfoSchema>(&version, txn_info)
             })?;
 
         // write hash of txn_info into the accumulator
@@ -304,9 +306,9 @@ impl LedgerStore {
             first_version, /* num_existing_leaves */
             &txn_hashes,
         )?;
-        writes
-            .iter()
-            .try_for_each(|(pos, hash)| batch.put::<TransactionAccumulatorSchema>(pos, hash))?;
+        writes.iter().try_for_each(|(pos, hash)| {
+            transaction_accumulator_batch.put::<TransactionAccumulatorSchema>(pos, hash)
+        })?;
         Ok(root_hash)
     }
 

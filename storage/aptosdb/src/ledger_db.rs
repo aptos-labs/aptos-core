@@ -167,16 +167,32 @@ impl LedgerDb {
         &self.transaction_accumulator_db
     }
 
+    pub(crate) fn transaction_accumulator_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_accumulator_db)
+    }
+
     pub(crate) fn transaction_db(&self) -> &DB {
         &self.transaction_db
+    }
+
+    pub(crate) fn transaction_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_db)
     }
 
     pub(crate) fn transaction_info_db(&self) -> &DB {
         &self.transaction_info_db
     }
 
+    pub(crate) fn transaction_info_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_info_db)
+    }
+
     pub(crate) fn write_set_db(&self) -> &DB {
         &self.write_set_db
+    }
+
+    pub(crate) fn write_set_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.write_set_db)
     }
 
     fn open_rocksdb(

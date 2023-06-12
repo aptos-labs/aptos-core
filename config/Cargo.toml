@@ -31,6 +31,7 @@ mirai-annotations = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+serde_merge = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }
 url = { workspace = true }
