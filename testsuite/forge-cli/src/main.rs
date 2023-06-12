@@ -1725,7 +1725,7 @@ impl NetworkTest for RunForever {
         while keep_running.load(Ordering::Acquire) {
             if let Err(x) = ctx.runtime.block_on(ctx.swarm.health_check()) {
                 error!("swarm failed health check: {}", x);
-                return Err(x)
+                return Err(x);
             }
             thread::sleep(Duration::from_millis(500));
         }
