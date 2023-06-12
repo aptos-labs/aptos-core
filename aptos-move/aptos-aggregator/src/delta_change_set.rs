@@ -5,14 +5,13 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::module::AGGREGATOR_MODULE;
+use crate::{aggregator_extension::AggregatorID, module::AGGREGATOR_MODULE};
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey,
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use crate::aggregator_extension::AggregatorID;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult};
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -35,7 +34,7 @@ pub struct DeltaOp {
     /// Delta which is the result of the execution.
     update: DeltaUpdate,
     /// This DeltaOp should be applied to this base_aggregator.
-    base_aggregator: Option<AggregatorID>
+    base_aggregator: Option<AggregatorID>,
 }
 
 /// Different delta functions.
@@ -47,13 +46,19 @@ pub enum DeltaUpdate {
 
 impl DeltaOp {
     /// Creates a new delta op.
-    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128, base_aggregator: Option<AggregatorID>) -> Self {
+    pub fn new(
+        update: DeltaUpdate,
+        limit: u128,
+        max_positive: u128,
+        min_negative: u128,
+        base_aggregator: Option<AggregatorID>,
+    ) -> Self {
         Self {
             max_positive,
             min_negative,
             limit,
             update,
-            base_aggregator
+            base_aggregator,
         }
     }
 

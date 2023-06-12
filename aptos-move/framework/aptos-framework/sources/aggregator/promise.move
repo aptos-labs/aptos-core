@@ -1,6 +1,9 @@
 module aptos_framework::promise {
     use std::option::{Self, Option};
-    use aptos_framework::aggregator;
+
+    /// The error code raised when `get_value` function is called before
+    /// resolving the promise.
+    const EPROMISE_NOT_RESOLVED: u64 = 1;
 
     struct Promise has store {
         value: u128,
@@ -15,11 +18,8 @@ module aptos_framework::promise {
         }
     }
 
-    public fun get_value(promise: &mut Promise): u128 {
-        if (option::is_some(&promise.id)) {
-            let id = option::extract(&mut promise.id);
-            promise.value = aggregator::read(id);
-        };
+    public fun get_value(promise: &Promise): u128 {
+        assert!(option::is_none(&promise.id), EPROMISE_NOT_RESOLVED);
         promise.value
     }
 }

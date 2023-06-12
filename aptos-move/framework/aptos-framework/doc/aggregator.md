@@ -23,6 +23,7 @@ at the moment.**
 -  [Function `add`](#0x1_aggregator_add)
 -  [Function `sub`](#0x1_aggregator_sub)
 -  [Function `read`](#0x1_aggregator_read)
+-  [Function `deferred_read`](#0x1_aggregator_deferred_read)
 -  [Function `destroy`](#0x1_aggregator_destroy)
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
@@ -32,7 +33,8 @@ at the moment.**
     -  [Function `destroy`](#@Specification_1_destroy)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="promise.md#0x1_promise">0x1::promise</a>;
+</code></pre>
 
 
 
@@ -206,6 +208,31 @@ Returns a value stored in this aggregator.
 
 </details>
 
+<a name="0x1_aggregator_deferred_read"></a>
+
+## Function `deferred_read`
+
+Returns a promise whhich acts as a placeholder for the aggregator read operation.
+The promise will be resolved (the aggregator read operation) will be performed
+when the transaction is committed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_deferred_read">deferred_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): <a href="promise.md#0x1_promise_Promise">promise::Promise</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_deferred_read">deferred_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): Promise;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_aggregator_destroy"></a>
 
 ## Function `destroy`
@@ -232,6 +259,24 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a name="@Specification_1"></a>
 
 ## Specification
+
+
+
+<a name="0x1_aggregator_spec_aggregator_set_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_aggregator_spec_aggregator_get_val"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
+</code></pre>
+
 
 
 <a name="@Specification_1_Aggregator"></a>
@@ -381,24 +426,6 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_aggregator_set_val"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
-</code></pre>
-
-
-
-
-<a name="0x1_aggregator_spec_aggregator_get_val"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
 </code></pre>
 
 

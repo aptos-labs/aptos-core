@@ -11,7 +11,7 @@ use crate::{
     },
     safely_pop_arg,
 };
-use aptos_aggregator::aggregator_extension::{Promise, AggregatorID};
+use aptos_aggregator::aggregator_extension::{AggregatorID, Promise};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::NativeFunction;
@@ -127,7 +127,7 @@ fn native_deferred_read(
 
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let Promise {value, id} = aggregator_data.deferred_read(id)?;
+    let Promise { value, id } = aggregator_data.deferred_read(id)?;
 
     // TODO: Use the correct syntax to return a promise. Handle the case where id is None.
     Ok(smallvec![Value::struct_(Struct::pack(vec![

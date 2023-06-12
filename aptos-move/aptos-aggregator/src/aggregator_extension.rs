@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{addition, deserialize, subtraction, abort_error};
+use crate::delta_change_set::{abort_error, addition, deserialize, subtraction};
 use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
@@ -107,7 +107,7 @@ impl History {
 
 pub struct Promise {
     pub value: u128,
-    pub id: Option<AggregatorID>
+    pub id: Option<AggregatorID>,
 }
 
 /// Internal aggregator data structure.
@@ -131,7 +131,7 @@ pub struct Aggregator {
     freeze_operations: bool,
     // If this value is set to Some(agg), then this aggregator is a snapshot
     // created from agg.
-    snapshot_of: Option<AggregatorID>
+    snapshot_of: Option<AggregatorID>,
 }
 
 impl Aggregator {
@@ -155,7 +155,7 @@ impl Aggregator {
             return Err(abort_error(
                 "Cannot perform add operation after aggregator is frozen",
                 EFREEZE_AGG,
-            ))
+            ));
         }
         match self.state {
             AggregatorState::Data => {
@@ -194,7 +194,7 @@ impl Aggregator {
             return Err(abort_error(
                 "Cannot perform sub operation after aggregator is frozen",
                 EFREEZE_AGG,
-            ))
+            ));
         }
         match self.state {
             AggregatorState::Data => {
@@ -303,8 +303,24 @@ impl Aggregator {
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>, bool, Option<AggregatorID>) {
-        (self.value, self.state, self.limit, self.history, self.freeze_operations, self.snapshot_of)
+    pub fn into(
+        self,
+    ) -> (
+        u128,
+        AggregatorState,
+        u128,
+        Option<History>,
+        bool,
+        Option<AggregatorID>,
+    ) {
+        (
+            self.value,
+            self.state,
+            self.limit,
+            self.history,
+            self.freeze_operations,
+            self.snapshot_of,
+        )
     }
 }
 
@@ -345,7 +361,7 @@ impl AggregatorData {
             limit,
             history: Some(History::new()),
             freeze_operations: false,
-            snapshot_of: None
+            snapshot_of: None,
         });
 
         if !aggregator_enabled {
@@ -369,44 +385,50 @@ impl AggregatorData {
             limit,
             history: None,
             freeze_operations: false,
-            snapshot_of: None
+            snapshot_of: None,
         };
         self.aggregators.insert(id, aggregator);
         self.new_aggregators.insert(id);
     }
 
     fn create_aggregator_snapshot(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorID> {
-        // TODO: Are we sure that id is in `self.aggregators` before calling `create_aggregator_snapshot`? 
-        let aggregator = self.aggregators.get(&id).expect("Aggregator should exist to create a snapshot");
+        // TODO: Are we sure that id is in `self.aggregators` before calling `create_aggregator_snapshot`?
+        let aggregator = self
+            .aggregators
+            .get(&id)
+            .expect("Aggregator should exist to create a snapshot");
         let snapshot = Aggregator {
             value: aggregator.value,
             state: aggregator.state,
             history: aggregator.history.clone(),
             limit: aggregator.limit,
             freeze_operations: false,
-            snapshot_of: Some(id)
+            snapshot_of: Some(id),
         };
         let snapshot_id = AggregatorID {
             handle: TableHandle(AccountAddress::ZERO),
             // TODO: Generate a random key
-            key: AggregatorHandle(AccountAddress::ZERO)
+            key: AggregatorHandle(AccountAddress::ZERO),
         };
         self.aggregators.insert(snapshot_id, snapshot);
         Ok(snapshot_id)
     }
 
     fn create_promise(&mut self, id: AggregatorID) -> Promise {
-        let aggregator = self.aggregators.get_mut(&id).expect("Aggregator should exist to create a promise");
+        let aggregator = self
+            .aggregators
+            .get_mut(&id)
+            .expect("Aggregator should exist to create a promise");
         aggregator.freeze_operations = true;
         if aggregator.state == AggregatorState::Data {
             Promise {
                 value: aggregator.value,
-                id: None
+                id: None,
             }
         } else {
             Promise {
                 value: 0,
-                id: Some(id)
+                id: Some(id),
             }
         }
     }

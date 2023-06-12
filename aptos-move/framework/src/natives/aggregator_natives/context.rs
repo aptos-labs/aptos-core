@@ -92,8 +92,13 @@ impl<'a> NativeAggregatorContext<'a> {
                     assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
-                    let delta_op =
-                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative, snapshot_of);
+                    let delta_op = DeltaOp::new(
+                        plus,
+                        limit,
+                        history.max_positive,
+                        history.min_negative,
+                        snapshot_of,
+                    );
                     AggregatorChange::Merge(delta_op)
                 },
                 AggregatorState::NegativeDelta => {
@@ -101,8 +106,13 @@ impl<'a> NativeAggregatorContext<'a> {
                     assert!(self.aggregator_enabled);
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
-                    let delta_op =
-                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative, snapshot_of);
+                    let delta_op = DeltaOp::new(
+                        minus,
+                        limit,
+                        history.max_positive,
+                        history.min_negative,
+                        snapshot_of,
+                    );
                     AggregatorChange::Merge(delta_op)
                 },
             };
