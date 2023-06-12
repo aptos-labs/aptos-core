@@ -636,8 +636,10 @@ class LocalForgeRunner(ForgeRunner):
 class K8sForgeRunner(ForgeRunner):
     def run(self, context: ForgeContext) -> ForgeResult:
         forge_pod_name = sanitize_forge_resource_name(
-            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}"
+            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}",
+            max_length=52 if context.forge_cluster.name == "multiregion" else 63,
         )
+        log.info(f"Creating forge pod {forge_pod_name}")
         assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
         context.shell.run(
             [
@@ -701,8 +703,10 @@ class K8sForgeRunner(ForgeRunner):
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
-            KUBECONFIG=MULTIREGION_KUBECONFIG_PATH if context.forge_cluster.region == "multiregion" else "",
-            MULTIREGION_KUBECONFIG_PATH=MULTIREGION_KUBECONFIG_PATH,
+            KUBECONFIG=MULTIREGION_KUBECONFIG_PATH
+            if context.forge_cluster.region == "multiregion"
+            else "",
+            MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
         )
 
         with ForgeResult.with_context(context) as forge_result:
@@ -742,6 +746,7 @@ class K8sForgeRunner(ForgeRunner):
                         "kubectl",
                         "--kubeconfig",
                         context.forge_cluster.kubeconf,
+                        current_context,
                         "logs",
                         "-n",
                         "default",
@@ -936,11 +941,10 @@ def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
     return result.exit_code == 0
 
 
-def sanitize_forge_resource_name(forge_resource: str) -> str:
+def sanitize_forge_resource_name(forge_resource: str, max_length: int = 63) -> str:
     """
     Sanitize the intended forge resource name to be a valid k8s resource name
     """
-    max_length = 63
     sanitized_namespace = ""
     for i, c in enumerate(forge_resource):
         if i >= max_length:
@@ -1309,6 +1313,7 @@ def test(
             cloud=Cloud.GCP,
             region="multiregion",
             kubeconf=context.filesystem.mkstemp(),
+            runner_mode=forge_runner_mode,
         )
     else:
         log.info(
