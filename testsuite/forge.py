@@ -635,6 +635,7 @@ class LocalForgeRunner(ForgeRunner):
 
 class K8sForgeRunner(ForgeRunner):
     def delete_forge_runner_pod(self, context: ForgeContext):
+        log.info(f"Deleting forge pod for namespace {context.forge_namespace}")
         assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
         context.shell.run(
             [
@@ -651,15 +652,6 @@ class K8sForgeRunner(ForgeRunner):
                 "--force",
             ]
         )
-
-    def run(self, context: ForgeContext) -> ForgeResult:
-        forge_pod_name = sanitize_forge_resource_name(
-            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}",
-            max_length=52 if context.forge_cluster.is_multiregion else 63,
-        )
-        log.info(f"Creating forge pod {forge_pod_name}")
-        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
-        self.delete_forge_runner_pod(context)
         context.shell.run(
             [
                 "kubectl",
@@ -674,6 +666,16 @@ class K8sForgeRunner(ForgeRunner):
                 f"forge-namespace={context.forge_namespace}",
             ]
         )
+
+    def run(self, context: ForgeContext) -> ForgeResult:
+        forge_pod_name = sanitize_forge_resource_name(
+            f"{context.forge_namespace}-{context.time.epoch()}-{context.image_tag}",
+            max_length=52 if context.forge_cluster.is_multiregion else 63,
+        )
+        assert context.forge_cluster.kubeconf is not None, "kubeconf is required"
+
+        self.delete_forge_runner_pod(context)
+
         if context.filesystem.exists(FORGE_TEST_RUNNER_TEMPLATE_PATH):
             template = context.filesystem.read(FORGE_TEST_RUNNER_TEMPLATE_PATH)
         else:
