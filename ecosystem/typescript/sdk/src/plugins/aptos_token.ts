@@ -521,15 +521,22 @@ export class AptosToken {
   async transfer(data: NonFungibleTokenParameters | FungibleTokenParameters): Promise<string> {
     if ("amount" in data) {
       const fungibleAsset = new FungibleAssetClient(this.provider);
-      return await fungibleAsset.transfer(data.owner, data.tokenAddress, data.recipient, data.amount, data.extraArgs);
-    } else {
-      return await this.transferTokenOwnership(
+      const txnHash = await fungibleAsset.transfer(
         data.owner,
         data.tokenAddress,
         data.recipient,
-        data.tokenType,
+        data.amount,
         data.extraArgs,
       );
+      return txnHash;
     }
+    const txnHash = await this.transferTokenOwnership(
+      data.owner,
+      data.tokenAddress,
+      data.recipient,
+      data.tokenType,
+      data.extraArgs,
+    );
+    return txnHash;
   }
 }
