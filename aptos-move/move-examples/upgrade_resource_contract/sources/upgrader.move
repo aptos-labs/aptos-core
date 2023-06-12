@@ -32,4 +32,9 @@ module upgrade_resource_contract::upgrader {
             code,
         );
     }
+
+    #[view]
+    public fun upgradeable_function(): u64 {
+        9000
+    }
 }
