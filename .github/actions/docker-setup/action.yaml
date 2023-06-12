@@ -30,12 +30,6 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
-  GCP_AUTH_DURATION:
-    description: "Duration of GCP auth token in seconds"
-    type: int
-    # setting this to 1.5h since sometimes docker builds (special performance
-    # builds etc.) take that long. Default is 1h.
-    default: 5400
 outputs:
   CLOUDSDK_AUTH_ACCESS_TOKEN:
     description: "GCP access token"
@@ -76,7 +70,7 @@ runs:
       with:
         create_credentials_file: false
         token_format: "access_token"
-        access_token_lifetime: ${{ inputs.GCP_AUTH_DURATION }}
+        access_token_lifetime: 5400 # setting this to 1.5h since sometimes docker builds (special performance builds etc.) take that long. Default is 1h.
         workload_identity_provider: ${{ inputs.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         service_account: ${{ inputs.GCP_SERVICE_ACCOUNT_EMAIL }}
         export_environment_variables: ${{ inputs.EXPORT_GCP_PROJECT_VARIABLES }}
