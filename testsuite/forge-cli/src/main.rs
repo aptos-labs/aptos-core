@@ -10,7 +10,7 @@ use aptos_forge::{
     system_metrics::{MetricsThreshold, SystemMetricsThreshold},
     ForgeConfig, Options, *,
 };
-use aptos_logger::Level;
+use aptos_logger::{error, Level};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
@@ -460,7 +460,7 @@ fn run_forever() -> ForgeConfig {
     ForgeConfig::default()
         .add_admin_test(GetMetadata)
         .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
-        .add_aptos_test(RunForever)
+        .add_network_test(RunForever)
 }
 
 fn local_test_suite() -> ForgeConfig {
@@ -1718,13 +1718,16 @@ impl Test for RunForever {
     }
 }
 
-#[async_trait::async_trait]
-impl AptosTest for RunForever {
-    async fn run<'t>(&self, _ctx: &mut AptosContext<'t>) -> Result<()> {
+impl NetworkTest for RunForever {
+    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         println!("The network has been deployed. Hit Ctrl+C to kill this, otherwise it will run forever.");
         let keep_running = Arc::new(AtomicBool::new(true));
         while keep_running.load(Ordering::Acquire) {
-            thread::park();
+            if let Err(x) = ctx.runtime.block_on(ctx.swarm.health_check()) {
+                error!("swarm failed health check: {}", x);
+                return Err(x)
+            }
+            thread::sleep(Duration::from_millis(500));
         }
         Ok(())
     }
