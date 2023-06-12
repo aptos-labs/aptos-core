@@ -75,6 +75,12 @@ module aptos_framework::aptos_account {
     /// Batch version of transfer_coins.
     public entry fun batch_transfer_coins<CoinType>(
         from: &signer, recipients: vector<address>, amounts: vector<u64>) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         let recipients_len = vector::length(&recipients);
         assert!(
             recipients_len == vector::length(&amounts),
@@ -90,12 +96,24 @@ module aptos_framework::aptos_account {
     /// Convenient function to transfer a custom CoinType to a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
     public entry fun transfer_coins<CoinType>(from: &signer, to: address, amount: u64) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         deposit_coins(to, coin::withdraw<CoinType>(from, amount));
     }
 
     /// Convenient function to deposit a custom CoinType into a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
     public fun deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) acquires DirectTransferConfig {
+        spec {
+        // Cointype should not be aptoscoin, otherwise it will automaticly create an account.
+        // Meanwhile, aptoscoin has already been proved in normal tranfer
+        use aptos_std::type_info;
+        assume type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
+        };
         if (!account::exists_at(to)) {
             create_account(to);
         };
