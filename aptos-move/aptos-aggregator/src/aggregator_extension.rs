@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{addition, deserialize, subtraction};
+use crate::delta_change_set::{addition, deserialize, subtraction, abort_error};
 use aptos_types::vm_status::StatusCode;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 use move_table_extension::{TableHandle, TableResolver};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// When `Addition` or `Subtraction` is performed after aggregator is freezed
+const EFREEZE_AGG: u64 = 0x02_0003;
 
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,6 +151,12 @@ impl Aggregator {
 
     /// Implements logic for adding to an aggregator.
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
+        if self.freeze_operations {
+            return Err(abort_error(
+                format!("Cannot perform add operation after aggregator is frozen"),
+                EFREEZE_AGG,
+            ))
+        }
         match self.state {
             AggregatorState::Data => {
                 // If aggregator knows the value, add directly and keep the state.
@@ -181,6 +190,12 @@ impl Aggregator {
 
     /// Implements logic for subtracting from an aggregator.
     pub fn sub(&mut self, value: u128) -> PartialVMResult<()> {
+        if self.freeze_operations {
+            return Err(abort_error(
+                format!("Cannot perform sub operation after aggregator is frozen"),
+                EFREEZE_AGG,
+            ))
+        }
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
