@@ -343,13 +343,15 @@ impl ShardedBlockPartitioner {
         }
 
         // We just add cross shard dependencies for remaining transactions.
-        let (frozen_sub_blocks, _, _) = self.add_cross_shard_dependencies(
+        let (frozen_sub_blocks, _, rejected_txns) = self.add_cross_shard_dependencies(
             current_round_start_index,
             txns_to_partition,
             frozen_sub_blocks,
             frozen_write_set_with_index,
         );
 
+        // Assert rejected transactions are empty
+        assert!(rejected_txns.iter().all(|txns| txns.is_empty()));
         frozen_sub_blocks
     }
 }
