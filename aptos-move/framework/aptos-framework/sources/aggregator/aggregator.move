@@ -11,6 +11,7 @@
 /// parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
 /// at the moment.**
 module aptos_framework::aggregator {
+    use aptos_framework::promise::{Self,Promise};
 
     /// The value of aggregator overflows. Raised by native code.
     const EAGGREGATOR_OVERFLOW: u64 = 1;
@@ -42,6 +43,11 @@ module aptos_framework::aggregator {
 
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;
+
+    /// Returns a promise whhich acts as a placeholder for the aggregator read operation. 
+    /// The promise will be resolved (the aggregator read operation) will be performed
+    /// when the transaction is committed.
+    public native fun deferred_read(aggregator: &Aggregator): Promise;
 
     /// Destroys an aggregator and removes it from its `AggregatorFactory`.
     public native fun destroy(aggregator: Aggregator);

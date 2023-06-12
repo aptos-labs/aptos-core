@@ -19,11 +19,11 @@ pub enum AggregatorState {
     NegativeDelta,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorHandle(pub AccountAddress);
 
 /// Uniquely identifies each aggregator instance in storage.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorID {
     // A handle that is shared across all aggregator instances created by the
     // same `AggregatorFactory` and which is used for fine-grained storage
@@ -79,7 +79,7 @@ pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct History {
     pub max_positive: u128,
     pub min_negative: u128,
@@ -102,6 +102,11 @@ impl History {
     }
 }
 
+pub struct Promise {
+    pub value: u128,
+    pub id: Option<AggregatorID>
+}
+
 /// Internal aggregator data structure.
 #[derive(Debug)]
 pub struct Aggregator {
@@ -118,6 +123,12 @@ pub struct Aggregator {
     // Describes values seen by this aggregator. Note that if aggregator knows
     // its value, then storing history doesn't make sense.
     history: Option<History>,
+    // If this value is set, then further add/sub operations to the aggregator
+    // results in an error.
+    freeze_operations: bool,
+    // If this value is set to Some(agg), then this aggregator is a snapshot
+    // created from agg.
+    snapshot_of: Option<AggregatorID>
 }
 
 impl Aggregator {
@@ -318,6 +329,8 @@ impl AggregatorData {
             state: AggregatorState::PositiveDelta,
             limit,
             history: Some(History::new()),
+            freeze_operations: false,
+            snapshot_of: None
         });
 
         if !aggregator_enabled {
@@ -340,9 +353,52 @@ impl AggregatorData {
             state: AggregatorState::Data,
             limit,
             history: None,
+            freeze_operations: false,
+            snapshot_of: None
         };
         self.aggregators.insert(id, aggregator);
         self.new_aggregators.insert(id);
+    }
+
+
+    fn create_aggregator_snapshot(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorID> {
+        // TODO: Are we sure that id is in `self.aggregators` before calling `create_aggregator_snapshot`? 
+        let aggregator = self.aggregators.get(&id).expect("Aggregator should exist to create a snapshot");
+        let snapshot = Aggregator {
+            value: aggregator.value,
+            state: aggregator.state.clone(),
+            history: aggregator.history.clone(),
+            limit: aggregator.limit,
+            freeze_operations: false,
+            snapshot_of: Some(id)
+        };
+        let snapshot_id = AggregatorID {
+            handle: TableHandle(AccountAddress::ZERO),
+            key: AggregatorHandle(AccountAddress::ZERO)
+        };
+        self.aggregators.insert(snapshot_id, snapshot);
+        return Ok(snapshot_id);
+    }
+
+    fn create_promise(&mut self, id: AggregatorID) -> Promise {
+        let aggregator = self.aggregators.get_mut(&id).expect("Aggregator should exist to create a promise");
+        aggregator.freeze_operations = true;
+        if aggregator.state == AggregatorState::Data {
+            Promise {
+                value: aggregator.value,
+                id: None
+            }
+        } else {
+            Promise {
+                value: 0,
+                id: Some(id)
+            }
+        }
+    }
+
+    pub fn deferred_read(&mut self, id: AggregatorID) -> PartialVMResult<Promise> {
+        let snapshot_id = self.create_aggregator_snapshot(id)?;
+        Ok(self.create_promise(snapshot_id))
     }
 
     /// If aggregator has been used in this transaction, it is removed. Otherwise,

@@ -102,6 +102,40 @@ fn native_read(
 }
 
 /***************************************************************************************************
+ * native fun deferred_read(aggregator: &Aggregator): Promise;
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+ #[derive(Debug, Clone)]
+ pub struct DeferredReadGasParameters {
+     pub base: InternalGas,
+ }
+ 
+ fn native_read(
+     gas_params: &DeferredReadGasParameters,
+     context: &mut SafeNativeContext,
+     _ty_args: Vec<Type>,
+     mut args: VecDeque<Value>,
+ ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+     debug_assert_eq!(args.len(), 1);
+ 
+     context.charge(gas_params.base)?;
+ 
+     // Extract information from aggregator struct reference.
+     let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+ 
+     // Get aggregator.
+     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
+     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+     let promise = aggregator_data.deferred_read(
+         id,
+     )?;
+     Ok(smallvec![Value::u128(value)])
+ }
+ 
+
+/***************************************************************************************************
  * native fun sub(aggregator: &mut Aggregator, value: u128);
  *
  *   gas cost: base_cost
@@ -185,6 +219,7 @@ fn native_destroy(
 pub struct GasParameters {
     pub add: AddGasParameters,
     pub read: ReadGasParameters,
+    pub deferred_read: DeferredReadGasParameters,
     pub sub: SubGasParameters,
     pub destroy: DestroyGasParameters,
 }
@@ -211,6 +246,15 @@ pub fn make_all(
                 timed_features.clone(),
                 features.clone(),
                 native_read,
+            ),
+        ),
+        (
+            "deferred_read",
+            make_safe_native(
+                gas_params.deferred_read,
+                timed_features.clone(),
+                features.clone(),
+                native_deferred_read,
             ),
         ),
         (
