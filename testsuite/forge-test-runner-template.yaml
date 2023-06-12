@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: { FORGE_POD_NAME }
+  name: {FORGE_POD_NAME}
   labels:
     app.kubernetes.io/name: forge
     app.kubernetes.io/part-of: forge-test-runner
-    forge-namespace: { FORGE_NAMESPACE }
-    forge-image-tag: { FORGE_IMAGE_TAG }
+    forge-namespace: {FORGE_NAMESPACE}
+    forge-image-tag: {FORGE_IMAGE_TAG}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
   containers:
     - name: main
-      image: { FORGE_IMAGE }
+      image: {FORGE_IMAGE}
       imagePullPolicy: Always
       command:
         - /bin/bash
@@ -29,7 +29,7 @@ spec:
           memory: 26Gi
       env:
         - name: FORGE_TRIGGERED_BY
-          value: { FORGE_TRIGGERED_BY }
+          value: {FORGE_TRIGGERED_BY}
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:
@@ -45,13 +45,13 @@ spec:
         - name: RUST_BACKTRACE
           value: "1"
         - name: KUBECONFIG
-          value: { CUSTOM_KUBECONFIG_PATH }
+          value: {CUSTOM_KUBECONFIG_PATH}
       # - name: RUST_LOG
       #   value: debug
       volumeMounts:
         - name: multiregion-kubeconfig
           readOnly: true
-          mountPath: { MULTIREGION_KUBECONFIG_DIR }
+          mountPath: {MULTIREGION_KUBECONFIG_DIR}
   affinity:
     # avoid scheduling with other forge or validator/fullnode pods
     podAntiAffinity:
@@ -66,7 +66,7 @@ spec:
           topologyKey: "kubernetes.io/hostname"
   # schedule on a k8s worker node in the "validators" nodegroup
   # to access more compute
-  nodeSelector: { VALIDATOR_NODE_SELECTOR }
+  nodeSelector: {VALIDATOR_NODE_SELECTOR}
   tolerations:
     - effect: NoExecute
       key: aptos.org/nodepool
