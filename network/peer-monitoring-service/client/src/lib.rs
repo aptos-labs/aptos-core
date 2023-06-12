@@ -21,6 +21,9 @@ use futures::StreamExt;
 use network::PeerMonitoringServiceClient;
 use peer_states::peer_state::PeerState;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::ops::DerefMut;
+use rand::Rng;
+use rand::rngs::OsRng;
 use thiserror::Error;
 use tokio::{runtime::Handle, task::JoinHandle};
 
@@ -296,7 +299,6 @@ async fn directsend_sentwork_perf_worker(
     time_service: TimeService,
     shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
 ) {
-    //TODO WRITEME
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
     let data_size= node_config.peer_monitoring_service.performance_monitoring.direct_send_data_size;
     let interval = Duration::from_micros(node_config.peer_monitoring_service.performance_monitoring.direct_send_interval_usec);
@@ -304,7 +306,14 @@ async fn directsend_sentwork_perf_worker(
     futures::pin_mut!(ticker);
 
     let mut counter : u64 = 0;
-    let blob = Vec::<u8>::with_capacity(data_size as usize);
+
+    // random payload filler
+    let mut blob = Vec::<u8>::with_capacity(data_size as usize);
+    let mut rng = OsRng;
+    // rng.fill(blob.deref_mut());
+    for _ in 0..data_size {
+        blob.push(rng.gen());
+    }
 
     loop {
         ticker.next().await;
@@ -325,6 +334,14 @@ async fn directsend_sentwork_perf_worker(
         let nowu = time_service.now_unix_time();
         for peer_network_id in all_peers {
             counter += 1;
+
+            {
+                // tweak the random payload a little on every send
+                let counter_bytes: [u8; 8] = counter.to_le_bytes();
+                let (dest, _) = blob.deref_mut().split_at_mut(8);
+                dest.copy_from_slice(&counter_bytes);
+            }
+
             let msg = PeerMonitoringServiceMessage::DirectNetPerformance(DirectNetPerformanceMessage{
                 request_counter: counter,
                 send_micros: nowu.as_micros() as i64,
