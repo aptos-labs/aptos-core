@@ -105,8 +105,8 @@ spec aptos_framework::aptos_account {
     }
 
     spec batch_transfer_coins<CoinType>(from: &signer, recipients: vector<address>, amounts: vector<u64>) {
+        //TODO: Can't verify the loop invariant in enumerate
         use aptos_std::type_info;
-         //TODO: Can't verify the loop invariant in enumerate
         pragma verify = false;
         let account_addr_source = signer::address_of(from);
         let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
@@ -117,10 +117,6 @@ spec aptos_framework::aptos_account {
 
         requires exists i in 0..len(recipients):
             amounts[i] > 0;
-
-        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
-        // meanwhile, aptoscoin has already been proved in normal tranfer
-        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
 
         aborts_if len(recipients) != len(amounts);
 
@@ -160,11 +156,6 @@ spec aptos_framework::aptos_account {
     }
 
     spec deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) {
-        use aptos_std::type_info;
-        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
-        // meanwhile, aptoscoin has already been proved in normal tranfer
-        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
-
         include CreateAccountTransferAbortsIf;
         include GuidAbortsIf<CoinType>;
         include RegistCoinAbortsIf<CoinType>;
@@ -173,16 +164,11 @@ spec aptos_framework::aptos_account {
     }
 
     spec transfer_coins<CoinType>(from: &signer, to: address, amount: u64) {
-        use aptos_std::type_info;
         let account_addr_source = signer::address_of(from);
         let coin_store_to = global<coin::CoinStore<CoinType>>(to);
 
         //The 'from' addr is implictly not equal to 'to' addr
         requires account_addr_source != to;
-
-        // cointype should not be aptoscoin, otherwise it will automaticly create an account.
-        // meanwhile, aptoscoin has already been proved in normal tranfer
-        requires type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
 
         include CreateAccountTransferAbortsIf;
         include WithdrawAbortsIf<CoinType>;
