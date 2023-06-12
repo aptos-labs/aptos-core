@@ -7,11 +7,14 @@ id: "resource-accounts"
 
 A resource account is an [Account](https://aptos.dev/concepts/accounts/) that's used to store and manage resources. It can be a simple storage account that's used merely to separate different resources for an account or a module, or it can be utilized to programmatically control resource management in a contract.
 
-There are two distinct ways to manage a resource account. In this guide we'll discuss how to implement each technique, variations on the implementations, and any configuration details relevant to the creation process.
+There are two distinct ways to manage a resource account:
 
-## How to utilize a resource account
+1. The auth key is rotated to a separate account that can control it manually
+2. The Move VM rotates the auth key to 0x0 and controls the account through a SignerCapability
 
-### Manually controlling a resource account by rotating its auth key to another account's auth key
+In this guide we'll discuss how to implement each technique, variations on the implementations, and any configuration details relevant to the creation process.
+
+## Rotating the auth key to another account
 
 The first technique we're going to discuss is through the `create_resource_account` function in the `resource_account.move` contract. View the code [here](https://github.com/aptos-labs/aptos-core/blob/4beb914a168bd358ec375bfd9854cffaa271199a/aptos-move/framework/aptos-framework/sources/account.move#L602).
 
@@ -39,7 +42,7 @@ Notice that there is nothing returned here- we are not given anything to store o
 If you don't specify an auth key, that is, if you pass in `vector::empty<u8>()` or `vector<u8> []` to the `optional_auth_key` field, it will automatically rotate the auth key to the `origin` account's auth key.
 :::
 
-### Managing a resource account programmatically with a SignerCapability
+## Rotating the auth key to 0x0 to create a SignerCapability
 
 The second technique is the `create_resource_account` function in the `account.move` contract. View the code [here](https://github.com/aptos-labs/aptos-core/blob/4beb914a168bd358ec375bfd9854cffaa271199a/aptos-move/framework/aptos-framework/sources/account.move#L602).
 
@@ -110,7 +113,7 @@ To intuitively understand why a `SignerCapability` is allowed to be so powerful,
 Upon creating the `SignerCapability`, you're free to decide how you want to expose it. You can store it somewhere, give it away, or gate its access to functions that use it or conditionally return it.
 :::
 
-### Using a resource account to publish a module
+## Publishing a module to a resource account
 
 There are a few other ways we can utilize a resource account. One common usage is to use it to publish a module:
 
@@ -141,7 +144,7 @@ If you don't store the `SignerCapability` there is no way to retrieve the resour
 You *also* need to provide some way to use or retrieve the `SignerCapability`, too, or you won't even be able to use it.
 :::
 
-### Publishing an upgradeable module with a resource account
+## Publishing an upgradeable module to a resource account
 
 If you want to publish to a resource account and also have an upgradeable contract, use the `init_module` function to use the resource account's signer to retrieve and store the `SignerCapability`. Here's a full working example:
 
@@ -180,6 +183,11 @@ module upgrade_resource_contract::upgrader {
             code,
         );
     }
+
+    #[view]
+    public fun upgradeable_function(): u64 {
+        9000
+    }
 }
 ```
 
@@ -195,13 +203,133 @@ aptos move create-resource-account-and-publish-package --address-name upgrade_re
 
 Where `CONTRACT_DEPLOYER` is the profile. Read more about [Aptos CLI profiles here](https://aptos.dev/tools/aptos-cli-tool/use-aptos-cli/#creating-other-profiles).
 
-If you want to see an end to end unit test displaying how to publish and then upgrade the code above by calling `upgrade_contract`, you can run the cargo test:
+Let's run through an example of how to publish the above upgradeable contract to a resource account and upgrade it.
+
+1. Publish the module to a resource account
+2. Run the `upgradeable_function` view function and see what it returns
+3. Upgrade the module using the json output from the `aptos move build-publish-package` command
+4. Run the `upgradeable_function` view function again to see the new return value
+
+First make sure you have a default profile initialized to devnet.
 
 ```shell
-cargo test --package e2e-move-tests --lib -- tests::upgrade_resource_contract::code_upgrading_using_resource_account --exact --nocapture
+aptos init --profile default
 ```
 
-### Creating and funding a resource account
+Choose `devnet` and leave the private key part empty so it will generate an account for you. When we write `default` in our commands, it will automatically use this profile.
+
+Navigate to the `move-examples/upgrade_resource_contract` directory.
+
+### Publish the module
+
+```shell
+aptos move create-resource-account-and-publish-package --address-name upgrade_resource_contract --seed '' --named-addresses owner=default
+```
+
+The `--address-name` flag denotes that the resource address created from the resource account we make will be supplied as the `upgrade_resource_contract` address in our module. Since we declared it as the module address with `module upgrade_resource_contract::upgrader { ... }` at the very top of our contract, this is where our contract will be deployed.
+
+When you run this command, it will ask you something like this:
+
+```
+Do you want to publish this package under the resource account's address be326762ddd27624743223991c2223027621e62b7d0849a40a970fa2df385da9? [yes/no] >
+```
+
+Say yes and copy that address to your clipboard. That's our resource account address where the contract is deployed.
+
+Now you can run the view function!
+
+### Run the view function
+
+```shell
+aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::upgrader::upgradeable_function
+```
+
+Remember to replace `RESOURCE_ACCOUNT_ADDRESS` with the resource account address you deployed your module to; it is different from the one posted above, so this will specifically only work for *your* contract.
+
+It should output:
+```json
+Result: [
+    9000
+]
+```
+
+### Change the view function
+
+Now let's change the value returned in the view function from `9000` to `9001` so we can see that we've upgraded the contract:
+
+```rust
+#[view]
+public fun upgradeable_function(): u64 {
+    9001
+}
+```
+
+Save that file, and then use the `build-publish-package` command to get the bytecode output in JSON format.
+
+### Get the bytecode for the module
+
+```shell
+aptos move build-publish-payload --json-output-file upgrade_contract.json --named-addresses upgrade_resource_contract=RESOURCE_ACCOUNT_ADDRESS,owner=default
+```
+
+Replace `RESOURCE_ACCOUNT_ADDRESS` with your resource account address and run the command. Once you do this, there will now be a `upgrade_contract.json` file with the bytecode output of the new, upgraded module in it.
+
+The hex values in this JSON file are arguments that we'd normally use to pass into the `0x1::code::publish_package_txn` function, but since we made our own `upgrade_contract` function that wraps it, we need to change the function call value to something else.
+
+Your JSON should look something like the below output, just with expanded `value` fields (truncated here for simplicity's sake):
+
+```json
+{
+  "function_id": "0x1::code::publish_package_txn",
+  "type_args": [],
+  "args": [
+    {
+      "type": "hex",
+      "value": "0x2155...6200"
+    },
+    {
+      "type": "hex",
+      "value": [
+        "0xa11c...0000"
+      ]
+    }
+  ]
+}
+```
+
+Change the `function_id` value in the JSON file to match your contract's upgrade function contract, with your resource account address filled in:
+
+```
+"function_id": "RESOURCE_ACCOUNT_ADDRESS::upgrader::upgrade_contract",
+```
+
+Save this file so we can use it to run an entry function with JSON parameters.
+
+### Run the upgrade_contract function
+
+```shell
+aptos move run --json-file upgrade_contract.json
+```
+
+Confirm yes to publish the upgraded module where the view function will return 9001 instead of 9000.
+
+### Run the upgraded view function
+
+```shell
+aptos move view --function-id RESOURCE_ACCOUNT_ADDRESS::upgrader::upgradeable_function
+```
+
+You should get:
+
+```json
+Result: [
+    9001
+]
+```
+
+Now you know how to publish an upgradeable module to a resource account!
+
+## Creating and funding a resource account
 
 Another common usage is to create and fund a resource account, in case the account needs access to functions that need access to `Coin<AptosCoin>`:
 
@@ -225,9 +353,9 @@ public entry fun create_resource_account_and_fund(
 }
 ```
 
-#### Can I acquire a SignerCapability later?
+## Acquiring a SignerCapability later
 
-Yes. Say you create a resource account and rotate its auth key to your account's auth key. You'd just need to sign for the account and call `retrieve_resource_account_cap` in order to get the `SignerCapability` and store it somewhere:
+Say you create a resource account and rotate its auth key to your account's auth key. You'd just need to sign for the account and call `retrieve_resource_account_cap` in order to get the `SignerCapability` and store it somewhere:
 
 ```rust
 struct MySignerCapability has key {
@@ -248,7 +376,7 @@ Call the function, but change the sender account to appear as the resource accou
 aptos move run --function-id MODULE_ADDRESS::MODULE_NAME::retrieve_cap --args address:default --sender-account RESOURCE_ADDRESS_HERE --profile default
 ```
 
-#### How is the address for a resource account derived?
+## How is the address for a resource account derived?
 
 When a resource account is created, the address is derived from a SHA3-256 hash of the requesting account's address plus an optional byte vector `seed`. If you want to know the resource address generated by an account + a given arbitrary seed, you can call the `create_resource_address` function in `account.move`:
 
