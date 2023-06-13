@@ -498,7 +498,7 @@ pub fn setup_environment_and_start_node(
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
-        peers_and_metadata,
+        peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
 
@@ -510,7 +510,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
-    let (state_sync_runtimes, mempool_listener, consensus_notifier, aptos_data_client) =
+    let (state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
             storage_service_network_interfaces,
@@ -532,7 +532,7 @@ pub fn setup_environment_and_start_node(
             mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
-            Arc::new(aptos_data_client),
+            peers_and_metadata,
         );
 
     // Create the consensus runtime (this blocks on state sync first)

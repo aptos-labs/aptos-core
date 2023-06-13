@@ -12,7 +12,7 @@ use aptos_config::{
 };
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::application::{error::Error, metadata::PeerMetadata, storage::PeersAndMetadata};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
@@ -368,13 +368,6 @@ impl PeerStates {
             advertised_data,
             optimal_chunk_sizes,
         }
-    }
-
-    /// Returns metadata for all peers currently connected to the node
-    pub(crate) fn get_connected_peers_and_metadata(
-        &self,
-    ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, Error> {
-        self.peers_and_metadata.get_connected_peers_and_metadata()
     }
 
     #[cfg(test)]

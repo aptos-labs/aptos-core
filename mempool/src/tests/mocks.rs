@@ -11,17 +11,14 @@ use anyhow::{format_err, Result};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::NetworkId,
 };
-use aptos_data_client::interface::AptosPeersInterface;
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::{
-        error::Error,
         interface::{NetworkClient, NetworkServiceEvents},
-        metadata::PeerMetadata,
         storage::PeersAndMetadata,
     },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
@@ -42,24 +39,6 @@ use futures::channel::mpsc;
 use maplit::hashmap;
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::{Handle, Runtime};
-
-pub struct MockAptosPeers {
-    peers: HashMap<PeerNetworkId, PeerMetadata>,
-}
-
-impl MockAptosPeers {
-    pub fn new(peers: HashMap<PeerNetworkId, PeerMetadata>) -> Self {
-        Self { peers }
-    }
-}
-
-impl AptosPeersInterface for MockAptosPeers {
-    fn get_connected_peers_and_metadata(
-        &self,
-    ) -> std::result::Result<HashMap<PeerNetworkId, PeerMetadata>, Error> {
-        Ok(self.peers.clone())
-    }
-}
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
@@ -154,7 +133,7 @@ impl MockSharedMempool {
             vec![MempoolDirectSend],
             vec![],
             network_senders,
-            peers_and_metadata,
+            peers_and_metadata.clone(),
         );
         let network_and_events = hashmap! {NetworkId::Validator => network_events};
         let network_service_events = NetworkServiceEvents::new(network_and_events);
@@ -172,7 +151,7 @@ impl MockSharedMempool {
             db.reader.clone(),
             Arc::new(RwLock::new(validator)),
             vec![],
-            Arc::new(MockAptosPeers::new(HashMap::new())),
+            peers_and_metadata,
         );
 
         (ac_client, mempool, quorum_store_sender, mempool_notifier)

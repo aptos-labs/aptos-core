@@ -12,12 +12,14 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_config::config::NodeConfig;
-use aptos_data_client::interface::AptosPeersInterface;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network::application::{
+    interface::{NetworkClient, NetworkServiceEvents},
+    storage::PeersAndMetadata,
+};
 use aptos_storage_interface::DbReader;
 use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
 use futures::channel::mpsc::{Receiver, UnboundedSender};
@@ -42,7 +44,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     db: Arc<dyn DbReader>,
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
-    peers: Arc<dyn AptosPeersInterface>,
+    peers: Arc<PeersAndMetadata>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
 {
@@ -91,7 +93,7 @@ pub fn bootstrap(
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
-    peers: Arc<dyn AptosPeersInterface>,
+    peers: Arc<PeersAndMetadata>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
