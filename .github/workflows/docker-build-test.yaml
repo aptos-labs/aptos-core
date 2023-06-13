@@ -341,4 +341,5 @@ jobs:
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-multiregion-test 
-      FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }} 
+      FORGE_NAMESPACE: forge-multiregion-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
+      FORGE_CLUSTER_NAME: forge-multiregion
