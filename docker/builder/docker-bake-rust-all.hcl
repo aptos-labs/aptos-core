@@ -27,7 +27,7 @@ variable "GCP_DOCKER_ARTIFACT_REPO_US" {}
 variable "AWS_ECR_ACCOUNT_NUM" {}
 
 variable "TARGET_REGISTRY" {
-  // must be "gcp" | "local" | "remote", informs which docker tags are being generated
+  // must be "gcp" | "local" | "remote-all" | "remote" (deprecated, but kept for backwards compatibility. Same as "gcp"), informs which docker tags are being generated
   default = CI == "true" ? "remote" : "local"
 }
 
@@ -224,7 +224,7 @@ function "generate_cache_from" {
 
 function "generate_cache_to" {
   params = [target]
-  result = TARGET_REGISTRY == "remote" ? [
+  result = TARGET_REGISTRY != "local" ? [
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "type=registry,ref=${GCP_DOCKER_ARTIFACT_REPO}/${target}:cache-${IMAGE_TAG_PREFIX}${GIT_SHA}"
   ] : []
@@ -232,7 +232,7 @@ function "generate_cache_to" {
 
 function "generate_tags" {
   params = [target]
-  result = TARGET_REGISTRY == "remote" ? [
+  result = TARGET_REGISTRY == "remote-all" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
@@ -240,12 +240,12 @@ function "generate_tags" {
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
     ] : (
-    TARGET_REGISTRY == "gcp" ? [
+    TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-      ] : [
+      ] : [ // "local" or any other value
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
     ]

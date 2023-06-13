@@ -63,7 +63,7 @@ env:
 
   # On PRs, only build and push to GCP
   # On push, build and push to all remote registries
-  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'gcp' || 'remote' }}
+  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
 
 permissions:
   contents: read

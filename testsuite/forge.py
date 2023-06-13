@@ -940,7 +940,8 @@ def image_exists(
                 "images",
                 "describe",
                 full_image,
-            ]
+            ],
+            stream_output=True,
         ).succeeded()
     elif cloud == Cloud.AWS:
         full_image = f"ECR_REPO/{image_name}:{image_tag}"
@@ -954,7 +955,8 @@ def image_exists(
                 f"{ECR_REPO_PREFIX}/{image_name}",
                 "--image-ids",
                 f"imageTag={image_tag}",
-            ]
+            ],
+            stream_output=True,
         ).succeeded()
     else:
         raise Exception(f"Unknown repo type: {repo_type}")
