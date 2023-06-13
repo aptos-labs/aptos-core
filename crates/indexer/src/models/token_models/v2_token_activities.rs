@@ -78,7 +78,7 @@ impl TokenActivityV2 {
             };
 
             if let Some(metadata) = token_v2_metadata.get(&token_data_id) {
-                let object_core = &metadata.object;
+                let object_core = &metadata.object.object_core;
                 let token_activity_helper = match token_event {
                     V2TokenEvent::MintEvent(_) => TokenActivityHelperV2 {
                         from_address: Some(object_core.get_owner_address()),

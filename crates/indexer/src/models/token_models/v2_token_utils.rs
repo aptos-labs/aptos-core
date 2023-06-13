@@ -6,7 +6,11 @@
 
 use super::token_utils::{NAME_LENGTH, URI_LENGTH};
 use crate::{
-    models::{move_resources::MoveResource, v2_objects::CurrentObjectPK},
+    models::{
+        coin_models::v2_fungible_asset_utils::{FungibleAssetMetadata, FungibleAssetSupply},
+        move_resources::MoveResource,
+        v2_objects::CurrentObjectPK,
+    },
     util::{
         deserialize_token_object_property_map_from_bcs_hexstring, standardize_address, truncate_str,
     },
@@ -31,11 +35,13 @@ pub type EventIndex = i64;
 pub struct TokenV2AggregatedData {
     pub aptos_collection: Option<AptosCollection>,
     pub fixed_supply: Option<FixedSupply>,
-    pub object: ObjectCore,
-    pub unlimited_supply: Option<UnlimitedSupply>,
+    pub fungible_asset_metadata: Option<FungibleAssetMetadata>,
+    pub fungible_asset_supply: Option<FungibleAssetSupply>,
+    pub object: ObjectWithMetadata,
     pub property_map: Option<PropertyMap>,
-    pub transfer_event: Option<(EventIndex, TransferEvent)>,
     pub token: Option<TokenV2>,
+    pub transfer_event: Option<(EventIndex, TransferEvent)>,
+    pub unlimited_supply: Option<UnlimitedSupply>,
 }
 
 /// Tracks which token standard a token / collection is built upon
@@ -64,6 +70,18 @@ pub struct ObjectCore {
 }
 
 impl ObjectCore {
+    pub fn get_owner_address(&self) -> String {
+        standardize_address(&self.owner)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ObjectWithMetadata {
+    pub object_core: ObjectCore,
+    state_key_hash: String,
+}
+
+impl ObjectWithMetadata {
     pub fn from_write_resource(
         write_resource: &WriteResource,
         txn_version: i64,
@@ -82,17 +100,21 @@ impl ObjectCore {
             &serde_json::to_value(&write_resource.data.data).unwrap(),
             txn_version,
         )? {
-            Ok(Some(inner))
+            Ok(Some(Self {
+                object_core: inner,
+                state_key_hash: standardize_address(write_resource.state_key_hash.as_str()),
+            }))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_owner_address(&self) -> String {
-        standardize_address(&self.owner)
+    pub fn get_state_key_hash(&self) -> String {
+        standardize_address(&self.state_key_hash)
     }
 }
 
+/* Section on Collection / Token */
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Collection {
     creator: String,
@@ -164,7 +186,7 @@ pub struct TokenV2 {
 
 impl TokenV2 {
     pub fn get_collection_address(&self) -> String {
-        standardize_address(&self.collection.inner)
+        self.collection.get_reference_address()
     }
 
     pub fn get_uri_trunc(&self) -> String {
@@ -210,6 +232,13 @@ pub struct ResourceReference {
     inner: String,
 }
 
+impl ResourceReference {
+    pub fn get_reference_address(&self) -> String {
+        standardize_address(&self.inner)
+    }
+}
+
+/* Section on Supply */
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FixedSupply {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -290,6 +319,7 @@ impl UnlimitedSupply {
     }
 }
 
+/* Section on Events */
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MintEvent {
     #[serde(deserialize_with = "deserialize_from_string")]
@@ -366,6 +396,7 @@ impl TransferEvent {
     }
 }
 
+/* Section on Property Maps */
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PropertyMap {
     #[serde(deserialize_with = "deserialize_token_object_property_map_from_bcs_hexstring")]
@@ -481,7 +512,7 @@ impl V2TokenEvent {
         data_type: &str,
         data: &serde_json::Value,
         txn_version: i64,
-    ) -> Result<Option<V2TokenEvent>> {
+    ) -> Result<Option<Self>> {
         match data_type {
             "0x4::collection::MintEvent" => {
                 serde_json::from_value(data.clone()).map(|inner| Some(Self::MintEvent(inner)))
