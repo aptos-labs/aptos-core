@@ -133,11 +133,53 @@ impl LedgerDb {
     }
 
     pub(crate) fn create_checkpoint(
-        _db_root_path: impl AsRef<Path>,
-        _cp_root_path: impl AsRef<Path>,
+        db_root_path: impl AsRef<Path>,
+        cp_root_path: impl AsRef<Path>,
+        split_ledger_db: bool,
     ) -> Result<()> {
-        // TODO(grao): Implement this function.
-        todo!()
+        let rocksdb_configs = RocksdbConfigs {
+            split_ledger_db,
+            ..Default::default()
+        };
+        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
+
+        info!(
+            split_ledger_db = split_ledger_db,
+            "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
+        );
+
+        std::fs::remove_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        if split_ledger_db {
+            std::fs::create_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        }
+
+        ledger_db
+            .metadata_db()
+            .create_checkpoint(Self::metadata_db_path(
+                cp_root_path.as_ref(),
+                split_ledger_db,
+            ))?;
+
+        if split_ledger_db {
+            ledger_db
+                .event_db()
+                .create_checkpoint(cp_ledger_db_folder.join(EVENT_DB_NAME))?;
+            ledger_db
+                .transaction_accumulator_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME))?;
+            ledger_db
+                .transaction_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_DB_NAME))?;
+            ledger_db
+                .transaction_info_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_INFO_DB_NAME))?;
+            ledger_db
+                .write_set_db()
+                .create_checkpoint(cp_ledger_db_folder.join(WRITE_SET_DB_NAME))?;
+        }
+
+        Ok(())
     }
 
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {

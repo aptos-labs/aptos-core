@@ -124,7 +124,7 @@ struct Opt {
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 
     #[clap(long)]
     use_sharded_state_merkle_db: bool,
@@ -229,7 +229,7 @@ where
                 data_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );
@@ -254,7 +254,7 @@ where
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );
@@ -273,7 +273,7 @@ where
                 checkpoint_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );

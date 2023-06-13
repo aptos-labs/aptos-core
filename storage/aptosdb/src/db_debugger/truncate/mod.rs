@@ -47,7 +47,7 @@ pub struct Cmd {
     opt_out_backup_checkpoint: bool,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 }
 
 impl Cmd {
@@ -61,14 +61,19 @@ impl Cmd {
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
             // TODO(grao): Support sharded state merkle db here.
-            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir, false)?;
+            AptosDB::create_checkpoint(
+                &self.db_dir,
+                backup_checkpoint_dir,
+                self.split_ledger_db,
+                false,
+            )?;
             println!("Done!");
         } else {
             println!("Opted out backup creation!.");
         }
 
         let rocksdb_config = RocksdbConfigs {
-            use_state_kv_db: self.use_state_kv_db,
+            split_ledger_db: self.split_ledger_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -242,7 +247,7 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
-                use_state_kv_db: false,
+                split_ledger_db: false,
             };
 
             cmd.run().unwrap();

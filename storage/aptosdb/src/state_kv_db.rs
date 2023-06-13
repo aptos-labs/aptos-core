@@ -38,7 +38,7 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.use_state_kv_db {
+        if !rocksdb_configs.split_ledger_db {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),

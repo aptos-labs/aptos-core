@@ -33,13 +33,13 @@ pub struct Cmd {
     db_dir: PathBuf,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 }
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let rocksdb_config = RocksdbConfigs {
-            use_state_kv_db: self.use_state_kv_db,
+            split_ledger_db: self.split_ledger_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(

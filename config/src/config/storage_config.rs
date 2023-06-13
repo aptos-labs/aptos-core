@@ -65,9 +65,6 @@ pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
     // Note: Not ready for production use yet.
-    // TODO(grao): Deprecate this flag and use the split_ledger_db_to_individual_dbs below.
-    pub use_state_kv_db: bool,
-    // Note: Not ready for production use yet.
     pub use_sharded_state_merkle_db: bool,
     // Note: Not ready for production use yet.
     // TODO(grao): Add RocksdbConfig for individual DBs when necessary.
@@ -81,7 +78,6 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            use_state_kv_db: false,
             use_sharded_state_merkle_db: false,
             split_ledger_db: false,
             state_kv_db_config: RocksdbConfig::default(),
