@@ -162,6 +162,7 @@ dependencies = [
  "aptos-github-client",
  "aptos-global-constants",
  "aptos-keygen",
+ "aptos-ledger",
  "aptos-logger",
  "aptos-network-checker",
  "aptos-node",
