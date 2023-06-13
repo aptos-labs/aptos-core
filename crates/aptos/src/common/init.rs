@@ -12,10 +12,7 @@ use crate::{
         utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
     },
 };
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    PrivateKey, ValidCryptoMaterialStringExt,
-};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
@@ -58,7 +55,7 @@ pub struct InitTool {
     /// Make sure that you have Ledger device connected, unlocked, and have Aptos app installed
     /// and opened. Otherwise CLI would not be able to open the connection to your account
     #[clap(long)]
-    pub from_ledger: bool,
+    pub ledger: bool,
 
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -141,16 +138,35 @@ impl CliCommand<()> for InitTool {
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
-        // Set the BIP44 index to 0
-        // TODO: Need to update this allow account at different bip44 derivative path index
-        profile_config.bip44_index = if self.from_ledger {
-            Some("0".to_string())
+        // Fetch the top 5 (index 0-4) accounts from Ledger
+        let derivative_path = if self.ledger {
+            let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
+            eprintln!(
+                "Please choose a derivative path from the following {} ledger accounts, or choose an arbitrary path that you want to use:",
+                account_map.len()
+            );
+            for (index, account) in account_map.iter() {
+                eprintln!("Path: {} Address {}", index, account);
+            }
+            let input = read_line("derivative_path")?;
+            let input = input.trim();
+
+            // Validate the path
+            if !aptos_ledger::validate_derivative_path(input) {
+                return Err(CliError::UnexpectedError(
+                    "Invalid derivative path".to_owned(),
+                ));
+            }
+            Some(input.to_string())
         } else {
             None
         };
 
+        // Set the derivative_path to the one user chose
+        profile_config.derivative_path = derivative_path.clone();
+
         // Private key
-        let private_key = if self.from_ledger {
+        let private_key = if self.ledger {
             // Private key stays in ledger
             None
         } else {
@@ -185,8 +201,15 @@ impl CliCommand<()> for InitTool {
         };
 
         // Public key
-        let public_key = if self.from_ledger {
-            let pub_key_str = match aptos_ledger::get_public_key(false) {
+        let public_key = if self.ledger {
+            let pub_key = match aptos_ledger::get_public_key(
+                derivative_path
+                    .ok_or(CliError::UnexpectedError(
+                        "Invalid derivative path".to_string(),
+                    ))?
+                    .as_str(),
+                false,
+            ) {
                 Ok(pub_key_str) => pub_key_str,
                 Err(err) => {
                     return Err(CliError::UnexpectedError(format!(
@@ -195,7 +218,7 @@ impl CliCommand<()> for InitTool {
                     )))
                 },
             };
-            Ed25519PublicKey::from_encoded_string(&pub_key_str)?
+            pub_key
         } else {
             private_key.clone().unwrap().public_key()
         };
