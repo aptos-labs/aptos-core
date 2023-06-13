@@ -8,9 +8,14 @@ use crate::{
 };
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
-use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
+use aptos_config::{
+    config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE},
+    network_id::PeerNetworkId,
+};
 use aptos_consensus_types::common::TransactionInProgress;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_data_client::interface::AptosPeersInterface;
+use aptos_network::application::{error::Error, metadata::PeerMetadata, storage::PeersAndMetadata};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
@@ -20,7 +25,10 @@ use aptos_types::{
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
@@ -207,4 +215,23 @@ pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
         .unwrap(),
     )
     .unwrap()
+}
+
+// TODO: belongs in common?
+pub struct PeersAndMetadataPeers {
+    peers_and_metadata: Arc<PeersAndMetadata>,
+}
+
+impl PeersAndMetadataPeers {
+    pub fn new(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
+        Self { peers_and_metadata }
+    }
+}
+
+impl AptosPeersInterface for PeersAndMetadataPeers {
+    fn get_connected_peers_and_metadata(
+        &self,
+    ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, Error> {
+        self.peers_and_metadata.get_connected_peers_and_metadata()
+    }
 }

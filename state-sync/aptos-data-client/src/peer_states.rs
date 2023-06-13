@@ -370,6 +370,10 @@ impl PeerStates {
         }
     }
 
+    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.peers_and_metadata.clone()
+    }
+
     #[cfg(test)]
     /// Returns a copy of the peer to states map for test purposes
     pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {

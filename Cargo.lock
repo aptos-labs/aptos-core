@@ -2031,6 +2031,7 @@ dependencies = [
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
+ "aptos-data-client",
  "aptos-event-notifications",
  "aptos-id-generator",
  "aptos-infallible",

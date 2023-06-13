@@ -6,6 +6,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
+use aptos_data_client::interface::AptosPeersInterface;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
@@ -107,6 +108,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     network_interfaces: ApplicationNetworkInterfaces<MempoolSyncMsg>,
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
+    peers: Arc<dyn AptosPeersInterface>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
     // Create a communication channel between consensus and mempool
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -123,6 +125,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         consensus_to_mempool_receiver,
         mempool_listener,
         mempool_reconfig_subscription,
+        peers,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 

@@ -83,6 +83,7 @@ pub fn start_state_sync_and_get_notification_handles(
     StateSyncRuntimes,
     MempoolNotificationListener,
     ConsensusNotifier,
+    AptosDataClient,
 )> {
     // Get the network client and events
     let network_client = storage_network_interfaces.network_client;
@@ -131,7 +132,7 @@ pub fn start_state_sync_and_get_notification_handles(
         metadata_storage,
         consensus_listener,
         event_subscription_service,
-        aptos_data_client,
+        aptos_data_client.clone(),
         streaming_service_client,
         TimeService::real(),
     );
@@ -144,7 +145,12 @@ pub fn start_state_sync_and_get_notification_handles(
         streaming_service_runtime,
     );
 
-    Ok((state_sync_runtimes, mempool_listener, consensus_notifier))
+    Ok((
+        state_sync_runtimes,
+        mempool_listener,
+        consensus_notifier,
+        aptos_data_client,
+    ))
 }
 
 /// Sets up the data streaming service runtime

@@ -5,8 +5,8 @@ use crate::{
     error::Error,
     global_summary::GlobalDataSummary,
     interface::{
-        AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
-        ResponseId,
+        AptosDataClientInterface, AptosPeersInterface, Response, ResponseCallback, ResponseContext,
+        ResponseError, ResponseId,
     },
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
@@ -23,7 +23,10 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
-use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
+use aptos_network::{
+    application::{interface::NetworkClient, metadata::PeerMetadata},
+    protocols::network::RpcError,
+};
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
@@ -45,7 +48,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use rand::prelude::SliceRandom;
-use std::{fmt, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 // Useful constants
@@ -667,6 +670,18 @@ impl AptosDataClientInterface for AptosDataClient {
             });
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
+    }
+}
+
+impl AptosPeersInterface for AptosDataClient {
+    fn get_connected_peers_and_metadata(
+        &self,
+    ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, aptos_network::application::error::Error>
+    {
+        self.peer_states
+            .read()
+            .get_peers_and_metadata()
+            .get_connected_peers_and_metadata()
     }
 }
 

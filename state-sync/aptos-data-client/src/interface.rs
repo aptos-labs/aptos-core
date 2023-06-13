@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};
+use aptos_config::network_id::PeerNetworkId;
+use aptos_network::application::metadata::PeerMetadata;
 use aptos_storage_service_types::{responses::TransactionOrOutputListWithProof, Epoch};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -10,7 +12,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 /// The API offered by the Aptos Data Client.
 #[async_trait]
@@ -310,4 +312,10 @@ impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
             ))
         }
     }
+}
+
+pub trait AptosPeersInterface: Send + Sync {
+    fn get_connected_peers_and_metadata(
+        &self,
+    ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, aptos_network::application::error::Error>;
 }
