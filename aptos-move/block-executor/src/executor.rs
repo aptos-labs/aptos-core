@@ -77,6 +77,76 @@ where
         }
     }
 
+    fn update_parallel_block_gas_counters(
+        &self,
+        accumulated_total_gas: u64,
+        accumulated_execution_gas: u64,
+        accumulated_io_gas: u64,
+        accumulated_storage_gas: u64,
+        accumulated_storage_fee: u64,
+        num_committed: usize,
+    ) {
+        counters::PARALLEL_BLOCK_TOTAL_GAS.observe(accumulated_total_gas as f64);
+        counters::PARALLEL_BLOCK_EXECUTION_GAS.observe(accumulated_execution_gas as f64);
+        counters::PARALLEL_BLOCK_IO_GAS.observe(accumulated_io_gas as f64);
+        counters::PARALLEL_BLOCK_STORAGE_GAS.observe(accumulated_storage_gas as f64);
+        counters::PARALLEL_BLOCK_STORAGE_FEE.observe(accumulated_storage_fee as f64);
+        counters::PARALLEL_BLOCK_NON_STORAGE_GAS
+            .observe((accumulated_execution_gas + accumulated_io_gas) as f64);
+        counters::PARALLEL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+    }
+
+    fn update_parallel_txn_gas_counters(
+        &self,
+        total_gas: u64,
+        execution_gas: u64,
+        io_gas: u64,
+        storage_gas: u64,
+        storage_fee: u64,
+    ) {
+        counters::PARALLEL_TXN_TOTAL_GAS.observe(total_gas as f64);
+        counters::PARALLEL_TXN_EXECUTION_GAS.observe(execution_gas as f64);
+        counters::PARALLEL_TXN_IO_GAS.observe(io_gas as f64);
+        counters::PARALLEL_TXN_STORAGE_GAS.observe(storage_gas as f64);
+        counters::PARALLEL_TXN_STORAGE_FEE.observe(storage_fee as f64);
+        counters::PARALLEL_TXN_NON_STORAGE_GAS.observe((execution_gas + io_gas) as f64);
+    }
+
+    fn update_sequential_block_gas_counters(
+        &self,
+        accumulated_total_gas: u64,
+        accumulated_execution_gas: u64,
+        accumulated_io_gas: u64,
+        accumulated_storage_gas: u64,
+        accumulated_storage_fee: u64,
+        num_committed: usize,
+    ) {
+        counters::SEQUENTIAL_BLOCK_TOTAL_GAS.observe(accumulated_total_gas as f64);
+        counters::SEQUENTIAL_BLOCK_EXECUTION_GAS.observe(accumulated_execution_gas as f64);
+        counters::SEQUENTIAL_BLOCK_IO_GAS.observe(accumulated_io_gas as f64);
+        counters::SEQUENTIAL_BLOCK_STORAGE_GAS.observe(accumulated_storage_gas as f64);
+        counters::SEQUENTIAL_BLOCK_STORAGE_FEE.observe(accumulated_storage_fee as f64);
+        counters::SEQUENTIAL_BLOCK_NON_STORAGE_GAS
+            .observe((accumulated_execution_gas + accumulated_io_gas) as f64);
+        counters::SEQUENTIAL_BLOCK_COMMITTED_TXNS.observe(num_committed as f64);
+    }
+
+    fn update_sequential_txn_gas_counters(
+        &self,
+        total_gas: u64,
+        execution_gas: u64,
+        io_gas: u64,
+        storage_gas: u64,
+        storage_fee: u64,
+    ) {
+        counters::SEQUENTIAL_TXN_TOTAL_GAS.observe(total_gas as f64);
+        counters::SEQUENTIAL_TXN_EXECUTION_GAS.observe(execution_gas as f64);
+        counters::SEQUENTIAL_TXN_IO_GAS.observe(io_gas as f64);
+        counters::SEQUENTIAL_TXN_STORAGE_GAS.observe(storage_gas as f64);
+        counters::SEQUENTIAL_TXN_STORAGE_FEE.observe(storage_fee as f64);
+        counters::SEQUENTIAL_TXN_NON_STORAGE_GAS.observe((execution_gas + io_gas) as f64);
+    }
+
     fn execute(
         &self,
         version: Version,
@@ -223,9 +293,13 @@ where
         scheduler: &Scheduler,
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
-        accumulated_gas: &mut u64,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        accumulated_total_gas: &mut u64,
+        accumulated_execution_gas: &mut u64,
+        accumulated_io_gas: &mut u64,
+        accumulated_storage_gas: &mut u64,
+        accumulated_storage_fee: &mut u64,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             post_commit_txs[*worker_idx]
@@ -238,8 +312,14 @@ where
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
                 *scheduler_task = SchedulerTask::Done;
 
-                counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
-                counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                self.update_parallel_block_gas_counters(
+                    *accumulated_total_gas,
+                    *accumulated_execution_gas,
+                    *accumulated_io_gas,
+                    *accumulated_storage_gas,
+                    *accumulated_storage_fee,
+                    (txn_idx + 1) as usize,
+                );
                 info!(
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
                     txn_idx + 1
@@ -247,34 +327,58 @@ where
                 break;
             }
 
-            // For committed txns with Success status, calculate the accumulated gas.
+            // For committed txns with Success status, calculate the accumulated gas costs.
             // For committed txns with Abort or SkipRest status, early halt BlockSTM.
-            match last_input_output.execution_and_io_gas_used(txn_idx) {
-                Some(gas) => {
-                    *accumulated_gas += gas;
-                    counters::PARALLEL_PER_TXN_GAS.observe(gas as f64);
+            match last_input_output.fee_statement(txn_idx) {
+                Some((total_gas, execution_gas, io_gas, storage_gas, storage_fee)) => {
+                    *accumulated_total_gas += total_gas;
+                    *accumulated_execution_gas += execution_gas;
+                    *accumulated_io_gas += io_gas;
+                    *accumulated_storage_gas += storage_gas;
+                    *accumulated_storage_fee += storage_fee;
+
+                    self.update_parallel_txn_gas_counters(
+                        total_gas,
+                        execution_gas,
+                        io_gas,
+                        storage_gas,
+                        storage_fee,
+                    );
                 },
                 None => {
                     scheduler.halt();
 
-                    counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
-                    counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                    self.update_parallel_block_gas_counters(
+                        *accumulated_total_gas,
+                        *accumulated_execution_gas,
+                        *accumulated_io_gas,
+                        *accumulated_storage_gas,
+                        *accumulated_storage_fee,
+                        (txn_idx + 1) as usize,
+                    );
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
                     break;
                 },
             };
 
             if let Some(per_block_gas_limit) = maybe_block_gas_limit {
-                // When the accumulated gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
-                if *accumulated_gas >= per_block_gas_limit {
+                // When the accumulated execution and io gas of the committed txns exceeds PER_BLOCK_GAS_LIMIT, early halt BlockSTM.
+                // Storage gas does not count towards the per block gas limit, as we measure execution related cost here.
+                if *accumulated_execution_gas + *accumulated_io_gas >= per_block_gas_limit {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
                     last_input_output.update_to_skip_rest(txn_idx);
                     scheduler.halt();
 
-                    counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
-                    counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                    self.update_parallel_block_gas_counters(
+                        *accumulated_total_gas,
+                        *accumulated_execution_gas,
+                        *accumulated_io_gas,
+                        *accumulated_storage_gas,
+                        *accumulated_storage_fee,
+                        (txn_idx + 1) as usize,
+                    );
                     counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                    info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_gas, per_block_gas_limit, txn_idx);
+                    info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_execution_gas + *accumulated_io_gas, per_block_gas_limit, txn_idx);
                     break;
                 }
             }
@@ -351,8 +455,13 @@ where
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
-        let mut accumulated_gas = 0;
         let mut worker_idx = 0;
+
+        let mut accumulated_total_gas = 0;
+        let mut accumulated_execution_gas = 0;
+        let mut accumulated_io_gas = 0;
+        let mut accumulated_storage_gas = 0;
+        let mut accumualted_storage_fee = 0;
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -362,9 +471,13 @@ where
                         scheduler,
                         post_commit_txs,
                         &mut worker_idx,
-                        &mut accumulated_gas,
                         &mut scheduler_task,
                         last_input_output,
+                        &mut accumulated_total_gas,
+                        &mut accumulated_execution_gas,
+                        &mut accumulated_io_gas,
+                        &mut accumulated_storage_gas,
+                        &mut accumualted_storage_fee,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -534,7 +647,13 @@ where
         let data_map = UnsyncMap::new();
 
         let mut ret = Vec::with_capacity(num_txns);
-        let mut accumulated_gas = 0;
+
+        let mut accumated_total_gas = 0;
+        let mut accumulated_execution_gas = 0;
+        let mut accumulated_io_gas = 0;
+        let mut accumulated_storage_gas = 0;
+        let mut accumulated_storage_fee = 0;
+
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
                 &LatestView::<T, S, X>::new_btree_view(base_view, &data_map, idx as TxnIndex),
@@ -555,11 +674,21 @@ where
                     for (ap, write_op) in output.get_writes().into_iter() {
                         data_map.write(ap, write_op);
                     }
-                    // Calculating the accumulated gas of the committed txns.
-                    let txn_execution_and_io_gas =
-                        output.execution_gas_used() + output.io_gas_used();
-                    accumulated_gas += txn_execution_and_io_gas;
-                    counters::SEQUENTIAL_PER_TXN_GAS.observe(txn_execution_and_io_gas as f64);
+                    // Calculating the accumulated gas costs of the committed txns.
+                    let (total_gas, execution_gas, io_gas, storage_gas, storage_fee) =
+                        output.fee_statement();
+                    accumated_total_gas += total_gas;
+                    accumulated_execution_gas += execution_gas;
+                    accumulated_io_gas += io_gas;
+                    accumulated_storage_gas += storage_gas;
+                    accumulated_storage_fee += storage_fee;
+                    self.update_sequential_txn_gas_counters(
+                        total_gas,
+                        execution_gas,
+                        io_gas,
+                        storage_gas,
+                        storage_fee,
+                    );
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
@@ -577,9 +706,9 @@ where
             if let Some(per_block_gas_limit) = self.maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns
                 // exceeds per_block_gas_limit, halt sequential execution.
-                if accumulated_gas >= per_block_gas_limit {
+                if accumulated_execution_gas + accumulated_io_gas >= per_block_gas_limit {
                     counters::SEQUENTIAL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
-                    info!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_gas, per_block_gas_limit, ret.len());
+                    info!("[Execution]: Sequential execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", accumulated_execution_gas + accumulated_io_gas, per_block_gas_limit, ret.len());
                     break;
                 }
             }
@@ -592,8 +721,14 @@ where
             );
         }
 
-        counters::SEQUENTIAL_PER_BLOCK_GAS.observe(accumulated_gas as f64);
-        counters::SEQUENTIAL_PER_BLOCK_COMMITTED_TXNS.observe(ret.len() as f64);
+        self.update_sequential_block_gas_counters(
+            accumated_total_gas,
+            accumulated_execution_gas,
+            accumulated_io_gas,
+            accumulated_storage_gas,
+            accumulated_storage_fee,
+            ret.len(),
+        );
         ret.resize_with(num_txns, E::Output::skip_output);
         Ok(ret)
     }

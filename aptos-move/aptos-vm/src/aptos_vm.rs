@@ -303,10 +303,16 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
+                let gas_used = txn_data
+                    .max_gas_amount()
+                    .checked_sub(gas_meter.balance())
+                    .expect("Balance should always be less than or equal to max gas amount");
                 let fee_statement = FeeStatement::new_v1(
+                    gas_used.into(),
                     u64::from(gas_meter.execution_gas_used()),
                     u64::from(gas_meter.io_gas_used()),
-                    u64::from(gas_meter.storage_gas_used()),
+                    u64::from(gas_meter.storage_fee_used_in_gas_units()),
+                    u64::from(gas_meter.storage_fee_used()),
                 );
                 let txn_output = get_transaction_output(
                     &mut (),
@@ -339,10 +345,16 @@ impl AptosVM {
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
 
+        let gas_used = txn_data
+            .max_gas_amount()
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount");
         let fee_statement = FeeStatement::new_v1(
+            gas_used.into(),
             u64::from(gas_meter.execution_gas_used()),
             u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_gas_used()),
+            u64::from(gas_meter.storage_fee_used_in_gas_units()),
+            u64::from(gas_meter.storage_fee_used()),
         );
         let output = VMOutput::new(
             change_set,
@@ -1313,7 +1325,7 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session: SessionExt =
+        let mut session =
             self.0
                 .new_session(resolver, SessionId::block_meta(&block_metadata), true);
 

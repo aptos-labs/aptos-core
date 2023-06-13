@@ -222,15 +222,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.inputs[txn_idx as usize].load_full()
     }
 
-    pub fn execution_and_io_gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
+    /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
+    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<(u64, u64, u64, u64, u64)> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            ExecutionStatus::Success(output) => {
-                Some(output.execution_gas_used() + output.io_gas_used())
-            },
+            ExecutionStatus::Success(output) => Some(output.fee_statement()),
             _ => None,
         }
     }

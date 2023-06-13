@@ -99,6 +99,15 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Return the amount of execution gas consumed by the transaction.
     fn execution_gas_used(&self) -> u64;
 
-    /// Return the amountof io gas consumed by the transaction.
+    /// Return the amount of io gas consumed by the transaction.
     fn io_gas_used(&self) -> u64;
+
+    /// Return the amount of storage gas consumed by the transaction.
+    fn storage_gas_used(&self) -> u64;
+
+    /// Return the amount of storage fee consumed by the transaction.
+    fn storage_fee_used(&self) -> u64;
+
+    /// Return the amount of gas refund by the transaction.
+    fn fee_statement(&self) -> (u64, u64, u64, u64, u64);
 }

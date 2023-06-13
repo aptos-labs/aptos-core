@@ -139,6 +139,24 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .get()
             .map_or(0, |output| output.io_gas_used())
     }
+
+    fn storage_gas_used(&self) -> u64 {
+        self.committed_output
+            .get()
+            .map_or(0, |output| output.storage_gas_used())
+    }
+
+    fn storage_fee_used(&self) -> u64 {
+        self.committed_output
+            .get()
+            .map_or(0, |output| output.storage_fee_used())
+    }
+
+    fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
+        self.committed_output
+            .get()
+            .map_or((0, 0, 0, 0, 0), |output| output.fee_statement())
+    }
 }
 
 pub struct BlockAptosVM();

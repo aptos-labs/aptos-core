@@ -978,6 +978,18 @@ impl TransactionOutput {
         self.fee_statement.io_gas_used()
     }
 
+    pub fn storage_gas_used(&self) -> u64 {
+        self.fee_statement.storage_gas_used()
+    }
+
+    pub fn storage_fee_used(&self) -> u64 {
+        self.fee_statement.storage_fee_used()
+    }
+
+    pub fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
+        self.fee_statement.fee_statement()
+    }
+
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }

@@ -524,6 +524,18 @@ where
     fn io_gas_used(&self) -> u64 {
         0
     }
+
+    fn storage_gas_used(&self) -> u64 {
+        0
+    }
+
+    fn storage_fee_used(&self) -> u64 {
+        0
+    }
+
+    fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
+        (1, 1, 0, 0, 0)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

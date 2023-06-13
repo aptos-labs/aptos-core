@@ -483,7 +483,9 @@ where
 
         fn io_gas_used(&self) -> Gas;
 
-        fn storage_gas_used(&self) -> Gas;
+        fn storage_fee_used_in_gas_units(&self) -> Gas;
+
+        fn storage_fee_used(&self) -> Fee;
     }
 
     delegate_mut! {
