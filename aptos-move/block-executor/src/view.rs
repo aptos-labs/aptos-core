@@ -4,6 +4,7 @@
 use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler},
+    task::Transaction,
     txn_last_input_output::ReadDescriptor,
 };
 use anyhow::Result;
@@ -16,7 +17,6 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
-    block_executor::BlockExecutorTransaction,
     executable::{Executable, ModulePath},
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     vm_status::{StatusCode, VMStatus},
@@ -169,25 +169,18 @@ impl<
     }
 }
 
-enum ViewMapKind<'a, T: BlockExecutorTransaction, X: Executable> {
+enum ViewMapKind<'a, T: Transaction, X: Executable> {
     MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value, X>),
     Unsync(&'a UnsyncMap<T::Key, T::Value, X>),
 }
 
-pub(crate) struct LatestView<
-    'a,
-    T: BlockExecutorTransaction,
-    S: TStateView<Key = T::Key>,
-    X: Executable,
-> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
     latest_view: ViewMapKind<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: BlockExecutorTransaction, S: TStateView<Key = T::Key>, X: Executable>
-    LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new_mv_view(
         base_view: &'a S,
         map: &'a MVHashMapView<'a, T::Key, T::Value, X>,
@@ -229,7 +222,7 @@ impl<'a, T: BlockExecutorTransaction, S: TStateView<Key = T::Key>, X: Executable
     }
 }
 
-impl<'a, T: BlockExecutorTransaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;

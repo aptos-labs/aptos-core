@@ -15,16 +15,17 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_block_executor::{
-    errors::Error, executor::BlockExecutor,
-    task::TransactionOutput as BlockExecutorTransactionOutput,
+    errors::Error,
+    executor::BlockExecutor,
+    task::{
+        Transaction as BlockExecutorTransaction,
+        TransactionOutput as BlockExecutorTransactionOutput,
+    },
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
-    block_executor::{
-        partitioner::{ExecutableTransactions, SubBlock, TransactionWithDependencies},
-        BlockExecutorTransaction,
-    },
+    block_executor::partitioner::{ExecutableTransactions, SubBlock, TransactionWithDependencies},
     executable::ExecutableTestType,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},

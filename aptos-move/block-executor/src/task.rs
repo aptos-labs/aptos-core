@@ -5,8 +5,11 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
-use aptos_types::{block_executor::BlockExecutorTransaction, write_set::WriteOp};
-use std::fmt::Debug;
+use aptos_types::{
+    executable::ModulePath,
+    write_set::{TransactionWrite, WriteOp},
+};
+use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -21,6 +24,13 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
+/// transaction will write to a key value storage as their side effect.
+pub trait Transaction: Sync + Send + 'static {
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    type Value: Send + Sync + TransactionWrite;
+}
+
 /// Inference result of a transaction.
 pub struct Accesses<K> {
     pub keys_read: Vec<K>,
@@ -31,7 +41,7 @@ pub struct Accesses<K> {
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
 pub trait ExecutorTask: Sync {
     /// Type of transaction and its associated key and value.
-    type Txn: BlockExecutorTransaction;
+    type Txn: Transaction;
 
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
@@ -49,7 +59,7 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as BlockExecutorTransaction>::Key>,
+        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
@@ -59,18 +69,18 @@ pub trait ExecutorTask: Sync {
 /// Trait for execution result of a single transaction.
 pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
-    type Txn: BlockExecutorTransaction;
+    type Txn: Transaction;
 
     /// Get the writes of a transaction from its output.
     fn get_writes(
         &self,
     ) -> Vec<(
-        <Self::Txn as BlockExecutorTransaction>::Key,
-        <Self::Txn as BlockExecutorTransaction>::Value,
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
     )>;
 
     /// Get the deltas of a transaction from its output.
-    fn get_deltas(&self) -> Vec<(<Self::Txn as BlockExecutorTransaction>::Key, DeltaOp)>;
+    fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -80,7 +90,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// materialized and incorporated during execution).
     fn incorporate_delta_writes(
         &self,
-        delta_writes: Vec<(<Self::Txn as BlockExecutorTransaction>::Key, WriteOp)>,
+        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
 
     /// Return the amount of gas consumed by the transaction.

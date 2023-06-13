@@ -3,15 +3,12 @@
 
 use crate::{
     errors::Error,
-    task::{ExecutionStatus, TransactionOutput},
+    task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use anyhow::anyhow;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{
-    access_path::AccessPath, block_executor::BlockExecutorTransaction, executable::ModulePath,
-    write_set::WriteOp,
-};
+use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -32,7 +29,7 @@ type TxnInput<K> = Vec<ReadDescriptor<K>>;
 struct TxnOutput<T: TransactionOutput, E: Debug> {
     output_status: ExecutionStatus<T, Error<E>>,
 }
-type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key>;
+type KeySet<T> = HashSet<<<T as TransactionOutput>::Txn as Transaction>::Key>;
 
 impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
     fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
@@ -269,22 +266,16 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
     ) -> (
         usize,
-        Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key>>,
+        Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
     ) {
         let _lock = self.commit_locks[txn_idx as usize].lock();
         let ret: (
             usize,
-            Box<
-                dyn Iterator<
-                    Item = <<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key,
-                >,
-            >,
+            Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
         ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
             (
                 0,
-                Box::new(empty::<
-                    <<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key,
-                >()),
+                Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
             ),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
@@ -293,9 +284,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
                 },
                 ExecutionStatus::Abort(_) => (
                     0,
-                    Box::new(empty::<
-                        <<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key,
-                    >()),
+                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
                 ),
             },
         );
@@ -307,10 +296,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     pub(crate) fn record_delta_writes(
         &self,
         txn_idx: TxnIndex,
-        delta_writes: Vec<(
-            <<T as TransactionOutput>::Txn as BlockExecutorTransaction>::Key,
-            WriteOp,
-        )>,
+        delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
         let _lock = self.commit_locks[txn_idx as usize].lock();
         match &self.outputs[txn_idx as usize]

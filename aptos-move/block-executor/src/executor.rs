@@ -10,7 +10,7 @@ use crate::{
     },
     errors::*,
     scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -23,9 +23,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
-    block_executor::{partitioner::ExecutableTransactions, BlockExecutorTransaction},
-    executable::Executable,
-    write_set::WriteOp,
+    block_executor::partitioner::ExecutableTransactions, executable::Executable, write_set::WriteOp,
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
@@ -56,7 +54,7 @@ pub struct BlockExecutor<T, E, S, X> {
 
 impl<T, E, S, X> BlockExecutor<T, E, S, X>
 where
-    T: BlockExecutorTransaction,
+    T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,

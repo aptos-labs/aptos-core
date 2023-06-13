@@ -4,7 +4,7 @@
 
 use crate::{
     errors::{Error, Result},
-    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, Transaction as TransactionType, TransactionOutput},
 };
 use aptos_aggregator::{
     delta_change_set::{delta_add, delta_sub, deserialize, serialize, DeltaOp},
@@ -15,7 +15,6 @@ use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    block_executor::BlockExecutorTransaction,
     executable::ModulePath,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
@@ -390,7 +389,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     }
 }
 
-impl<K, V> BlockExecutorTransaction for Transaction<K, V>
+impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     V: Debug + Send + Sync + Debug + Clone + TransactionWrite + 'static,
