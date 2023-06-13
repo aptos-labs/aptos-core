@@ -505,37 +505,45 @@ export class AptosToken {
     return pendingTransaction.hash;
   }
 
-  async transfer(data: NonFungibleTokenParameters): Promise<string>;
-  async transfer(data: FungibleTokenParameters): Promise<string>;
-
   /**
    * Transfer a token. This function supports transfer non-fungible token and fungible token.
    *
-   * We use the `amount` property to distinguish between fungible and non-fungible token.
-   * To transfer a fungible token, make sure to pass an `amount` property. Since non-fungible asset amount
-   * is always 1, no need to include the `amount` property.
+   * To set the token type, set isFungibleToken param to true or false.
+   * If isFungibleToken param is not set, the function would query Indexer
+   * for the token data and check whether it is a non-fungible or a fungible token.
    *
    * @param data NonFungibleTokenParameters | FungibleTokenParameters type
+   * @param isFungibleToken (optional) The token type, non-fungible or fungible token.
    * @returns The hash of the transaction submitted to the API
    */
-  async transfer(data: NonFungibleTokenParameters | FungibleTokenParameters): Promise<string> {
-    if ("amount" in data) {
+  async transfer(
+    data: NonFungibleTokenParameters | FungibleTokenParameters,
+    isFungibleToken?: boolean | null,
+  ): Promise<string> {
+    let isFungible = isFungibleToken;
+    if (isFungible === undefined || isFungible === null) {
+      const tokenData = await this.provider.getTokenData(HexString.ensure(data.tokenAddress).hex());
+      isFungible = tokenData.current_token_datas_v2[0].is_fungible_v2;
+    }
+    if (isFungible) {
+      const token = data as FungibleTokenParameters;
       const fungibleAsset = new FungibleAssetClient(this.provider);
       const txnHash = await fungibleAsset.transfer(
-        data.owner,
-        data.tokenAddress,
-        data.recipient,
-        data.amount,
-        data.extraArgs,
+        token.owner,
+        token.tokenAddress,
+        token.recipient,
+        token.amount,
+        token.extraArgs,
       );
       return txnHash;
     }
+    const token = data as NonFungibleTokenParameters;
     const txnHash = await this.transferTokenOwnership(
-      data.owner,
-      data.tokenAddress,
-      data.recipient,
-      data.tokenType,
-      data.extraArgs,
+      token.owner,
+      token.tokenAddress,
+      token.recipient,
+      token.tokenType,
+      token.extraArgs,
     );
     return txnHash;
   }

@@ -139,6 +139,12 @@ maybe("fungible asset", () => {
     "aptos_token supports transfer fungible token",
     async () => {
       const aptosToken = new AptosToken(provider);
+
+      const getTokenDataSpy = jest.spyOn(provider, "getTokenData");
+      const getTokenDataSpyResponse = { current_token_datas_v2: new Array() };
+      getTokenDataSpyResponse.current_token_datas_v2.push({ is_fungible_v2: true });
+      getTokenDataSpy.mockResolvedValue(getTokenDataSpyResponse);
+
       await provider.waitForTransaction(
         await aptosToken.transfer({
           owner: alice,
@@ -155,6 +161,34 @@ maybe("fungible asset", () => {
       const fungibleAsset = new FungibleAssetClient(provider);
       const bobBalance = await fungibleAsset.getPrimaryBalance(bob.address(), fungibleAssetMetadataAddress);
       expect(bobBalance).toEqual(BigInt(5));
+    },
+    longTestTimeout,
+  );
+
+  test(
+    "aptos_token supports transfer fungible token when isFungibleToken param set to true",
+    async () => {
+      const aptosToken = new AptosToken(provider);
+
+      await provider.waitForTransaction(
+        await aptosToken.transfer(
+          {
+            owner: bob,
+            tokenAddress: fungibleAssetMetadataAddress,
+            recipient: alice.address(),
+            amount: 1,
+          },
+          true,
+        ),
+        {
+          checkSuccess: true,
+        },
+      );
+
+      // Bob balance is now 4
+      const fungibleAsset = new FungibleAssetClient(provider);
+      const bobBalance = await fungibleAsset.getPrimaryBalance(bob.address(), fungibleAssetMetadataAddress);
+      expect(bobBalance).toEqual(BigInt(4));
     },
     longTestTimeout,
   );
