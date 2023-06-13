@@ -588,19 +588,25 @@ fn run_consensus_only_three_region_simulation() -> ForgeConfig {
 
 fn run_consensus_only_perf_test() -> ForgeConfig {
     let config = ForgeConfig::default();
-    let emit_job = config.get_emit_job().clone();
     config
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .add_network_test(LoadVsPerfBenchmark {
-            test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(&[30000]),
-            criteria: vec![],
-        })
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad { mempool_backlog: 600000 })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .add_network_test(CompositeNetworkTest::new(
+            MultiRegionNetworkEmulationTest {
+                override_config: None,
+            },
+            CpuChaosTest {
+                override_config: None,
+            },
+        ))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
-        .with_emit_job(emit_job.txn_expiration_time_secs(5 * 60))
         .with_node_helm_config_fn(Arc::new(|helm_values| {
             helm_values["validator"]["config"]["mempool"]["capacity"] = 3_000_000.into();
             helm_values["validator"]["config"]["mempool"]["capacity_bytes"] =
