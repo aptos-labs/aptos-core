@@ -9,7 +9,7 @@ import traceback
 from dataclasses import dataclass
 
 from aptos_sdk.client import RestClient
-from common import AccountInfo, build_image_name
+from common import METRICS_PORT, NODE_PORT, AccountInfo, Network, build_image_name
 
 LOG = logging.getLogger(__name__)
 
@@ -23,13 +23,20 @@ class RunHelper:
     image_repo_with_project: str
     image_tag: str
     cli_path: str
+    base_network: Network
+
     test_count: int
 
-    # This can be used by the tests to query the local testnet.
+    # This can be used by the tests to query the local testnet node.
     api_client: RestClient
 
     def __init__(
-        self, host_working_directory, image_repo_with_project, image_tag, cli_path
+        self,
+        host_working_directory,
+        image_repo_with_project,
+        image_tag,
+        cli_path,
+        base_network,
     ):
         if image_tag and cli_path:
             raise RuntimeError("Cannot specify both image_tag and cli_path")
@@ -39,8 +46,9 @@ class RunHelper:
         self.image_repo_with_project = image_repo_with_project
         self.image_tag = image_tag
         self.cli_path = os.path.abspath(cli_path) if cli_path else cli_path
+        self.base_network = base_network
         self.test_count = 0
-        self.api_client = RestClient(f"http://127.0.0.1:8080/v1")
+        self.api_client = RestClient(f"http://127.0.0.1:{NODE_PORT}/v1")
 
     def build_image_name(self):
         return build_image_name(self.image_repo_with_project, self.image_tag)
@@ -160,6 +168,10 @@ class RunHelper:
             public_key=public_key,
             account_address=account_address,
         )
+
+    def get_metrics_url(self, json=False):
+        path = "metrics" if not json else "json_metrics"
+        return f"http://127.0.0.1:{METRICS_PORT}/{path}"
 
 
 # This function helps with writing the stdout / stderr of a subprocess to files.

@@ -428,11 +428,13 @@ where
         &mut self,
         addr: AccountAddress,
         ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         let ty_tag = ty.to_type_tag();
 
-        let (cost, res) = self.delegate_charge(|base| base.charge_load_resource(addr, ty, loaded));
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_load_resource(addr, ty, val, bytes_loaded));
 
         self.active_event_stream()
             .push(ExecutionGasEvent::LoadResource {

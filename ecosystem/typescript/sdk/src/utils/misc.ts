@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { VERSION } from "../version";
+
 export type Nullable<T> = { [P in keyof T]: T[P] | null };
 
 export type AnyObject = { [key: string]: any };
@@ -30,3 +32,5 @@ export const DEFAULT_TXN_EXP_SEC_FROM_NOW = 20;
 // How long does SDK wait for txhn to finish
 export const DEFAULT_TXN_TIMEOUT_SEC = 20;
 export const APTOS_COIN = "0x1::aptos_coin::AptosCoin";
+
+export const CUSTOM_REQUEST_HEADER = { "x-aptos-client": `aptos-ts-sdk/${VERSION}` };

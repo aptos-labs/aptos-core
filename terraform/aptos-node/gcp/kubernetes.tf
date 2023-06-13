@@ -44,7 +44,7 @@ resource "helm_release" "validator" {
       numValidators     = var.num_validators
       numFullnodeGroups = var.num_fullnode_groups
       imageTag          = var.image_tag
-      mangeImages       = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
+      manageImages      = var.manage_via_tf # if we're managing the entire deployment via terraform, override the images as well
       chain = {
         era      = var.era
         chain_id = var.chain_id
@@ -76,6 +76,14 @@ resource "helm_release" "validator" {
           value  = "validators"
           effect = "NoExecute"
         }]
+      }
+      haproxy = {
+        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
+          "cloud.google.com/gke-nodepool" = google_container_node_pool.utilities.name
+        }
+      }
+      service = {
+        domain = local.domain
       }
     }),
     var.helm_values_file != "" ? file(var.helm_values_file) : "{}",

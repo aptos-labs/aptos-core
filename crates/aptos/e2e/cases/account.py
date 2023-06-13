@@ -60,3 +60,23 @@ def test_account_create(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"Account {OTHER_ACCOUNT_ONE.account_address} has balance {balance}, expected 0"
         )
+
+
+@test_case
+def test_account_lookup_address(run_helper: RunHelper, test_name=None):
+    # Create the new account.
+    result_addr = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "lookup-address",
+            "--auth-key",
+            run_helper.get_account_info().account_address,  # initially the account address is the auth key
+        ],
+    )
+
+    if run_helper.get_account_info().account_address not in result_addr.stdout:
+        raise TestError(
+            f"lookup-address result does not match {run_helper.get_account_info().account_address}"
+        )

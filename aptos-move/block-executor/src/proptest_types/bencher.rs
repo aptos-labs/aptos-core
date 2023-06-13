@@ -9,6 +9,7 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
+use aptos_types::executable::ExecutableTestType;
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -124,6 +125,7 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 

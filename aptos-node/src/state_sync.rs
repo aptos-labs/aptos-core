@@ -21,7 +21,7 @@ use aptos_state_sync_driver::{
     driver_factory::{DriverFactory, StateSyncRuntimes},
     metadata_storage::PersistentMetadataStorage,
 };
-use aptos_storage_interface::DbReaderWriter;
+use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::{
     network::StorageServiceNetworkEvents, storage::StorageReader, StorageServiceServer,
@@ -99,7 +99,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the data client
     let (aptos_data_client, aptos_data_client_runtime) =
-        setup_aptos_data_client(node_config, network_client)?;
+        setup_aptos_data_client(node_config, network_client, db_rw.reader.clone())?;
 
     // Start the data streaming service
     let (streaming_service_client, streaming_service_runtime) =
@@ -173,6 +173,7 @@ fn setup_data_streaming_service(
 fn setup_aptos_data_client(
     node_config: &NodeConfig,
     network_client: NetworkClient<StorageServiceMessage>,
+    storage: Arc<dyn DbReader>,
 ) -> anyhow::Result<(AptosDataClient, Runtime)> {
     // Create the storage service client
     let storage_service_client = StorageServiceClient::new(network_client);
@@ -185,6 +186,7 @@ fn setup_aptos_data_client(
         node_config.state_sync.aptos_data_client,
         node_config.base.clone(),
         TimeService::real(),
+        storage,
         storage_service_client,
         Some(aptos_data_client_runtime.handle().clone()),
     );

@@ -56,7 +56,7 @@ def main():
             sys.stderr.write("unknown arg {!r}".format(path))
             sys.exit(1)
     if path is None:
-        sys.stderr("need some path to node data dir or config yaml")
+        sys.stderr.write("need some path to node data dir or config yaml")
         sys.exit(1)
     if not args:
         args = ["api"]

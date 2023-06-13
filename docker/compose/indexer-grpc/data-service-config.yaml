@@ -6,4 +6,4 @@ server_config:
   file_store_config:
     file_store_type: LocalFileStore
     local_file_store_path: /opt/aptos/file-store
-  redis_read_replica_address: 172.16.1.12:6379
+  redis_read_replica_address: 172.16.1.22:6379 # use a the read replica

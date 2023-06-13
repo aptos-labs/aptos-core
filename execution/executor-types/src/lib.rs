@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
+use aptos_block_partitioner::types::SubBlock;
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
@@ -80,7 +80,7 @@ pub struct StateSnapshotDelta {
     pub jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
 }
 
-pub trait BlockExecutorTrait<T>: Send + Sync {
+pub trait BlockExecutorTrait: Send + Sync {
     /// Get the latest committed block id
     fn committed_block_id(&self) -> HashValue;
 
@@ -90,8 +90,9 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
     /// Executes a block.
     fn execute_block(
         &self,
-        block: (HashValue, Vec<T>),
+        block: ExecutableBlock,
         parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<StateComputeResult, Error>;
 
     /// Saves eligible blocks to persistent storage.
@@ -124,10 +125,48 @@ pub trait BlockExecutorTrait<T>: Send + Sync {
 
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
+}
 
-    fn get_block_gas_limit(&self) -> Option<u64>;
+pub struct ExecutableBlock {
+    pub block_id: HashValue,
+    pub transactions: ExecutableTransactions,
+}
 
-    fn update_block_gas_limit(&self, block_gas_limit: Option<u64>);
+impl ExecutableBlock {
+    pub fn new(block_id: HashValue, transactions: ExecutableTransactions) -> Self {
+        Self {
+            block_id,
+            transactions,
+        }
+    }
+}
+
+impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
+    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
+        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+    }
+}
+
+pub enum ExecutableTransactions {
+    Unsharded(Vec<Transaction>),
+    Sharded(Vec<SubBlock>),
+}
+
+impl ExecutableTransactions {
+    pub fn num_transactions(&self) -> usize {
+        match self {
+            ExecutableTransactions::Unsharded(transactions) => transactions.len(),
+            ExecutableTransactions::Sharded(sub_blocks) => {
+                sub_blocks.iter().map(|sub_block| sub_block.len()).sum()
+            },
+        }
+    }
+}
+
+impl From<Vec<Transaction>> for ExecutableTransactions {
+    fn from(txns: Vec<Transaction>) -> Self {
+        Self::Unsharded(txns)
+    }
 }
 
 #[derive(Clone)]

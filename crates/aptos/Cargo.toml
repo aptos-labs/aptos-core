@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "1.0.13"
+version = "2.0.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
 aptos-backup-cli = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-build-info = { workspace = true }
@@ -69,6 +70,7 @@ move-prover-boogie-backend = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = [ "debugging" ] }
 move-vm-runtime = { workspace = true, features = [ "testing" ] }
+once_cell = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }

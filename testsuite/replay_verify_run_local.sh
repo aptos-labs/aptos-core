@@ -1,1 +1,0 @@
-../scripts/poetry-wrapper.sh

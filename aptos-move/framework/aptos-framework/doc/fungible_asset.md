@@ -248,7 +248,7 @@ The store object that holds fungible assets of a specific type associated with a
 ## Struct `FungibleAsset`
 
 FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
-FungibleAsset is ephermeral and cannot be stored directly. It must be deposited back into a store.
+FungibleAsset is ephemeral and cannot be stored directly. It must be deposited back into a store.
 
 
 <pre><code><b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>

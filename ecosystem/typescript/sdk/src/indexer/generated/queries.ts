@@ -150,6 +150,30 @@ export const GetCollectionData = `
   }
 }
     `;
+export const GetCollectionsWithOwnedTokens = `
+    query getCollectionsWithOwnedTokens($where_condition: current_collection_ownership_v2_view_bool_exp!, $offset: Int, $limit: Int) {
+  current_collection_ownership_v2_view(
+    where: $where_condition
+    order_by: {last_transaction_version: desc}
+    offset: $offset
+    limit: $limit
+  ) {
+    current_collection {
+      creator_address
+      collection_name
+      token_standard
+      collection_id
+      description
+      table_handle_v1
+      uri
+      total_minted_v2
+      max_supply
+    }
+    distinct_tokens
+    last_transaction_version
+  }
+}
+    `;
 export const GetDelegatedStakingActivities = `
     query getDelegatedStakingActivities($delegatorAddress: String, $poolAddress: String) {
   delegated_staking_activities(
@@ -182,9 +206,9 @@ export const GetNumberOfDelegators = `
 }
     `;
 export const GetOwnedTokens = `
-    query getOwnedTokens($address: String!, $offset: Int, $limit: Int) {
+    query getOwnedTokens($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
-    where: {owner_address: {_eq: $address}, amount: {_gt: 0}}
+    where: $where_condition
     offset: $offset
     limit: $limit
   ) {
@@ -244,9 +268,9 @@ export const GetTokenData = `
 }
     `;
 export const GetTokenOwnedFromCollection = `
-    query getTokenOwnedFromCollection($collection_id: String!, $owner_address: String!, $offset: Int, $limit: Int) {
+    query getTokenOwnedFromCollection($where_condition: current_token_ownerships_v2_bool_exp!, $offset: Int, $limit: Int) {
   current_token_ownerships_v2(
-    where: {owner_address: {_eq: $owner_address}, current_token_data: {collection_id: {_eq: $collection_id}}, amount: {_gt: 0}}
+    where: $where_condition
     offset: $offset
     limit: $limit
   ) {
@@ -307,6 +331,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getCollectionData(variables: Types.GetCollectionDataQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionDataQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionDataQuery>(GetCollectionData, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionData', 'query');
+    },
+    getCollectionsWithOwnedTokens(variables: Types.GetCollectionsWithOwnedTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionsWithOwnedTokensQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionsWithOwnedTokensQuery>(GetCollectionsWithOwnedTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionsWithOwnedTokens', 'query');
     },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');

@@ -10,6 +10,7 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
+use aptos_types::executable::ExecutableTestType;
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -29,7 +30,7 @@ fn run_transactions<K, V>(
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
     module_access: (bool, bool),
-    maybe_gas_limit: Option<u64>,
+    maybe_block_gas_limit: Option<u64>,
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
@@ -64,10 +65,11 @@ fn run_transactions<K, V>(
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
@@ -76,7 +78,8 @@ fn run_transactions<K, V>(
             continue;
         }
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
+        let baseline =
+            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
         baseline.assert_output(&output);
     }
 }
@@ -134,7 +137,7 @@ proptest! {
     }
 }
 
-fn dynamic_read_writes_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 100)
@@ -156,11 +159,11 @@ fn dynamic_read_writes_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u
         vec![],
         100,
         (false, false),
-        maybe_gas_limit,
+        maybe_block_gas_limit,
     );
 }
 
-fn deltas_writes_mixed_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 50)
@@ -197,19 +200,21 @@ fn deltas_writes_mixed_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        let baseline = ExpectedOutput::generate_baseline(&transactions, None, maybe_gas_limit);
+        let baseline =
+            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
         baseline.assert_output(&output);
     }
 }
 
-fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: Option<u64>) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 50)
@@ -246,10 +251,11 @@ fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>)
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
-            maybe_gas_limit,
+            maybe_block_gas_limit,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
@@ -260,13 +266,19 @@ fn deltas_resolver_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>)
             .map(|out| out.delta_writes())
             .collect();
 
-        let baseline =
-            ExpectedOutput::generate_baseline(&transactions, Some(delta_writes), maybe_gas_limit);
+        let baseline = ExpectedOutput::generate_baseline(
+            &transactions,
+            Some(delta_writes),
+            maybe_block_gas_limit,
+        );
         baseline.assert_output(&output);
     }
 }
 
-fn dynamic_read_writes_contended_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn dynamic_read_writes_contended_with_block_gas_limit(
+    num_txns: usize,
+    maybe_block_gas_limit: Option<u64>,
+) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 10)
@@ -289,11 +301,14 @@ fn dynamic_read_writes_contended_with_gas_limit(num_txns: usize, maybe_gas_limit
         vec![],
         100,
         (false, false),
-        maybe_gas_limit,
+        maybe_block_gas_limit,
     );
 }
 
-fn module_publishing_fallback_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn module_publishing_fallback_with_block_gas_limit(
+    num_txns: usize,
+    maybe_block_gas_limit: Option<u64>,
+) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 100)
@@ -315,7 +330,7 @@ fn module_publishing_fallback_with_gas_limit(num_txns: usize, maybe_gas_limit: O
         vec![],
         2,
         (false, true),
-        maybe_gas_limit,
+        maybe_block_gas_limit,
     );
     run_transactions(
         &universe,
@@ -324,7 +339,7 @@ fn module_publishing_fallback_with_gas_limit(num_txns: usize, maybe_gas_limit: O
         vec![],
         2,
         (false, true),
-        maybe_gas_limit,
+        maybe_block_gas_limit,
     );
     run_transactions(
         &universe,
@@ -333,11 +348,14 @@ fn module_publishing_fallback_with_gas_limit(num_txns: usize, maybe_gas_limit: O
         vec![],
         2,
         (true, true),
-        maybe_gas_limit,
+        maybe_block_gas_limit,
     );
 }
 
-fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Option<u64>) {
+fn publishing_fixed_params_with_block_gas_limit(
+    num_txns: usize,
+    maybe_block_gas_limit: Option<u64>,
+) {
     let mut runner = TestRunner::default();
 
     let universe = vec(any::<[u8; 32]>(), 50)
@@ -407,7 +425,8 @@ fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Opti
         Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
-    >::new(num_cpus::get(), executor_thread_pool, maybe_gas_limit)
+        ExecutableTestType,
+    >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
     .execute_transactions_parallel((), &transactions, &data_view);
     assert_ok!(output);
 
@@ -450,6 +469,7 @@ fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Opti
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            ExecutableTestType,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
@@ -463,27 +483,27 @@ fn publishing_fixed_params_with_gas_limit(num_txns: usize, maybe_gas_limit: Opti
 
 #[test]
 fn dynamic_read_writes() {
-    dynamic_read_writes_with_gas_limit(3000, None);
+    dynamic_read_writes_with_block_gas_limit(3000, None);
 }
 
 #[test]
 fn deltas_writes_mixed() {
-    deltas_writes_mixed_with_gas_limit(1000, None);
+    deltas_writes_mixed_with_block_gas_limit(1000, None);
 }
 
 #[test]
 fn deltas_resolver() {
-    deltas_resolver_with_gas_limit(1000, None);
+    deltas_resolver_with_block_gas_limit(1000, None);
 }
 
 #[test]
 fn dynamic_read_writes_contended() {
-    dynamic_read_writes_contended_with_gas_limit(1000, None);
+    dynamic_read_writes_contended_with_block_gas_limit(1000, None);
 }
 
 #[test]
 fn module_publishing_fallback() {
-    module_publishing_fallback_with_gas_limit(3000, None);
+    module_publishing_fallback_with_block_gas_limit(3000, None);
 }
 
 #[test]
@@ -491,7 +511,7 @@ fn module_publishing_fallback() {
 // not overlapping module r/w keys.
 fn module_publishing_races() {
     for _ in 0..5 {
-        publishing_fixed_params_with_gas_limit(300, None);
+        publishing_fixed_params_with_block_gas_limit(300, None);
     }
 }
 
@@ -550,35 +570,41 @@ proptest! {
 }
 
 #[test]
-fn dynamic_read_writes_with_block_gas_limit() {
-    dynamic_read_writes_with_gas_limit(3000, Some(rand::thread_rng().gen_range(0, 3000) as u64));
-    dynamic_read_writes_with_gas_limit(3000, Some(0));
+fn dynamic_read_writes_with_block_gas_limit_test() {
+    dynamic_read_writes_with_block_gas_limit(
+        3000,
+        Some(rand::thread_rng().gen_range(0, 3000) as u64),
+    );
+    dynamic_read_writes_with_block_gas_limit(3000, Some(0));
 }
 
 #[test]
-fn deltas_writes_mixed_with_block_gas_limit() {
-    deltas_writes_mixed_with_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
-    deltas_writes_mixed_with_gas_limit(1000, Some(0));
-}
-
-#[test]
-fn deltas_resolver_with_block_gas_limit() {
-    deltas_resolver_with_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
-    deltas_resolver_with_gas_limit(1000, Some(0));
-}
-
-#[test]
-fn dynamic_read_writes_contended_with_block_gas_limit() {
-    dynamic_read_writes_contended_with_gas_limit(
+fn deltas_writes_mixed_with_block_gas_limit_test() {
+    deltas_writes_mixed_with_block_gas_limit(
         1000,
         Some(rand::thread_rng().gen_range(0, 1000) as u64),
     );
-    dynamic_read_writes_contended_with_gas_limit(1000, Some(0));
+    deltas_writes_mixed_with_block_gas_limit(1000, Some(0));
 }
 
 #[test]
-fn module_publishing_fallback_with_block_gas_limit() {
-    module_publishing_fallback_with_gas_limit(
+fn deltas_resolver_with_block_gas_limit_test() {
+    deltas_resolver_with_block_gas_limit(1000, Some(rand::thread_rng().gen_range(0, 1000) as u64));
+    deltas_resolver_with_block_gas_limit(1000, Some(0));
+}
+
+#[test]
+fn dynamic_read_writes_contended_with_block_gas_limit_test() {
+    dynamic_read_writes_contended_with_block_gas_limit(
+        1000,
+        Some(rand::thread_rng().gen_range(0, 1000) as u64),
+    );
+    dynamic_read_writes_contended_with_block_gas_limit(1000, Some(0));
+}
+
+#[test]
+fn module_publishing_fallback_with_block_gas_limit_test() {
+    module_publishing_fallback_with_block_gas_limit(
         3000,
         // Need to execute at least 2 txns to trigger module publishing fallback
         Some(rand::thread_rng().gen_range(1, 3000) as u64),
@@ -588,9 +614,9 @@ fn module_publishing_fallback_with_block_gas_limit() {
 #[test]
 // Test a single transaction intersection interleaves with a lot of dependencies and
 // not overlapping module r/w keys.
-fn module_publishing_races_with_block_gas_limit() {
+fn module_publishing_races_with_block_gas_limit_test() {
     for _ in 0..5 {
-        publishing_fixed_params_with_gas_limit(
+        publishing_fixed_params_with_block_gas_limit(
             300,
             Some(rand::thread_rng().gen_range(0, 300) as u64),
         );

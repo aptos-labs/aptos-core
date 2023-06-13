@@ -40,7 +40,8 @@ pub use self::{
         ProposerElectionType,
     },
     execution_config::{
-        ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType,
+        ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionDeduperType,
+        TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},

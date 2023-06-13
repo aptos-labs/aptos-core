@@ -374,9 +374,7 @@ module post_mint_reveal_nft::minting {
 
         assert!(vector::length(&token_uris) + big_vector::length(&collection_config.tokens) <= collection_config.destination_collection_maximum || collection_config.destination_collection_maximum == 0, error::invalid_argument(EEXCEEDS_COLLECTION_MAXIMUM));
 
-        let i = 0;
-        while (i < vector::length(&token_uris)) {
-            let token_uri = vector::borrow(&token_uris, i);
+        vector::enumerate_ref(&token_uris, |i, token_uri| {
             assert!(!bucket_table::contains(&collection_config.deduped_tokens, token_uri), error::invalid_argument(EDUPLICATE_TOKEN_URI));
             big_vector::push_back(&mut collection_config.tokens, TokenAsset {
                 token_uri: *token_uri,
@@ -385,8 +383,7 @@ module post_mint_reveal_nft::minting {
                 property_types: *vector::borrow(&property_types, i),
             });
             bucket_table::add(&mut collection_config.deduped_tokens, *token_uri, true);
-            i = i + 1;
-        };
+        });
     }
 
     /// Mint source certificate.

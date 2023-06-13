@@ -200,7 +200,13 @@ const sidebars = {
       link: { type: "doc", id: "standards/index" },
       collapsible: true,
       collapsed: true,
-      items: ["standards/aptos-coin", "standards/aptos-token", "standards/wallets"],
+      items: [
+        "standards/aptos-object",
+        "standards/aptos-coin",
+        "standards/aptos-token-v2",
+        "standards/aptos-token",
+        "standards/wallets",
+      ],
     },
     {
       type: "category",
@@ -404,6 +410,7 @@ const sidebars = {
       items: [
         "nodes/full-node/fullnode-source-code-or-docker",
         "nodes/full-node/bootstrap-fullnode",
+        "nodes/full-node/aptos-db-restore",
         "nodes/full-node/update-fullnode-with-new-releases",
         "nodes/full-node/network-identity-fullnode",
         "nodes/full-node/fullnode-network-connections",

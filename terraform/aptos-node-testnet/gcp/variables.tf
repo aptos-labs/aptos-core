@@ -50,6 +50,16 @@ variable "image_tag" {
 
 ### DNS config
 
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
 variable "zone_name" {
   description = "Zone name of GCP Cloud DNS zone to create records in"
   default     = ""
@@ -63,6 +73,16 @@ variable "zone_project" {
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
   default     = "<workspace>.aptos"
+}
+
+variable "create_dns_records" {
+  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
+}
+
+variable "dns_ttl" {
+  description = "Time-to-Live for the Validator and Fullnode DNS records"
+  default     = 300
 }
 
 ### Testnet config
@@ -134,7 +154,7 @@ variable "enable_forge" {
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
-  default     = true
+  default     = false
 }
 
 variable "monitoring_helm_values" {
@@ -145,19 +165,13 @@ variable "monitoring_helm_values" {
 
 variable "enable_prometheus_node_exporter" {
   description = "Enable prometheus-node-exporter within monitoring helm chart"
-  default     = true
-}
-
-### Cluster node config
-
-variable "gke_cluster_enable_gcfs" {
-  description = "Enable GCFS at the cluster level"
   default     = false
 }
 
-variable "gke_cluster_enable_gvnic" {
-  description = "Enable GVNIC (networking driver) at the cluster level"
-  default     = false
+variable "testnet_addons_helm_values" {
+  description = "Map of values to pass to testnet-addons helm chart"
+  type        = any
+  default     = {}
 }
 
 ### Autoscaling
@@ -192,4 +206,22 @@ variable "gke_autoscaling_max_node_count" {
 variable "cluster_ipv4_cidr_block" {
   description = "The IP address range of the container pods in this cluster, in CIDR notation. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#cluster_ipv4_cidr_block"
   default     = ""
+}
+
+variable "gke_maintenance_policy" {
+  description = "The maintenance policy to use for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#maintenance_policy"
+  type = object({
+    recurring_window = object({
+      start_time = string
+      end_time   = string
+      recurrence = string
+    })
+  })
+  default = {
+    recurring_window = {
+      start_time = "2023-06-15T00:00:00Z"
+      end_time   = "2023-06-15T23:59:00Z"
+      recurrence = "FREQ=DAILY"
+    }
+  }
 }

@@ -267,6 +267,59 @@ module std::vector_tests {
     }
 
     #[test]
+    fun remove_value_singleton_vector() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        assert!(V::borrow(&V::remove_value(&mut v, &0), 0) == &0, 0);
+        assert!(V::length(&v) == 0, 0);
+    }
+
+    #[test]
+    fun remove_value_nonsingleton_vector() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+
+        assert!(V::borrow(&V::remove_value(&mut v, &2), 0) == &2, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 1, 0);
+        assert!(*V::borrow(&v, 2) == 3, 0);
+    }
+
+    #[test]
+    fun remove_value_nonsingleton_vector_last_elem() {
+        let v = V::empty();
+        V::push_back(&mut v, 0);
+        V::push_back(&mut v, 1);
+        V::push_back(&mut v, 2);
+        V::push_back(&mut v, 3);
+
+        assert!(V::borrow(&V::remove_value(&mut v, &3), 0) == &3, 0);
+        assert!(V::length(&v) == 3, 0);
+        assert!(*V::borrow(&v, 0) == 0, 0);
+        assert!(*V::borrow(&v, 1) == 1, 0);
+        assert!(*V::borrow(&v, 2) == 2, 0);
+    }
+
+    #[test]
+    fun remove_value_empty_vector() {
+        let v = V::empty<u64>();
+        assert!(V::length(&V::remove_value(&mut v, &1)) == 0, 0);
+        assert!(V::length(&v) == 0, 1);
+    }
+
+    #[test]
+    fun remove_value_nonexistent() {
+        let v = V::empty<u64>();
+        V::push_back(&mut v, 0);
+        assert!(V::length(&V::remove_value(&mut v, &1)) == 0, 0);
+        assert!(V::length(&v) == 1, 1);
+    }
+
+    #[test]
     fun reverse_vector_empty() {
         let v = V::empty<u64>();
         let is_empty = V::is_empty(&v);
@@ -536,6 +589,38 @@ module std::vector_tests {
     }
 
     #[test]
+    fun test_zip() {
+        let v1 = vector[1, 2, 3];
+        let v2 = vector[10, 20, 30];
+        let s = 0;
+        V::zip(v1, v2, |e1, e2| s = s + e1 * e2);
+        assert!(s == 140, 0);
+    }
+
+    #[test]
+    // zip is an inline function so any error code will be reported at the call site.
+    #[expected_failure(abort_code = V::EVECTORS_LENGTH_MISMATCH, location = Self)]
+    fun test_zip_mismatching_lengths_should_fail() {
+        let v1 = vector[1];
+        let v2 = vector[10, 20];
+        let s = 0;
+        V::zip(v1, v2, |e1, e2| s = s + e1 * e2);
+    }
+
+    #[test]
+    fun test_enumerate_ref() {
+        let v = vector[1, 2, 3];
+        let i_s = 0;
+        let s = 0;
+        V::enumerate_ref(&v, |i, e| {
+            i_s = i_s + i;
+            s = s + *e;
+        });
+        assert!(i_s == 3, 0);
+        assert!(s == 6, 0);
+    }
+
+    #[test]
     fun test_for_each_ref() {
         let v = vector[1, 2, 3];
         let s = 0;
@@ -549,6 +634,97 @@ module std::vector_tests {
         let s = 2;
         V::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
         assert!(v == vector[2, 3, 4], 0)
+    }
+
+    #[test]
+    fun test_zip_ref() {
+        let v1 = vector[1, 2, 3];
+        let v2 = vector[10, 20, 30];
+        let s = 0;
+        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 * *e2);
+        assert!(s == 140, 0);
+    }
+
+    #[test]
+    // zip_ref is an inline function so any error code will be reported at the call site.
+    #[expected_failure(abort_code = V::EVECTORS_LENGTH_MISMATCH, location = Self)]
+    fun test_zip_ref_mismatching_lengths_should_fail() {
+        let v1 = vector[1];
+        let v2 = vector[10, 20];
+        let s = 0;
+        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 * *e2);
+    }
+
+    #[test]
+    fun test_zip_mut() {
+        let v1 = vector[1, 2, 3];
+        let v2 = vector[10, 20, 30];
+        V::zip_mut(&mut v1, &mut v2, |e1, e2| {
+            let e1: &mut u64 = e1;
+            let e2: &mut u64 = e2;
+            *e1 = *e1 + 1;
+            *e2 = *e2 + 10;
+        });
+        assert!(v1 == vector[2, 3, 4], 0);
+        assert!(v2 == vector[20, 30, 40], 0);
+    }
+
+    #[test]
+    fun test_zip_map() {
+        let v1 = vector[1, 2, 3];
+        let v2 = vector[10, 20, 30];
+        let result = V::zip_map(v1, v2, |e1, e2| e1 + e2);
+        assert!(result == vector[11, 22, 33], 0);
+    }
+
+    #[test]
+    fun test_zip_map_ref() {
+        let v1 = vector[1, 2, 3];
+        let v2 = vector[10, 20, 30];
+        let result = V::zip_map_ref(&v1, &v2, |e1, e2| *e1 + *e2);
+        assert!(result == vector[11, 22, 33], 0);
+    }
+
+    #[test]
+    // zip_mut is an inline function so any error code will be reported at the call site.
+    #[expected_failure(abort_code = V::EVECTORS_LENGTH_MISMATCH, location = Self)]
+    fun test_zip_mut_mismatching_lengths_should_fail() {
+        let v1 = vector[1];
+        let v2 = vector[10, 20];
+        let s = 0;
+        V::zip_mut(&mut v1, &mut v2, |e1, e2| s = s + *e1 * *e2);
+    }
+
+    #[test]
+    // zip_map is an inline function so any error code will be reported at the call site.
+    #[expected_failure(abort_code = V::EVECTORS_LENGTH_MISMATCH, location = Self)]
+    fun test_zip_map_mismatching_lengths_should_fail() {
+        let v1 = vector[1];
+        let v2 = vector[10, 20];
+        V::zip_map(v1, v2, |e1, e2| e1 * e2);
+    }
+
+    #[test]
+    // zip_map_ref is an inline function so any error code will be reported at the call site.
+    #[expected_failure(abort_code = V::EVECTORS_LENGTH_MISMATCH, location = Self)]
+    fun test_zip_map_ref_mismatching_lengths_should_fail() {
+        let v1 = vector[1];
+        let v2 = vector[10, 20];
+        V::zip_map_ref(&v1, &v2, |e1, e2| *e1 * *e2);
+    }
+
+    #[test]
+    fun test_enumerate_mut() {
+        let v = vector[1, 2, 3];
+        let i_s = 0;
+        let s = 2;
+        V::enumerate_mut(&mut v, |i, e| {
+            i_s = i_s + i;
+            *e = s;
+            s = s + 1
+        });
+        assert!(i_s == 3, 0);
+        assert!(v == vector[2, 3, 4], 0);
     }
 
     #[test]

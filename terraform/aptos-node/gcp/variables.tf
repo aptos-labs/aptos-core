@@ -46,26 +46,6 @@ variable "image_tag" {
   default     = "devnet"
 }
 
-variable "zone_name" {
-  description = "Zone name of GCP Cloud DNS zone to create records in"
-  default     = ""
-}
-
-variable "zone_project" {
-  description = "GCP project which the DNS zone is in (if different)"
-  default     = ""
-}
-
-variable "record_name" {
-  description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
-  default     = "<workspace>.aptos"
-}
-
-variable "create_dns_records" {
-  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
-  default     = true
-}
-
 variable "helm_chart" {
   description = "Path to aptos-validator Helm chart file"
   default     = ""
@@ -171,16 +151,36 @@ variable "manage_via_tf" {
   default     = true
 }
 
-### Cluster node config
+### DNS
 
-variable "gke_cluster_enable_gcfs" {
-  description = "Enable GCFS at the cluster level"
-  default     = false
+variable "zone_name" {
+  description = "Zone name of GCP Cloud DNS zone to create records in"
+  default     = ""
 }
 
-variable "gke_cluster_enable_gvnic" {
-  description = "Enable GVNIC (networking driver) at the cluster level"
-  default     = false
+variable "zone_project" {
+  description = "GCP project which the DNS zone is in (if different)"
+  default     = ""
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
+variable "record_name" {
+  description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
+  default     = "<workspace>.aptos"
+}
+
+variable "create_dns_records" {
+  description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  default     = true
+}
+
+variable "dns_ttl" {
+  description = "Time-to-Live for the Validator and Fullnode DNS records"
+  default     = 300
 }
 
 ### Autoscaling
@@ -239,4 +239,22 @@ variable "num_validators" {
 variable "num_fullnode_groups" {
   description = "The number of fullnode groups to create"
   default     = 1
+}
+
+variable "gke_maintenance_policy" {
+  description = "The maintenance policy to use for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#maintenance_policy"
+  type = object({
+    recurring_window = object({
+      start_time = string
+      end_time   = string
+      recurrence = string
+    })
+  })
+  default = {
+    recurring_window = {
+      start_time = "2023-06-15T00:00:00Z"
+      end_time   = "2023-06-15T23:59:00Z"
+      recurrence = "FREQ=DAILY"
+    }
+  }
 }

@@ -132,7 +132,7 @@ where
                         },
                         Data::Delta(d) => match acc.as_mut() {
                             Some(a) => {
-                                if a.merge_onto(*d).is_err() {
+                                if a.merge_with_previous_delta(*d).is_err() {
                                     failure = true;
                                 }
                             },
@@ -190,7 +190,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice());
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new(None);
+    let map = MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -205,7 +205,7 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(&KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
+        map.write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
         map.mark_estimate(&KeyType(key), idx as TxnIndex);
     }
 
@@ -283,17 +283,17 @@ where
                         }
                     },
                     Operator::Remove => {
-                        map.write(&KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
+                        map.write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
                     },
                     Operator::Insert(v) => {
                         map.write(
-                            &KeyType(key.clone()),
+                            KeyType(key.clone()),
                             (idx as TxnIndex, 1),
                             Value(Some(v.clone())),
                         );
                     },
                     Operator::Update(delta) => {
-                        map.add_delta(&KeyType(key.clone()), idx as TxnIndex, *delta)
+                        map.add_delta(KeyType(key.clone()), idx as TxnIndex, *delta)
                     },
                 }
             })
@@ -301,6 +301,8 @@ where
     });
     Ok(())
 }
+
+// TODO: proptest MVHashMap delete and dependency handling!
 
 proptest! {
     #[test]

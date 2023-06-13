@@ -35,6 +35,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
+pub mod analyzed_transaction;
 pub mod authenticator;
 mod change_set;
 mod module;
@@ -42,9 +43,7 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-#[cfg(any(test, feature = "fuzzing"))]
-pub use change_set::NoOpChangeSetChecker;
-pub use change_set::{ChangeSet, CheckChangeSet};
+pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
@@ -555,12 +554,20 @@ impl SignedTransaction {
         self.authenticator.clone()
     }
 
+    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
+        &self.authenticator
+    }
+
     pub fn sender(&self) -> AccountAddress {
         self.raw_txn.sender
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
         self.raw_txn
+    }
+
+    pub fn raw_transaction_ref(&self) -> &RawTransaction {
+        &self.raw_txn
     }
 
     pub fn sequence_number(&self) -> u64 {
@@ -832,11 +839,10 @@ impl TransactionStatus {
             _ => Err(format_err!("Not Keep.")),
         }
     }
-}
 
-impl From<VMStatus> for TransactionStatus {
-    fn from(vm_status: VMStatus) -> Self {
+    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
         let status_code = vm_status.status_code();
+        // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
         match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
@@ -844,8 +850,22 @@ impl From<VMStatus> for TransactionStatus {
                 },
                 _ => TransactionStatus::Keep(recorded.into()),
             },
-            Err(code) => TransactionStatus::Discard(code),
+            Err(code) => {
+                if code.status_type() == StatusType::InvariantViolation
+                    && charge_invariant_violation
+                {
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
+                } else {
+                    TransactionStatus::Discard(code)
+                }
+            },
         }
+    }
+}
+
+impl From<VMStatus> for TransactionStatus {
+    fn from(vm_status: VMStatus) -> Self {
+        TransactionStatus::from_vm_status(vm_status, true)
     }
 }
 

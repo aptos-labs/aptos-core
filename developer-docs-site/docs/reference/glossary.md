@@ -187,6 +187,21 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 - **Fullnodes** are clients that ensure data are stored up-to-date on the network. They replicate blockchain state and transactions from other fullnodes and validator nodes.
 
+### Fungible Asset
+
+- A **fungible asset** is an asset, such as a currency, share, in-game resource, etc., that is interchangeable with another identical asset without any loss in its value. For example, APT is a fungible asset because you can exchange one APT for another.
+- Follow the [Digital Asset Standards](../standards/index.md#digital-asset-standards) to create fungible assets on the Aptos blockchain. 
+- Next generation of the Coin standard that addresses shortcomings of `aptos_framework::coin` such as lack of guaranteed enforcement of freeze and burn and advanced functionalities such as programmable transfers, e.g., approve in ERC-20.
+
+### Fungible Token
+
+- For TokenV1 (aptos_token::token), a **fungible token** is a token that is interchangeable with other identical tokens (i.e., tokens that share the same `TokenId`). This means the tokens have the same `creator address`, `collection name`, `token name`, and `property version`.
+- For TokenV2 (aptos_token_objects::token), a **fungible token** is a fungible asset with metadata object includes a TokenV2 resource.
+
+### Fungible Unit
+
+- A **fungible unit** is an individual unit of a fungible asset. These units are identical and interchangeable without any loss in value. For example, each Octa (the smallest unit of APT) is a fungible unit.
+
 ## G
 
 ### Gas
