@@ -120,14 +120,14 @@ impl AnalyzedTransaction {
         )
     }
 
-    fn account_resource_location(address: AccountAddress) -> StorageLocation {
+    pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
         StorageLocation::Specific(StateKey::access_path(AccessPath::new(
             address,
             AccountResource::struct_tag().access_vector(),
         )))
     }
 
-    fn coin_store_location(address: AccountAddress) -> StorageLocation {
+    pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
         StorageLocation::Specific(StateKey::access_path(AccessPath::new(
             address,
             CoinStoreResource::struct_tag().access_vector(),

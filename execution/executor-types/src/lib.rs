@@ -156,9 +156,10 @@ impl ExecutableTransactions {
     pub fn num_transactions(&self) -> usize {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
-            ExecutableTransactions::Sharded(sub_blocks) => {
-                sub_blocks.iter().map(|sub_block| sub_block.len()).sum()
-            },
+            ExecutableTransactions::Sharded(sub_blocks) => sub_blocks
+                .iter()
+                .map(|sub_block| sub_block.num_txns())
+                .sum(),
         }
     }
 }
