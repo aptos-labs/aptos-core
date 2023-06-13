@@ -189,6 +189,12 @@ impl From<bcs::Error> for CliError {
     }
 }
 
+impl From<aptos_ledger::AptosLedgerError> for CliError {
+    fn from(e: aptos_ledger::AptosLedgerError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
@@ -221,6 +227,8 @@ pub struct ProfileConfig {
     /// URL for the Faucet endpoint (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
+    /// Derivative path index of the account on ledger
+    pub derivative_path: Option<String>,
 }
 
 /// ProfileConfig but without the private parts
