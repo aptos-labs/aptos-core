@@ -64,7 +64,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 2,
+            fee_statement: V1 {
+                total_charge_gas_units: 2,
+                execution_gas_units: 2,
+                io_gas_units: 0,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 MiscellaneousError(
                     Some(

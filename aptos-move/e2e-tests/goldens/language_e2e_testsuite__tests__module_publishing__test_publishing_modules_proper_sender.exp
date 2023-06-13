@@ -22,7 +22,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 7,
+            fee_statement: V1 {
+                total_charge_gas_units: 7,
+                execution_gas_units: 2,
+                io_gas_units: 5,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 Success,
             ),

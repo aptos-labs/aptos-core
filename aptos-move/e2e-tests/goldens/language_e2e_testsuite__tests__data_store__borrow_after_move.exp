@@ -22,7 +22,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 7,
+            fee_statement: V1 {
+                total_charge_gas_units: 7,
+                execution_gas_units: 2,
+                io_gas_units: 5,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 Success,
             ),
@@ -47,7 +53,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 2,
+            fee_statement: V1 {
+                total_charge_gas_units: 2,
+                execution_gas_units: 2,
+                io_gas_units: 1,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 ExecutionFailure {
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,
@@ -82,7 +94,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 7,
+            fee_statement: V1 {
+                total_charge_gas_units: 7,
+                execution_gas_units: 2,
+                io_gas_units: 6,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 Success,
             ),
@@ -107,7 +125,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 2,
+            fee_statement: V1 {
+                total_charge_gas_units: 2,
+                execution_gas_units: 2,
+                io_gas_units: 1,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 Success,
             ),
@@ -138,7 +162,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 2,
+            fee_statement: V1 {
+                total_charge_gas_units: 2,
+                execution_gas_units: 2,
+                io_gas_units: 1,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 Success,
             ),
@@ -159,7 +189,13 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 2,
+            fee_statement: V1 {
+                total_charge_gas_units: 2,
+                execution_gas_units: 2,
+                io_gas_units: 1,
+                storage_gas_units: 0,
+                storage_fee_units: 0,
+            },
             status: Keep(
                 ExecutionFailure {
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,
