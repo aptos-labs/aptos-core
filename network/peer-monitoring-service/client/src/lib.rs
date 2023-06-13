@@ -21,9 +21,6 @@ use futures::StreamExt;
 use network::PeerMonitoringServiceClient;
 use peer_states::peer_state::PeerState;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-//use std::ops::DerefMut;
-//use rand::Rng;
-//use rand::rngs::OsRng;
 use thiserror::Error;
 use tokio::{runtime::Handle, task::JoinHandle};
 
