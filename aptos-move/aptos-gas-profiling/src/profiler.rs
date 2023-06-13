@@ -478,6 +478,12 @@ where
         fn storage_discount_for_events(&self, total_cost: Fee) -> Fee;
 
         fn storage_fee_for_transaction_storage(&self, txn_size: NumBytes) -> Fee;
+
+        fn execution_gas_used(&self) -> Gas;
+
+        fn io_gas_used(&self) -> Gas;
+
+        fn storage_gas_used(&self) -> Gas;
     }
 
     delegate_mut! {

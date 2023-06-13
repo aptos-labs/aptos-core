@@ -30,6 +30,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
@@ -586,7 +587,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                 TransactionOutput::new(
                     write_set,
                     events,
-                    txn_info.gas_used(),
+                    FeeStatement::new_v0(txn_info.gas_used()),
                     TransactionStatus::Keep(txn_info.status().clone()),
                 ),
             )

@@ -27,6 +27,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
+    fee_statement::FeeStatement,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -457,7 +458,7 @@ fn apply_transaction_by_writeset(
                 TransactionOutput::new(
                     write_set.clone(),
                     vec![],
-                    0,
+                    FeeStatement::empty_v0(),
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
                 ),
             )
@@ -467,7 +468,7 @@ fn apply_transaction_by_writeset(
             TransactionOutput::new(
                 WriteSet::default(),
                 Vec::new(),
-                0,
+                FeeStatement::empty_v0(),
                 TransactionStatus::Keep(ExecutionStatus::Success),
             ),
         )))

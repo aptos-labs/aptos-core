@@ -6,6 +6,7 @@ use aptos_aggregator::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet},
@@ -17,15 +18,19 @@ use move_core_types::vm_status::VMStatus;
 #[derive(Debug, Clone)]
 pub struct VMOutput {
     change_set: VMChangeSet,
-    gas_used: u64,
+    fee_statement: FeeStatement,
     status: TransactionStatus,
 }
 
 impl VMOutput {
-    pub fn new(change_set: VMChangeSet, gas_used: u64, status: TransactionStatus) -> Self {
+    pub fn new(
+        change_set: VMChangeSet,
+        fee_statement: FeeStatement,
+        status: TransactionStatus,
+    ) -> Self {
         Self {
             change_set,
-            gas_used,
+            fee_statement,
             status,
         }
     }
@@ -35,13 +40,13 @@ impl VMOutput {
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
-            gas_used: 0,
+            fee_statement: FeeStatement::empty_v0(),
             status,
         }
     }
 
-    pub fn unpack(self) -> (VMChangeSet, u64, TransactionStatus) {
-        (self.change_set, self.gas_used, self.status)
+    pub fn unpack(self) -> (VMChangeSet, FeeStatement, TransactionStatus) {
+        (self.change_set, self.fee_statement, self.status)
     }
 
     pub fn write_set(&self) -> &WriteSet {
@@ -57,7 +62,15 @@ impl VMOutput {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.gas_used
+        self.fee_statement.gas_used()
+    }
+
+    pub fn execution_gas_used(&self) -> u64 {
+        self.fee_statement.execution_gas_used()
+    }
+
+    pub fn io_gas_used(&self) -> u64 {
+        self.fee_statement.io_gas_used()
     }
 
     pub fn status(&self) -> &TransactionStatus {

@@ -8,6 +8,7 @@ use crate::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     event::EventKey,
+    fee_statement::FeeStatement,
     ledger_info::LedgerInfo,
     proof::{
         definition::MAX_ACCUMULATOR_PROOF_DEPTH, AccumulatorExtensionProof, AccumulatorRangeProof,
@@ -487,7 +488,7 @@ fn test_transaction_and_output_list_with_proof() {
     let transaction_output = TransactionOutput::new(
         write_set,
         vec![event],
-        0,
+        FeeStatement::empty_v0(),
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
     );
 

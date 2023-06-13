@@ -23,6 +23,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::EventKey,
+    fee_statement::FeeStatement,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::{
@@ -214,7 +215,7 @@ pub fn create_transaction_output() -> TransactionOutput {
     TransactionOutput::new(
         WriteSet::default(),
         vec![create_event(None)],
-        0,
+        FeeStatement::empty_v0(),
         TransactionStatus::Keep(ExecutionStatus::Success),
     )
 }

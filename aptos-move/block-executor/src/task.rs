@@ -95,4 +95,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the amount of gas consumed by the transaction.
     fn gas_used(&self) -> u64;
+
+    /// Return the amount of execution gas consumed by the transaction.
+    fn execution_gas_used(&self) -> u64;
+
+    /// Return the amountof io gas consumed by the transaction.
+    fn io_gas_used(&self) -> u64;
 }

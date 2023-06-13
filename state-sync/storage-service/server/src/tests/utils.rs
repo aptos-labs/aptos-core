@@ -27,6 +27,7 @@ use aptos_types::{
     chain_id::ChainId,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
+    fee_statement::FeeStatement,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     transaction::{
@@ -165,7 +166,7 @@ fn create_test_transaction_output() -> TransactionOutput {
     TransactionOutput::new(
         WriteSet::default(),
         vec![],
-        0,
+        FeeStatement::empty_v0(),
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
     )
 }

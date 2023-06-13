@@ -31,6 +31,7 @@ use aptos_types::{
     account_config,
     account_config::new_block_event_key,
     block_metadata::BlockMetadata,
+    fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -302,11 +303,15 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
+                let fee_statement = FeeStatement::new_v1(
+                    u64::from(gas_meter.execution_gas_used()),
+                    u64::from(gas_meter.io_gas_used()),
+                    u64::from(gas_meter.storage_gas_used()),
+                );
                 let txn_output = get_transaction_output(
                     &mut (),
                     session,
-                    gas_meter.balance(),
-                    txn_data,
+                    fee_statement,
                     status,
                     change_set_configs,
                 )
@@ -333,14 +338,15 @@ impl AptosVM {
                 .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
-        let gas_used = txn_data
-            .max_gas_amount()
-            .checked_sub(gas_meter.balance())
-            .expect("Balance should always be less than or equal to max gas amount");
 
+        let fee_statement = FeeStatement::new_v1(
+            u64::from(gas_meter.execution_gas_used()),
+            u64::from(gas_meter.io_gas_used()),
+            u64::from(gas_meter.storage_gas_used()),
+        );
         let output = VMOutput::new(
             change_set,
-            gas_used.into(),
+            fee_statement,
             TransactionStatus::Keep(ExecutionStatus::Success),
         );
 
@@ -1280,7 +1286,11 @@ impl AptosVM {
         self.read_writeset(resolver, change_set.write_set())?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = VMOutput::new(change_set, 0, VMStatus::Executed.into());
+        let output = VMOutput::new(
+            change_set,
+            FeeStatement::empty_v0(),
+            VMStatus::Executed.into(),
+        );
         Ok((VMStatus::Executed, output))
     }
 
@@ -1303,7 +1313,7 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
+        let mut session: SessionExt =
             self.0
                 .new_session(resolver, SessionId::block_meta(&block_metadata), true);
 
@@ -1325,8 +1335,7 @@ impl AptosVM {
         let output = get_transaction_output(
             &mut (),
             session,
-            0.into(),
-            &txn_data,
+            FeeStatement::empty_v0(),
             ExecutionStatus::Success,
             &self
                 .0

@@ -23,6 +23,7 @@ use aptos_logger::error;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     proof::accumulator::InMemoryAccumulator,
     state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates},
     transaction::{
@@ -242,7 +243,7 @@ impl ApplyChunkOutput {
                 Into::into(TransactionOutput::new(
                     WriteSet::default(),
                     Vec::new(),
-                    0,
+                    FeeStatement::empty_v1(),
                     TransactionStatus::Keep(ExecutionStatus::Success),
                 ));
             to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
@@ -304,7 +305,7 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
+            let (write_set, events, reconfig_events, fee_statement, status) = txn_output.unpack();
             let event_tree =
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes);
 
@@ -314,7 +315,7 @@ impl ApplyChunkOutput {
                     write_set_hash,
                     event_tree.root_hash(),
                     state_checkpoint_hash,
-                    gas_used,
+                    fee_statement.gas_used(),
                     status.clone(),
                 ),
                 _ => unreachable!("Transaction sorted by status already."),
@@ -330,7 +331,7 @@ impl ApplyChunkOutput {
                     reconfig_events,
                     status,
                     Arc::new(event_tree),
-                    gas_used,
+                    fee_statement.gas_used(),
                     txn_info,
                     txn_info_hash,
                 ),
@@ -379,7 +380,7 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, per_txn_reconfig_events, gas_used, status) =
+            let (write_set, events, per_txn_reconfig_events, fee_statement, status) =
                 txn_output.unpack();
 
             let txn_info = match &status {
@@ -388,7 +389,7 @@ impl ApplyChunkOutput {
                     write_set_hash,
                     event_root_hash,
                     state_checkpoint_hash,
-                    gas_used,
+                    fee_statement.gas_used(),
                     status.clone(),
                 ),
                 _ => unreachable!("Transaction sorted by status already."),

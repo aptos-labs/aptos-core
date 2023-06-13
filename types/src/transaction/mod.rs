@@ -7,6 +7,7 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    fee_statement::FeeStatement,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -931,8 +932,8 @@ pub struct TransactionOutput {
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
 
-    /// The amount of gas used during execution.
-    gas_used: u64,
+    /// The gas fee charged during execution.
+    fee_statement: FeeStatement,
 
     /// The execution status.
     status: TransactionStatus,
@@ -942,13 +943,13 @@ impl TransactionOutput {
     pub fn new(
         write_set: WriteSet,
         events: Vec<ContractEvent>,
-        gas_used: u64,
+        fee_statement: FeeStatement,
         status: TransactionStatus,
     ) -> Self {
         TransactionOutput {
             write_set,
             events,
-            gas_used,
+            fee_statement,
             status,
         }
     }
@@ -966,21 +967,36 @@ impl TransactionOutput {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.gas_used
+        self.fee_statement.gas_used()
+    }
+
+    pub fn execution_gas_used(&self) -> u64 {
+        self.fee_statement.execution_gas_used()
+    }
+
+    pub fn io_gas_used(&self) -> u64 {
+        self.fee_statement.io_gas_used()
     }
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }
 
-    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
+    pub fn unpack(
+        self,
+    ) -> (
+        WriteSet,
+        Vec<ContractEvent>,
+        FeeStatement,
+        TransactionStatus,
+    ) {
         let Self {
             write_set,
             events,
-            gas_used,
+            fee_statement,
             status,
         } = self;
-        (write_set, events, gas_used, status)
+        (write_set, events, fee_statement, status)
     }
 
     pub fn ensure_match_transaction_info(

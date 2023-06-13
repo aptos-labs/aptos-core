@@ -249,7 +249,7 @@ where
 
             // For committed txns with Success status, calculate the accumulated gas.
             // For committed txns with Abort or SkipRest status, early halt BlockSTM.
-            match last_input_output.gas_used(txn_idx) {
+            match last_input_output.execution_and_io_gas_used(txn_idx) {
                 Some(gas) => {
                     *accumulated_gas += gas;
                     counters::PARALLEL_PER_TXN_GAS.observe(gas as f64);
@@ -556,9 +556,10 @@ where
                         data_map.write(ap, write_op);
                     }
                     // Calculating the accumulated gas of the committed txns.
-                    let txn_gas = output.gas_used();
-                    accumulated_gas += txn_gas;
-                    counters::SEQUENTIAL_PER_TXN_GAS.observe(txn_gas as f64);
+                    let txn_execution_and_io_gas =
+                        output.execution_gas_used() + output.io_gas_used();
+                    accumulated_gas += txn_execution_and_io_gas;
+                    counters::SEQUENTIAL_PER_TXN_GAS.observe(txn_execution_and_io_gas as f64);
                     ret.push(output);
                 },
                 ExecutionStatus::Abort(err) => {
