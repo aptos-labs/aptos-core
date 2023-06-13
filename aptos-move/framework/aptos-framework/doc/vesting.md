@@ -56,20 +56,20 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Struct `TerminateEvent`](#0x1_vesting_TerminateEvent)
 -  [Struct `AdminWithdrawEvent`](#0x1_vesting_AdminWithdrawEvent)
 -  [Constants](#@Constants_0)
--  [Function `stake_pool_address`](#0x1_vesting_stake_pool_address)
--  [Function `vesting_start_secs`](#0x1_vesting_vesting_start_secs)
--  [Function `period_duration_secs`](#0x1_vesting_period_duration_secs)
--  [Function `remaining_grant`](#0x1_vesting_remaining_grant)
--  [Function `beneficiary`](#0x1_vesting_beneficiary)
--  [Function `operator_commission_percentage`](#0x1_vesting_operator_commission_percentage)
--  [Function `vesting_contracts`](#0x1_vesting_vesting_contracts)
--  [Function `operator`](#0x1_vesting_operator)
--  [Function `voter`](#0x1_vesting_voter)
--  [Function `vesting_schedule`](#0x1_vesting_vesting_schedule)
--  [Function `total_accumulated_rewards`](#0x1_vesting_total_accumulated_rewards)
--  [Function `accumulated_rewards`](#0x1_vesting_accumulated_rewards)
--  [Function `shareholders`](#0x1_vesting_shareholders)
--  [Function `shareholder`](#0x1_vesting_shareholder)
+-  [`#[view]`<br>Function `stake_pool_address`](#0x1_vesting_stake_pool_address)
+-  [`#[view]`<br>Function `vesting_start_secs`](#0x1_vesting_vesting_start_secs)
+-  [`#[view]`<br>Function `period_duration_secs`](#0x1_vesting_period_duration_secs)
+-  [`#[view]`<br>Function `remaining_grant`](#0x1_vesting_remaining_grant)
+-  [`#[view]`<br>Function `beneficiary`](#0x1_vesting_beneficiary)
+-  [`#[view]`<br>Function `operator_commission_percentage`](#0x1_vesting_operator_commission_percentage)
+-  [`#[view]`<br>Function `vesting_contracts`](#0x1_vesting_vesting_contracts)
+-  [`#[view]`<br>Function `operator`](#0x1_vesting_operator)
+-  [`#[view]`<br>Function `voter`](#0x1_vesting_voter)
+-  [`#[view]`<br>Function `vesting_schedule`](#0x1_vesting_vesting_schedule)
+-  [`#[view]`<br>Function `total_accumulated_rewards`](#0x1_vesting_total_accumulated_rewards)
+-  [`#[view]`<br>Function `accumulated_rewards`](#0x1_vesting_accumulated_rewards)
+-  [`#[view]`<br>Function `shareholders`](#0x1_vesting_shareholders)
+-  [`#[view]`<br>Function `shareholder`](#0x1_vesting_shareholder)
 -  [Function `create_vesting_schedule`](#0x1_vesting_create_vesting_schedule)
 -  [Function `create_vesting_contract`](#0x1_vesting_create_vesting_contract)
 -  [Function `unlock_rewards`](#0x1_vesting_unlock_rewards)
@@ -1141,7 +1141,7 @@ Vesting contract has been terminated and all funds have been released back to th
 
 <a name="0x1_vesting_stake_pool_address"></a>
 
-## Function `stake_pool_address`
+## `#[view]`<br>Function `stake_pool_address`
 
 Return the address of the underlying stake pool (separate resource account) of the vesting contract.
 
@@ -1169,7 +1169,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_vesting_start_secs"></a>
 
-## Function `vesting_start_secs`
+## `#[view]`<br>Function `vesting_start_secs`
 
 Return the vesting start timestamp (in seconds) of the vesting contract.
 Vesting will start at this time, and once a full period has passed, the first vest will become unlocked.
@@ -1198,7 +1198,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_period_duration_secs"></a>
 
-## Function `period_duration_secs`
+## `#[view]`<br>Function `period_duration_secs`
 
 Return the duration of one vesting period (in seconds).
 Each vest is released after one full period has started, starting from the specified start_timestamp_secs.
@@ -1227,7 +1227,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_remaining_grant"></a>
 
-## Function `remaining_grant`
+## `#[view]`<br>Function `remaining_grant`
 
 Return the remaining grant, consisting of unvested coins that have not been distributed to shareholders.
 Prior to start_timestamp_secs, the remaining grant will always be equal to the original grant.
@@ -1258,7 +1258,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_beneficiary"></a>
 
-## Function `beneficiary`
+## `#[view]`<br>Function `beneficiary`
 
 Return the beneficiary account of the specified shareholder in a vesting contract.
 This is the same as the shareholder address by default and only different if it's been explicitly set.
@@ -1287,7 +1287,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_operator_commission_percentage"></a>
 
-## Function `operator_commission_percentage`
+## `#[view]`<br>Function `operator_commission_percentage`
 
 Return the percentage of accumulated rewards that is paid to the operator as commission.
 
@@ -1315,7 +1315,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_vesting_contracts"></a>
 
-## Function `vesting_contracts`
+## `#[view]`<br>Function `vesting_contracts`
 
 Return all the vesting contracts a given address is an admin of.
 
@@ -1344,7 +1344,7 @@ Return all the vesting contracts a given address is an admin of.
 
 <a name="0x1_vesting_operator"></a>
 
-## Function `operator`
+## `#[view]`<br>Function `operator`
 
 Return the operator who runs the validator for the vesting contract.
 
@@ -1372,7 +1372,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_voter"></a>
 
-## Function `voter`
+## `#[view]`<br>Function `voter`
 
 Return the voter who will be voting on on-chain governance proposals on behalf of the vesting contract's stake
 pool.
@@ -1401,7 +1401,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_vesting_schedule"></a>
 
-## Function `vesting_schedule`
+## `#[view]`<br>Function `vesting_schedule`
 
 Return the vesting contract's vesting schedule. The core schedule is represented as a list of u64-based
 fractions, where the rightmmost 32 bits can be divided by 2^32 to get the fraction, and anything else is the
@@ -1435,7 +1435,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_total_accumulated_rewards"></a>
 
-## Function `total_accumulated_rewards`
+## `#[view]`<br>Function `total_accumulated_rewards`
 
 Return the total accumulated rewards that have not been distributed to shareholders of the vesting contract.
 This excludes any unpaid commission that the operator has not collected.
@@ -1468,7 +1468,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_accumulated_rewards"></a>
 
-## Function `accumulated_rewards`
+## `#[view]`<br>Function `accumulated_rewards`
 
 Return the accumulated rewards that have not been distributed to the provided shareholder. Caller can also pass
 the beneficiary address instead of shareholder address.
@@ -1503,7 +1503,7 @@ This errors out if the vesting contract with the provided address doesn't exist.
 
 <a name="0x1_vesting_shareholders"></a>
 
-## Function `shareholders`
+## `#[view]`<br>Function `shareholders`
 
 Return the list of all shareholders in the vesting contract.
 
@@ -1531,7 +1531,7 @@ Return the list of all shareholders in the vesting contract.
 
 <a name="0x1_vesting_shareholder"></a>
 
-## Function `shareholder`
+## `#[view]`<br>Function `shareholder`
 
 Return the shareholder address given the beneficiary address in a given vesting contract. If there are multiple
 shareholders with the same beneficiary address, only the first shareholder is returned. If the given beneficiary

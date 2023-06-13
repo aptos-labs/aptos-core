@@ -21,11 +21,11 @@
 -  [Function `initialize`](#0x1_account_initialize)
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
--  [Function `exists_at`](#0x1_account_exists_at)
--  [Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
--  [Function `get_sequence_number`](#0x1_account_get_sequence_number)
+-  [`#[view]`<br>Function `exists_at`](#0x1_account_exists_at)
+-  [`#[view]`<br>Function `get_guid_next_creation_num`](#0x1_account_get_guid_next_creation_num)
+-  [`#[view]`<br>Function `get_sequence_number`](#0x1_account_get_sequence_number)
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
--  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
+-  [`#[view]`<br>Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
@@ -33,8 +33,8 @@
 -  [Function `revoke_rotation_capability`](#0x1_account_revoke_rotation_capability)
 -  [Function `revoke_any_rotation_capability`](#0x1_account_revoke_any_rotation_capability)
 -  [Function `offer_signer_capability`](#0x1_account_offer_signer_capability)
--  [Function `is_signer_capability_offered`](#0x1_account_is_signer_capability_offered)
--  [Function `get_signer_capability_offer_for`](#0x1_account_get_signer_capability_offer_for)
+-  [`#[view]`<br>Function `is_signer_capability_offered`](#0x1_account_is_signer_capability_offered)
+-  [`#[view]`<br>Function `get_signer_capability_offer_for`](#0x1_account_get_signer_capability_offer_for)
 -  [Function `revoke_signer_capability`](#0x1_account_revoke_signer_capability)
 -  [Function `revoke_any_signer_capability`](#0x1_account_revoke_any_signer_capability)
 -  [Function `create_authorized_signer`](#0x1_account_create_authorized_signer)
@@ -932,7 +932,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 <a name="0x1_account_exists_at"></a>
 
-## Function `exists_at`
+## `#[view]`<br>Function `exists_at`
 
 
 
@@ -956,7 +956,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 <a name="0x1_account_get_guid_next_creation_num"></a>
 
-## Function `get_guid_next_creation_num`
+## `#[view]`<br>Function `get_guid_next_creation_num`
 
 
 
@@ -980,7 +980,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 <a name="0x1_account_get_sequence_number"></a>
 
-## Function `get_sequence_number`
+## `#[view]`<br>Function `get_sequence_number`
 
 
 
@@ -1035,7 +1035,7 @@ is returned. This way, the caller of this function can publish additional resour
 
 <a name="0x1_account_get_authentication_key"></a>
 
-## Function `get_authentication_key`
+## `#[view]`<br>Function `get_authentication_key`
 
 
 
@@ -1420,7 +1420,7 @@ to the account owner's signer capability).
 
 <a name="0x1_account_is_signer_capability_offered"></a>
 
-## Function `is_signer_capability_offered`
+## `#[view]`<br>Function `is_signer_capability_offered`
 
 Returns true if the account at <code>account_addr</code> has a signer capability offer.
 
@@ -1446,7 +1446,7 @@ Returns true if the account at <code>account_addr</code> has a signer capability
 
 <a name="0x1_account_get_signer_capability_offer_for"></a>
 
-## Function `get_signer_capability_offer_for`
+## `#[view]`<br>Function `get_signer_capability_offer_for`
 
 Returns the address of the account that has a signer capability offer from the account at <code>account_addr</code>.
 

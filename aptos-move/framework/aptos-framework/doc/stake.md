@@ -49,18 +49,18 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Constants](#@Constants_0)
 -  [Function `initialize_validator_fees`](#0x1_stake_initialize_validator_fees)
 -  [Function `add_transaction_fee`](#0x1_stake_add_transaction_fee)
--  [Function `get_lockup_secs`](#0x1_stake_get_lockup_secs)
--  [Function `get_remaining_lockup_secs`](#0x1_stake_get_remaining_lockup_secs)
--  [Function `get_stake`](#0x1_stake_get_stake)
--  [Function `get_validator_state`](#0x1_stake_get_validator_state)
--  [Function `get_current_epoch_voting_power`](#0x1_stake_get_current_epoch_voting_power)
--  [Function `get_delegated_voter`](#0x1_stake_get_delegated_voter)
--  [Function `get_operator`](#0x1_stake_get_operator)
+-  [`#[view]`<br>Function `get_lockup_secs`](#0x1_stake_get_lockup_secs)
+-  [`#[view]`<br>Function `get_remaining_lockup_secs`](#0x1_stake_get_remaining_lockup_secs)
+-  [`#[view]`<br>Function `get_stake`](#0x1_stake_get_stake)
+-  [`#[view]`<br>Function `get_validator_state`](#0x1_stake_get_validator_state)
+-  [`#[view]`<br>Function `get_current_epoch_voting_power`](#0x1_stake_get_current_epoch_voting_power)
+-  [`#[view]`<br>Function `get_delegated_voter`](#0x1_stake_get_delegated_voter)
+-  [`#[view]`<br>Function `get_operator`](#0x1_stake_get_operator)
 -  [Function `get_owned_pool_address`](#0x1_stake_get_owned_pool_address)
--  [Function `get_validator_index`](#0x1_stake_get_validator_index)
--  [Function `get_current_epoch_proposal_counts`](#0x1_stake_get_current_epoch_proposal_counts)
--  [Function `get_validator_config`](#0x1_stake_get_validator_config)
--  [Function `stake_pool_exists`](#0x1_stake_stake_pool_exists)
+-  [`#[view]`<br>Function `get_validator_index`](#0x1_stake_get_validator_index)
+-  [`#[view]`<br>Function `get_current_epoch_proposal_counts`](#0x1_stake_get_current_epoch_proposal_counts)
+-  [`#[view]`<br>Function `get_validator_config`](#0x1_stake_get_validator_config)
+-  [`#[view]`<br>Function `stake_pool_exists`](#0x1_stake_stake_pool_exists)
 -  [Function `initialize`](#0x1_stake_initialize)
 -  [Function `store_aptos_coin_mint_cap`](#0x1_stake_store_aptos_coin_mint_cap)
 -  [Function `remove_validators`](#0x1_stake_remove_validators)
@@ -1366,7 +1366,7 @@ Stores the transaction fee collected to the specified validator address.
 
 <a name="0x1_stake_get_lockup_secs"></a>
 
-## Function `get_lockup_secs`
+## `#[view]`<br>Function `get_lockup_secs`
 
 Return the lockup expiration of the stake pool at <code>pool_address</code>.
 This will throw an error if there's no stake pool at <code>pool_address</code>.
@@ -1393,7 +1393,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 <a name="0x1_stake_get_remaining_lockup_secs"></a>
 
-## Function `get_remaining_lockup_secs`
+## `#[view]`<br>Function `get_remaining_lockup_secs`
 
 Return the remaining lockup of the stake pool at <code>pool_address</code>.
 This will throw an error if there's no stake pool at <code>pool_address</code>.
@@ -1425,7 +1425,7 @@ This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 <a name="0x1_stake_get_stake"></a>
 
-## Function `get_stake`
+## `#[view]`<br>Function `get_stake`
 
 Return the different stake amounts for <code>pool_address</code> (whether the validator is active or not).
 The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
@@ -1458,7 +1458,7 @@ The returned amounts are for (active, inactive, pending_active, pending_inactive
 
 <a name="0x1_stake_get_validator_state"></a>
 
-## Function `get_validator_state`
+## `#[view]`<br>Function `get_validator_state`
 
 Returns the validator's state.
 
@@ -1492,7 +1492,7 @@ Returns the validator's state.
 
 <a name="0x1_stake_get_current_epoch_voting_power"></a>
 
-## Function `get_current_epoch_voting_power`
+## `#[view]`<br>Function `get_current_epoch_voting_power`
 
 Return the voting power of the validator in the current epoch.
 This is the same as the validator's total active and pending_inactive stake.
@@ -1527,7 +1527,7 @@ This is the same as the validator's total active and pending_inactive stake.
 
 <a name="0x1_stake_get_delegated_voter"></a>
 
-## Function `get_delegated_voter`
+## `#[view]`<br>Function `get_delegated_voter`
 
 Return the delegated voter of the validator at <code>pool_address</code>.
 
@@ -1553,7 +1553,7 @@ Return the delegated voter of the validator at <code>pool_address</code>.
 
 <a name="0x1_stake_get_operator"></a>
 
-## Function `get_operator`
+## `#[view]`<br>Function `get_operator`
 
 Return the operator of the validator at <code>pool_address</code>.
 
@@ -1604,7 +1604,7 @@ Return the pool address in <code>owner_cap</code>.
 
 <a name="0x1_stake_get_validator_index"></a>
 
-## Function `get_validator_index`
+## `#[view]`<br>Function `get_validator_index`
 
 Return the validator index for <code>pool_address</code>.
 
@@ -1630,7 +1630,7 @@ Return the validator index for <code>pool_address</code>.
 
 <a name="0x1_stake_get_current_epoch_proposal_counts"></a>
 
-## Function `get_current_epoch_proposal_counts`
+## `#[view]`<br>Function `get_current_epoch_proposal_counts`
 
 Return the number of successful and failed proposals for the proposal at the given validator index.
 
@@ -1657,7 +1657,7 @@ Return the number of successful and failed proposals for the proposal at the giv
 
 <a name="0x1_stake_get_validator_config"></a>
 
-## Function `get_validator_config`
+## `#[view]`<br>Function `get_validator_config`
 
 Return the validator's config.
 
@@ -1684,7 +1684,7 @@ Return the validator's config.
 
 <a name="0x1_stake_stake_pool_exists"></a>
 
-## Function `stake_pool_exists`
+## `#[view]`<br>Function `stake_pool_exists`
 
 
 

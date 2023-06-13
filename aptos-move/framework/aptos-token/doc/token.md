@@ -97,7 +97,7 @@ Checkout our developer doc on our token standard https://aptos.dev/concepts/coin
 -  [Function `get_token_mutability_uri`](#0x3_token_get_token_mutability_uri)
 -  [Function `get_token_mutability_description`](#0x3_token_get_token_mutability_description)
 -  [Function `get_token_mutability_default_properties`](#0x3_token_get_token_mutability_default_properties)
--  [Function `get_collection_mutability_config`](#0x3_token_get_collection_mutability_config)
+-  [`#[view]`<br>Function `get_collection_mutability_config`](#0x3_token_get_collection_mutability_config)
 -  [Function `get_collection_mutability_description`](#0x3_token_get_collection_mutability_description)
 -  [Function `get_collection_mutability_uri`](#0x3_token_get_collection_mutability_uri)
 -  [Function `get_collection_mutability_maximum`](#0x3_token_get_collection_mutability_maximum)
@@ -4145,7 +4145,7 @@ return if the tokendata's default properties is mutable with a token mutability 
 
 <a name="0x3_token_get_collection_mutability_config"></a>
 
-## Function `get_collection_mutability_config`
+## `#[view]`<br>Function `get_collection_mutability_config`
 
 return the collection mutation setting
 

@@ -13,8 +13,8 @@ It interacts with the other modules in the following ways:
 -  [Constants](#@Constants_0)
 -  [Function `set_time_has_started`](#0x1_timestamp_set_time_has_started)
 -  [Function `update_global_time`](#0x1_timestamp_update_global_time)
--  [Function `now_microseconds`](#0x1_timestamp_now_microseconds)
--  [Function `now_seconds`](#0x1_timestamp_now_seconds)
+-  [`#[view]`<br>Function `now_microseconds`](#0x1_timestamp_now_microseconds)
+-  [`#[view]`<br>Function `now_seconds`](#0x1_timestamp_now_seconds)
 -  [Specification](#@Specification_1)
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
@@ -158,7 +158,7 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 
 <a name="0x1_timestamp_now_microseconds"></a>
 
-## Function `now_microseconds`
+## `#[view]`<br>Function `now_microseconds`
 
 Gets the current time in microseconds.
 
@@ -183,7 +183,7 @@ Gets the current time in microseconds.
 
 <a name="0x1_timestamp_now_seconds"></a>
 
-## Function `now_seconds`
+## `#[view]`<br>Function `now_seconds`
 
 Gets the current time in seconds.
 

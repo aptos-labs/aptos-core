@@ -8,7 +8,7 @@ token. Applications should read the royalty from the token, as it will read the 
 royalty.
 
 
--  [Resource `Royalty`](#0x4_royalty_Royalty)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Royalty`](#0x4_royalty_Royalty)
 -  [Struct `MutatorRef`](#0x4_royalty_MutatorRef)
 -  [Constants](#@Constants_0)
 -  [Function `init`](#0x4_royalty_init)
@@ -32,7 +32,7 @@ royalty.
 
 <a name="0x4_royalty_Royalty"></a>
 
-## Resource `Royalty`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Royalty`
 
 The royalty of a token within this collection
 

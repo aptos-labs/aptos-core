@@ -123,17 +123,17 @@ transferred to A
 -  [Struct `WithdrawStakeEvent`](#0x1_delegation_pool_WithdrawStakeEvent)
 -  [Struct `DistributeCommissionEvent`](#0x1_delegation_pool_DistributeCommissionEvent)
 -  [Constants](#@Constants_0)
--  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
--  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
--  [Function `delegation_pool_exists`](#0x1_delegation_pool_delegation_pool_exists)
--  [Function `observed_lockup_cycle`](#0x1_delegation_pool_observed_lockup_cycle)
--  [Function `operator_commission_percentage`](#0x1_delegation_pool_operator_commission_percentage)
--  [Function `shareholders_count_active_pool`](#0x1_delegation_pool_shareholders_count_active_pool)
--  [Function `get_delegation_pool_stake`](#0x1_delegation_pool_get_delegation_pool_stake)
--  [Function `get_pending_withdrawal`](#0x1_delegation_pool_get_pending_withdrawal)
--  [Function `get_stake`](#0x1_delegation_pool_get_stake)
--  [Function `get_add_stake_fee`](#0x1_delegation_pool_get_add_stake_fee)
--  [Function `can_withdraw_pending_inactive`](#0x1_delegation_pool_can_withdraw_pending_inactive)
+-  [`#[view]`<br>Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
+-  [`#[view]`<br>Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
+-  [`#[view]`<br>Function `delegation_pool_exists`](#0x1_delegation_pool_delegation_pool_exists)
+-  [`#[view]`<br>Function `observed_lockup_cycle`](#0x1_delegation_pool_observed_lockup_cycle)
+-  [`#[view]`<br>Function `operator_commission_percentage`](#0x1_delegation_pool_operator_commission_percentage)
+-  [`#[view]`<br>Function `shareholders_count_active_pool`](#0x1_delegation_pool_shareholders_count_active_pool)
+-  [`#[view]`<br>Function `get_delegation_pool_stake`](#0x1_delegation_pool_get_delegation_pool_stake)
+-  [`#[view]`<br>Function `get_pending_withdrawal`](#0x1_delegation_pool_get_pending_withdrawal)
+-  [`#[view]`<br>Function `get_stake`](#0x1_delegation_pool_get_stake)
+-  [`#[view]`<br>Function `get_add_stake_fee`](#0x1_delegation_pool_get_add_stake_fee)
+-  [`#[view]`<br>Function `can_withdraw_pending_inactive`](#0x1_delegation_pool_can_withdraw_pending_inactive)
 -  [Function `initialize_delegation_pool`](#0x1_delegation_pool_initialize_delegation_pool)
 -  [Function `assert_owner_cap_exists`](#0x1_delegation_pool_assert_owner_cap_exists)
 -  [Function `assert_delegation_pool_exists`](#0x1_delegation_pool_assert_delegation_pool_exists)
@@ -733,7 +733,7 @@ Scaling factor of shares pools used within the delegation pool
 
 <a name="0x1_delegation_pool_owner_cap_exists"></a>
 
-## Function `owner_cap_exists`
+## `#[view]`<br>Function `owner_cap_exists`
 
 Return whether supplied address <code>addr</code> is owner of a delegation pool.
 
@@ -758,7 +758,7 @@ Return whether supplied address <code>addr</code> is owner of a delegation pool.
 
 <a name="0x1_delegation_pool_get_owned_pool_address"></a>
 
-## Function `get_owned_pool_address`
+## `#[view]`<br>Function `get_owned_pool_address`
 
 Return address of the delegation pool owned by <code>owner</code> or fail if there is none.
 
@@ -784,7 +784,7 @@ Return address of the delegation pool owned by <code>owner</code> or fail if the
 
 <a name="0x1_delegation_pool_delegation_pool_exists"></a>
 
-## Function `delegation_pool_exists`
+## `#[view]`<br>Function `delegation_pool_exists`
 
 Return whether a delegation pool exists at supplied address <code>addr</code>.
 
@@ -809,7 +809,7 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 <a name="0x1_delegation_pool_observed_lockup_cycle"></a>
 
-## Function `observed_lockup_cycle`
+## `#[view]`<br>Function `observed_lockup_cycle`
 
 Return the index of current observed lockup cycle on delegation pool <code>pool_address</code>.
 
@@ -835,7 +835,7 @@ Return the index of current observed lockup cycle on delegation pool <code>pool_
 
 <a name="0x1_delegation_pool_operator_commission_percentage"></a>
 
-## Function `operator_commission_percentage`
+## `#[view]`<br>Function `operator_commission_percentage`
 
 Return the operator commission percentage set on the delegation pool <code>pool_address</code>.
 
@@ -861,7 +861,7 @@ Return the operator commission percentage set on the delegation pool <code>pool_
 
 <a name="0x1_delegation_pool_shareholders_count_active_pool"></a>
 
-## Function `shareholders_count_active_pool`
+## `#[view]`<br>Function `shareholders_count_active_pool`
 
 Return the number of delegators owning active stake within <code>pool_address</code>.
 
@@ -887,7 +887,7 @@ Return the number of delegators owning active stake within <code>pool_address</c
 
 <a name="0x1_delegation_pool_get_delegation_pool_stake"></a>
 
-## Function `get_delegation_pool_stake`
+## `#[view]`<br>Function `get_delegation_pool_stake`
 
 Return the stake amounts on <code>pool_address</code> in the different states:
 (<code>active</code>,<code>inactive</code>,<code>pending_active</code>,<code>pending_inactive</code>)
@@ -914,7 +914,7 @@ Return the stake amounts on <code>pool_address</code> in the different states:
 
 <a name="0x1_delegation_pool_get_pending_withdrawal"></a>
 
-## Function `get_pending_withdrawal`
+## `#[view]`<br>Function `get_pending_withdrawal`
 
 Return whether the given delegator has any withdrawable stake. If they recently requested to unlock
 some stake and the stake pool's lockup cycle has not ended, their coins are not withdrawable yet.
@@ -973,7 +973,7 @@ some stake and the stake pool's lockup cycle has not ended, their coins are not 
 
 <a name="0x1_delegation_pool_get_stake"></a>
 
-## Function `get_stake`
+## `#[view]`<br>Function `get_stake`
 
 Return total stake owned by <code>delegator_address</code> within delegation pool <code>pool_address</code>
 in each of its individual states: (<code>active</code>,<code>inactive</code>,<code>pending_inactive</code>)
@@ -1048,7 +1048,7 @@ in each of its individual states: (<code>active</code>,<code>inactive</code>,<co
 
 <a name="0x1_delegation_pool_get_add_stake_fee"></a>
 
-## Function `get_add_stake_fee`
+## `#[view]`<br>Function `get_add_stake_fee`
 
 Return refundable stake to be extracted from added <code>amount</code> at <code>add_stake</code> operation on pool <code>pool_address</code>.
 If the validator produces rewards this epoch, added stake goes directly to <code>pending_active</code> and
@@ -1090,7 +1090,7 @@ extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commi
 
 <a name="0x1_delegation_pool_can_withdraw_pending_inactive"></a>
 
-## Function `can_withdraw_pending_inactive`
+## `#[view]`<br>Function `can_withdraw_pending_inactive`
 
 Return whether <code>pending_inactive</code> stake can be directly withdrawn from
 the delegation pool, implicitly its stake pool, in the special case

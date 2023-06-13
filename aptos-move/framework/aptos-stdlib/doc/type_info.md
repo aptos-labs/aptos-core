@@ -15,8 +15,8 @@
 -  [Function `type_name`](#0x1_type_info_type_name)
 -  [Function `chain_id_internal`](#0x1_type_info_chain_id_internal)
 -  [Function `size_of_val`](#0x1_type_info_size_of_val)
--  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
--  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
+-  [`#[verify_only]`<br>Function `verify_type_of`](#0x1_type_info_verify_type_of)
+-  [`#[verify_only]`<br>Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
     -  [Function `chain_id`](#@Specification_1_chain_id)
     -  [Function `type_of`](#@Specification_1_type_of)
@@ -289,7 +289,7 @@ analysis of vector size dynamism.
 
 <a name="0x1_type_info_verify_type_of"></a>
 
-## Function `verify_type_of`
+## `#[verify_only]`<br>Function `verify_type_of`
 
 
 
@@ -321,7 +321,7 @@ analysis of vector size dynamism.
 
 <a name="0x1_type_info_verify_type_of_generic"></a>
 
-## Function `verify_type_of_generic`
+## `#[verify_only]`<br>Function `verify_type_of_generic`
 
 
 

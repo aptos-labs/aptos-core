@@ -7,10 +7,10 @@ This defines the fungible asset module that can issue fungible asset of any <cod
 metadata object can be any object that equipped with <code><a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a></code> resource.
 
 
--  [Resource `Supply`](#0x1_fungible_asset_Supply)
--  [Resource `Metadata`](#0x1_fungible_asset_Metadata)
--  [Resource `FungibleStore`](#0x1_fungible_asset_FungibleStore)
--  [Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Supply`](#0x1_fungible_asset_Supply)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Metadata`](#0x1_fungible_asset_Metadata)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FungibleStore`](#0x1_fungible_asset_FungibleStore)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FungibleAssetEvents`](#0x1_fungible_asset_FungibleAssetEvents)
 -  [Struct `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
 -  [Struct `TransferRef`](#0x1_fungible_asset_TransferRef)
@@ -23,17 +23,17 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
 -  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
--  [Function `supply`](#0x1_fungible_asset_supply)
--  [Function `maximum`](#0x1_fungible_asset_maximum)
--  [Function `name`](#0x1_fungible_asset_name)
--  [Function `symbol`](#0x1_fungible_asset_symbol)
--  [Function `decimals`](#0x1_fungible_asset_decimals)
--  [Function `store_exists`](#0x1_fungible_asset_store_exists)
+-  [`#[view]`<br>Function `supply`](#0x1_fungible_asset_supply)
+-  [`#[view]`<br>Function `maximum`](#0x1_fungible_asset_maximum)
+-  [`#[view]`<br>Function `name`](#0x1_fungible_asset_name)
+-  [`#[view]`<br>Function `symbol`](#0x1_fungible_asset_symbol)
+-  [`#[view]`<br>Function `decimals`](#0x1_fungible_asset_decimals)
+-  [`#[view]`<br>Function `store_exists`](#0x1_fungible_asset_store_exists)
 -  [Function `metadata_from_asset`](#0x1_fungible_asset_metadata_from_asset)
--  [Function `store_metadata`](#0x1_fungible_asset_store_metadata)
+-  [`#[view]`<br>Function `store_metadata`](#0x1_fungible_asset_store_metadata)
 -  [Function `amount`](#0x1_fungible_asset_amount)
--  [Function `balance`](#0x1_fungible_asset_balance)
--  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
+-  [`#[view]`<br>Function `balance`](#0x1_fungible_asset_balance)
+-  [`#[view]`<br>Function `is_frozen`](#0x1_fungible_asset_is_frozen)
 -  [Function `asset_metadata`](#0x1_fungible_asset_asset_metadata)
 -  [Function `mint_ref_metadata`](#0x1_fungible_asset_mint_ref_metadata)
 -  [Function `transfer_ref_metadata`](#0x1_fungible_asset_transfer_ref_metadata)
@@ -77,7 +77,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 <a name="0x1_fungible_asset_Supply"></a>
 
-## Resource `Supply`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Supply`
 
 
 
@@ -110,7 +110,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 <a name="0x1_fungible_asset_Metadata"></a>
 
-## Resource `Metadata`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Metadata`
 
 Metadata of a Fungible asset
 
@@ -166,7 +166,7 @@ Metadata of a Fungible asset
 
 <a name="0x1_fungible_asset_FungibleStore"></a>
 
-## Resource `FungibleStore`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FungibleStore`
 
 The store object that holds fungible assets of a specific type associated with an account.
 
@@ -206,7 +206,7 @@ The store object that holds fungible assets of a specific type associated with a
 
 <a name="0x1_fungible_asset_FungibleAssetEvents"></a>
 
-## Resource `FungibleAssetEvents`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FungibleAssetEvents`
 
 
 
@@ -849,7 +849,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 <a name="0x1_fungible_asset_supply"></a>
 
-## Function `supply`
+## `#[view]`<br>Function `supply`
 
 Get the current supply from the <code>metadata</code> object.
 
@@ -880,7 +880,7 @@ Get the current supply from the <code>metadata</code> object.
 
 <a name="0x1_fungible_asset_maximum"></a>
 
-## Function `maximum`
+## `#[view]`<br>Function `maximum`
 
 Get the maximum supply from the <code>metadata</code> object.
 
@@ -911,7 +911,7 @@ Get the maximum supply from the <code>metadata</code> object.
 
 <a name="0x1_fungible_asset_name"></a>
 
-## Function `name`
+## `#[view]`<br>Function `name`
 
 Get the name of the fungible asset from the <code>metadata</code> object.
 
@@ -936,7 +936,7 @@ Get the name of the fungible asset from the <code>metadata</code> object.
 
 <a name="0x1_fungible_asset_symbol"></a>
 
-## Function `symbol`
+## `#[view]`<br>Function `symbol`
 
 Get the symbol of the fungible asset from the <code>metadata</code> object.
 
@@ -961,7 +961,7 @@ Get the symbol of the fungible asset from the <code>metadata</code> object.
 
 <a name="0x1_fungible_asset_decimals"></a>
 
-## Function `decimals`
+## `#[view]`<br>Function `decimals`
 
 Get the decimals from the <code>metadata</code> object.
 
@@ -986,7 +986,7 @@ Get the decimals from the <code>metadata</code> object.
 
 <a name="0x1_fungible_asset_store_exists"></a>
 
-## Function `store_exists`
+## `#[view]`<br>Function `store_exists`
 
 Return whether the provided address has a store initialized.
 
@@ -1036,7 +1036,7 @@ Return the underlying metadata object
 
 <a name="0x1_fungible_asset_store_metadata"></a>
 
-## Function `store_metadata`
+## `#[view]`<br>Function `store_metadata`
 
 Return the underlying metadata object.
 
@@ -1086,7 +1086,7 @@ Return the <code>amount</code> of a given fungible asset.
 
 <a name="0x1_fungible_asset_balance"></a>
 
-## Function `balance`
+## `#[view]`<br>Function `balance`
 
 Get the balance of a given store.
 
@@ -1115,7 +1115,7 @@ Get the balance of a given store.
 
 <a name="0x1_fungible_asset_is_frozen"></a>
 
-## Function `is_frozen`
+## `#[view]`<br>Function `is_frozen`
 
 Return whether a store is frozen.
 

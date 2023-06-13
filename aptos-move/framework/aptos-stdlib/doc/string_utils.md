@@ -8,7 +8,7 @@ A module for formatting move values as strings.
 
 -  [Struct `Cons`](#0x1_string_utils_Cons)
 -  [Struct `NIL`](#0x1_string_utils_NIL)
--  [Struct `FakeCons`](#0x1_string_utils_FakeCons)
+-  [`#[testonly]`<br>Struct `FakeCons`](#0x1_string_utils_FakeCons)
 -  [Constants](#@Constants_0)
 -  [Function `to_string`](#0x1_string_utils_to_string)
 -  [Function `to_string_with_canonical_addresses`](#0x1_string_utils_to_string_with_canonical_addresses)
@@ -98,7 +98,7 @@ A module for formatting move values as strings.
 
 <a name="0x1_string_utils_FakeCons"></a>
 
-## Struct `FakeCons`
+## `#[testonly]`<br>Struct `FakeCons`
 
 
 

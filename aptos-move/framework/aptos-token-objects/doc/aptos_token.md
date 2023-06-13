@@ -13,20 +13,20 @@ The key features are:
 * Metadata property type
 
 
--  [Resource `AptosCollection`](#0x4_aptos_token_AptosCollection)
--  [Resource `AptosToken`](#0x4_aptos_token_AptosToken)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `AptosCollection`](#0x4_aptos_token_AptosCollection)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `AptosToken`](#0x4_aptos_token_AptosToken)
 -  [Constants](#@Constants_0)
 -  [Function `create_collection`](#0x4_aptos_token_create_collection)
 -  [Function `mint`](#0x4_aptos_token_mint)
 -  [Function `mint_soul_bound`](#0x4_aptos_token_mint_soul_bound)
 -  [Function `mint_internal`](#0x4_aptos_token_mint_internal)
 -  [Function `borrow`](#0x4_aptos_token_borrow)
--  [Function `are_properties_mutable`](#0x4_aptos_token_are_properties_mutable)
--  [Function `is_burnable`](#0x4_aptos_token_is_burnable)
--  [Function `is_freezable_by_creator`](#0x4_aptos_token_is_freezable_by_creator)
--  [Function `is_mutable_description`](#0x4_aptos_token_is_mutable_description)
--  [Function `is_mutable_name`](#0x4_aptos_token_is_mutable_name)
--  [Function `is_mutable_uri`](#0x4_aptos_token_is_mutable_uri)
+-  [`#[view]`<br>Function `are_properties_mutable`](#0x4_aptos_token_are_properties_mutable)
+-  [`#[view]`<br>Function `is_burnable`](#0x4_aptos_token_is_burnable)
+-  [`#[view]`<br>Function `is_freezable_by_creator`](#0x4_aptos_token_is_freezable_by_creator)
+-  [`#[view]`<br>Function `is_mutable_description`](#0x4_aptos_token_is_mutable_description)
+-  [`#[view]`<br>Function `is_mutable_name`](#0x4_aptos_token_is_mutable_name)
+-  [`#[view]`<br>Function `is_mutable_uri`](#0x4_aptos_token_is_mutable_uri)
 -  [Function `authorized_borrow`](#0x4_aptos_token_authorized_borrow)
 -  [Function `burn`](#0x4_aptos_token_burn)
 -  [Function `freeze_transfer`](#0x4_aptos_token_freeze_transfer)
@@ -72,7 +72,7 @@ The key features are:
 
 <a name="0x4_aptos_token_AptosCollection"></a>
 
-## Resource `AptosCollection`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `AptosCollection`
 
 Storage state for managing the no-code Collection.
 
@@ -154,7 +154,7 @@ Storage state for managing the no-code Collection.
 
 <a name="0x4_aptos_token_AptosToken"></a>
 
-## Resource `AptosToken`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `AptosToken`
 
 Storage state for managing the no-code Token.
 
@@ -549,7 +549,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_are_properties_mutable"></a>
 
-## Function `are_properties_mutable`
+## `#[view]`<br>Function `are_properties_mutable`
 
 
 
@@ -574,7 +574,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_is_burnable"></a>
 
-## Function `is_burnable`
+## `#[view]`<br>Function `is_burnable`
 
 
 
@@ -598,7 +598,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_is_freezable_by_creator"></a>
 
-## Function `is_freezable_by_creator`
+## `#[view]`<br>Function `is_freezable_by_creator`
 
 
 
@@ -622,7 +622,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_is_mutable_description"></a>
 
-## Function `is_mutable_description`
+## `#[view]`<br>Function `is_mutable_description`
 
 
 
@@ -646,7 +646,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_is_mutable_name"></a>
 
-## Function `is_mutable_name`
+## `#[view]`<br>Function `is_mutable_name`
 
 
 
@@ -670,7 +670,7 @@ With an existing collection, directly mint a soul bound token into the recipient
 
 <a name="0x4_aptos_token_is_mutable_uri"></a>
 
-## Function `is_mutable_uri`
+## `#[view]`<br>Function `is_mutable_uri`
 
 
 

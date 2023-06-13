@@ -12,8 +12,8 @@ which reflect that the system has been successfully initialized.
 -  [Resource `GenesisEndMarker`](#0x1_chain_status_GenesisEndMarker)
 -  [Constants](#@Constants_0)
 -  [Function `set_genesis_end`](#0x1_chain_status_set_genesis_end)
--  [Function `is_genesis`](#0x1_chain_status_is_genesis)
--  [Function `is_operating`](#0x1_chain_status_is_operating)
+-  [`#[view]`<br>Function `is_genesis`](#0x1_chain_status_is_genesis)
+-  [`#[view]`<br>Function `is_operating`](#0x1_chain_status_is_operating)
 -  [Function `assert_operating`](#0x1_chain_status_assert_operating)
 -  [Function `assert_genesis`](#0x1_chain_status_assert_genesis)
 -  [Specification](#@Specification_1)
@@ -109,7 +109,7 @@ Marks that genesis has finished.
 
 <a name="0x1_chain_status_is_genesis"></a>
 
-## Function `is_genesis`
+## `#[view]`<br>Function `is_genesis`
 
 Helper function to determine if Aptos is in genesis state.
 
@@ -134,7 +134,7 @@ Helper function to determine if Aptos is in genesis state.
 
 <a name="0x1_chain_status_is_operating"></a>
 
-## Function `is_operating`
+## `#[view]`<br>Function `is_operating`
 
 Helper function to determine if Aptos is operating. This is
 the same as <code>!<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code> and is provided for convenience.

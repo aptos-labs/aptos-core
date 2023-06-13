@@ -23,11 +23,11 @@ require adding the field original_name.
 * Add aggregator support when added to framework
 
 
--  [Resource `Collection`](#0x4_collection_Collection)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Collection`](#0x4_collection_Collection)
 -  [Struct `MutatorRef`](#0x4_collection_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_collection_MutationEvent)
--  [Resource `FixedSupply`](#0x4_collection_FixedSupply)
--  [Resource `UnlimitedSupply`](#0x4_collection_UnlimitedSupply)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FixedSupply`](#0x4_collection_FixedSupply)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `UnlimitedSupply`](#0x4_collection_UnlimitedSupply)
 -  [Struct `BurnEvent`](#0x4_collection_BurnEvent)
 -  [Struct `MintEvent`](#0x4_collection_MintEvent)
 -  [Constants](#@Constants_0)
@@ -42,11 +42,11 @@ require adding the field original_name.
 -  [Function `generate_mutator_ref`](#0x4_collection_generate_mutator_ref)
 -  [Function `check_collection_exists`](#0x4_collection_check_collection_exists)
 -  [Function `borrow`](#0x4_collection_borrow)
--  [Function `count`](#0x4_collection_count)
--  [Function `creator`](#0x4_collection_creator)
--  [Function `description`](#0x4_collection_description)
--  [Function `name`](#0x4_collection_name)
--  [Function `uri`](#0x4_collection_uri)
+-  [`#[view]`<br>Function `count`](#0x4_collection_count)
+-  [`#[view]`<br>Function `creator`](#0x4_collection_creator)
+-  [`#[view]`<br>Function `description`](#0x4_collection_description)
+-  [`#[view]`<br>Function `name`](#0x4_collection_name)
+-  [`#[view]`<br>Function `uri`](#0x4_collection_uri)
 -  [Function `borrow_mut`](#0x4_collection_borrow_mut)
 -  [Function `set_description`](#0x4_collection_set_description)
 -  [Function `set_uri`](#0x4_collection_set_uri)
@@ -65,7 +65,7 @@ require adding the field original_name.
 
 <a name="0x4_collection_Collection"></a>
 
-## Resource `Collection`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Collection`
 
 Represents the common fields for a collection.
 
@@ -175,7 +175,7 @@ directly understand the behavior in a writeset.
 
 <a name="0x4_collection_FixedSupply"></a>
 
-## Resource `FixedSupply`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `FixedSupply`
 
 Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
 and adding events and supply tracking to a collection.
@@ -228,7 +228,7 @@ and adding events and supply tracking to a collection.
 
 <a name="0x4_collection_UnlimitedSupply"></a>
 
-## Resource `UnlimitedSupply`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `UnlimitedSupply`
 
 Unlimited supply tracker, this is useful for adding events and supply tracking to a collection.
 
@@ -882,7 +882,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 <a name="0x4_collection_count"></a>
 
-## Function `count`
+## `#[view]`<br>Function `count`
 
 Provides the count of the current selection if supply tracking is used
 
@@ -918,7 +918,7 @@ Provides the count of the current selection if supply tracking is used
 
 <a name="0x4_collection_creator"></a>
 
-## Function `creator`
+## `#[view]`<br>Function `creator`
 
 
 
@@ -942,7 +942,7 @@ Provides the count of the current selection if supply tracking is used
 
 <a name="0x4_collection_description"></a>
 
-## Function `description`
+## `#[view]`<br>Function `description`
 
 
 
@@ -966,7 +966,7 @@ Provides the count of the current selection if supply tracking is used
 
 <a name="0x4_collection_name"></a>
 
-## Function `name`
+## `#[view]`<br>Function `name`
 
 
 
@@ -990,7 +990,7 @@ Provides the count of the current selection if supply tracking is used
 
 <a name="0x4_collection_uri"></a>
 
-## Function `uri`
+## `#[view]`<br>Function `uri`
 
 
 

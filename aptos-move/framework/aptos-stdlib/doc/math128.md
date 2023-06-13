@@ -18,7 +18,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `log2_64`](#0x1_math128_log2_64)
 -  [Function `sqrt`](#0x1_math128_sqrt)
 -  [Function `ceil_div`](#0x1_math128_ceil_div)
--  [Function `assert_approx_the_same`](#0x1_math128_assert_approx_the_same)
+-  [`#[testonly]`<br>Function `assert_approx_the_same`](#0x1_math128_assert_approx_the_same)
 -  [Specification](#@Specification_1)
     -  [Function `max`](#@Specification_1_max)
     -  [Function `min`](#@Specification_1_min)
@@ -415,7 +415,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 <a name="0x1_math128_assert_approx_the_same"></a>
 
-## Function `assert_approx_the_same`
+## `#[testonly]`<br>Function `assert_approx_the_same`
 
 For functions that approximate a value it's useful to test a value is close
 to the most correct value up to last digit

@@ -10,7 +10,7 @@ This code provides a container for storing a chain id and functions to initializ
 
 -  [Resource `ChainId`](#0x1_chain_id_ChainId)
 -  [Function `initialize`](#0x1_chain_id_initialize)
--  [Function `get`](#0x1_chain_id_get)
+-  [`#[view]`<br>Function `get`](#0x1_chain_id_get)
 -  [Specification](#@Specification_0)
     -  [Function `initialize`](#@Specification_0_initialize)
     -  [Function `get`](#@Specification_0_get)
@@ -77,7 +77,7 @@ Publish the chain ID <code>id</code> of this instance under the SystemAddresses 
 
 <a name="0x1_chain_id_get"></a>
 
-## Function `get`
+## `#[view]`<br>Function `get`
 
 Return the chain ID of this instance.
 

@@ -10,7 +10,7 @@ token are:
 * Extensible framework for tokens
 
 
--  [Resource `Token`](#0x4_token_Token)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Token`](#0x4_token_Token)
 -  [Struct `BurnRef`](#0x4_token_BurnRef)
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
@@ -24,13 +24,13 @@ token are:
 -  [Function `generate_burn_ref`](#0x4_token_generate_burn_ref)
 -  [Function `address_from_burn_ref`](#0x4_token_address_from_burn_ref)
 -  [Function `borrow`](#0x4_token_borrow)
--  [Function `creator`](#0x4_token_creator)
--  [Function `collection_name`](#0x4_token_collection_name)
--  [Function `collection_object`](#0x4_token_collection_object)
--  [Function `description`](#0x4_token_description)
--  [Function `name`](#0x4_token_name)
--  [Function `uri`](#0x4_token_uri)
--  [Function `royalty`](#0x4_token_royalty)
+-  [`#[view]`<br>Function `creator`](#0x4_token_creator)
+-  [`#[view]`<br>Function `collection_name`](#0x4_token_collection_name)
+-  [`#[view]`<br>Function `collection_object`](#0x4_token_collection_object)
+-  [`#[view]`<br>Function `description`](#0x4_token_description)
+-  [`#[view]`<br>Function `name`](#0x4_token_name)
+-  [`#[view]`<br>Function `uri`](#0x4_token_uri)
+-  [`#[view]`<br>Function `royalty`](#0x4_token_royalty)
 -  [Function `borrow_mut`](#0x4_token_borrow_mut)
 -  [Function `burn`](#0x4_token_burn)
 -  [Function `set_description`](#0x4_token_set_description)
@@ -53,7 +53,7 @@ token are:
 
 <a name="0x4_token_Token"></a>
 
-## Resource `Token`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `Token`
 
 Represents the common fields to all tokens.
 
@@ -608,7 +608,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_creator"></a>
 
-## Function `creator`
+## `#[view]`<br>Function `creator`
 
 
 
@@ -632,7 +632,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_collection_name"></a>
 
-## Function `collection_name`
+## `#[view]`<br>Function `collection_name`
 
 
 
@@ -656,7 +656,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_collection_object"></a>
 
-## Function `collection_object`
+## `#[view]`<br>Function `collection_object`
 
 
 
@@ -680,7 +680,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_description"></a>
 
-## Function `description`
+## `#[view]`<br>Function `description`
 
 
 
@@ -704,7 +704,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_name"></a>
 
-## Function `name`
+## `#[view]`<br>Function `name`
 
 
 
@@ -728,7 +728,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_uri"></a>
 
-## Function `uri`
+## `#[view]`<br>Function `uri`
 
 
 
@@ -752,7 +752,7 @@ Extracts the tokens address from a BurnRef.
 
 <a name="0x4_token_royalty"></a>
 
-## Function `royalty`
+## `#[view]`<br>Function `royalty`
 
 
 

@@ -12,9 +12,9 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_block_initialize)
 -  [Function `update_epoch_interval_microsecs`](#0x1_block_update_epoch_interval_microsecs)
--  [Function `get_epoch_interval_secs`](#0x1_block_get_epoch_interval_secs)
+-  [`#[view]`<br>Function `get_epoch_interval_secs`](#0x1_block_get_epoch_interval_secs)
 -  [Function `block_prologue`](#0x1_block_block_prologue)
--  [Function `get_current_block_height`](#0x1_block_get_current_block_height)
+-  [`#[view]`<br>Function `get_current_block_height`](#0x1_block_get_current_block_height)
 -  [Function `emit_new_block_event`](#0x1_block_emit_new_block_event)
 -  [Function `emit_genesis_block_event`](#0x1_block_emit_genesis_block_event)
 -  [Function `emit_writeset_block_event`](#0x1_block_emit_writeset_block_event)
@@ -315,7 +315,7 @@ Can only be called as part of the Aptos governance proposal process established 
 
 <a name="0x1_block_get_epoch_interval_secs"></a>
 
-## Function `get_epoch_interval_secs`
+## `#[view]`<br>Function `get_epoch_interval_secs`
 
 Return epoch interval in seconds.
 
@@ -420,7 +420,7 @@ The runtime always runs this before executing the transactions in a block.
 
 <a name="0x1_block_get_current_block_height"></a>
 
-## Function `get_current_block_height`
+## `#[view]`<br>Function `get_current_block_height`
 
 Get the current block height
 

@@ -18,15 +18,15 @@ fungible asset from it. This emits an withdraw event.
 fungible asset to it. This emits an deposit event.
 
 
--  [Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
 -  [Function `create_primary_store_enabled_fungible_asset`](#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset)
 -  [Function `ensure_primary_store_exists`](#0x1_primary_fungible_store_ensure_primary_store_exists)
 -  [Function `create_primary_store`](#0x1_primary_fungible_store_create_primary_store)
--  [Function `primary_store_address`](#0x1_primary_fungible_store_primary_store_address)
--  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
--  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
--  [Function `balance`](#0x1_primary_fungible_store_balance)
--  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
+-  [`#[view]`<br>Function `primary_store_address`](#0x1_primary_fungible_store_primary_store_address)
+-  [`#[view]`<br>Function `primary_store`](#0x1_primary_fungible_store_primary_store)
+-  [`#[view]`<br>Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
+-  [`#[view]`<br>Function `balance`](#0x1_primary_fungible_store_balance)
+-  [`#[view]`<br>Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
@@ -44,7 +44,7 @@ fungible asset to it. This emits an deposit event.
 
 <a name="0x1_primary_fungible_store_DeriveRefPod"></a>
 
-## Resource `DeriveRefPod`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `DeriveRefPod`
 
 A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
 stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
@@ -190,7 +190,7 @@ Create a primary store object to hold fungible asset for the given address.
 
 <a name="0x1_primary_fungible_store_primary_store_address"></a>
 
-## Function `primary_store_address`
+## `#[view]`<br>Function `primary_store_address`
 
 Get the address of the primary store for the given account.
 
@@ -216,7 +216,7 @@ Get the address of the primary store for the given account.
 
 <a name="0x1_primary_fungible_store_primary_store"></a>
 
-## Function `primary_store`
+## `#[view]`<br>Function `primary_store`
 
 Get the primary store object for the given account.
 
@@ -242,7 +242,7 @@ Get the primary store object for the given account.
 
 <a name="0x1_primary_fungible_store_primary_store_exists"></a>
 
-## Function `primary_store_exists`
+## `#[view]`<br>Function `primary_store_exists`
 
 Return whether the given account's primary store exists.
 
@@ -267,7 +267,7 @@ Return whether the given account's primary store exists.
 
 <a name="0x1_primary_fungible_store_balance"></a>
 
-## Function `balance`
+## `#[view]`<br>Function `balance`
 
 Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s primary store.
 
@@ -296,7 +296,7 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 <a name="0x1_primary_fungible_store_is_frozen"></a>
 
-## Function `is_frozen`
+## `#[view]`<br>Function `is_frozen`
 
 Return whether the given account's primary store is frozen.
 

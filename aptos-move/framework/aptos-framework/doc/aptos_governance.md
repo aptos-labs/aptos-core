@@ -29,9 +29,9 @@ only be used to vote on each proposal exactly once.
 -  [Function `store_signer_cap`](#0x1_aptos_governance_store_signer_cap)
 -  [Function `initialize`](#0x1_aptos_governance_initialize)
 -  [Function `update_governance_config`](#0x1_aptos_governance_update_governance_config)
--  [Function `get_voting_duration_secs`](#0x1_aptos_governance_get_voting_duration_secs)
--  [Function `get_min_voting_threshold`](#0x1_aptos_governance_get_min_voting_threshold)
--  [Function `get_required_proposer_stake`](#0x1_aptos_governance_get_required_proposer_stake)
+-  [`#[view]`<br>Function `get_voting_duration_secs`](#0x1_aptos_governance_get_voting_duration_secs)
+-  [`#[view]`<br>Function `get_min_voting_threshold`](#0x1_aptos_governance_get_min_voting_threshold)
+-  [`#[view]`<br>Function `get_required_proposer_stake`](#0x1_aptos_governance_get_required_proposer_stake)
 -  [Function `create_proposal`](#0x1_aptos_governance_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_aptos_governance_create_proposal_v2)
 -  [Function `vote`](#0x1_aptos_governance_vote)
@@ -45,7 +45,7 @@ only be used to vote on each proposal exactly once.
 -  [Function `get_voting_power`](#0x1_aptos_governance_get_voting_power)
 -  [Function `get_signer`](#0x1_aptos_governance_get_signer)
 -  [Function `create_proposal_metadata`](#0x1_aptos_governance_create_proposal_metadata)
--  [Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
+-  [`#[verify_only]`<br>Function `initialize_for_verification`](#0x1_aptos_governance_initialize_for_verification)
 -  [Specification](#@Specification_1)
     -  [Function `store_signer_cap`](#@Specification_1_store_signer_cap)
     -  [Function `initialize`](#@Specification_1_initialize)
@@ -703,7 +703,7 @@ AptosGovernance.
 
 <a name="0x1_aptos_governance_get_voting_duration_secs"></a>
 
-## Function `get_voting_duration_secs`
+## `#[view]`<br>Function `get_voting_duration_secs`
 
 
 
@@ -727,7 +727,7 @@ AptosGovernance.
 
 <a name="0x1_aptos_governance_get_min_voting_threshold"></a>
 
-## Function `get_min_voting_threshold`
+## `#[view]`<br>Function `get_min_voting_threshold`
 
 
 
@@ -751,7 +751,7 @@ AptosGovernance.
 
 <a name="0x1_aptos_governance_get_required_proposer_stake"></a>
 
-## Function `get_required_proposer_stake`
+## `#[view]`<br>Function `get_required_proposer_stake`
 
 
 
@@ -1285,7 +1285,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 
 <a name="0x1_aptos_governance_initialize_for_verification"></a>
 
-## Function `initialize_for_verification`
+## `#[verify_only]`<br>Function `initialize_for_verification`
 
 
 

@@ -41,18 +41,18 @@ the resolution process.
 -  [Function `is_proposal_resolvable`](#0x1_voting_is_proposal_resolvable)
 -  [Function `resolve`](#0x1_voting_resolve)
 -  [Function `resolve_proposal_v2`](#0x1_voting_resolve_proposal_v2)
--  [Function `next_proposal_id`](#0x1_voting_next_proposal_id)
--  [Function `is_voting_closed`](#0x1_voting_is_voting_closed)
+-  [`#[view]`<br>Function `next_proposal_id`](#0x1_voting_next_proposal_id)
+-  [`#[view]`<br>Function `is_voting_closed`](#0x1_voting_is_voting_closed)
 -  [Function `can_be_resolved_early`](#0x1_voting_can_be_resolved_early)
--  [Function `get_proposal_state`](#0x1_voting_get_proposal_state)
--  [Function `get_proposal_creation_secs`](#0x1_voting_get_proposal_creation_secs)
--  [Function `get_proposal_expiration_secs`](#0x1_voting_get_proposal_expiration_secs)
--  [Function `get_execution_hash`](#0x1_voting_get_execution_hash)
--  [Function `get_min_vote_threshold`](#0x1_voting_get_min_vote_threshold)
--  [Function `get_early_resolution_vote_threshold`](#0x1_voting_get_early_resolution_vote_threshold)
--  [Function `get_votes`](#0x1_voting_get_votes)
--  [Function `is_resolved`](#0x1_voting_is_resolved)
--  [Function `is_multi_step_proposal_in_execution`](#0x1_voting_is_multi_step_proposal_in_execution)
+-  [`#[view]`<br>Function `get_proposal_state`](#0x1_voting_get_proposal_state)
+-  [`#[view]`<br>Function `get_proposal_creation_secs`](#0x1_voting_get_proposal_creation_secs)
+-  [`#[view]`<br>Function `get_proposal_expiration_secs`](#0x1_voting_get_proposal_expiration_secs)
+-  [`#[view]`<br>Function `get_execution_hash`](#0x1_voting_get_execution_hash)
+-  [`#[view]`<br>Function `get_min_vote_threshold`](#0x1_voting_get_min_vote_threshold)
+-  [`#[view]`<br>Function `get_early_resolution_vote_threshold`](#0x1_voting_get_early_resolution_vote_threshold)
+-  [`#[view]`<br>Function `get_votes`](#0x1_voting_get_votes)
+-  [`#[view]`<br>Function `is_resolved`](#0x1_voting_is_resolved)
+-  [`#[view]`<br>Function `is_multi_step_proposal_in_execution`](#0x1_voting_is_multi_step_proposal_in_execution)
 -  [Function `is_voting_period_over`](#0x1_voting_is_voting_period_over)
 -  [Specification](#@Specification_1)
     -  [Function `register`](#@Specification_1_register)
@@ -1101,7 +1101,7 @@ there are more yes votes than no. If either of these conditions is not met, this
 
 <a name="0x1_voting_next_proposal_id"></a>
 
-## Function `next_proposal_id`
+## `#[view]`<br>Function `next_proposal_id`
 
 Return the next unassigned proposal id
 
@@ -1127,7 +1127,7 @@ Return the next unassigned proposal id
 
 <a name="0x1_voting_is_voting_closed"></a>
 
-## Function `is_voting_closed`
+## `#[view]`<br>Function `is_voting_closed`
 
 
 
@@ -1184,7 +1184,7 @@ Return true if the proposal has reached early resolution threshold (if specified
 
 <a name="0x1_voting_get_proposal_state"></a>
 
-## Function `get_proposal_state`
+## `#[view]`<br>Function `get_proposal_state`
 
 Return the state of the proposal with given id.
 
@@ -1229,7 +1229,7 @@ Return the state of the proposal with given id.
 
 <a name="0x1_voting_get_proposal_creation_secs"></a>
 
-## Function `get_proposal_creation_secs`
+## `#[view]`<br>Function `get_proposal_creation_secs`
 
 Return the proposal's creation time.
 
@@ -1259,7 +1259,7 @@ Return the proposal's creation time.
 
 <a name="0x1_voting_get_proposal_expiration_secs"></a>
 
-## Function `get_proposal_expiration_secs`
+## `#[view]`<br>Function `get_proposal_expiration_secs`
 
 Return the proposal's expiration time.
 
@@ -1289,7 +1289,7 @@ Return the proposal's expiration time.
 
 <a name="0x1_voting_get_execution_hash"></a>
 
-## Function `get_execution_hash`
+## `#[view]`<br>Function `get_execution_hash`
 
 Return the proposal's execution hash.
 
@@ -1319,7 +1319,7 @@ Return the proposal's execution hash.
 
 <a name="0x1_voting_get_min_vote_threshold"></a>
 
-## Function `get_min_vote_threshold`
+## `#[view]`<br>Function `get_min_vote_threshold`
 
 Return the proposal's minimum vote threshold
 
@@ -1349,7 +1349,7 @@ Return the proposal's minimum vote threshold
 
 <a name="0x1_voting_get_early_resolution_vote_threshold"></a>
 
-## Function `get_early_resolution_vote_threshold`
+## `#[view]`<br>Function `get_early_resolution_vote_threshold`
 
 Return the proposal's early resolution minimum vote threshold (optionally set)
 
@@ -1379,7 +1379,7 @@ Return the proposal's early resolution minimum vote threshold (optionally set)
 
 <a name="0x1_voting_get_votes"></a>
 
-## Function `get_votes`
+## `#[view]`<br>Function `get_votes`
 
 Return the proposal's current vote count (yes_votes, no_votes)
 
@@ -1409,7 +1409,7 @@ Return the proposal's current vote count (yes_votes, no_votes)
 
 <a name="0x1_voting_is_resolved"></a>
 
-## Function `is_resolved`
+## `#[view]`<br>Function `is_resolved`
 
 Return true if the governance proposal has already been resolved.
 
@@ -1439,7 +1439,7 @@ Return true if the governance proposal has already been resolved.
 
 <a name="0x1_voting_is_multi_step_proposal_in_execution"></a>
 
-## Function `is_multi_step_proposal_in_execution`
+## `#[view]`<br>Function `is_multi_step_proposal_in_execution`
 
 Return true if the multi-step governance proposal is in execution.
 

@@ -17,7 +17,7 @@
 -  [Function `assert_account_exists`](#0x1_aptos_account_assert_account_exists)
 -  [Function `assert_account_is_registered_for_apt`](#0x1_aptos_account_assert_account_is_registered_for_apt)
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
--  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
+-  [`#[view]`<br>Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Specification](#@Specification_1)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
@@ -455,7 +455,7 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 <a name="0x1_aptos_account_can_receive_direct_coin_transfers"></a>
 
-## Function `can_receive_direct_coin_transfers`
+## `#[view]`<br>Function `can_receive_direct_coin_transfers`
 
 Return true if <code><a href="account.md#0x1_account">account</a></code> can receive direct transfers of coins that they have not explicitly registered to
 receive.

@@ -21,7 +21,7 @@
 -  [Function `create_initialize_validator`](#0x1_genesis_create_initialize_validator)
 -  [Function `initialize_validator`](#0x1_genesis_initialize_validator)
 -  [Function `set_genesis_end`](#0x1_genesis_set_genesis_end)
--  [Function `initialize_for_verification`](#0x1_genesis_initialize_for_verification)
+-  [`#[verify_only]`<br>Function `initialize_for_verification`](#0x1_genesis_initialize_for_verification)
 -  [Specification](#@Specification_1)
     -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
@@ -827,7 +827,7 @@ The last step of genesis.
 
 <a name="0x1_genesis_initialize_for_verification"></a>
 
-## Function `initialize_for_verification`
+## `#[verify_only]`<br>Function `initialize_for_verification`
 
 
 

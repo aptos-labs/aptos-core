@@ -21,8 +21,8 @@ TODO:
 make it so that a reference to a global object can be returned from a function.
 
 
--  [Resource `ObjectCore`](#0x1_object_ObjectCore)
--  [Struct `ObjectGroup`](#0x1_object_ObjectGroup)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `ObjectCore`](#0x1_object_ObjectCore)
+-  [`#[resource_group(scope = global)]`<br>Struct `ObjectGroup`](#0x1_object_ObjectGroup)
 -  [Struct `Object`](#0x1_object_Object)
 -  [Struct `ConstructorRef`](#0x1_object_ConstructorRef)
 -  [Struct `DeleteRef`](#0x1_object_DeleteRef)
@@ -94,7 +94,7 @@ make it so that a reference to a global object can be returned from a function.
 
 <a name="0x1_object_ObjectCore"></a>
 
-## Resource `ObjectCore`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `ObjectCore`
 
 The core of the object model that defines ownership, transferability, and events.
 
@@ -141,7 +141,7 @@ The core of the object model that defines ownership, transferability, and events
 
 <a name="0x1_object_ObjectGroup"></a>
 
-## Struct `ObjectGroup`
+## `#[resource_group(scope = global)]`<br>Struct `ObjectGroup`
 
 A shared resource group for storing object resources together in storage.
 

@@ -31,11 +31,11 @@ pool.
 55 coins become 70 coins. Calling distribute() distributes 6 coins to the operator and 64 coins to the validator.
 
 
--  [Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
+-  [`#[resource_group(scope = module_)]`<br>Struct `StakingGroupContainer`](#0x1_staking_contract_StakingGroupContainer)
 -  [Struct `StakingContract`](#0x1_staking_contract_StakingContract)
 -  [Resource `Store`](#0x1_staking_contract_Store)
 -  [Struct `UpdateCommissionEvent`](#0x1_staking_contract_UpdateCommissionEvent)
--  [Resource `StakingGroupUpdateCommissionEvent`](#0x1_staking_contract_StakingGroupUpdateCommissionEvent)
+-  [`#[resource_group_member(group = 0x1::staking_contract::StakingGroupContainer)]`<br>Resource `StakingGroupUpdateCommissionEvent`](#0x1_staking_contract_StakingGroupUpdateCommissionEvent)
 -  [Struct `CreateStakingContractEvent`](#0x1_staking_contract_CreateStakingContractEvent)
 -  [Struct `UpdateVoterEvent`](#0x1_staking_contract_UpdateVoterEvent)
 -  [Struct `ResetLockupEvent`](#0x1_staking_contract_ResetLockupEvent)
@@ -46,12 +46,12 @@ pool.
 -  [Struct `AddDistributionEvent`](#0x1_staking_contract_AddDistributionEvent)
 -  [Struct `DistributeEvent`](#0x1_staking_contract_DistributeEvent)
 -  [Constants](#@Constants_0)
--  [Function `stake_pool_address`](#0x1_staking_contract_stake_pool_address)
--  [Function `last_recorded_principal`](#0x1_staking_contract_last_recorded_principal)
--  [Function `commission_percentage`](#0x1_staking_contract_commission_percentage)
--  [Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
--  [Function `pending_distribution_counts`](#0x1_staking_contract_pending_distribution_counts)
--  [Function `staking_contract_exists`](#0x1_staking_contract_staking_contract_exists)
+-  [`#[view]`<br>Function `stake_pool_address`](#0x1_staking_contract_stake_pool_address)
+-  [`#[view]`<br>Function `last_recorded_principal`](#0x1_staking_contract_last_recorded_principal)
+-  [`#[view]`<br>Function `commission_percentage`](#0x1_staking_contract_commission_percentage)
+-  [`#[view]`<br>Function `staking_contract_amounts`](#0x1_staking_contract_staking_contract_amounts)
+-  [`#[view]`<br>Function `pending_distribution_counts`](#0x1_staking_contract_pending_distribution_counts)
+-  [`#[view]`<br>Function `staking_contract_exists`](#0x1_staking_contract_staking_contract_exists)
 -  [Function `create_staking_contract`](#0x1_staking_contract_create_staking_contract)
 -  [Function `create_staking_contract_with_coins`](#0x1_staking_contract_create_staking_contract_with_coins)
 -  [Function `add_stake`](#0x1_staking_contract_add_stake)
@@ -119,7 +119,7 @@ pool.
 
 <a name="0x1_staking_contract_StakingGroupContainer"></a>
 
-## Struct `StakingGroupContainer`
+## `#[resource_group(scope = module_)]`<br>Struct `StakingGroupContainer`
 
 
 
@@ -329,7 +329,7 @@ pool.
 
 <a name="0x1_staking_contract_StakingGroupUpdateCommissionEvent"></a>
 
-## Resource `StakingGroupUpdateCommissionEvent`
+## `#[resource_group_member(group = 0x1::staking_contract::StakingGroupContainer)]`<br>Resource `StakingGroupUpdateCommissionEvent`
 
 
 
@@ -841,7 +841,7 @@ Maximum number of distributions a stake pool can support.
 
 <a name="0x1_staking_contract_stake_pool_address"></a>
 
-## Function `stake_pool_address`
+## `#[view]`<br>Function `stake_pool_address`
 
 Return the address of the underlying stake pool for the staking contract between the provided staker and
 operator.
@@ -871,7 +871,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <a name="0x1_staking_contract_last_recorded_principal"></a>
 
-## Function `last_recorded_principal`
+## `#[view]`<br>Function `last_recorded_principal`
 
 Return the last recorded principal (the amount that 100% belongs to the staker with commission already paid for)
 for staking contract between the provided staker and operator.
@@ -901,7 +901,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <a name="0x1_staking_contract_commission_percentage"></a>
 
-## Function `commission_percentage`
+## `#[view]`<br>Function `commission_percentage`
 
 Return percentage of accumulated rewards that will be paid to the operator as commission for staking contract
 between the provided staker and operator.
@@ -931,7 +931,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <a name="0x1_staking_contract_staking_contract_amounts"></a>
 
-## Function `staking_contract_amounts`
+## `#[view]`<br>Function `staking_contract_amounts`
 
 Return a tuple of three numbers:
 1. The total active stake in the underlying stake pool
@@ -964,7 +964,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <a name="0x1_staking_contract_pending_distribution_counts"></a>
 
-## Function `pending_distribution_counts`
+## `#[view]`<br>Function `pending_distribution_counts`
 
 Return the number of pending distributions (e.g. commission, withdrawals from stakers).
 
@@ -993,7 +993,7 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <a name="0x1_staking_contract_staking_contract_exists"></a>
 
-## Function `staking_contract_exists`
+## `#[view]`<br>Function `staking_contract_exists`
 
 Return true if the staking contract between the provided staker and operator exists.
 

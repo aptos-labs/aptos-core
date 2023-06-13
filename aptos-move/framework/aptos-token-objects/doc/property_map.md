@@ -8,7 +8,7 @@
 represent types and storing values in bcs format.
 
 
--  [Resource `PropertyMap`](#0x4_property_map_PropertyMap)
+-  [`#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `PropertyMap`](#0x4_property_map_PropertyMap)
 -  [Struct `PropertyValue`](#0x4_property_map_PropertyValue)
 -  [Struct `MutatorRef`](#0x4_property_map_MutatorRef)
 -  [Constants](#@Constants_0)
@@ -58,7 +58,7 @@ represent types and storing values in bcs format.
 
 <a name="0x4_property_map_PropertyMap"></a>
 
-## Resource `PropertyMap`
+## `#[resource_group_member(group = 0x1::object::ObjectGroup)]`<br>Resource `PropertyMap`
 
 A Map for typed key to value mapping, the contract using it
 should keep track of what keys are what types, and parse them accordingly.
