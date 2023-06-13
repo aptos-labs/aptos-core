@@ -1,0 +1,14 @@
+//# run --signers 0x1 --check-runtime-types
+main(account: signer) {
+    let c: u64;
+    let c_ref: &mut u64;
+    let c2_ref: &mut u64;
+
+label b0:
+    c = 10;
+    c_ref = &mut c;
+    c2_ref = copy(c_ref);
+
+    *move(c2_ref) = 1;
+    return;
+}

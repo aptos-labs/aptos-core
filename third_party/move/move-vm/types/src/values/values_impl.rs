@@ -1081,16 +1081,6 @@ impl Locals {
         match v.get_mut(idx) {
             Some(v) => {
                 if violation_check {
-                    if let ValueImpl::Container(c) = v {
-                        if c.rc_count() > 1 {
-                            return Err(PartialVMError::new(
-                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            )
-                            .with_message(
-                                "moving container with dangling references".to_string(),
-                            ));
-                        }
-                    }
                     // only check top-level as this might happen many times for a single big value
                     v.top_level_check_refs_before_move()?;
                 }

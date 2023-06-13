@@ -1,0 +1,35 @@
+//# publish
+module 0x2.A {
+  struct C has drop { x: Self.D }
+  struct D has drop { x: u64 }
+
+  public make(): Self.C {
+    let d: Self.D;
+  label b0:
+    d = D { x: 0 };
+    return C { x: move(d) };
+  }
+
+  public mutate(c: &mut Self.C): &mut u64 {
+    let d_ref: &mut Self.D;
+  label b0:
+    d_ref = &mut move(c).C::x;
+    return &mut move(d_ref).D::x;
+  }
+}
+
+//# run --signers 0x1 --check-runtime-types
+import 0x2.A;
+main(account: signer) {
+    let c: A.C;
+    let c_ref_mut: &mut u64;
+    let b: A.C;
+
+label b0:
+    c = A.make();
+    c_ref_mut = A.mutate(&mut c);
+    // Storing would fail here as there's a reference to the inner field.
+    b = move(c);
+
+    return;
+}

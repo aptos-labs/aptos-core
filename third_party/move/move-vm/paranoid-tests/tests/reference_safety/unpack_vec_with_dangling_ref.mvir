@@ -1,0 +1,56 @@
+//# publish --syntax=move
+module 0x1::test {
+    struct Balance has drop {
+        value: u64
+    }
+    public fun balance_create(value: u64): Balance {
+        Balance { value }
+    }
+    public fun balance_value(balance: &Balance): u64 {
+        balance.value
+    }
+    public fun pay_debt(balance: Balance) {
+        assert!(balance.value >= 100, 234);
+        // Here we are dropping the balance
+        // In reality it would be transferred, the payment marked as done, etc
+    }
+    public fun balance_split(self: &mut Balance, value: u64): Balance {
+        assert!(self.value >= value, 123);
+        self.value = self.value - value;
+        Balance { value }
+    }
+}
+//# run
+import 0x1.test;
+main() {
+    let v: vector<test.Balance>;
+    let bal: test.Balance;
+label padding:
+    jump end;
+    return;
+    // [padding returns]
+    return;
+label start:
+    bal = test.balance_create(100);
+    v = vec_pack_1<test.Balance>(move(bal));
+    // Stack at this point: <empty>
+    // Pushes a mutable reference to the balance on the stack
+    vec_mut_borrow<test.Balance>(&mut v, 0);
+    // Stack at this point: &mut balance
+    // Pushes the balance instance by unpacking the vector
+
+    // Unpack would fail here as it will push value with dangling reference onto stack.
+    vec_unpack_1<test.Balance>(move(v));
+    // Stack at this point: &mut balance, balance
+    // Pay something (implicitly using the balance on top of the stack as argument)
+    test.pay_debt();
+    // Stack at this point: &mut balance
+    // We still have the mutable reference to the balance, let's steal from it
+    (100);                          // Push 100 on the stack
+    bal = test.balance_split();
+    // Stack at this point: <empty>
+    assert(test.balance_value(&bal) == 100, 567);
+    return;
+label end:
+    jump start;
+}

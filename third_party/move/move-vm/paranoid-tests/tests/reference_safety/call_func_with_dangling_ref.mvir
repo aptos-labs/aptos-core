@@ -1,0 +1,50 @@
+//# publish
+module 0x2.A {
+  struct C has drop { x: Self.D }
+  struct D has drop { x: vector<u64> }
+
+  public make(d: Self.D): Self.C {
+  label b0:
+    return C { x: move(d) };
+  }
+
+  public make_d(): Self.D {
+    let x: vector<u64>;
+  label b0:
+    x = vec_pack_1<u64>(0);
+    return D { x: move(x) };
+  }
+
+  public borrow_d(c: &mut Self.C): &mut Self.D {
+  label b0:
+    return &mut move(c).C::x;
+  }
+
+  public borrow_d_inner(d: &mut Self.D): &mut u64 {
+    let v_ref: &mut u64;
+  label b0:
+    v_ref = vec_mut_borrow<u64>(&mut move(d).D::x, 0);
+    return move(v_ref);
+  }
+}
+
+//# run --signers 0x1 --check-runtime-types
+import 0x2.A;
+main(account: signer) {
+    let c: A.C;
+    let c_ref_mut: &mut A.D;
+    let d_ref_mut: &mut u64;
+    let d: A.D;
+    let d2: A.D;
+
+label b0:
+    d = A.make_d();
+    d_ref_mut = A.borrow_d_inner(&mut d);
+
+    c = A.make(move(d));
+    
+    // Call instruction would fail as c has inner dangling reference still alive.
+    c_ref_mut = A.borrow_d(&mut c);
+
+    return;
+}
