@@ -82,7 +82,7 @@ pub fn mempool_network_configuration(node_config: &NodeConfig) -> NetworkApplica
 
 /// Returns the network application config for the peer monitoring client and server
 pub fn peer_monitoring_network_configuration(node_config: &NodeConfig) -> NetworkApplicationConfig {
-    let direct_send_protocols = vec![ProtocolId::PeerMonitoringDirectSend]; // The monitoring service does not use direct send
+    let direct_send_protocols = vec![ProtocolId::PeerMonitoringDirectSend];
     let rpc_protocols = vec![ProtocolId::PeerMonitoringServiceRpc];
     let max_network_channel_size =
         node_config.peer_monitoring_service.max_network_channel_size as usize;

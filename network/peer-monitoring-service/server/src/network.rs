@@ -29,6 +29,7 @@ pub struct NetworkRequest {
 
 /// A stream of requests from the network. Each request also comes with a
 /// callback to send the response.
+/// TODO: UNUSED? DEAD CODE?
 pub struct PeerMonitoringServiceNetworkEvents {
     network_request_stream: BoxStream<'static, NetworkRequest>,
 }

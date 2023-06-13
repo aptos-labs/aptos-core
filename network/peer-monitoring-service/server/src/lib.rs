@@ -6,7 +6,6 @@
 use crate::{
     logging::{LogEntry, LogSchema},
     metrics::{increment_counter, start_timer},
-    // network::PeerMonitoringServiceNetworkEvents,
     storage::StorageReaderInterface,
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -50,7 +49,6 @@ pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
 pub struct PeerMonitoringServiceServer<T> {
     base_config: BaseConfig,
     bounded_executor: BoundedExecutor,
-    //network_requests: NetworkServiceEvents<PeerMonitoringServiceMessage>,//PeerMonitoringServiceNetworkEvents,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
@@ -62,7 +60,6 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
     pub fn new(
         node_config: NodeConfig,
         executor: Handle,
-        //network_requests: NetworkServiceEvents<PeerMonitoringServiceMessage>, //PeerMonitoringServiceNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
         storage: T,
         time_service: TimeService,
@@ -78,7 +75,6 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         Self {
             base_config,
             bounded_executor,
-            //network_requests,
             peers_and_metadata,
             start_time,
             storage,
@@ -100,7 +96,6 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
             .collect();
         let mut network_events = futures::stream::select_all(network_events).fuse();
         // Handle the service requests
-        // while let Some(network_request) = self.network_requests.next().await {
         loop {
             let (network_id, event) = match network_events.next().await {
                 None => { return; }  // fused stream will never return more
@@ -110,8 +105,8 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                 Event::Message(peer_id, msg_wrapper) => {
                     // TODO: counters, note blob size and increment message counter
                     match msg_wrapper {
-                        PeerMonitoringServiceMessage::Request(_) => {}
-                        PeerMonitoringServiceMessage::Response(_) => {}
+                        PeerMonitoringServiceMessage::Request(_) => {}  // TODO: log/count err?
+                        PeerMonitoringServiceMessage::Response(_) => {}  // TODO: log/count err?
                         PeerMonitoringServiceMessage::DirectNetPerformance(msg) => {
                             if msg.data.is_empty() {
                                 // this is a reply, note the request_counter got back and round trip time
@@ -145,8 +140,8 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                         PeerMonitoringServiceMessage::Request(request) => {
                             self.handle_rpc(network_id, peer_id, request, protocol_id, sender).await;
                         }
-                        PeerMonitoringServiceMessage::Response(_) => {}
-                        PeerMonitoringServiceMessage::DirectNetPerformance(_) => {}
+                        PeerMonitoringServiceMessage::Response(_) => {}  // TODO: log/count err?
+                        PeerMonitoringServiceMessage::DirectNetPerformance(_) => {}  // TODO: log/count err?
                     };
                 }
                 Event::NewPeer(_) => {}  // don't care
@@ -163,10 +158,6 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                             sender: oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
             // Log the request
-            //let peer_network_id = network_request.peer_network_id;
-            //let peer_monitoring_service_request = network_request.peer_monitoring_service_request;
-            //let response_sender = network_request.response_sender;
-            //let response_sender = sender;
             trace!(LogSchema::new(LogEntry::ReceivedPeerMonitoringRequest)
                 .request(&peer_monitoring_service_request)
                 .message(&format!(

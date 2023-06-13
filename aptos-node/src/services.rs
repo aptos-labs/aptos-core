@@ -13,7 +13,7 @@ use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRe
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
 use aptos_peer_monitoring_service_server::{
-    network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
+    storage::StorageReader,
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::{PeerMonitoringServiceMessage, PeerMonitoringSharedState};
@@ -146,7 +146,6 @@ pub fn start_peer_monitoring_service(
 ) -> Runtime {
     // Get the network client and events
     let network_client = network_interfaces.network_client;
-    //let network_service_events = network_interfaces.network_service_events;
 
     // Create a new runtime for the monitoring service
     let peer_monitoring_service_runtime =
@@ -154,12 +153,9 @@ pub fn start_peer_monitoring_service(
 
     let shared = Arc::new(RwLock::new(PeerMonitoringSharedState::new()));
     // Create and spawn the peer monitoring server
-    // let peer_monitoring_network_events =
-    //     PeerMonitoringServiceNetworkEvents::new(network_service_events);
     let peer_monitoring_server = PeerMonitoringServiceServer::new(
         node_config.clone(),
         peer_monitoring_service_runtime.handle().clone(),
-        // network_interfaces.network_service_events, //peer_monitoring_network_events,
         network_client.get_peers_and_metadata(),
         StorageReader::new(db_reader),
         TimeService::real(),

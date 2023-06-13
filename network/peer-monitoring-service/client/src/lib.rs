@@ -14,16 +14,16 @@ use aptos_logger::{info, warn};
 use aptos_network::application::{
     interface::NetworkClient, metadata::PeerMetadata, storage::PeersAndMetadata,
 };
-use aptos_peer_monitoring_service_types::{DirectNetPerformanceMessage, PeerMonitoringMetadata, PeerMonitoringServiceMessage, PeerMonitoringSharedState, SendRecord};
+use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage, PeerMonitoringSharedState};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::StreamExt;
 use network::PeerMonitoringServiceClient;
 use peer_states::peer_state::PeerState;
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use std::ops::DerefMut;
-use rand::Rng;
-use rand::rngs::OsRng;
+//use std::ops::DerefMut;
+//use rand::Rng;
+//use rand::rngs::OsRng;
 use thiserror::Error;
 use tokio::{runtime::Handle, task::JoinHandle};
 
@@ -101,7 +101,7 @@ async fn start_peer_monitor_with_state(
     peer_monitor_state: PeerMonitorState,
     time_service: TimeService,
     runtime: Option<Handle>,
-    shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
+    _shared: Arc<std::sync::RwLock<PeerMonitoringSharedState>>,
 ) {
     // Get the peers and metadata
     let peers_and_metadata = peer_monitoring_client.get_peers_and_metadata();
