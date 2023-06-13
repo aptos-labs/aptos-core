@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 mod proptest_types;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Value(Vec<u32>);
 
 impl TransactionWrite for Value {

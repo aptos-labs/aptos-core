@@ -20,6 +20,7 @@ use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     unsync_map::UnsyncMap,
     MVHashMap,
+    versioned_data::EntryCell
 };
 use aptos_state_view::TStateView;
 use aptos_types::{executable::Executable, write_set::WriteOp};
@@ -298,6 +299,21 @@ where
     ) {
         let (num_deltas, delta_keys) = last_input_output.delta_keys(txn_idx);
         let mut delta_writes = Vec::with_capacity(num_deltas);
+        let resolved_promises = Vec::new();
+        
+        // Resolve all the aggregator snapshots (derived aggregators). 
+        // The DeltaOps corresponding to aggregator snapshots 
+        for k in delta_keys {
+            versioned_cache.get_delta_value(&k, txn_idx).map(|entry_cell| {
+                if let EntryCell::Delta(delta_op, _) = entry_cell {
+                    println!("Delta Op in worker commit hook {:?}", entry_cell);
+                    if !matches!(delta_op.base_aggregator(), Some(base_aggregator)) {
+                        println!("Didn't match");
+                    }
+                }
+            });
+        }
+
         for k in delta_keys {
             // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up

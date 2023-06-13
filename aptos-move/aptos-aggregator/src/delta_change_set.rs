@@ -67,6 +67,10 @@ impl DeltaOp {
         self.update
     }
 
+    pub fn base_aggregator(&self) -> Option<AggregatorID> {
+        self.base_aggregator
+    }
+
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {

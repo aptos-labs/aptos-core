@@ -4,7 +4,7 @@
 
 use crate::{
     types::{MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex, Version},
-    versioned_data::VersionedData,
+    versioned_data::{EntryCell, VersionedData},
     versioned_modules::VersionedModules,
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
@@ -33,12 +33,12 @@ mod unit_tests;
 ///
 /// TODO: separate V into different generic types for data and code modules with specialized
 /// traits (currently both WriteOp for executor).
-pub struct MVHashMap<K, V: TransactionWrite, X: Executable> {
+pub struct MVHashMap<K, V: TransactionWrite + Clone, X: Executable> {
     data: VersionedData<K, V>,
     modules: VersionedModules<K, V, X>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executable>
+impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite + Clone, X: Executable>
     MVHashMap<K, V, X>
 {
     // -----------------------------------
@@ -104,6 +104,15 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
         self.data.materialize_delta(key, txn_idx)
     }
 
+    pub fn get_delta_value(&self, key: &K, txn_idx: TxnIndex) -> Result<EntryCell<V>, ()> {
+        debug_assert!(
+            key.module_path().is_none(),
+            "Delta must be stored at a path corresponding to data"
+        );
+
+        self.data.get_value(key, txn_idx)
+    }
+
     pub fn set_aggregator_base_value(&self, key: &K, value: u128) {
         debug_assert!(
             key.module_path().is_none(),
@@ -145,7 +154,7 @@ impl<K: ModulePath + Hash + Clone + Eq + Debug, V: TransactionWrite, X: Executab
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Debug + Eq, V: TransactionWrite, X: Executable> Default
+impl<K: ModulePath + Hash + Clone + Debug + Eq, V: TransactionWrite + Clone, X: Executable> Default
     for MVHashMap<K, V, X>
 {
     fn default() -> Self {

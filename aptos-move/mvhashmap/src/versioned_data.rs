@@ -11,7 +11,7 @@ use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
-struct Entry<V> {
+pub struct Entry<V: Clone> {
     /// Actual contents.
     cell: EntryCell<V>,
 
@@ -20,7 +20,8 @@ struct Entry<V> {
 }
 
 /// Represents the content of a single entry in multi-version data-structure.
-enum EntryCell<V> {
+#[derive(Clone)]
+pub enum EntryCell<V: Clone> {
     /// Recorded in the shared multi-version data-structure for each write. It
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
@@ -37,7 +38,7 @@ enum EntryCell<V> {
 /// that update the given access path alongside the corresponding entries. It may
 /// also contain a base value (value from storage) as u128 if the key corresponds
 /// to an aggregator.
-struct VersionedValue<V> {
+struct VersionedValue<V: Clone> {
     versioned_map: BTreeMap<TxnIndex, CachePadded<Entry<V>>>,
 
     // An aggregator value from storage can be here to avoid redundant storage calls.
@@ -45,11 +46,11 @@ struct VersionedValue<V> {
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
-pub struct VersionedData<K, V> {
+pub struct VersionedData<K, V: Clone> {
     values: DashMap<K, VersionedValue<V>>,
 }
 
-impl<V> Entry<V> {
+impl<V: Clone> Entry<V> {
     fn new_write_from(incarnation: Incarnation, data: V) -> Entry<V> {
         Entry {
             cell: EntryCell::Write(incarnation, Arc::new(data)),
@@ -90,7 +91,7 @@ impl<V> Entry<V> {
     }
 }
 
-impl<V: TransactionWrite> VersionedValue<V> {
+impl<V: TransactionWrite + Clone> VersionedValue<V> {
     fn new() -> Self {
         Self {
             versioned_map: BTreeMap::new(),
@@ -195,15 +196,23 @@ impl<V: TransactionWrite> VersionedValue<V> {
             None => Err(NotFound),
         }
     }
+
+    pub fn get_value(&self, txn_idx: TxnIndex) -> Result<EntryCell<V>,()> {
+        let entry = self.versioned_map.get(&txn_idx);
+        if entry.is_none() || entry.unwrap().flag() == Flag::Estimate {
+            return Err(());
+        }
+        Ok(entry.unwrap().cell.clone())
+    }
 }
 
-impl<V: TransactionWrite> Default for VersionedValue<V> {
+impl<V: TransactionWrite + Clone> Default for VersionedValue<V> {
     fn default() -> Self {
         VersionedValue::new()
     }
 }
 
-impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
+impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + Clone> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
@@ -268,6 +277,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                 true
             }
         }));
+    }
+
+    pub fn get_value(&self, key: &K, txn_idx: TxnIndex) -> Result<EntryCell<V>, ()> {
+        self.values.get(key).expect("Path must exist").get_value(txn_idx)
     }
 
     // When a transaction is committed, this method can be called for its delta outputs to add

@@ -43,7 +43,8 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
-struct Value<V>(Option<V>);
+#[derive(Clone)]
+struct Value<V: Clone>(Option<V>);
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
@@ -65,11 +66,11 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     }
 }
 
-enum Data<V> {
+enum Data<V: Clone> {
     Write(Value<V>),
     Delta(DeltaOp),
 }
-struct Baseline<K, V>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
+struct Baseline<K, V: Clone>(HashMap<K, BTreeMap<TxnIndex, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
