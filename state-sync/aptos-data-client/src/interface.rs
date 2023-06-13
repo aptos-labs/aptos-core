@@ -315,6 +315,7 @@ impl TryFrom<TransactionOrOutputListWithProof> for ResponsePayload {
 }
 
 pub trait AptosPeersInterface: Send + Sync {
+    /// Returns metadata for all peers currently connected to the node
     fn get_connected_peers_and_metadata(
         &self,
     ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, aptos_network::application::error::Error>;

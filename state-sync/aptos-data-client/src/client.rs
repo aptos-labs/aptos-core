@@ -678,10 +678,7 @@ impl AptosPeersInterface for AptosDataClient {
         &self,
     ) -> Result<HashMap<PeerNetworkId, PeerMetadata>, aptos_network::application::error::Error>
     {
-        self.peer_states
-            .read()
-            .get_peers_and_metadata()
-            .get_connected_peers_and_metadata()
+        self.peer_states.read().get_connected_peers_and_metadata()
     }
 }
 

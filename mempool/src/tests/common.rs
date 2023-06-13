@@ -217,7 +217,6 @@ pub fn decompress_and_deserialize(message_bytes: &Vec<u8>) -> MempoolSyncMsg {
     .unwrap()
 }
 
-// TODO: belongs in common?
 pub struct PeersAndMetadataPeers {
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
