@@ -3,7 +3,8 @@
 
 use crate::common::{
     types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        account_address_from_auth_key, account_address_from_public_key,
+        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
         ConfigSearchMode, EncodingOptions, EncodingType, ExtractPublicKey, ParsePrivateKey,
         ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions, RotationProofChallenge,
         TransactionOptions, TransactionSummary,
@@ -20,7 +21,10 @@ use aptos_rest_client::{
     error::{AptosErrorResponse, RestError},
     Client,
 };
-use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
+use aptos_types::{
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    transaction::authenticator::AuthenticationKey,
+};
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -260,12 +264,20 @@ pub struct LookupAddress {
 
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
+
+    #[clap(flatten)]
+    pub(crate) authentication_key_options: AuthenticationKeyInputOptions,
 }
 
 impl LookupAddress {
     pub(crate) fn public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
         self.public_key_options
             .extract_public_key(self.encoding_options.encoding, &self.profile_options)
+    }
+
+    pub(crate) fn auth_key(&self) -> CliTypedResult<Option<AuthenticationKey>> {
+        self.authentication_key_options
+            .extract_auth_key(self.encoding_options.encoding)
     }
 
     /// Builds a rest client
@@ -284,7 +296,10 @@ impl CliCommand<AccountAddress> for LookupAddress {
         let rest_client = self.rest_client()?;
 
         // TODO: Support arbitrary auth key to support other types like multie25519
-        let address = account_address_from_public_key(&self.public_key()?);
+        let address = match self.auth_key()? {
+            Some(key) => account_address_from_auth_key(&key),
+            None => account_address_from_public_key(&self.public_key()?),
+        };
         Ok(lookup_address(&rest_client, address, true).await?)
     }
 }

@@ -164,7 +164,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let output1 = executor
         .execute_block(
-            (block1_id, block1.clone()),
+            (block1_id, block1.clone()).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -375,7 +375,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Execute block 2, 3, 4
     let output2 = executor
-        .execute_block((block2_id, block2), epoch2_genesis_id, BLOCK_GAS_LIMIT)
+        .execute_block(
+            (block2_id, block2).into(),
+            epoch2_genesis_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, &[signer.clone()]);
     let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
@@ -391,7 +395,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let output3 = executor
         .execute_block(
-            (block3_id, block3.clone()),
+            (block3_id, block3.clone()).into(),
             epoch3_genesis_id,
             BLOCK_GAS_LIMIT,
         )

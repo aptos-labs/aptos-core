@@ -35,7 +35,7 @@ import {
   Uint64,
   AnyNumber,
 } from "../bcs";
-import { Ed25519PublicKey, MultiEd25519PublicKey } from "../aptos_types";
+import { Ed25519PublicKey, MultiEd25519PublicKey, RawTransaction } from "../aptos_types";
 
 export interface OptionalTransactionArgs {
   maxGasAmount?: Uint64;
@@ -740,6 +740,19 @@ export class AptosClient {
     const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
     return pendingTransaction.hash;
     // <:!:generateSignSubmitTransactionInner
+  }
+
+  /**
+   * Helper for signing and submitting a transaction.
+   *
+   * @param sender AptosAccount of transaction sender.
+   * @param transaction A generated Raw transaction payload.
+   * @returns The transaction response from the API.
+   */
+  async signAndSubmitTransaction(sender: AptosAccount, transaction: RawTransaction): Promise<string> {
+    const bcsTxn = AptosClient.generateBCSTransaction(sender, transaction);
+    const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 
   /**

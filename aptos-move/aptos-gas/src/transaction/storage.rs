@@ -143,12 +143,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
-        self.per_item_read * (NumArgs::from(1))
-            + match loaded {
-                Some(num_bytes) => self.per_byte_read * num_bytes,
-                None => 0.into(),
-            }
+    fn calculate_read_gas(&self, loaded: NumBytes) -> InternalGas {
+        self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
     fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
@@ -175,12 +171,18 @@ pub enum StoragePricing {
 }
 
 impl StoragePricing {
-    pub fn calculate_read_gas(&self, loaded: Option<NumBytes>) -> InternalGas {
+    pub fn calculate_read_gas(&self, resource_exists: bool, bytes_loaded: NumBytes) -> InternalGas {
         use StoragePricing::*;
 
         match self {
-            V1(v1) => v1.calculate_read_gas(loaded),
-            V2(v2) => v2.calculate_read_gas(loaded),
+            V1(v1) => v1.calculate_read_gas(
+                if resource_exists {
+                    Some(bytes_loaded)
+                } else {
+                    None
+                },
+            ),
+            V2(v2) => v2.calculate_read_gas(bytes_loaded),
         }
     }
 
@@ -306,14 +308,9 @@ pub struct StorageGasParameters {
 impl StorageGasParameters {
     pub fn new(
         feature_version: u64,
-        gas_params: Option<&AptosGasParameters>,
+        gas_params: &AptosGasParameters,
         storage_gas_schedule: Option<&StorageGasSchedule>,
-    ) -> Option<Self> {
-        if feature_version == 0 || gas_params.is_none() {
-            return None;
-        }
-        let gas_params = gas_params.unwrap();
-
+    ) -> Self {
         let pricing = match storage_gas_schedule {
             Some(schedule) => {
                 StoragePricing::V2(StoragePricingV2::new(feature_version, schedule, gas_params))
@@ -323,10 +320,10 @@ impl StorageGasParameters {
 
         let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
 
-        Some(Self {
+        Self {
             pricing,
             change_set_configs,
-        })
+        }
     }
 
     pub fn free_and_unlimited() -> Self {

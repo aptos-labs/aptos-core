@@ -141,7 +141,7 @@ fn test_reconfiguration() {
     let block_id = gen_block_id(1);
     let vm_output = executor
         .execute_block(
-            (block_id, txn_block.clone()),
+            (block_id, txn_block.clone()).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
