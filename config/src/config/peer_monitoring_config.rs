@@ -100,7 +100,7 @@ impl Default for PerformanceMonitoringConfig {
         Self {
             enable_direct_send_testing: true,    // Disabled by default TODO REVERT
             direct_send_data_size: 512 * 1024,    // 512 KB
-            direct_send_interval_usec: 20_000, // .02 seconds TODO REVERT
+            direct_send_interval_usec: 1_000, // .001 seconds TODO REVERT
             enable_rpc_testing: true,            // Disabled by default TODO REVERT
             rpc_data_size: 512 * 1024,            // 512 KB
             rpc_interval_usec: 20_000,         // .02 seconds TODO REVERT
