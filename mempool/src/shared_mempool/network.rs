@@ -104,7 +104,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     }
 
     /// Returns peers to add (with metadata) and peers to disable
-    fn determine_peers_to_add_and_disable(
+    fn get_upstream_peers_to_add_and_disable(
         &self,
         updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<(PeerNetworkId, ConnectionMetadata)>, Vec<PeerNetworkId>) {
@@ -124,20 +124,18 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     }
 
     /// Returns newly added peers
-    fn add_and_disable_peers(
+    fn add_and_disable_upstream_peers(
         &self,
         to_add: &[(PeerNetworkId, ConnectionMetadata)],
         to_disable: &[PeerNetworkId],
     ) {
         let mut sync_states = self.sync_states.write();
         for (peer, metadata) in to_add.iter().cloned() {
-            if self.is_upstream_peer(&peer, Some(&metadata)) {
-                counters::active_upstream_peers(&peer.network_id()).inc();
-                sync_states.insert(
-                    peer,
-                    PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
-                );
-            }
+            counters::active_upstream_peers(&peer.network_id()).inc();
+            sync_states.insert(
+                peer,
+                PeerSyncState::new(metadata, self.mempool_config.broadcast_buckets.len()),
+            );
         }
         for peer in to_disable {
             // All other nodes have their state immediately restarted anyways, so let's free them
@@ -151,15 +149,15 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     /// to start broadcasts, peers that will be disabled from broadcasts).
     pub fn update_peers(
         &self,
-        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+        all_connected_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
-        // Get the peers to add or disable, using a read lock
-        let (to_add, to_disable) = self.determine_peers_to_add_and_disable(updated_peers);
+        // Get the upstream peers to add or disable, using a read lock
+        let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
         if to_add.is_empty() && to_disable.is_empty() {
             return (vec![], vec![]);
         }
         // If there are updates, apply using a write lock
-        self.add_and_disable_peers(&to_add, &to_disable);
+        self.add_and_disable_upstream_peers(&to_add, &to_disable);
         self.update_prioritized_peers();
 
         (to_add.iter().map(|(peer, _)| *peer).collect(), to_disable)
