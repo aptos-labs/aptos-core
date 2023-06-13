@@ -24,9 +24,10 @@ use std::{
 };
 use thiserror::Error;
 
-// A piece of data which tells a wallet how to derive a specific key within a tree of keys
-// 637 is the key for Aptos
-const DERIVATIVE_PATH: &str = "m/44'/637'/{index}'/0'/0'";
+/// Derivative path template
+/// A piece of data which tells a wallet how to derive a specific key within a tree of keys
+/// 637 is the key for Aptos
+pub const DERIVATIVE_PATH: &str = "m/44'/637'/{index}'/0'/0'";
 
 const CLA_APTOS: u8 = 0x5B; // Aptos CLA Instruction class
 const INS_GET_VERSION: u8 = 0x03; // Get version instruction code
@@ -72,6 +73,33 @@ impl Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
+}
+
+/// Validate the input derivative path to check if it's valid
+pub fn validate_derivative_path(input: &str) -> bool {
+    let prefix = "m/44'/637'/";
+    let suffix = "'";
+
+    if input.starts_with(prefix) && input.ends_with(suffix) {
+        let inner_input = &input[prefix.len()..input.len()];
+
+        // Sample: 0'/0'/0'
+        let sections: Vec<&str> = inner_input.split('/').collect();
+        if sections.len() != 3 {
+            return false;
+        }
+
+        for section in sections {
+            let section_value = &section.trim_end_matches('\'');
+            if section_value.parse::<u32>().is_ok() {
+                continue;
+            }
+            return false;
+        }
+
+        return true;
+    }
+    false
 }
 
 /// Returns the current version of the Aptos app on Ledger
