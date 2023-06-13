@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
@@ -48,6 +49,13 @@ pub struct InitTool {
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
+
+    /// Whether you want to create a profile from your ledger account
+    ///
+    /// Make sure that you have Ledger device connected, unlocked, and have Aptos app installed
+    /// and opened. Otherwise CLI would not be able to open the connection to your account
+    #[clap(long)]
+    pub ledger: bool,
 
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -86,7 +94,6 @@ impl CliCommand<()> for InitTool {
         } else {
             ProfileConfig::default()
         };
-
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
@@ -131,33 +138,90 @@ impl CliCommand<()> for InitTool {
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
-        // Private key
-        let private_key = if let Some(private_key) = self
-            .private_key_options
-            .extract_private_key_cli(self.encoding_options.encoding)?
-        {
-            eprintln!("Using command line argument for private key");
-            private_key
-        } else {
-            eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
-            let input = read_line("Private key")?;
-            let input = input.trim();
-            if input.is_empty() {
-                if let Some(private_key) = profile_config.private_key {
-                    eprintln!("No key given, keeping existing key...");
-                    private_key
-                } else {
-                    eprintln!("No key given, generating key...");
-                    self.rng_args
-                        .key_generator()?
-                        .generate_ed25519_private_key()
-                }
-            } else {
-                Ed25519PrivateKey::from_encoded_string(input)
-                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
+        // Fetch the top 5 (index 0-4) accounts from Ledger
+        let derivative_path = if self.ledger {
+            let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
+            eprintln!(
+                "Please choose a derivative path from the following {} ledger accounts, or choose an arbitrary path that you want to use:",
+                account_map.len()
+            );
+            for (index, account) in account_map.iter() {
+                eprintln!("Path: {} Address {}", index, account);
             }
+            let input = read_line("derivative_path")?;
+            let input = input.trim();
+
+            // Validate the path
+            if !aptos_ledger::validate_derivative_path(input) {
+                return Err(CliError::UnexpectedError(
+                    "Invalid derivative path".to_owned(),
+                ));
+            }
+            Some(input.to_string())
+        } else {
+            None
         };
-        let public_key = private_key.public_key();
+
+        // Set the derivative_path to the one user chose
+        profile_config.derivative_path = derivative_path.clone();
+
+        // Private key
+        let private_key = if self.ledger {
+            // Private key stays in ledger
+            None
+        } else {
+            let ed25519_private_key = if let Some(key) = self
+                .private_key_options
+                .extract_private_key_cli(self.encoding_options.encoding)?
+            {
+                eprintln!("Using command line argument for private key");
+                key
+            } else {
+                eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+                let input = read_line("Private key")?;
+                let input = input.trim();
+                if input.is_empty() {
+                    if let Some(key) = profile_config.private_key {
+                        eprintln!("No key given, keeping existing key...");
+                        key
+                    } else {
+                        eprintln!("No key given, generating key...");
+                        self.rng_args
+                            .key_generator()?
+                            .generate_ed25519_private_key()
+                    }
+                } else {
+                    Ed25519PrivateKey::from_encoded_string(input).map_err(|err| {
+                        CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
+                    })?
+                }
+            };
+
+            Some(ed25519_private_key)
+        };
+
+        // Public key
+        let public_key = if self.ledger {
+            let pub_key = match aptos_ledger::get_public_key(
+                derivative_path
+                    .ok_or(CliError::UnexpectedError(
+                        "Invalid derivative path".to_string(),
+                    ))?
+                    .as_str(),
+                false,
+            ) {
+                Ok(pub_key_str) => pub_key_str,
+                Err(err) => {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Unexpected Ledger Error: {:?}",
+                        err.to_string()
+                    )))
+                },
+            };
+            pub_key
+        } else {
+            private_key.clone().unwrap().public_key()
+        };
 
         let client = aptos_rest_client::Client::new(
             Url::parse(
@@ -174,7 +238,7 @@ impl CliCommand<()> for InitTool {
         let derived_address = account_address_from_public_key(&public_key);
         let address = lookup_address(&client, derived_address, false).await?;
 
-        profile_config.private_key = Some(private_key);
+        profile_config.private_key = private_key;
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 
