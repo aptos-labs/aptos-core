@@ -325,11 +325,13 @@ impl ConfigOptimizer for StateSyncDriverConfig {
         let state_sync_driver_config = &mut node_config.state_sync.state_sync_driver;
         let local_driver_config_yaml = &local_config_yaml["state_sync"]["state_sync_driver"];
 
-        // Default to fast sync for all testnet nodes because testnet is old
-        // enough that pruning has kicked in, and nodes will struggle to
-        // locate all the data since genesis.
+        // Default to fast sync for all testnet and mainnet nodes
+        // because pruning has kicked in, and nodes will struggle
+        // to locate all the data since genesis.
         let mut modified_config = false;
-        if chain_id.is_testnet() && local_driver_config_yaml["bootstrapping_mode"].is_null() {
+        if (chain_id.is_testnet() || chain_id.is_mainnet())
+            && local_driver_config_yaml["bootstrapping_mode"].is_null()
+        {
             state_sync_driver_config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
             modified_config = true;
         }
@@ -374,7 +376,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_optimize_bootstrapping_mode_testnet_vfn() {
+    fn test_optimize_bootstrapping_mode_devnet_vfn() {
         // Create a node config with execution mode enabled
         let mut node_config = create_execution_mode_config();
 
@@ -383,15 +385,15 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            ChainId::new(40), // Not mainnet or testnet
         )
         .unwrap();
         assert!(modified_config);
 
-        // Verify that the bootstrapping mode is now set to fast sync
+        // Verify that the bootstrapping mode is not changed
         assert_eq!(
             node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
+            BootstrappingMode::ExecuteTransactionsFromGenesis
         );
     }
 
@@ -432,10 +434,10 @@ mod tests {
         .unwrap();
         assert!(modified_config);
 
-        // Verify that the bootstrapping mode is still set to execution mode
+        // Verify that the bootstrapping mode is now set to fast sync
         assert_eq!(
             node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::ExecuteTransactionsFromGenesis
+            BootstrappingMode::DownloadLatestStates
         );
     }
 
