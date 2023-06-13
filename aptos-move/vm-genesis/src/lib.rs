@@ -409,7 +409,6 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
-        FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
     ]
 }
