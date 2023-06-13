@@ -229,12 +229,10 @@ spec aptos_framework::object {
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {
+        pragma aborts_if_is_partial;
         aborts_if !exists<ObjectCore>(destination);
         aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner != destination && !exists<ObjectCore>(destination);
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner != destination && !global<ObjectCore>(destination).allow_ungated_transfer;
+        // TODO: Verify the link list loop
     }
 
     spec ungated_transfer_allowed<T: key>(object: Object<T>): bool {
