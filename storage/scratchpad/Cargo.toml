@@ -20,6 +20,7 @@ aptos-types = { workspace = true }
 bitvec = { workspace = true }
 criterion = { workspace = true, optional = true }
 itertools = { workspace = true }
+jemallocator = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
