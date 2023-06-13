@@ -78,6 +78,7 @@ spec aptos_framework::object {
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);
         aborts_if exists<ObjectCore>(obj_addr);
+        aborts_if !from_bcs::deserializable<address>(hash_bytes);
     }
 
     spec create_object_from_object(creator: &signer): ConstructorRef{
@@ -100,6 +101,7 @@ spec aptos_framework::object {
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);
         aborts_if exists<ObjectCore>(obj_addr);
+        aborts_if !from_bcs::deserializable<address>(hash_bytes);
     }
 
     spec create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
@@ -108,6 +110,7 @@ spec aptos_framework::object {
         let hash_bytes = hash::sha3_256(bytes);
         let obj_addr = from_bcs::deserialize<address>(hash_bytes);
         aborts_if exists<ObjectCore>(obj_addr);
+        aborts_if !from_bcs::deserializable<address>(hash_bytes);
     }
 
     spec create_object_internal(
@@ -175,13 +178,11 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
+        pragma aborts_if_is_partial;
+        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object && !exists<ObjectCore>(object);
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object && !global<ObjectCore>(object).allow_ungated_transfer;
     }
 
     spec transfer<T: key>(
@@ -189,14 +190,12 @@ spec aptos_framework::object {
         object: Object<T>,
         to: address,
     ) {
+        pragma aborts_if_is_partial;
+        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object_address && !exists<ObjectCore>(object_address);
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object_address && !global<ObjectCore>(object_address).allow_ungated_transfer;
     }
 
     spec transfer_raw(
@@ -204,13 +203,11 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
+        pragma aborts_if_is_partial;
+        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object && !exists<ObjectCore>(object);
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object && !global<ObjectCore>(object).allow_ungated_transfer;
     }
 
     spec transfer_to_object<O: key, T: key> (
@@ -218,21 +215,19 @@ spec aptos_framework::object {
         object: Object<O>,
         to: Object<T>,
     ){
+        pragma aborts_if_is_partial;
+        // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object_address && !exists<ObjectCore>(object_address);
-        aborts_if exists i in 0 .. MAXIMUM_OBJECT_NESTING-1:
-            owner_address != object_address && !global<ObjectCore>(object_address).allow_ungated_transfer;
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {
         pragma aborts_if_is_partial;
+        // TODO: Verify the link list loop in verify_ungated_and_descendant
         aborts_if !exists<ObjectCore>(destination);
         aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
-        // TODO: Verify the link list loop
     }
 
     spec ungated_transfer_allowed<T: key>(object: Object<T>): bool {
