@@ -4,8 +4,10 @@
 use crate::{
     access_path::AccessPath,
     account_config::{AccountResource, CoinStoreResource},
+    block_executor::BlockExecutorTransaction,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{SignedTransaction, Transaction, TransactionPayload},
+    write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 pub use move_core_types::abi::{
@@ -152,6 +154,11 @@ impl AnalyzedTransaction {
             read_hints,
         )
     }
+}
+
+impl BlockExecutorTransaction for AnalyzedTransaction {
+    type Key = StateKey;
+    type Value = WriteOp;
 }
 
 impl PartialEq<Self> for AnalyzedTransaction {

@@ -10,7 +10,7 @@ use crate::{
     },
     errors::*,
     scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
 };
@@ -22,7 +22,11 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{executable::Executable, write_set::WriteOp};
+use aptos_types::{
+    block_executor::{partitioner::ExecutableTransactions, BlockExecutorTransaction},
+    executable::Executable,
+    write_set::WriteOp,
+};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
@@ -52,7 +56,7 @@ pub struct BlockExecutor<T, E, S, X> {
 
 impl<T, E, S, X> BlockExecutor<T, E, S, X>
 where
-    T: Transaction,
+    T: BlockExecutorTransaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     X: Executable + 'static,
@@ -428,7 +432,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -437,6 +441,13 @@ where
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
+
+        let signature_verified_block = match signature_verified_block {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::Sharded(_) => {
+                unimplemented!("Sharded execution is not supported yet")
+            },
+        };
 
         let versioned_cache = MVHashMap::new();
 
@@ -526,9 +537,16 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &[T],
+        signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
+        let signature_verified_block = match signature_verified_block {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::Sharded(_) => {
+                unimplemented!("Sharded execution is not supported yet")
+            },
+        };
+
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let data_map = UnsyncMap::new();
@@ -600,7 +618,7 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        signature_verified_block: ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
@@ -622,7 +640,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(signature_verified_block.num_transactions());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,

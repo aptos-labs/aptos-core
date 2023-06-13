@@ -7,7 +7,7 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutableTransactions, ExecutedBlock, ExecutedChunk};
+use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, trace, warn};
 use aptos_storage_interface::{
@@ -16,6 +16,7 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
+    block_executor::partitioner::ExecutableTransactions,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
 };
 use aptos_vm::{
@@ -47,7 +48,7 @@ pub struct ChunkOutput {
 
 impl ChunkOutput {
     pub fn by_transaction_execution<V: VMExecutor>(
-        transactions: ExecutableTransactions,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
