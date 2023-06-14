@@ -47,6 +47,7 @@ module token_objects::ambassador {
     const RANK_SILVER: vector<u8> = b"Silver";
     const RANK_BRONZE: vector<u8> = b"Bronze";
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The ambassador token
     struct AmbassadorToken has key {
         /// Used to mutate the token uri
@@ -61,6 +62,7 @@ module token_objects::ambassador {
         base_uri: String,
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The ambassador level
     struct AmbassadorLevel has key {
         ambassador_level: u64,
