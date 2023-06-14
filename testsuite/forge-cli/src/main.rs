@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
-use aptos_config::config::ConsensusConfig;
+use aptos_config::config::{ChainHealthBackoffValues, ConsensusConfig, PipelineBackpressureValues};
 use aptos_forge::{
     args::TransactionTypeArg,
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
@@ -488,11 +488,12 @@ fn single_test_suite(test_name: &str, duration: Duration) -> Result<ForgeConfig>
     let single_test_suite = match test_name {
         // Land-blocking tests to be run on every PR:
         "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_throughput" => realistic_env_max_throughput_test_suite(duration),
+        "realistic_env_max_throughput" => realistic_env_max_throughput_test(duration),
         "compat" => compat(),
         "framework_upgrade" => upgrade(),
         // Rest of the tests:
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
         "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
         "state_sync_perf_fullnodes_execute_transactions" => {
@@ -910,7 +911,7 @@ fn graceful_overload() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are proposing almost empty blocks,
+        // Validators without VFN are not creating batches,
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
@@ -957,7 +958,7 @@ fn three_region_sim_graceful_overload() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         // if we have full nodes for subset of validators, TPS drops.
-        // Validators without VFN are proposing almost empty blocks,
+        // Validators without VFN are not creating batches,
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
@@ -1367,7 +1368,7 @@ fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
 }
 
 // TODO: Replace land_blocking when performance reaches on par with current land_blocking
-fn realistic_env_max_throughput_test_suite(duration: Duration) -> ForgeConfig {
+fn realistic_env_max_throughput_test(duration: Duration) -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(10)
@@ -1413,6 +1414,65 @@ fn realistic_env_max_throughput_test_suite(duration: Duration) -> ForgeConfig {
                 ))
                 .add_latency_threshold(3.0, LatencyType::P50)
                 .add_latency_threshold(5.0, LatencyType::P90)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
+
+fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(12).unwrap())
+        // if we have full nodes for subset of validators, TPS drops.
+        // Validators without VFN are not creating batches,
+        // as no useful transaction reach their mempool.
+        // something to potentially improve upon.
+        // So having VFNs for all validators
+        .with_initial_fullnode_count(12)
+        .add_network_test(MultiRegionNetworkEmulationTest {
+            override_config: None,
+        })
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 150000,
+        }))
+        .with_node_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["validator"]["config"]["consensus"]
+                ["max_sending_block_txns_quorum_store_override"] = 10000.into();
+            helm_values["validator"]["config"]["consensus"]["pipeline_backpressure"] =
+                serde_yaml::to_value(Vec::<PipelineBackpressureValues>::new()).unwrap();
+            helm_values["validator"]["config"]["consensus"]["chain_health_backoff"] =
+                serde_yaml::to_value(Vec::<ChainHealthBackoffValues>::new()).unwrap();
+
+            helm_values["validator"]["config"]["consensus"]
+                ["wait_for_full_blocks_above_recent_fill_threshold"] = (0.8).into();
+            helm_values["validator"]["config"]["consensus"]
+                ["wait_for_full_blocks_above_pending_blocks"] = 8.into();
+
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+                ["backlog_txn_limit_count"] = 100000.into();
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+                ["backlog_per_validator_batch_limit_count"] = 10.into();
+
+            helm_values["validator"]["config"]["consensus"]["quorum_store"]["back_pressure"]
+                ["dynamic_max_txn_per_s"] = 6000.into();
+
+            // Experimental storage optimizations
+            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]["use_state_kv_db"] =
+                true.into();
+            helm_values["validator"]["config"]["storage"]["rocksdb_configs"]
+                ["use_sharded_state_merkle_db"] = true.into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(8000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 12 CPU cores for 30% of the time.
+                    MetricsThreshold::new(12, 30),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new(10 * 1024 * 1024 * 1024, 30),
+                ))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,

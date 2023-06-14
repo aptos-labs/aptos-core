@@ -2780,6 +2780,7 @@ dependencies = [
  "bitvec 0.19.6",
  "criterion",
  "itertools",
+ "jemallocator",
  "once_cell",
  "proptest",
  "rand 0.7.3",
