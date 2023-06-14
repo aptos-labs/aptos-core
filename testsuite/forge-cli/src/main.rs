@@ -595,14 +595,7 @@ fn run_consensus_only_perf_test() -> ForgeConfig {
                 .mode(EmitJobMode::MaxLoad { mempool_backlog: 600000 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .add_network_test(CompositeNetworkTest::new(
-            MultiRegionNetworkEmulationTest {
-                override_config: None,
-            },
-            CpuChaosTest {
-                override_config: None,
-            },
-        ))
+        .add_network_test(ThreeRegionSameCloudSimulationTest)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
