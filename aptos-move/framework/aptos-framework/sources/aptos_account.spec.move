@@ -206,6 +206,9 @@ spec aptos_framework::aptos_account {
         use aptos_std::type_info;
         to: address;
         aborts_if !coin::is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();
-        aborts_if !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
+        aborts_if exists<aptos_framework::account::Account>(to)
+            && !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
+        aborts_if type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>()
+            && !coin::is_account_registered<CoinType>(to) && !can_receive_direct_coin_transfers(to);
     }
 }
