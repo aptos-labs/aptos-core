@@ -10,7 +10,9 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
-use aptos_types::executable::ExecutableTestType;
+use aptos_types::{
+    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
+};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -60,6 +62,8 @@ fn run_transactions<K, V>(
             .unwrap(),
     );
 
+    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
@@ -71,15 +75,18 @@ fn run_transactions<K, V>(
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), &executable_txns, &data_view);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
             continue;
         }
 
-        let baseline =
-            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
+        let baseline = ExpectedOutput::generate_baseline(
+            executable_txns.get_unsharded_transactions().unwrap(),
+            None,
+            maybe_block_gas_limit,
+        );
         baseline.assert_output(&output);
     }
 }
@@ -184,6 +191,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+
     let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
         phantom: PhantomData,
     };
@@ -206,10 +215,13 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), &executable_txns, &data_view);
 
-        let baseline =
-            ExpectedOutput::generate_baseline(&transactions, None, maybe_block_gas_limit);
+        let baseline = ExpectedOutput::generate_baseline(
+            executable_txns.get_unsharded_transactions().unwrap(),
+            None,
+            maybe_block_gas_limit,
+        );
         baseline.assert_output(&output);
     }
 }
@@ -239,6 +251,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -257,7 +271,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), &executable_txns, &data_view);
 
         let delta_writes = output
             .as_ref()
@@ -267,7 +281,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             .collect();
 
         let baseline = ExpectedOutput::generate_baseline(
-            &transactions,
+            executable_txns.get_unsharded_transactions().unwrap(),
             Some(delta_writes),
             maybe_block_gas_limit,
         );
@@ -413,6 +427,8 @@ fn publishing_fixed_params_with_block_gas_limit(
         phantom: PhantomData,
     };
 
+    let executable_txns = ExecutableTransactions::Unsharded(transactions.clone());
+
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -427,7 +443,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel((), &executable_txns, &data_view);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -464,6 +480,8 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
+    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+
     for _ in 0..200 {
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
@@ -475,7 +493,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             executor_thread_pool.clone(),
             Some(max(w_index, r_index) as u64 + 1),
         ) // Ensure enough gas limit to commit the module txns
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), &executable_txns, &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    sharded_block_partitioner::{
-        cross_shard_messages::CrossShardMsg,
-        dependency_analysis::WriteSetWithTxnIndex,
-        messages::{
-            AddWithCrossShardDep, ControlMsg,
-            ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
-            DiscardCrossShardDep, PartitioningResp,
-        },
-        partitioning_shard::PartitioningShard,
+use crate::sharded_block_partitioner::{
+    cross_shard_messages::CrossShardMsg,
+    dependency_analysis::WriteSetWithTxnIndex,
+    messages::{
+        AddWithCrossShardDep, ControlMsg,
+        ControlMsg::{AddCrossShardDepReq, DiscardCrossShardDepReq},
+        DiscardCrossShardDep, PartitioningResp,
     },
-    types::{ShardId, SubBlocksForShard, TxnIndex},
+    partitioning_shard::PartitioningShard,
 };
 use aptos_logger::{error, info};
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::{
+    block_executor::partitioner::{ShardId, SubBlocksForShard, TxnIndex},
+    transaction::analyzed_transaction::AnalyzedTransaction,
+};
 use itertools::Itertools;
 use std::{
     collections::HashMap,
@@ -206,7 +206,7 @@ impl ShardedBlockPartitioner {
     fn collect_partition_block_response(
         &self,
     ) -> (
-        Vec<SubBlocksForShard>,
+        Vec<SubBlocksForShard<AnalyzedTransaction>>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -234,10 +234,10 @@ impl ShardedBlockPartitioner {
         &self,
         txns_to_partition: Vec<Vec<AnalyzedTransaction>>,
         current_round_start_index: TxnIndex,
-        frozen_sub_blocks: Vec<SubBlocksForShard>,
+        frozen_sub_blocks: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
-        Vec<SubBlocksForShard>,
+        Vec<SubBlocksForShard<AnalyzedTransaction>>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -261,10 +261,10 @@ impl ShardedBlockPartitioner {
         &self,
         index_offset: usize,
         remaining_txns_vec: Vec<Vec<AnalyzedTransaction>>,
-        frozen_sub_blocks_by_shard: Vec<SubBlocksForShard>,
+        frozen_sub_blocks_by_shard: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         frozen_write_set_with_index: Arc<Vec<WriteSetWithTxnIndex>>,
     ) -> (
-        Vec<SubBlocksForShard>,
+        Vec<SubBlocksForShard<AnalyzedTransaction>>,
         Vec<WriteSetWithTxnIndex>,
         Vec<Vec<AnalyzedTransaction>>,
     ) {
@@ -295,7 +295,7 @@ impl ShardedBlockPartitioner {
         &self,
         transactions: Vec<AnalyzedTransaction>,
         num_partitioning_round: usize,
-    ) -> Vec<SubBlocksForShard> {
+    ) -> Vec<SubBlocksForShard<AnalyzedTransaction>> {
         let total_txns = transactions.len();
         if total_txns == 0 {
             return vec![];
@@ -305,7 +305,7 @@ impl ShardedBlockPartitioner {
         let mut txns_to_partition = self.partition_by_senders(transactions);
         let mut frozen_write_set_with_index = Arc::new(Vec::new());
         let mut current_round_start_index = 0;
-        let mut frozen_sub_blocks: Vec<SubBlocksForShard> = vec![];
+        let mut frozen_sub_blocks: Vec<SubBlocksForShard<AnalyzedTransaction>> = vec![];
         for shard_id in 0..self.num_shards {
             frozen_sub_blocks.push(SubBlocksForShard::empty(shard_id))
         }
@@ -401,14 +401,16 @@ mod tests {
             create_non_conflicting_p2p_transaction, create_signed_p2p_transaction,
             generate_test_account, generate_test_account_for_address, TestAccount,
         },
-        types::{SubBlock, TxnIdxWithShardId},
     };
-    use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+    use aptos_types::{
+        block_executor::partitioner::{SubBlock, TxnIdxWithShardId},
+        transaction::analyzed_transaction::AnalyzedTransaction,
+    };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};
     use std::collections::HashMap;
 
-    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock>) {
+    fn verify_no_cross_shard_dependency(sub_blocks_for_shards: Vec<SubBlock<AnalyzedTransaction>>) {
         for sub_blocks in sub_blocks_for_shards {
             for txn in sub_blocks.iter() {
                 assert_eq!(txn.cross_shard_dependencies().num_required_edges(), 0);

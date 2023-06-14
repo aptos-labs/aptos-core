@@ -1,16 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    sharded_block_partitioner::{
-        conflict_detector::CrossShardConflictDetector,
-        cross_shard_messages::{CrossShardClient, CrossShardClientInterface, CrossShardMsg},
-        dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-        dependent_edges::DependentEdgeCreator,
-        messages::{AddWithCrossShardDep, ControlMsg, DiscardCrossShardDep, PartitioningResp},
-    },
-    types::{ShardId, SubBlock, TransactionWithDependencies},
+use crate::sharded_block_partitioner::{
+    conflict_detector::CrossShardConflictDetector,
+    cross_shard_messages::{CrossShardClient, CrossShardClientInterface, CrossShardMsg},
+    dependency_analysis::{RWSet, WriteSetWithTxnIndex},
+    dependent_edges::DependentEdgeCreator,
+    messages::{AddWithCrossShardDep, ControlMsg, DiscardCrossShardDep, PartitioningResp},
 };
 use aptos_logger::trace;
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+use aptos_types::block_executor::partitioner::{ShardId, SubBlock, TransactionWithDependencies};
+use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use std::sync::{
     mpsc::{Receiver, Sender},
     Arc,
@@ -93,7 +94,7 @@ impl PartitioningShard {
             .into_iter()
             .zip(accepted_cross_shard_dependencies.into_iter())
             .map(|(txn, dependencies)| TransactionWithDependencies::new(txn, dependencies))
-            .collect::<Vec<TransactionWithDependencies>>();
+            .collect::<Vec<TransactionWithDependencies<AnalyzedTransaction>>>();
 
         let mut frozen_sub_blocks = dependent_edge_creator.into_frozen_sub_blocks();
         let current_frozen_sub_block = SubBlock::new(index_offset, accepted_txns_with_dependencies);

@@ -30,6 +30,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
+    block_executor::partitioner::ExecutableTransactions,
     block_metadata::BlockMetadata,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
@@ -1505,7 +1506,7 @@ impl VMExecutor for AptosVM {
         let count = transactions.len();
         let ret = BlockAptosVM::execute_block(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            ExecutableTransactions::Unsharded(transactions),
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,

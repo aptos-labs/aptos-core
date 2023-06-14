@@ -24,7 +24,7 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
-/// Trait that defines a transaction that could be parallel executed by the scheduler. Each
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
