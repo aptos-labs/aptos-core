@@ -35,6 +35,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant, SystemTime},
 };
+use tokio::time::timeout;
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {
@@ -81,7 +82,15 @@ pub async fn to_common_result<T: Serialize>(
         } else {
             None
         };
-        send_telemetry_event(command, latency, !is_err, error).await;
+
+        if let Err(err) = timeout(
+            Duration::from_millis(2000),
+            send_telemetry_event(command, latency, !is_err, error),
+        )
+        .await
+        {
+            debug!("send_telemetry_event timeout from CLI: {}", err.to_string())
+        }
     }
 
     let result: ResultWrapper<T> = result.into();
