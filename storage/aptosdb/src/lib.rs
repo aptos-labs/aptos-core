@@ -74,7 +74,7 @@ use aptos_config::config::{
 use aptos_config::config::{
     BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -115,7 +115,6 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use arr_macro::arr;
-use itertools::zip_eq;
 use move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -275,16 +274,6 @@ impl Drop for RocksdbPropertyReporter {
             .join()
             .expect("Rocksdb property reporting thread should join peacefully.");
     }
-}
-
-#[derive(Default)]
-struct LedgerSchemaBatches {
-    ledger_metadata_batch: SchemaBatch,
-    event_batch: SchemaBatch,
-    transaction_batch: SchemaBatch,
-    transaction_info_batch: SchemaBatch,
-    transaction_accumulator_batch: SchemaBatch,
-    write_set_batch: SchemaBatch,
 }
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
@@ -800,137 +789,6 @@ impl AptosDB {
         Ok(events_with_version)
     }
 
-    fn save_ledger_info(
-        &self,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        ledger_batch: &SchemaBatch,
-    ) -> Result<()> {
-        // If expected ledger info is provided, verify result root hash and save the ledger info.
-        if let Some(x) = ledger_info_with_sigs {
-            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
-            ensure!(
-                new_root_hash == expected_root_hash,
-                "Root hash calculated doesn't match expected. {:?} vs {:?}",
-                new_root_hash,
-                expected_root_hash,
-            );
-            let current_epoch = self
-                .ledger_store
-                .get_latest_ledger_info_option()
-                .map_or(0, |li| li.ledger_info().next_block_epoch());
-            ensure!(
-                x.ledger_info().epoch() == current_epoch,
-                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
-                x.ledger_info().epoch(),
-                current_epoch,
-            );
-
-            self.ledger_store.put_ledger_info(x, ledger_batch)?;
-        }
-        Ok(())
-    }
-
-    fn save_transactions_impl(
-        &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
-        first_version: u64,
-        expected_state_db_usage: StateStorageUsage,
-        sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<(LedgerSchemaBatches, ShardedStateKvSchemaBatch, HashValue)> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions_impl"])
-            .start_timer();
-
-        let ledger_schema_batches = LedgerSchemaBatches::default();
-
-        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
-
-        let last_version = first_version + txns_to_commit.len() as u64 - 1;
-
-        let new_root_hash = thread::scope(|s| {
-            let t0 = s.spawn(|| {
-                // Account state updates.
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_state"])
-                    .start_timer();
-
-                let state_updates_vec = txns_to_commit
-                    .iter()
-                    .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
-                    .collect::<Vec<_>>();
-
-                // TODO(grao): Make state_store take sharded state updates.
-                self.state_store.put_value_sets(
-                    state_updates_vec,
-                    first_version,
-                    expected_state_db_usage,
-                    sharded_state_cache,
-                    &ledger_schema_batches.ledger_metadata_batch,
-                    &sharded_state_kv_batches,
-                )
-            });
-
-            let t1 = s.spawn(|| {
-                // Event updates. Gather event accumulator root hashes.
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_events"])
-                    .start_timer();
-                zip_eq(first_version..=last_version, txns_to_commit)
-                    .map(|(ver, txn_to_commit)| {
-                        self.event_store.put_events(
-                            ver,
-                            txn_to_commit.borrow().events(),
-                            &ledger_schema_batches.event_batch,
-                        )
-                    })
-                    .collect::<Result<Vec<_>>>()
-            });
-
-            let t2 = s.spawn(|| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_txn_infos"])
-                    .start_timer();
-                zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
-                    |(ver, txn_to_commit)| {
-                        // Transaction updates. Gather transaction hashes.
-                        self.transaction_store.put_transaction(
-                            ver,
-                            txn_to_commit.borrow().transaction(),
-                            &ledger_schema_batches.transaction_batch,
-                        )?;
-                        self.transaction_store.put_write_set(
-                            ver,
-                            txn_to_commit.borrow().write_set(),
-                            &ledger_schema_batches.write_set_batch,
-                        )
-                    },
-                )?;
-                // Transaction accumulator updates. Get result root hash.
-                let txn_infos: Vec<_> = txns_to_commit
-                    .iter()
-                    .map(|t| t.borrow().transaction_info())
-                    .cloned()
-                    .collect();
-                self.ledger_store.put_transaction_infos(
-                    first_version,
-                    &txn_infos,
-                    &ledger_schema_batches.transaction_info_batch,
-                    &ledger_schema_batches.transaction_accumulator_batch,
-                )
-            });
-            t0.join().unwrap()?;
-            t1.join().unwrap()?;
-            t2.join().unwrap()
-        });
-
-        Ok((
-            ledger_schema_batches,
-            sharded_state_kv_batches,
-            new_root_hash?,
-        ))
-    }
-
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
@@ -948,6 +806,9 @@ impl AptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         latest_in_memory_state: &StateDelta,
     ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["save_transactions_validation"])
+            .start_timer();
         let buffered_state = self.state_store.buffered_state().lock();
         ensure!(
             base_state_version == buffered_state.current_state().base_version,
@@ -1006,100 +867,278 @@ impl AptosDB {
         Ok(())
     }
 
-    fn commit_ledger_and_state_kv_db(
+    fn calculate_and_commit_ledger_and_state_kv(
         &self,
-        last_version: Version,
-        ledger_schema_batches: LedgerSchemaBatches,
-        sharded_state_kv_batches: ShardedStateKvSchemaBatch,
-        new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-    ) -> Result<()> {
-        // Commit multiple batches for different DBs in parallel, then write the overall
-        // progress.
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["save_transactions_commit"])
-            .start_timer();
-
-        COMMIT_POOL.scope(|s| {
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<HashValue> {
+        let new_root_hash = thread::scope(|s| {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["save_transactions__work"])
+                .start_timer();
+            // TODO(grao): Write progress for each of the following databases, and handle the
+            // inconsistency at the startup time.
+            let t0 = s.spawn(|| self.commit_events(txns_to_commit, first_version));
+            let t1 = s.spawn(|| self.commit_write_sets(txns_to_commit, first_version));
+            let t2 = s.spawn(|| self.commit_transactions(txns_to_commit, first_version));
+            let t3 = s.spawn(|| {
+                self.commit_state_kv_and_ledger_metadata(
+                    txns_to_commit,
+                    first_version,
+                    expected_state_db_usage,
+                    sharded_state_cache,
+                )
+            });
+            let t4 = s.spawn(|| self.commit_transaction_infos(txns_to_commit, first_version));
+            let t5 = s.spawn(|| self.commit_transaction_accumulator(txns_to_commit, first_version));
             // TODO(grao): Consider propagating the error instead of panic, if necessary.
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___state_kv_commit"])
-                    .start_timer();
+            t0.join().unwrap()?;
+            t1.join().unwrap()?;
+            t2.join().unwrap()?;
+            t3.join().unwrap()?;
+            t4.join().unwrap()?;
+            t5.join().unwrap()
+        })?;
+
+        Ok(new_root_hash)
+    }
+
+    fn commit_state_kv_and_ledger_metadata(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+        expected_state_db_usage: StateStorageUsage,
+        sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_state_kv_and_ledger_metadata"])
+            .start_timer();
+        let state_updates_vec = txns_to_commit
+            .iter()
+            .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
+            .collect::<Vec<_>>();
+
+        let ledger_metadata_batch = SchemaBatch::new();
+        let sharded_state_kv_batches = new_sharded_kv_schema_batch();
+
+        // TODO(grao): Make state_store take sharded state updates.
+        self.state_store.put_value_sets(
+            state_updates_vec,
+            first_version,
+            expected_state_db_usage,
+            sharded_state_cache,
+            &ledger_metadata_batch,
+            &sharded_state_kv_batches,
+        )?;
+
+        let last_version = first_version + txns_to_commit.len() as u64 - 1;
+        ledger_metadata_batch
+            .put::<DbMetadataSchema>(
+                &DbMetadataKey::LedgerCommitProgress,
+                &DbMetadataValue::Version(last_version),
+            )
+            .unwrap();
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_state_kv_and_ledger_metadata___commit"])
+            .start_timer();
+        thread::scope(|s| {
+            s.spawn(|| {
+                self.ledger_db
+                    .metadata_db()
+                    .write_schemas(ledger_metadata_batch)
+                    .unwrap();
+            });
+            s.spawn(|| {
                 self.state_kv_db
                     .commit(last_version, sharded_state_kv_batches)
                     .unwrap();
             });
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___ledger_metadata_commit"])
-                    .start_timer();
-                ledger_schema_batches
-                    .ledger_metadata_batch
-                    .put::<DbMetadataSchema>(
-                        &DbMetadataKey::LedgerCommitProgress,
-                        &DbMetadataValue::Version(last_version),
-                    )
-                    .unwrap();
-                self.ledger_db
-                    .metadata_db()
-                    .write_schemas(ledger_schema_batches.ledger_metadata_batch)
-                    .unwrap();
-            });
-
-            // TODO(grao): Write progress for each of the following databases, and handle the
-            // inconsistency at the startup time.
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___event_commit"])
-                    .start_timer();
-                self.ledger_db
-                    .event_db()
-                    .write_schemas(ledger_schema_batches.event_batch)
-                    .unwrap();
-            });
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___write_set_commit"])
-                    .start_timer();
-                self.ledger_db
-                    .write_set_db()
-                    .write_schemas(ledger_schema_batches.write_set_batch)
-                    .unwrap();
-            });
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___transaction_commit"])
-                    .start_timer();
-                self.ledger_db
-                    .transaction_db()
-                    .write_schemas(ledger_schema_batches.transaction_batch)
-                    .unwrap();
-            });
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["save_transactions_commit___transaction_info_commit"])
-                    .start_timer();
-                self.ledger_db
-                    .transaction_info_db()
-                    .write_schemas(ledger_schema_batches.transaction_info_batch)
-                    .unwrap();
-            });
-            s.spawn(|_| {
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&[
-                        "save_transactions_commit___transaction_accumulator_commit",
-                    ])
-                    .start_timer();
-                self.ledger_db
-                    .transaction_accumulator_db()
-                    .write_schemas(ledger_schema_batches.transaction_accumulator_batch)
-                    .unwrap();
-            });
         });
 
+        Ok(())
+    }
+
+    fn commit_events(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_events"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                self.event_store.put_events(
+                    first_version + i as u64,
+                    txn_to_commit.borrow().events(),
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_events___commit"])
+            .start_timer();
+        self.ledger_db.event_db().write_schemas(batch)
+    }
+
+    fn commit_transactions(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transactions"])
+            .start_timer();
+        let chunk_size = 512;
+        txns_to_commit
+            .par_chunks(chunk_size)
+            .enumerate()
+            .try_for_each(|(chunk_index, txns_in_chunk)| -> Result<()> {
+                let batch = SchemaBatch::new();
+                let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
+                txns_in_chunk.iter().enumerate().try_for_each(
+                    |(i, txn_to_commit)| -> Result<()> {
+                        self.transaction_store.put_transaction(
+                            chunk_first_version + i as u64,
+                            txn_to_commit.borrow().transaction(),
+                            &batch,
+                        )?;
+
+                        Ok(())
+                    },
+                )?;
+                let _timer = OTHER_TIMERS_SECONDS
+                    .with_label_values(&["commit_transactions___commit"])
+                    .start_timer();
+                self.ledger_db.transaction_db().write_schemas(batch)
+            })
+    }
+
+    fn commit_transaction_accumulator(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: u64,
+    ) -> Result<HashValue> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_accumulator"])
+            .start_timer();
+
+        let batch = SchemaBatch::new();
+        let root_hash =
+            self.ledger_store
+                .put_transaction_accumulator(first_version, txns_to_commit, &batch)?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_accumulator___commit"])
+            .start_timer();
+        self.ledger_db
+            .transaction_accumulator_db()
+            .write_schemas(batch)?;
+
+        Ok(root_hash)
+    }
+
+    fn commit_transaction_infos(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: u64,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_infos"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                let version = first_version + i as u64;
+                self.ledger_store.put_transaction_info(
+                    version,
+                    txn_to_commit.borrow().transaction_info(),
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_infos___commit"])
+            .start_timer();
+        self.ledger_db.transaction_info_db().write_schemas(batch)
+    }
+
+    fn commit_write_sets(
+        &self,
+        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        first_version: Version,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_write_sets"])
+            .start_timer();
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .par_iter()
+            .with_min_len(128)
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                self.transaction_store.put_write_set(
+                    first_version + i as u64,
+                    txn_to_commit.borrow().write_set(),
+                    &batch,
+                )?;
+
+                Ok(())
+            })?;
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_write_sets___commit"])
+            .start_timer();
+        self.ledger_db.write_set_db().write_schemas(batch)
+    }
+
+    fn commit_ledger_info(
+        &self,
+        last_version: Version,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_ledger_info"])
+            .start_timer();
+
         let ledger_batch = SchemaBatch::new();
-        self.save_ledger_info(new_root_hash, ledger_info_with_sigs, &ledger_batch)?;
+
+        // If expected ledger info is provided, verify result root hash and save the ledger info.
+        if let Some(x) = ledger_info_with_sigs {
+            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
+            ensure!(
+                new_root_hash == expected_root_hash,
+                "Root hash calculated doesn't match expected. {:?} vs {:?}",
+                new_root_hash,
+                expected_root_hash,
+            );
+            let current_epoch = self
+                .ledger_store
+                .get_latest_ledger_info_option()
+                .map_or(0, |li| li.ledger_info().next_block_epoch());
+            ensure!(
+                x.ledger_info().epoch() == current_epoch,
+                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                x.ledger_info().epoch(),
+                current_epoch,
+            );
+
+            self.ledger_store.put_ledger_info(x, &ledger_batch)?;
+        }
+
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(last_version),
@@ -1975,24 +2014,18 @@ impl DbWriter for AptosDB {
                 &latest_in_memory_state,
             )?;
 
-            let (ledger_schema_batches, sharded_state_kv_batches, new_root_hash) = self
-                .save_transactions_impl(
-                    txns_to_commit,
-                    first_version,
-                    latest_in_memory_state.current.usage(),
-                    None,
-                )?;
+            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                None,
+            )?;
 
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
-                self.commit_ledger_and_state_kv_db(
-                    last_version,
-                    ledger_schema_batches,
-                    sharded_state_kv_batches,
-                    new_root_hash,
-                    ledger_info_with_sigs,
-                )?;
+
+                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
 
                 self.maybe_commit_state_merkle_db(
                     &mut buffered_state,
@@ -2042,27 +2075,21 @@ impl DbWriter for AptosDB {
                 &latest_in_memory_state,
             )?;
 
-            // TODO(grao): Schedule tasks in save_transactions_impl and
-            // commit_ledger_and_state_kv_db in a different way to make them more parallelizable.
-            let (ledger_schema_batches, sharded_state_kv_batches, new_root_hash) = self
-                .save_transactions_impl(
-                    txns_to_commit,
-                    first_version,
-                    latest_in_memory_state.current.usage(),
-                    Some(sharded_state_cache),
-                )?;
+            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                Some(sharded_state_cache),
+            )?;
 
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["save_transactions__others"])
+                .start_timer();
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
-                self.commit_ledger_and_state_kv_db(
-                    last_version,
-                    ledger_schema_batches,
-                    sharded_state_kv_batches,
-                    new_root_hash,
-                    ledger_info_with_sigs,
-                )?;
+                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
 
                 if !txns_to_commit.is_empty() {
                     let _timer = OTHER_TIMERS_SECONDS

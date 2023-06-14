@@ -21,15 +21,15 @@ EXPECTED_TPS = {
     ("coin-transfer", False, 1): (12600.0, True),
     ("coin-transfer", True, 1): (22100.0, True),
     ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (17600.0, True),
+    ("account-generation", True, 1): (20000.0, True),
     # changed to not use account_pool. either recalibrate or add here to use account pool.
-    ("account-resource32-b", False, 1): (13000.0, False),
+    ("account-resource32-b", False, 1): (15000.0, False),
     ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
     # seems to have changed, disabling as land_blocking, until recalibrated
     ("publish-package", False, 1): (159.0, False),
     ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (553, True),
+    ("batch100-transfer", True, 1): (630, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
     ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
     ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
