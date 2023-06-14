@@ -9,7 +9,7 @@ use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
-    constants::{GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
+    constants::{BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
 };
@@ -261,15 +261,19 @@ impl RawData for RawDataServerWrapper {
                                 ])
                                 .inc_by(current_batch_size as u64);
                             if let Some(data_latency_in_secs) = data_latency_in_secs {
-                                PROCESSED_LATENCY_IN_SECS
-                                    .with_label_values(&[
-                                        request_metadata.request_token.as_str(),
-                                        request_metadata.request_name.as_str(),
-                                    ])
-                                    .set(data_latency_in_secs);
-                                PROCESSED_LATENCY_IN_SECS_ALL
-                                    .with_label_values(&[request_metadata.request_source.as_str()])
-                                    .observe(data_latency_in_secs);
+                                // If it's a partial batch, we record the latency because it usually means
+                                // the data is the latest.
+                                if current_batch_size % BLOB_STORAGE_SIZE != 0 {
+                                    PROCESSED_LATENCY_IN_SECS
+                                        .with_label_values(&[
+                                            request_metadata.request_token.as_str(),
+                                            request_metadata.request_name.as_str(),
+                                        ])
+                                        .set(data_latency_in_secs);
+                                    PROCESSED_LATENCY_IN_SECS_ALL
+                                        .with_label_values(&[request_metadata.request_source.as_str()])
+                                        .observe(data_latency_in_secs);
+                                }
                             }
                         },
                         Err(SendTimeoutError::Timeout(_)) => {
