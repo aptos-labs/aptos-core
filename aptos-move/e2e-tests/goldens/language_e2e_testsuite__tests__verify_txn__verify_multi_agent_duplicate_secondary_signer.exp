@@ -9,7 +9,9 @@ Ok(
                 ),
             ),
             events: [],
-            gas_used: 0,
+            fee_statement: V0 {
+                total_charge_gas_units: 0,
+            },
             status: Discard(
                 SIGNERS_CONTAIN_DUPLICATES,
             ),

@@ -23,9 +23,9 @@ Ok(
             ),
             events: [],
             fee_statement: V1 {
-                total_charge_gas_units: 7,
+                total_charge_gas_units: 2,
                 execution_gas_units: 2,
-                io_gas_units: 5,
+                io_gas_units: 1,
                 storage_gas_units: 0,
                 storage_fee_units: 0,
             },

@@ -31,9 +31,9 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 0, account_address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("account"), name: Identifier("CoinRegisterEvent"), type_params: [] }), event_data: "00000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e" },
             ],
             fee_statement: V1 {
-                total_charge_gas_units: 16,
+                total_charge_gas_units: 6,
                 execution_gas_units: 5,
-                io_gas_units: 11,
+                io_gas_units: 2,
                 storage_gas_units: 0,
                 storage_fee_units: 0,
             },
