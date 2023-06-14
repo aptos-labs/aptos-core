@@ -362,9 +362,7 @@ impl Default for ForgeConfig {
             genesis_config: None,
             genesis_helm_config_fn: None,
             node_helm_config_fn: None,
-            emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-                mempool_backlog: 40000,
-            }),
+            emit_job_request: EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 500 }),
             success_criteria,
             existing_db_tag: None,
         }
