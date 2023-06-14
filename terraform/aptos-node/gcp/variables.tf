@@ -240,3 +240,21 @@ variable "num_fullnode_groups" {
   description = "The number of fullnode groups to create"
   default     = 1
 }
+
+variable "gke_maintenance_policy" {
+  description = "The maintenance policy to use for the cluster. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#maintenance_policy"
+  type = object({
+    recurring_window = object({
+      start_time = string
+      end_time   = string
+      recurrence = string
+    })
+  })
+  default = {
+    recurring_window = {
+      start_time = "2023-06-15T00:00:00Z"
+      end_time   = "2023-06-15T23:59:00Z"
+      recurrence = "FREQ=DAILY"
+    }
+  }
+}

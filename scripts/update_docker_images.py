@@ -9,14 +9,14 @@ ARCH = "amd64"
 OS = "linux"
 
 IMAGES = {
-    "debian-base": "debian:bullseye",
-    "rust-base": "rust:1.66.1-bullseye",
+    "debian": "debian:bullseye",
+    "rust": "rust:1.66.1-bullseye",
 }
 
 
 def update() -> int:
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    dockerfile_path = os.path.join(script_dir, "..", "docker", "rust-all.Dockerfile")
+    dockerfile_path = os.path.join(script_dir, "..", "docker", "builder", "docker-bake-rust-all.hcl")
 
     update_exists = False
 
@@ -24,7 +24,7 @@ def update() -> int:
         manifest = None
         digest = None
         current_digest = None
-        regex = f"FROM [\S]+ AS {base_image}"
+        regex = f"{base_image} = \"docker-image://{image_name}.*\""
 
         print(f"Update {image_name}")
         manifest_inspect = subprocess.check_output(["docker", "manifest", "inspect", image_name])
@@ -48,8 +48,8 @@ def update() -> int:
             dockerfile_content = f.read()
 
         for line in dockerfile_content.splitlines():
-            if re.match(regex, line):
-                current_digest = line.split()[1].split("@")[1]
+            if re.search(regex, line):
+                current_digest = line.split("@")[1].split("\"")[0]
                 break
             
         if current_digest == None:
@@ -61,7 +61,7 @@ def update() -> int:
             continue
 
         print(f"Found update for {image_name}: {current_digest} -> {digest}")
-        dockerfile_content = re.sub(regex, f"FROM {image_name}@{digest} AS {base_image}", dockerfile_content)
+        dockerfile_content = re.sub(regex, f"{base_image} = \"docker-image://{image_name}@{digest}\"", dockerfile_content)
 
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)

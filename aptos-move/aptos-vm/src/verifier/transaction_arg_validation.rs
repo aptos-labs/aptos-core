@@ -7,7 +7,11 @@
 //! for strings whether they consist of correct characters.
 
 use crate::{move_vm_ext::SessionExt, VMStatus};
-use move_binary_format::{errors::VMError, file_format_common::read_uleb128_as_u64};
+use move_binary_format::{
+    errors::{Location, PartialVMError},
+    file_format::FunctionDefinitionIndex,
+    file_format_common::read_uleb128_as_u64,
+};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -123,10 +127,9 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    // validate all non_signer params
-    let mut needs_construction = vec![];
-    for (idx, ty) in func.parameters[signer_param_cnt..].iter().enumerate() {
-        let (valid, construction) = is_valid_txn_arg(
+    // Need to keep this here to ensure we return the historic correct error code for replay
+    for ty in func.parameters[signer_param_cnt..].iter() {
+        let valid = is_valid_txn_arg(
             session,
             &ty.subst(&func.type_arguments).unwrap(),
             allowed_structs,
@@ -137,9 +140,6 @@ pub(crate) fn validate_combine_signer_and_txn_args(
                 None,
             ));
         }
-        if construction {
-            needs_construction.push(idx + signer_param_cnt);
-        }
     }
 
     if (signer_param_cnt + args.len()) != func.parameters.len() {
@@ -148,34 +148,40 @@ pub(crate) fn validate_combine_signer_and_txn_args(
             None,
         ));
     }
-    // if function doesn't require signer, we reuse txn args
-    // if the function require signer, we check senders number same as signers
-    // and then combine senders with txn args.
-    let mut combined_args = if signer_param_cnt == 0 {
+
+    // If the invoked function expects one or more signers, we need to check that the number of
+    // signers actually passed is matching first to maintain backward compatibility before
+    // moving on to the validation of non-signer args.
+    // the number of txn senders should be the same number of signers
+    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+        return Err(VMStatus::Error(
+            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+            None,
+        ));
+    }
+
+    // This also validates that the args are valid. If they are structs, they have to be allowed
+    // and must be constructed successfully. If construction fails, this would fail with a
+    // FAILED_TO_DESERIALIZE_ARGUMENT error.
+    let args = construct_args(
+        session,
+        &func.parameters[signer_param_cnt..],
+        args,
+        &func.type_arguments,
+        allowed_structs,
+        false,
+    )?;
+
+    // Combine signer and non-signer arguments.
+    let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        // the number of txn senders should be the same number of signers
-        if senders.len() != signer_param_cnt {
-            return Err(VMStatus::Error(
-                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
-                None,
-            ));
-        }
         senders
             .into_iter()
             .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
             .chain(args)
             .collect()
     };
-    if !needs_construction.is_empty() {
-        construct_args(
-            session,
-            &needs_construction,
-            &mut combined_args,
-            func,
-            allowed_structs,
-        )?;
-    }
     Ok(combined_args)
 }
 
@@ -184,21 +190,21 @@ pub(crate) fn is_valid_txn_arg(
     session: &SessionExt,
     typ: &Type,
     allowed_structs: &ConstructorMap,
-) -> (bool, bool) {
+) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => (true, false),
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
         Struct(idx) | StructInstantiation(idx, _) => {
             if let Some(st) = session.get_struct_type(*idx) {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                (allowed_structs.contains_key(&full_name), true)
+                allowed_structs.contains_key(&full_name)
             } else {
-                (false, false)
+                false
             }
         },
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => (false, false),
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
 }
 
@@ -207,41 +213,81 @@ pub(crate) fn is_valid_txn_arg(
 // TODO: This needs a more solid story and a tighter integration with the VM.
 pub(crate) fn construct_args(
     session: &mut SessionExt,
-    idxs: &[usize],
-    args: &mut [Vec<u8>],
-    func: &LoadedFunctionInstantiation,
+    types: &[Type],
+    args: Vec<Vec<u8>>,
+    ty_args: &[Type],
     allowed_structs: &ConstructorMap,
-) -> Result<(), VMStatus> {
+    is_view: bool,
+) -> Result<Vec<Vec<u8>>, VMStatus> {
     // Perhaps in a future we should do proper gas metering here
     let mut gas_meter = UnmeteredGasMeter;
-    for (idx, ty) in func.parameters.iter().enumerate() {
-        if !idxs.contains(&idx) {
-            continue;
-        }
-        let arg = &mut args[idx];
-        let mut cursor = Cursor::new(&arg[..]);
-        let mut new_arg = vec![];
-        recursively_construct_arg(
-            session,
-            &ty.subst(&func.type_arguments).unwrap(),
-            allowed_structs,
-            &mut cursor,
-            &mut gas_meter,
-            &mut new_arg,
-        )?;
-        // Check cursor has parsed everything
-        // Unfortunately, is_empty is only enabled in nightly, so we check this way.
-        if cursor.position() != arg.len() as u64 {
-            return Err(VMStatus::Error(
-                StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                Some(String::from(
-                    "The serialized arguments to constructor contained extra data",
-                )),
-            ));
-        }
-        *arg = new_arg;
+    let mut res_args = vec![];
+    if types.len() != args.len() {
+        return Err(invalid_signature());
     }
-    Ok(())
+    for (ty, arg) in types.iter().zip(args.into_iter()) {
+        let arg = construct_arg(
+            session,
+            &ty.subst(ty_args).unwrap(),
+            allowed_structs,
+            arg,
+            &mut gas_meter,
+            is_view,
+        )?;
+        res_args.push(arg);
+    }
+    Ok(res_args)
+}
+
+fn invalid_signature() -> VMStatus {
+    VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE, None)
+}
+
+fn construct_arg(
+    session: &mut SessionExt,
+    ty: &Type,
+    allowed_structs: &ConstructorMap,
+    arg: Vec<u8>,
+    gas_meter: &mut impl GasMeter,
+    is_view: bool,
+) -> Result<Vec<u8>, VMStatus> {
+    use move_vm_types::loaded_data::runtime_types::Type::*;
+    match ty {
+        Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
+        Vector(_) | Struct(_) | StructInstantiation(_, _) => {
+            let mut cursor = Cursor::new(&arg[..]);
+            let mut new_arg = vec![];
+            let mut max_invocations = 10; // Read from config in the future
+            recursively_construct_arg(
+                session,
+                ty,
+                allowed_structs,
+                &mut cursor,
+                gas_meter,
+                &mut max_invocations,
+                &mut new_arg,
+            )?;
+            // Check cursor has parsed everything
+            // Unfortunately, is_empty is only enabled in nightly, so we check this way.
+            if cursor.position() != arg.len() as u64 {
+                return Err(VMStatus::Error(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                    Some(String::from(
+                        "The serialized arguments to constructor contained extra data",
+                    )),
+                ));
+            }
+            Ok(new_arg)
+        },
+        Signer => {
+            if is_view {
+                Ok(arg)
+            } else {
+                Err(invalid_signature())
+            }
+        },
+        Reference(_) | MutableReference(_) | TyParam(_) => Err(invalid_signature()),
+    }
 }
 
 // A Cursor is used to recursively walk the serialized arg manually and correctly. In effect we
@@ -253,6 +299,7 @@ pub(crate) fn recursively_construct_arg(
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
+    max_invocations: &mut u64,
     arg: &mut Vec<u8>,
 ) -> Result<(), VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
@@ -263,7 +310,15 @@ pub(crate) fn recursively_construct_arg(
             let mut len = get_len(cursor)?;
             serialize_uleb128(len, arg);
             while len > 0 {
-                recursively_construct_arg(session, inner, allowed_structs, cursor, gas_meter, arg)?;
+                recursively_construct_arg(
+                    session,
+                    inner,
+                    allowed_structs,
+                    cursor,
+                    gas_meter,
+                    max_invocations,
+                    arg,
+                )?;
                 len -= 1;
             }
         },
@@ -272,11 +327,11 @@ pub(crate) fn recursively_construct_arg(
             // performed in `is_valid_txn_arg`
             let st = session
                 .get_struct_type(*idx)
-                .expect("unreachable, type must exist");
+                .ok_or_else(invalid_signature)?;
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
             let constructor = allowed_structs
                 .get(&full_name)
-                .expect("unreachable: struct must be allowed");
+                .ok_or_else(invalid_signature)?;
             // By appending the BCS to the output parameter we construct the correct BCS format
             // of the argument.
             arg.append(&mut validate_and_construct(
@@ -286,6 +341,7 @@ pub(crate) fn recursively_construct_arg(
                 allowed_structs,
                 cursor,
                 gas_meter,
+                max_invocations,
             )?);
         },
         Bool | U8 => read_n_bytes(1, cursor, arg)?,
@@ -294,11 +350,8 @@ pub(crate) fn recursively_construct_arg(
         U64 => read_n_bytes(8, cursor, arg)?,
         U128 => read_n_bytes(16, cursor, arg)?,
         U256 | Address => read_n_bytes(32, cursor, arg)?,
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) => {
-            unreachable!("We already checked for this in is-valid-txn-arg")
-        },
+        Signer | Reference(_) | MutableReference(_) | TyParam(_) => return Err(invalid_signature()),
     };
-
     Ok(())
 }
 
@@ -313,7 +366,45 @@ fn validate_and_construct(
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     gas_meter: &mut impl GasMeter,
+    max_invocations: &mut u64,
 ) -> Result<Vec<u8>, VMStatus> {
+    if *max_invocations == 0 {
+        return Err(VMStatus::Error(
+            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+            None,
+        ));
+    }
+    // HACK mitigation of performance attack
+    // To maintain compatibility with vector<string> or so on, we need to allow unlimited strings.
+    // So we do not count the string constructor against the max_invocations, instead we
+    // shortcut the string case to avoid the performance attack.
+    if constructor.func_name.as_str() == "utf8" {
+        let constructor_error = || {
+            // A slight hack, to prevent additional piping of the feature flag through all
+            // function calls. We know the feature is active when more structs then just strings are
+            // allowed.
+            let are_struct_constructors_enabled = allowed_structs.len() > 1;
+            if are_struct_constructors_enabled {
+                PartialVMError::new(StatusCode::ABORTED)
+                    .with_sub_status(1)
+                    .at_code_offset(FunctionDefinitionIndex::new(0), 0)
+                    .finish(Location::Module(constructor.module_id.clone()))
+                    .into_vm_status()
+            } else {
+                VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
+            }
+        };
+        // short cut for the utf8 constructor, which is a special case
+        let len = get_len(cursor)?;
+        let mut arg = vec![];
+        read_n_bytes(len, cursor, &mut arg)?;
+        std::str::from_utf8(&arg).map_err(|_| constructor_error())?;
+        return bcs::to_bytes(&arg)
+            .map_err(|_| VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None));
+    } else {
+        *max_invocations -= 1;
+    }
+
     let (function, instantiation) = session.load_function_with_type_arg_inference(
         &constructor.module_id,
         constructor.func_name,
@@ -328,24 +419,13 @@ fn validate_and_construct(
             allowed_structs,
             cursor,
             gas_meter,
+            max_invocations,
             &mut arg,
         )?;
         args.push(arg);
     }
-    let constructor_error = |e: VMError| {
-        // A slight hack, to prevent additional piping of the feature flag through all
-        // function calls. We know the feature is active when more structs then just strings are
-        // allowed.
-        let are_struct_constructors_enabled = allowed_structs.len() > 1;
-        if are_struct_constructors_enabled {
-            e.into_vm_status()
-        } else {
-            VMStatus::Error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None)
-        }
-    };
-    let serialized_result = session
-        .execute_instantiated_function(function, instantiation, args, gas_meter)
-        .map_err(constructor_error)?;
+    let serialized_result =
+        session.execute_instantiated_function(function, instantiation, args, gas_meter)?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     let deserialize_error = VMStatus::Error(

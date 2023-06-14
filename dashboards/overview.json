@@ -3106,6 +3106,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "description": "Data on PFN nodes only. Unless clients send duplicate transactions, this is a reliable way to see E2E latency.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -3178,7 +3179,7 @@
           "refId": "C"
         }
       ],
-      "title": "(devnet/testnet) PFN-only e2e latency",
+      "title": "Aptos PFN-only e2e latency",
       "type": "timeseries"
     },
     {
@@ -3912,6 +3913,6 @@
   "timezone": "",
   "title": "overview",
   "uid": "overview",
-  "version": 16,
+  "version": 17,
   "weekStart": ""
 }

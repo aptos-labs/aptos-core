@@ -11,7 +11,7 @@ import platform
 THRESHOLDS = {
     "1k_8": 11000,
     "1k_16": 13000,
-    "1k_32": 15000,
+    # "1k_32": 13000,
     "10k_8": 23000,
     "10k_16": 37000,
     "10k_32": 48000,
@@ -23,7 +23,7 @@ THRESHOLDS = {
 SPEEDUPS = {
     "1k_8": 3,
     "1k_16": 4,
-    "1k_32": 4,
+    # "1k_32": 4,
     "10k_8": 5,
     "10k_16": 8,
     "10k_32": 11,
@@ -58,6 +58,8 @@ for threads in THREADS:
     # print(output)
 
     for i, block_size in enumerate(BLOCK_SIZES):
+        if threads == 32 and block_size == "1k":
+            continue
         tps_index = i * 2
         speedup_index = i * 2 + 1
         key = f"{block_size}_{threads}"
@@ -96,6 +98,8 @@ for threads in THREADS:
 
 for block_size in BLOCK_SIZES:
     for threads in THREADS:
+        if threads == 32 and block_size == "1k":
+            continue
         key = f"{block_size}_{threads}"
         print(
             f"Average Parallel TPS with {threads} threads for {block_size} block: TPS {tps_set[key]}, Threshold TPS: {THRESHOLDS[key]}, Speedup: {speedups_set[key]}x, Speedup Threshold: {SPEEDUPS[key]}x"

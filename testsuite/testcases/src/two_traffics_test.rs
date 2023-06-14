@@ -4,25 +4,17 @@
 use crate::{
     create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
-use anyhow::{bail, Ok};
 use aptos_forge::{
-    success_criteria::{LatencyType, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TransactionType,
+    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
+    EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TestReport,
 };
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
 pub struct TwoTrafficsTest {
-    // cannot have 'static EmitJobRequest, like below, so need to have inner fields
-    // pub inner_emit_job_request: EmitJobRequest,
-    pub inner_tps: usize,
-    pub inner_gas_price: u64,
-    pub inner_init_gas_price_multiplier: u64,
-    pub inner_transaction_type: TransactionType,
-
-    pub avg_tps: usize,
-    pub latency_thresholds: &'static [(f32, LatencyType)],
+    pub inner_traffic: EmitJobRequest,
+    pub inner_success_criteria: SuccessCriteria,
 }
 
 impl Test for TwoTrafficsTest {
@@ -32,7 +24,12 @@ impl Test for TwoTrafficsTest {
 }
 
 impl NetworkLoadTest for TwoTrafficsTest {
-    fn test(&self, swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        swarm: &mut dyn Swarm,
+        report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         info!(
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
@@ -43,13 +40,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
 
         let (emitter, emit_job_request) = create_emitter_and_request(
             swarm,
-            EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps {
-                    tps: self.inner_tps,
-                })
-                .gas_price(self.inner_gas_price)
-                .init_gas_price_multiplier(self.inner_init_gas_price_multiplier)
-                .transaction_type(self.inner_transaction_type),
+            self.inner_traffic.clone(),
             &nodes_to_send_load_to,
             rng,
         )?;
@@ -72,27 +63,15 @@ impl NetworkLoadTest for TwoTrafficsTest {
         );
 
         let rate = stats.rate();
-        info!("Inner traffic: {:?}", rate);
 
-        let avg_tps = rate.committed;
-        if avg_tps < self.avg_tps as u64 {
-            bail!(
-                "TPS requirement for inner traffic failed. Average TPS {}, minimum TPS requirement {}. Full inner stats: {:?}",
-                avg_tps,
-                self.avg_tps,
-                rate,
-            )
-        }
+        report.report_txn_stats(format!("{}: inner traffic", self.name()), &stats);
 
-        SuccessCriteriaChecker::check_latency(
-            &self
-                .latency_thresholds
-                .iter()
-                .map(|(s, t)| (Duration::from_secs_f32(*s), t.clone()))
-                .collect::<Vec<_>>(),
+        SuccessCriteriaChecker::check_core_for_success(
+            &self.inner_success_criteria,
+            report,
             &rate,
+            Some("inner traffic".to_string()),
         )?;
-
         Ok(())
     }
 }

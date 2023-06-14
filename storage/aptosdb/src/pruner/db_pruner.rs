@@ -3,7 +3,6 @@
 
 use anyhow::{Context, Result};
 use aptos_logger::info;
-use aptos_schemadb::SchemaBatch;
 use aptos_types::transaction::Version;
 use std::cmp::min;
 
@@ -32,11 +31,8 @@ pub trait DBPruner: Send + Sync {
     /// Initializes the least readable version stored in underlying DB storage
     fn initialize_min_readable_version(&self) -> Result<Version>;
 
-    /// Saves the min readable version.
-    fn save_min_readable_version(&self, version: Version, batch: &SchemaBatch) -> Result<()>;
-
-    /// Returns the least readable version stores in the DB pruner
-    fn min_readable_version(&self) -> Version;
+    /// Returns the progress of the pruner.
+    fn progress(&self) -> Version;
 
     /// Sets the target version for the pruner
     fn set_target_version(&self, target_version: Version);
@@ -49,19 +45,13 @@ pub trait DBPruner: Send + Sync {
     fn get_current_batch_target(&self, max_versions: Version) -> Version {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
-        min(
-            self.min_readable_version() + max_versions,
-            self.target_version(),
-        )
+        min(self.progress() + max_versions, self.target_version())
     }
     /// Records the current progress of the pruner by updating the least readable version
     fn record_progress(&self, min_readable_version: Version);
 
     /// True if there is pruning work pending to be done
     fn is_pruning_pending(&self) -> bool {
-        self.target_version() > self.min_readable_version()
+        self.target_version() > self.progress()
     }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version);
 }
