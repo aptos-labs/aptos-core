@@ -10,4 +10,6 @@ describe("account", () => {
     const account = await aptos.account.get("0x1");
     console.log(account);
   });
+
+  test("submit txn", async () => {});
 });

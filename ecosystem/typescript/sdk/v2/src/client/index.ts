@@ -97,7 +97,7 @@ export async function get<Req, Res>(
 export async function post<Req, Res>(
   config: AptosConfig,
   url: string,
-  body?: FormData,
+  body?: Req,
   originMethod?: string,
   overrides?: AxiosRequestConfig,
 ): Promise<Res> {

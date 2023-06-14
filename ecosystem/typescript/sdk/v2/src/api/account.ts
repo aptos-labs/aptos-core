@@ -1,5 +1,5 @@
 import { AptosConfig } from "../aptos_config";
-import { get } from "../client";
+import { get, post } from "../client";
 
 type AnyNumber = bigint | number;
 type AccountData = {
@@ -23,4 +23,11 @@ export class Account {
   }
 
   async getCoinsData(accountAddress: string, query?: PaginationArgs) {}
+
+  // TODO move to Transaction class
+  async submitTransaction(signedTxn: Uint8Array) {
+    return await post(this.config, `/transactions`, signedTxn, "submitTransaction", {
+      headers: { "Content-Type": "application/x.aptos.signed_transaction+bcs" },
+    });
+  }
 }
