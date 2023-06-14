@@ -46,4 +46,11 @@ spec aptos_framework::code {
         // TODO: loop too deep.
         pragma verify = false;
     }
+
+    spec get_module_names(pack: &PackageMetadata): vector<String> {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] len(result) == len(pack.modules);
+        ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
+    }
 }

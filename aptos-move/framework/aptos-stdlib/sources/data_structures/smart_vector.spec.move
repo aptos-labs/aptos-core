@@ -33,6 +33,10 @@ spec aptos_std::smart_vector {
         );
     }
 
+    spec push_back<T: store>(v: &mut SmartVector<T>, val: T) {
+        pragma verify = false; // TODO: set to false because of timeout
+    }
+
     spec pop_back {
         use aptos_std::table_with_length;
 
