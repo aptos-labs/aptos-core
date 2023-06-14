@@ -39,7 +39,7 @@ pub mod abort_codes {
     /// NOTE: This must match the code in the Move implementation
     pub const NFE_VALUE_OUTSIDE_RANGE: u64 = 0x01_0002;
 
-    /// Abort code when the request range is too large than the maximum supported one.
+    /// Abort code when the requested range is larger than the maximum supported one.
     /// NOTE: This must match the code in the Move implementation
     pub const NFE_RANGE_NOT_SUPPORTED: u64 = 0x01_0003;
 }

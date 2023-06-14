@@ -60,8 +60,14 @@
 /// scheme. Currently, our best candidate is ElGamal encryption in the exponent, which can only decrypt values around
 /// 32 bits or slightly larger.
 ///
-/// Specifically, veiled coins are the middle 32 bits of the normal 64 bit coin values. In order to convert a `u32`
-/// veiled coin amount to a normal `u64` coin amount, we have to shift it left by 16 bits.
+/// Specifically, veiled coin amounts are restricted to be 32 bits and can be cast to a normal 64-bit coin value by
+/// setting the leftmost and rightmost 16 bits to zero and the "middle" 32 bits to be the veiled coin bits.
+///
+/// This gives veiled amounts ~10 bits for specifying ~3 decimals and ~22 bits for specifying whole amounts, which
+/// limits veiled balances and veiled transfers to around 4 million coins. (See `coin.move` for how a normal 64-bit coin
+/// value gets interpreted as a decimal number.)
+///
+/// In order to convert a `u32` veiled coin amount to a normal `u64` coin amount, we have to shift it left by 16 bits.
 ///
 /// ```
 /// u64 normal coin amount format:
@@ -77,7 +83,7 @@
 /// `aptos_coin.move`). This precision $d$ is used when displaying a `u64` amount, by dividing the amount by $10^d$.
 /// For example, if the precision $d = 2$, then a `u64` amount of 505 coins displays as 5.05 coins.
 ///
-/// For veield coins, we can easily display a `u32` `Coin<T>` amount $v$ by:
+/// For veiled coins, we can easily display a `u32` `Coin<T>` amount $v$ by:
 ///  1. Casting $v$ as a u64 and shifting this left by 16 bits, obtaining a 64-bit $v'$
 ///  2. Displaying $v'$ normally, by dividing it by $d$, which is the precision in `CoinInfo<T>`.
 ///
@@ -90,11 +96,6 @@
 /// Later on, when someone wants to convert their `VeiledCoin<T>` into a normal `coin::Coin<T>`,
 /// the resource account can be used to transfer out the normal from its coin store. Transfering out a coin like this
 /// requires a `signer` for the resource account, which the `veiled_coin` module can obtain via a `SignerCapability`.
-///
-/// ## TODOs
-///
-///  - We could have an `is_veiled` flag associated with the veiled balance, which we turn on only after a veiled to
-///    veiled transaction to that account. This way, the wallet could even display the (actually-)veiled amount correctly.
 ///
 /// ## References
 ///
@@ -311,13 +312,13 @@ module veiled_coin::veiled_coin {
         let comm_new_balance = std::option::extract(&mut comm_new_balance);
         let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
 
-        let withdrawl_proof = WithdrawalProof {
+        let withdrawal_proof = WithdrawalProof {
             sigma_proof: std::option::extract(&mut sigma_proof),
             zkrp_new_balance,
         };
 
         // Do the actual work
-        unveil_to_internal<CoinType>(sender, recipient, amount, comm_new_balance, withdrawl_proof);
+        unveil_to_internal<CoinType>(sender, recipient, amount, comm_new_balance, withdrawal_proof);
     }
 
     /// Like `unveil_to`, except the `sender` is also the recipient.
@@ -398,8 +399,6 @@ module veiled_coin::veiled_coin {
     /// Clamps a `u64` normal public amount to a `u32` to-be-veiled amount.
     ///
     /// WARNING: Precision is lost here (see "Veiled coin amounts as truncated `u32`'s" in the top-level comments)
-    ///
-    /// (Unclear if this function will be needed.)
     public fun clamp_u64_to_u32_amount(amount: u64): u32 {
         // Removes the `NUM_MOST_SIGNIFICANT_BITS_REMOVED` most significant bits.
         amount << NUM_MOST_SIGNIFICANT_BITS_REMOVED;
@@ -718,7 +717,8 @@ module veiled_coin::veiled_coin {
         let value_u64 = coin::value(&c);
         let value_u32 = clamp_u64_to_u32_amount(value_u64);
 
-        // Paranoid check: assert that the u64 coin value had only its middle 32 bits set
+        // Paranoid check: assert that the u64 coin value had only its middle 32 bits set (should be the case
+        // because the caller should have withdrawn a u32 amount, but enforcing this here anyway).
         assert!(cast_u32_to_u64_amount(value_u32) == value_u64, error::internal(EINTERNAL_ERROR));
 
         // Deposit a normal coin into the resource account...

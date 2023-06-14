@@ -72,7 +72,6 @@ impl GasParameters {
     ///  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
     /// For simplicity, we estimate the complexity as O(n / log_2 n)
     pub fn multi_scalar_mul_gas(&self, size: usize) -> GasQuantity<InternalGasUnit> {
-        // TODO(Gas): Get benchmark numbers and handle size = 2 better, cause it returns `point_mul * 2` which gives no savings and thus no incentive to call the double_scalar_mul function
         self.point_mul * NumArgs::new((size as f64 / f64::log2(size as f64)).ceil() as u64)
     }
 }

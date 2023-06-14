@@ -22,8 +22,6 @@ def main(bench_path):
 
     Param `bench_path` has to be a serial bench, (e.g. 'target/criterion/hash/SHA2-256').
     '''
-    print(bench_path)
-    print("hello world")
     for sbp in glob(f'{bench_path}/*'):
         print(sbp)
     datapoints = [get_datapoint(sub_bench_path) for sub_bench_path in glob(f'{bench_path}/*')]

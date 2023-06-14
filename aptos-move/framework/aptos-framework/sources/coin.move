@@ -290,6 +290,10 @@ module aptos_framework::coin {
         }
     }
 
+    //
+    // Public functions
+    //
+
     /// Burn `coin` with capability.
     /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
     public fun burn<CoinType>(
