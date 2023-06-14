@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    sharded_block_partitioner::{
-        cross_shard_messages::CrossShardMsg::CrossShardDependentEdgesMsg,
-        dependency_analysis::{RWSet, WriteSetWithTxnIndex},
-    },
-    types::{CrossShardEdges, ShardId, TxnIndex},
+use crate::sharded_block_partitioner::{
+    cross_shard_messages::CrossShardMsg::CrossShardDependentEdgesMsg,
+    dependency_analysis::{RWSet, WriteSetWithTxnIndex},
 };
+use aptos_types::block_executor::partitioner::{CrossShardEdges, ShardId, TxnIndex};
 use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Clone, Debug)]
