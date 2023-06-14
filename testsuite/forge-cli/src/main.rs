@@ -589,7 +589,7 @@ fn run_consensus_only_three_region_simulation() -> ForgeConfig {
 fn run_consensus_only_perf_test() -> ForgeConfig {
     let config = ForgeConfig::default();
     config
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(50).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog: 600000 })
