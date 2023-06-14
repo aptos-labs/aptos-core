@@ -316,11 +316,9 @@ pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, Apt
 ///
 /// # Arguments
 ///
-/// * `raw_message` - the serialized raw transaction that need to be signed
-pub fn sign_message(
-    path: &str,
-    raw_message: Vec<u8>,
-) -> Result<Ed25519Signature, AptosLedgerError> {
+/// * `path` - derivative path of the ledger account
+/// * `raw_message` - the raw message that need to be signed
+pub fn sign_message(path: &str, raw_message: &[u8]) -> Result<Ed25519Signature, AptosLedgerError> {
     // open connection to ledger
     let transport = open_ledger_transport()?;
 
