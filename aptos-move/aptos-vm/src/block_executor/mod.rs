@@ -129,36 +129,15 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .map_or(0, |output| output.gas_used())
     }
 
-    fn execution_gas_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.execution_gas_used())
-    }
-
-    fn io_gas_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.io_gas_used())
-    }
-
-    fn storage_gas_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.storage_gas_used())
-    }
-
-    fn storage_fee_used(&self) -> u64 {
-        self.committed_output
-            .get()
-            .map_or(0, |output| output.storage_fee_used())
-    }
-
+    // Return the fee statement of the transaction.
+    // Should never be called after vm_output is consumed.
     fn fee_statement(&self) -> FeeStatement {
-        self.committed_output
-            .get()
-            .map_or(FeeStatement::new_v1(0, 0, 0, 0, 0), |output| {
-                output.fee_statement()
-            })
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get fee statement")
+            .fee_statement()
+            .clone()
     }
 }
 

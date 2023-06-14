@@ -18,7 +18,6 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
-    fee_statement::FeeStatement,
     on_chain_config::{
         access_path_for_config, new_epoch_event_key, ConfigurationResource, OnChainConfig,
         ValidatorSet,
@@ -94,7 +93,7 @@ impl VMExecutor for MockVM {
                     TypeTag::Bool,
                     bcs::to_bytes(&0).unwrap(),
                 )],
-                FeeStatement::empty_v0(),
+                0,
                 KEEP_STATUS.clone(),
             );
             return Ok(vec![output]);
@@ -110,7 +109,7 @@ impl VMExecutor for MockVM {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),
                     vec![],
-                    FeeStatement::empty_v0(),
+                    0,
                     KEEP_STATUS.clone(),
                 ));
                 continue;
@@ -136,7 +135,7 @@ impl VMExecutor for MockVM {
                         TypeTag::Bool,
                         bcs::to_bytes(&0).unwrap(),
                     )],
-                    FeeStatement::empty_v0(),
+                    0,
                     KEEP_STATUS.clone(),
                 ));
                 continue;
@@ -157,7 +156,7 @@ impl VMExecutor for MockVM {
                     outputs.push(TransactionOutput::new(
                         write_set,
                         events,
-                        FeeStatement::empty_v0(),
+                        0,
                         KEEP_STATUS.clone(),
                     ));
                 },
@@ -172,7 +171,7 @@ impl VMExecutor for MockVM {
                         outputs.push(TransactionOutput::new(
                             WriteSet::default(),
                             vec![],
-                            FeeStatement::empty_v0(),
+                            0,
                             DISCARD_STATUS.clone(),
                         ));
                         continue;
@@ -198,7 +197,7 @@ impl VMExecutor for MockVM {
                     outputs.push(TransactionOutput::new(
                         write_set,
                         events,
-                        FeeStatement::empty_v0(),
+                        0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     ));
                 },

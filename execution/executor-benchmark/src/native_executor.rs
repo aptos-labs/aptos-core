@@ -16,7 +16,6 @@ use aptos_types::{
     account_config::{deposit::DepositEvent, withdraw::WithdrawEvent},
     contract_event::ContractEvent,
     event::EventKey,
-    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
     vm_status::AbortLocation,
@@ -41,7 +40,7 @@ impl IncrementalOutput {
         Ok(TransactionOutput::new(
             WriteSetMut::new(self.write_set).freeze()?,
             self.events,
-            /*gas_used=*/ FeeStatement::new_v0(1),
+            /*gas_used=*/ 1,
             TransactionStatus::Keep(ExecutionStatus::Success),
         ))
     }
@@ -52,7 +51,7 @@ impl IncrementalOutput {
     }
 
     fn to_abort(status: TransactionStatus) -> TransactionOutput {
-        TransactionOutput::new(Default::default(), vec![], FeeStatement::empty_v0(), status)
+        TransactionOutput::new(Default::default(), vec![], 0, status)
     }
 }
 
@@ -330,7 +329,7 @@ impl NativeExecutor {
         Ok(TransactionOutput::new(
             WriteSet::default(),
             vec![],
-            /*gas_used=*/ FeeStatement::empty_v0(),
+            /*gas_used=*/ 0,
             TransactionStatus::Keep(ExecutionStatus::Success),
         ))
     }

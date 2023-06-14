@@ -8,7 +8,6 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     chain_id::ChainId,
-    fee_statement::FeeStatement,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
@@ -144,7 +143,7 @@ fn create_test_transaction_output() -> TransactionOutput {
     TransactionOutput::new(
         WriteSet::default(),
         vec![],
-        FeeStatement::empty_v0(),
+        0,
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
     )
 }

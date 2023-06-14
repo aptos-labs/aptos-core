@@ -90,7 +90,6 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
-    fee_statement::FeeStatement,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
@@ -1476,11 +1475,10 @@ impl DbReader for AptosDB {
                     let events = self.event_store.get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
                     let txn = self.transaction_store.get_transaction(version)?;
-                    let fee_statement = FeeStatement::new_v0(txn_info.gas_used());
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
-                        fee_statement,
+                        txn_info.gas_used(),
                         txn_info.status().clone().into(),
                     );
                     Ok((txn_info, (txn, txn_output)))

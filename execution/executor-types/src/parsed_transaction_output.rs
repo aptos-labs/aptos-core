@@ -4,7 +4,6 @@
 use crate::in_memory_state_calculator::NEW_EPOCH_EVENT_KEY;
 use aptos_types::{
     contract_event::ContractEvent,
-    fee_statement::FeeStatement,
     transaction::{TransactionOutput, TransactionStatus},
     write_set::WriteSet,
 };
@@ -52,15 +51,15 @@ impl ParsedTransactionOutput {
         WriteSet,
         Vec<ContractEvent>,
         Vec<ContractEvent>,
-        FeeStatement,
+        u64,
         TransactionStatus,
     ) {
         let Self {
             output,
             reconfig_events,
         } = self;
-        let (write_set, events, fee_statement, status) = output.unpack();
+        let (write_set, events, gas_used, status) = output.unpack();
 
-        (write_set, events, reconfig_events, fee_statement, status)
+        (write_set, events, reconfig_events, gas_used, status)
     }
 }

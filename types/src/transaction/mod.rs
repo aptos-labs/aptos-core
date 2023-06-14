@@ -7,7 +7,6 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    fee_statement::FeeStatement,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -932,8 +931,8 @@ pub struct TransactionOutput {
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
 
-    /// The gas fee charged during execution.
-    fee_statement: FeeStatement,
+    /// The amount of gas used during execution.
+    gas_used: u64,
 
     /// The execution status.
     status: TransactionStatus,
@@ -943,13 +942,13 @@ impl TransactionOutput {
     pub fn new(
         write_set: WriteSet,
         events: Vec<ContractEvent>,
-        fee_statement: FeeStatement,
+        gas_used: u64,
         status: TransactionStatus,
     ) -> Self {
         TransactionOutput {
             write_set,
             events,
-            fee_statement,
+            gas_used,
             status,
         }
     }
@@ -967,48 +966,21 @@ impl TransactionOutput {
     }
 
     pub fn gas_used(&self) -> u64 {
-        self.fee_statement.gas_used()
-    }
-
-    pub fn execution_gas_used(&self) -> u64 {
-        self.fee_statement.execution_gas_used()
-    }
-
-    pub fn io_gas_used(&self) -> u64 {
-        self.fee_statement.io_gas_used()
-    }
-
-    pub fn storage_gas_used(&self) -> u64 {
-        self.fee_statement.storage_gas_used()
-    }
-
-    pub fn storage_fee_used(&self) -> u64 {
-        self.fee_statement.storage_fee_used()
-    }
-
-    pub fn fee_statement(&self) -> FeeStatement {
-        self.fee_statement.fee_statement()
+        self.gas_used
     }
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }
 
-    pub fn unpack(
-        self,
-    ) -> (
-        WriteSet,
-        Vec<ContractEvent>,
-        FeeStatement,
-        TransactionStatus,
-    ) {
+    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
         let Self {
             write_set,
             events,
-            fee_statement,
+            gas_used,
             status,
         } = self;
-        (write_set, events, fee_statement, status)
+        (write_set, events, gas_used, status)
     }
 
     pub fn ensure_match_transaction_info(

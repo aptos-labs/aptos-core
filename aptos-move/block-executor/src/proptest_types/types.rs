@@ -518,22 +518,6 @@ where
         1
     }
 
-    fn execution_gas_used(&self) -> u64 {
-        1
-    }
-
-    fn io_gas_used(&self) -> u64 {
-        0
-    }
-
-    fn storage_gas_used(&self) -> u64 {
-        0
-    }
-
-    fn storage_fee_used(&self) -> u64 {
-        0
-    }
-
     fn fee_statement(&self) -> FeeStatement {
         FeeStatement::new_v1(1, 1, 0, 0, 0)
     }

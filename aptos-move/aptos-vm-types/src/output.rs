@@ -45,7 +45,11 @@ impl VMOutput {
         }
     }
 
-    pub fn unpack(self) -> (VMChangeSet, FeeStatement, TransactionStatus) {
+    pub fn unpack(self) -> (VMChangeSet, u64, TransactionStatus) {
+        (self.change_set, self.fee_statement.gas_used(), self.status)
+    }
+
+    pub fn unpack_with_fee_statement(self) -> (VMChangeSet, FeeStatement, TransactionStatus) {
         (self.change_set, self.fee_statement, self.status)
     }
 
@@ -65,12 +69,8 @@ impl VMOutput {
         self.fee_statement.gas_used()
     }
 
-    pub fn execution_gas_used(&self) -> u64 {
-        self.fee_statement.execution_gas_used()
-    }
-
-    pub fn io_gas_used(&self) -> u64 {
-        self.fee_statement.io_gas_used()
+    pub fn fee_statement(&self) -> &FeeStatement {
+        &self.fee_statement
     }
 
     pub fn status(&self) -> &TransactionStatus {
@@ -91,7 +91,7 @@ impl VMOutput {
         }
 
         // Try to materialize deltas and add them to the write set.
-        let (change_set, gas_used, status) = self.unpack();
+        let (change_set, gas_used, status) = self.unpack_with_fee_statement();
         let materialized_change_set = change_set.try_materialize(state_view)?;
         Ok(VMOutput::new(materialized_change_set, gas_used, status))
     }
