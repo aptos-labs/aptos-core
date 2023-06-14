@@ -232,7 +232,7 @@ fn main() -> Result<()> {
     let suite_name: &str = args.suite.as_ref();
 
     let suite_name = if suite_name == "land_blocking" {
-        "workload_mix"
+        "realistic_env_graceful_overload"
     } else {
         panic!()
     };
