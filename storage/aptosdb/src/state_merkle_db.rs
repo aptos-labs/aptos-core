@@ -255,9 +255,18 @@ impl StateMerkleDb {
                 .rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
             iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
             if let Some((key, _node)) = iter.next().transpose()? {
-                // TODO: If we break up a single update batch to multiple commits, we would need to
-                // deal with a partial version, which hasn't got the root committed.
-                return Ok(Some(key.version()));
+                let version = key.version();
+                if self
+                    .metadata_db()
+                    .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
+                    .is_some()
+                {
+                    return Ok(Some(version));
+                }
+                // Since we split state merkle commit into multiple batches, it's possible that
+                // the root is not committed yet. In this case we need to look at the previous
+                // root.
+                return self.get_state_snapshot_version_before(version);
             }
         }
         // No version before genesis.
