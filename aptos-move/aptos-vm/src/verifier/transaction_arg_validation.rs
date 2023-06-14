@@ -149,6 +149,20 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         ));
     }
 
+    // If the invoked function expects one or more signers, we need to check that the number of
+    // signers actually passed is matching first to maintain backward compatibility before
+    // moving on to the validation of non-signer args.
+    // the number of txn senders should be the same number of signers
+    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+        return Err(VMStatus::Error(
+            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+            None,
+        ));
+    }
+
+    // This also validates that the args are valid. If they are structs, they have to be allowed
+    // and must be constructed successfully. If construction fails, this would fail with a
+    // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
         &func.parameters[signer_param_cnt..],
@@ -158,19 +172,10 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         false,
     )?;
 
-    // if function doesn't require signer, we reuse txn args
-    // if the function require signer, we check senders number same as signers
-    // and then combine senders with txn args.
+    // Combine signer and non-signer arguments.
     let combined_args = if signer_param_cnt == 0 {
         args
     } else {
-        // the number of txn senders should be the same number of signers
-        if senders.len() != signer_param_cnt {
-            return Err(VMStatus::Error(
-                StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
-                None,
-            ));
-        }
         senders
             .into_iter()
             .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
