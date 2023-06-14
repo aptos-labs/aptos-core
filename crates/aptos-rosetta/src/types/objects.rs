@@ -554,7 +554,7 @@ impl Operation {
         amount: Option<u64>,
     ) -> Operation {
         Operation::new(
-            OperationType::WithdrawUndelegated,
+            OperationType::WithdrawUndelegatedFunds,
             operation_index,
             status,
             AccountIdentifier::base_account(owner),
@@ -1914,7 +1914,7 @@ impl InternalOperation {
                                 }));
                             }
                         },
-                        Ok(OperationType::WithdrawUndelegated) => {
+                        Ok(OperationType::WithdrawUndelegatedFunds) => {
                             if let (
                                 Some(OperationMetadata {
                                     pool_address: Some(pool_address),

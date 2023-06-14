@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::BlockExecutorTrait;
+use aptos_executor_types::{BlockExecutorTrait, ExecutableTransactions};
 use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
@@ -39,7 +39,8 @@ pub fn fuzz_execute_and_commit_blocks(
     let mut block_ids = vec![];
     for block in blocks {
         let block_id = block.0;
-        let _execution_results = executor.execute_block(block, parent_block_id, BLOCK_GAS_LIMIT);
+        let _execution_results =
+            executor.execute_block(block.into(), parent_block_id, BLOCK_GAS_LIMIT);
         parent_block_id = block_id;
         block_ids.push(block_id);
     }
@@ -51,7 +52,7 @@ pub struct FakeVM;
 
 impl TransactionBlockExecutor for FakeVM {
     fn execute_transaction_block(
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {
