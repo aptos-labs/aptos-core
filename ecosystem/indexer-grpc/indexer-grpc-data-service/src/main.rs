@@ -23,8 +23,24 @@ use tonic::{
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct IndexerGrpcDataServiceConfig {
+pub struct TlsConfig {
+    // TLS config.
     pub data_service_grpc_listen_address: String,
+    pub cert_path: String,
+    pub key_path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NonTlsConfig {
+    pub data_service_grpc_listen_address: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexerGrpcDataServiceConfig {
+    pub data_service_grpc_tls_config: Option<TlsConfig>,
+    pub data_service_grpc_non_tls_config: Option<NonTlsConfig>,
     pub whitelisted_auth_tokens: Vec<String>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_read_replica_address: String,
@@ -33,8 +49,6 @@ pub struct IndexerGrpcDataServiceConfig {
 #[async_trait::async_trait]
 impl RunnableConfig for IndexerGrpcDataServiceConfig {
     async fn run(&self) -> Result<()> {
-        let grpc_address = self.data_service_grpc_listen_address.clone();
-
         let token_set = build_auth_token_set(self.whitelisted_auth_tokens.clone());
         let authentication_inceptor =
             move |req: Request<()>| -> std::result::Result<Request<()>, Status> {
@@ -61,7 +75,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
             .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
             .build()
-            .expect("Failed to build reflection service");
+            .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?;
 
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
@@ -72,12 +86,57 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
         let svc_with_interceptor = InterceptedService::new(svc, authentication_inceptor);
-        Server::builder()
-            .add_service(reflection_service)
-            .add_service(svc_with_interceptor)
-            .serve(grpc_address.to_socket_addrs().unwrap().next().unwrap())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to serve: {}", e))
+
+        let svc_with_interceptor_clone = svc_with_interceptor.clone();
+        let reflection_service_clone = reflection_service.clone();
+
+        let mut tasks = vec![];
+        if self.data_service_grpc_non_tls_config.is_some() {
+            let config = self.data_service_grpc_non_tls_config.clone().unwrap();
+            let grpc_address = config
+                .data_service_grpc_listen_address
+                .to_socket_addrs()
+                .map_err(|e| anyhow::anyhow!(e))?
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("Failed to parse grpc address"))?;
+            tasks.push(tokio::spawn(async move {
+                Server::builder()
+                    .add_service(svc_with_interceptor_clone)
+                    .add_service(reflection_service_clone)
+                    .serve(grpc_address)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))
+            }));
+        }
+        if self.data_service_grpc_tls_config.is_some() {
+            let config = self.data_service_grpc_tls_config.clone().unwrap();
+            let grpc_address = config
+                .data_service_grpc_listen_address
+                .to_socket_addrs()
+                .map_err(|e| anyhow::anyhow!(e))?
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("Failed to parse grpc address"))?;
+
+            let cert = tokio::fs::read(config.cert_path.clone()).await?;
+            let key = tokio::fs::read(config.key_path.clone()).await?;
+            let identity = tonic::transport::Identity::from_pem(cert, key);
+            tasks.push(tokio::spawn(async move {
+                Server::builder()
+                    .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?
+                    .add_service(svc_with_interceptor)
+                    .add_service(reflection_service)
+                    .serve(grpc_address)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))
+            }));
+        }
+
+        if tasks.is_empty() {
+            return Err(anyhow::anyhow!("No grpc config provided"));
+        }
+
+        futures::future::try_join_all(tasks).await?;
+        Ok(())
     }
 
     fn get_server_name(&self) -> String {
