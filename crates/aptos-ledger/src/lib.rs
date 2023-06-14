@@ -7,6 +7,7 @@
 
 #![deny(missing_docs)]
 
+use aptos_crypto::ed25519::Ed25519Signature;
 pub use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 pub use aptos_types::{
     account_address::AccountAddress, transaction::authenticator::AuthenticationKey,
@@ -315,8 +316,9 @@ pub fn get_public_key(path: &str, display: bool) -> Result<Ed25519PublicKey, Apt
 ///
 /// # Arguments
 ///
-/// * `raw_txn` - the serialized raw transaction that need to be signed
-pub fn sign_txn(path: &str, raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerError> {
+/// * `path` - derivative path of the ledger account
+/// * `raw_message` - the raw message that need to be signed
+pub fn sign_message(path: &str, raw_message: &[u8]) -> Result<Ed25519Signature, AptosLedgerError> {
     // open connection to ledger
     let transport = open_ledger_transport()?;
 
@@ -336,7 +338,7 @@ pub fn sign_txn(path: &str, raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerErro
         return Err(AptosLedgerError::UnexpectedError(err.to_string(), None));
     }
 
-    let chunks = raw_txn.chunks(MAX_APDU_LEN);
+    let chunks = raw_message.chunks(MAX_APDU_LEN);
     let chunks_count = chunks.len();
 
     for (i, chunk) in chunks.enumerate() {
@@ -356,7 +358,9 @@ pub fn sign_txn(path: &str, raw_txn: Vec<u8>) -> Result<Vec<u8>, AptosLedgerErro
 
                         let signature_len: usize = response_buffer[0] as usize;
                         let signature_buffer = &response_buffer[1..1 + signature_len];
-                        return Ok(signature_buffer.to_vec());
+                        return Ed25519Signature::try_from(signature_buffer).map_err(|err| {
+                            AptosLedgerError::UnexpectedError(err.to_string(), None)
+                        });
                     }
                 } else {
                     let error_string = response
