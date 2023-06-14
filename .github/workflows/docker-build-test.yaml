@@ -316,6 +316,6 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: consensus_only_perf_benchmark
       IMAGE_TAG: consensus_only_perf_test_${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_RUNNER_DURATION_SECS: 1800
+      FORGE_RUNNER_DURATION_SECS: 900
       COMMENT_HEADER: forge-consensus-only-perf-test
       FORGE_NAMESPACE: forge-consensus-only-perf-test-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
