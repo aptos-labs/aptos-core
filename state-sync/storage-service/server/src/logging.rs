@@ -39,7 +39,7 @@ pub enum LogEntry {
     OptimisticFetchRefresh,
     OptimisticFetchRequest,
     OptimisticFetchResponse,
-    ReceivedCacheUpdateNotification,
+    //ReceivedCacheUpdateNotification,
     ReceivedCommitNotification,
     ReceivedStorageRequest,
     RequestModeratorIgnoredPeer,
