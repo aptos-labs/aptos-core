@@ -25,7 +25,6 @@ use aptos_types::{
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
-    fee_statement::FeeStatement,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
@@ -582,7 +581,7 @@ impl DbReader for FakeAptosDB {
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
-                        FeeStatement::new_v0(txn_info.gas_used()),
+                        txn_info.gas_used(),
                         txn_info.status().clone().into(),
                     );
                     Ok((txn_info, (txn, txn_output)))
