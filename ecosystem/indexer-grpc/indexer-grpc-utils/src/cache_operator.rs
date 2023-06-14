@@ -16,7 +16,7 @@ const CACHE_SIZE_ESTIMATION: u64 = 3_000_000_u64;
 // lower than the latest version - CACHE_SIZE_EVICTION_LOWER_BOUND.
 // The gap between CACHE_SIZE_ESTIMATION and this is to give buffer since
 // reading latest version and actual data not atomic(two operations).
-const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 12_000_000_u64;
+const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 4_000_000_u64;
 
 // Keys for cache.
 const CACHE_KEY_LATEST_VERSION: &str = "latest_version";

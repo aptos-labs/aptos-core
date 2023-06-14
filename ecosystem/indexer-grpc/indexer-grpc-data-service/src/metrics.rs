@@ -50,7 +50,7 @@ pub static ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Data latency for data service based on latest processed transaction based on selected processor.
 pub static PROCESSED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!(
-        "indexer_grpc_data_service_data_latency_in_secs",
+        "indexer_grpc_data_service_latest_data_latency_in_secs",
         "Latency of data service based on latest processed transaction",
         &["request_token", "processor_name"],
     )
@@ -60,7 +60,7 @@ pub static PROCESSED_LATENCY_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
 /// Data latency for data service based on latest processed transaction for all processors.
 pub static PROCESSED_LATENCY_IN_SECS_ALL: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "indexer_grpc_data_service_data_latency_in_secs_all",
+        "indexer_grpc_data_service_latest_data_latency_in_secs_all",
         "Latency of data service based on latest processed transaction",
         &["request_token"]
     )
