@@ -37,6 +37,31 @@ use std::{
     },
 };
 
+struct CommitGuard<'a> {
+    post_commit_txs: &'a Vec<Sender<u32>>,
+    worker_idx: usize,
+    txn_idx: u32,
+}
+
+impl<'a> CommitGuard<'a> {
+    fn new(post_commit_txs: &'a Vec<Sender<u32>>, worker_idx: usize, txn_idx: u32) -> Self {
+        Self {
+            post_commit_txs,
+            worker_idx,
+            txn_idx,
+        }
+    }
+}
+
+impl<'a> Drop for CommitGuard<'a> {
+    fn drop(&mut self) {
+        // Send the committed txn to the Worker thread.
+        self.post_commit_txs[self.worker_idx]
+            .send(self.txn_idx)
+            .expect("Worker must be available");
+    }
+}
+
 #[derive(Debug)]
 enum CommitRole {
     Coordinator(Vec<Sender<TxnIndex>>),
@@ -229,8 +254,11 @@ where
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
-        let mut remaining_work = None;
         while let Some(txn_idx) = scheduler.try_commit() {
+            // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
+            let _commit_guard: CommitGuard =
+                CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
+
             // Committed the last transaction, BlockSTM finishes execution.
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
                 *scheduler_task = SchedulerTask::Done;
@@ -241,7 +269,6 @@ where
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
                     txn_idx + 1
                 );
-                remaining_work = Some(txn_idx);
                 break;
             }
 
@@ -258,7 +285,6 @@ where
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
-                    remaining_work = Some(txn_idx);
                     break;
                 },
             };
@@ -274,14 +300,10 @@ where
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_gas, per_block_gas_limit, txn_idx);
-                    remaining_work = Some(txn_idx);
                     break;
                 }
             }
 
-            post_commit_txs[*worker_idx]
-                .send(txn_idx)
-                .expect("Worker must be available");
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
@@ -292,12 +314,6 @@ where
             // committing thread (to be Done), otherwise some other pending thread waiting for the execution
             // will be pending on read forever (since the halt logic let the execution task to wake up such
             // pending task).
-        }
-        if let Some(txn_idx) = remaining_work {
-            // Send the last remaining txn to worker.
-            post_commit_txs[*worker_idx]
-                .send(txn_idx)
-                .expect("Worker must be available");
         }
     }
 
