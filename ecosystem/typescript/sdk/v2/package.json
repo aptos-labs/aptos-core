@@ -14,15 +14,16 @@
       "require": "./dist/cjs/index.js",
       "import": "./dist/cjs/index.js"
     },
-    "types": "./dist/esm/index.d.ts",
+    "types": "./dist/types/index.d.ts",
     "default": "./dist/esm/index.mjs"
   },
   "scripts": {
     "build:clean": "rm -rf dist",
-    "build": "pnpm build:clean && pnpm _build:esm && pnpm _build:cjs && pnpm _build:browser",
-    "_build:browser": "tsup src/index.ts --platform browser --format iife --global-name aptosSDK --minify --out-dir dist/browser --external got",
+    "build": "pnpm build:clean && pnpm run _build:types && pnpm _build:esm && pnpm _build:cjs && pnpm _build:browser",
+    "_build:browser": "tsup src/index.ts --platform browser --format iife --global-name aptosSDK --minify --out-dir dist/browser",
     "_build:esm": "tsup src/index.ts --format esm --dts --out-dir dist/esm",
-    "_build:cjs": "tsup src/index.ts --format cjs --dts --out-dir dist/cjs"
+    "_build:cjs": "tsup src/index.ts --format cjs --dts --out-dir dist/cjs",
+    "_build:types": "tsup src/types/index.ts --dts --out-dir dist/types"
   },
   "dependencies": {
     "axios": "^1.4.0"

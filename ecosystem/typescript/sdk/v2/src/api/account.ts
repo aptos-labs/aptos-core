@@ -1,15 +1,6 @@
 import { AptosConfig } from "../aptos_config";
 import { get, post } from "../client";
-
-type AnyNumber = bigint | number;
-type AccountData = {
-  sequence_number: string;
-  authentication_key: string;
-};
-interface PaginationArgs {
-  start?: AnyNumber;
-  limit?: number;
-}
+import { AccountData, PaginationArgs } from "../types";
 
 export class Account {
   readonly config: AptosConfig;
