@@ -258,6 +258,8 @@ where
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
+            // Iterate round robin over workers to do commit_hook.
+            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
             if txn_idx as usize + 1 == scheduler.num_txns() as usize {
@@ -303,9 +305,6 @@ where
                     break;
                 }
             }
-
-            // Iterate round robin over workers to do commit_hook.
-            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
             // will be properly handled by the threads. For instance, it is possible that the committing
