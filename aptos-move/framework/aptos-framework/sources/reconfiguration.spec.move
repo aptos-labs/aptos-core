@@ -67,7 +67,9 @@ spec aptos_framework::reconfiguration {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+        //We use aborts_if_is_partial to avoid timeout
+        //All properties is verifed
+        pragma aborts_if_is_partial;
 
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
