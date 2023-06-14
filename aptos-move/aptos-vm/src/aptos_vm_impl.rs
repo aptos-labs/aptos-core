@@ -23,7 +23,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
-        GasScheduleV2, OnChainConfig, StorageGasSchedule, TimedFeatures, Version,
+        GasScheduleV2, OnChainConfig, TimedFeatures, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -85,16 +85,8 @@ impl AptosVMImpl {
             gas_config(&storage);
 
         let storage_gas_params = if let Some(gas_params) = &mut gas_params {
-            let storage_gas_schedule = match gas_feature_version {
-                0 => None,
-                _ => StorageGasSchedule::fetch_config(&storage),
-            };
-
-            let storage_gas_params = StorageGasParameters::new(
-                gas_feature_version,
-                gas_params,
-                storage_gas_schedule.as_ref(),
-            );
+            let storage_gas_params =
+                StorageGasParameters::new(gas_feature_version, gas_params, &storage);
 
             if let StoragePricing::V2(pricing) = &storage_gas_params.pricing {
                 // Overwrite table io gas parameters with global io pricing.

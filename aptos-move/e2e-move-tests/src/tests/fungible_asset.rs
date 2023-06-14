@@ -23,26 +23,49 @@ fn test_basic_fungible_token() {
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
         .named_addresses
-        .insert("fungible_token".to_string(), *alice.address());
+        .insert("example_addr".to_string(), *alice.address());
 
     let result = h.publish_package_with_options(
         &alice,
-        &common::test_dir_path("../../../move-examples/fungible_token"),
+        &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_asset"),
+        build_options.clone(),
+    );
+
+    assert_success!(result);
+    let result = h.publish_package_with_options(
+        &alice,
+        &common::test_dir_path("../../../move-examples/fungible_asset/managed_fungible_token"),
         build_options,
     );
     assert_success!(result);
 
+    let metadata = h
+        .execute_view_function(
+            str::parse(&format!(
+                "0x{}::managed_fungible_token::get_metadata",
+                *alice.address()
+            ))
+            .unwrap(),
+            vec![],
+            vec![],
+        )
+        .unwrap()
+        .pop()
+        .unwrap();
+    let metadata = bcs::from_bytes::<AccountAddress>(metadata.as_slice()).unwrap();
+
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_token::mint",
+            "0x{}::managed_fungible_asset::mint_to_primary_stores",
             *alice.address()
         ))
         .unwrap(),
         vec![],
         vec![
-            bcs::to_bytes::<u64>(&100).unwrap(), // amount
-            bcs::to_bytes(alice.address()).unwrap(),
+            bcs::to_bytes(&metadata).unwrap(),
+            bcs::to_bytes(&vec![alice.address()]).unwrap(),
+            bcs::to_bytes(&vec![100u64]).unwrap(), // amount
         ],
     );
     assert_success!(result);
@@ -50,15 +73,16 @@ fn test_basic_fungible_token() {
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_token::transfer",
+            "0x{}::managed_fungible_asset::transfer_between_primary_stores",
             *alice.address()
         ))
         .unwrap(),
         vec![],
         vec![
-            bcs::to_bytes(alice.address()).unwrap(),
-            bcs::to_bytes(bob.address()).unwrap(),
-            bcs::to_bytes::<u64>(&30).unwrap(), // amount
+            bcs::to_bytes(&metadata).unwrap(),
+            bcs::to_bytes(&vec![alice.address()]).unwrap(),
+            bcs::to_bytes(&vec![bob.address()]).unwrap(),
+            bcs::to_bytes(&vec![30u64]).unwrap(), // amount
         ],
     );
 
@@ -66,14 +90,15 @@ fn test_basic_fungible_token() {
     let result = h.run_entry_function(
         &alice,
         str::parse(&format!(
-            "0x{}::managed_fungible_token::burn",
+            "0x{}::managed_fungible_asset::burn_from_primary_stores",
             *alice.address()
         ))
         .unwrap(),
         vec![],
         vec![
-            bcs::to_bytes(bob.address()).unwrap(),
-            bcs::to_bytes::<u64>(&20).unwrap(), // amount
+            bcs::to_bytes(&metadata).unwrap(),
+            bcs::to_bytes(&vec![bob.address()]).unwrap(),
+            bcs::to_bytes(&vec![20u64]).unwrap(), // amount
         ],
     );
     assert_success!(result);
