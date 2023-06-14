@@ -9,7 +9,6 @@ spec aptos_framework::resource_account {
         seed: vector<u8>,
         optional_auth_key: vector<u8>,
     ) {
-        pragma verify = true;
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
 
@@ -35,7 +34,6 @@ spec aptos_framework::resource_account {
         optional_auth_key: vector<u8>,
         fund_amount: u64,
     ) {
-        pragma verify = true;
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
         let container = global<Container>(source_addr);
