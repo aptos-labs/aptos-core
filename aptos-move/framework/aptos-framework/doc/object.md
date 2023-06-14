@@ -1658,8 +1658,7 @@ objects may have cyclic dependencies.
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
 
     <b>let</b> count = 0;
-    <b>while</b> (owner != current_address)
-    {
+    <b>while</b> (owner != current_address) {
         <b>let</b> count = count + 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
 
@@ -1676,7 +1675,6 @@ objects may have cyclic dependencies.
         );
 
         current_address = <a href="object.md#0x1_object">object</a>.owner;
-
     };
 }
 </code></pre>

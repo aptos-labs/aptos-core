@@ -464,8 +464,7 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address)
-        {
+        while (owner != current_address) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
 
@@ -482,7 +481,6 @@ module aptos_framework::object {
             );
 
             current_address = object.owner;
-
         };
     }
 
