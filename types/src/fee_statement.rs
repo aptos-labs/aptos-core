@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -62,6 +63,16 @@ impl FeeStatement {
         }
     }
 
+    pub fn new_v1_from_fee_statement(fee_statement: &FeeStatement) -> Self {
+        FeeStatement::V1 {
+            total_charge_gas_units: fee_statement.gas_used(),
+            execution_gas_units: fee_statement.execution_gas_used(),
+            io_gas_units: fee_statement.io_gas_used(),
+            storage_gas_units: fee_statement.storage_gas_used(),
+            storage_fee_units: fee_statement.storage_fee_used(),
+        }
+    }
+
     pub fn gas_used(&self) -> u64 {
         match self {
             FeeStatement::V0 {
@@ -111,24 +122,47 @@ impl FeeStatement {
         }
     }
 
-    pub fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
-        match self {
-            FeeStatement::V0 {
-                total_charge_gas_units,
-            } => (*total_charge_gas_units, 0, 0, 0, 0),
-            FeeStatement::V1 {
-                total_charge_gas_units,
-                execution_gas_units,
-                io_gas_units,
-                storage_gas_units,
-                storage_fee_units,
-            } => (
-                *total_charge_gas_units,
-                *execution_gas_units,
-                *io_gas_units,
-                *storage_gas_units,
-                *storage_fee_units,
-            ),
+    pub fn add_fee_statement(&mut self, other: &FeeStatement) -> anyhow::Result<()> {
+        match (self, other) {
+            (
+                FeeStatement::V0 {
+                    total_charge_gas_units,
+                },
+                FeeStatement::V0 {
+                    total_charge_gas_units: other_total_charge_gas_units,
+                },
+            ) => {
+                *total_charge_gas_units += *other_total_charge_gas_units;
+                Ok(())
+            },
+            (
+                FeeStatement::V1 {
+                    total_charge_gas_units,
+                    execution_gas_units,
+                    io_gas_units,
+                    storage_gas_units,
+                    storage_fee_units,
+                },
+                FeeStatement::V1 {
+                    total_charge_gas_units: other_total_charge_gas_units,
+                    execution_gas_units: other_execution_gas_units,
+                    io_gas_units: other_io_gas_units,
+                    storage_gas_units: other_storage_gas_units,
+                    storage_fee_units: other_storage_fee_units,
+                },
+            ) => {
+                *total_charge_gas_units += *other_total_charge_gas_units;
+                *execution_gas_units += *other_execution_gas_units;
+                *io_gas_units += *other_io_gas_units;
+                *storage_gas_units += *other_storage_gas_units;
+                *storage_fee_units += *other_storage_fee_units;
+                Ok(())
+            },
+            _ => bail!("Cannot add different versions of FeeStatement"),
         }
+    }
+
+    pub fn fee_statement(&self) -> FeeStatement {
+        self.clone()
     }
 }

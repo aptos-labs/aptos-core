@@ -26,6 +26,7 @@ use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     executable::ExecutableTestType,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -152,10 +153,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .map_or(0, |output| output.storage_fee_used())
     }
 
-    fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
+    fn fee_statement(&self) -> FeeStatement {
         self.committed_output
             .get()
-            .map_or((0, 0, 0, 0, 0), |output| output.fee_statement())
+            .map_or(FeeStatement::new_v1(0, 0, 0, 0, 0), |output| {
+                output.fee_statement()
+            })
     }
 }
 

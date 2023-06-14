@@ -25,6 +25,7 @@ use aptos_types::{
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
+    fee_statement::FeeStatement,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, position::Position, AccumulatorConsistencyProof,
@@ -104,7 +105,7 @@ impl FakeBufferedState {
         ensure!(
             new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
         );
-        if let Some(updates_until_next_checkpoint_since_current) =
+        if let Some(_updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
@@ -581,7 +582,7 @@ impl DbReader for FakeAptosDB {
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
-                        txn_info.gas_used(),
+                        FeeStatement::new_v0(txn_info.gas_used()),
                         txn_info.status().clone().into(),
                     );
                     Ok((txn_info, (txn, txn_output)))

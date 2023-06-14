@@ -213,7 +213,7 @@ impl ChunkOutput {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         use aptos_state_view::{StateViewId, TStateView};
-        use aptos_types::write_set::WriteSet;
+        use aptos_types::{fee_statement::FeeStatement, write_set::WriteSet};
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
@@ -226,7 +226,7 @@ impl ChunkOutput {
                     TransactionOutput::new(
                         WriteSet::default(),
                         Vec::new(),
-                        100,
+                        FeeStatement::new_v0(100),
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     )
                 })

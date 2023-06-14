@@ -7,6 +7,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ModulePath,
+    fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
@@ -109,5 +110,5 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn storage_fee_used(&self) -> u64;
 
     /// Return the amount of gas refund by the transaction.
-    fn fee_statement(&self) -> (u64, u64, u64, u64, u64);
+    fn fee_statement(&self) -> FeeStatement;
 }

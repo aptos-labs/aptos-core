@@ -253,6 +253,16 @@ impl AptosVM {
         )
     }
 
+    fn fee_statement_from_gas_meter(gas_used: u64, gas_meter: &impl AptosGasMeter) -> FeeStatement {
+        FeeStatement::new_v1(
+            gas_used,
+            u64::from(gas_meter.execution_gas_used()),
+            u64::from(gas_meter.io_gas_used()),
+            u64::from(gas_meter.storage_fee_used_in_gas_units()),
+            u64::from(gas_meter.storage_fee_used()),
+        )
+    }
+
     fn failed_transaction_cleanup_and_keep_vm_status(
         &self,
         error_code: VMStatus,
@@ -307,13 +317,8 @@ impl AptosVM {
                     .max_gas_amount()
                     .checked_sub(gas_meter.balance())
                     .expect("Balance should always be less than or equal to max gas amount");
-                let fee_statement = FeeStatement::new_v1(
-                    gas_used.into(),
-                    u64::from(gas_meter.execution_gas_used()),
-                    u64::from(gas_meter.io_gas_used()),
-                    u64::from(gas_meter.storage_fee_used_in_gas_units()),
-                    u64::from(gas_meter.storage_fee_used()),
-                );
+                let fee_statement =
+                    AptosVM::fee_statement_from_gas_meter(gas_used.into(), gas_meter);
                 let txn_output = get_transaction_output(
                     &mut (),
                     session,
@@ -349,13 +354,7 @@ impl AptosVM {
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount");
-        let fee_statement = FeeStatement::new_v1(
-            gas_used.into(),
-            u64::from(gas_meter.execution_gas_used()),
-            u64::from(gas_meter.io_gas_used()),
-            u64::from(gas_meter.storage_fee_used_in_gas_units()),
-            u64::from(gas_meter.storage_fee_used()),
-        );
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(gas_used.into(), gas_meter);
         let output = VMOutput::new(
             change_set,
             fee_statement,

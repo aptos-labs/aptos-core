@@ -986,7 +986,7 @@ impl TransactionOutput {
         self.fee_statement.storage_fee_used()
     }
 
-    pub fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
+    pub fn fee_statement(&self) -> FeeStatement {
         self.fee_statement.fee_statement()
     }
 

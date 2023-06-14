@@ -16,6 +16,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
+    fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
@@ -533,8 +534,8 @@ where
         0
     }
 
-    fn fee_statement(&self) -> (u64, u64, u64, u64, u64) {
-        (1, 1, 0, 0, 0)
+    fn fee_statement(&self) -> FeeStatement {
+        FeeStatement::new_v1(1, 1, 0, 0, 0)
     }
 }
 
