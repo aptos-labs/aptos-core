@@ -23,8 +23,11 @@ server_config:
       file_store_type: GcsFileStore
       gcs_file_store_bucket_name: indexer-grpc-file-store-bucketname
     data_service_grpc_tls_config:
+      data_service_grpc_listen_address: 0.0.0.0:50055
       cert_path: /path/to/cert.cert
       key_path: /path/to/key.pem
+    data_service_grpc_non_tls_config:
+      data_service_grpc_listen_address: 0.0.0.0:50057
     redis_read_replica_address: 127.0.0.1:6379
 ```
 
