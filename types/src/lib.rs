@@ -16,6 +16,7 @@ pub mod epoch_change;
 pub mod epoch_state;
 pub mod event;
 pub mod executable;
+pub mod fee_statement;
 pub mod governance;
 pub mod ledger_info;
 pub mod mempool_status;
