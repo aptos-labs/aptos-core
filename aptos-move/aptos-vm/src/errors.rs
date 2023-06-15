@@ -132,6 +132,8 @@ pub fn convert_prologue_error(
             };
             VMStatus::Error(new_major_status, None)
         },
+        // Storage error can be a result of speculation failure so throw the error back for caller to handle.
+        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error(..) => {
             speculative_error!(
                 log_context,
@@ -176,7 +178,8 @@ pub fn convert_epilogue_error(
                 VMStatus::Error(StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION, None)
             },
         },
-
+        // Storage error can be a result of speculation failure so throw the error back for caller to handle.
+        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
         status => {
             speculative_error!(
                 log_context,
@@ -198,7 +201,8 @@ pub fn expect_only_successful_execution(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
-
+        // Storage error can be a result of speculation failure so throw the error back for caller to handle.
+        e @ VMStatus::Error(StatusCode::STORAGE_ERROR, _) => e,
         status => {
             // Only trigger a warning here as some errors could be a result of the speculative parallel execution.
             // We will report the errors after we obtained the final transaction output in update_counters_for_processed_chunk
