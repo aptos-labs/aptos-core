@@ -7,9 +7,11 @@ const config = {
 describe("account", () => {
   test("get account", async () => {
     const aptos = new Aptos(config);
-    const account = await aptos.account.get("0x1");
+    const account = await aptos.account.getData("0x1");
     console.log(account);
   });
 
-  test("submit txn", async () => {});
+  test("submit txn", async () => {
+    const aptos = new Aptos(config);
+  });
 });
