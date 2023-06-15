@@ -25,6 +25,7 @@ use aptos_block_executor::{
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    block_executor::partitioner::{ExecutableTransactions, SubBlock, TransactionWithDependencies},
     executable::ExecutableTestType,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
@@ -132,9 +133,50 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
+    fn verify_transactions(
+        transactions: ExecutableTransactions<Transaction>,
+    ) -> ExecutableTransactions<PreprocessedTransaction> {
+        match transactions {
+            ExecutableTransactions::Unsharded(transactions) => {
+                let signature_verified_txns = transactions
+                    .into_par_iter()
+                    .with_min_len(25)
+                    .map(preprocess_transaction::<AptosVM>)
+                    .collect();
+                ExecutableTransactions::Unsharded(signature_verified_txns)
+            },
+            ExecutableTransactions::Sharded(sub_blocks) => {
+                let signature_verified_block = sub_blocks
+                    .into_par_iter()
+                    .map(|sub_block| {
+                        let start_index = sub_block.start_index;
+                        let verified_txns = sub_block
+                            .into_transactions_with_deps()
+                            .into_par_iter()
+                            .with_min_len(25)
+                            .map(|txn_with_deps| {
+                                let TransactionWithDependencies {
+                                    txn,
+                                    cross_shard_dependencies,
+                                } = txn_with_deps;
+                                let preprocessed_txn = preprocess_transaction::<AptosVM>(txn);
+                                TransactionWithDependencies::new(
+                                    preprocessed_txn,
+                                    cross_shard_dependencies,
+                                )
+                            })
+                            .collect();
+                        SubBlock::new(start_index, verified_txns)
+                    })
+                    .collect();
+                ExecutableTransactions::Sharded(signature_verified_block)
+            },
+        }
+    }
+
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
-        transactions: Vec<Transaction>,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
@@ -146,17 +188,11 @@ impl BlockAptosVM {
         // TODO: state sync runs this code but doesn't need to verify signatures
         let signature_verification_timer =
             BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS.start_timer();
-        let signature_verified_block: Vec<PreprocessedTransaction> =
-            executor_thread_pool.install(|| {
-                transactions
-                    .into_par_iter()
-                    .with_min_len(25)
-                    .map(preprocess_transaction::<AptosVM>)
-                    .collect()
-            });
+        let signature_verified_block =
+            executor_thread_pool.install(|| Self::verify_transactions(transactions));
         drop(signature_verification_timer);
 
-        let num_txns = signature_verified_block.len();
+        let num_txns = signature_verified_block.num_transactions();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
             // can even lead to concurrent execute_block invocations, leading to errors on flush.

@@ -31,6 +31,7 @@
     -  [Function `destroy_empty`](#@Specification_1_destroy_empty)
     -  [Function `borrow`](#@Specification_1_borrow)
     -  [Function `append`](#@Specification_1_append)
+    -  [Function `push_back`](#@Specification_1_push_back)
     -  [Function `pop_back`](#@Specification_1_pop_back)
     -  [Function `remove`](#@Specification_1_remove)
     -  [Function `swap_remove`](#@Specification_1_swap_remove)
@@ -886,6 +887,22 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_append">append</a>&lt;T: store&gt;(lhs: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, other: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_push_back"></a>
+
+### Function `push_back`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>&lt;T: store&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, val: T)
 </code></pre>
 
 

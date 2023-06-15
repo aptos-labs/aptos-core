@@ -28,6 +28,7 @@ pub struct SuccessCriteria {
     latency_thresholds: Vec<(Duration, LatencyType)>,
     check_no_restarts: bool,
     max_expired_tps: Option<usize>,
+    max_failed_submission_tps: Option<usize>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
     system_metrics_threshold: Option<SystemMetricsThreshold>,
@@ -41,6 +42,7 @@ impl SuccessCriteria {
             latency_thresholds: Vec::new(),
             check_no_restarts: false,
             max_expired_tps: None,
+            max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
             system_metrics_threshold: None,
             chain_progress_check: None,
@@ -54,6 +56,11 @@ impl SuccessCriteria {
 
     pub fn add_max_expired_tps(mut self, max_expired_tps: usize) -> Self {
         self.max_expired_tps = Some(max_expired_tps);
+        self
+    }
+
+    pub fn add_max_failed_submission_tps(mut self, max_failed_submission_tps: usize) -> Self {
+        self.max_failed_submission_tps = Some(max_failed_submission_tps);
         self
     }
 
@@ -91,8 +98,10 @@ impl SuccessCriteriaChecker {
         let traffic_name_addition = traffic_name
             .map(|n| format!(" for {}", n))
             .unwrap_or_else(|| "".to_string());
-        Self::check_tps(
+        Self::check_throughput(
             success_criteria.min_avg_tps,
+            success_criteria.max_expired_tps,
+            success_criteria.max_failed_submission_tps,
             stats_rate,
             &traffic_name_addition,
         )?;
@@ -122,9 +131,10 @@ impl SuccessCriteriaChecker {
         );
         let stats_rate = stats.rate();
 
-        Self::check_tps(success_criteria.min_avg_tps, &stats_rate, &"".to_string())?;
-        Self::check_latency(
-            &success_criteria.latency_thresholds,
+        Self::check_throughput(
+            success_criteria.min_avg_tps,
+            success_criteria.max_expired_tps,
+            success_criteria.max_failed_submission_tps,
             &stats_rate,
             &"".to_string(),
         )?;
@@ -289,6 +299,61 @@ impl SuccessCriteriaChecker {
             );
             Ok(())
         }
+    }
+
+    fn check_max_value(
+        max_config: Option<usize>,
+        stats_rate: &TxnStatsRate,
+        value: u64,
+        value_desc: &str,
+        traffic_name_addition: &String,
+    ) -> anyhow::Result<()> {
+        if let Some(max) = max_config {
+            if value > max as u64 {
+                bail!(
+                    "{} requirement{} failed. {} TPS: average {}, maximum requirement {}. Full stats: {}",
+                    value_desc,
+                    traffic_name_addition,
+                    value_desc,
+                    value,
+                    max,
+                    stats_rate,
+                )
+            } else {
+                println!(
+                    "{} TPS is {} and is below max limit of {}",
+                    value_desc, value, max
+                );
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn check_throughput(
+        min_avg_tps: usize,
+        max_expired_config: Option<usize>,
+        max_failed_submission_config: Option<usize>,
+        stats_rate: &TxnStatsRate,
+        traffic_name_addition: &String,
+    ) -> anyhow::Result<()> {
+        Self::check_tps(min_avg_tps, stats_rate, traffic_name_addition)?;
+        Self::check_max_value(
+            max_expired_config,
+            stats_rate,
+            stats_rate.expired,
+            "expired",
+            traffic_name_addition,
+        )?;
+        Self::check_max_value(
+            max_failed_submission_config,
+            stats_rate,
+            stats_rate.failed_submission,
+            "submission",
+            traffic_name_addition,
+        )?;
+        Ok(())
     }
 
     pub fn check_latency(
