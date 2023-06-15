@@ -50,6 +50,10 @@ module tic_tac_toe::ttt {
         game_over_events: event::EventHandle<GameOverEvent>,
     }
 
+    /*
+     * @notice initializes a valid, playable Game
+     * @dev stores the Game into global storage
+     */
     public entry fun start_game(creator: &signer) {
         let game = initalize_game(creator);
         let creator_addr = signer::address_of(creator);
@@ -57,6 +61,9 @@ module tic_tac_toe::ttt {
         move_to<Game>(creator, game);
     }
 
+    /*
+     * @notice lets another user join given a valid game address
+     */
     public entry fun join_as_player_o(new_user: &signer, game_addr: address) acquires Game {
         let new_user_addr = signer::address_of(new_user);
         assert!(new_user_addr != game_addr, error::invalid_argument(ERR_ILLEGAL_ACTION));
@@ -64,7 +71,11 @@ module tic_tac_toe::ttt {
         let game = borrow_global_mut(game_addr);
         choose_player_o(game, new_user_addr);
     }
-        
+
+    /*
+     * @notice places a move at a given (x,y) coordinate on a 3x3 board
+     * @dev checks to ensure a player can make a valid move
+     */ 
     public entry fun choose_move(player: &signer, game_addr: address, x: u64, y: u64) acquires Game {
         assert!(x < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
         assert!(y < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
@@ -85,6 +96,9 @@ module tic_tac_toe::ttt {
         };
     }
 
+    /*
+     * @notice destroy Game at the end of session / forfeit
+     */ 
     public entry fun cleanup(creator: &signer) acquires Game {
         let creator_addr: address = signer::address_of(creator);
         // abort if no such game exists under creator
@@ -92,6 +106,9 @@ module tic_tac_toe::ttt {
         cleanup_game(game); 
     }
 
+    /*
+     * @notice voluntarily give up, the other player wins
+     */ 
     public entry fun forfeit(player: &signer, game_addr: address) acquires Game {
         let player_addr = signer::address_of(player);
         let game: &mut Game = borrow_global_mut(game_addr);
@@ -114,6 +131,9 @@ module tic_tac_toe::ttt {
         );
     }
 
+    /*
+     * @notice initialize Game struct with base values for a 3x3 game
+     */ 
     fun initalize_game(creator: &signer): Game {
         let v = vector::empty<u64>();
         let i = 0;
@@ -136,6 +156,9 @@ module tic_tac_toe::ttt {
         }
     }
 
+    /*
+     * @notice user who initiates game is automatically player_x
+     */ 
     fun choose_player_x(game: &mut Game, user: address) {
         assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
         assert!(option::is_none(&game.player_x), error::already_exists(ERR_PLAYER_TAKEN));
@@ -146,6 +169,9 @@ module tic_tac_toe::ttt {
         });
     }
 
+    /*
+     * @notice another user whose not the creator may join as player_o
+     */ 
     fun choose_player_o(game: &mut Game, user: address) {
         assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
         assert!(option::is_none(&game.player_o), error::already_exists(ERR_PLAYER_TAKEN));
@@ -156,6 +182,9 @@ module tic_tac_toe::ttt {
         });
     }
 
+    /*
+     * @notice place (x,y) move on a 3x3 board 
+     */ 
     fun place_move(game: &mut Game, x: u64, y: u64, player: Player) {
         // validate game state
         assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
@@ -187,6 +216,9 @@ module tic_tac_toe::ttt {
         if (is_game_over) game.is_game_over = true;
     }
 
+    /*
+     * @notice exhaustive search to validate all winning game states
+     */ 
     fun check_player_win(game: &mut Game): bool {
         // check rows
         let row = 0;
@@ -239,10 +271,16 @@ module tic_tac_toe::ttt {
         false
     }
 
+    /*
+     * @notice check status of game
+     */ 
     fun check_is_game_over(game: &Game): bool {
         game.is_game_over
     }
 
+    /*
+     * @notice helper function to destroy Game at the end of session / forfeit
+     */ 
     fun cleanup_game(game: Game) {
         let Game { 
             board: Board{
@@ -263,7 +301,6 @@ module tic_tac_toe::ttt {
         };
         event::destroy_handle(game_over_events);
     }
-
 
 
     // Tests
