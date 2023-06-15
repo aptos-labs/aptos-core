@@ -143,9 +143,7 @@ spec aptos_framework::aptos_governance {
         metadata_location: vector<u8>;
         metadata_hash: vector<u8>;
 
-        // let proposer_address = signer::address_of(proposer);
         include VotingGetDelegatedVoterAbortsIf { sign: proposer };
-
         include AbortsIfNotGovernanceConfig;
 
         // verify get_voting_power(stake_pool)
@@ -259,7 +257,7 @@ spec aptos_framework::aptos_governance {
         let execution_key = utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if simple_map::spec_contains_key(proposal.metadata, execution_key) &&
                   simple_map::spec_get(proposal.metadata, execution_key) != std::bcs::to_bytes(false);
-        // Since there are two possibilities for voting_power, the result of the vote is not only related to should_pass, 
+        // Since there are two possibilities for voting_power, the result of the vote is not only related to should_pass,
         // but also to allow_validator_set_change which determines the voting_power
         aborts_if allow_validator_set_change &&
             if (should_pass) { proposal.yes_votes + voting_power_0 > MAX_U128 } else { proposal.no_votes + voting_power_0 > MAX_U128 };
@@ -281,7 +279,7 @@ spec aptos_framework::aptos_governance {
         // verify voting::get_proposal_state
         let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         let is_voting_period_over = timestamp::now_seconds() > proposal_expiration;
-        // The success state depends on the number of votes, but since the number of votes is related to allow_validator_set_change and should_pass, 
+        // The success state depends on the number of votes, but since the number of votes is related to allow_validator_set_change and should_pass,
         // we describe the success state in different cases.
         // allow_validator_set_change && should_pass
         let new_proposal_yes_votes_0 = proposal.yes_votes + voting_power_0;
