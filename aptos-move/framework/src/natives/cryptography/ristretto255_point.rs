@@ -561,7 +561,7 @@ pub(crate) fn native_double_scalar_mul(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(args.len(), 4);
 
-    context.charge( gas_params.point_double_mul * NumArgs::one())?;
+    context.charge(gas_params.point_double_mul * NumArgs::one())?;
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
@@ -584,7 +584,6 @@ pub(crate) fn native_double_scalar_mul(
 
     Ok(smallvec![Value::u64(result_handle)])
 }
-
 
 /// This upgrades 'native_multi_scalar_mul' in two ways:
 /// 1. It is a "safe" native that uses `SafeNativeContext::charge` to prevent DoS attacks.

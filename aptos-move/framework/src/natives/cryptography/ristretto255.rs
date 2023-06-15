@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "testing")]
+use crate::natives::helpers::make_test_only_safe_native;
 use crate::{
     natives::{
         cryptography::{ristretto255_point, ristretto255_scalar},
@@ -8,8 +10,6 @@ use crate::{
     },
     safely_assert_eq, safely_pop_arg,
 };
-#[cfg(feature = "testing")]
-use crate::natives::helpers::make_test_only_safe_native;
 use aptos_types::{
     on_chain_config::{Features, TimedFeatures},
     vm_status::StatusCode,
@@ -84,16 +84,14 @@ pub fn make_all(
     let mut natives = vec![];
 
     #[cfg(feature = "testing")]
-    natives.append(&mut vec![
-        (
-            "random_scalar_internal",
-            make_test_only_safe_native(
-                timed_features.clone(),
-                features.clone(),
-                ristretto255_scalar::native_scalar_random,
-            )
+    natives.append(&mut vec![(
+        "random_scalar_internal",
+        make_test_only_safe_native(
+            timed_features.clone(),
+            features.clone(),
+            ristretto255_scalar::native_scalar_random,
         ),
-    ]);
+    )]);
 
     natives.append(&mut vec![
         (
@@ -129,7 +127,7 @@ pub fn make_all(
                 gas_params.clone(),
                 timed_features.clone(),
                 features.clone(),
-                ristretto255_point::native_point_clone
+                ristretto255_point::native_point_clone,
             ),
         ),
         (

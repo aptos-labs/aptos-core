@@ -390,7 +390,11 @@ pub fn all_natives(
     );
     add_natives_from_module!(
         "bulletproofs",
-        cryptography::bulletproofs::make_all(gas_params.bulletproofs, timed_features.clone(), features.clone())
+        cryptography::bulletproofs::make_all(
+            gas_params.bulletproofs,
+            timed_features.clone(),
+            features.clone()
+        )
     );
     add_natives_from_module!(
         "transaction_context",

@@ -277,15 +277,14 @@ pub fn make_test_only_safe_native(
     timed_features: TimedFeatures,
     features: Arc<Features>,
     func: impl Fn(
-        &mut SafeNativeContext,
-        Vec<Type>,
-        VecDeque<Value>,
-    ) -> SafeNativeResult<SmallVec<[Value; 1]>>
-    + Sync
-    + Send
-    + 'static,
-) -> NativeFunction
-{
+            &mut SafeNativeContext,
+            Vec<Type>,
+            VecDeque<Value>,
+        ) -> SafeNativeResult<SmallVec<[Value; 1]>>
+        + Sync
+        + Send
+        + 'static,
+) -> NativeFunction {
     let closure = move |context: &mut NativeContext, ty_args, args| {
         use SafeNativeError::*;
 

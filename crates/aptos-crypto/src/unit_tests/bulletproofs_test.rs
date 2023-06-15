@@ -1,14 +1,14 @@
+// Copyright © Aptos Foundation
+
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::bulletproofs::MAX_RANGE_BITS;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
-use curve25519_dalek_ng::ristretto::CompressedRistretto;
-use curve25519_dalek_ng::scalar::Scalar;
+use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
 use rand::{thread_rng, Rng};
 use std::convert::TryFrom;
-
-use crate::bulletproofs::MAX_RANGE_BITS;
 
 const TEST_DOMAIN_SEPARATION_TAG: &[u8; 21] = b"AptosTestBulletproofs";
 

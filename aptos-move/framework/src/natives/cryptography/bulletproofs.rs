@@ -5,12 +5,17 @@
 
 #[cfg(feature = "testing")]
 use crate::natives::cryptography::ristretto255::pop_scalar_from_bytes;
-use crate::natives::cryptography::ristretto255_point::{
-    get_point_handle, NativeRistrettoPointContext,
-};
 #[cfg(feature = "testing")]
 use crate::natives::helpers::make_test_only_safe_native;
+use crate::{
+    natives::{
+        cryptography::ristretto255_point::{get_point_handle, NativeRistrettoPointContext},
+        helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult},
+    },
+    safely_pop_arg,
+};
 use aptos_crypto::bulletproofs::MAX_RANGE_BITS;
+use aptos_types::on_chain_config::{Features, TimedFeatures};
 use bulletproofs::{BulletproofGens, PedersenGens};
 #[cfg(feature = "testing")]
 use byteorder::{ByteOrder, LittleEndian};
@@ -19,16 +24,14 @@ use merlin::Transcript;
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
-use move_vm_runtime::native_functions::{NativeFunction};
-use move_vm_types::loaded_data::runtime_types::Type;
-use move_vm_types::values::{StructRef, Value};
+use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{StructRef, Value},
+};
 use once_cell::sync::Lazy;
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
-use std::sync::Arc;
-use aptos_types::on_chain_config::{Features, TimedFeatures};
-use crate::natives::helpers::{make_safe_native, SafeNativeContext, SafeNativeError, SafeNativeResult};
-use crate::safely_pop_arg;
+use std::{collections::VecDeque, sync::Arc};
 
 pub mod abort_codes {
     /// Abort code when deserialization fails (leading 0x01 == INVALID_ARGUMENT)
@@ -155,8 +158,10 @@ fn native_test_only_prove_range(
     )
     .expect("Bulletproofs prover failed unexpectedly");
 
-    Ok(smallvec![Value::vector_u8(proof.to_bytes()),
-            Value::vector_u8(commitment.as_bytes().to_vec())])
+    Ok(smallvec![
+        Value::vector_u8(proof.to_bytes()),
+        Value::vector_u8(commitment.as_bytes().to_vec())
+    ])
 }
 
 /***************************************************************************************************
@@ -183,7 +188,9 @@ impl GasParameters {
         dst: Vec<u8>,
     ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
         context.charge(self.base)?;
-        context.charge(self.per_byte_rangeproof_deserialize * NumBytes::new(proof_bytes.len() as u64))?;
+        context.charge(
+            self.per_byte_rangeproof_deserialize * NumBytes::new(proof_bytes.len() as u64),
+        )?;
 
         let range_proof = match bulletproofs::RangeProof::from_bytes(proof_bytes) {
             Ok(proof) => proof,
@@ -191,7 +198,7 @@ impl GasParameters {
                 return Err(SafeNativeError::Abort {
                     abort_code: abort_codes::NFE_DESERIALIZE_RANGE_PROOF,
                 })
-            }
+            },
         };
 
         // The (Bullet)proof size is $\log_2(num_bits)$ and its verification time is $O(num_bits)$
@@ -213,21 +220,32 @@ impl GasParameters {
     }
 }
 
-pub fn make_all(gas_params: GasParameters, timed_features: TimedFeatures, features: Arc<Features>) -> impl Iterator<Item = (String, NativeFunction)> {
+pub fn make_all(
+    gas_params: GasParameters,
+    timed_features: TimedFeatures,
+    features: Arc<Features>,
+) -> impl Iterator<Item = (String, NativeFunction)> {
     let mut natives = vec![];
 
     #[cfg(feature = "testing")]
     natives.append(&mut vec![(
         "prove_range_internal",
-        make_test_only_safe_native(timed_features.clone(), features.clone(), native_test_only_prove_range),
+        make_test_only_safe_native(
+            timed_features.clone(),
+            features.clone(),
+            native_test_only_prove_range,
+        ),
     )]);
 
-    natives.append(&mut vec![
-        (
-            "verify_range_proof_internal",
-            make_safe_native(gas_params, timed_features, features, native_verify_range_proof),
+    natives.append(&mut vec![(
+        "verify_range_proof_internal",
+        make_safe_native(
+            gas_params,
+            timed_features,
+            features,
+            native_verify_range_proof,
         ),
-    ]);
+    )]);
 
     crate::natives::helpers::make_module_natives(natives)
 }
