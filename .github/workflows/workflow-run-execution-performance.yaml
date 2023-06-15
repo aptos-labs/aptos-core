@@ -20,7 +20,7 @@ on:
 jobs:
   sequential-execution-performance:
     timeout-minutes: 30
-    runs-on: executor-benchmark-runner
+    runs-on: spot-runner 
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -36,7 +36,7 @@ jobs:
 
   parallel-execution-performance:
     timeout-minutes: 60
-    runs-on: executor-benchmark-runner
+    runs-on: spot-runner
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
@@ -52,7 +52,7 @@ jobs:
 
   single-node-performance:
     timeout-minutes: 60
-    runs-on: executor-benchmark-runner
+    runs-on: spot-runner
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
