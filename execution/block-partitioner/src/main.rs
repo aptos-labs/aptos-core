@@ -37,7 +37,6 @@ fn main() {
     println!("Created {} accounts", num_accounts);
     println!("Creating {} transactions", args.block_size);
     let transactions: Vec<AnalyzedTransaction> = (0..args.block_size)
-        .into_iter()
         .map(|_| {
             // randomly select a sender and receiver from accounts
             let mut rng = OsRng;

@@ -216,7 +216,6 @@ fn random_namespace<R: Rng>(dictionary: Vec<String>, rng: &mut R) -> Result<Stri
     // Pick four random words
     let random_words = dictionary
         .choose_multiple(rng, 4)
-        .into_iter()
         .cloned()
         .collect::<Vec<String>>();
     Ok(format!("forge-{}", random_words.join("-")))
@@ -1879,7 +1878,7 @@ impl Test for GetMetadata {
 }
 
 impl AdminTest for GetMetadata {
-    fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut AdminContext<'_>) -> Result<()> {
         let client = ctx.rest_client();
         let runtime = Runtime::new().unwrap();
         runtime.block_on(client.get_aptos_version()).unwrap();
@@ -1968,7 +1967,7 @@ impl Test for RestartValidator {
 }
 
 impl NetworkTest for RestartValidator {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new()?;
         runtime.block_on(async {
             let node = ctx.swarm().validators_mut().next().unwrap();
@@ -1993,7 +1992,7 @@ impl Test for EmitTransaction {
 }
 
 impl NetworkTest for EmitTransaction {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let duration = Duration::from_secs(10);
         let all_validators = ctx
             .swarm()

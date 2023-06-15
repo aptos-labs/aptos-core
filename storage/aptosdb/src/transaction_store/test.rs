@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
+
 use super::*;
 use crate::AptosDB;
 use aptos_proptest_helpers::Index;

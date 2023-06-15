@@ -102,7 +102,7 @@ impl NetworkLoadTest for ExecutionDelayTest {
 }
 
 impl NetworkTest for ExecutionDelayTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -187,7 +187,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
 }
 
 impl NetworkTest for NetworkUnreliabilityTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -270,7 +270,7 @@ impl NetworkLoadTest for CpuChaosTest {
 }
 
 impl NetworkTest for CpuChaosTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
