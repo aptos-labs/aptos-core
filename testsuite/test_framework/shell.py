@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Sequence, Union
 
+from test_framework.logging import log
 
 @dataclass
 class RunResult:
@@ -38,7 +39,7 @@ class Shell:
 
 @dataclass
 class LocalShell(Shell):
-    logger: logging.Logger = logging.getLogger("")
+    logger: logging.Logger = log
 
     def run(self, command: Sequence[str], stream_output: bool = False) -> RunResult:
         # Write to a temp file, stream to stdout
@@ -128,6 +129,7 @@ class FakeCommand:
 
 
 class SpyShell(FakeShell):
+    logger: logging.Logger = log
     def __init__(
         self,
         expected_command_list: Sequence[FakeCommand],
