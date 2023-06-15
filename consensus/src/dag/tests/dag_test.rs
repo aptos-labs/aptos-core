@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::dag_store::{CertifiedNode, Dag, Node, NodeCertificate, NodeMetadata};
+use crate::dag::{
+    dag_store::Dag,
+    types::{CertifiedNode, Node, NodeCertificate, NodeMetadata},
+};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_types::{
     aggregate_signature::AggregateSignature, validator_verifier::random_validator_verifier,
@@ -62,7 +65,7 @@ fn test_dag_insertion_failure() {
     let mut parents = dag
         .get_strong_links_for_round(1, &validator_verifier)
         .unwrap();
-    parents.push(missing_node.metadata());
+    parents.push(missing_node.metadata().clone());
 
     let node = new_node(2, signers[0].author(), parents.clone());
     // parents not exist
@@ -84,6 +87,6 @@ fn new_node(round: Round, author: Author, parents: Vec<NodeMetadata>) -> Certifi
     let digest = node.digest();
     CertifiedNode::new(
         node,
-        NodeCertificate::new(digest, AggregateSignature::empty()),
+        NodeCertificate::new(1, digest, AggregateSignature::empty()),
     )
 }

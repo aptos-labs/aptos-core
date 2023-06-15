@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::reliable_broadcast::{BroadcastStatus, DAGMessage, DAGNetworkSender, ReliableBroadcast},
+    dag::{
+        reliable_broadcast::{BroadcastStatus, DAGNetworkSender, ReliableBroadcast},
+        types::DAGMessage,
+    },
     network_interface::ConsensusMsg,
 };
 use anyhow::bail;
@@ -26,15 +29,8 @@ use tokio::sync::oneshot;
 struct TestMessage(Vec<u8>);
 
 impl DAGMessage for TestMessage {
-    fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
-        match msg {
-            ConsensusMsg::DAGTestMessage(payload) => Ok(Self(payload)),
-            _ => bail!("wrong message"),
-        }
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGTestMessage(self.0)
+    fn epoch(&self) -> u64 {
+        1
     }
 }
 
@@ -42,12 +38,8 @@ impl DAGMessage for TestMessage {
 struct TestAck;
 
 impl DAGMessage for TestAck {
-    fn from_network_message(_: ConsensusMsg) -> anyhow::Result<Self> {
-        Ok(TestAck)
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGTestMessage(vec![])
+    fn epoch(&self) -> u64 {
+        1
     }
 }
 
@@ -60,13 +52,6 @@ impl BroadcastStatus for TestBroadcastStatus {
     type Ack = TestAck;
     type Aggregated = HashSet<Author>;
     type Message = TestMessage;
-
-    fn empty(receivers: Vec<Author>) -> Self {
-        Self {
-            threshold: receivers.len(),
-            received: HashSet::new(),
-        }
-    }
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.insert(peer);
@@ -114,7 +99,7 @@ impl DAGNetworkSender for TestDAGSender {
         self.received
             .lock()
             .insert(receiver, TestMessage::from_network_message(message)?);
-        Ok(ConsensusMsg::DAGTestMessage(vec![]))
+        Ok(TestAck.into_network_message())
     }
 }
 
@@ -125,8 +110,12 @@ async fn test_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
-    let message = TestMessage(vec![1, 2, 3]);
-    let fut = rb.broadcast::<TestBroadcastStatus>(message);
+    let message = TestMessage(vec![42; validators.len() - 1]);
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
+    let fut = rb.broadcast::<TestBroadcastStatus>(message, aggregating);
     assert_eq!(fut.await, validators.into_iter().collect());
 }
 
@@ -137,13 +126,22 @@ async fn test_chaining_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
-    let message = TestMessage(vec![1, 2, 3]);
+    let message = TestMessage(vec![42; validators.len()]);
     let expected = validators.iter().cloned().collect();
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
     let fut = rb
-        .broadcast::<TestBroadcastStatus>(message.clone())
+        .broadcast::<TestBroadcastStatus>(message.clone(), aggregating)
         .then(|aggregated| async move {
             assert_eq!(aggregated, expected);
-            rb.broadcast::<TestBroadcastStatus>(message).await
+            let aggregating = TestBroadcastStatus {
+                threshold: validator_verifier.len(),
+                received: HashSet::new(),
+            };
+            rb.broadcast::<TestBroadcastStatus>(message, aggregating)
+                .await
         });
     assert_eq!(fut.await, validators.into_iter().collect());
 }
@@ -155,13 +153,23 @@ async fn test_abort_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestDAGSender::new(failures));
     let rb = ReliableBroadcast::new(validators.clone(), sender);
-    let message = TestMessage(vec![1, 2, 3]);
+    let message = TestMessage(vec![42; validators.len()]);
     let (tx, rx) = oneshot::channel();
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    let aggregating = TestBroadcastStatus {
+        threshold: validators.len(),
+        received: HashSet::new(),
+    };
     let fut = Abortable::new(
-        rb.broadcast::<TestBroadcastStatus>(message.clone())
+        rb.broadcast::<TestBroadcastStatus>(message.clone(), aggregating)
             .then(|_| async move {
-                let ret = rb.broadcast::<TestBroadcastStatus>(message).await;
+                let aggregating = TestBroadcastStatus {
+                    threshold: validators.len(),
+                    received: HashSet::new(),
+                };
+                let ret = rb
+                    .broadcast::<TestBroadcastStatus>(message, aggregating)
+                    .await;
                 tx.send(ret)
             }),
         abort_registration,
