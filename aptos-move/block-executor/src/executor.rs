@@ -23,8 +23,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
-block_executor::partitioner::BlockExecutorTransactions,
-executable::Executable,
+    block_executor::partitioner::BlockExecutorTransactions, executable::Executable,
     fee_statement::FeeStatement, write_set::WriteOp,
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
