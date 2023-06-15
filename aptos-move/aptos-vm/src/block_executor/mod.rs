@@ -14,14 +14,10 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_block_executor::{
-    errors::Error,
-    executor::BlockExecutor,
-    task::{
-        Transaction as BlockExecutorTransaction,
-        TransactionOutput as BlockExecutorTransactionOutput,
-    },
-};
+use aptos_block_executor::{errors::Error, executor::BlockExecutor, IndexMapping, task::{
+    Transaction as BlockExecutorTransaction,
+    TransactionOutput as BlockExecutorTransactionOutput,
+}};
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
@@ -180,6 +176,7 @@ impl BlockAptosVM {
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
+        index_mapping: IndexMapping,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -211,7 +208,7 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
         );
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view, index_mapping);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

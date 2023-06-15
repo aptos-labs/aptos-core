@@ -2,18 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters,
-    counters::{
-        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
-    },
-    errors::*,
-    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
-    txn_last_input_output::TxnLastInputOutput,
-    view::{LatestView, MVHashMapView},
-};
+use crate::{counters, counters::{
+    PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+    TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+}, errors::*, IndexMapping, scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave}, task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput}, txn_last_input_output::TxnLastInputOutput, view::{LatestView, MVHashMapView}};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
@@ -457,6 +449,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
+        index_mapping: IndexMapping,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -643,12 +636,14 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: ExecutableTransactions<T>,
         base_view: &S,
+        index_mapping: IndexMapping,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 &signature_verified_block,
                 base_view,
+                index_mapping,
             )
         } else {
             self.execute_transactions_sequential(

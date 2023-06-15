@@ -21,6 +21,7 @@ use aptos_gas::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
+use aptos_block_executor::IndexMapping;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -415,12 +416,14 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let index_mapping = IndexMapping::new_unsharded(txn_block.len());
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
             ExecutableTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,
+            index_mapping,
         )
     }
 

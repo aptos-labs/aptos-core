@@ -8,6 +8,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
+use aptos_block_executor::IndexMapping;
 
 pub trait BlockExecutorClient {
     fn execute_block<S: StateView + Sync>(
@@ -27,6 +28,7 @@ impl BlockExecutorClient for LocalExecutorClient {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let index_mapping = IndexMapping::new_unsharded(transactions.len());
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
             // TODO: (skedia) Change this to sharded transactions
@@ -34,6 +36,7 @@ impl BlockExecutorClient for LocalExecutorClient {
             state_view,
             concurrency_level,
             maybe_block_gas_limit,
+            index_mapping,
         )
     }
 }

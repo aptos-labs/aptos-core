@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::block_executor::partitioner::TxnIndex;
+
 /**
 The high level parallel execution logic is implemented in 'executor.rs'. The
 input of parallel executor is a block of transactions, containing a sequence
@@ -147,3 +149,28 @@ mod txn_last_input_output;
 #[cfg(test)]
 mod unit_tests;
 pub mod view;
+
+pub struct IndexMapping {
+    pub indices: Vec<TxnIndex>,
+    pub inverses: Vec<usize>,
+}
+
+impl IndexMapping {
+    pub fn new(indices: Vec<TxnIndex>, block_size: usize) -> Self {
+        let mut inverses = vec![usize::MAX; block_size];
+        for (pos, &index) in indices.iter().enumerate() {
+            inverses[index] = pos;
+        }
+        Self {
+            indices,
+            inverses,
+        }
+    }
+
+    pub fn new_unsharded(block_size: usize) -> Self {
+        Self {
+            indices: (0..block_size).collect(),
+            inverses: (0..block_size).collect(),
+        }
+    }
+}
