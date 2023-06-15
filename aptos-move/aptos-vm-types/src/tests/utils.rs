@@ -90,7 +90,7 @@ pub(crate) fn build_vm_output(
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
     VMOutput::new(
         build_change_set(write_set, delta_change_set),
-        FeeStatement::new_v0(GAS_USED),
+        FeeStatement::new_v1(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
     )
 }

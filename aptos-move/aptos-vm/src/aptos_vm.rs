@@ -1299,7 +1299,7 @@ impl AptosVM {
 
         let output = VMOutput::new(
             change_set,
-            FeeStatement::empty_v0(),
+            FeeStatement::empty_v1(),
             VMStatus::Executed.into(),
         );
         Ok((VMStatus::Executed, output))
@@ -1346,7 +1346,7 @@ impl AptosVM {
         let output = get_transaction_output(
             &mut (),
             session,
-            FeeStatement::empty_v0(),
+            FeeStatement::empty_v1(),
             ExecutionStatus::Success,
             &self
                 .0
