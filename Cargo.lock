@@ -3330,6 +3330,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
+ "rayon",
  "regex",
  "serde 1.0.149",
  "serde_bytes",
