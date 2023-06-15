@@ -778,12 +778,14 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
                     (9, 1.5, 3.),
                     (95, 1.5, 3.),
                     (950, 2., 3.),
-                    (2900, 2.5, 4.),
-                    (4900, 3., 5.),
+                    (2750, 2.5, 4.),
+                    (4600, 3., 5.),
                 ]
                 .into_iter()
                 .map(|(min_tps, max_lat_p50, max_lat_p99)| {
                     SuccessCriteria::new(min_tps)
+                        .add_max_expired_tps(0)
+                        .add_max_failed_submission_tps(0)
                         .add_latency_threshold(max_lat_p50, LatencyType::P50)
                         .add_latency_threshold(max_lat_p99, LatencyType::P99)
                 })

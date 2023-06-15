@@ -155,18 +155,22 @@ spec aptos_framework::account {
             challenge: challenge,
         };
 
-        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+        // Verify all properties in update_auth_key_and_originating_address_table
+        let originating_addr = addr;
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
-        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
-        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf{
-        //     originating_addr: addr,
-        //     account_resource: account_resource,
-        //     new_auth_key_vector: new_auth_key
-        // };
-        pragma aborts_if_is_partial;
+        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
-        modifies global<Account>(addr);
-        modifies global<OriginatingAddress>(@aptos_framework);
+        aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
+        aborts_if table::spec_contains(address_map, curr_auth_key) &&
+            table::spec_get(address_map, curr_auth_key) != originating_addr;
+
+        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+
+        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+
     }
 
     spec rotate_authentication_key_with_rotation_capability(
@@ -195,10 +199,20 @@ spec aptos_framework::account {
             signature: cap_update_table,
             challenge: challenge,
         };
-        // let new_auth_key = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
-        // TODO: Need to investigate the issue of including UpdateAuthKeyAndOriginatingAddressTableAbortsIf here.
-        // TODO: boogie error: Error: invalid type for argument 0 in application of $1_from_bcs_deserializable'address': int (expected: Vec int).
-        pragma aborts_if_is_partial;
+
+        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+
+        // Verify all properties in update_auth_key_and_originating_address_table
+        aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
+        aborts_if table::spec_contains(address_map, curr_auth_key) &&
+            table::spec_get(address_map, curr_auth_key) != rotation_cap_offerer_address;
+
+        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
+
+        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
     }
 
     spec offer_rotation_capability(

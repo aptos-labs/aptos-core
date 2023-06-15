@@ -8,13 +8,13 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_executor_types::ExecutableTransactions;
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
+    block_executor::partitioner::ExecutableTransactions,
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -60,7 +60,7 @@ pub struct MockVM;
 
 impl TransactionBlockExecutor for MockVM {
     fn execute_transaction_block(
-        transactions: ExecutableTransactions,
+        transactions: ExecutableTransactions<Transaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ChunkOutput> {

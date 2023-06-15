@@ -22,7 +22,9 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_state_view::TStateView;
-use aptos_types::{executable::Executable, write_set::WriteOp};
+use aptos_types::{
+    block_executor::partitioner::ExecutableTransactions, executable::Executable, write_set::WriteOp,
+};
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
@@ -34,6 +36,31 @@ use std::{
         Arc,
     },
 };
+
+struct CommitGuard<'a> {
+    post_commit_txs: &'a Vec<Sender<u32>>,
+    worker_idx: usize,
+    txn_idx: u32,
+}
+
+impl<'a> CommitGuard<'a> {
+    fn new(post_commit_txs: &'a Vec<Sender<u32>>, worker_idx: usize, txn_idx: u32) -> Self {
+        Self {
+            post_commit_txs,
+            worker_idx,
+            txn_idx,
+        }
+    }
+}
+
+impl<'a> Drop for CommitGuard<'a> {
+    fn drop(&mut self) {
+        // Send the committed txn to the Worker thread.
+        self.post_commit_txs[self.worker_idx]
+            .send(self.txn_idx)
+            .expect("Worker must be available");
+    }
+}
 
 #[derive(Debug)]
 enum CommitRole {
@@ -228,9 +255,9 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            post_commit_txs[*worker_idx]
-                .send(txn_idx)
-                .expect("Worker must be available");
+            // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
+            let _commit_guard: CommitGuard =
+                CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
@@ -428,7 +455,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -437,6 +464,13 @@ where
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
+
+        let signature_verified_block = match signature_verified_block {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::Sharded(_) => {
+                unimplemented!("Sharded execution is not supported yet")
+            },
+        };
 
         let versioned_cache = MVHashMap::new();
 
@@ -526,9 +560,16 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &[T],
+        signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
+        let signature_verified_block = match signature_verified_block {
+            ExecutableTransactions::Unsharded(txns) => txns,
+            ExecutableTransactions::Sharded(_) => {
+                unimplemented!("Sharded execution is not supported yet")
+            },
+        };
+
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let data_map = UnsyncMap::new();
@@ -600,7 +641,7 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        signature_verified_block: ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
@@ -622,7 +663,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
+            init_speculative_logs(signature_verified_block.num_transactions());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,

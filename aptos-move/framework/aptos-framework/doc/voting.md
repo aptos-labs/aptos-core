@@ -1633,6 +1633,7 @@ Return true if the voting period of the given proposal has already ended.
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+
 <b>let</b> voting_forum =  <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
 <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
 <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(proposal.early_resolution_vote_threshold);
@@ -1643,6 +1644,7 @@ Return true if the voting period of the given proposal has already ended.
 <b>let</b> voting_closed = voting_period_over || be_resolved_early;
 <b>aborts_if</b> voting_closed && (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
 <b>aborts_if</b> !voting_closed;
+
 <b>aborts_if</b> proposal.is_resolved;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, std::string::spec_utf8(<a href="voting.md#0x1_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>));
@@ -1741,6 +1743,18 @@ Return true if the voting period of the given proposal has already ended.
 
 
 
+
+<a name="0x1_voting_spec_get_proposal_state"></a>
+
+
+<pre><code><b>fun</b> <a href="voting.md#0x1_voting_spec_get_proposal_state">spec_get_proposal_state</a>&lt;ProposalType&gt;(
+   voting_forum_address: <b>address</b>,
+   proposal_id: u64,
+): u64;
+</code></pre>
+
+
+
 <a name="@Specification_1_get_proposal_state"></a>
 
 ### Function `get_proposal_state`
@@ -1748,6 +1762,7 @@ Return true if the voting period of the given proposal has already ended.
 
 <pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
 </code></pre>
+
 
 
 
@@ -1769,6 +1784,7 @@ Return true if the voting period of the given proposal has already ended.
     result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_FAILED">PROPOSAL_STATE_FAILED</a>
 };
 <b>ensures</b> !voting_closed ==&gt; result == <a href="voting.md#0x1_voting_PROPOSAL_STATE_PENDING">PROPOSAL_STATE_PENDING</a>;
+
 </code></pre>
 
 
