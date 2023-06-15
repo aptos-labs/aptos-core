@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Node Profiling Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .content {
+            width: 80%;
+            margin: auto;
+        }
+        select, button {
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            margin-top: 50px;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="content">
+        <h1>Node Profiling Dashboard</h1>
+
+        <select id="profilingType">
+            <option value="">--Select Profiling Type--</option>
+            <option value="cpu">CPU Profiling</option>
+            <option value="heap">Heap Profiling</option>
+        </select>
+        <button id="startButton" disabled>Start Profiling</button>
+
+        <table id="resultsTable">
+            <tr>
+                <th>Profiling ID</th>
+                <th>Type</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            <!-- Rows will be populated dynamically -->
+        </table>
+
+    </div>
+
+    <script>
+        // handle start button state
+        document.getElementById('profilingType').onchange = function() {
+            document.getElementById('startButton').disabled = this.value === "";
+        }
+
+
+        // handle start profiling
+        document.getElementById('startButton').onclick = function() {
+            // Here you'll need to call your backend API to start the profiling.
+            // After the profiling has started, append the result to the table.
+            // For now, let's just mock this with a random id and the current date/time.
+            
+            
+            var type = document.getElementById('profilingType').value;
+
+            // select API endpoint based on the type
+            var endpoint;
+            switch(type) {
+                case 'cpu':
+                    endpoint = 'http://localhost:1234/cpu_profiling';
+                    break;
+                case 'heap':
+                    endpoint = 'http://localhost:1234/memory_profiling';
+                    break;
+            }
+
+            // make the API call
+            fetch(endpoint)
+                .then(response => response.json())
+
+                .catch(error => {
+                    // Handle any errors
+                    console.error('Error:', error);
+                });
+
+
+            var id = Math.floor(Math.random() * 1000000);
+            var type = document.getElementById('profilingType').value;
+            var dateTime = new Date().toLocaleString();
+            var status = "In progress";
+
+            var table = document.getElementById('resultsTable');
+            var row = table.insertRow(1); // Insert a new row at position 1 (after the header)
+
+            // Now insert the cells
+            var cell1 = row.insertCell(0);
+            var cell2 = row.insertCell(1);
+            var cell3 = row.insertCell(2);
+            var cell4 = row.insertCell(3);
+            var cell5 = row.insertCell(4);
+
+            // Fill the cells with data
+            cell1.innerHTML = id;
+            cell2.innerHTML = type;
+            cell3.innerHTML = dateTime;
+            cell4.innerHTML = status;
+
+            var viewResultsButton = document.createElement('button');
+            viewResultsButton.textContent = 'View Results';
+
+            var resultEndpoint;
+            switch(type) {
+                case 'cpu':
+                    resultEndpoint = 'http://localhost:1234/cpu_flamegraph';
+                    break;
+                case 'heap':
+                    resultEndpoint = 'http://localhost:1234/memory_svg';
+                    break;
+            }
+            viewResultsButton.addEventListener('click', function() {
+                window.open(resultEndpoint, '_blank');
+            });
+
+            cell5.appendChild(viewResultsButton);
+
+            
+
+            }
+                    
+        </script>
+</body>
+</html>
+
