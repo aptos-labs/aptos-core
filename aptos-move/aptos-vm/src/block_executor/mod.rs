@@ -27,6 +27,7 @@ use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, SubBlock, TransactionWithDependencies},
     executable::ExecutableTestType,
+    fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::WriteOp,
@@ -127,6 +128,17 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.committed_output
             .get()
             .map_or(0, |output| output.gas_used())
+    }
+
+    // Return the fee statement of the transaction.
+    // Should never be called after vm_output is consumed.
+    fn fee_statement(&self) -> FeeStatement {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get fee statement")
+            .fee_statement()
+            .clone()
     }
 }
 
