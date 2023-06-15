@@ -72,6 +72,10 @@ permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+
 jobs:
   rust-all:
     runs-on: experimental-docker 
