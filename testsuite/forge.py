@@ -643,7 +643,6 @@ class K8sForgeRunner(ForgeRunner):
                 "kubectl",
                 "--kubeconfig",
                 context.forge_cluster.kubeconf,
-                context.forge_cluster.kubectl_create_context_arg,
                 "delete",
                 "pod",
                 "-n",
@@ -651,6 +650,7 @@ class K8sForgeRunner(ForgeRunner):
                 "-l",
                 f"forge-namespace={context.forge_namespace}",
                 "--force",
+                context.forge_cluster.kubectl_create_context_arg,
             ]
         )
         context.shell.run(
@@ -725,12 +725,12 @@ class K8sForgeRunner(ForgeRunner):
                     "kubectl",
                     "--kubeconfig",
                     context.forge_cluster.kubeconf,
-                    context.forge_cluster.kubectl_create_context_arg,
                     "apply",
                     "-n",
                     "default",
                     "-f",
                     specfile,
+                    context.forge_cluster.kubectl_create_context_arg,
                 ]
             ).unwrap()
             context.shell.run(
