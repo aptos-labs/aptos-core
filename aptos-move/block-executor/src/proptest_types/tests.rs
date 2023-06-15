@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
+    block_executor::partitioner::BlockExecutorTransactions, executable::ExecutableTestType,
 };
 use claims::assert_ok;
 use num_cpus;
@@ -62,7 +62,7 @@ fn run_transactions<K, V>(
             .unwrap(),
     );
 
-    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+    let executable_txns = BlockExecutorTransactions::Unsharded(transactions);
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
@@ -191,7 +191,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
-    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+    let executable_txns = BlockExecutorTransactions::Unsharded(transactions);
 
     let data_view = DeltaDataView::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
         phantom: PhantomData,
@@ -251,7 +251,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
-    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+    let executable_txns = BlockExecutorTransactions::Unsharded(transactions);
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -427,7 +427,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         phantom: PhantomData,
     };
 
-    let executable_txns = ExecutableTransactions::Unsharded(transactions.clone());
+    let executable_txns = BlockExecutorTransactions::Unsharded(transactions.clone());
 
     let executor_thread_pool = Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -480,7 +480,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
-    let executable_txns = ExecutableTransactions::Unsharded(transactions);
+    let executable_txns = BlockExecutorTransactions::Unsharded(transactions);
 
     for _ in 0..200 {
         let output = BlockExecutor::<

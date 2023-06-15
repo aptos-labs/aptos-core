@@ -23,7 +23,8 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions, executable::Executable,
+block_executor::partitioner::BlockExecutorTransactions,
+executable::Executable,
     fee_statement::FeeStatement, write_set::WriteOp,
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -580,7 +581,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &ExecutableTransactions<T>,
+        signature_verified_block: &BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -591,8 +592,8 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let signature_verified_block = match signature_verified_block {
-            ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
+            BlockExecutorTransactions::Unsharded(txns) => txns,
+            BlockExecutorTransactions::Sharded(_) => {
                 unimplemented!("Sharded execution is not supported yet")
             },
         };
@@ -685,12 +686,12 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &ExecutableTransactions<T>,
+        signature_verified_block: &BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_block = match signature_verified_block {
-            ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
+            BlockExecutorTransactions::Unsharded(txns) => txns,
+            BlockExecutorTransactions::Sharded(_) => {
                 unimplemented!("Sharded execution is not supported yet")
             },
         };
@@ -769,7 +770,7 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: ExecutableTransactions<T>,
+        signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
@@ -791,7 +792,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_transactions());
+            init_speculative_logs(signature_verified_block.num_txns());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,

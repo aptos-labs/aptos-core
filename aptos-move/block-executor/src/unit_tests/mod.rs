@@ -10,7 +10,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::partitioner::BlockExecutorTransactions,
     executable::{ExecutableTestType, ModulePath},
     write_set::TransactionWrite,
 };
@@ -41,7 +41,7 @@ where
             .unwrap(),
     );
 
-    let executable_transactions = ExecutableTransactions::Unsharded(transactions);
+    let executable_transactions = BlockExecutorTransactions::Unsharded(transactions);
 
     let output = BlockExecutor::<
         Transaction<K, V>,

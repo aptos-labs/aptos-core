@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
+    block_executor::partitioner::BlockExecutorTransactions, executable::ExecutableTestType,
 };
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
@@ -36,7 +36,7 @@ pub(crate) struct BencherState<
 > where
     Vec<u8>: From<V>,
 {
-    transactions: ExecutableTransactions<Transaction<KeyType<K>, ValueType<V>>>,
+    transactions: BlockExecutorTransactions<Transaction<KeyType<K>, ValueType<V>>>,
     expected_output: ExpectedOutput<ValueType<V>>,
 }
 
@@ -106,7 +106,7 @@ where
         let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
-            transactions: ExecutableTransactions::Unsharded(transactions),
+            transactions: BlockExecutorTransactions::Unsharded(transactions),
             expected_output,
         }
     }
