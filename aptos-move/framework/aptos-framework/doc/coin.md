@@ -16,6 +16,8 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
 -  [Struct `BurnCapability`](#0x1_coin_BurnCapability)
+-  [Resource `FungibleAssetMigration`](#0x1_coin_FungibleAssetMigration)
+-  [Resource `FungibleAssetAdmin`](#0x1_coin_FungibleAssetAdmin)
 -  [Resource `Ghost$supply`](#0x1_coin_Ghost$supply)
 -  [Resource `Ghost$aggregate_supply`](#0x1_coin_Ghost$aggregate_supply)
 -  [Constants](#@Constants_0)
@@ -56,6 +58,16 @@ This module provides the foundation for typesafe Coins.
 -  [Function `destroy_freeze_cap`](#0x1_coin_destroy_freeze_cap)
 -  [Function `destroy_mint_cap`](#0x1_coin_destroy_mint_cap)
 -  [Function `destroy_burn_cap`](#0x1_coin_destroy_burn_cap)
+-  [Function `initialize_fungible_asset_migration`](#0x1_coin_initialize_fungible_asset_migration)
+-  [Function `initialize_fungible_asset`](#0x1_coin_initialize_fungible_asset)
+-  [Function `set_enable_default_fungible_assets_in_transfers`](#0x1_coin_set_enable_default_fungible_assets_in_transfers)
+-  [Function `convert_to_fungible_asset_and_store`](#0x1_coin_convert_to_fungible_asset_and_store)
+-  [Function `convert_to_fungible_asset`](#0x1_coin_convert_to_fungible_asset)
+-  [Function `convert_to_coin_and_store`](#0x1_coin_convert_to_coin_and_store)
+-  [Function `convert_to_coin`](#0x1_coin_convert_to_coin)
+-  [Function `fungible_asset_admin_address`](#0x1_coin_fungible_asset_admin_address)
+-  [Function `is_registered_fungible_asset_migration`](#0x1_coin_is_registered_fungible_asset_migration)
+-  [Function `is_registered_fungible_asset_migration_internal`](#0x1_coin_is_registered_fungible_asset_migration_internal)
 -  [Specification](#@Specification_1)
     -  [Struct `AggregatableCoin`](#@Specification_1_AggregatableCoin)
     -  [Function `initialize_supply_config`](#@Specification_1_initialize_supply_config)
@@ -96,9 +108,13 @@ This module provides the foundation for typesafe Coins.
 <b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="optional_aggregator.md#0x1_optional_aggregator">0x1::optional_aggregator</a>;
+<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
@@ -430,6 +446,84 @@ Capability required to burn coins.
 
 </details>
 
+<a name="0x1_coin_FungibleAssetMigration"></a>
+
+## Resource `FungibleAssetMigration`
+
+
+
+<pre><code><b>struct</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coins_to_fungible_assets: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>, <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>fungible_assets_to_coins: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>enable_default_fungible_assets_in_transfers: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_coin_FungibleAssetAdmin"></a>
+
+## Resource `FungibleAssetAdmin`
+
+
+
+<pre><code><b>struct</b> <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>&lt;CoinType&gt; <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v1_locked: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>mint_ref: <a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_coin_Ghost$supply"></a>
 
 ## Resource `Ghost$supply`
@@ -505,6 +599,16 @@ Maximum possible coin supply.
 
 
 <pre><code><b>const</b> <a href="coin.md#0x1_coin_MAX_U128">MAX_U128</a>: u128 = 340282366920938463463374607431768211455;
+</code></pre>
+
+
+
+<a name="0x1_coin_EINSUFFICIENT_BALANCE"></a>
+
+Not enough coins to complete transaction
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>: u64 = 6;
 </code></pre>
 
 
@@ -619,12 +723,32 @@ CoinStore is frozen. Coins cannot be deposited or withdrawn
 
 
 
-<a name="0x1_coin_EINSUFFICIENT_BALANCE"></a>
+<a name="0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED"></a>
 
-Not enough coins to complete transaction
+CoinType is already initialized in fungible asset migration
 
 
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>: u64 = 6;
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED</a>: u64 = 16;
+</code></pre>
+
+
+
+<a name="0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED"></a>
+
+CoinType is already initialized in fungible asset migration
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED</a>: u64 = 17;
+</code></pre>
+
+
+
+<a name="0x1_coin_EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED"></a>
+
+Sender is not authorized to perform fungible asset migration
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED">EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED</a>: u64 = 15;
 </code></pre>
 
 
@@ -1855,6 +1979,325 @@ Destroy a burn capability.
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_destroy_burn_cap">destroy_burn_cap</a>&lt;CoinType&gt;(burn_cap: <a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;) {
     <b>let</b> <a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt; {} = burn_cap;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_initialize_fungible_asset_migration"></a>
+
+## Function `initialize_fungible_asset_migration`
+
+Initialize fungible asset migration.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_initialize_fungible_asset_migration">initialize_fungible_asset_migration</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_initialize_fungible_asset_migration">initialize_fungible_asset_migration</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+
+    <b>move_to</b>(aptos_framework, <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a> {
+        coins_to_fungible_assets: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        fungible_assets_to_coins: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>(),
+        enable_default_fungible_assets_in_transfers: <b>false</b>,
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_initialize_fungible_asset"></a>
+
+## Function `initialize_fungible_asset`
+
+Create a fungible asset version of an existing Coin. This can only be called by
+the signer corresponding to the address where CoinType is defined/deployed.
+Icon and project uris are new fields in Fungible Asset that don't exist in Coin
+and can be provided or left empty at the caller's discretion.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_initialize_fungible_asset">initialize_fungible_asset</a>&lt;CoinType&gt;(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, maximum_supply: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u128&gt;, icon_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, project_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_initialize_fungible_asset">initialize_fungible_asset</a>&lt;CoinType&gt;(
+    creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    maximum_supply: Option&lt;u128&gt;,
+    icon_uri: String,
+    project_uri: String,
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a> {
+    <b>assert</b>!(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED">EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED</a>);
+
+    // TODO: should <b>use</b> aptos_framework <b>as</b> the <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, but no idea how <b>to</b> get aptos_framework <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+    <b>let</b> constructor_ref = <a href="object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&<a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;()));
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">primary_fungible_store::create_primary_store_enabled_fungible_asset</a>(
+        &constructor_ref,
+        maximum_supply,
+        <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;(),
+        <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;(),
+        <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;(),
+        icon_uri,
+        project_uri
+    );
+
+    <b>let</b> migration = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <b>assert</b>!(!<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&migration.coins_to_fungible_assets, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED</a>);
+
+    <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;Metadata&gt;(&constructor_ref);
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(&<b>mut</b> migration.coins_to_fungible_assets, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;(), metadata);
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(&<b>mut</b> migration.fungible_assets_to_coins, metadata, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;());
+
+    <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
+    <b>move_to</b>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>&lt;CoinType&gt; {
+        v1_locked: <a href="coin.md#0x1_coin_zero">zero</a>&lt;CoinType&gt;(),
+        mint_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">fungible_asset::generate_mint_ref</a>(&constructor_ref),
+        burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">fungible_asset::generate_burn_ref</a>(&constructor_ref),
+    })
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_set_enable_default_fungible_assets_in_transfers"></a>
+
+## Function `set_enable_default_fungible_assets_in_transfers`
+
+Set enable_default_fungible_assets_in_transfers in the migration config.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_set_enable_default_fungible_assets_in_transfers">set_enable_default_fungible_assets_in_transfers</a>&lt;CoinType&gt;(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_value: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_set_enable_default_fungible_assets_in_transfers">set_enable_default_fungible_assets_in_transfers</a>&lt;CoinType&gt;(
+    creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_value: bool,
+) <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a> {
+    <b>assert</b>!(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED">EFUNGIBLE_ASSET_MIGRATION_UNAHORIZED</a>);
+
+    <b>let</b> migration = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <b>assert</b>!(<a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED</a>);
+
+    migration.enable_default_fungible_assets_in_transfers = new_value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_convert_to_fungible_asset_and_store"></a>
+
+## Function `convert_to_fungible_asset_and_store`
+
+Convert an amount of Coins from the caller's CoinStore to its corresponding
+FungibleAsset. This is only callable after the creator of CoinType has already
+created the FungibleAsset version.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_convert_to_fungible_asset_and_store">convert_to_fungible_asset_and_store</a>&lt;CoinType&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_convert_to_fungible_asset_and_store">convert_to_fungible_asset_and_store</a>&lt;CoinType&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64) <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_withdraw">withdraw</a>&lt;CoinType&gt;(owner, amount);
+    <b>let</b> <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a> = <a href="coin.md#0x1_coin_convert_to_fungible_asset">convert_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>);
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">primary_fungible_store::deposit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_convert_to_fungible_asset"></a>
+
+## Function `convert_to_fungible_asset`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_to_fungible_asset">convert_to_fungible_asset</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_to_fungible_asset">convert_to_fungible_asset</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): FungibleAsset <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a> {
+    <b>let</b> migration = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <b>assert</b>!(<a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED</a>);
+
+    <b>let</b> fungible_asset_admin_address = <a href="coin.md#0x1_coin_fungible_asset_admin_address">fungible_asset_admin_address</a>&lt;CoinType&gt;();
+    <b>let</b> fungible_asset_admin = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>&lt;CoinType&gt;&gt;(fungible_asset_admin_address);
+
+    <b>let</b> amount = <a href="coin.md#0x1_coin_value">value</a>(&<a href="coin.md#0x1_coin">coin</a>);
+    <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> fungible_asset_admin.v1_locked, <a href="coin.md#0x1_coin">coin</a>);
+    <a href="fungible_asset.md#0x1_fungible_asset_mint">fungible_asset::mint</a>(&fungible_asset_admin.mint_ref, amount)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_convert_to_coin_and_store"></a>
+
+## Function `convert_to_coin_and_store`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_convert_to_coin_and_store">convert_to_coin_and_store</a>&lt;CoinType&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="coin.md#0x1_coin_convert_to_coin_and_store">convert_to_coin_and_store</a>&lt;CoinType&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64) <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>let</b> migration = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <b>let</b> asset = *<a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow">smart_table::borrow</a>(&migration.coins_to_fungible_assets, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;());
+
+    <b>let</b> fa = <a href="primary_fungible_store.md#0x1_primary_fungible_store_withdraw">primary_fungible_store::withdraw</a>(owner, asset, amount);
+    <b>let</b> <a href="coin.md#0x1_coin">coin</a> = <a href="coin.md#0x1_coin_convert_to_coin">convert_to_coin</a>&lt;CoinType&gt;(fa);
+    <a href="coin.md#0x1_coin_deposit">deposit</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), <a href="coin.md#0x1_coin">coin</a>);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_convert_to_coin"></a>
+
+## Function `convert_to_coin`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_to_coin">convert_to_coin</a>&lt;CoinType&gt;(fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_to_coin">convert_to_coin</a>&lt;CoinType&gt;(fa: FungibleAsset): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a> {
+    <b>let</b> migration = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <b>assert</b>!(<a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration), <a href="coin.md#0x1_coin_EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED">EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED</a>);
+
+    <b>let</b> fungible_asset_admin_address = <a href="coin.md#0x1_coin_fungible_asset_admin_address">fungible_asset_admin_address</a>&lt;CoinType&gt;();
+    <b>let</b> fungible_asset_admin = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetAdmin">FungibleAssetAdmin</a>&lt;CoinType&gt;&gt;(fungible_asset_admin_address);
+
+    <b>let</b> amount = <a href="fungible_asset.md#0x1_fungible_asset_amount">fungible_asset::amount</a>(&fa);
+    <a href="fungible_asset.md#0x1_fungible_asset_burn">fungible_asset::burn</a>(&fungible_asset_admin.burn_ref, fa);
+    <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> fungible_asset_admin.v1_locked, amount)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_fungible_asset_admin_address"></a>
+
+## Function `fungible_asset_admin_address`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_fungible_asset_admin_address">fungible_asset_admin_address</a>&lt;CoinType&gt;(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_fungible_asset_admin_address">fungible_asset_admin_address</a>&lt;CoinType&gt;(): <b>address</b> <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <a href="object.md#0x1_object_create_object_address">object::create_object_address</a>(&@aptos_framework, *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&<a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;()))
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_is_registered_fungible_asset_migration"></a>
+
+## Function `is_registered_fungible_asset_migration`
+
+Get whether a CoinType has been registered in fungible asset migration by its creator.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_registered_fungible_asset_migration">is_registered_fungible_asset_migration</a>&lt;CoinType&gt;(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_registered_fungible_asset_migration">is_registered_fungible_asset_migration</a>&lt;CoinType&gt;(): bool <b>acquires</b> <a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a> {
+    <b>let</b> migration = <b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>&gt;(@aptos_framework);
+    <a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_coin_is_registered_fungible_asset_migration_internal"></a>
+
+## Function `is_registered_fungible_asset_migration_internal`
+
+
+
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration: &<a href="coin.md#0x1_coin_FungibleAssetMigration">coin::FungibleAssetMigration</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_is_registered_fungible_asset_migration_internal">is_registered_fungible_asset_migration_internal</a>&lt;CoinType&gt;(migration: &<a href="coin.md#0x1_coin_FungibleAssetMigration">FungibleAssetMigration</a>): bool {
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(&migration.coins_to_fungible_assets, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;())
 }
 </code></pre>
 

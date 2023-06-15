@@ -466,16 +466,6 @@ Maximum possible coin supply.
 
 
 
-<a name="0x1_fungible_asset_EINSUFFICIENT_BALANCE"></a>
-
-Insufficient balance to withdraw or transfer.
-
-
-<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>: u64 = 4;
-</code></pre>
-
-
-
 <a name="0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO"></a>
 
 Amount cannot be zero.
@@ -552,6 +542,16 @@ Fungible asset do not match when merging.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_ASSET_MISMATCH">EFUNGIBLE_ASSET_MISMATCH</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_fungible_asset_EINSUFFICIENT_BALANCE"></a>
+
+Insufficient balance to withdraw or transfer.
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>: u64 = 4;
 </code></pre>
 
 

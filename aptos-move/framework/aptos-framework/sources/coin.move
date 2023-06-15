@@ -8,11 +8,18 @@ module aptos_framework::coin {
     use aptos_framework::account;
     use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::{Self, Aggregator};
+    use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, BurnRef};
+    use aptos_framework::object::{Self, Object};
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
 
-    use aptos_std::type_info;
+    use aptos_std::smart_table::{Self, SmartTable};
+    use std::string::String;
+    use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::create_signer;
+    use aptos_framework::primary_fungible_store;
 
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
@@ -60,6 +67,18 @@ module aptos_framework::coin {
 
     /// The value of aggregatable coin used for transaction fees redistribution does not fit in u64.
     const EAGGREGATABLE_COIN_VALUE_TOO_LARGE: u64 = 14;
+
+    /// Sender is not authorized to perform fungible asset migration
+    const EFUNGIBLE_ASSET_MIGRATION_UNAUTHORIZED: u64 = 15;
+
+    /// CoinType is already initialized in fungible asset migration
+    const EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED: u64 = 16;
+
+    /// CoinType is uninitialized in fungible asset migration
+    const EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED: u64 = 17;
+
+    /// Maximum supply argument provided to initialize_fungible_asset method is invalid
+    const EFUNGIBLE_ASSET_MIGRATION_INVALID_MAXIMUM_SUPPLY: u64 = 18;
 
     //
     // Constants
@@ -137,6 +156,23 @@ module aptos_framework::coin {
 
     /// Capability required to burn coins.
     struct BurnCapability<phantom CoinType> has copy, store {}
+
+    struct FungibleAssetMigration has key {
+        // Fast lookup maps to help convert back and forth between coins and fungible assets.
+        coins_to_fungible_assets: SmartTable<TypeInfo, Object<Metadata>>,
+        fungible_assets_to_coins: SmartTable<Object<Metadata>, TypeInfo>,
+
+        // If set to true, coin::transfer and coin::deposit will always deposit the amount
+        // as fungible assets instead of Coins.
+        enable_default_fungible_assets_in_transfers: bool,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct FungibleAssetAdmin<phantom CoinType> has key {
+        v1_locked: Coin<CoinType>,
+        mint_ref: MintRef,
+        burn_ref: BurnRef
+    }
 
     //
     // Total supply config
@@ -615,6 +651,207 @@ module aptos_framework::coin {
     /// Destroy a burn capability.
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> {} = burn_cap;
+    }
+
+    /// Initialize fungible asset migration.
+    public entry fun initialize_fungible_asset_migration(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        move_to(aptos_framework, FungibleAssetMigration {
+            coins_to_fungible_assets: smart_table::new(),
+            fungible_assets_to_coins: smart_table::new(),
+            enable_default_fungible_assets_in_transfers: false,
+        });
+    }
+
+    /// Create a fungible asset version of an existing Coin. This can only be called by
+    /// the signer corresponding to the address where CoinType is defined/deployed.
+    /// Icon and project uris are new fields in Fungible Asset that don't exist in Coin
+    /// and can be provided or left empty at the caller's discretion.
+    public entry fun initialize_fungible_asset<CoinType>(
+        creator: &signer,
+        maximum_supply: Option<u128>,
+        icon_uri: String,
+        project_uri: String,
+    ) acquires CoinInfo, FungibleAssetMigration {
+        assert!(coin_address<CoinType>() == signer::address_of(creator), EFUNGIBLE_ASSET_MIGRATION_UNAUTHORIZED);
+
+        // if supply is tracked in coin v1, then coin v2 should either have unlimited supply,
+        // or a maximum supply that is equal or greater than the current supply;
+        // if supply is not tracked in coin v1, then coin v2 should have unlimited supply.
+        {
+            let supply_v1 = supply<CoinType>();
+            if (option::is_some(&supply_v1)) {
+                assert!(option::is_none(&maximum_supply) || *option::borrow(&maximum_supply) >= *option::borrow(&supply_v1), EFUNGIBLE_ASSET_MIGRATION_INVALID_MAXIMUM_SUPPLY);
+            } else {
+                assert!(option::is_none(&maximum_supply), EFUNGIBLE_ASSET_MIGRATION_INVALID_MAXIMUM_SUPPLY);
+            }
+        };
+
+        let coin_type = type_info::type_of<CoinType>();
+        let migration = borrow_global_mut<FungibleAssetMigration>(@aptos_framework);
+        assert!(!smart_table::contains(&migration.coins_to_fungible_assets, coin_type), EFUNGIBLE_ASSET_MIGRATION_COINTYPE_INITIALIZED);
+
+        let constructor_ref = object::create_named_object(&create_signer(@aptos_framework), *string::bytes(&type_info::type_name<CoinType>()));
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(
+            &constructor_ref,
+            maximum_supply,
+            name<CoinType>(),
+            symbol<CoinType>(),
+            decimals<CoinType>(),
+            icon_uri,
+            project_uri
+        );
+
+        let metadata = object::object_from_constructor_ref<Metadata>(&constructor_ref);
+        smart_table::add(&mut migration.coins_to_fungible_assets, coin_type, metadata);
+        smart_table::add(&mut migration.fungible_assets_to_coins, metadata, coin_type);
+
+        let signer = object::generate_signer(&constructor_ref);
+        move_to(&signer, FungibleAssetAdmin<CoinType> {
+            v1_locked: zero<CoinType>(),
+            mint_ref: fungible_asset::generate_mint_ref(&constructor_ref),
+            burn_ref: fungible_asset::generate_burn_ref(&constructor_ref),
+        })
+    }
+
+    /// Set enable_default_fungible_assets_in_transfers in the migration config.
+    public entry fun set_enable_default_fungible_assets_in_transfers<CoinType>(
+        creator: &signer,
+        new_value: bool,
+    ) acquires FungibleAssetMigration {
+        assert!(coin_address<CoinType>() == signer::address_of(creator), EFUNGIBLE_ASSET_MIGRATION_UNAUTHORIZED);
+
+        let migration = borrow_global_mut<FungibleAssetMigration>(@aptos_framework);
+        assert!(is_registered_fungible_asset_migration_internal<CoinType>(migration), EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED);
+
+        migration.enable_default_fungible_assets_in_transfers = new_value
+    }
+
+    /// Convert an amount of Coins from the caller's CoinStore to its corresponding
+    /// FungibleAsset. This is only callable after the creator of CoinType has already
+    /// created the FungibleAsset version.
+    public entry fun convert_to_fungible_asset_and_store<CoinType>(owner: &signer, amount: u64) acquires FungibleAssetMigration, CoinInfo, FungibleAssetAdmin, CoinStore {
+        let coin = withdraw<CoinType>(owner, amount);
+        let fungible_asset = convert_to_fungible_asset(coin);
+        primary_fungible_store::deposit(signer::address_of(owner), fungible_asset);
+    }
+
+    // Non-entry version for calling in another Move module.
+    public fun convert_to_fungible_asset<CoinType>(coin: Coin<CoinType>): FungibleAsset acquires FungibleAssetMigration, CoinInfo, FungibleAssetAdmin {
+        let migration = borrow_global<FungibleAssetMigration>(@aptos_framework);
+        assert!(is_registered_fungible_asset_migration_internal<CoinType>(migration), EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED);
+
+        let fungible_asset_admin_address = fungible_asset_admin_address<CoinType>();
+        let fungible_asset_admin = borrow_global_mut<FungibleAssetAdmin<CoinType>>(fungible_asset_admin_address);
+
+        let amount = value(&coin);
+        merge(&mut fungible_asset_admin.v1_locked, coin);
+        fungible_asset::mint(&fungible_asset_admin.mint_ref, amount)
+    }
+
+    // Convert an amount of FungibleAsset from an owner's primary store back to
+    // Coin. This is necessary during phase 1 of the transition as the ecosystem might
+    // not have fully supported the FungibleAsset version yet.
+    public entry fun convert_to_coin_and_store<CoinType>(owner: &signer, amount: u64) acquires FungibleAssetMigration, CoinInfo, FungibleAssetAdmin, CoinStore {
+        let migration = borrow_global<FungibleAssetMigration>(@aptos_framework);
+        let asset = *smart_table::borrow(&migration.coins_to_fungible_assets, type_info::type_of<CoinType>());
+
+        let fa = primary_fungible_store::withdraw(owner, asset, amount);
+        let coin = convert_to_coin<CoinType>(fa);
+        deposit(signer::address_of(owner), coin);
+    }
+
+    // Non-entry version for calling in another Move module.
+    public fun convert_to_coin<CoinType>(fa: FungibleAsset): Coin<CoinType> acquires FungibleAssetMigration, CoinInfo, FungibleAssetAdmin {
+        let migration = borrow_global<FungibleAssetMigration>(@aptos_framework);
+        assert!(is_registered_fungible_asset_migration_internal<CoinType>(migration), EFUNGIBLE_ASSET_MIGRATION_COINTYPE_UNINITIALIZED);
+
+        let fungible_asset_admin_address = fungible_asset_admin_address<CoinType>();
+        let fungible_asset_admin = borrow_global_mut<FungibleAssetAdmin<CoinType>>(fungible_asset_admin_address);
+
+        let amount = fungible_asset::amount(&fa);
+        fungible_asset::burn(&fungible_asset_admin.burn_ref, fa);
+        extract(&mut fungible_asset_admin.v1_locked, amount)
+    }
+
+    // Functions to withdraw a total amount of a token from the user. This will try
+    // to withdraw coins first, and then any remaining amount in FungibleAssets.
+    // This returns FungibleAsset and is meant to use by a flow that supports
+    // FungibleAsset.
+    // public fun withdraw_fungible_asset(
+    //     owner: &signer,
+    //     fungibleAssetType: Object<Metadata>,
+    // ): FungibleAsset {
+    //
+    // }
+
+    // Similar to above but takes a reference to CoinType instead of FungibleAsset.
+    // public fun withdraw_fungible_asset_by_coin<CoinType>(
+    //     owner: &signer,
+    // ): FungibleAsset {
+    //
+    // }
+
+    // Similar to above function but returns Coin instead and is meant to use by a
+    // flow that supports Coins only.
+    // public fun withdraw_to_coin<CoinType>(owner: &signer): Coin<CoinType> {
+    //
+    // }
+
+    // Similar to above function and returns Coin but take FungibleAsset reference.
+    // public fun withdraw_to_coin_by_fungible_asset<CoinType>(
+    //     owner: &signer,
+    //     fungibleAssetType: Object<Metadata>,
+    // ): Coin<CoinType> {
+    //
+    // }
+
+    // Deposit coins as fungible assets into an account.
+    // public fun deposit_as_fungible_asset<CoinType>(coins: Coin<CoinType>) {
+    //
+    // }
+
+    // Deposit fungible assets as coins into an account.
+    // public fun deposit_as_coins<CoinType>(fungible_assets: FungibleAsset) {
+    //
+    // }
+
+    // Transfer coins to an account but depositing them as fungible assets instead.
+    // This would first extract the amount from the sender's CoinStore and any
+    // remaining amount in FungibleAssets.
+    // public fun transfer_as_fungible_asset<CoinType>(
+    //     sender: &signer,
+    //     recipient: address,
+    //     amount: u64,
+    // ) {}
+
+    // Transfer fungible assets to an account but depositing them as coins instead.
+    // This would first extract the amount from the sender's CoinStore and any
+    // remaining amount in FungibleAssets.
+    // public fun transfer_as_coin(
+    //     sender: &signer,
+    //     recipient: address,
+    //     fungible_asset: Object<Metadata>,
+    //     amount: u64,
+    // ) {
+    //
+    // }
+
+    #[view]
+    public fun fungible_asset_admin_address<CoinType>(): address acquires CoinInfo {
+        object::create_object_address(&@aptos_framework, *string::bytes(&name<CoinType>()))
+    }
+
+    #[view]
+    /// Get whether a CoinType has been registered in fungible asset migration by its creator.
+    public fun is_registered_fungible_asset_migration<CoinType>(): bool acquires FungibleAssetMigration {
+        let migration = borrow_global<FungibleAssetMigration>(@aptos_framework);
+        is_registered_fungible_asset_migration_internal<CoinType>(migration)
+    }
+
+    fun is_registered_fungible_asset_migration_internal<CoinType>(migration: &FungibleAssetMigration): bool {
+        smart_table::contains(&migration.coins_to_fungible_assets, type_info::type_of<CoinType>())
     }
 
     #[test_only]
