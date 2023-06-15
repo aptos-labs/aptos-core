@@ -1,8 +1,8 @@
-import axios, { Axios, AxiosRequestConfig, AxiosResponse } from "axios";
-import { AptosConfig } from "../aptos_config";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import { AptosConfig } from "../api/aptos_config";
 import { VERSION } from "../version";
 
-class AptosApiError {
+export class AptosApiError {
   constructor(
     public readonly status: number,
     public readonly message: string,
