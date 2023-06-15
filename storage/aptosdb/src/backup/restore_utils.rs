@@ -5,9 +5,16 @@
 //! database restore operations, as required by restore and
 //! state sync v2.
 use crate::{
-    event_store::EventStore, ledger_store::LedgerStore, new_sharded_kv_schema_batch,
-    schema::transaction_accumulator::TransactionAccumulatorSchema, state_store::StateStore,
-    transaction_store::TransactionStore, ShardedStateKvSchemaBatch,
+    event_store::EventStore,
+    ledger_store::LedgerStore,
+    new_sharded_kv_schema_batch,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        transaction_accumulator::TransactionAccumulatorSchema,
+    },
+    state_store::StateStore,
+    transaction_store::TransactionStore,
+    ShardedStateKvSchemaBatch,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -236,6 +243,16 @@ pub(crate) fn save_transactions_impl(
     if kv_replay && first_version > 0 && state_store.get_usage(Some(first_version - 1)).is_ok() {
         state_store.put_write_sets(write_sets.to_vec(), first_version, batch, state_kv_batches)?;
     }
+
+    let last_version = first_version + txns.len() as u64 - 1;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::LedgerCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::OverallCommitProgress,
+        &DbMetadataValue::Version(last_version),
+    )?;
 
     Ok(())
 }

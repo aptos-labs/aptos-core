@@ -459,9 +459,7 @@ impl AptosDB {
         rocksdb_config: RocksdbConfig,
     ) -> Result<()> {
         let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self
-            .get_latest_transaction_info_option()?
-            .map_or(0, |(v, _)| v + 1);
+        let ledger_next_version = self.get_latest_version().map_or(0, |v| v + 1);
         info!(
             indexer_next_version = indexer.next_version(),
             ledger_next_version = ledger_next_version,
@@ -825,10 +823,7 @@ impl AptosDB {
             .current_version
             .map(|version| version + 1)
             .unwrap_or(0);
-        let num_transactions_in_db = self
-            .get_latest_transaction_info_option()?
-            .map(|(version, _)| version + 1)
-            .unwrap_or(0);
+        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
         ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
             "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
             first_version,
@@ -1330,6 +1325,12 @@ impl DbReader for AptosDB {
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         gauged_api("get_latest_ledger_info_option", || {
             Ok(self.ledger_store.get_latest_ledger_info_option())
+        })
+    }
+
+    fn get_latest_version(&self) -> Result<Version> {
+        gauged_api("get_latest_version", || {
+            self.ledger_store.get_latest_version()
         })
     }
 
@@ -1848,12 +1849,6 @@ impl DbReader for AptosDB {
         gauged_api("get_last_version_before_timestamp", || {
             self.event_store
                 .get_last_version_before_timestamp(timestamp, ledger_version)
-        })
-    }
-
-    fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>> {
-        gauged_api("get_latest_transaction_info_option", || {
-            self.ledger_store.get_latest_transaction_info_option()
         })
     }
 
