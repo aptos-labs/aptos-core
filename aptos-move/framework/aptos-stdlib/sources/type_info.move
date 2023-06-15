@@ -20,6 +20,17 @@ module aptos_std::type_info {
         struct_name: vector<u8>,
     }
 
+    /// A human-readable version of `TypeInfo` useful for returning in view functions, or other
+    /// applications where it is appropriate to partition address, module, and struct fields into
+    /// isolated fields.
+    ///
+    /// For example, a trading application with a global registry of phantom `CoinType`s.
+    struct ReadableTypeInfo has copy, drop, store {
+        account_address: address,
+        module_name: string::String,
+        struct_name: string::String
+    }
+
     //
     // Public functions
     //
@@ -34,6 +45,14 @@ module aptos_std::type_info {
 
     public fun struct_name(type_info: &TypeInfo): vector<u8> {
         type_info.struct_name
+    }
+
+    public fun to_readable_type_info(type_info: &TypeInfo): ReadableTypeInfo {
+        ReadableTypeInfo{
+            account_address: type_info.account_address,
+            module_name: string::utf8(type_info.module_name),
+            struct_name: string::utf8(type_info.struct_name)
+        }
     }
 
     /// Returns the current chain ID, mirroring what `aptos_framework::chain_id::get()` would return, except in `#[test]`
@@ -71,6 +90,11 @@ module aptos_std::type_info {
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
+        assert!(to_readable_type_info(&type_info) == ReadableTypeInfo {
+            account_address: @aptos_std,
+            module_name: string::utf8(b"type_info"),
+            struct_name: string::utf8(b"TypeInfo"),
+        }, 3);
     }
 
     #[test(fx = @std)]

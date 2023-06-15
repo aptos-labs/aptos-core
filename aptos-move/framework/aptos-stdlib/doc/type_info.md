@@ -6,10 +6,12 @@
 
 
 -  [Struct `TypeInfo`](#0x1_type_info_TypeInfo)
+-  [Struct `ReadableTypeInfo`](#0x1_type_info_ReadableTypeInfo)
 -  [Constants](#@Constants_0)
 -  [Function `account_address`](#0x1_type_info_account_address)
 -  [Function `module_name`](#0x1_type_info_module_name)
 -  [Function `struct_name`](#0x1_type_info_struct_name)
+-  [Function `to_readable_type_info`](#0x1_type_info_to_readable_type_info)
 -  [Function `chain_id`](#0x1_type_info_chain_id)
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
@@ -63,6 +65,50 @@
 </dd>
 <dt>
 <code>struct_name: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_type_info_ReadableTypeInfo"></a>
+
+## Struct `ReadableTypeInfo`
+
+A human-readable version of <code><a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a></code> useful for returning in view functions, or other
+applications where it is appropriate to partition address, module, and struct fields into
+isolated fields.
+
+For example, a trading application with a global registry of phantom <code>CoinType</code>s.
+
+
+<pre><code><b>struct</b> <a href="type_info.md#0x1_type_info_ReadableTypeInfo">ReadableTypeInfo</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>account_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>module_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>struct_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
@@ -151,6 +197,34 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <a href="type_info.md#0x1_type_info">type_info</a>.struct_name
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_type_info_to_readable_type_info"></a>
+
+## Function `to_readable_type_info`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_to_readable_type_info">to_readable_type_info</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="type_info.md#0x1_type_info_ReadableTypeInfo">type_info::ReadableTypeInfo</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_to_readable_type_info">to_readable_type_info</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="type_info.md#0x1_type_info_ReadableTypeInfo">ReadableTypeInfo</a> {
+    <a href="type_info.md#0x1_type_info_ReadableTypeInfo">ReadableTypeInfo</a>{
+        account_address: <a href="type_info.md#0x1_type_info">type_info</a>.account_address,
+        module_name: <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="type_info.md#0x1_type_info">type_info</a>.module_name),
+        struct_name: <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="type_info.md#0x1_type_info">type_info</a>.struct_name)
+    }
 }
 </code></pre>
 
@@ -356,6 +430,15 @@ analysis of vector size dynamism.
 ## Specification
 
 
+
+<a name="0x1_type_info_spec_chain_id_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
+</code></pre>
+
+
+
 <a name="@Specification_1_chain_id"></a>
 
 ### Function `chain_id`
@@ -409,15 +492,6 @@ analysis of vector size dynamism.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
-</code></pre>
-
-
-
-
-<a name="0x1_type_info_spec_chain_id_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 
