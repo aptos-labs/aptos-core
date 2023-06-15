@@ -19,7 +19,7 @@ fn test_dag_insertion_succeed() {
         assert!(dag.add_node(node).is_ok());
     }
     let parents = dag
-        .get_unlinked_nodes_for_new_round(&validator_verifier)
+        .get_strong_links_for_round(1, &validator_verifier)
         .unwrap();
 
     // Round 2 nodes 0, 1, 2 links to 0, 1, 2
@@ -28,19 +28,10 @@ fn test_dag_insertion_succeed() {
         assert!(dag.add_node(node).is_ok());
     }
 
-    let slow_node = new_node(1, signers[3].author(), vec![]);
-    assert!(dag.add_node(slow_node).is_ok());
-
-    // Round 3 nodes 1, 2 links to 0, 1, 2, 3 (weak)
+    // Round 3 nodes 1, 2 links to 0, 1, 2
     let parents = dag
-        .get_unlinked_nodes_for_new_round(&validator_verifier)
+        .get_strong_links_for_round(2, &validator_verifier)
         .unwrap();
-    assert_eq!(parents.len(), 4);
-
-    dag.mark_nodes_linked(&parents);
-    assert!(dag
-        .get_unlinked_nodes_for_new_round(&validator_verifier)
-        .is_none());
 
     for signer in &signers[1..3] {
         let node = new_node(3, signer.author(), parents.clone());
@@ -49,7 +40,7 @@ fn test_dag_insertion_succeed() {
 
     // not enough strong links
     assert!(dag
-        .get_unlinked_nodes_for_new_round(&validator_verifier)
+        .get_strong_links_for_round(3, &validator_verifier)
         .is_none());
 }
 
@@ -69,7 +60,7 @@ fn test_dag_insertion_failure() {
 
     let missing_node = new_node(1, signers[3].author(), vec![]);
     let mut parents = dag
-        .get_unlinked_nodes_for_new_round(&validator_verifier)
+        .get_strong_links_for_round(1, &validator_verifier)
         .unwrap();
     parents.push(missing_node.metadata());
 
@@ -84,6 +75,7 @@ fn test_dag_insertion_failure() {
     let node = new_node(2, signers[0].author(), parents[0..3].to_vec());
     assert!(dag.add_node(node).is_ok());
     let node = new_node(2, signers[0].author(), vec![]);
+    // equivocation node
     assert!(dag.add_node(node).is_err());
 }
 
