@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation 
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::server::utils::{CONTENT_TYPE_TEXT, CONTENT_TYPE_SVG, CONTENT_TYPE_HTML};
+use crate::server::utils::CONTENT_TYPE_TEXT;
 use aptos_config::config::NodeConfig;
 use aptos_logger::debug;
 use aptos_network::application::storage::PeersAndMetadata;

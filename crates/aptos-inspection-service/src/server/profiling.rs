@@ -1,9 +1,7 @@
 use hyper::{Body, StatusCode};
 use crate::{
-    server::utils::{CONTENT_TYPE_TEXT, CONTENT_TYPE_HTML}, CONFIGURATION_PATH, FORGE_METRICS_PATH, JSON_METRICS_PATH,
-    METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    server::utils::CONTENT_TYPE_HTML
 };
-use std::{thread, time};
 
 use std::fs::File;
 use std::io::Read;

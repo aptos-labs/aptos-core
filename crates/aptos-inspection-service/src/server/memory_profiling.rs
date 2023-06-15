@@ -1,7 +1,6 @@
 use hyper::{Body, StatusCode};
 use crate::{
-    server::utils::CONTENT_TYPE_TEXT, CONFIGURATION_PATH, FORGE_METRICS_PATH, JSON_METRICS_PATH,
-    METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    server::utils::CONTENT_TYPE_TEXT
 };
 use std::thread;
 use std::time::Duration;

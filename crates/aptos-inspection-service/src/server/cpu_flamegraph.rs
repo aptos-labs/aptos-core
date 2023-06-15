@@ -1,14 +1,9 @@
 use hyper::{Body, StatusCode};
 use crate::{
-    server::utils::CONTENT_TYPE_SVG, CONFIGURATION_PATH, FORGE_METRICS_PATH, JSON_METRICS_PATH,
-    METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
+    server::utils::CONTENT_TYPE_SVG
 };
-use std::{thread, time};
 
 use std::fs;
-use std::fs::File;
-
-use std::io::Read;
 
 pub fn handle_cpu_flamegraph_request() -> (StatusCode, Body, String) {
     
