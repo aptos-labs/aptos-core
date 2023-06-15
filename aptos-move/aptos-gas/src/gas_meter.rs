@@ -334,6 +334,18 @@ pub trait AptosGasMeter: MoveGasMeter {
 
         Ok(())
     }
+
+    /// Return the total gas used for execution.
+    fn execution_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for io.
+    fn io_gas_used(&self) -> Gas;
+
+    /// Return the total gas used for storage.
+    fn storage_fee_used_in_gas_units(&self) -> Gas;
+
+    /// Return the total fee used for storage.
+    fn storage_fee_used(&self) -> Fee;
 }
 
 /// The official gas meter used inside the Aptos VM.
@@ -348,6 +360,9 @@ pub struct StandardGasMeter {
 
     execution_gas_used: InternalGas,
     io_gas_used: InternalGas,
+    // The gas consumed by the storage operations.
+    storage_fee_in_internal_units: InternalGas,
+    // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
 
     should_leak_memory_for_native: bool,
@@ -370,6 +385,7 @@ impl StandardGasMeter {
             balance,
             execution_gas_used: 0.into(),
             io_gas_used: 0.into(),
+            storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
             memory_quota,
             should_leak_memory_for_native: false,
@@ -1000,6 +1016,7 @@ impl AptosGasMeter for StandardGasMeter {
 
         self.charge(gas_consumed_internal)?;
 
+        self.storage_fee_in_internal_units += gas_consumed_internal;
         self.storage_fee_used += amount;
         if self.feature_version >= 7 && self.storage_fee_used > self.gas_params.txn.max_storage_fee
         {
@@ -1035,5 +1052,24 @@ impl AptosGasMeter for StandardGasMeter {
         let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
         self.charge_execution(cost)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn execution_gas_used(&self) -> Gas {
+        self.execution_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn io_gas_used(&self) -> Gas {
+        self.io_gas_used
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used_in_gas_units(&self) -> Gas {
+        self.storage_fee_in_internal_units
+            .to_unit_round_up_with_params(&self.gas_params.txn)
+    }
+
+    fn storage_fee_used(&self) -> Fee {
+        self.storage_fee_used
     }
 }

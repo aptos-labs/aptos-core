@@ -20,6 +20,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{TransactionValidation, APTOS_TRANSACTION_VALIDATION, CORE_CODE_ADDRESS},
     chain_id::ChainId,
+    fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigurationResource, FeatureFlag, Features, GasSchedule,
         GasScheduleV2, OnChainConfig, TimedFeatures, Version,
@@ -653,21 +654,15 @@ impl<'a> AptosVMInternals<'a> {
 pub(crate) fn get_transaction_output<A: AccessPathCache>(
     ap_cache: &mut A,
     session: SessionExt,
-    gas_left: Gas,
-    txn_data: &TransactionMetadata,
+    fee_statement: FeeStatement,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let gas_used = txn_data
-        .max_gas_amount()
-        .checked_sub(gas_left)
-        .expect("Balance should always be less than or equal to max gas amount");
-
     let change_set = session.finish(ap_cache, change_set_configs)?;
 
     Ok(VMOutput::new(
         change_set,
-        gas_used.into(),
+        fee_statement,
         TransactionStatus::Keep(status),
     ))
 }

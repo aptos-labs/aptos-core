@@ -7,7 +7,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
-use aptos_types::{access_path::AccessPath, executable::ModulePath, write_set::WriteOp};
+use aptos_types::{
+    access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -218,13 +221,14 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         self.inputs[txn_idx as usize].load_full()
     }
 
-    pub fn gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
+    /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
+    pub fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            ExecutionStatus::Success(output) => Some(output.gas_used()),
+            ExecutionStatus::Success(output) => Some(output.fee_statement()),
             _ => None,
         }
     }
