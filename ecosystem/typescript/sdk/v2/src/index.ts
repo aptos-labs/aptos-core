@@ -3,6 +3,7 @@
 
 export * from "./client";
 export * from "./utils";
-export { Aptos } from "./aptos";
-
-export type { AptosConfig } from "./aptos_config";
+export * from "./api";
+export * from "./bcs";
+export * from "./crypto";
+export * from "./account";
