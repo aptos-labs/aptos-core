@@ -2,10 +2,19 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters, counters::{
-    PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-    TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
-}, errors::*, IndexMapping, scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave}, task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput}, txn_last_input_output::TxnLastInputOutput, view::{LatestView, MVHashMapView}};
+use crate::{
+    counters,
+    counters::{
+        PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
+        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+    },
+    errors::*,
+    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
+    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    txn_last_input_output::TxnLastInputOutput,
+    view::{LatestView, MVHashMapView},
+    IndexMapping,
+};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
@@ -254,7 +263,7 @@ where
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
-            if txn_idx as usize + 1 == scheduler.num_txns() as usize {
+            if scheduler.is_last_index(txn_idx) {
                 *scheduler_task = SchedulerTask::Done;
 
                 counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
@@ -471,9 +480,9 @@ where
             return Ok(vec![]);
         }
 
-        let num_txns = signature_verified_block.len() as u32;
-        let last_input_output = TxnLastInputOutput::new(num_txns);
-        let scheduler = Scheduler::new(num_txns);
+        let num_txns = signature_verified_block.len();
+        let last_input_output = TxnLastInputOutput::new(index_mapping.clone());
+        let scheduler = Scheduler::new(index_mapping.clone());
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -508,7 +517,6 @@ where
         });
         drop(timer);
 
-        let num_txns = num_txns as usize;
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 
@@ -517,8 +525,8 @@ where
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
+            for &idx in index_mapping.indices.iter() {
+                match last_input_output.take_output(idx) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);

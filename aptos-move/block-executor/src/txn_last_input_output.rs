@@ -4,6 +4,7 @@
 use crate::{
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
+    IndexMapping,
 };
 use anyhow::anyhow;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
@@ -118,6 +119,7 @@ impl<K: ModulePath> ReadDescriptor<K> {
 }
 
 pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
+    index_mapping: IndexMapping,
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
@@ -132,8 +134,10 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
-    pub fn new(num_txns: TxnIndex) -> Self {
+    pub fn new(index_mapping: IndexMapping) -> Self {
+        let num_txns = index_mapping.indices.len();
         Self {
+            index_mapping,
             inputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
                 .collect(),
@@ -204,8 +208,9 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
             }
         }
 
-        self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
+        self.input(txn_idx).store(Some(Arc::new(input)));
+        self.output(txn_idx)
+            .store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
         Ok(())
     }
@@ -215,11 +220,12 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
-        self.inputs[txn_idx as usize].load_full()
+        self.input(txn_idx).load_full()
     }
 
     pub fn gas_used(&self, txn_idx: TxnIndex) -> Option<u64> {
-        match &self.outputs[txn_idx as usize]
+        match &self
+            .output(txn_idx)
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
@@ -231,7 +237,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
 
     pub fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
-            self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
+            self.output(txn_idx).store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
@@ -242,7 +248,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     // Extracts a set of paths written or updated during execution from transaction
     // output: (modified by writes, modified by deltas).
     pub(crate) fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
-        match &self.outputs[txn_idx as usize].load_full() {
+        match &self.output(txn_idx).load_full() {
             None => HashSet::new(),
             Some(txn_output) => match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
@@ -266,7 +272,7 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         let ret: (
             usize,
             Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Key>>,
-        ) = self.outputs[txn_idx as usize].load().as_ref().map_or(
+        ) = self.output(txn_idx).load().as_ref().map_or(
             (
                 0,
                 Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Key>()),
@@ -292,7 +298,8 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
         txn_idx: TxnIndex,
         delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
     ) {
-        match &self.outputs[txn_idx as usize]
+        match &self
+            .output(txn_idx)
             .load_full()
             .expect("Output must exist")
             .output_status
@@ -307,12 +314,23 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
     pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
-        let owning_ptr = self.outputs[txn_idx as usize]
+        let owning_ptr = self
+            .output(txn_idx)
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");
 
         Arc::try_unwrap(owning_ptr)
             .map(|output| output.output_status)
             .expect("[BlockSTM]: Output should be uniquely owned after execution")
+    }
+
+    fn input(&self, txn_idx: TxnIndex) -> &CachePadded<ArcSwapOption<TxnInput<K>>> {
+        let pos = self.index_mapping.inverses[txn_idx as usize];
+        &self.inputs[pos]
+    }
+
+    fn output(&self, txn_idx: TxnIndex) -> &CachePadded<ArcSwapOption<TxnOutput<T, E>>> {
+        let pos = self.index_mapping.inverses[txn_idx as usize];
+        &self.outputs[pos]
     }
 }

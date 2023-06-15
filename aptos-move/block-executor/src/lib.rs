@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::block_executor::partitioner::TxnIndex;
+use aptos_mvhashmap::types::TxnIndex;
 
 /**
 The high level parallel execution logic is implemented in 'executor.rs'. The
@@ -150,27 +150,49 @@ mod txn_last_input_output;
 mod unit_tests;
 pub mod view;
 
+#[derive(Clone)]
 pub struct IndexMapping {
     pub indices: Vec<TxnIndex>,
     pub inverses: Vec<usize>,
+    /// A fake index representing the end of the transaction list.
+    pub end_index: TxnIndex,
 }
 
 impl IndexMapping {
     pub fn new(indices: Vec<TxnIndex>, block_size: usize) -> Self {
         let mut inverses = vec![usize::MAX; block_size];
         for (pos, &index) in indices.iter().enumerate() {
-            inverses[index] = pos;
+            inverses[index as usize] = pos;
         }
         Self {
             indices,
             inverses,
+            end_index: TxnIndex::MAX,
         }
     }
 
     pub fn new_unsharded(block_size: usize) -> Self {
         Self {
-            indices: (0..block_size).collect(),
+            indices: (0..(block_size as TxnIndex)).collect(),
             inverses: (0..block_size).collect(),
+            end_index: block_size as TxnIndex,
         }
+    }
+
+    pub fn next_index(&self, index: TxnIndex) -> TxnIndex {
+        if index == self.end_index {
+            self.end_index
+        } else {
+            let pos = self.inverses[index as usize];
+            if pos >= self.indices.len() - 1 {
+                self.end_index
+            } else {
+                self.indices[pos + 1]
+            }
+        }
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.indices.len()
     }
 }

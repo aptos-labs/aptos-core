@@ -14,10 +14,15 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_block_executor::{errors::Error, executor::BlockExecutor, IndexMapping, task::{
-    Transaction as BlockExecutorTransaction,
-    TransactionOutput as BlockExecutorTransactionOutput,
-}};
+use aptos_block_executor::{
+    errors::Error,
+    executor::BlockExecutor,
+    task::{
+        Transaction as BlockExecutorTransaction,
+        TransactionOutput as BlockExecutorTransactionOutput,
+    },
+    IndexMapping,
+};
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
@@ -208,7 +213,12 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
         );
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view, index_mapping);
+        let ret = executor.execute_block(
+            state_view,
+            signature_verified_block,
+            state_view,
+            index_mapping,
+        );
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

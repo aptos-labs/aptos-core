@@ -9,6 +9,7 @@ use crate::{
         DeltaDataView, EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
         TransactionGenParams, ValueType,
     },
+    IndexMapping,
 };
 use aptos_types::{
     block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
@@ -75,7 +76,12 @@ fn run_transactions<K, V>(
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &executable_txns, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &executable_txns,
+            &data_view,
+            IndexMapping::new_unsharded(executable_txns.num_transactions()),
+        );
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -215,7 +221,12 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &executable_txns, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &executable_txns,
+            &data_view,
+            IndexMapping::new_unsharded(executable_txns.num_transactions()),
+        );
 
         let baseline = ExpectedOutput::generate_baseline(
             executable_txns.get_unsharded_transactions().unwrap(),
@@ -271,7 +282,12 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
         )
-        .execute_transactions_parallel((), &executable_txns, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &executable_txns,
+            &data_view,
+            IndexMapping::new_unsharded(executable_txns.num_transactions()),
+        );
 
         let delta_writes = output
             .as_ref()
@@ -443,7 +459,12 @@ fn publishing_fixed_params_with_block_gas_limit(
         DeltaDataView<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
-    .execute_transactions_parallel((), &executable_txns, &data_view);
+    .execute_transactions_parallel(
+        (),
+        &executable_txns,
+        &data_view,
+        IndexMapping::new_unsharded(executable_txns.num_transactions()),
+    );
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -493,7 +514,12 @@ fn publishing_fixed_params_with_block_gas_limit(
             executor_thread_pool.clone(),
             Some(max(w_index, r_index) as u64 + 1),
         ) // Ensure enough gas limit to commit the module txns
-        .execute_transactions_parallel((), &executable_txns, &data_view);
+        .execute_transactions_parallel(
+            (),
+            &executable_txns,
+            &data_view,
+            IndexMapping::new_unsharded(executable_txns.num_transactions()),
+        );
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::GET_NEXT_TASK_SECONDS;
+use crate::{counters::GET_NEXT_TASK_SECONDS, IndexMapping};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use crossbeam::utils::CachePadded;
@@ -166,7 +166,7 @@ impl PartialEq for ExecutionStatus {
 /// because max_triggered_wave implies that this wave of validations was required for all higher transactions
 /// (and is set as a part of decrease_validation_idx), while required_wave is set for the transaction only
 /// (when a validation task is returned to the caller). Moreover, the code is structured in a way that
-/// decrease_validation_idx is always called for txn_idx + 1 (e.g. when aborting, there is no need to validate
+/// decrease_validation_idx is always called for the next txn_idx (e.g. when aborting, there is no need to validate
 /// the transaction before re-execution, and in finish_execution, even if there is a need to validate txn_idx,
 /// it is returned to the caller directly, which is done so as an optimization and also for uniformity).
 #[derive(Debug)]
@@ -188,8 +188,7 @@ impl ValidationStatus {
 
 pub struct Scheduler {
     /// Number of txns to execute, immutable.
-    num_txns: TxnIndex,
-
+    index_mapping: IndexMapping,
     /// An index i maps to indices of other transactions that depend on transaction i, i.e. they
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
@@ -230,12 +229,13 @@ pub struct Scheduler {
 
 /// Public Interfaces for the Scheduler
 impl Scheduler {
-    pub fn new(num_txns: TxnIndex) -> Self {
+    pub fn new(index_mapping: IndexMapping) -> Self {
+        let num_txns = index_mapping.indices.len();
         // Empty block should early return and not create a scheduler.
         assert!(num_txns > 0, "No scheduler needed for 0 transactions");
-
+        let first_index = index_mapping.indices[0];
         Self {
-            num_txns,
+            index_mapping,
             txn_dependency: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(Vec::new())))
                 .collect(),
@@ -247,15 +247,16 @@ impl Scheduler {
                     ))
                 })
                 .collect(),
-            commit_state: CachePadded::new(Mutex::new((0, 0))),
-            execution_idx: AtomicU32::new(0),
-            validation_idx: AtomicU64::new(0),
+            commit_state: CachePadded::new(Mutex::new((first_index, 0))),
+            execution_idx: AtomicU32::new(first_index),
+            validation_idx: AtomicU64::new(first_index as u64),
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn num_txns(&self) -> TxnIndex {
-        self.num_txns
+    pub fn is_last_index(&self, index: TxnIndex) -> bool {
+        index != self.index_mapping.end_index
+            && self.index_mapping.next_index(index) == self.index_mapping.end_index
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
@@ -266,9 +267,10 @@ impl Scheduler {
         let commit_state = commit_state_mutex.deref_mut();
         let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
 
-        if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
+        if let Some(validation_status) = self.txn_status_by_index(*commit_idx).1.try_read() {
             // Acquired the validation status read lock.
-            if let Some(status) = self.txn_status[*commit_idx as usize]
+            if let Some(status) = self
+                .txn_status_by_index(*commit_idx)
                 .0
                 .try_upgradable_read()
             {
@@ -288,12 +290,13 @@ impl Scheduler {
                             // Can commit.
                             *status_write = ExecutionStatus::Committed(incarnation);
 
-                            *commit_idx += 1;
-                            if *commit_idx == self.num_txns {
+                            let ret = *commit_idx;
+                            *commit_idx = self.index_mapping.next_index(*commit_idx);
+                            if *commit_idx == self.index_mapping.end_index {
                                 // All txns have been committed, the parallel execution can finish.
                                 self.done_marker.store(true, Ordering::SeqCst);
                             }
-                            return Some(*commit_idx - 1);
+                            return Some(ret);
                         }
                     }
                 }
@@ -319,7 +322,7 @@ impl Scheduler {
         // Note: we could upgradable read, then upgrade and write. Similar for other places.
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
 
         if *status == ExecutionStatus::Executed(incarnation) {
             *status = ExecutionStatus::Aborting(incarnation);
@@ -342,10 +345,11 @@ impl Scheduler {
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
-            let prefer_validate = idx_to_validate < min(idx_to_execute, self.num_txns)
+            let prefer_validate = idx_to_validate
+                < min(idx_to_execute, self.index_mapping.end_index)
                 && !self.never_executed(idx_to_validate);
 
-            if !prefer_validate && idx_to_execute >= self.num_txns {
+            if !prefer_validate && idx_to_execute >= self.index_mapping.end_index {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
@@ -393,7 +397,7 @@ impl Scheduler {
         // Create a condition variable associated with the dependency.
         let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
 
-        let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
+        let mut stored_deps = self.txn_dependency_by_index(dep_txn_idx).lock();
 
         // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
         // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
@@ -430,7 +434,7 @@ impl Scheduler {
     }
 
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        let mut validation_status = self.txn_status_by_index(txn_idx).1.write();
         validation_status.maybe_max_validated_wave = Some(
             validation_status
                 .maybe_max_validated_wave
@@ -455,11 +459,11 @@ impl Scheduler {
         // difference and like this correctness argument is much easier to see, in fact also
         // the reason why we grab write lock directly, and never release it during the whole function.
         // So even validation status readers have to wait if they somehow end up at the same index.
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        let mut validation_status = self.txn_status_by_index(txn_idx).1.write();
         self.set_executed_status(txn_idx, incarnation);
 
         let txn_deps: Vec<TxnIndex> = {
-            let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
+            let mut stored_deps = self.txn_dependency_by_index(txn_idx).lock();
             // Holding the lock, take dependency vector.
             std::mem::take(&mut stored_deps)
         };
@@ -492,7 +496,9 @@ impl Scheduler {
                 // The transaction execution required revalidating all higher txns (not
                 // only itself), currently happens when incarnation writes to a new path
                 // (w.r.t. the write-set of its previous completed incarnation).
-                if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
+                if let Some(wave) =
+                    self.decrease_validation_idx(self.index_mapping.next_index(txn_idx))
+                {
                     cur_wave = wave;
                 };
             }
@@ -511,19 +517,19 @@ impl Scheduler {
             // acquire exclusive lock on the validation status of txn_idx, and hold the lock
             // while calling decrease_validation_idx below. Otherwise, this thread might get
             // suspended after setting aborted ( = ready) status, and other threads might finish
-            // re-executing, then commit txn_idx, and potentially commit txn_idx + 1 before
+            // re-executing, then commit txn_idx, and potentially commit the next txn_idx before
             // decrease_validation_idx would be able to set max_triggered_wave.
             //
             // Also, as a convention, we always acquire validation status lock before execution
             // status lock, as we have to have a consistent order and this order is easier to
             // provide correctness between finish_execution & try_commit.
-            let _validation_status = self.txn_status[txn_idx as usize].1.write();
+            let _validation_status = self.txn_status_by_index(txn_idx).1.write();
 
             self.set_aborted_status(txn_idx, incarnation);
 
             // Schedule higher txns for validation, skipping txn_idx itself (needs to be
             // re-executed first).
-            self.decrease_validation_idx(txn_idx + 1);
+            self.decrease_validation_idx(self.index_mapping.next_index(txn_idx));
 
             // can release the lock early.
         }
@@ -560,7 +566,7 @@ impl Scheduler {
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
         if !self.done_marker.swap(true, Ordering::SeqCst) {
-            for txn_idx in 0..self.num_txns {
+            for &txn_idx in self.index_mapping.indices.iter() {
                 self.resolve_condvar(txn_idx);
             }
         }
@@ -571,7 +577,7 @@ impl Scheduler {
     /// Therefore the commit thread needs to wake up all such pending threads, by sending notification to the condition
     /// variable and setting the lock variables properly.
     pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
         {
             // Only transactions with status Suspended or ReadyToExecute may have the condition variable of pending threads.
             match &*status {
@@ -603,9 +609,9 @@ impl Scheduler {
 
     /// Decreases the validation index, adjusting the wave and validation status as needed.
     fn decrease_validation_idx(&self, target_idx: TxnIndex) -> Option<Wave> {
-        // We only call with txn_idx + 1, so it can equal num_txns, but not be strictly larger.
-        debug_assert!(target_idx <= self.num_txns);
-        if target_idx >= self.num_txns {
+        // We only call with the next txn_idx, so it can equal num_txns, but not be strictly larger.
+        debug_assert!(target_idx <= self.index_mapping.end_index);
+        if target_idx >= self.index_mapping.end_index {
             return None;
         }
 
@@ -614,7 +620,7 @@ impl Scheduler {
                 .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
-                        let mut validation_status = self.txn_status[target_idx as usize].1.write();
+                        let mut validation_status = self.txn_status_by_index(target_idx).1.write();
                         // Update the minimum wave all the suffix txn needs to pass.
                         // We set it to max for safety (to avoid overwriting with lower values
                         // by a slower thread), but currently this isn't strictly required
@@ -644,14 +650,14 @@ impl Scheduler {
     /// An unsuccessful incarnation returns None. Since incarnation numbers never decrease
     /// for each transaction, incarnate function may not succeed more than once per version.
     fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, Option<DependencyCondvar>)> {
-        if txn_idx >= self.num_txns {
+        if txn_idx >= self.index_mapping.end_index {
             return None;
         }
 
         // Note: we could upgradable read, then upgrade and write. Similar for other places.
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
         if let ExecutionStatus::ReadyToExecute(incarnation, maybe_condvar) = &*status {
             let ret = (*incarnation, maybe_condvar.clone());
             *status = ExecutionStatus::Executing(*incarnation);
@@ -671,9 +677,9 @@ impl Scheduler {
     /// and a committed (in between) txn does not need to be scheduled for validation -
     /// so can return None.
     fn is_executed(&self, txn_idx: TxnIndex, include_committed: bool) -> Option<Incarnation> {
-        debug_assert!(txn_idx < self.num_txns);
+        debug_assert!(txn_idx < self.index_mapping.end_index);
 
-        let status = self.txn_status[txn_idx as usize].0.read();
+        let status = self.txn_status_by_index(txn_idx).0.read();
         match *status {
             ExecutionStatus::Executed(incarnation) => Some(incarnation),
             ExecutionStatus::Committed(incarnation) => {
@@ -692,7 +698,7 @@ impl Scheduler {
     /// Returns true iff no incarnation (even the 0-th one) has set the executed status, i.e.
     /// iff the execution status is READY_TO_EXECUTE/EXECUTING/SUSPENDED for incarnation 0.
     fn never_executed(&self, txn_idx: TxnIndex) -> bool {
-        let status = self.txn_status[txn_idx as usize].0.read();
+        let status = self.txn_status_by_index(txn_idx).0.read();
         matches!(
             *status,
             ExecutionStatus::ReadyToExecute(0, _)
@@ -719,7 +725,8 @@ impl Scheduler {
         // but if we used fetch-and-increment, two threads can arrive in a cloned state and
         // both increment, effectively skipping over the 'never_executed' transaction index.
         let validation_idx = (idx_to_validate as u64) | ((wave as u64) << 32);
-        let new_validation_idx = ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
+        let new_validation_idx =
+            ((self.index_mapping.next_index(idx_to_validate)) as u64) | ((wave as u64) << 32);
         if self
             .validation_idx
             .compare_exchange(
@@ -749,9 +756,14 @@ impl Scheduler {
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(Version, Option<DependencyCondvar>)> {
-        let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
+        let idx_to_execute = self
+            .execution_idx
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                Some(self.index_mapping.next_index(x))
+            })
+            .unwrap();
 
-        if idx_to_execute >= self.num_txns {
+        if idx_to_execute >= self.index_mapping.end_index {
             return None;
         }
 
@@ -766,7 +778,7 @@ impl Scheduler {
     /// Return true when the txn is successfully suspended.
     /// Return false when the execution is halted.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
 
         match *status {
             ExecutionStatus::Executing(incarnation) => {
@@ -782,7 +794,7 @@ impl Scheduler {
     /// incremented incarnation number.
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
 
         if matches!(*status, ExecutionStatus::ExecutionHalted) {
             return;
@@ -797,7 +809,7 @@ impl Scheduler {
 
     /// Set status of the transaction to Executed(incarnation).
     fn set_executed_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
         // The execution is already halted.
         if matches!(*status, ExecutionStatus::ExecutionHalted) {
             return;
@@ -811,7 +823,7 @@ impl Scheduler {
     /// After a successful abort, mark the transaction as ready for re-execution with
     /// an incremented incarnation number.
     fn set_aborted_status(&self, txn_idx: TxnIndex, incarnation: Incarnation) {
-        let mut status = self.txn_status[txn_idx as usize].0.write();
+        let mut status = self.txn_status_by_index(txn_idx).0.write();
         // The execution is already halted.
         if matches!(*status, ExecutionStatus::ExecutionHalted) {
             return;
@@ -825,5 +837,18 @@ impl Scheduler {
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
+    }
+
+    fn txn_dependency_by_index(&self, index: TxnIndex) -> &CachePadded<Mutex<Vec<TxnIndex>>> {
+        let pos = self.index_mapping.inverses[index as usize];
+        &self.txn_dependency[pos]
+    }
+
+    fn txn_status_by_index(
+        &self,
+        index: TxnIndex,
+    ) -> &CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)> {
+        let pos = self.index_mapping.inverses[index as usize];
+        &self.txn_status[pos]
     }
 }

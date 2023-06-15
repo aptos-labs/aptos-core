@@ -14,6 +14,7 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_bitvec::BitVec;
+use aptos_block_executor::IndexMapping;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
@@ -21,7 +22,6 @@ use aptos_gas::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
-use aptos_block_executor::IndexMapping;
 use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,

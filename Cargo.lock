@@ -1936,6 +1936,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",

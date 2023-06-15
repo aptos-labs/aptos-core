@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::block_executor::BlockAptosVM;
+use aptos_block_executor::IndexMapping;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::ExecutableTransactions,
@@ -8,7 +9,6 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
-use aptos_block_executor::IndexMapping;
 
 pub trait BlockExecutorClient {
     fn execute_block<S: StateView + Sync>(
