@@ -11,7 +11,7 @@ use aptos_crypto_derive::CryptoHasher;
 use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     ops::Deref,
     sync::Arc,
 };
@@ -27,7 +27,6 @@ pub struct NodeMetadata {
 }
 
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
-/// plus weak links (links to lower round)
 #[derive(Clone, Serialize, Deserialize, CryptoHasher)]
 pub struct Node {
     metadata: NodeMetadata,
@@ -149,8 +148,6 @@ pub struct Dag {
     nodes_by_round: BTreeMap<Round, Vec<Option<Arc<CertifiedNode>>>>,
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
-    /// Highest head nodes that are not linked by other nodes
-    highest_unlinked_nodes_by_author: Vec<Option<Arc<CertifiedNode>>>,
 }
 
 impl Dag {
@@ -162,7 +159,6 @@ impl Dag {
             nodes_by_digest: HashMap::new(),
             nodes_by_round,
             author_to_index,
-            highest_unlinked_nodes_by_author: vec![None; num_nodes],
         }
     }
 
@@ -208,13 +204,6 @@ impl Dag {
                 .is_none(),
             "equivocate node"
         );
-        if round
-            > self.highest_unlinked_nodes_by_author[index]
-                .as_ref()
-                .map_or(0, |node| node.metadata.round)
-        {
-            self.highest_unlinked_nodes_by_author[index].replace(node);
-        }
         Ok(())
     }
 
@@ -226,46 +215,23 @@ impl Dag {
         self.nodes_by_digest.get(digest).cloned()
     }
 
-    pub fn get_unlinked_nodes_for_new_round(
+    pub fn get_strong_links_for_round(
         &self,
+        round: Round,
         validator_verifier: &ValidatorVerifier,
     ) -> Option<Vec<NodeMetadata>> {
-        let current_round = self.highest_round();
-        let strong_link_authors =
-            self.highest_unlinked_nodes_by_author
-                .iter()
-                .filter_map(|maybe_node| {
-                    maybe_node.as_ref().and_then(|node| {
-                        if node.metadata.round == current_round {
-                            Some(&node.metadata.author)
-                        } else {
-                            None
-                        }
-                    })
-                });
+        let all_nodes_in_round = self.nodes_by_round.get(&round)?.iter().flatten();
         if validator_verifier
-            .check_voting_power(strong_link_authors)
+            .check_voting_power(all_nodes_in_round.clone().map(|node| &node.metadata.author))
             .is_ok()
         {
             Some(
-                self.highest_unlinked_nodes_by_author
-                    .iter()
-                    .filter_map(|maybe_node| maybe_node.as_ref().map(|node| node.metadata.clone()))
+                all_nodes_in_round
+                    .map(|node| node.metadata.clone())
                     .collect(),
             )
         } else {
             None
-        }
-    }
-
-    pub fn mark_nodes_linked(&mut self, node_metadata: &[NodeMetadata]) {
-        let digests: HashSet<_> = node_metadata.iter().map(|node| node.digest).collect();
-        for maybe_node in &mut self.highest_unlinked_nodes_by_author {
-            if let Some(node) = maybe_node {
-                if digests.contains(&node.metadata.digest) {
-                    *maybe_node = None;
-                }
-            }
         }
     }
 }
