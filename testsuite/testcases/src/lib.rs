@@ -157,7 +157,7 @@ pub trait NetworkLoadTest: Test {
 }
 
 impl NetworkTest for dyn NetworkLoadTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new().unwrap();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -385,7 +385,7 @@ impl CompositeNetworkTest {
 }
 
 impl NetworkTest for CompositeNetworkTest {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
         for wrapper in &self.wrappers {
             wrapper.setup(ctx)?;
         }
