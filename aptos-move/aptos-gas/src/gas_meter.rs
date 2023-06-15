@@ -32,7 +32,7 @@ use move_vm_types::{
 };
 use std::collections::BTreeMap;
 // This gas feature version must be bumped up when one of the following conditions arises
-//  - a new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
+//  - A new gas parameter is added, removed or renamed in `aptos_framework.rs` or `move_stdlib.rs`
 //  - Changing how gas is calculated in any way (needs to be gated by a new feature version in the
 //    first place)
 //  - << What else? >>
@@ -40,6 +40,7 @@ use std::collections::BTreeMap;
 // Change log:
 // - V10
 //   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives
+//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
 //   - Accurate tracking of the cost of loading resource groups
 // - V8
