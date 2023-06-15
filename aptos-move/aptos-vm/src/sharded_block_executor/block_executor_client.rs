@@ -2,7 +2,10 @@
 
 use crate::block_executor::BlockAptosVM;
 use aptos_state_view::StateView;
-use aptos_types::transaction::{Transaction, TransactionOutput};
+use aptos_types::{
+    block_executor::partitioner::ExecutableTransactions,
+    transaction::{Transaction, TransactionOutput},
+};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
@@ -26,7 +29,8 @@ impl BlockExecutorClient for LocalExecutorClient {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
-            transactions,
+            // TODO: (skedia) Change this to sharded transactions
+            ExecutableTransactions::Unsharded(transactions),
             state_view,
             concurrency_level,
             maybe_block_gas_limit,

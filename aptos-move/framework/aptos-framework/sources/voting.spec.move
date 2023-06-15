@@ -115,6 +115,7 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ) {
+
         use aptos_framework::chain_status;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
@@ -132,6 +133,7 @@ spec aptos_framework::voting {
         aborts_if voting_closed && (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
         // Resolvable_time Properties
         aborts_if !voting_closed;
+
         aborts_if proposal.is_resolved;
         aborts_if !std::string::spec_internal_check_utf8(RESOLVABLE_TIME_METADATA_KEY);
         aborts_if !simple_map::spec_contains_key(proposal.metadata, std::string::spec_utf8(RESOLVABLE_TIME_METADATA_KEY));
@@ -183,11 +185,18 @@ spec aptos_framework::voting {
         aborts_if false;
     }
 
+    spec fun spec_get_proposal_state<ProposalType>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64;
+
     spec get_proposal_state<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 {
+
         use aptos_framework::chain_status;
+
         pragma addition_overflow_unchecked;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
@@ -211,6 +220,7 @@ spec aptos_framework::voting {
 
         // Voting is Pending
         ensures !voting_closed ==> result == PROPOSAL_STATE_PENDING;
+
     }
 
     spec get_proposal_creation_secs<ProposalType: store>(
