@@ -9,8 +9,9 @@ use clap::Parser;
 use std::{fmt::Formatter, str::FromStr};
 
 /// Encoding for the Resource account seed
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum SeedEncoding {
+    #[default]
     Bcs,
     Hex,
     Utf8,
@@ -19,12 +20,6 @@ pub enum SeedEncoding {
 const BCS: &str = "bcs";
 const UTF_8: &str = "utf8";
 const HEX: &str = "hex";
-
-impl Default for SeedEncoding {
-    fn default() -> Self {
-        SeedEncoding::Bcs
-    }
-}
 
 impl std::fmt::Display for SeedEncoding {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

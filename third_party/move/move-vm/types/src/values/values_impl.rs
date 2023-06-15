@@ -3440,15 +3440,13 @@ impl ValueView for SignerRef {
 // Note: We may want to add more helpers to retrieve value views behind references here.
 
 impl Struct {
-    #[allow(clippy::needless_lifetimes)]
-    pub fn field_views<'a>(&'a self) -> impl ExactSizeIterator<Item = impl ValueView + 'a> + Clone {
+    pub fn field_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
         self.fields.iter()
     }
 }
 
 impl Vector {
-    #[allow(clippy::needless_lifetimes)]
-    pub fn elem_views<'a>(&'a self) -> impl ExactSizeIterator<Item = impl ValueView + 'a> + Clone {
+    pub fn elem_views(&self) -> impl ExactSizeIterator<Item = impl ValueView + '_> + Clone {
         struct ElemView<'b> {
             container: &'b Container,
             idx: usize,
@@ -3470,8 +3468,7 @@ impl Vector {
 }
 
 impl Reference {
-    #[allow(clippy::needless_lifetimes)]
-    pub fn value_view<'a>(&'a self) -> impl ValueView + 'a {
+    pub fn value_view(&self) -> impl ValueView + '_ {
         struct ValueBehindRef<'b>(&'b ReferenceImpl);
 
         impl<'b> ValueView for ValueBehindRef<'b> {
@@ -3490,8 +3487,7 @@ impl Reference {
 }
 
 impl GlobalValue {
-    #[allow(clippy::needless_lifetimes)]
-    pub fn view<'a>(&'a self) -> Option<impl ValueView + 'a> {
+    pub fn view(&self) -> Option<impl ValueView + '_> {
         use GlobalValueImpl as G;
 
         struct Wrapper<'b>(&'b Rc<RefCell<Vec<ValueImpl>>>);

@@ -282,7 +282,6 @@ mod tests {
 
         let sender = Account::new();
         let txns: Vec<_> = (0..PERF_TXN_PER_BLOCK)
-            .into_iter()
             .map(|i| {
                 empty_txn(sender.addr, i as u64, 100)
                     .sign(&sender.privkey, sender.pubkey.clone())
@@ -324,7 +323,6 @@ mod tests {
         let sender = Account::new();
         let receiver = Account::new();
         let txns: Vec<_> = (0..PERF_TXN_PER_BLOCK)
-            .into_iter()
             .map(|i| {
                 peer_to_peer_txn(sender.addr, receiver.addr, i as u64, 100)
                     .sign(&sender.privkey, sender.pubkey.clone())

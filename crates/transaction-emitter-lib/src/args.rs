@@ -84,11 +84,11 @@ pub struct ClusterArgs {
 
 impl ClusterArgs {
     pub fn get_targets(&self) -> Result<Vec<Url>> {
-        return match (&self.targets, &self.targets_file) {
+        match (&self.targets, &self.targets_file) {
             (Some(targets), _) => Ok(targets.clone()),
             (None, Some(target_file)) => Self::get_targets_from_file(target_file),
             (_, _) => Err(anyhow::anyhow!("Expected either targets or target_file")),
-        };
+        }
     }
 
     fn get_targets_from_file(path: &String) -> Result<Vec<Url>> {

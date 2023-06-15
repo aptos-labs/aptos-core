@@ -30,8 +30,7 @@ pub unsafe extern "C" fn run_aptos_sync(s: *const c_char) -> *const c_char {
     // Create a new Tokio runtime and block on the execution of `cli.execute()`
     let result_string = Runtime::new().unwrap().block_on(async move {
         let cli = Tool::parse_from(input_string);
-        let result = cli.execute().await;
-        result
+        cli.execute().await
     });
 
     let res_cstr = CString::new(result_string.unwrap()).unwrap();

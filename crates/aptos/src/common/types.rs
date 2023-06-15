@@ -452,11 +452,12 @@ impl ProfileOptions {
 }
 
 /// Types of encodings used by the blockchain
-#[derive(ArgEnum, Clone, Copy, Debug)]
+#[derive(ArgEnum, Clone, Copy, Debug, Default)]
 pub enum EncodingType {
     /// Binary Canonical Serialization
     BCS,
     /// Hex encoded e.g. 0xABCDE12345
+    #[default]
     Hex,
     /// Base 64 encoded
     Base64,
@@ -553,12 +554,6 @@ impl RngArgs {
         } else {
             Ok(KeyGen::from_os_rng())
         }
-    }
-}
-
-impl Default for EncodingType {
-    fn default() -> Self {
-        EncodingType::Hex
     }
 }
 

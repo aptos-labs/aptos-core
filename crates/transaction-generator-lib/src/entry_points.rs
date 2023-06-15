@@ -56,7 +56,6 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             MultiSigConfig::Random(num) => {
                 let new_accounts = Arc::new(
                     (0..num)
-                        .into_iter()
                         .map(|_| LocalAccount::generate(rng))
                         .collect::<Vec<_>>(),
                 );

@@ -313,7 +313,6 @@ impl CliCommand<Vec<String>> for CompilePackage {
         }
         let ids = pack
             .modules()
-            .into_iter()
             .map(|m| m.self_id().to_string())
             .collect::<Vec<_>>();
         Ok(ids)

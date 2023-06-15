@@ -451,7 +451,7 @@ async fn test_save_states_invalid_chunk() {
     );
 
     // Initialize the state synchronizer
-    let _ = storage_synchronizer
+    let _join_handle = storage_synchronizer
         .initialize_state_synchronizer(
             vec![create_epoch_ending_ledger_info()],
             create_epoch_ending_ledger_info(),

@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::match_result_ok)] // Required to overcome the limitations of deriving Union
+
 mod account;
 mod address;
 mod block;

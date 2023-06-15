@@ -22,7 +22,7 @@ impl Test for FrameworkUpgrade {
 }
 
 impl NetworkTest for FrameworkUpgrade {
-    fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new()?;
 
         // Get the different versions we're testing with
