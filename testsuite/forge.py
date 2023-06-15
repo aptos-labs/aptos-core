@@ -931,21 +931,17 @@ def image_exists(
     """Check if an image exists in a given repository"""
     if cloud == Cloud.GCP:
         full_image = f"{GAR_REPO_NAME}/{image_name}:{image_tag}"
-        log.debug(f"Checking if image exists in GCP: {full_image}")
         return shell.run(
             [
-                "gcloud",
-                "artifacts",
-                "docker",
-                "images",
-                "describe",
+                "crane",
+                "manifest",
                 full_image,
             ],
             stream_output=True,
         ).succeeded()
     elif cloud == Cloud.AWS:
-        full_image = f"ECR_REPO/{image_name}:{image_tag}"
-        log.debug(f"Checking if image exists in AWS: {full_image}")
+        full_image = f"{ECR_REPO_PREFIX}/{image_name}:{image_tag}"
+        log.info(f"Checking if image exists in GCP: {full_image}")
         return shell.run(
             [
                 "aws",
@@ -959,7 +955,7 @@ def image_exists(
             stream_output=True,
         ).succeeded()
     else:
-        raise Exception(f"Unknown repo type: {repo_type}")
+        raise Exception(f"Unknown cloud repo type: {cloud}")
 
 
 def sanitize_forge_resource_name(forge_resource: str) -> str:

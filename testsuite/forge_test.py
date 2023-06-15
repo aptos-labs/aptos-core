@@ -291,12 +291,12 @@ class TestFindRecentImage(unittest.TestCase):
             [
                 FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
                 FakeCommand(
-                    f"gcloud artifacts docker images describe {GAR_REPO_NAME}/validator-testing:potato",
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:potato",
                     RunResult(1, b""),
                 ),
                 FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
                 FakeCommand(
-                    f"gcloud artifacts docker images describe {GAR_REPO_NAME}/validator-testing:lychee",
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:lychee",
                     RunResult(0, b""),
                 ),
             ]
