@@ -23,7 +23,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc, thread};
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
@@ -142,9 +142,12 @@ impl<
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
+                            let thread_id = thread::current().id();
                             while let DependencyStatus::Unresolved = *dep_resolved {
+                                println!("thread {:?} waiting! txn {} waiting on txn {}", thread_id, txn_idx, dep_idx);
                                 dep_resolved = cvar.wait(dep_resolved).unwrap();
                             }
+                            println!("thread {:?} resolved! txn {} waiting on txn {}", thread_id, txn_idx, dep_idx);
                             if let DependencyStatus::ExecutionHalted = *dep_resolved {
                                 return ReadResult::ExecutionHalted;
                             }

@@ -14,7 +14,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Condvar,
-    },
+    }, thread,
 };
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
@@ -45,7 +45,7 @@ pub enum DependencyResult {
 /// there are no more tasks and the scheduler is done.
 #[derive(Debug)]
 pub enum SchedulerTask {
-    ExecutionTask(Version, Option<DependencyCondvar>),
+    ExecutionTask(Version, ReadyTaskType),
     ValidationTask(Version, Wave),
     NoTask,
     Done,
@@ -93,9 +93,16 @@ pub enum SchedulerTask {
 ///    ↓                finish_abort                                                         |
 /// Aborting(i) ---------------------------------------------------------> Ready(i+1)      ---
 ///
+#[derive(Debug, Clone)]
+pub enum ReadyTaskType {
+    Execution,
+    Wakeup(DependencyCondvar),
+}
+
 #[derive(Debug)]
 enum ExecutionStatus {
-    ReadyToExecute(Incarnation, Option<DependencyCondvar>),
+    // ReadyToExecute(Incarnation, Option<DependencyCondvar>),
+    Ready(Incarnation, ReadyTaskType),
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
@@ -108,7 +115,7 @@ impl PartialEq for ExecutionStatus {
     fn eq(&self, other: &Self) -> bool {
         use ExecutionStatus::*;
         match (self, other) {
-            (&ReadyToExecute(ref a, _), &ReadyToExecute(ref b, _))
+            (&Ready(ref a, _), &Ready(ref b, _))
             | (&Executing(ref a), &Executing(ref b))
             | (&Suspended(ref a, _), &Suspended(ref b, _))
             | (&Executed(ref a), &Executed(ref b))
@@ -242,7 +249,7 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
-                        RwLock::new(ExecutionStatus::ReadyToExecute(0, None)),
+                        RwLock::new(ExecutionStatus::Ready(0, ReadyTaskType::Execution)),
                         RwLock::new(ValidationStatus::new()),
                     ))
                 })
@@ -368,10 +375,10 @@ impl Scheduler {
                 {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
-            } else if let Some((version_to_execute, maybe_condvar)) =
+            } else if let Some((version_to_execute, task_type)) =
                 self.try_execute_next_version()
             {
-                return SchedulerTask::ExecutionTask(version_to_execute, maybe_condvar);
+                return SchedulerTask::ExecutionTask(version_to_execute, task_type);
             }
         }
     }
@@ -536,8 +543,8 @@ impl Scheduler {
             // re-execution task back to the caller. If incarnation fails, there is
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
-            if let Some((new_incarnation, maybe_condvar)) = self.try_incarnate(txn_idx) {
-                return SchedulerTask::ExecutionTask((txn_idx, new_incarnation), maybe_condvar);
+            if let Some((new_incarnation, task_type)) = self.try_incarnate(txn_idx) {
+                return SchedulerTask::ExecutionTask((txn_idx, new_incarnation), task_type);
             }
         }
 
@@ -573,10 +580,11 @@ impl Scheduler {
     pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         {
+            println!("resolving txn_idx: {}, status: {:?}", txn_idx, *status);
             // Only transactions with status Suspended or ReadyToExecute may have the condition variable of pending threads.
             match &*status {
                 ExecutionStatus::Suspended(_, condvar)
-                | ExecutionStatus::ReadyToExecute(_, Some(condvar)) => {
+                | ExecutionStatus::Ready(_, ReadyTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
                     // Mark parallel execution halted due to reasons like module r/w intersection.
                     *lock.lock() = DependencyStatus::ExecutionHalted;
@@ -643,7 +651,7 @@ impl Scheduler {
     /// status is (atomically, due to the mutex) updated to Executing(incarnation).
     /// An unsuccessful incarnation returns None. Since incarnation numbers never decrease
     /// for each transaction, incarnate function may not succeed more than once per version.
-    fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, Option<DependencyCondvar>)> {
+    fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, ReadyTaskType)> {
         if txn_idx >= self.num_txns {
             return None;
         }
@@ -652,8 +660,9 @@ impl Scheduler {
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        if let ExecutionStatus::ReadyToExecute(incarnation, maybe_condvar) = &*status {
-            let ret = (*incarnation, maybe_condvar.clone());
+        if let ExecutionStatus::Ready(incarnation, task_type) = &*status {
+            let ret: (u32, ReadyTaskType) = (*incarnation, (*task_type).clone());
+            println!("thread {:?} incarnating txn_idx: {}, status: {:?}", thread::current().id(), txn_idx, *status);
             *status = ExecutionStatus::Executing(*incarnation);
             Some(ret)
         } else {
@@ -695,7 +704,7 @@ impl Scheduler {
         let status = self.txn_status[txn_idx as usize].0.read();
         matches!(
             *status,
-            ExecutionStatus::ReadyToExecute(0, _)
+            ExecutionStatus::Ready(0, _)
                 | ExecutionStatus::Executing(0)
                 | ExecutionStatus::Suspended(0, _)
         )
@@ -748,7 +757,7 @@ impl Scheduler {
     /// to create the next incarnation (should happen exactly once), and if successful,
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
-    fn try_execute_next_version(&self) -> Option<(Version, Option<DependencyCondvar>)> {
+    fn try_execute_next_version(&self) -> Option<(Version,ReadyTaskType)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
@@ -758,7 +767,7 @@ impl Scheduler {
         // If successfully incarnated (changed status from ready to executing),
         // return version for execution task, otherwise None.
         self.try_incarnate(idx_to_execute)
-            .map(|(incarnation, maybe_condvar)| ((idx_to_execute, incarnation), maybe_condvar))
+            .map(|(incarnation, task_type)| ((idx_to_execute, incarnation), task_type))
     }
 
     /// Put a transaction in a suspended state, with a condition variable that can be
@@ -767,10 +776,11 @@ impl Scheduler {
     /// Return false when the execution is halted.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-
+        println!("suspending txn {} status {:?}", txn_idx, *status);
         match *status {
             ExecutionStatus::Executing(incarnation) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
+                println!("suspended txn {} status {:?}", txn_idx, *status);
                 true
             },
             ExecutionStatus::ExecutionHalted => false,
@@ -789,7 +799,7 @@ impl Scheduler {
         }
 
         if let ExecutionStatus::Suspended(incarnation, dep_condvar) = &*status {
-            *status = ExecutionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
+            *status = ExecutionStatus::Ready(*incarnation, ReadyTaskType::Wakeup(dep_condvar.clone()));
         } else {
             unreachable!();
         }
@@ -819,7 +829,7 @@ impl Scheduler {
 
         // Only makes sense when the current status is 'Aborting'.
         debug_assert!(*status == ExecutionStatus::Aborting(incarnation));
-        *status = ExecutionStatus::ReadyToExecute(incarnation + 1, None);
+        *status = ExecutionStatus::Ready(incarnation + 1, ReadyTaskType::Execution);
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.

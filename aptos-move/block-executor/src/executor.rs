@@ -9,7 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
+    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave, ReadyTaskType},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -34,7 +34,7 @@ use std::{
         mpsc,
         mpsc::{Receiver, Sender},
         Arc,
-    },
+    }, thread,
 };
 
 struct CommitGuard<'a> {
@@ -255,6 +255,7 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
+            println!("committed txn_idx: {}", txn_idx);
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
@@ -287,6 +288,8 @@ where
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
+                    println!("thread {:?} task: {:?}", thread::current().id(), *scheduler_task);
+                    *scheduler_task = SchedulerTask::Done;
                     break;
                 },
             };
@@ -302,6 +305,8 @@ where
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_gas, per_block_gas_limit, txn_idx);
+                    println!("thread {:?} task: {:?}", thread::current().id(), *scheduler_task);
+                    *scheduler_task = SchedulerTask::Done;
                     break;
                 }
             }
@@ -414,7 +419,7 @@ where
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, None) => self.execute(
+                SchedulerTask::ExecutionTask(version_to_execute, ReadyTaskType::Execution) => self.execute(
                     version_to_execute,
                     block,
                     last_input_output,
@@ -423,7 +428,7 @@ where
                     &executor,
                     base_view,
                 ),
-                SchedulerTask::ExecutionTask(_, Some(condvar)) => {
+                SchedulerTask::ExecutionTask(_, ReadyTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = DependencyStatus::Resolved;
@@ -450,6 +455,8 @@ where
                 },
             }
         }
+        let thread_id = thread::current().id();
+        println!("Thread finished: {:?}", thread_id);
     }
 
     pub(crate) fn execute_transactions_parallel(
