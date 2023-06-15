@@ -82,9 +82,28 @@ module collection_offer {
 
     // Initializers
 
-    #[legacy_entry_fun]
     /// Create a tokenv1 collection offer.
     public entry fun init_for_tokenv1<CoinType>(
+        purchaser: &signer,
+        creator_address: address,
+        collection_name: String,
+        fee_schedule: Object<FeeSchedule>,
+        item_price: u64,
+        amount: u64,
+        expiration_time: u64,
+    ) {
+        init_for_tokenv1_internal<CoinType>(
+            purchaser,
+            creator_address,
+            collection_name,
+            fee_schedule,
+            item_price,
+            amount,
+            expiration_time
+        );
+    }
+
+    public fun init_for_tokenv1_internal<CoinType>(
         purchaser: &signer,
         creator_address: address,
         collection_name: String,
@@ -99,9 +118,26 @@ module collection_offer {
         object::address_to_object(signer::address_of(&offer_signer))
     }
 
-    #[legacy_entry_fun]
     /// Create a tokenv2 collection offer.
     public entry fun init_for_tokenv2<CoinType>(
+        purchaser: &signer,
+        collection: Object<Collection>,
+        fee_schedule: Object<FeeSchedule>,
+        item_price: u64,
+        amount: u64,
+        expiration_time: u64,
+    ) {
+        init_for_tokenv2_internal<CoinType>(
+            purchaser,
+            collection,
+            fee_schedule,
+            item_price,
+            amount,
+            expiration_time
+        );
+    }
+
+    public fun init_for_tokenv2_internal<CoinType>(
         purchaser: &signer,
         collection: Object<Collection>,
         fee_schedule: Object<FeeSchedule>,
@@ -175,19 +211,30 @@ module collection_offer {
         cleanup<CoinType>(collection_offer);
     }
 
-    #[legacy_entry_fun]
     /// Sell a tokenv1 to a collection offer.
     public entry fun sell_tokenv1<CoinType>(
         seller: &signer,
         collection_offer: Object<CollectionOffer>,
         token_name: String,
         property_version: u64,
+    )
+    acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2
+    {
+        sell_tokenv1_internal<CoinType>(seller, collection_offer, token_name, property_version);
+    }
+
+    /// Sell a tokenv1 to a collection offer.
+    public fun sell_tokenv1_internal<CoinType>(
+        seller: &signer,
+        collection_offer: Object<CollectionOffer>,
+        token_name: String,
+        property_version: u64,
     ): Option<Object<TokenV1Container>>
-        acquires
-            CoinOffer,
-            CollectionOffer,
-            CollectionOfferTokenV1,
-            CollectionOfferTokenV2
+    acquires
+    CoinOffer,
+    CollectionOffer,
+    CollectionOfferTokenV1,
+    CollectionOfferTokenV2
     {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
@@ -456,7 +503,7 @@ module collection_offer_tests {
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
         assert!(object::is_owner(token, seller_addr), 0);
-        let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv2_internal<AptosCoin>(
             purchaser,
             tokenv2::collection_object(token),
             test_utils::fee_schedule(marketplace),
@@ -506,7 +553,7 @@ module collection_offer_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let collection_offer = collection_offer::init_for_tokenv1<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv1_internal<AptosCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -521,14 +568,14 @@ module collection_offer_tests {
         assert!(coin::balance<AptosCoin>(purchaser_addr) == 8999, 0);
         assert!(coin::balance<AptosCoin>(seller_addr) == 10000, 0);
 
-        collection_offer::sell_tokenv1<AptosCoin>(seller, collection_offer, token_name, property_version);
+        collection_offer::sell_tokenv1_internal<AptosCoin>(seller, collection_offer, token_name, property_version);
         assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
         assert!(coin::balance<AptosCoin>(purchaser_addr) == 8999, 0);
         assert!(coin::balance<AptosCoin>(seller_addr) == 10495, 0);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
         assert!(collection_offer::remaining(collection_offer) == 1, 0);
 
-        collection_offer::sell_tokenv1<AptosCoin>(purchaser, collection_offer, token_name, property_version);
+        collection_offer::sell_tokenv1_internal<AptosCoin>(purchaser, collection_offer, token_name, property_version);
         assert!(coin::balance<AptosCoin>(marketplace_addr) == 11, 0);
         assert!(coin::balance<AptosCoin>(purchaser_addr) == 9489, 0);
         assert!(coin::balance<AptosCoin>(seller_addr) == 10500, 0);
@@ -552,7 +599,7 @@ module collection_offer_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let collection_offer = collection_offer::init_for_tokenv1<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv1_internal<AptosCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -562,7 +609,7 @@ module collection_offer_tests {
             timestamp::now_seconds() + 200,
         );
 
-        let token_container = collection_offer::sell_tokenv1<AptosCoin>(
+        let token_container = collection_offer::sell_tokenv1_internal<AptosCoin>(
             seller,
             collection_offer,
             token_name,
@@ -583,7 +630,7 @@ module collection_offer_tests {
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv2_internal<AptosCoin>(
             purchaser,
             tokenv2::collection_object(token),
             test_utils::fee_schedule(marketplace),
@@ -607,7 +654,7 @@ module collection_offer_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let collection_offer = collection_offer::init_for_tokenv1<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv1_internal<AptosCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -617,7 +664,7 @@ module collection_offer_tests {
             timestamp::now_seconds() + 200,
         );
 
-        collection_offer::sell_tokenv1<AptosCoin>(
+        collection_offer::sell_tokenv1_internal<AptosCoin>(
             marketplace,
             collection_offer,
             token_name,
@@ -635,7 +682,7 @@ module collection_offer_tests {
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv2_internal<AptosCoin>(
             purchaser,
             tokenv2::collection_object(token),
             test_utils::fee_schedule(marketplace),
@@ -657,7 +704,7 @@ module collection_offer_tests {
     ) {
         test_utils::setup(aptos_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv2_internal<AptosCoin>(
             purchaser,
             tokenv2::collection_object(token),
             test_utils::fee_schedule(marketplace),
@@ -689,7 +736,7 @@ module collection_offer_tests {
             string::utf8(b"..."),
         );
 
-        let collection_offer = collection_offer::init_for_tokenv2<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv2_internal<AptosCoin>(
             purchaser,
             object::object_from_constructor_ref(&other_collection),
             test_utils::fee_schedule(marketplace),
@@ -720,7 +767,7 @@ module collection_offer_tests {
             vector[true, true, true],
         );
 
-        let collection_offer = collection_offer::init_for_tokenv1<AptosCoin>(
+        let collection_offer = collection_offer::init_for_tokenv1_internal<AptosCoin>(
             purchaser,
             purchaser_addr,
             string::utf8(b"..."),
@@ -733,7 +780,7 @@ module collection_offer_tests {
         let token_id = test_utils::mint_tokenv1(seller);
         let (_creator_addr, _collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
-        collection_offer::sell_tokenv1<AptosCoin>(
+        collection_offer::sell_tokenv1_internal<AptosCoin>(
             marketplace,
             collection_offer,
             token_name,
