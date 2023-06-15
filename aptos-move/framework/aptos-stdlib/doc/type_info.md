@@ -12,6 +12,7 @@
 -  [Function `module_name`](#0x1_type_info_module_name)
 -  [Function `struct_name`](#0x1_type_info_struct_name)
 -  [Function `to_readable_type_info`](#0x1_type_info_to_readable_type_info)
+-  [Function `to_type_info`](#0x1_type_info_to_type_info)
 -  [Function `chain_id`](#0x1_type_info_chain_id)
 -  [Function `type_of`](#0x1_type_info_type_of)
 -  [Function `type_name`](#0x1_type_info_type_name)
@@ -224,6 +225,34 @@ For example, a trading application with a global registry of phantom <code>CoinT
         account_address: <a href="type_info.md#0x1_type_info">type_info</a>.account_address,
         module_name: <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="type_info.md#0x1_type_info">type_info</a>.module_name),
         struct_name: <a href="../../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(<a href="type_info.md#0x1_type_info">type_info</a>.struct_name)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_type_info_to_type_info"></a>
+
+## Function `to_type_info`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_to_type_info">to_type_info</a>(readable_type_info: &<a href="type_info.md#0x1_type_info_ReadableTypeInfo">type_info::ReadableTypeInfo</a>): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_to_type_info">to_type_info</a>(readable_type_info: &<a href="type_info.md#0x1_type_info_ReadableTypeInfo">ReadableTypeInfo</a>): <a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a> {
+    <a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>{
+        account_address: readable_type_info.account_address,
+        module_name: *<a href="../../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&readable_type_info.module_name),
+        struct_name: *<a href="../../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&readable_type_info.struct_name)
     }
 }
 </code></pre>

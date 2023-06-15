@@ -55,6 +55,14 @@ module aptos_std::type_info {
         }
     }
 
+    public fun to_type_info(readable_type_info: &ReadableTypeInfo): TypeInfo {
+        TypeInfo{
+            account_address: readable_type_info.account_address,
+            module_name: *string::bytes(&readable_type_info.module_name),
+            struct_name: *string::bytes(&readable_type_info.struct_name)
+        }
+    }
+
     /// Returns the current chain ID, mirroring what `aptos_framework::chain_id::get()` would return, except in `#[test]`
     /// functions, where this will always return `4u8` as the chain ID, whereas `aptos_framework::chain_id::get()` will
     /// return whichever ID was passed to `aptos_framework::chain_id::initialize_for_test()`.
@@ -90,11 +98,13 @@ module aptos_std::type_info {
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
-        assert!(to_readable_type_info(&type_info) == ReadableTypeInfo {
+        let readable_type_info = to_readable_type_info(&type_info);
+        assert!(readable_type_info == ReadableTypeInfo {
             account_address: @aptos_std,
             module_name: string::utf8(b"type_info"),
             struct_name: string::utf8(b"TypeInfo"),
         }, 3);
+        assert!(to_type_info(&readable_type_info) == type_info, 4);
     }
 
     #[test(fx = @std)]
