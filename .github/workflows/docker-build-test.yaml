@@ -61,6 +61,10 @@ env:
   # We use `pr-<pr_number>` as cache-id for PRs and simply <branch_name> otherwise.
   TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
 
+  # On PRs, only build and push to GCP
+  # On push, build and push to all remote registries
+  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
+
 permissions:
   contents: read
   id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
@@ -99,9 +103,11 @@ jobs:
         run: |
           echo "GIT_SHA: ${GIT_SHA}"
           echo "TARGET_CACHE_ID: ${TARGET_CACHE_ID}"
+          echo "TARGET_REGISTRY: ${TARGET_REGISTRY}"
     outputs:
       gitSha: ${{ env.GIT_SHA }}
       targetCacheId: ${{ env.TARGET_CACHE_ID }}
+      targetRegistry: ${{ env.TARGET_REGISTRY }}
 
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
@@ -112,6 +118,7 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-indexer:
     needs: [permission-check, determine-docker-build-metadata]
@@ -127,6 +134,7 @@ jobs:
       PROFILE: release
       FEATURES: indexer
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
@@ -142,6 +150,7 @@ jobs:
       PROFILE: release
       FEATURES: failpoints
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-performance:
     needs: [permission-check, determine-docker-build-metadata]
@@ -156,6 +165,7 @@ jobs:
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: performance
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-consensus-only-perf-test:
     needs: [permission-check, determine-docker-build-metadata]
@@ -170,6 +180,7 @@ jobs:
       PROFILE: release
       FEATURES: consensus-only-perf-test
       BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   sdk-release:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"

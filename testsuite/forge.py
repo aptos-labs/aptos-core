@@ -47,14 +47,17 @@ BUILD_VARIANT_TAG_PREFIX_MAP = {
     "release": "",  # the default release profile has no tag prefix
 }
 
-VALIDATOR_IMAGE_NAME = "aptos/validator"
-VALIDATOR_TESTING_IMAGE_NAME = "aptos/validator-testing"
-FORGE_IMAGE_NAME = "aptos/forge"
+VALIDATOR_IMAGE_NAME = "validator"
+VALIDATOR_TESTING_IMAGE_NAME = "validator-testing"
+FORGE_IMAGE_NAME = "forge"
+ECR_REPO_PREFIX = "aptos"
 
 DEFAULT_CONFIG = "forge-wrapper-config"
 DEFAULT_CONFIG_KEY = "forge-wrapper-config.json"
 
 FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
+
+GAR_REPO_NAME = "us-west1-docker.pkg.dev/aptos-global/aptos-internal"
 
 
 @dataclass
@@ -676,12 +679,12 @@ class K8sForgeRunner(ForgeRunner):
 
         # determine the interal image repos based on the context of where the cluster is located
         if context.cloud == Cloud.AWS:
-            forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/aptos/forge:{context.forge_image_tag}"
+            forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/{ECR_REPO_PREFIX}/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif (
             context.cloud == Cloud.GCP
         ):  # the GCP project for images is separate than the cluster
-            forge_image_full = f"us-west1-docker.pkg.dev/aptos-global/aptos-internal/forge:{context.forge_image_tag}"
+            forge_image_full = f"{GAR_REPO_NAME}/forge:{context.forge_image_tag}"
             validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
             # TODO: also registries need to be set up such that the default compute service account can access it:  $PROJECT_ID-compute@developer.gserviceaccount.com
@@ -852,6 +855,7 @@ def find_recent_images_by_profile_or_features(
     num_images: int,
     enable_failpoints: Optional[bool],
     enable_performance_profile: Optional[bool],
+    cloud: Cloud = Cloud.GCP,
 ) -> Sequence[str]:
     image_tag_prefix = ""
     if enable_failpoints and enable_performance_profile:
@@ -870,6 +874,7 @@ def find_recent_images_by_profile_or_features(
         num_images,
         image_name=VALIDATOR_TESTING_IMAGE_NAME,
         image_tag_prefixes=[image_tag_prefix],
+        cloud=cloud,
     )
 
 
@@ -880,6 +885,7 @@ def find_recent_images(
     image_name: str,
     image_tag_prefixes: List[str] = [""],
     commit_threshold: int = 100,
+    cloud: Cloud = Cloud.GCP,
 ) -> Sequence[str]:
     """
     Find the last `num_images` images built from the current git repo by searching the git commit history
@@ -901,7 +907,7 @@ def find_recent_images(
         temp_ret = []  # count variants for this revision
         for prefix in image_tag_prefixes:
             image_tag = f"{prefix}{revision}"
-            exists = image_exists(shell, image_name, image_tag)
+            exists = image_exists(shell, image_name, image_tag, cloud=cloud)
             if exists:
                 temp_ret.append(image_tag)
             if len(temp_ret) >= num_variants:
@@ -916,19 +922,40 @@ def find_recent_images(
     return ret
 
 
-def image_exists(shell: Shell, image_name: str, image_tag: str) -> bool:
-    result = shell.run(
-        [
-            "aws",
-            "ecr",
-            "describe-images",
-            "--repository-name",
-            f"{image_name}",
-            "--image-ids",
-            f"imageTag={image_tag}",
-        ]
-    )
-    return result.exit_code == 0
+def image_exists(
+    shell: Shell,
+    image_name: str,
+    image_tag: str,
+    cloud: Cloud = Cloud.GCP,
+) -> bool:
+    """Check if an image exists in a given repository"""
+    if cloud == Cloud.GCP:
+        full_image = f"{GAR_REPO_NAME}/{image_name}:{image_tag}"
+        return shell.run(
+            [
+                "crane",
+                "manifest",
+                full_image,
+            ],
+            stream_output=True,
+        ).succeeded()
+    elif cloud == Cloud.AWS:
+        full_image = f"{ECR_REPO_PREFIX}/{image_name}:{image_tag}"
+        log.info(f"Checking if image exists in GCP: {full_image}")
+        return shell.run(
+            [
+                "aws",
+                "ecr",
+                "describe-images",
+                "--repository-name",
+                f"{ECR_REPO_PREFIX}/{image_name}",
+                "--image-ids",
+                f"imageTag={image_tag}",
+            ],
+            stream_output=True,
+        ).succeeded()
+    else:
+        raise Exception(f"Unknown cloud repo type: {cloud}")
 
 
 def sanitize_forge_resource_name(forge_resource: str) -> str:
@@ -1338,6 +1365,7 @@ def test(
                 2,
                 enable_failpoints=enable_failpoints,
                 enable_performance_profile=enable_performance_profile,
+                cloud=cloud_enum,
             )
         )
         # This might not work as intended because we dont know if that revision
@@ -1354,6 +1382,7 @@ def test(
             1,
             enable_failpoints=enable_failpoints,
             enable_performance_profile=enable_performance_profile,
+            cloud=cloud_enum,
         )[0]
 
         image_tag = image_tag or default_latest_image
@@ -1378,13 +1407,13 @@ def test(
 
     # finally, whether we've derived the image tags or used the user-inputted ones, check if they exist
     assert image_exists(
-        shell, VALIDATOR_TESTING_IMAGE_NAME, image_tag
+        shell, VALIDATOR_TESTING_IMAGE_NAME, image_tag, cloud=cloud_enum
     ), f"swarm (validator) image does not exist: {image_tag}"
     assert image_exists(
-        shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag
+        shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag, cloud=cloud_enum
     ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
     assert image_exists(
-        shell, FORGE_IMAGE_NAME, forge_image_tag
+        shell, FORGE_IMAGE_NAME, forge_image_tag, cloud=cloud_enum
     ), f"forge (test runner) image does not exist: {forge_image_tag}"
 
     forge_args = create_forge_command(
