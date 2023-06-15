@@ -481,8 +481,9 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        let last_input_output = TxnLastInputOutput::new(index_mapping.clone());
-        let scheduler = Scheduler::new(index_mapping.clone());
+        let txn_indices = index_mapping.indices.clone();
+        let last_input_output = TxnLastInputOutput::new(index_mapping.num_txns(), index_mapping.inverses.clone());
+        let scheduler = Scheduler::new(index_mapping);
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -525,7 +526,7 @@ where
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
-            for &idx in index_mapping.indices.iter() {
+            for &idx in txn_indices.iter() {
                 match last_input_output.take_output(idx) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
