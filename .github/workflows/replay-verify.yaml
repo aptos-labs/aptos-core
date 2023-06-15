@@ -23,7 +23,7 @@ on:
       - ".github/workflows/replay-verify.yaml"
       - "testsuite/replay_verify.py"
   schedule:
-    - cron: "0 8,20 * * *"
+    - cron: "0 22 * * *"
   push:
     branches:
       - aptos-release-v* # the aptos release branches
