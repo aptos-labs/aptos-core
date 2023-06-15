@@ -57,6 +57,16 @@ If you want to tag a mutable function as `#[view]`, consider making it private s
 
 In order to use the View functions, you need to [publish the module](../move/move-on-aptos/cli.md#publishing-a-move-package-with-a-named-address) through the [Aptos CLI](../tools/install-cli/index.md).
 
+In the Aptos CLI, a view function request would look like this:
+```
+aptos move view --function-id devnet::message::get_message --profile devnet --args address:devnet                   
+{
+  "Result": [
+    "View functions rock!"
+  ]
+}
+```
+
 In the TypeScript SDK, a view function request would look like this:
 ```
     const payload: Gen.ViewRequest = {
