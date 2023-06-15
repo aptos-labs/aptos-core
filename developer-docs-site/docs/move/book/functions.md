@@ -327,6 +327,10 @@ fun zero(): u64 { 0 }
 
 Here `: u64` indicates that the function's return type is `u64`.
 
+:::tip
+A function can return an immutable `&` or mutable `&mut` [reference](./references.md) if derived from an input reference. Keep in mind, this means that a function [cannot return a reference to global storage](./references.md#references-cannot-be-stored) unless it is an [inline function](#inline-functions).
+:::
+
 Using tuples, a function can return multiple values:
 
 ```move
