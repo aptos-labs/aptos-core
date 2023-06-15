@@ -15,7 +15,7 @@ use crate::{
     view::{LatestView, MVHashMapView},
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
-use aptos_logger::{debug, error, info};
+use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     unsync_map::UnsyncMap,
@@ -395,10 +395,7 @@ where
             // For committed txns with Abort or SkipRest status, early halt BlockSTM.
             match last_input_output.fee_statement(txn_idx) {
                 Some(fee_statement) => {
-                    if let Err(e) = accumulated_fee_statement.add_fee_statement(&fee_statement) {
-                        error!("[BlockSTM]: Failed to accumulate fee statement: {:?}", e);
-                    }
-
+                    accumulated_fee_statement.add_fee_statement(&fee_statement);
                     self.update_parallel_txn_gas_counters(&fee_statement);
                 },
                 None => {
@@ -507,7 +504,7 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
         let mut worker_idx = 0;
 
-        let mut accumulated_fee_statement = FeeStatement::empty_v1();
+        let mut accumulated_fee_statement = FeeStatement::zero();
         loop {
             // Only one thread does try_commit to avoid contention.
             match &role {
@@ -704,7 +701,7 @@ where
 
         let mut ret = Vec::with_capacity(num_txns);
 
-        let mut accumulated_fee_statement = FeeStatement::empty_v1();
+        let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let res = executor.execute_transaction(
@@ -728,9 +725,7 @@ where
                     }
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
-                    if let Err(e) = accumulated_fee_statement.add_fee_statement(&fee_statement) {
-                        error!("[BlockSTM]: Failed to accumulate fee statement: {:?}", e);
-                    }
+                    accumulated_fee_statement.add_fee_statement(&fee_statement);
                     self.update_sequential_txn_gas_counters(&accumulated_fee_statement);
                     ret.push(output);
                 },

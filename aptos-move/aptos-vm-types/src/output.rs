@@ -40,7 +40,7 @@ impl VMOutput {
     pub fn empty_with_status(status: TransactionStatus) -> Self {
         Self {
             change_set: VMChangeSet::empty(),
-            fee_statement: FeeStatement::empty_v1(),
+            fee_statement: FeeStatement::zero(),
             status,
         }
     }

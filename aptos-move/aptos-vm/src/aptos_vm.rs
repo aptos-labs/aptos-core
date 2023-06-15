@@ -254,9 +254,16 @@ impl AptosVM {
         )
     }
 
-    fn fee_statement_from_gas_meter(gas_used: u64, gas_meter: &impl AptosGasMeter) -> FeeStatement {
-        FeeStatement::new_v1(
-            gas_used,
+    fn fee_statement_from_gas_meter(
+        txn_data: &TransactionMetadata,
+        gas_meter: &impl AptosGasMeter,
+    ) -> FeeStatement {
+        let gas_used = txn_data
+            .max_gas_amount()
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount");
+        FeeStatement::new(
+            gas_used.into(),
             u64::from(gas_meter.execution_gas_used()),
             u64::from(gas_meter.io_gas_used()),
             u64::from(gas_meter.storage_fee_used_in_gas_units()),
@@ -314,12 +321,7 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let gas_used = txn_data
-                    .max_gas_amount()
-                    .checked_sub(gas_meter.balance())
-                    .expect("Balance should always be less than or equal to max gas amount");
-                let fee_statement =
-                    AptosVM::fee_statement_from_gas_meter(gas_used.into(), gas_meter);
+                let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
                 let txn_output = get_transaction_output(
                     &mut (),
                     session,
@@ -350,12 +352,7 @@ impl AptosVM {
                 .run_success_epilogue(session, gas_meter.balance(), txn_data, log_context)
         })?;
         let change_set = respawned_session.finish(change_set_configs)?;
-
-        let gas_used = txn_data
-            .max_gas_amount()
-            .checked_sub(gas_meter.balance())
-            .expect("Balance should always be less than or equal to max gas amount");
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(gas_used.into(), gas_meter);
+        let fee_statement = AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter);
         let output = VMOutput::new(
             change_set,
             fee_statement,
@@ -1298,11 +1295,7 @@ impl AptosVM {
         self.read_writeset(resolver, change_set.write_set())?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = VMOutput::new(
-            change_set,
-            FeeStatement::empty_v1(),
-            VMStatus::Executed.into(),
-        );
+        let output = VMOutput::new(change_set, FeeStatement::zero(), VMStatus::Executed.into());
         Ok((VMStatus::Executed, output))
     }
 
@@ -1347,7 +1340,7 @@ impl AptosVM {
         let output = get_transaction_output(
             &mut (),
             session,
-            FeeStatement::empty_v1(),
+            FeeStatement::zero(),
             ExecutionStatus::Success,
             &self
                 .0

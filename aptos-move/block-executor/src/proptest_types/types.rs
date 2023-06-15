@@ -519,7 +519,7 @@ where
     }
 
     fn fee_statement(&self) -> FeeStatement {
-        FeeStatement::new_v1(1, 1, 0, 0, 0)
+        FeeStatement::new(1, 1, 0, 0, 0)
     }
 }
 
