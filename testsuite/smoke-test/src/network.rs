@@ -75,6 +75,7 @@ async fn test_connection_limiting() {
                 peer_set,
             ),
         )
+        .await
         .unwrap();
     swarm
         .fullnode_mut(pfn_peer_id)
@@ -115,6 +116,7 @@ async fn test_connection_limiting() {
                 peer_set,
             ),
         )
+        .await
         .unwrap();
 
     // This node should fail to connect
@@ -155,7 +157,10 @@ async fn test_rest_discovery() {
 
     // Start a new node that should connect to the previous node only via REST
     // The startup wait time should check if it connects successfully
-    swarm.add_full_node(&version, full_node_config).unwrap();
+    swarm
+        .add_full_node(&version, full_node_config)
+        .await
+        .unwrap();
 }
 
 // Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670

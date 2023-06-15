@@ -38,7 +38,7 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.use_state_kv_db {
+        if !rocksdb_configs.split_ledger_db {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
@@ -95,20 +95,6 @@ impl StateKvDb {
         Ok(state_kv_db)
     }
 
-    // TODO(grao): Remove this function.
-    pub(crate) fn commit_nonsharded(
-        &self,
-        version: Version,
-        state_kv_batch: SchemaBatch,
-    ) -> Result<()> {
-        state_kv_batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvCommitProgress,
-            &DbMetadataValue::Version(version),
-        )?;
-
-        self.commit_raw_batch(state_kv_batch)
-    }
-
     pub(crate) fn commit(
         &self,
         version: Version,
@@ -137,6 +123,13 @@ impl StateKvDb {
     pub(crate) fn write_progress(&self, version: Version) -> Result<()> {
         self.state_kv_metadata_db.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvCommitProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.state_kv_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::StateKvPrunerProgress,
             &DbMetadataValue::Version(version),
         )
     }

@@ -98,7 +98,7 @@ impl Default for Format {
     }
 }
 
-pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
+pub fn forge_main<F: Factory>(tests: ForgeConfig, factory: F, options: &Options) -> Result<()> {
     let forge = Forge::new(options, tests, Duration::from_secs(30), factory);
 
     if options.list {
@@ -125,10 +125,10 @@ pub enum InitialVersion {
 pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 
-pub struct ForgeConfig<'cfg> {
-    aptos_tests: Vec<&'cfg dyn AptosTest>,
-    admin_tests: Vec<&'cfg dyn AdminTest>,
-    network_tests: Vec<&'cfg dyn NetworkTest>,
+pub struct ForgeConfig {
+    aptos_tests: Vec<Box<dyn AptosTest>>,
+    admin_tests: Vec<Box<dyn AdminTest>>,
+    network_tests: Vec<Box<dyn NetworkTest>>,
 
     /// The initial number of validators to spawn when the test harness creates a swarm
     initial_validator_count: NonZeroUsize,
@@ -158,22 +158,37 @@ pub struct ForgeConfig<'cfg> {
     existing_db_tag: Option<String>,
 }
 
-impl<'cfg> ForgeConfig<'cfg> {
+impl ForgeConfig {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_aptos_tests(mut self, aptos_tests: Vec<&'cfg dyn AptosTest>) -> Self {
+    pub fn add_aptos_test<T: AptosTest + 'static>(mut self, aptos_test: T) -> Self {
+        self.aptos_tests.push(Box::new(aptos_test));
+        self
+    }
+
+    pub fn with_aptos_tests(mut self, aptos_tests: Vec<Box<dyn AptosTest>>) -> Self {
         self.aptos_tests = aptos_tests;
         self
     }
 
-    pub fn with_admin_tests(mut self, admin_tests: Vec<&'cfg dyn AdminTest>) -> Self {
+    pub fn add_admin_test<T: AdminTest + 'static>(mut self, admin_test: T) -> Self {
+        self.admin_tests.push(Box::new(admin_test));
+        self
+    }
+
+    pub fn with_admin_tests(mut self, admin_tests: Vec<Box<dyn AdminTest>>) -> Self {
         self.admin_tests = admin_tests;
         self
     }
 
-    pub fn with_network_tests(mut self, network_tests: Vec<&'cfg dyn NetworkTest>) -> Self {
+    pub fn add_network_test<T: NetworkTest + 'static>(mut self, network_test: T) -> Self {
+        self.network_tests.push(Box::new(network_test));
+        self
+    }
+
+    pub fn with_network_tests(mut self, network_tests: Vec<Box<dyn NetworkTest>>) -> Self {
         self.network_tests = network_tests;
         self
     }
@@ -240,12 +255,55 @@ impl<'cfg> ForgeConfig<'cfg> {
         self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
 
-    pub fn all_tests(&self) -> impl Iterator<Item = &'_ dyn Test> {
+    pub fn all_tests(&self) -> Vec<Box<AnyTestRef<'_>>> {
         self.admin_tests
             .iter()
-            .map(|t| t as &dyn Test)
-            .chain(self.network_tests.iter().map(|t| t as &dyn Test))
-            .chain(self.aptos_tests.iter().map(|t| t as &dyn Test))
+            .map(|t| Box::new(AnyTestRef::Admin(t.as_ref())))
+            .chain(
+                self.network_tests
+                    .iter()
+                    .map(|t| Box::new(AnyTestRef::Network(t.as_ref()))),
+            )
+            .chain(
+                self.aptos_tests
+                    .iter()
+                    .map(|t| Box::new(AnyTestRef::Aptos(t.as_ref()))),
+            )
+            .collect()
+    }
+}
+
+// Workaround way to implement all_tests, for:
+// error[E0658]: cannot cast `dyn interface::admin::AdminTest` to `dyn interface::test::Test`, trait upcasting coercion is experimental
+pub enum AnyTestRef<'a> {
+    Aptos(&'a dyn AptosTest),
+    Admin(&'a dyn AdminTest),
+    Network(&'a dyn NetworkTest),
+}
+
+impl<'a> Test for AnyTestRef<'a> {
+    fn name(&self) -> &'static str {
+        match self {
+            AnyTestRef::Aptos(t) => t.name(),
+            AnyTestRef::Admin(t) => t.name(),
+            AnyTestRef::Network(t) => t.name(),
+        }
+    }
+
+    fn ignored(&self) -> bool {
+        match self {
+            AnyTestRef::Aptos(t) => t.ignored(),
+            AnyTestRef::Admin(t) => t.ignored(),
+            AnyTestRef::Network(t) => t.ignored(),
+        }
+    }
+
+    fn should_fail(&self) -> ShouldFail {
+        match self {
+            AnyTestRef::Aptos(t) => t.should_fail(),
+            AnyTestRef::Admin(t) => t.should_fail(),
+            AnyTestRef::Network(t) => t.should_fail(),
+        }
     }
 }
 
@@ -279,7 +337,7 @@ impl ForgeRunnerMode {
     }
 }
 
-impl<'cfg> Default for ForgeConfig<'cfg> {
+impl Default for ForgeConfig {
     fn default() -> Self {
         let forge_run_mode = ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
         let success_criteria = if forge_run_mode == ForgeRunnerMode::Local {
@@ -315,7 +373,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
 
 pub struct Forge<'cfg, F> {
     options: &'cfg Options,
-    tests: ForgeConfig<'cfg>,
+    tests: ForgeConfig,
     global_duration: Duration,
     factory: F,
 }
@@ -323,7 +381,7 @@ pub struct Forge<'cfg, F> {
 impl<'cfg, F: Factory> Forge<'cfg, F> {
     pub fn new(
         options: &'cfg Options,
-        tests: ForgeConfig<'cfg>,
+        tests: ForgeConfig,
         global_duration: Duration,
         factory: F,
     ) -> Self {
@@ -336,7 +394,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
     }
 
     pub fn list(&self) -> Result<()> {
-        for test in self.filter_tests(self.tests.all_tests()) {
+        for test in self.filter_tests(&self.tests.all_tests()) {
             println!("{}: test", test.name());
         }
 
@@ -344,7 +402,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             println!();
             println!(
                 "{} tests",
-                self.filter_tests(self.tests.all_tests()).count()
+                self.filter_tests(&self.tests.all_tests()).count()
             );
         }
 
@@ -362,8 +420,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
     }
 
     pub fn run(&self) -> Result<TestReport> {
-        let test_count = self.filter_tests(self.tests.all_tests()).count();
-        let filtered_out = test_count.saturating_sub(self.tests.all_tests().count());
+        let test_count = self.filter_tests(&self.tests.all_tests()).count();
+        let filtered_out = test_count.saturating_sub(self.tests.all_tests().len());
 
         let mut report = TestReport::new();
         let mut summary = TestSummary::new(test_count, filtered_out);
@@ -396,7 +454,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             ))?;
 
             // Run AptosTests
-            for test in self.filter_tests(self.tests.aptos_tests.iter()) {
+            for test in self.filter_tests(&self.tests.aptos_tests) {
                 let mut aptos_ctx = AptosContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info().into_aptos_public_info(),
@@ -408,7 +466,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             }
 
             // Run AdminTests
-            for test in self.filter_tests(self.tests.admin_tests.iter()) {
+            for test in self.filter_tests(&self.tests.admin_tests) {
                 let mut admin_ctx = AdminContext::new(
                     CoreContext::from_rng(&mut rng),
                     swarm.chain_info(),
@@ -419,7 +477,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
-            for test in self.filter_tests(self.tests.network_tests.iter()) {
+            for test in self.filter_tests(&self.tests.network_tests) {
                 let mut network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
                     &mut *swarm,
@@ -452,11 +510,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         }
     }
 
-    fn filter_tests<'a, T: Test, I: Iterator<Item = T> + 'a>(
+    fn filter_tests<'a, T: Test + ?Sized>(
         &'a self,
-        tests: I,
-    ) -> impl Iterator<Item = T> + 'a {
+        tests: &'a [Box<T>],
+    ) -> impl Iterator<Item = &'a Box<T>> {
         tests
+            .iter()
             // Filter by ignored
             .filter(
                 move |test| match (self.options.include_ignored, self.options.ignored) {

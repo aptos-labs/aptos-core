@@ -33,6 +33,8 @@ use move_vm_types::{
 use std::collections::BTreeMap;
 
 // Change log:
+// - V10
+//   - Storage gas charges (excluding "storage fees") stop respecting the storage gas curves
 // - V9
 //   - Accurate tracking of the cost of loading resource groups
 // - V8
@@ -61,7 +63,7 @@ use std::collections::BTreeMap;
 //       global operations.
 // - V1
 //   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 9;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 10;
 
 pub(crate) const EXECUTION_GAS_MULTIPLIER: u64 = 20;
 
@@ -491,11 +493,12 @@ impl MoveGasMeter for StandardGasMeter {
         &mut self,
         _addr: AccountAddress,
         _ty: impl TypeView,
-        loaded: Option<(NumBytes, impl ValueView)>,
+        val: Option<impl ValueView>,
+        bytes_loaded: NumBytes,
     ) -> PartialVMResult<()> {
         if self.feature_version != 0 {
             // TODO(Gas): Rewrite this in a better way.
-            if let Some((_, val)) = &loaded {
+            if let Some(val) = &val {
                 self.use_heap_memory(
                     self.gas_params
                         .misc
@@ -504,10 +507,13 @@ impl MoveGasMeter for StandardGasMeter {
                 )?;
             }
         }
+        if self.feature_version <= 8 && val.is_none() && bytes_loaded != 0.into() {
+            return Err(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message("in legacy versions, number of bytes loaded must be zero when the resource does not exist ".to_string()));
+        }
         let cost = self
             .storage_gas_params
             .pricing
-            .calculate_read_gas(loaded.map(|(num_bytes, _)| num_bytes));
+            .calculate_read_gas(val.is_some(), bytes_loaded);
         self.charge_io(cost)
     }
 

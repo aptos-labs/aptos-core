@@ -228,9 +228,25 @@ fn parse_serialized_node_config(serialized_config: &str, caller: &'static str) -
     })
 }
 
+/// Merges node_config with a config config override
+pub fn merge_node_config(
+    node_config: NodeConfig,
+    override_node_config: serde_yaml::Value,
+) -> Result<NodeConfig, Error> {
+    serde_merge::tmerge::<NodeConfig, serde_yaml::Value, NodeConfig>(
+        node_config,
+        override_node_config,
+    )
+    .map_err(|e| {
+        Error::Unexpected(format!(
+            "Unable to merge default config with override. Error: {}",
+            e
+        ))
+    })
+}
 #[cfg(test)]
 mod test {
-    use crate::config::{NodeConfig, SafetyRulesConfig};
+    use crate::config::{merge_node_config, Error, NodeConfig, SafetyRulesConfig};
 
     #[test]
     fn verify_config_defaults() {
@@ -241,5 +257,33 @@ mod test {
 
         // Verify the safety rules config default
         SafetyRulesConfig::get_default_config();
+    }
+
+    #[test]
+    fn verify_merge_node_config() {
+        let node_config = NodeConfig::get_default_pfn_config();
+        let override_node_config = serde_yaml::from_str(
+            r#"
+            api:
+                enabled: false
+            "#,
+        )
+        .unwrap();
+        let merged_node_config = merge_node_config(node_config, override_node_config).unwrap();
+        assert!(!merged_node_config.api.enabled);
+    }
+
+    #[test]
+    fn verify_bad_merge_node_config() {
+        let node_config = NodeConfig::get_default_pfn_config();
+        let override_node_config = serde_yaml::from_str(
+            r#"
+            blablafakenodeconfigkeyblabla:
+                enabled: false
+            "#,
+        )
+        .unwrap();
+        let merged_node_config = merge_node_config(node_config, override_node_config);
+        assert!(matches!(merged_node_config, Err(Error::Unexpected(_))));
     }
 }

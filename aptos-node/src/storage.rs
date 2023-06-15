@@ -62,6 +62,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
     AptosDB::create_checkpoint(
         &source_dir,
         &checkpoint_dir,
+        node_config.storage.rocksdb_configs.split_ledger_db,
         node_config
             .storage
             .rocksdb_configs

@@ -144,7 +144,7 @@ impl StateComputer for ExecutionProxy {
             "execute_block",
             tokio::task::spawn_blocking(move || {
                 executor.execute_block(
-                    (block_id, transactions_to_execute),
+                    (block_id, transactions_to_execute).into(),
                     parent_block_id,
                     block_gas_limit,
                 )
@@ -331,6 +331,7 @@ async fn test_commit_sync_race() {
         transaction_shuffler::create_transaction_shuffler,
     };
     use aptos_consensus_notifications::Error;
+    use aptos_executor_types::ExecutableBlock;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
@@ -354,7 +355,7 @@ async fn test_commit_sync_race() {
 
         fn execute_block(
             &self,
-            _block: (HashValue, Vec<Transaction>),
+            _block: ExecutableBlock,
             _parent_block_id: HashValue,
             _maybe_block_gas_limit: Option<u64>,
         ) -> Result<StateComputeResult, ExecutionError> {
