@@ -37,6 +37,31 @@ use std::{
     },
 };
 
+struct CommitGuard<'a> {
+    post_commit_txs: &'a Vec<Sender<u32>>,
+    worker_idx: usize,
+    txn_idx: u32,
+}
+
+impl<'a> CommitGuard<'a> {
+    fn new(post_commit_txs: &'a Vec<Sender<u32>>, worker_idx: usize, txn_idx: u32) -> Self {
+        Self {
+            post_commit_txs,
+            worker_idx,
+            txn_idx,
+        }
+    }
+}
+
+impl<'a> Drop for CommitGuard<'a> {
+    fn drop(&mut self) {
+        // Send the committed txn to the Worker thread.
+        self.post_commit_txs[self.worker_idx]
+            .send(self.txn_idx)
+            .expect("Worker must be available");
+    }
+}
+
 #[derive(Debug)]
 enum CommitRole {
     Coordinator(Vec<Sender<TxnIndex>>),
@@ -230,9 +255,9 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            post_commit_txs[*worker_idx]
-                .send(txn_idx)
-                .expect("Worker must be available");
+            // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
+            let _commit_guard: CommitGuard =
+                CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
             // Iterate round robin over workers to do commit_hook.
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
