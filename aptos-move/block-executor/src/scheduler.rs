@@ -14,7 +14,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Condvar,
-    }, thread,
+    },
 };
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
@@ -39,13 +39,22 @@ pub enum DependencyResult {
     ExecutionHalted,
 }
 
+/// Two types of execution tasks: Execution and Wakeup.
+/// Execution is a normal execution task, Wakeup is a task that just wakes up a suspended execution.
+/// See explanations for the ExecutionStatus below.
+#[derive(Debug, Clone)]
+pub enum ExecutionTaskType {
+    Execution,
+    Wakeup(DependencyCondvar),
+}
+
 /// A holder for potential task returned from the Scheduler. ExecutionTask and ValidationTask
 /// each contain a version of transaction that must be executed or validated, respectively.
 /// NoTask holds no task (similar None if we wrapped tasks in Option), and Done implies that
 /// there are no more tasks and the scheduler is done.
 #[derive(Debug)]
 pub enum SchedulerTask {
-    ExecutionTask(Version, ReadyTaskType),
+    ExecutionTask(Version, ExecutionTaskType),
     ValidationTask(Version, Wave),
     NoTask,
     Done,
@@ -56,21 +65,24 @@ pub enum SchedulerTask {
 /// 'execution status' as 'status'. Each status contains the latest incarnation number,
 /// where incarnation = i means it is the i-th execution instance of the transaction.
 ///
-/// 'ReadyToExecute' means that the corresponding incarnation should be executed and the scheduler
+/// 'Ready' means that the corresponding incarnation should be executed and the scheduler
 /// must eventually create a corresponding execution task. The scheduler ensures that exactly one
-/// execution task gets created, changing the status to 'Executing' in the process. If a dependency
-/// condition variable is set, then an execution of a prior incarnation is waiting on it with
-/// a read dependency resolved (when dependency was encountered, the status changed to Suspended,
-/// and suspended changed to ReadyToExecute when the dependency finished its execution). In this case
-/// the caller need not create a new execution task, but just notify the suspended execution.
+/// execution task gets created, changing the status to 'Executing' in the process. 'Ready' status
+/// contains an ExecutionTaskType, which is either Execution or Wakeup. If it is Execution, then
+/// the scheduler creates an execution task for the corresponding incarnation. If it is Wakeup,
+/// a dependency condition variable is set in ExecutionTaskType::Wakeup(DependencyCondvar): an execution
+/// of a prior incarnation is waiting on it with a read dependency resolved (when dependency was
+/// encountered, the status changed to Suspended, and suspended changed to Ready when the dependency
+/// finished its execution). In this case the caller need not create a new execution task, but
+/// just notify the suspended execution via the dependency condition variable.
 ///
 /// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes, or
-/// if a dependency is encountered, it becomes 'ReadyToExecute(incarnation + 1)' once the
+/// if a dependency is encountered, it becomes 'Ready(incarnation + 1)' once the
 /// dependency is resolved. An 'Executed' status allows creation of validation tasks for the
 /// corresponding incarnation, and a validation failure leads to an abort. The scheduler ensures
 /// that there is exactly one abort, changing the status to 'Aborting' in the process. Once the
 /// thread that successfully aborted performs everything that's required, it sets the status
-/// to 'ReadyToExecute(incarnation + 1)', allowing the scheduler to create an execution
+/// to 'Ready(incarnation + 1)', allowing the scheduler to create an execution
 /// task for the next incarnation of the transaction.
 ///
 /// 'ExecutionHalted' is a transaction status marking that parallel execution is halted, due to
@@ -93,16 +105,9 @@ pub enum SchedulerTask {
 ///    ↓                finish_abort                                                         |
 /// Aborting(i) ---------------------------------------------------------> Ready(i+1)      ---
 ///
-#[derive(Debug, Clone)]
-pub enum ReadyTaskType {
-    Execution,
-    Wakeup(DependencyCondvar),
-}
-
 #[derive(Debug)]
 enum ExecutionStatus {
-    // ReadyToExecute(Incarnation, Option<DependencyCondvar>),
-    Ready(Incarnation, ReadyTaskType),
+    Ready(Incarnation, ExecutionTaskType),
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
@@ -215,7 +220,7 @@ pub struct Scheduler {
     // validation/execution preferences stick to the worker threads).
     /// A shared index that tracks the minimum of all transaction indices that require execution.
     /// The threads increment the index and attempt to create an execution task for the corresponding
-    /// transaction, if the status of the txn is 'ReadyToExecute'. This implements a counting-based
+    /// transaction, if the status of the txn is 'Ready'. This implements a counting-based
     /// concurrent ordered set. It is reduced as necessary when transactions become ready to be
     /// executed, in particular, when execution finishes and dependencies are resolved.
     execution_idx: AtomicU32,
@@ -249,7 +254,7 @@ impl Scheduler {
             txn_status: (0..num_txns)
                 .map(|_| {
                     CachePadded::new((
-                        RwLock::new(ExecutionStatus::Ready(0, ReadyTaskType::Execution)),
+                        RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
                         RwLock::new(ValidationStatus::new()),
                     ))
                 })
@@ -375,10 +380,10 @@ impl Scheduler {
                 {
                     return SchedulerTask::ValidationTask(version_to_validate, wave);
                 }
-            } else if let Some((version_to_execute, task_type)) =
+            } else if let Some((version_to_execute, execution_task_type)) =
                 self.try_execute_next_version()
             {
-                return SchedulerTask::ExecutionTask(version_to_execute, task_type);
+                return SchedulerTask::ExecutionTask(version_to_execute, execution_task_type);
             }
         }
     }
@@ -475,7 +480,7 @@ impl Scheduler {
         let min_dep = txn_deps
             .into_iter()
             .map(|dep| {
-                // Mark the status of dependencies as 'ReadyToExecute' since dependency on
+                // Mark the status of dependencies as 'Ready' since dependency on
                 // transaction txn_idx is now resolved.
                 self.resume(dep);
 
@@ -543,8 +548,11 @@ impl Scheduler {
             // re-execution task back to the caller. If incarnation fails, there is
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
-            if let Some((new_incarnation, task_type)) = self.try_incarnate(txn_idx) {
-                return SchedulerTask::ExecutionTask((txn_idx, new_incarnation), task_type);
+            if let Some((new_incarnation, execution_task_type)) = self.try_incarnate(txn_idx) {
+                return SchedulerTask::ExecutionTask(
+                    (txn_idx, new_incarnation),
+                    execution_task_type,
+                );
             }
         }
 
@@ -580,11 +588,10 @@ impl Scheduler {
     pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         {
-            println!("resolving txn_idx: {}, status: {:?}", txn_idx, *status);
-            // Only transactions with status Suspended or ReadyToExecute may have the condition variable of pending threads.
+            // Only transactions with status Suspended or Ready may have the condition variable of pending threads.
             match &*status {
                 ExecutionStatus::Suspended(_, condvar)
-                | ExecutionStatus::Ready(_, ReadyTaskType::Wakeup(condvar)) => {
+                | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
                     // Mark parallel execution halted due to reasons like module r/w intersection.
                     *lock.lock() = DependencyStatus::ExecutionHalted;
@@ -647,11 +654,11 @@ impl Scheduler {
     }
 
     /// Try and incarnate a transaction. Only possible when the status is
-    /// ReadyToExecute(incarnation), in which case Some(incarnation) is returned and the
+    /// Ready(incarnation), in which case Some(incarnation) is returned and the
     /// status is (atomically, due to the mutex) updated to Executing(incarnation).
     /// An unsuccessful incarnation returns None. Since incarnation numbers never decrease
     /// for each transaction, incarnate function may not succeed more than once per version.
-    fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, ReadyTaskType)> {
+    fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, ExecutionTaskType)> {
         if txn_idx >= self.num_txns {
             return None;
         }
@@ -660,9 +667,8 @@ impl Scheduler {
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        if let ExecutionStatus::Ready(incarnation, task_type) = &*status {
-            let ret: (u32, ReadyTaskType) = (*incarnation, (*task_type).clone());
-            println!("thread {:?} incarnating txn_idx: {}, status: {:?}", thread::current().id(), txn_idx, *status);
+        if let ExecutionStatus::Ready(incarnation, execution_task_type) = &*status {
+            let ret: (u32, ExecutionTaskType) = (*incarnation, (*execution_task_type).clone());
             *status = ExecutionStatus::Executing(*incarnation);
             Some(ret)
         } else {
@@ -753,11 +759,11 @@ impl Scheduler {
     /// Grab an index to try and execute next (by fetch-and-incrementing execution_idx).
     /// - If the index is out of bounds, return None (and invoke a check of whether
     /// all txns can be committed).
-    /// - If the transaction is ready for execution (ReadyToExecute state), attempt
+    /// - If the transaction is ready for execution (Ready state), attempt
     /// to create the next incarnation (should happen exactly once), and if successful,
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
-    fn try_execute_next_version(&self) -> Option<(Version,ReadyTaskType)> {
+    fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
@@ -767,7 +773,9 @@ impl Scheduler {
         // If successfully incarnated (changed status from ready to executing),
         // return version for execution task, otherwise None.
         self.try_incarnate(idx_to_execute)
-            .map(|(incarnation, task_type)| ((idx_to_execute, incarnation), task_type))
+            .map(|(incarnation, execution_task_type)| {
+                ((idx_to_execute, incarnation), execution_task_type)
+            })
     }
 
     /// Put a transaction in a suspended state, with a condition variable that can be
@@ -776,11 +784,9 @@ impl Scheduler {
     /// Return false when the execution is halted.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        println!("suspending txn {} status {:?}", txn_idx, *status);
         match *status {
             ExecutionStatus::Executing(incarnation) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
-                println!("suspended txn {} status {:?}", txn_idx, *status);
                 true
             },
             ExecutionStatus::ExecutionHalted => false,
@@ -788,7 +794,7 @@ impl Scheduler {
         }
     }
 
-    /// When a dependency is resolved, mark the transaction as ReadyToExecute with an
+    /// When a dependency is resolved, mark the transaction as Ready with an
     /// incremented incarnation number.
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
@@ -799,7 +805,10 @@ impl Scheduler {
         }
 
         if let ExecutionStatus::Suspended(incarnation, dep_condvar) = &*status {
-            *status = ExecutionStatus::Ready(*incarnation, ReadyTaskType::Wakeup(dep_condvar.clone()));
+            *status = ExecutionStatus::Ready(
+                *incarnation,
+                ExecutionTaskType::Wakeup(dep_condvar.clone()),
+            );
         } else {
             unreachable!();
         }
@@ -829,7 +838,7 @@ impl Scheduler {
 
         // Only makes sense when the current status is 'Aborting'.
         debug_assert!(*status == ExecutionStatus::Aborting(incarnation));
-        *status = ExecutionStatus::Ready(incarnation + 1, ReadyTaskType::Execution);
+        *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
     }
 
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.

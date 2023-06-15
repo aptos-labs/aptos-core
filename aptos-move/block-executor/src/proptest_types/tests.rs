@@ -64,8 +64,7 @@ fn run_transactions<K, V>(
 
     let executable_txns = ExecutableTransactions::Unsharded(transactions);
 
-    for i in 0..num_repeat {
-        println!("Running test case {} of {}", i + 1, num_repeat);
+    for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,

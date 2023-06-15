@@ -9,7 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
-    scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave, ReadyTaskType},
+    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
@@ -34,7 +34,7 @@ use std::{
         mpsc,
         mpsc::{Receiver, Sender},
         Arc,
-    }, thread,
+    },
 };
 
 struct CommitGuard<'a> {
@@ -255,7 +255,6 @@ where
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            println!("committed txn_idx: {}", txn_idx);
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
@@ -288,7 +287,6 @@ where
                     counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     info!("[BlockSTM]: Parallel execution early halted due to Abort or SkipRest txn, {} txns committed.", txn_idx + 1);
-                    println!("thread {:?} task: {:?}", thread::current().id(), *scheduler_task);
                     *scheduler_task = SchedulerTask::Done;
                     break;
                 },
@@ -305,7 +303,6 @@ where
                     counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
                     counters::PARALLEL_EXCEED_PER_BLOCK_GAS_LIMIT_COUNT.inc();
                     info!("[BlockSTM]: Parallel execution early halted due to accumulated_gas {} >= PER_BLOCK_GAS_LIMIT {}, {} txns committed", *accumulated_gas, per_block_gas_limit, txn_idx);
-                    println!("thread {:?} task: {:?}", thread::current().id(), *scheduler_task);
                     *scheduler_task = SchedulerTask::Done;
                     break;
                 }
@@ -313,11 +310,11 @@ where
 
             // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
             // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task from the last iteration, and then early halts the BlockSTM
-            // due to a txn execution abort. In this case, we cannot reset the scheduler_task of the
-            // committing thread (to be Done), otherwise some other pending thread waiting for the execution
-            // will be pending on read forever (since the halt logic let the execution task to wake up such
-            // pending task).
+            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
+            // other thread pending on the dependency conditional variable from the last iteration. If
+            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
+            // pending thread will be pending on read forever. In other words, we rely on the committing
+            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
@@ -419,16 +416,18 @@ where
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, ReadyTaskType::Execution) => self.execute(
-                    version_to_execute,
-                    block,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                ),
-                SchedulerTask::ExecutionTask(_, ReadyTaskType::Wakeup(condvar)) => {
+                SchedulerTask::ExecutionTask(version_to_execute, ExecutionTaskType::Execution) => {
+                    self.execute(
+                        version_to_execute,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                    )
+                },
+                SchedulerTask::ExecutionTask(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = DependencyStatus::Resolved;
@@ -455,8 +454,6 @@ where
                 },
             }
         }
-        let thread_id = thread::current().id();
-        println!("Thread finished: {:?}", thread_id);
     }
 
     pub(crate) fn execute_transactions_parallel(
