@@ -16,7 +16,7 @@ use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -916,32 +916,45 @@ pub async fn query_sequence_numbers<'a, I>(
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
-    let (addresses, futures): (Vec<_>, Vec<_>) = addresses
-        .map(|address| {
-            (
-                *address,
-                RETRY_POLICY.retry(move || client.get_account_bcs(*address)),
-            )
-        })
-        .unzip();
+    let futures = addresses
+        .map(|address| RETRY_POLICY.retry(move || get_account_if_exists(client, *address)));
 
     let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(futures)
         .await
         .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
         .into_iter()
-        .zip(addresses.iter())
-        .map(|(resp, address)| {
-            let (account, state) = resp.into_parts();
-            (
-                (*address, account.sequence_number()),
-                Duration::from_micros(state.timestamp_usecs).as_secs(),
-            )
-        })
         .unzip();
 
     // return min for the timestamp, to make sure
     // all sequence numbers were <= to return values at that timestamp
     Ok((seq_nums, timestamps.into_iter().min().unwrap()))
+}
+
+async fn get_account_if_exists(
+    client: &RestClient,
+    address: AccountAddress,
+) -> Result<((AccountAddress, u64), u64)> {
+    let result = client.get_account_bcs(address).await;
+    match &result {
+        Ok(resp) => Ok((
+            (address, resp.inner().sequence_number()),
+            Duration::from_micros(resp.state().timestamp_usecs).as_secs(),
+        )),
+        Err(e) => {
+            // if account is not present, that is equivalent to sequence_number = 0
+            if let RestError::Api(api_error) = e {
+                if let AptosErrorCode::AccountNotFound = api_error.error.error_code {
+                    return Ok((
+                        (address, 0),
+                        Duration::from_micros(api_error.state.as_ref().unwrap().timestamp_usecs)
+                            .as_secs(),
+                    ));
+                }
+            }
+            result?;
+            unreachable!()
+        },
+    }
 }
 
 pub fn gen_transfer_txn_request(
