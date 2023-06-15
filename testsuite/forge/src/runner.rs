@@ -92,6 +92,7 @@ arg_enum! {
     }
 }
 
+#[allow(clippy::derivable_impls)] // Required to overcome the limitations of arg_enum!
 impl Default for Format {
     fn default() -> Self {
         Format::Pretty

@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::StateStore;
-///! This file contains utilities that are helpful for performing
-///! database restore operations, as required by restore and
-///! state sync v2.
+//! This file contains utilities that are helpful for performing
+//! database restore operations, as required by restore and
+//! state sync v2.
 use crate::{
     event_store::EventStore, ledger_store::LedgerStore, new_sharded_kv_schema_batch,
-    schema::transaction_accumulator::TransactionAccumulatorSchema,
+    schema::transaction_accumulator::TransactionAccumulatorSchema, state_store::StateStore,
     transaction_store::TransactionStore, ShardedStateKvSchemaBatch,
 };
 use anyhow::{ensure, Result};
