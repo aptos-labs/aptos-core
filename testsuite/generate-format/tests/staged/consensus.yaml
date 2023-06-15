@@ -252,6 +252,10 @@ ConsensusMsg:
       ProofOfStoreMsg:
         NEWTYPE:
           TYPENAME: ProofOfStoreMsg
+    14:
+      DAGMessage:
+        NEWTYPE:
+          TYPENAME: DAGNetworkMessage
 ContractEvent:
   ENUM:
     0:
@@ -266,6 +270,10 @@ ContractEventV0:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
+DAGNetworkMessage:
+  STRUCT:
+    - epoch: U64
+    - data: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
