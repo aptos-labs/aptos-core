@@ -39,6 +39,7 @@ from forge import (
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
+    GAR_REPO_NAME,
 )
 
 from click.testing import CliRunner, Result
@@ -56,6 +57,7 @@ from test_framework.cluster import (
 
 from test_framework.shell import SpyShell, FakeShell, FakeCommand, RunResult
 from test_framework.time import FakeTime
+from test_framework.cluster import Cloud
 
 # Show the entire diff when unittest fails assertion
 unittest.util._MAX_LENGTH = 2000  # type: ignore
@@ -278,7 +280,31 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        image_tags = find_recent_images(shell, git, 1, "aptos/validator-testing")
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.AWS
+        )
+        self.assertEqual(list(image_tags), ["lychee"])
+        shell.assert_commands(self)
+
+    def testFindRecentImageGcp(self) -> None:
+        shell = SpyShell(
+            [
+                FakeCommand("git rev-parse HEAD~0", RunResult(0, b"potato\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:potato",
+                    RunResult(1, b""),
+                ),
+                FakeCommand("git rev-parse HEAD~1", RunResult(0, b"lychee\n")),
+                FakeCommand(
+                    f"crane manifest {GAR_REPO_NAME}/validator-testing:lychee",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        git = Git(shell)
+        image_tags = find_recent_images(
+            shell, git, 1, "validator-testing", cloud=Cloud.GCP
+        )
         self.assertEqual(list(image_tags), ["lychee"])
         shell.assert_commands(self)
 
@@ -294,7 +320,12 @@ class TestFindRecentImage(unittest.TestCase):
         )
         git = Git(shell)
         image_tags = find_recent_images_by_profile_or_features(
-            shell, git, 1, enable_performance_profile=False, enable_failpoints=True
+            shell,
+            git,
+            1,
+            enable_performance_profile=False,
+            enable_failpoints=True,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["failpoints_tomato"])
         shell.assert_commands(self)
@@ -316,6 +347,7 @@ class TestFindRecentImage(unittest.TestCase):
             1,
             enable_performance_profile=True,
             enable_failpoints=False,
+            cloud=Cloud.AWS,
         )
         self.assertEqual(list(image_tags), ["performance_potato"])
         shell.assert_commands(self)
@@ -368,7 +400,7 @@ class TestFindRecentImage(unittest.TestCase):
             ]
         )
         git = Git(shell)
-        images = find_recent_images(shell, git, 2, "aptos/validator")
+        images = find_recent_images(shell, git, 2, "validator", cloud=Cloud.AWS)
         self.assertEqual(list(images), ["crab", "shrimp"])
 
     def testFailpointsProvidedImageTag(self) -> None:

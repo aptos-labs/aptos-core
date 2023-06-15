@@ -25,6 +25,12 @@ on:
         required: false
         type: boolean
         description: Whether to build additional testing images. If not specified, only the base release images will be built
+      TARGET_REGISTRY:
+        default: gcp
+        required: false
+        type: string
+        description: The target docker registry to push to
+
   workflow_dispatch:
     inputs:
       GIT_SHA:
@@ -45,6 +51,11 @@ on:
         required: false
         type: boolean
         description: Whether to build additional testing images. If not specified, only the base release images will be built
+      TARGET_REGISTRY:
+        default: gcp
+        required: false
+        type: string
+        description: The target docker registry to push to
 
 env:
   GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -55,6 +66,11 @@ env:
   GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
   GCP_DOCKER_ARTIFACT_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+  TARGET_REGISTRY: ${{ inputs.TARGET_REGISTRY }}
+
+permissions:
+  contents: read
+  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 jobs:
   rust-all:
@@ -80,3 +96,4 @@ jobs:
           FEATURES: ${{ env.FEATURES }}
           BUILD_ADDL_TESTING_IMAGES: ${{ env.BUILD_ADDL_TESTING_IMAGES }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          TARGET_REGISTRY: ${{ env.TARGET_REGISTRY }}
