@@ -150,9 +150,15 @@ mod txn_last_input_output;
 mod unit_tests;
 pub mod view;
 
+/// In standard BlockSTM, the internal states assume contiguous transactions indices.
+/// To also support sharded execution (where each shard gets a subsequence of the transactions
+/// and possibly waits for transaction results from other shards),
+/// an index mapping is need as an additional input to our existing BlockSTM implementation.
 #[derive(Clone)]
 pub struct IndexMapping {
     pub indices: Vec<TxnIndex>,
+    /// A TxnIndex -> local position mapping.
+    /// Currently implemented as a `Vec` of size equal to the block size, assuming it's not too large.
     pub inverses: Vec<usize>,
     /// A fake index representing the end of the transaction list.
     pub end_index: TxnIndex,
