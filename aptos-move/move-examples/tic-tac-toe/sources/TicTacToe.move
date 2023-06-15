@@ -66,6 +66,8 @@ module tic_tac_toe::ttt {
     }
         
     public entry fun choose_move(player: &signer, game_addr: address, x: u64, y: u64) acquires Game {
+        assert!(x < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
+        assert!(y < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
         let game: &mut Game = borrow_global_mut(game_addr);
         let player_x = option::borrow_mut(&mut game.player_x);
         let player_o = option::borrow_mut(&mut game.player_o);
@@ -306,6 +308,23 @@ module tic_tac_toe::ttt {
         choose_move(player_x, game_addr, 0, 1);
         choose_move(player_o, game_addr, 2, 1);
         choose_move(player_x, game_addr, 0, 2);
+
+        let game = borrow_global(game_addr);
+        assert!(check_is_game_over(game), error::invalid_state(ERR_GAME_NOT_DONE));
+        cleanup(player_x);
+    }
+
+    #[test(player_x = @0x123, player_o = @0x223, game_addr = @0x123)]
+    #[expected_failure]
+    fun test_out_of_bound_move(
+        player_x: &signer, 
+        player_o: &signer,
+        game_addr: address,
+    ) acquires Game {
+        create_account_for_test(signer::address_of(player_x));
+        start_game(player_x);
+        join_as_player_o(player_o, game_addr);
+        choose_move(player_x, game_addr, 3, 4);
 
         let game = borrow_global(game_addr);
         assert!(check_is_game_over(game), error::invalid_state(ERR_GAME_NOT_DONE));
