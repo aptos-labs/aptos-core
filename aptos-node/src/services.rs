@@ -107,7 +107,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     network_interfaces: ApplicationNetworkInterfaces<MempoolSyncMsg>,
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
-    peers: Arc<PeersAndMetadata>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
     // Create a communication channel between consensus and mempool
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -124,7 +124,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         consensus_to_mempool_receiver,
         mempool_listener,
         mempool_reconfig_subscription,
-        peers,
+        peers_and_metadata,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 

@@ -54,7 +54,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
     mut mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener,
     peer_update_interval_ms: u64,
-    peers: Arc<PeersAndMetadata>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
@@ -113,7 +113,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
                 handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
             },
             _ = update_peers_interval.tick().fuse() => {
-                if let Ok(connected_peers) = peers.get_connected_peers_and_metadata() {
+                if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
                     let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
                     if !newly_added_upstream.is_empty() || !disabled.is_empty() {
                         counters::shared_mempool_event_inc("peer_update");

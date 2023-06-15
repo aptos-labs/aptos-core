@@ -44,7 +44,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
     db: Arc<dyn DbReader>,
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
-    peers: Arc<PeersAndMetadata>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
 {
@@ -68,7 +68,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator>(
         mempool_listener,
         mempool_reconfig_events,
         config.mempool.shared_mempool_peer_update_interval_ms,
-        peers,
+        peers_and_metadata,
     ));
 
     executor.spawn(gc_coordinator(
@@ -93,7 +93,7 @@ pub fn bootstrap(
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener,
-    peers: Arc<PeersAndMetadata>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
@@ -111,7 +111,7 @@ pub fn bootstrap(
         db,
         vm_validator,
         vec![],
-        peers,
+        peers_and_metadata,
     );
     runtime
 }
