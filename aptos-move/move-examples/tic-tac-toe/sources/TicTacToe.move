@@ -21,10 +21,21 @@ module tic_tac_toe::ttt {
     const PLAYER_O_TYPE: u64 = 2;
 
     //// ERROR CODES
-    const ERR_ILLEGAL_ACTION: u64 = 0;
-    const ERR_INVALID_MOVE: u64 = 1;
-    const ERR_PLAYER_TAKEN: u64 = 2;
-    const ERR_GAME_NOT_DONE: u64 = 3;
+    /// Placing a move on a (x,y) position that is already occupied
+    const EINVALID_MOVE: u64 = 0;
+    /// An address trying to claim a player that is already taken
+    const EPLAYER_TAKEN: u64 = 1;
+    /// Trying to destroy game before game has been finished
+    const EGAME_NOT_DONE: u64 = 3;
+    /// An address can only join as one player, not two
+    const ECANNOT_JOIN_AS_TWO_PLAYERS: u64 = 4;
+    /// A (x,y) move is out of bounds of the 3x3 grid
+    const EOUT_OF_BOUNDS_MOVE: u64 = 5;
+    /// Address doesn't exist in the current Game
+    const EPLAYER_NOT_IN_GAME: u64 = 6;
+    /// An attempt to place moves even though a Game is over
+    const EGAME_HAS_ALREADY_FINISHED: u64 = 7;
+
 
     struct GameOverEvent has drop, store {
         is_game_over: bool,
@@ -66,7 +77,7 @@ module tic_tac_toe::ttt {
      */
     public entry fun join_as_player_o(new_user: &signer, game_addr: address) acquires Game {
         let new_user_addr = signer::address_of(new_user);
-        assert!(new_user_addr != game_addr, error::invalid_argument(ERR_ILLEGAL_ACTION));
+        assert!(new_user_addr != game_addr, error::invalid_argument(ECANNOT_JOIN_AS_TWO_PLAYERS));
 
         let game = borrow_global_mut(game_addr);
         choose_player_o(game, new_user_addr);
@@ -77,8 +88,8 @@ module tic_tac_toe::ttt {
      * @dev checks to ensure a player can make a valid move
      */ 
     public entry fun choose_move(player: &signer, game_addr: address, x: u64, y: u64) acquires Game {
-        assert!(x < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
-        assert!(y < 3, error::invalid_argument(ERR_ILLEGAL_ACTION));
+        assert!(x < 3, error::out_of_range(EOUT_OF_BOUNDS_MOVE));
+        assert!(y < 3, error::out_of_range(EOUT_OF_BOUNDS_MOVE));
         let game: &mut Game = borrow_global_mut(game_addr);
         let player_x = option::borrow_mut(&mut game.player_x);
         let player_o = option::borrow_mut(&mut game.player_o);
@@ -86,7 +97,7 @@ module tic_tac_toe::ttt {
         let player_addr = signer::address_of(player);
         assert!(
             player_addr != player_x.owner || player_addr != player_o.owner, 
-            error::invalid_argument(ERR_ILLEGAL_ACTION),
+            error::permission_denied(EPLAYER_NOT_IN_GAME),
         );
 
         if (player_addr == player_x.owner) {
@@ -117,7 +128,7 @@ module tic_tac_toe::ttt {
 
         assert!(
             player_addr != player_x.owner || player_addr != player_o.owner, 
-            error::invalid_argument(ERR_ILLEGAL_ACTION)
+            error::permission_denied(EPLAYER_NOT_IN_GAME)
         );
 
         game.is_game_over = true;
@@ -160,8 +171,8 @@ module tic_tac_toe::ttt {
      * @notice user who initiates game is automatically player_x
      */ 
     fun choose_player_x(game: &mut Game, user: address) {
-        assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
-        assert!(option::is_none(&game.player_x), error::already_exists(ERR_PLAYER_TAKEN));
+        assert!(!game.is_game_over, error::invalid_argument(EGAME_HAS_ALREADY_FINISHED));
+        assert!(option::is_none(&game.player_x), error::already_exists(EPLAYER_TAKEN));
 
         game.player_x = option::some(Player { 
             type: PLAYER_X_TYPE,
@@ -173,8 +184,8 @@ module tic_tac_toe::ttt {
      * @notice another user whose not the creator may join as player_o
      */ 
     fun choose_player_o(game: &mut Game, user: address) {
-        assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
-        assert!(option::is_none(&game.player_o), error::already_exists(ERR_PLAYER_TAKEN));
+        assert!(!game.is_game_over, error::invalid_argument(EGAME_HAS_ALREADY_FINISHED));
+        assert!(option::is_none(&game.player_o), error::already_exists(EPLAYER_TAKEN));
 
         game.player_o = option::some(Player { 
             type: PLAYER_O_TYPE,
@@ -187,7 +198,7 @@ module tic_tac_toe::ttt {
      */ 
     fun place_move(game: &mut Game, x: u64, y: u64, player: Player) {
         // validate game state
-        assert!(!game.is_game_over, error::invalid_argument(ERR_ILLEGAL_ACTION));
+        assert!(!game.is_game_over, error::invalid_argument(EGAME_HAS_ALREADY_FINISHED));
 
         // validate player move
         let player_type = player.type;
@@ -201,7 +212,7 @@ module tic_tac_toe::ttt {
         let cell = vector::borrow_mut(&mut game.board.vec, position);
         
         // validate cell is empty
-        assert!(*cell == EMPTY_CELL, error::invalid_state(ERR_INVALID_MOVE));
+        assert!(*cell == EMPTY_CELL, error::invalid_state(EINVALID_MOVE));
         *cell = player_type;
 
         // update turn after placing move
@@ -347,7 +358,7 @@ module tic_tac_toe::ttt {
         choose_move(player_x, game_addr, 0, 2);
 
         let game = borrow_global(game_addr);
-        assert!(check_is_game_over(game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(game), error::invalid_state(EGAME_NOT_DONE));
         cleanup(player_x);
     }
 
@@ -364,7 +375,7 @@ module tic_tac_toe::ttt {
         choose_move(player_x, game_addr, 3, 4);
 
         let game = borrow_global(game_addr);
-        assert!(check_is_game_over(game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(game), error::invalid_state(EGAME_NOT_DONE));
         cleanup(player_x);
     }
 
@@ -381,7 +392,7 @@ module tic_tac_toe::ttt {
         
         forfeit(player_x, game_addr);
         let game = borrow_global(game_addr);
-        assert!(check_is_game_over(game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(game), error::invalid_state(EGAME_NOT_DONE));
         cleanup(player_x);   
     }        
 
@@ -406,7 +417,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 0, 1, player_x);
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 0, 2, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));
         cleanup_game(game);
     }
 
@@ -431,7 +442,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 1, 1, player_x);
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 1, 2, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));
         cleanup_game(game);      
     }
 
@@ -456,7 +467,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 2, 1, player_x);
         place_move(&mut game, 1, 1, player_o);
         place_move(&mut game, 2, 2, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));
         cleanup_game(game);
     }
 
@@ -481,7 +492,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 1, 0, player_x);
         place_move(&mut game, 1, 2, player_o);
         place_move(&mut game, 2, 0, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));           
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));           
         cleanup_game(game);
     }
 
@@ -507,7 +518,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 1, 1, player_o);
         place_move(&mut game, 2, 1, player_x);
         place_move(&mut game, 1, 2, player_o);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));           
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));           
         cleanup_game(game);
     }
 
@@ -533,7 +544,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 0, 1, player_x);
         place_move(&mut game, 2, 2, player_o);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));           
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));           
         cleanup_game(game);
     }    
 
@@ -558,7 +569,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 1, 1, player_x);
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 2, 2, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));        
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));        
         cleanup_game(game);
     }
 
@@ -583,7 +594,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 1, 1, player_x);
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 2, 0, player_x);
-        assert!(check_is_game_over(&game), error::invalid_state(ERR_GAME_NOT_DONE));           
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));           
         cleanup_game(game);
     }
 
@@ -646,7 +657,7 @@ module tic_tac_toe::ttt {
         place_move(&mut game, 0, 1, player_x);
         place_move(&mut game, 2, 1, player_o);
         place_move(&mut game, 0, 2, player_x);
-        assert!(check_is_game_over(&game), ERR_GAME_NOT_DONE);
+        assert!(check_is_game_over(&game), error::invalid_state(EGAME_NOT_DONE));
         
         place_move(&mut game, 1, 1, player_x);   
         cleanup_game(game);  
