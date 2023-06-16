@@ -456,9 +456,10 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
+        block_size: usize,
+        txn_indices: Vec<TxnIndex>,
         signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
-        index_mapping: IndexMapping,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
@@ -481,9 +482,9 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        let txn_indices = index_mapping.indices.clone();
-        let last_input_output = TxnLastInputOutput::new(index_mapping.num_txns(), index_mapping.inverses.clone());
-        let scheduler = Scheduler::new(index_mapping);
+        let positions_by_txn_idx = IndexMapping::inverse(block_size, &txn_indices);
+        let last_input_output = TxnLastInputOutput::new(num_txns, positions_by_txn_idx.clone());
+        let scheduler = Scheduler::new(IndexMapping::wrap(txn_indices.clone(), positions_by_txn_idx));
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -643,16 +644,18 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
+        block_size: usize,
+        txn_indices: Vec<TxnIndex>,
         signature_verified_block: ExecutableTransactions<T>,
         base_view: &S,
-        index_mapping: IndexMapping,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
+                block_size,
+                txn_indices,
                 &signature_verified_block,
                 base_view,
-                index_mapping,
             )
         } else {
             self.execute_transactions_sequential(

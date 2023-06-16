@@ -8,7 +8,6 @@ use crate::{
         EmptyDataView, ExpectedOutput, KeyType, Task, Transaction, TransactionGen,
         TransactionGenParams, ValueType,
     },
-    IndexMapping,
 };
 use aptos_types::{
     block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
@@ -124,6 +123,7 @@ where
                 .unwrap(),
         );
 
+        let num_txns = self.transactions.num_transactions();
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
@@ -132,9 +132,10 @@ where
         >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel(
             (),
+            num_txns,
+            (0..(num_txns as u32)).collect(),
             &self.transactions,
             &data_view,
-            IndexMapping::new_unsharded(self.transactions.num_transactions()),
         );
 
         self.expected_output.assert_output(&output);

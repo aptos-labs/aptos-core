@@ -43,7 +43,7 @@ where
     );
 
     let executable_transactions = ExecutableTransactions::Unsharded(transactions);
-
+    let num_txns = executable_transactions.num_transactions();
     let output = BlockExecutor::<
         Transaction<K, V>,
         Task<K, V>,
@@ -52,9 +52,10 @@ where
     >::new(num_cpus::get(), executor_thread_pool, None)
     .execute_transactions_parallel(
         (),
+        num_txns,
+        (0..num_txns).map(|x|x as TxnIndex).collect(),
         &executable_transactions,
         &data_view,
-        IndexMapping::new_unsharded(executable_transactions.num_transactions()),
     );
 
     let baseline = ExpectedOutput::generate_baseline(

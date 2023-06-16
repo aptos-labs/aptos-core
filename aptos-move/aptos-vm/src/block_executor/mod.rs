@@ -38,6 +38,7 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
+use aptos_mvhashmap::types::TxnIndex;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -177,11 +178,12 @@ impl BlockAptosVM {
 
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
+        block_size: usize,
+        txn_indices: Vec<TxnIndex>,
         transactions: ExecutableTransactions<Transaction>,
         state_view: &S,
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
-        index_mapping: IndexMapping,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         // Verify the signatures of all the transactions in parallel.
@@ -215,9 +217,10 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(
             state_view,
+            block_size,
+            txn_indices,
             signature_verified_block,
             state_view,
-            index_mapping,
         );
         match ret {
             Ok(outputs) => {
