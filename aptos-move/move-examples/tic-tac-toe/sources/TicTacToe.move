@@ -37,6 +37,8 @@ module tic_tac_toe::ttt {
     const EGAME_HAS_ALREADY_FINISHED: u64 = 6;
     /// User tries to make two games
     const EGAME_ALREADY_EXISTS_FOR_USER: u64 = 7;
+    /// Game doesn't exist under address
+    const EGAME_DOESNT_EXIST: u64 = 8;
 
 
     struct GameOverEvent has drop, store {
@@ -83,6 +85,7 @@ module tic_tac_toe::ttt {
         let new_user_addr = signer::address_of(new_user);
         assert!(new_user_addr != game_addr, error::invalid_argument(ECANNOT_JOIN_AS_TWO_PLAYERS));
 
+        assert!(exists<Game>(game_addr), error::not_found(EGAME_DOESNT_EXIST));
         let game = borrow_global_mut(game_addr);
         choose_player_o(game, new_user_addr);
     }
