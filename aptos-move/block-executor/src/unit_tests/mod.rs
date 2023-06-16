@@ -4,9 +4,9 @@
 
 use crate::{
     executor::BlockExecutor,
+    index_mapping::IndexMapping,
     proptest_types::types::{DeltaDataView, ExpectedOutput, KeyType, Task, Transaction, ValueType},
     scheduler::{DependencyResult, Scheduler, SchedulerTask},
-    IndexMapping,
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
@@ -49,11 +49,7 @@ where
         DeltaDataView<K, V>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None)
-    .execute_transactions_parallel(
-        (),
-        &executable_transactions,
-        &data_view,
-    );
+    .execute_transactions_parallel((), &executable_transactions, &data_view);
 
     let baseline = ExpectedOutput::generate_baseline(
         executable_transactions
@@ -401,7 +397,9 @@ fn scheduler_first_wave_with_non_contiguous_indices() {
 fn scheduler_first_wave_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for i in index_mapping.iter_txn_indices().take(index_mapping.num_txns() - 1)
+    for i in index_mapping
+        .iter_txn_indices()
+        .take(index_mapping.num_txns() - 1)
     {
         // Nothing to validate.
         assert!(matches!(

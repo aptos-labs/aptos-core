@@ -348,11 +348,14 @@ impl<T> ExecutableTransactions<T> {
     pub fn txn_indices(&self) -> Vec<TxnIndex> {
         match self {
             ExecutableTransactions::Unsharded(txns) => {
-                (0..txns.len()).map(|i|i as TxnIndex).collect()
-            }
-            ExecutableTransactions::Sharded(_, sub_blocks) => {
-                sub_blocks.iter().flat_map(|sub_block|sub_block.start_index..(sub_block.start_index + sub_block.transactions.len())).collect()
-            }
+                (0..txns.len()).map(|i| i as TxnIndex).collect()
+            },
+            ExecutableTransactions::Sharded(_, sub_blocks) => sub_blocks
+                .iter()
+                .flat_map(|sub_block| {
+                    sub_block.start_index..(sub_block.start_index + sub_block.transactions.len())
+                })
+                .collect(),
         }
     }
 

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::GET_NEXT_TASK_SECONDS, IndexMapping};
+use crate::{counters::GET_NEXT_TASK_SECONDS, index_mapping::IndexMapping};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
 use crossbeam::utils::CachePadded;
@@ -230,10 +230,10 @@ pub struct Scheduler {
 /// Public Interfaces for the Scheduler
 impl Scheduler {
     pub fn new(index_mapping: IndexMapping) -> Self {
-        let num_txns = index_mapping.indices.len();
+        let num_txns = index_mapping.num_txns();
         // Empty block should early return and not create a scheduler.
         assert!(num_txns > 0, "No scheduler needed for 0 transactions");
-        let first_index = index_mapping.indices[0] as TxnIndex;
+        let first_index = index_mapping.index(0);
         Self {
             index_mapping,
             txn_dependency: (0..num_txns)
@@ -346,10 +346,10 @@ impl Scheduler {
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
             let prefer_validate = idx_to_validate
-                < min(idx_to_execute, self.index_mapping.end_index as TxnIndex)
+                < min(idx_to_execute, self.index_mapping.end_index() as TxnIndex)
                 && !self.never_executed(idx_to_validate);
 
-            if !prefer_validate && idx_to_execute >= self.index_mapping.end_index as TxnIndex {
+            if !prefer_validate && idx_to_execute >= self.index_mapping.end_index() as TxnIndex {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done

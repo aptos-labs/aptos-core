@@ -9,11 +9,11 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
+    index_mapping::IndexMapping,
     scheduler::{DependencyStatus, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, MVHashMapView},
-    IndexMapping,
 };
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_logger::{debug, info};
@@ -467,7 +467,8 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let txn_indices = signature_verified_block.txn_indices();
-        let positions_by_txn_idx = IndexMapping::inverse(signature_verified_block.block_size(), &txn_indices);
+        let positions_by_txn_idx =
+            IndexMapping::inverse(signature_verified_block.block_size(), &txn_indices);
         let signature_verified_block = match signature_verified_block {
             ExecutableTransactions::Unsharded(txns) => txns,
             ExecutableTransactions::Sharded(_, _) => {
@@ -483,7 +484,10 @@ where
 
         let num_txns = signature_verified_block.len();
         let last_input_output = TxnLastInputOutput::new(num_txns, positions_by_txn_idx.clone());
-        let scheduler = Scheduler::new(IndexMapping::wrap(txn_indices.clone(), positions_by_txn_idx));
+        let scheduler = Scheduler::new(IndexMapping::wrap(
+            txn_indices.clone(),
+            positions_by_txn_idx,
+        ));
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
