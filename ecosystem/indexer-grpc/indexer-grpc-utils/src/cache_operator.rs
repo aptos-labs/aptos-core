@@ -530,11 +530,11 @@ mod tests {
         let version = 123_u64;
         let encoded_proto_data = String::from("123");
         let timestamp_in_seconds = 12_u64;
-        transactions.push((version, encoded_proto_data, timestamp_in_seconds));
+        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
         let cmds = vec![MockCmd::new(
             redis::cmd("SET")
                 .arg(version)
-                .arg(String::from("123"))
+                .arg(encoded_proto_data.clone())
                 .arg("EX")
                 .arg(get_ttl_in_seconds(timestamp_in_seconds)),
             Ok("ok"),
@@ -554,12 +554,12 @@ mod tests {
         let version = CACHE_SIZE_EVICTION_LOWER_BOUND + 100;
         let encoded_proto_data = String::from("123");
         let timestamp_in_seconds = 12_u64;
-        transactions.push((version, encoded_proto_data, timestamp_in_seconds));
+        transactions.push((version, encoded_proto_data.clone(), timestamp_in_seconds));
         let mut redis_pipeline = redis::pipe();
         redis_pipeline
             .cmd("SET")
             .arg(version)
-            .arg(String::from("123"))
+            .arg(encoded_proto_data.clone())
             .arg("EX")
             .arg(get_ttl_in_seconds(timestamp_in_seconds));
         redis_pipeline
