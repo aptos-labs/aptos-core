@@ -254,11 +254,6 @@ impl Scheduler {
         }
     }
 
-    pub fn is_last_index(&self, index: TxnIndex) -> bool {
-        index != self.index_mapping.end_index()
-            && self.index_mapping.next_index(index) == self.index_mapping.end_index()
-    }
-
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
     /// The current implementation has one dedicated thread to try_commit.
     /// Should not be called after the last transaction is committed.

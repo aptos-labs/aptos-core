@@ -254,6 +254,7 @@ where
         accumulated_gas: &mut u64,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        index_mapping: &IndexMapping,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
@@ -263,14 +264,15 @@ where
             *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
 
             // Committed the last transaction, BlockSTM finishes execution.
-            if scheduler.is_last_index(txn_idx) {
+            if index_mapping.is_last_index(txn_idx) {
                 *scheduler_task = SchedulerTask::Done;
 
                 counters::PARALLEL_PER_BLOCK_GAS.observe(*accumulated_gas as f64);
-                counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS.observe((txn_idx + 1) as f64);
+                counters::PARALLEL_PER_BLOCK_COMMITTED_TXNS
+                    .observe((index_mapping.num_txns()) as f64);
                 info!(
                     "[BlockSTM]: Parallel execution completed, all {} txns committed.",
-                    txn_idx + 1
+                    index_mapping.num_txns()
                 );
                 break;
             }
@@ -369,6 +371,7 @@ where
         scheduler: &Scheduler,
         base_view: &S,
         role: CommitRole,
+        index_mapping: &IndexMapping,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -393,6 +396,7 @@ where
                         &mut accumulated_gas,
                         &mut scheduler_task,
                         last_input_output,
+                        index_mapping,
                     );
                 },
                 CommitRole::Worker(rx) => {
@@ -466,16 +470,16 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
-        let txn_indices = signature_verified_block.txn_indices();
-        let positions_by_txn_idx =
-            IndexMapping::inverse(signature_verified_block.block_size(), &txn_indices);
+        let index_mapping = IndexMapping::new(
+            signature_verified_block.txn_indices(),
+            signature_verified_block.block_size(),
+        );
         let signature_verified_block = match signature_verified_block {
             ExecutableTransactions::Unsharded(txns) => txns,
             ExecutableTransactions::Sharded(_, _) => {
                 unimplemented!("Sharded execution is not supported yet")
             },
         };
-
         let versioned_cache = MVHashMap::new();
 
         if signature_verified_block.is_empty() {
@@ -483,11 +487,8 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        let last_input_output = TxnLastInputOutput::new(num_txns, positions_by_txn_idx.clone());
-        let scheduler = Scheduler::new(IndexMapping::wrap(
-            txn_indices.clone(),
-            positions_by_txn_idx,
-        ));
+        let last_input_output = TxnLastInputOutput::new(num_txns, index_mapping.clone());
+        let scheduler = Scheduler::new(index_mapping.clone());
 
         let mut roles: Vec<CommitRole> = vec![];
         let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
@@ -516,6 +517,7 @@ where
                         &scheduler,
                         base_view,
                         role,
+                        &index_mapping,
                     );
                 });
             }
@@ -530,8 +532,8 @@ where
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;
-            for &idx in txn_indices.iter() {
-                match last_input_output.take_output(idx as aptos_mvhashmap::types::TxnIndex) {
+            for idx in index_mapping.iter_txn_indices() {
+                match last_input_output.take_output(idx) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);
@@ -552,6 +554,7 @@ where
             drop(scheduler);
             // TODO: re-use the code cache.
             drop(versioned_cache);
+            drop(index_mapping);
         });
 
         match maybe_err {

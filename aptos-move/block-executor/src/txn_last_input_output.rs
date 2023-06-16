@@ -3,6 +3,7 @@
 
 use crate::{
     errors::Error,
+    index_mapping::IndexMapping,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
 use anyhow::anyhow;
@@ -118,7 +119,7 @@ impl<K: ModulePath> ReadDescriptor<K> {
 }
 
 pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
-    positions_by_txn_idx: Vec<usize>,
+    index_mapping: IndexMapping,
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
@@ -133,9 +134,9 @@ pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
 }
 
 impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputOutput<K, T, E> {
-    pub fn new(num_txns: usize, positions_by_txn_idx: Vec<usize>) -> Self {
+    pub fn new(num_txns: usize, index_mapping: IndexMapping) -> Self {
         Self {
-            positions_by_txn_idx,
+            index_mapping,
             inputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
                 .collect(),
@@ -323,12 +324,12 @@ impl<K: ModulePath, T: TransactionOutput, E: Debug + Send + Clone> TxnLastInputO
     }
 
     fn input(&self, txn_idx: TxnIndex) -> &CachePadded<ArcSwapOption<TxnInput<K>>> {
-        let pos = self.positions_by_txn_idx[txn_idx as usize];
+        let pos = self.index_mapping.position_by_index(txn_idx).unwrap();
         &self.inputs[pos]
     }
 
     fn output(&self, txn_idx: TxnIndex) -> &CachePadded<ArcSwapOption<TxnOutput<T, E>>> {
-        let pos = self.positions_by_txn_idx[txn_idx as usize];
+        let pos = self.index_mapping.position_by_index(txn_idx).unwrap();
         &self.outputs[pos]
     }
 }

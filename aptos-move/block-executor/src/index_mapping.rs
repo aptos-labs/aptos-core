@@ -46,16 +46,20 @@ impl IndexMapping {
         }
     }
 
+    pub fn is_end_index(&self, index: TxnIndex) -> bool {
+        index as usize == self.positions_by_index.len()
+    }
+
+    pub fn is_last_index(&self, index: TxnIndex) -> bool {
+        self.index(self.num_txns() - 1) == index
+    }
+
     pub fn next_index(&self, index: TxnIndex) -> TxnIndex {
-        if index == self.end_index() {
+        if self.is_end_index(index) || self.is_last_index(index) {
             self.end_index()
         } else {
             let pos = self.position_by_index(index).unwrap();
-            if pos >= self.indices.len() - 1 {
-                self.end_index()
-            } else {
-                self.index(pos + 1)
-            }
+            self.index(pos + 1)
         }
     }
 
