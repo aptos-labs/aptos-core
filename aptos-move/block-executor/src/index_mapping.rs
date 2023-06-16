@@ -8,6 +8,7 @@ use aptos_mvhashmap::types::TxnIndex;
 /// an index mapping is need as an additional input to our existing BlockSTM implementation.
 #[derive(Clone)]
 pub struct IndexMapping {
+    /// A sorted list of transaction indices.
     indices: Vec<usize>,
     /// A TxnIndex -> local position mapping.
     /// Currently implemented as a `Vec` of size equal to the block size, assuming it's not too large.
