@@ -37,7 +37,6 @@ use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::sync::Arc;
-use aptos_mvhashmap::types::TxnIndex;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Key = StateKey;
@@ -212,11 +211,7 @@ impl BlockAptosVM {
             maybe_block_gas_limit,
         );
 
-        let ret = executor.execute_block(
-            state_view,
-            signature_verified_block,
-            state_view,
-        );
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

@@ -14,7 +14,6 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::IndexMapping;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas::{
@@ -416,14 +415,12 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let index_mapping = IndexMapping::new_unsharded(txn_block.len());
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
             ExecutableTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,
-            index_mapping,
         )
     }
 

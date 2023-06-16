@@ -166,7 +166,7 @@ pub struct IndexMapping {
 
 impl IndexMapping {
     /// Create Positions by TxnIndex mapping from the TxnIndex list.
-    pub fn inverse(block_size: usize, indices: &Vec<usize>) -> Vec<usize> {
+    pub fn inverse(block_size: usize, indices: &[usize]) -> Vec<usize> {
         let mut ret = vec![usize::MAX; block_size];
         for (pos, &index) in indices.iter().enumerate() {
             ret[index] = pos;
@@ -205,7 +205,7 @@ impl IndexMapping {
         let ret = if index == self.end_index {
             self.end_index
         } else {
-            let pos = self.positions_by_index[index as usize];
+            let pos = self.positions_by_index[index];
             if pos >= self.indices.len() - 1 {
                 self.end_index
             } else {
@@ -220,7 +220,7 @@ impl IndexMapping {
     }
 
     pub fn iter_txn_indices(&self) -> Box<dyn Iterator<Item = TxnIndex> + '_> {
-        Box::new(self.indices.iter().map(|&i|i as TxnIndex))
+        Box::new(self.indices.iter().map(|&i| i as TxnIndex))
     }
 
     pub fn position_by_index(&self, index: TxnIndex) -> Option<usize> {

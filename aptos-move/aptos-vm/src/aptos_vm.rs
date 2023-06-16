@@ -19,7 +19,6 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_aggregator::delta_change_set::DeltaChangeSet;
-use aptos_block_executor::IndexMapping;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas::{
