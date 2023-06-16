@@ -11,7 +11,6 @@ spec aptos_framework::resource_account {
     ) {
         let source_addr = signer::address_of(origin);
         let resource_addr = account::spec_create_resource_address(source_addr, seed);
-        let origin_addr = signer::address_of(origin);
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
     }
 
@@ -64,13 +63,13 @@ spec aptos_framework::resource_account {
         resource_addr: address;
         optional_auth_key: vector<u8>;
 
-        let origin_addr = signer::address_of(origin);
-        let container = global<Container>(origin_addr);
+        let source_addr = signer::address_of(origin);
+        let container = global<Container>(source_addr);
         let get = len(optional_auth_key) == 0;
 
-        aborts_if get && !exists<Account>(origin_addr);
-        aborts_if exists<Container>(origin_addr) && simple_map::spec_contains_key(container.store, resource_addr);
-        aborts_if get && !(exists<Account>(resource_addr) && len(global<Account>(origin_addr).authentication_key) == 32);
+        aborts_if get && !exists<Account>(source_addr);
+        aborts_if exists<Container>(source_addr) && simple_map::spec_contains_key(container.store, resource_addr);
+        aborts_if get && !(exists<Account>(resource_addr) && len(global<Account>(source_addr).authentication_key) == 32);
         aborts_if !get && !(exists<Account>(resource_addr) && len(optional_auth_key) == 32);
     }
 
