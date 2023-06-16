@@ -4,14 +4,14 @@ on:
 
 jobs:
   execution-performance:
-    uses: ./.github/workflows/workflow-run-execution-performance.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
 
   spot-runner-execution-performance:
-    uses: ./.github/workflows/workflow-run-execution-performance.yaml
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
