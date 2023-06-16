@@ -123,7 +123,8 @@ pool.
 
 
 
-<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupContainer">StakingGroupContainer</a>
+<pre><code>#[resource_group(#[scope = module_])]
+<b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupContainer">StakingGroupContainer</a>
 </code></pre>
 
 
@@ -333,7 +334,8 @@ pool.
 
 
 
-<pre><code><b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> <b>has</b> key
+<pre><code>#[resource_group_member(#[group = <a href="staking_contract.md#0x1_staking_contract_StakingGroupContainer">0x1::staking_contract::StakingGroupContainer</a>])]
+<b>struct</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> <b>has</b> key
 </code></pre>
 
 
@@ -849,7 +851,8 @@ operator.
 This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -879,7 +882,8 @@ for staking contract between the provided staker and operator.
 This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -909,7 +913,8 @@ between the provided staker and operator.
 This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -941,7 +946,8 @@ Return a tuple of three numbers:
 This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(staker: <b>address</b>, operator: <b>address</b>): (u64, u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(staker: <b>address</b>, operator: <b>address</b>): (u64, u64, u64)
 </code></pre>
 
 
@@ -971,7 +977,8 @@ Return the number of pending distributions (e.g. commission, withdrawals from st
 This errors out the staking contract with the provided staker and operator doesn't exist.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -998,7 +1005,8 @@ This errors out the staking contract with the provided staker and operator doesn
 Return true if the staking contract between the provided staker and operator exists.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool
 </code></pre>
 
 
@@ -1944,7 +1952,8 @@ Create a new staking_contracts resource.
 ### Function `stake_pool_address`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1960,7 +1969,8 @@ Create a new staking_contracts resource.
 ### Function `last_recorded_principal`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -1977,7 +1987,8 @@ Staking_contract exists the stacker/operator pair.
 ### Function `commission_percentage`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -1994,7 +2005,8 @@ Staking_contract exists the stacker/operator pair.
 ### Function `staking_contract_amounts`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(staker: <b>address</b>, operator: <b>address</b>): (u64, u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(staker: <b>address</b>, operator: <b>address</b>): (u64, u64, u64)
 </code></pre>
 
 
@@ -2015,7 +2027,8 @@ Staking_contract exists the stacker/operator pair.
 ### Function `pending_distribution_counts`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(staker: <b>address</b>, operator: <b>address</b>): u64
 </code></pre>
 
 
@@ -2032,7 +2045,8 @@ Staking_contract exists the stacker/operator pair.
 ### Function `staking_contract_exists`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(staker: <b>address</b>, operator: <b>address</b>): bool
 </code></pre>
 
 

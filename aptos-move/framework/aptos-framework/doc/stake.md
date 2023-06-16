@@ -1373,7 +1373,8 @@ Return the lockup expiration of the stake pool at <code>pool_address</code>.
 This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_lockup_secs">get_lockup_secs</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_lockup_secs">get_lockup_secs</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1400,7 +1401,8 @@ Return the remaining lockup of the stake pool at <code>pool_address</code>.
 This will throw an error if there's no stake pool at <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_remaining_lockup_secs">get_remaining_lockup_secs</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_remaining_lockup_secs">get_remaining_lockup_secs</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1432,7 +1434,8 @@ Return the different stake amounts for <code>pool_address</code> (whether the va
 The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_stake">get_stake</a>(pool_address: <b>address</b>): (u64, u64, u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_stake">get_stake</a>(pool_address: <b>address</b>): (u64, u64, u64, u64)
 </code></pre>
 
 
@@ -1464,7 +1467,8 @@ The returned amounts are for (active, inactive, pending_active, pending_inactive
 Returns the validator's state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_state">get_validator_state</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_state">get_validator_state</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1499,7 +1503,8 @@ Return the voting power of the validator in the current epoch.
 This is the same as the validator's total active and pending_inactive stake.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_current_epoch_voting_power">get_current_epoch_voting_power</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_current_epoch_voting_power">get_current_epoch_voting_power</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1533,7 +1538,8 @@ This is the same as the validator's total active and pending_inactive stake.
 Return the delegated voter of the validator at <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_delegated_voter">get_delegated_voter</a>(pool_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_delegated_voter">get_delegated_voter</a>(pool_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1559,7 +1565,8 @@ Return the delegated voter of the validator at <code>pool_address</code>.
 Return the operator of the validator at <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_operator">get_operator</a>(pool_address: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_operator">get_operator</a>(pool_address: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -1610,7 +1617,8 @@ Return the pool address in <code>owner_cap</code>.
 Return the validator index for <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_index">get_validator_index</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_index">get_validator_index</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -1636,7 +1644,8 @@ Return the validator index for <code>pool_address</code>.
 Return the number of successful and failed proposals for the proposal at the given validator index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_current_epoch_proposal_counts">get_current_epoch_proposal_counts</a>(validator_index: u64): (u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_current_epoch_proposal_counts">get_current_epoch_proposal_counts</a>(validator_index: u64): (u64, u64)
 </code></pre>
 
 
@@ -1663,7 +1672,8 @@ Return the number of successful and failed proposals for the proposal at the giv
 Return the validator's config.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_config">get_validator_config</a>(pool_address: <b>address</b>): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_config">get_validator_config</a>(pool_address: <b>address</b>): (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -1689,7 +1699,8 @@ Return the validator's config.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake_pool_exists</a>(addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_stake_pool_exists">stake_pool_exists</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -3695,7 +3706,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 ### Function `get_validator_state`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_state">get_validator_state</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_get_validator_state">get_validator_state</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 

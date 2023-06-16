@@ -936,7 +936,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_exists_at">exists_at</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -960,7 +961,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -984,7 +986,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -1039,7 +1042,8 @@ is returned. This way, the caller of this function can publish additional resour
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -1425,7 +1429,8 @@ to the account owner's signer capability).
 Returns true if the account at <code>account_addr</code> has a signer capability offer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -1451,7 +1456,8 @@ Returns true if the account at <code>account_addr</code> has a signer capability
 Returns the address of the account that has a signer capability offer from the account at <code>account_addr</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -2076,7 +2082,8 @@ The Account does not exist under the new address before creating the account.
 ### Function `get_guid_next_creation_num`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_guid_next_creation_num">get_guid_next_creation_num</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -2093,7 +2100,8 @@ The Account does not exist under the new address before creating the account.
 ### Function `get_sequence_number`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_sequence_number">get_sequence_number</a>(addr: <b>address</b>): u64
 </code></pre>
 
 
@@ -2133,7 +2141,8 @@ The sequence_number of the Account is up to MAX_U64.
 ### Function `get_authentication_key`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_authentication_key">get_authentication_key</a>(addr: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -2427,7 +2436,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 ### Function `is_signer_capability_offered`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_is_signer_capability_offered">is_signer_capability_offered</a>(account_addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -2443,7 +2453,8 @@ The authentication scheme is ED25519_SCHEME and MULTI_ED25519_SCHEME.
 ### Function `get_signer_capability_offer_for`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_signer_capability_offer_for">get_signer_capability_offer_for</a>(account_addr: <b>address</b>): <b>address</b>
 </code></pre>
 
 

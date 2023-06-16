@@ -738,7 +738,8 @@ Scaling factor of shares pools used within the delegation pool
 Return whether supplied address <code>addr</code> is owner of a delegation pool.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_owner_cap_exists">owner_cap_exists</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -763,7 +764,8 @@ Return whether supplied address <code>addr</code> is owner of a delegation pool.
 Return address of the delegation pool owned by <code>owner</code> or fail if there is none.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(owner: <b>address</b>): <b>address</b>
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(owner: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -789,7 +791,8 @@ Return address of the delegation pool owned by <code>owner</code> or fail if the
 Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool_exists</a>(addr: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool_exists</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -814,7 +817,8 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 Return the index of current observed lockup cycle on delegation pool <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_observed_lockup_cycle">observed_lockup_cycle</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_observed_lockup_cycle">observed_lockup_cycle</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -840,7 +844,8 @@ Return the index of current observed lockup cycle on delegation pool <code>pool_
 Return the operator commission percentage set on the delegation pool <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -866,7 +871,8 @@ Return the operator commission percentage set on the delegation pool <code>pool_
 Return the number of delegators owning active stake within <code>pool_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_shareholders_count_active_pool">shareholders_count_active_pool</a>(pool_address: <b>address</b>): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_shareholders_count_active_pool">shareholders_count_active_pool</a>(pool_address: <b>address</b>): u64
 </code></pre>
 
 
@@ -893,7 +899,8 @@ Return the stake amounts on <code>pool_address</code> in the different states:
 (<code>active</code>,<code>inactive</code>,<code>pending_active</code>,<code>pending_inactive</code>)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_delegation_pool_stake">get_delegation_pool_stake</a>(pool_address: <b>address</b>): (u64, u64, u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_delegation_pool_stake">get_delegation_pool_stake</a>(pool_address: <b>address</b>): (u64, u64, u64, u64)
 </code></pre>
 
 
@@ -920,7 +927,8 @@ Return whether the given delegator has any withdrawable stake. If they recently 
 some stake and the stake pool's lockup cycle has not ended, their coins are not withdrawable yet.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_pending_withdrawal">get_pending_withdrawal</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (bool, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_pending_withdrawal">get_pending_withdrawal</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (bool, u64)
 </code></pre>
 
 
@@ -979,7 +987,8 @@ Return total stake owned by <code>delegator_address</code> within delegation poo
 in each of its individual states: (<code>active</code>,<code>inactive</code>,<code>pending_inactive</code>)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_stake">get_stake</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (u64, u64, u64)
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_stake">get_stake</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (u64, u64, u64)
 </code></pre>
 
 
@@ -1060,7 +1069,8 @@ for the rewards the remaining stake would have earned if active:
 extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commission%)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64
 </code></pre>
 
 
@@ -1097,7 +1107,8 @@ the delegation pool, implicitly its stake pool, in the special case
 the validator had gone inactive before its lockup expired.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_can_withdraw_pending_inactive">can_withdraw_pending_inactive</a>(pool_address: <b>address</b>): bool
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_can_withdraw_pending_inactive">can_withdraw_pending_inactive</a>(pool_address: <b>address</b>): bool
 </code></pre>
 
 

@@ -293,7 +293,8 @@ analysis of vector size dynamism.
 
 
 
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>()
 </code></pre>
 
 
@@ -325,7 +326,8 @@ analysis of vector size dynamism.
 
 
 
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
 </code></pre>
 
 
@@ -427,7 +429,8 @@ analysis of vector size dynamism.
 ### Function `verify_type_of_generic`
 
 
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
 </code></pre>
 
 

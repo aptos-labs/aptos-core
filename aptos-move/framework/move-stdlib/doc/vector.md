@@ -128,7 +128,8 @@ The length of the vectors are not equal.
 Create an empty vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_empty">empty</a>&lt;Element&gt;(): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_empty">empty</a>&lt;Element&gt;(): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
 </code></pre>
 
 
@@ -151,7 +152,8 @@ Create an empty vector.
 Return the length of the vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_length">length</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): u64
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_length">length</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): u64
 </code></pre>
 
 
@@ -175,7 +177,8 @@ Acquire an immutable reference to the <code>i</code>th element of the vector <co
 Aborts if <code>i</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow">borrow</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow">borrow</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &Element
 </code></pre>
 
 
@@ -198,7 +201,8 @@ Aborts if <code>i</code> is out of bounds.
 Add element <code>e</code> to the end of the vector <code>v</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_push_back">push_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_push_back">push_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element)
 </code></pre>
 
 
@@ -222,7 +226,8 @@ Return a mutable reference to the <code>i</code>th element in the vector <code>v
 Aborts if <code>i</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &<b>mut</b> Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64): &<b>mut</b> Element
 </code></pre>
 
 
@@ -246,7 +251,8 @@ Pop an element from the end of vector <code>v</code>.
 Aborts if <code>v</code> is empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_pop_back">pop_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): Element
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_pop_back">pop_back</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): Element
 </code></pre>
 
 
@@ -270,7 +276,8 @@ Destroy the vector <code>v</code>.
 Aborts if <code>v</code> is not empty.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;)
 </code></pre>
 
 
@@ -294,7 +301,8 @@ Swaps the elements at the <code>i</code>th and <code>j</code>th indices in the v
 Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64)
+<pre><code>#[bytecode_instruction]
+<b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_swap">swap</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, j: u64)
 </code></pre>
 
 
