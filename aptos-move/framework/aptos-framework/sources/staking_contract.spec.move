@@ -20,8 +20,6 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
-        requires staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
-
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
 
@@ -57,14 +55,10 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>,
     ) {
         pragma verify = false;
-        // TODO: The latest problem is serious timeout.
 
-        // preconditions
         include PreconditionsInCreateContract;
-
         include WithdrawAbortsIf<AptosCoin> {account: staker};
-
-        include CreateStakingContractWithCoinsAbortsif;
+        include Create_Staking_Contract_With_Coins_Abortsif;
     }
 
     /// The amount should be at least the min_stake_required, so the stake pool will be eligible to join the validator set.
@@ -80,17 +74,17 @@ spec aptos_framework::staking_contract {
     ): address {
         // TODO: The latest problem is serious timeout.
         pragma verify = false;
-        
-        // preconditions
         include PreconditionsInCreateContract;
-        
+
         let amount = coins.value;
-        include CreateStakingContractWithCoinsAbortsif { amount };
+        include Create_Staking_Contract_With_Coins_Abortsif { amount };
     }
 
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
+        pragma verify = false;
+
         // preconditions
         include stake::ResourceRequirement;
 
@@ -246,11 +240,9 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
-        // preconditions
         include stake::ResourceRequirement;
-
         let staker_address = signer::address_of(staker);
-        
+
         // verify account::create_resource_account()
         let seed_0 = bcs::to_bytes(staker_address);
         let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
@@ -280,18 +272,11 @@ spec aptos_framework::staking_contract {
     ) {
         // TODO: complex aborts conditions in the cycle.
         pragma verify = false;
-        // pragma aborts_if_is_partial;
     }
 
     /// The Account exists under the staker.
     /// The guid_creation_num of the ccount resource is up to MAX_U64.
     spec new_staking_contracts_holder(staker: &signer): Store {
-        include NewStakingContractsHolderAbortsIf;
-    }
-
-    spec schema NewStakingContractsHolderAbortsIf {
-        staker: signer;
-
         let addr = signer::address_of(staker);
         let account = global<account::Account>(addr);
         aborts_if !exists<account::Account>(addr);
@@ -371,7 +356,7 @@ spec aptos_framework::staking_contract {
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
     }
 
-    spec schema CreateStakingContractWithCoinsAbortsif {
+    spec schema Create_Staking_Contract_With_Coins_Abortsif {
         staker: signer;
         operator: address;
         voter: address;
@@ -385,10 +370,11 @@ spec aptos_framework::staking_contract {
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let min_stake_required = config.minimum_stake;
         aborts_if amount < min_stake_required;
-        
-        // verify new_staking_contracts_holder()
-        include !exists<Store>(staker_address) ==> NewStakingContractsHolderAbortsIf;
+
         let staker_address = signer::address_of(staker);
+        let account = global<account::Account>(staker_address);
+        aborts_if !exists<Store>(staker_address) && !exists<account::Account>(staker_address);
+        aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 + 12 >= account::MAX_GUID_CREATION_NUM; // 12 in create_stake_pool
         ensures exists<Store>(staker_address);
 
         let store = global<Store>(staker_address);

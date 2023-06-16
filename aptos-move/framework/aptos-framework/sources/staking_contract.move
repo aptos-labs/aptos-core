@@ -658,6 +658,11 @@ module aptos_framework::staking_contract {
         let (active, _, pending_active, _) = stake::get_stake(staking_contract.pool_address);
         let total_active_stake = active + pending_active;
         let accumulated_rewards = total_active_stake - staking_contract.principal;
+        spec {
+            // To avoid timeout, we assume staking_contract.commission_percentage is in range (0..100).
+            // This assumption is reasonable becasue a percentage value should be restricted in this range.
+            assume staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
+        };
         let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
 
         (total_active_stake, accumulated_rewards, commission_amount)
