@@ -6,6 +6,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ### Added
 - Added account lookup by authentication key
   - Example: `account lookup-address --auth-key {your_auth_key}`
+### Updated
+- Updated CLI source compilation to use rust toolchain version 1.7.0 (from 1.66.1).
 
 ## [2.0.1] - 2023/06/05
 ### Fixed
