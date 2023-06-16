@@ -337,6 +337,10 @@ owned.
 <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 <b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
     (<a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b2) ==&gt; b1 == b2);
+<b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    ( b1 == b2 ==&gt; <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b2) );
+<b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    ( b1 == b2 ==&gt; <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b2) );
 </code></pre>
 
 
