@@ -303,7 +303,7 @@ fn scheduler_tasks_with_non_contiguous_indices() {
 fn scheduler_tasks_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // No validation tasks.
         assert!(matches!(
             s.next_task(false),
@@ -311,7 +311,7 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
         ));
     }
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // Validation index is at 0, so transactions will be validated and no
         // need to return a validation task to the caller.
         assert!(matches!(
@@ -320,7 +320,7 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
         ));
     }
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         assert!(matches!(
             s.next_task(false),
             SchedulerTask::ValidationTask((j, 0), 0) if i == j
@@ -474,7 +474,7 @@ fn scheduler_dependency_with_non_contiguous_indices() {
 fn scheduler_dependency_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -521,7 +521,7 @@ fn scheduler_dependency_main(index_mapping: IndexMapping) {
 fn incarnation_one_scheduler(index_mapping: &IndexMapping) -> Scheduler {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // Get the first executions out of the way.
         assert!(matches!(
             s.next_task(false),
@@ -656,7 +656,7 @@ fn scheduler_basic_with_non_contiguous_indices() {
 fn scheduler_basic_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -690,12 +690,12 @@ fn scheduler_basic_main(index_mapping: IndexMapping) {
         SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.indices[2] == i
     ));
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         s.finish_validation(i, 1)
     }
 
     // make sure everything can be committed.
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         assert_some_eq!(s.try_commit(), i);
     }
 
@@ -715,7 +715,7 @@ fn scheduler_drain_idx_with_non_contiguous_indices() {
 fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -749,12 +749,12 @@ fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
         SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[2]
     ));
 
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         s.finish_validation(i, 1)
     }
 
     // make sure everything can be committed.
-    for &i in index_mapping.indices.iter() {
+    for &i in index_mapping.iter() {
         assert_some_eq!(s.try_commit(), i);
     }
 
@@ -964,7 +964,7 @@ fn no_conflict_task_count() {
             assert_eq!(num_exec_tasks, num_txns);
             assert_eq!(num_val_tasks, num_txns);
 
-            for &i in index_mapping.indices.iter() {
+            for &i in index_mapping.iter() {
                 assert_some_eq!(s.try_commit(), i);
                 let expected = if i == index_mapping.indices[index_mapping.num_txns() - 1] {
                     index_mapping.end_index

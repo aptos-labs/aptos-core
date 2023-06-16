@@ -566,7 +566,7 @@ impl Scheduler {
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
         if !self.done_marker.swap(true, Ordering::SeqCst) {
-            for &txn_idx in self.index_mapping.indices.iter() {
+            for &txn_idx in self.index_mapping.iter() {
                 self.resolve_condvar(txn_idx);
             }
         }
@@ -840,7 +840,7 @@ impl Scheduler {
     }
 
     fn txn_dependency_by_index(&self, index: TxnIndex) -> &CachePadded<Mutex<Vec<TxnIndex>>> {
-        let pos = self.index_mapping.inverses[index as usize];
+        let pos = self.index_mapping.positions_by_index[index as usize];
         &self.txn_dependency[pos]
     }
 
@@ -848,7 +848,7 @@ impl Scheduler {
         &self,
         index: TxnIndex,
     ) -> &CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)> {
-        let pos = self.index_mapping.inverses[index as usize];
+        let pos = self.index_mapping.positions_by_index[index as usize];
         &self.txn_status[pos]
     }
 }

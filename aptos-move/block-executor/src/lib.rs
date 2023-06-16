@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::slice::Iter;
 use aptos_mvhashmap::types::TxnIndex;
 
 /**
@@ -159,7 +160,7 @@ pub struct IndexMapping {
     pub indices: Vec<TxnIndex>,
     /// A TxnIndex -> local position mapping.
     /// Currently implemented as a `Vec` of size equal to the block size, assuming it's not too large.
-    pub inverses: Vec<usize>,
+    pub positions_by_index: Vec<usize>,
     /// A fake index representing the end of the transaction list.
     pub end_index: TxnIndex,
 }
@@ -175,10 +176,10 @@ impl IndexMapping {
     }
 
     pub fn new(indices: Vec<TxnIndex>, block_size: usize) -> Self {
-        let inverses = Self::inverse(block_size, &indices);
+        let positions_by_index = Self::inverse(block_size, &indices);
         Self {
             indices,
-            inverses,
+            positions_by_index,
             end_index: TxnIndex::MAX,
         }
     }
@@ -187,7 +188,7 @@ impl IndexMapping {
         let end_index = TxnIndex::MAX;
         Self {
             indices,
-            inverses: positions_by_idx,
+            positions_by_index: positions_by_idx,
             end_index,
         }
     }
@@ -195,7 +196,7 @@ impl IndexMapping {
     pub fn new_unsharded(block_size: usize) -> Self {
         Self {
             indices: (0..(block_size as TxnIndex)).collect(),
-            inverses: (0..block_size).collect(),
+            positions_by_index: (0..block_size).collect(),
             end_index: block_size as TxnIndex,
         }
     }
@@ -204,7 +205,7 @@ impl IndexMapping {
         if index == self.end_index {
             self.end_index
         } else {
-            let pos = self.inverses[index as usize];
+            let pos = self.positions_by_index[index as usize];
             if pos >= self.indices.len() - 1 {
                 self.end_index
             } else {
@@ -215,5 +216,13 @@ impl IndexMapping {
 
     pub fn num_txns(&self) -> usize {
         self.indices.len()
+    }
+
+    pub fn iter(&self) -> Iter<TxnIndex> {
+        self.indices.iter()
+    }
+
+    pub fn position_by_index(&self, index: TxnIndex) -> Option<usize> {
+        self.positions_by_index.get(index as usize).map(|&v|v)
     }
 }
