@@ -23,7 +23,7 @@ use k8s_openapi::api::{
 use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
-    config::Kubeconfig,
+    config::{KubeConfigOptions, Kubeconfig},
     Config, Error as KubeError, ResourceExt,
 };
 use rand::Rng;
@@ -717,10 +717,27 @@ pub async fn collect_running_nodes(
     Ok((validators, fullnodes))
 }
 
+/// Returns a [Config] object reading the KUBECONFIG environment variable or infering from the
+/// environment. Differently from [`Config::infer()`], this will look at the
+/// `KUBECONFIG` env var first, and only then infer from the environment.
+async fn make_kube_client_config() -> Result<Config> {
+    match Config::from_kubeconfig(&KubeConfigOptions::default()).await {
+        Ok(config) => Ok(config),
+        Err(kubeconfig_err) => {
+            Config::infer()
+                .await
+                .map_err(|infer_err|
+                    anyhow::anyhow!("Unable to construct Config. Failed to infer config {:?}. Failed to read KUBECONFIG {:?}", infer_err, kubeconfig_err)
+                )
+        }
+    }
+}
+
 pub async fn create_k8s_client() -> Result<K8sClient> {
-    let mut config = Config::infer().await?;
+    let mut config = make_kube_client_config().await?;
+
     let cluster_name = Kubeconfig::read()
-        .map(|k| k.current_context.unwrap())
+        .map(|k| k.current_context.unwrap_or_default())
         .unwrap_or_else(|_| config.cluster_url.to_string());
 
     config.accept_invalid_certs = true;

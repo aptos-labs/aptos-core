@@ -1802,6 +1802,9 @@ fn mainnet_like_simulation_test() -> ForgeConfig {
         )
 }
 
+/// This test runs a network test in a real multi-region setup. It configures
+/// genesis and node helm values to enable certain configurations needed to run in
+/// the multiregion forge cluster.
 fn multiregion_benchmark_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())

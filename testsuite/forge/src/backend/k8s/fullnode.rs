@@ -441,7 +441,7 @@ pub async fn install_public_fullnode<'a>(
     info!("Wrote fullnode k8s specs to path: {:?}", &tmp_dir);
 
     // create the StatefulSet
-    stateful_set_api
+    let sts = stateful_set_api
         .create(&PostParams::default(), &fullnode_stateful_set)
         .await?;
     let fullnode_stateful_set_str = serde_yaml::to_string(&fullnode_stateful_set)?;
@@ -465,6 +465,18 @@ pub async fn install_public_fullnode<'a>(
         .context("Fullnode Service does not have metadata.name")?;
 
     let full_service_name = format!("{}.{}.svc", service_name, &namespace); // this is the full name that includes the namespace
+
+    // Append the cluster name if its a multi-cluster deployment
+    let full_service_name = if let Some(target_cluster_name) = sts
+        .metadata
+        .labels
+        .as_ref()
+        .and_then(|labels| labels.get("multicluster/targetcluster"))
+    {
+        format!("{}.{}", &full_service_name, &target_cluster_name)
+    } else {
+        full_service_name
+    };
 
     let ret_node = K8sNode {
         name: fullnode_name.clone(),

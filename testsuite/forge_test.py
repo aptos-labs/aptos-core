@@ -119,6 +119,7 @@ def fake_context(
     processes=None,
     time=None,
     mode=None,
+    multiregion=False,
 ) -> ForgeContext:
     return ForgeContext(
         shell=shell if shell else FakeShell(),
@@ -147,7 +148,9 @@ def fake_context(
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
         forge_namespace="forge-potato",
-        forge_cluster=ForgeCluster(name="tomato", kubeconf="kubeconf"),
+        forge_cluster=ForgeCluster(
+            name="tomato", kubeconf="kubeconf", is_multiregion=multiregion
+        ),
         forge_test_suite="banana",
         forge_blocking=True,
         github_actions="false",
@@ -241,6 +244,14 @@ class ForgeRunnerTests(unittest.TestCase):
                     "kubectl --kubeconfig kubeconf get pods -n forge-potato",
                     RunResult(0, b"Pods"),
                 ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
             ]
         )
         forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
@@ -255,6 +266,67 @@ class ForgeRunnerTests(unittest.TestCase):
             },
         )
         context = fake_context(shell, filesystem, mode="k8s")
+        runner = K8sForgeRunner()
+        result = runner.run(context)
+        shell.assert_commands(self)
+        filesystem.assert_writes(self)
+        filesystem.assert_reads(self)
+        self.assertEqual(result.state, ForgeState.PASS, result.output)
+
+    def testK8sRunnerWithMultiregionCluster(self) -> None:
+        self.maxDiff = None
+        shell = SpyShell(
+            [
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver apply -n default -f temp1",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --timeout=5m --for=condition=Ready pod/forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf logs -n default -f forge-potato-1659078000-asdf",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pod -n default forge-potato-1659078000-asdf -o jsonpath='{.status.phase}'",
+                    RunResult(0, b"Succeeded"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf get pods -n forge-potato",
+                    RunResult(0, b"Pods"),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf --context=karmada-apiserver delete pod -n default -l forge-namespace=forge-potato --force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig kubeconf wait -n default --for=delete pod -l forge-namespace=forge-potato",
+                    RunResult(0, b""),
+                ),
+            ]
+        )
+        forge_yaml = get_cwd() / "forge-test-runner-template.yaml"
+        template_fixture = get_fixture_path("forge-test-runner-template.fixture")
+        filesystem = SpyFilesystem(
+            {
+                "temp1": template_fixture.read_bytes(),
+            },
+            {
+                "forge-test-runner-template.yaml": FILE_NOT_FOUND,
+                "testsuite/forge-test-runner-template.yaml": forge_yaml.read_bytes(),
+            },
+        )
+        context = fake_context(shell, filesystem, mode="k8s", multiregion=True)
         runner = K8sForgeRunner()
         result = runner.run(context)
         shell.assert_commands(self)
@@ -627,6 +699,16 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                 ),
                 FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 delete pod -n default -l forge-namespace=forge-perry-1659078000 "
+                    "--force",
+                    RunResult(0, b""),
+                ),
+                FakeCommand(
+                    "kubectl --kubeconfig temp1 wait -n default --for=delete pod -l "
+                    "forge-namespace=forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
             ]
