@@ -10,7 +10,6 @@ use crate::{
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    block_executor::partitioner::ExecutableTransactions,
     executable::{ExecutableTestType, ModulePath},
     write_set::TransactionWrite,
 };
@@ -41,23 +40,15 @@ where
             .unwrap(),
     );
 
-    let executable_transactions = ExecutableTransactions::Unsharded(transactions);
-
     let output = BlockExecutor::<
         Transaction<K, V>,
         Task<K, V>,
         DeltaDataView<K, V>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None)
-    .execute_transactions_parallel((), &executable_transactions, &data_view);
+    .execute_transactions_parallel((), &transactions, &data_view);
 
-    let baseline = ExpectedOutput::generate_baseline(
-        executable_transactions
-            .get_unsharded_transactions()
-            .unwrap(),
-        None,
-        None,
-    );
+    let baseline = ExpectedOutput::generate_baseline(&transactions, None, None);
     baseline.assert_output(&output);
 }
 

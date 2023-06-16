@@ -46,7 +46,7 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
         loop {
             let command = self.command_rx.recv().unwrap();
             match command {
-                ExecutorShardCommand::ExecuteBlock(
+                ExecutorShardCommand::ExecuteSubBlocks(
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
@@ -55,7 +55,7 @@ impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.len()
+                        transactions.num_txns()
                     );
                     let ret = self.executor_client.execute_block(
                         transactions,

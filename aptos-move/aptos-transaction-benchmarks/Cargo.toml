@@ -14,6 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-bitvec = { workspace = true }
+aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-executor-service = { workspace = true }
 aptos-gas = { workspace = true, features = ["testing"] }
@@ -27,7 +28,9 @@ clap = { workspace = true }
 criterion = { workspace = true, features = ["html_reports"] }
 criterion-cpu-time = { workspace = true }
 num_cpus = { workspace = true }
+once_cell = { workspace = true }
 proptest = { workspace = true }
+rayon = { workspace = true }
 
 [[bench]]
 name = "transaction_benches"

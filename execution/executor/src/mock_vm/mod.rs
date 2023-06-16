@@ -14,7 +14,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::partitioner::{ExecutableTransactions, SubBlocksForShard},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -209,7 +209,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         _sharded_block_executor: &ShardedBlockExecutor<S>,
-        _transactions: Vec<Transaction>,
+        _block: Vec<SubBlocksForShard<Transaction>>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {

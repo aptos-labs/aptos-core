@@ -37,7 +37,7 @@ impl ExecutorService {
     ) -> Result<BlockExecutionResult, Error> {
         let result = match execution_request {
             BlockExecutionRequest::ExecuteBlock(command) => self.client.execute_block(
-                command.transactions,
+                command.sub_blocks,
                 &command.state_view,
                 command.concurrency_level,
                 command.maybe_block_gas_limit,
@@ -90,6 +90,9 @@ mod tests {
     };
     use aptos_types::{
         account_config::{DepositEvent, WithdrawEvent},
+        block_executor::partitioner::{
+            CrossShardDependencies, SubBlock, SubBlocksForShard, TransactionWithDependencies,
+        },
         transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
     };
     use aptos_vm::sharded_block_executor::{
@@ -194,9 +197,15 @@ mod tests {
         let mut executor = FakeExecutor::from_head_genesis();
         for _ in 0..5 {
             let (txns, receiver) = generate_transactions(&mut executor);
+            let txns_with_deps = txns
+                .into_iter()
+                .map(|txn| TransactionWithDependencies::new(txn, CrossShardDependencies::default()))
+                .collect::<Vec<_>>();
+            let sub_block = SubBlock::new(0, txns_with_deps);
+            let sub_blocks_for_shard = SubBlocksForShard::new(0, vec![sub_block]);
 
             let output = client
-                .execute_block(txns, executor.data_store(), 2, None)
+                .execute_block(sub_blocks_for_shard, executor.data_store(), 2, None)
                 .unwrap();
             verify_txn_output(1_000, &output, &mut executor, &receiver);
         }
@@ -214,9 +223,20 @@ mod tests {
         let mut executor = FakeExecutor::from_head_genesis();
         for _ in 0..5 {
             let (txns, receiver) = generate_transactions(&mut executor);
+            let txns_with_deps = txns
+                .into_iter()
+                .map(|txn| TransactionWithDependencies::new(txn, CrossShardDependencies::default()))
+                .collect::<Vec<_>>();
+            let sub_block = SubBlock::new(0, txns_with_deps);
+            let sub_blocks_for_shard = SubBlocksForShard::new(0, vec![sub_block]);
 
             let output = sharded_block_executor
-                .execute_block(Arc::new(executor.data_store().clone()), txns, 2, None)
+                .execute_block(
+                    Arc::new(executor.data_store().clone()),
+                    vec![sub_blocks_for_shard],
+                    2,
+                    None,
+                )
                 .unwrap();
             verify_txn_output(1_000, &output, &mut executor, &receiver);
         }

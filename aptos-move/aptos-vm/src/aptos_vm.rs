@@ -30,7 +30,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::new_block_event_key,
-    block_executor::partitioner::ExecutableTransactions,
+    block_executor::partitioner::{BlockExecutorTransactions, SubBlocksForShard},
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
     on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
@@ -1519,7 +1519,7 @@ impl VMExecutor for AptosVM {
         let count = transactions.len();
         let ret = BlockAptosVM::execute_block(
             Arc::clone(&RAYON_EXEC_POOL),
-            ExecutableTransactions::Unsharded(transactions),
+            BlockExecutorTransactions::Unsharded(transactions),
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
@@ -1533,7 +1533,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static>(
         sharded_block_executor: &ShardedBlockExecutor<S>,
-        transactions: Vec<Transaction>,
+        transactions: Vec<SubBlocksForShard<Transaction>>,
         state_view: Arc<S>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -1541,7 +1541,7 @@ impl VMExecutor for AptosVM {
         info!(
             log_context,
             "Executing block, transaction count: {}",
-            transactions.len()
+            transactions.iter().map(|s| s.num_txns()).sum::<usize>()
         );
 
         let count = transactions.len();
