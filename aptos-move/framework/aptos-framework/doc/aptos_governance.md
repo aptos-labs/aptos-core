@@ -1639,16 +1639,16 @@ Address @aptos_framework must exist VotingRecords and GovernanceProposal.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_Schema_add_approved_script_hash">Schema_add_approved_script_hash</a>;
+<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_AddApprovedScriptHash">AddApprovedScriptHash</a>;
 </code></pre>
 
 
 
 
-<a name="0x1_aptos_governance_Schema_add_approved_script_hash"></a>
+<a name="0x1_aptos_governance_AddApprovedScriptHash"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_Schema_add_approved_script_hash">Schema_add_approved_script_hash</a> {
+<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_AddApprovedScriptHash">AddApprovedScriptHash</a> {
     proposal_id: u64;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
@@ -1683,7 +1683,7 @@ Address @aptos_framework must exist VotingRecords and GovernanceProposal.
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_Schema_add_approved_script_hash">Schema_add_approved_script_hash</a>;
+<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_AddApprovedScriptHash">AddApprovedScriptHash</a>;
 </code></pre>
 
 
@@ -1701,7 +1701,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_Voting_Is_proposal_resolvable_Abortsif">Voting_Is_proposal_resolvable_Abortsif</a>;
+<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a>;
 <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
 <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
 <b>let</b> multi_step_key = utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_KEY">voting::IS_MULTI_STEP_PROPOSAL_KEY</a>);
@@ -1738,7 +1738,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_Voting_Is_proposal_resolvable_Abortsif">Voting_Is_proposal_resolvable_Abortsif</a>;
+<b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a>;
 <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
 <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
 <b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
@@ -1782,10 +1782,10 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 
-<a name="0x1_aptos_governance_Voting_Is_proposal_resolvable_Abortsif"></a>
+<a name="0x1_aptos_governance_VotingIsProposalResolvableAbortsif"></a>
 
 
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_Voting_Is_proposal_resolvable_Abortsif">Voting_Is_proposal_resolvable_Abortsif</a> {
+<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingIsProposalResolvableAbortsif">VotingIsProposalResolvableAbortsif</a> {
     proposal_id: u64;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
