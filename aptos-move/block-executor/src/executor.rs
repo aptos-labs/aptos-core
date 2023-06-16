@@ -580,7 +580,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &BlockExecutorTransactions<T>,
+        signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -589,13 +589,6 @@ where
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
-
-        let signature_verified_block = match signature_verified_block {
-            BlockExecutorTransactions::Unsharded(txns) => txns,
-            BlockExecutorTransactions::Sharded(_) => {
-                unimplemented!("Sharded execution is not supported yet")
-            },
-        };
 
         let versioned_cache = MVHashMap::new();
 
@@ -685,16 +678,9 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &BlockExecutorTransactions<T>,
+        signature_verified_block: &Vec<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let signature_verified_block = match signature_verified_block {
-            BlockExecutorTransactions::Unsharded(txns) => txns,
-            BlockExecutorTransactions::Sharded(_) => {
-                unimplemented!("Sharded execution is not supported yet")
-            },
-        };
-
         let num_txns = signature_verified_block.len();
         let executor = E::init(executor_arguments);
         let data_map = UnsyncMap::new();
@@ -772,16 +758,17 @@ where
         signature_verified_block: BlockExecutorTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
+        let signature_verified_txns = signature_verified_block.into_txns();
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         };
@@ -791,18 +778,18 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_txns());
+            init_speculative_logs(signature_verified_txns.len());
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                &signature_verified_txns,
                 base_view,
             )
         }
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
-            drop(signature_verified_block);
+            drop(signature_verified_txns);
         });
 
         ret

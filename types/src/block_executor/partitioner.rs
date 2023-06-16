@@ -273,6 +273,13 @@ impl<T: Clone> SubBlocksForShard<T> {
         self.sub_blocks
     }
 
+    pub fn into_txns(self) -> Vec<T> {
+        self.sub_blocks
+            .into_iter()
+            .flat_map(|sub_block| sub_block.into_txns())
+            .collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.sub_blocks.is_empty()
     }
@@ -416,6 +423,13 @@ impl<T: Clone> BlockExecutorTransactions<T> {
         match self {
             BlockExecutorTransactions::Unsharded(transactions) => Some(transactions),
             BlockExecutorTransactions::Sharded(_) => None,
+        }
+    }
+
+    pub fn into_txns(self) -> Vec<T> {
+        match self {
+            BlockExecutorTransactions::Unsharded(transactions) => transactions,
+            BlockExecutorTransactions::Sharded(sub_blocks) => sub_blocks.into_txns(),
         }
     }
 }
