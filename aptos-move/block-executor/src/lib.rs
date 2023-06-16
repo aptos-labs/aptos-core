@@ -223,6 +223,11 @@ impl IndexMapping {
     }
 
     pub fn position_by_index(&self, index: TxnIndex) -> Option<usize> {
-        self.positions_by_index.get(index as usize).map(|&v|v)
+        let index = index as usize;
+        if index >= self.positions_by_index.len() {
+            None
+        } else {
+            Some(self.positions_by_index[index])
+        }
     }
 }

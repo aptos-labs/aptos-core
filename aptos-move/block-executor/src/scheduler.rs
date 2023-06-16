@@ -840,7 +840,7 @@ impl Scheduler {
     }
 
     fn txn_dependency_by_index(&self, index: TxnIndex) -> &CachePadded<Mutex<Vec<TxnIndex>>> {
-        let pos = self.index_mapping.positions_by_index[index as usize];
+        let pos = self.index_mapping.position_by_index(index).unwrap();
         &self.txn_dependency[pos]
     }
 
@@ -848,7 +848,7 @@ impl Scheduler {
         &self,
         index: TxnIndex,
     ) -> &CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)> {
-        let pos = self.index_mapping.positions_by_index[index as usize];
+        let pos = self.index_mapping.position_by_index(index).unwrap();
         &self.txn_status[pos]
     }
 }
