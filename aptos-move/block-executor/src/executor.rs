@@ -470,7 +470,7 @@ where
 
         let signature_verified_block = match signature_verified_block {
             ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
+            ExecutableTransactions::Sharded(_, _) => {
                 unimplemented!("Sharded execution is not supported yet")
             },
         };
@@ -568,7 +568,7 @@ where
     ) -> Result<Vec<E::Output>, E::Error> {
         let signature_verified_block = match signature_verified_block {
             ExecutableTransactions::Unsharded(txns) => txns,
-            ExecutableTransactions::Sharded(_) => {
+            ExecutableTransactions::Sharded(_, _) => {
                 unimplemented!("Sharded execution is not supported yet")
             },
         };

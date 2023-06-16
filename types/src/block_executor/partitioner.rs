@@ -324,14 +324,14 @@ impl<T> From<(HashValue, Vec<T>)> for ExecutableBlock<T> {
 
 pub enum ExecutableTransactions<T> {
     Unsharded(Vec<T>),
-    Sharded(Vec<SubBlock<T>>),
+    Sharded(usize, Vec<SubBlock<T>>),
 }
 
 impl<T> ExecutableTransactions<T> {
     pub fn num_transactions(&self) -> usize {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
-            ExecutableTransactions::Sharded(sub_blocks) => sub_blocks
+            ExecutableTransactions::Sharded(_, sub_blocks) => sub_blocks
                 .iter()
                 .map(|sub_block| sub_block.num_txns())
                 .sum(),
@@ -341,7 +341,7 @@ impl<T> ExecutableTransactions<T> {
     pub fn get_unsharded_transactions(&self) -> Option<&Vec<T>> {
         match self {
             ExecutableTransactions::Unsharded(transactions) => Some(transactions),
-            ExecutableTransactions::Sharded(_) => None,
+            ExecutableTransactions::Sharded(_, _) => None,
         }
     }
 }

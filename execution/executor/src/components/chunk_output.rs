@@ -60,7 +60,7 @@ impl ChunkOutput {
                     maybe_block_gas_limit,
                 )
             },
-            ExecutableTransactions::Sharded(_) => {
+            ExecutableTransactions::Sharded(_, _) => {
                 // TODO(skedia): Change this into sharded once we move partitioner out of the
                 // sharded block executor.
                 todo!("sharded execution integration is not yet done")

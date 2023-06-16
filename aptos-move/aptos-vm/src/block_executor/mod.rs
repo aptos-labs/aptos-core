@@ -147,7 +147,7 @@ impl BlockAptosVM {
                     .collect();
                 ExecutableTransactions::Unsharded(signature_verified_txns)
             },
-            ExecutableTransactions::Sharded(sub_blocks) => {
+            ExecutableTransactions::Sharded(block_size, sub_blocks) => {
                 let signature_verified_block = sub_blocks
                     .into_par_iter()
                     .map(|sub_block| {
@@ -171,7 +171,7 @@ impl BlockAptosVM {
                         SubBlock::new(start_index, verified_txns)
                     })
                     .collect();
-                ExecutableTransactions::Sharded(signature_verified_block)
+                ExecutableTransactions::Sharded(block_size, signature_verified_block)
             },
         }
     }
