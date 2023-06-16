@@ -2,41 +2,40 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_metadata::DbMetadataSchema,
+    ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
         event_store::event_store_pruner::EventStorePruner,
-        ledger_store::version_data_pruner::VersionDataPruner,
+        ledger_store::ledger_metadata_pruner::LedgerMetadataPruner,
         transaction_store::{
-            transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
+            transaction_accumulator_pruner::TransactionAccumulatorPruner,
+            transaction_info_pruner::TransactionInfoPruner, transaction_pruner::TransactionPruner,
+            write_set_pruner::WriteSetPruner,
         },
-    },
-    pruner_utils,
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataValue},
-        transaction::TransactionSchema,
     },
     EventStore, TransactionStore,
 };
-use aptos_logger::warn;
-use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use anyhow::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    cmp::min,
+    sync::{atomic::Ordering, Arc},
+};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
 
 /// Responsible for pruning everything except for the state tree.
 pub(crate) struct LedgerPruner {
-    db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
-    min_readable_version: AtomicVersion,
-    transaction_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
-    version_data_pruner: Arc<dyn DBSubPruner + Send + Sync>,
-    event_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
-    write_set_pruner: Arc<dyn DBSubPruner + Send + Sync>,
+
+    progress: AtomicVersion,
+
+    ledger_metadata_pruner: Box<LedgerMetadataPruner>,
+
+    sub_pruners: Vec<Box<dyn DBSubPruner + Send + Sync>>,
 }
 
 impl DBPruner for LedgerPruner {
@@ -44,157 +43,108 @@ impl DBPruner for LedgerPruner {
         LEDGER_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: usize) -> anyhow::Result<Version> {
-        if !self.is_pruning_pending() {
-            return Ok(self.min_readable_version());
+    fn prune(&self, max_versions: usize) -> Result<Version> {
+        let mut progress = self.progress();
+        let target_version = self.target_version();
+
+        while progress < target_version {
+            let current_batch_target_version =
+                min(progress + max_versions as Version, target_version);
+
+            self.ledger_metadata_pruner
+                .prune(progress, current_batch_target_version)?;
+
+            // NOTE: If necessary, this can be done in parallel.
+            self.sub_pruners
+                .iter()
+                .try_for_each(|pruner| pruner.prune(progress, current_batch_target_version))?;
+
+            progress = current_batch_target_version;
+            self.record_progress(progress);
         }
 
-        // Collect the schema batch writes
-        let mut db_batch = SchemaBatch::new();
-        let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
-        self.save_min_readable_version(current_target_version, &db_batch)?;
-        // Commit all the changes to DB atomically
-        self.db.write_schemas(db_batch)?;
-
-        // TODO(zcc): recording progress after writing schemas might provide wrong answers to
-        // API calls when they query min_readable_version while the write_schemas are still in
-        // progress.
-        self.record_progress(current_target_version);
-        Ok(current_target_version)
+        Ok(target_version)
     }
 
-    fn save_min_readable_version(
-        &self,
-        version: Version,
-        batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
-        batch.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+    fn initialize_min_readable_version(&self) -> Result<Version> {
+        self.ledger_metadata_pruner.progress()
     }
 
-    fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        let stored_min_version = self
-            .db
-            .get::<DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)?
-            .map_or(0, |v| v.expect_version());
-        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
-        iter.seek(&stored_min_version)?;
-        let version = match iter.next().transpose()? {
-            Some((version, _)) => version,
-            None => 0,
-        };
-        match version.cmp(&stored_min_version) {
-            std::cmp::Ordering::Greater => {
-                let res = self.db.put::<DbMetadataSchema>(
-                    &DbMetadataKey::LedgerPrunerProgress,
-                    &DbMetadataValue::Version(version),
-                );
-                warn!(
-                    stored_min_version = stored_min_version,
-                    actual_min_version = version,
-                    res = ?res,
-                    "Try to update stored min readable transaction version to the actual one.",
-                );
-                Ok(version)
-            },
-            std::cmp::Ordering::Equal => Ok(version),
-            std::cmp::Ordering::Less => {
-                panic!("No transaction is found at or after stored ledger pruner progress ({}), db might be corrupted.", stored_min_version)
-            },
-        }
-    }
-
-    fn min_readable_version(&self) -> Version {
-        self.min_readable_version.load(Ordering::Relaxed)
+    fn progress(&self) -> Version {
+        self.progress.load(Ordering::SeqCst)
     }
 
     fn set_target_version(&self, target_version: Version) {
-        self.target_version.store(target_version, Ordering::Relaxed);
+        self.target_version.store(target_version, Ordering::SeqCst);
         PRUNER_VERSIONS
             .with_label_values(&["ledger_pruner", "target"])
             .set(target_version as i64);
     }
 
     fn target_version(&self) -> Version {
-        self.target_version.load(Ordering::Relaxed)
+        self.target_version.load(Ordering::SeqCst)
     }
 
     fn record_progress(&self, min_readable_version: Version) {
-        self.min_readable_version
-            .store(min_readable_version, Ordering::Relaxed);
+        self.progress.store(min_readable_version, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&["ledger_pruner", "min_readable"])
+            .with_label_values(&["ledger_pruner", "progress"])
             .set(min_readable_version as i64);
-    }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    fn testonly_update_min_version(&self, version: Version) {
-        self.min_readable_version.store(version, Ordering::Relaxed)
     }
 }
 
 impl LedgerPruner {
-    pub fn new(
-        db: Arc<DB>,
-        transaction_store: Arc<TransactionStore>,
-        event_store: Arc<EventStore>,
-    ) -> Self {
+    pub fn new(ledger_db: Arc<LedgerDb>) -> Result<Self> {
+        let ledger_metadata_pruner = Box::new(
+            LedgerMetadataPruner::new(ledger_db.metadata_db_arc())
+                .expect("Failed to initialize ledger_metadata_pruner."),
+        );
+
+        let metadata_progress = ledger_metadata_pruner.progress()?;
+
+        let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&ledger_db)));
+
+        let event_store_pruner = Box::new(EventStorePruner::new(
+            Arc::new(EventStore::new(ledger_db.event_db_arc())),
+            ledger_db.event_db_arc(),
+            metadata_progress,
+        )?);
+        let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
+            Arc::clone(&transaction_store),
+            ledger_db.transaction_accumulator_db_arc(),
+            metadata_progress,
+        )?);
+        let transaction_info_pruner = Box::new(TransactionInfoPruner::new(
+            Arc::clone(&transaction_store),
+            ledger_db.transaction_info_db_arc(),
+            metadata_progress,
+        )?);
+        let transaction_pruner = Box::new(TransactionPruner::new(
+            Arc::clone(&transaction_store),
+            ledger_db.transaction_db_arc(),
+            metadata_progress,
+        )?);
+        let write_set_pruner = Box::new(WriteSetPruner::new(
+            Arc::clone(&transaction_store),
+            ledger_db.write_set_db_arc(),
+            metadata_progress,
+        )?);
+
         let pruner = LedgerPruner {
-            db,
-            target_version: AtomicVersion::new(0),
-            min_readable_version: AtomicVersion::new(0),
-            transaction_store_pruner: Arc::new(TransactionStorePruner::new(
-                transaction_store.clone(),
-            )),
-            event_store_pruner: Arc::new(EventStorePruner::new(event_store)),
-            write_set_pruner: Arc::new(WriteSetPruner::new(transaction_store)),
-            version_data_pruner: Arc::new(VersionDataPruner::new()),
+            target_version: AtomicVersion::new(metadata_progress),
+            progress: AtomicVersion::new(metadata_progress),
+            ledger_metadata_pruner,
+            sub_pruners: vec![
+                event_store_pruner,
+                transaction_accumulator_pruner,
+                transaction_info_pruner,
+                transaction_pruner,
+                write_set_pruner,
+            ],
         };
+
         pruner.initialize();
-        pruner
-    }
 
-    /// Prunes the genesis transaction and saves the db alterations to the given change set
-    pub fn prune_genesis(ledger_db: Arc<DB>, db_batch: &mut SchemaBatch) -> anyhow::Result<()> {
-        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
-        let max_version = 1; // We should only be pruning a single version
-
-        let ledger_pruner = pruner_utils::create_ledger_pruner(ledger_db);
-        ledger_pruner.set_target_version(target_version);
-        ledger_pruner.prune_inner(max_version, db_batch)?;
-
-        Ok(())
-    }
-
-    fn prune_inner(
-        &self,
-        max_versions: usize,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<Version> {
-        let min_readable_version = self.min_readable_version();
-
-        // Current target version might be less than the target version to ensure we don't prune
-        // more than max_version in one go.
-        let current_target_version = self.get_current_batch_target(max_versions as Version);
-
-        if current_target_version < min_readable_version {
-            return Ok(min_readable_version);
-        }
-
-        self.transaction_store_pruner.prune(
-            db_batch,
-            min_readable_version,
-            current_target_version,
-        )?;
-        self.write_set_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-        self.version_data_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-        self.event_store_pruner
-            .prune(db_batch, min_readable_version, current_target_version)?;
-
-        Ok(current_target_version)
+        Ok(pruner)
     }
 }

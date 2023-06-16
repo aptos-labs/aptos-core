@@ -77,7 +77,11 @@ pub(crate) fn update_store(
                 &sharded_state_kv_batches,
             )
             .unwrap();
-        store.ledger_db.write_schemas(ledger_batch).unwrap();
+        store
+            .ledger_db
+            .metadata_db()
+            .write_schemas(ledger_batch)
+            .unwrap();
         store
             .state_kv_db
             .commit(version, sharded_state_kv_batches)
@@ -864,9 +868,9 @@ pub fn verify_committed_transactions(
 pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
     let batch = SchemaBatch::new();
     db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &batch)
+        .put_transaction_infos(version, &[txn_info.clone()], &batch, &batch)
         .unwrap();
-    db.ledger_db.write_schemas(batch).unwrap();
+    db.ledger_db.transaction_db().write_schemas(batch).unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
@@ -878,7 +882,8 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     let smt = SparseMerkleTree::<StateValue>::default()
         .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
-    db.ledger_db
+    db.state_kv_db
+        .metadata_db()
         .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
     let mut in_memory_state = db

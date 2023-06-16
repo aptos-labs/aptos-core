@@ -4,18 +4,22 @@
 #![forbid(unsafe_code)]
 #![allow(dead_code)]
 
-use crate::db_options::{
-    event_db_column_families, gen_event_cfds, gen_ledger_cfds, gen_ledger_metadata_cfds,
-    gen_transaction_accumulator_cfds, gen_transaction_cfds, gen_transaction_info_cfds,
-    gen_write_set_cfds, ledger_db_column_families, ledger_metadata_db_column_families,
-    transaction_accumulator_db_column_families, transaction_db_column_families,
-    transaction_info_db_column_families, write_set_db_column_families,
+use crate::{
+    db_options::{
+        event_db_column_families, gen_event_cfds, gen_ledger_cfds, gen_ledger_metadata_cfds,
+        gen_transaction_accumulator_cfds, gen_transaction_cfds, gen_transaction_info_cfds,
+        gen_write_set_cfds, ledger_db_column_families, ledger_metadata_db_column_families,
+        transaction_accumulator_db_column_families, transaction_db_column_families,
+        transaction_info_db_column_families, write_set_db_column_families,
+    },
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, DB};
+use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -30,6 +34,7 @@ pub const TRANSACTION_DB_NAME: &str = "transaction_db";
 pub const TRANSACTION_INFO_DB_NAME: &str = "transaction_info_db";
 pub const WRITE_SET_DB_NAME: &str = "write_set_db";
 
+#[derive(Debug)]
 pub struct LedgerDb {
     ledger_metadata_db: Arc<DB>,
 
@@ -128,35 +133,108 @@ impl LedgerDb {
     }
 
     pub(crate) fn create_checkpoint(
-        _db_root_path: impl AsRef<Path>,
-        _cp_root_path: impl AsRef<Path>,
+        db_root_path: impl AsRef<Path>,
+        cp_root_path: impl AsRef<Path>,
+        split_ledger_db: bool,
     ) -> Result<()> {
-        // TODO(grao): Implement this function.
-        todo!()
+        let rocksdb_configs = RocksdbConfigs {
+            split_ledger_db,
+            ..Default::default()
+        };
+        let ledger_db = Self::new(db_root_path, rocksdb_configs, /*readonly=*/ false)?;
+        let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
+
+        info!(
+            split_ledger_db = split_ledger_db,
+            "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
+        );
+
+        std::fs::remove_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        if split_ledger_db {
+            std::fs::create_dir_all(&cp_ledger_db_folder).unwrap_or(());
+        }
+
+        ledger_db
+            .metadata_db()
+            .create_checkpoint(Self::metadata_db_path(
+                cp_root_path.as_ref(),
+                split_ledger_db,
+            ))?;
+
+        if split_ledger_db {
+            ledger_db
+                .event_db()
+                .create_checkpoint(cp_ledger_db_folder.join(EVENT_DB_NAME))?;
+            ledger_db
+                .transaction_accumulator_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME))?;
+            ledger_db
+                .transaction_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_DB_NAME))?;
+            ledger_db
+                .transaction_info_db()
+                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_INFO_DB_NAME))?;
+            ledger_db
+                .write_set_db()
+                .create_checkpoint(cp_ledger_db_folder.join(WRITE_SET_DB_NAME))?;
+        }
+
+        Ok(())
     }
 
-    pub(crate) fn metadata_db(&self) -> &DB {
+    pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.ledger_metadata_db.put::<DbMetadataSchema>(
+            &DbMetadataKey::LedgerPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    pub fn metadata_db(&self) -> &DB {
         &self.ledger_metadata_db
+    }
+
+    pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.ledger_metadata_db)
     }
 
     pub(crate) fn event_db(&self) -> &DB {
         &self.event_db
     }
 
+    pub(crate) fn event_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.event_db)
+    }
+
     pub(crate) fn transaction_accumulator_db(&self) -> &DB {
         &self.transaction_accumulator_db
+    }
+
+    pub(crate) fn transaction_accumulator_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_accumulator_db)
     }
 
     pub(crate) fn transaction_db(&self) -> &DB {
         &self.transaction_db
     }
 
+    pub(crate) fn transaction_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_db)
+    }
+
     pub(crate) fn transaction_info_db(&self) -> &DB {
         &self.transaction_info_db
     }
 
+    pub(crate) fn transaction_info_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.transaction_info_db)
+    }
+
     pub(crate) fn write_set_db(&self) -> &DB {
         &self.write_set_db
+    }
+
+    pub(crate) fn write_set_db_arc(&self) -> Arc<DB> {
+        Arc::clone(&self.write_set_db)
     }
 
     fn open_rocksdb(

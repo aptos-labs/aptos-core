@@ -9,7 +9,7 @@ pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
 pub mod modifiers;
-pub mod multi_region_simulation_test;
+pub mod multi_region_network_test;
 pub mod network_bandwidth_test;
 pub mod network_loss_test;
 pub mod network_partition_test;
@@ -27,7 +27,7 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TxnEmitter, TxnStats, Version,
+    TestReport, TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
@@ -141,7 +141,12 @@ pub trait NetworkLoadTest: Test {
     // Load is started before this function is called, and stops after this function returns.
     // Expected duration is passed into this function, expecting this function to take that much
     // time to finish. How long this function takes will dictate how long the actual test lasts.
-    fn test(&self, _swarm: &mut dyn Swarm, duration: Duration) -> Result<()> {
+    fn test(
+        &self,
+        _swarm: &mut dyn Swarm,
+        _report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
         std::thread::sleep(duration);
         Ok(())
     }
@@ -174,7 +179,7 @@ impl NetworkTest for dyn NetworkLoadTest {
                 rng,
             )?;
         ctx.report
-            .report_txn_stats(self.name().to_string(), &txn_stat, actual_test_duration);
+            .report_txn_stats(self.name().to_string(), &txn_stat);
 
         let end_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -272,7 +277,7 @@ impl dyn NetworkLoadTest {
             }
             let phase_start = Instant::now();
 
-            self.test(ctx.swarm(), phase_duration)
+            self.test(ctx.swarm, ctx.report, phase_duration)
                 .context("test NetworkLoadTest")?;
             actual_phase_durations.push(phase_start.elapsed());
         }
@@ -346,17 +351,48 @@ impl dyn NetworkLoadTest {
 pub struct CompositeNetworkTest {
     // Wrapper tests - their setup and finish methods are called, before the test ones.
     // TODO don't know how to make this array, and have forge/main.rs work
-    pub wrapper: &'static dyn NetworkLoadTest,
+    pub wrappers: Vec<Box<dyn NetworkLoadTest>>,
     // This is the main test, return values from this test are used in setup, and
     // only it's test function is called.
-    pub test: &'static dyn NetworkTest,
+    pub test: Box<dyn NetworkTest>,
+}
+
+impl CompositeNetworkTest {
+    pub fn new<W: NetworkLoadTest + 'static, T: NetworkTest + 'static>(
+        wrapper: W,
+        test: T,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper)],
+            test: Box::new(test),
+        }
+    }
+
+    pub fn new_with_two_wrappers<
+        T1: NetworkLoadTest + 'static,
+        T2: NetworkLoadTest + 'static,
+        W: NetworkTest + 'static,
+    >(
+        wrapper1: T1,
+        wrapper2: T2,
+        test: W,
+    ) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![Box::new(wrapper1), Box::new(wrapper2)],
+            test: Box::new(test),
+        }
+    }
 }
 
 impl NetworkTest for CompositeNetworkTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> anyhow::Result<()> {
-        self.wrapper.setup(ctx)?;
+        for wrapper in &self.wrappers {
+            wrapper.setup(ctx)?;
+        }
         self.test.run(ctx)?;
-        self.wrapper.finish(ctx.swarm())?;
+        for wrapper in &self.wrappers {
+            wrapper.finish(ctx.swarm())?;
+        }
         Ok(())
     }
 }

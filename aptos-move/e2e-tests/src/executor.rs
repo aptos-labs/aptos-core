@@ -28,6 +28,7 @@ use aptos_types::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
+    block_executor::partitioner::ExecutableTransactions,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     on_chain_config::{
@@ -160,6 +161,10 @@ impl FakeExecutor {
             GENESIS_CHANGE_SET_MAINNET.clone().write_set(),
             ChainId::mainnet(),
         )
+    }
+
+    pub fn data_store(&self) -> &FakeDataStore {
+        &self.data_store
     }
 
     /// Creates an executor in which no genesis state has been applied yet.
@@ -412,7 +417,7 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block(
             self.executor_thread_pool.clone(),
-            txn_block,
+            ExecutableTransactions::Unsharded(txn_block),
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,
@@ -436,7 +441,7 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
+        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
         if !self.no_parallel_exec {
             let parallel_output = self.execute_transaction_block_parallel(txn_block);
             assert_eq!(output, parallel_output);
@@ -643,14 +648,13 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let change_set_ext = session
+            let change_set = session
                 .finish(
                     &mut (),
                     &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
                 )
                 .expect("Failed to generate txn effects");
-            let (_delta_change_set, change_set) = change_set_ext.into_inner();
-            let (write_set, _events) = change_set.into_inner();
+            let (write_set, _delta_change_set, _events) = change_set.unpack();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -686,16 +690,15 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
 
-        let change_set_ext = session
+        let change_set = session
             .finish(
                 &mut (),
                 &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
             )
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
-        let (_delta_change_set, change_set) = change_set_ext.into_inner();
-        let (writeset, _events) = change_set.into_inner();
-        Ok(writeset)
+        let (write_set, _delta_change_set, _events) = change_set.unpack();
+        Ok(write_set)
     }
 
     pub fn execute_view_function(

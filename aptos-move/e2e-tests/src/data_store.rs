@@ -6,7 +6,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::TStateView;
+use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
@@ -132,6 +132,10 @@ impl TStateView for FakeDataStore {
             usage.add_item(k.size() + v.size())
         }
         Ok(usage)
+    }
+
+    fn as_in_memory_state_view(&self) -> InMemoryStateView {
+        InMemoryStateView::new(self.state_data.clone())
     }
 }
 

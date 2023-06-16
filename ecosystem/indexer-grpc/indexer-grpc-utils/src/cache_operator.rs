@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::constants::BLOB_STORAGE_SIZE;
+use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
 
 // Configurations for cache.
@@ -15,7 +16,7 @@ const CACHE_SIZE_ESTIMATION: u64 = 3_000_000_u64;
 // lower than the latest version - CACHE_SIZE_EVICTION_LOWER_BOUND.
 // The gap between CACHE_SIZE_ESTIMATION and this is to give buffer since
 // reading latest version and actual data not atomic(two operations).
-const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 12_000_000_u64;
+const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 4_000_000_u64;
 
 // Keys for cache.
 const CACHE_KEY_LATEST_VERSION: &str = "latest_version";
@@ -153,7 +154,23 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
     // Downstream system can infer the chain id from cache.
     pub async fn get_chain_id(&mut self) -> anyhow::Result<u64> {
         let chain_id: u64 = match self.conn.get::<&str, String>(CACHE_KEY_CHAIN_ID).await {
-            Ok(v) => v.parse::<u64>().expect("Redis chain_id is not a number."),
+            Ok(v) => v
+                .parse::<u64>()
+                .with_context(|| format!("Redis key {} is not a number.", CACHE_KEY_CHAIN_ID))?,
+            Err(err) => return Err(err.into()),
+        };
+        Ok(chain_id)
+    }
+
+    pub async fn get_latest_version(&mut self) -> anyhow::Result<u64> {
+        let chain_id: u64 = match self
+            .conn
+            .get::<&str, String>(CACHE_KEY_LATEST_VERSION)
+            .await
+        {
+            Ok(v) => v.parse::<u64>().with_context(|| {
+                format!("Redis key {} is not a number.", CACHE_KEY_LATEST_VERSION)
+            })?,
             Err(err) => return Err(err.into()),
         };
         Ok(chain_id)
@@ -227,7 +244,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
         version: u64,
     ) -> anyhow::Result<()> {
         let script = redis::Script::new(CACHE_SCRIPT_UPDATE_LATEST_VERSION);
-        tracing::info!(
+        tracing::debug!(
             num_of_versions = num_of_versions,
             version = version,
             "Updating latest version in cache."

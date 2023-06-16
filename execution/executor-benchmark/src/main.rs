@@ -6,10 +6,7 @@ use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
-use aptos_executor_benchmark::{
-    benchmark_transaction::BenchmarkTransaction, native_executor::NativeExecutor,
-    pipeline::PipelineConfig,
-};
+use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
@@ -120,11 +117,14 @@ struct Opt {
     #[clap(long)]
     concurrency_level: Option<usize>,
 
+    #[clap(long, default_value = "1")]
+    num_executor_shards: usize,
+
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 
     #[clap(long)]
     use_sharded_state_merkle_db: bool,
@@ -147,10 +147,11 @@ impl Opt {
     fn concurrency_level(&self) -> usize {
         match self.concurrency_level {
             None => {
-                let level = num_cpus::get();
+                let level =
+                    (num_cpus::get() as f64 / self.num_executor_shards as f64).ceil() as usize;
                 println!(
-                    "\nVM concurrency level defaults to num of cpus: {}\n",
-                    level
+                    "\nVM concurrency level defaults to {} for number of shards {} \n",
+                    level, self.num_executor_shards
                 );
                 level
             },
@@ -213,7 +214,7 @@ enum Command {
 
 fn run<E>(opt: Opt)
 where
-    E: TransactionBlockExecutor<BenchmarkTransaction> + 'static,
+    E: TransactionBlockExecutor + 'static,
 {
     match opt.cmd {
         Command::CreateDb {
@@ -228,7 +229,7 @@ where
                 data_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );
@@ -253,7 +254,7 @@ where
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );
@@ -272,7 +273,7 @@ where
                 checkpoint_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.use_state_kv_db,
+                opt.split_ledger_db,
                 opt.use_sharded_state_merkle_db,
                 opt.pipeline_opt.pipeline_config(),
             );
@@ -296,6 +297,7 @@ fn main() {
         .build_global()
         .expect("Failed to build rayon global thread pool.");
     AptosVM::set_concurrency_level_once(opt.concurrency_level());
+    AptosVM::set_num_shards_once(opt.num_executor_shards);
     NativeExecutor::set_concurrency_level_once(opt.concurrency_level());
 
     if opt.use_native_executor {

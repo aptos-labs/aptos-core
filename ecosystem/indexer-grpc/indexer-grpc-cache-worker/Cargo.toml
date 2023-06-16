@@ -1,7 +1,7 @@
 [package]
 name = "aptos-indexer-grpc-cache-worker"
 description = "Indexer gRPC worker to collect on-chain data from node gRPC and push to cache."
-version = "0.1.0"
+version = "1.0.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -35,3 +35,11 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+aptos-config = { workspace = true }
+reqwest = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+integration-tests = []

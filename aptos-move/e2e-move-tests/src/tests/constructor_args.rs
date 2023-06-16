@@ -156,6 +156,14 @@ fn constructor_args_good() {
             ],
             "pff vectors of optionals",
         ),
+        (
+            "0xcafe::test::ensure_vector_vector_u8",
+            vec![
+                bcs::to_bytes(&OBJECT_ADDRESS).unwrap(), // Object<T>
+                bcs::to_bytes(&vec![vec![1u8], vec![2u8]]).unwrap(), // vector<vector<u8>>
+            ],
+            "vector<vector<u8>>",
+        ),
     ];
 
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::STRUCT_CONSTRUCTORS], vec![]);
@@ -224,6 +232,20 @@ fn constructor_args_bad() {
                     e,
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
                         StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
+                    )))
+                )
+            }),
+        ),
+        (
+            "0xcafe::test::ensure_no_fabrication",
+            vec![
+                bcs::to_bytes(&vec![1u64]).unwrap(), // Option<MyPrecious>
+            ],
+            Box::new(|e| {
+                matches!(
+                    e,
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE
                     )))
                 )
             }),

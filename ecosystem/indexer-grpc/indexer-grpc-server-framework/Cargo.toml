@@ -1,7 +1,7 @@
 [package]
 name = "aptos-indexer-grpc-server-framework"
-description = "Indexer gRPC server framework."
-version = "0.1.0"
+description = "Indexer gRPC server framework library."
+version = "1.0.0"
 
 # Workspace inherited keys
 authors = { workspace = true }

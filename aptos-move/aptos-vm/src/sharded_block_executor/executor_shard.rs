@@ -1,46 +1,44 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-use crate::{block_executor::BlockAptosVM, sharded_block_executor::ExecutorShardCommand};
+
+use crate::sharded_block_executor::{
+    block_executor_client::BlockExecutorClient, ExecutorShardCommand,
+};
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::transaction::TransactionOutput;
+use aptos_vm_logging::disable_speculative_logging;
 use move_core_types::vm_status::VMStatus;
-use std::sync::{
-    mpsc::{Receiver, Sender},
-    Arc,
-};
+use std::sync::mpsc::{Receiver, Sender};
 
 /// A remote block executor that receives transactions from a channel and executes them in parallel.
 /// Currently it runs in the local machine and it will be further extended to run in a remote machine.
-pub struct ExecutorShard<S: StateView + Sync + Send + 'static> {
+pub struct ExecutorShard<S, E> {
     shard_id: usize,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
+    executor_client: E,
     command_rx: Receiver<ExecutorShardCommand<S>>,
     result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-    maybe_gas_limit: Option<u64>,
 }
 
-impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
+impl<S: StateView + Sync + Send + 'static, E: BlockExecutorClient> ExecutorShard<S, E> {
     pub fn new(
+        num_executor_shards: usize,
+        executor_client: E,
         shard_id: usize,
-        num_executor_threads: usize,
         command_rx: Receiver<ExecutorShardCommand<S>>,
         result_tx: Sender<Result<Vec<TransactionOutput>, VMStatus>>,
-        maybe_gas_limit: Option<u64>,
     ) -> Self {
-        let executor_thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(num_executor_threads)
-                .build()
-                .unwrap(),
-        );
+        if num_executor_shards > 1 {
+            // todo: speculative logging is not yet compatible with sharded block executor.
+            disable_speculative_logging();
+        }
+
         Self {
             shard_id,
-            executor_thread_pool,
+            executor_client,
             command_rx,
             result_tx,
-            maybe_gas_limit,
         }
     }
 
@@ -52,18 +50,18 @@ impl<S: StateView + Sync + Send + 'static> ExecutorShard<S> {
                     state_view,
                     transactions,
                     concurrency_level_per_shard,
+                    maybe_block_gas_limit,
                 ) => {
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
                         transactions.len()
                     );
-                    let ret = BlockAptosVM::execute_block(
-                        self.executor_thread_pool.clone(),
+                    let ret = self.executor_client.execute_block(
                         transactions,
                         state_view.as_ref(),
                         concurrency_level_per_shard,
-                        self.maybe_gas_limit,
+                        maybe_block_gas_limit,
                     );
                     drop(state_view);
                     self.result_tx.send(ret).unwrap();

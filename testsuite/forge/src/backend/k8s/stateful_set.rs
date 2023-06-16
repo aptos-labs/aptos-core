@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_k8s_client, Get, K8sApi, Result, KUBECTL_BIN};
+use crate::{create_k8s_client, k8s_wait_nodes_strategy, K8sApi, ReadWrite, Result, KUBECTL_BIN};
 use again::RetryPolicy;
 use anyhow::bail;
 use aptos_logger::info;
-use aptos_retrier::ExponentWithLimitDelay;
 use json_patch::{Patch as JsonPatch, PatchOperation, ReplaceOperation};
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Pod};
 use kube::{
@@ -86,8 +85,8 @@ pub async fn wait_stateful_set(
 
 /// Checks the status of a single K8s StatefulSet. Also inspects the pods to make sure they are all ready.
 async fn check_stateful_set_status(
-    stateful_set_api: Arc<dyn Get<StatefulSet>>,
-    pod_api: Arc<dyn Get<Pod>>,
+    stateful_set_api: Arc<dyn ReadWrite<StatefulSet>>,
+    pod_api: Arc<dyn ReadWrite<Pod>>,
     sts_name: &str,
     desired_replicas: u64,
 ) -> Result<(), WorkloadScalingError> {
@@ -186,7 +185,7 @@ pub async fn set_stateful_set_image_tag(
     image_tag: String,
     kube_namespace: String,
 ) -> Result<()> {
-    let kube_client: K8sClient = create_k8s_client().await;
+    let kube_client: K8sClient = create_k8s_client().await?;
     let sts_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), &kube_namespace);
     let sts = sts_api.get(&stateful_set_name).await?;
     let image_repo = get_stateful_set_image(&sts)?.name;
@@ -217,7 +216,7 @@ pub async fn scale_stateful_set_replicas(
     kube_namespace: &str,
     replica_num: u64,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let pp = PatchParams::apply("forge").force();
     let patch = serde_json::json!({
@@ -251,7 +250,7 @@ pub async fn set_identity(
     kube_namespace: &str,
     k8s_secret_name: &str,
 ) -> Result<()> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let patch_op = PatchOperation::Replace(ReplaceOperation {
         // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
@@ -265,7 +264,7 @@ pub async fn set_identity(
 }
 
 pub async fn get_identity(sts_name: &str, kube_namespace: &str) -> Result<String> {
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let sts = stateful_set_api.get(sts_name).await?;
     // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
@@ -283,81 +282,46 @@ pub async fn check_for_container_restart(
     kube_namespace: &str,
     sts_name: &str,
 ) -> Result<()> {
-    aptos_retrier::retry_async(
-        ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000),
-        || {
-            let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
-            Box::pin(async move {
-                // Get the StatefulSet's Pod status
-                let pod_name = format!("{}-0", sts_name);
-                if let Some(status) = pod_api.get_status(&pod_name).await?.status {
-                    if let Some(container_statuses) = status.container_statuses {
-                        for container_status in container_statuses {
-                            if container_status.restart_count > 0 {
-                                bail!(
-                                    "Container {} in pod {} restarted {} times ",
-                                    container_status.name,
-                                    &pod_name,
-                                    container_status.restart_count
-                                );
-                            }
+    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
+        let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
+        Box::pin(async move {
+            // Get the StatefulSet's Pod status
+            let pod_name = format!("{}-0", sts_name);
+            if let Some(status) = pod_api.get_status(&pod_name).await?.status {
+                if let Some(container_statuses) = status.container_statuses {
+                    for container_status in container_statuses {
+                        if container_status.restart_count > 0 {
+                            bail!(
+                                "Container {} in pod {} restarted {} times ",
+                                container_status.name,
+                                &pod_name,
+                                container_status.restart_count
+                            );
                         }
-                        return Ok(());
                     }
-                    // In case of no restarts, k8 apis returns no container statuses
-                    Ok(())
-                } else {
-                    bail!("Can't query the pod status for {}", sts_name)
+                    return Ok(());
                 }
-            })
-        },
-    )
+                // In case of no restarts, k8 apis returns no container statuses
+                Ok(())
+            } else {
+                bail!("Can't query the pod status for {}", sts_name)
+            }
+        })
+    })
     .await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use k8s_openapi::api::{
-        apps::v1::{StatefulSet, StatefulSetSpec, StatefulSetStatus},
-        core::v1::{ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus},
+    use crate::{MockPodApi, MockStatefulSetApi};
+    use k8s_openapi::{
+        api::{
+            apps::v1::{StatefulSet, StatefulSetSpec, StatefulSetStatus},
+            core::v1::{ContainerState, ContainerStateWaiting, ContainerStatus, PodStatus},
+        },
+        apimachinery::pkg::apis::meta::v1::ObjectMeta,
     };
-    use kube::{api::ObjectMeta, Error as KubeError};
-
-    struct MockStatefulSetApi {
-        stateful_set: StatefulSet,
-    }
-
-    impl MockStatefulSetApi {
-        fn from_stateful_set(stateful_set: StatefulSet) -> Self {
-            MockStatefulSetApi { stateful_set }
-        }
-    }
-
-    #[async_trait]
-    impl Get<StatefulSet> for MockStatefulSetApi {
-        async fn get(&self, _name: &str) -> Result<StatefulSet, KubeError> {
-            Ok(self.stateful_set.clone())
-        }
-    }
-
-    struct MockPodApi {
-        pod: Pod,
-    }
-
-    impl MockPodApi {
-        fn from_pod(pod: Pod) -> Self {
-            MockPodApi { pod }
-        }
-    }
-
-    #[async_trait]
-    impl Get<Pod> for MockPodApi {
-        async fn get(&self, _name: &str) -> Result<Pod, KubeError> {
-            Ok(self.pod.clone())
-        }
-    }
 
     #[tokio::test]
     async fn test_check_stateful_set_status() {

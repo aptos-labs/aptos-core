@@ -129,15 +129,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    fn get_gas_prices(
-        &self,
-        start_version: Version,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<u64>> {
-        unimplemented!()
-    }
-
     /// See [AptosDB::get_transaction_by_hash].
     ///
     /// [AptosDB::get_transaction_by_hash]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash

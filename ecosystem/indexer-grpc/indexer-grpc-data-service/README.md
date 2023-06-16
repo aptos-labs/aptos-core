@@ -13,13 +13,19 @@ Indexer GRPC data service fetches data from both cache and file store.
 * Yaml Example
 
 ```yaml
-data_service_grpc_listen_address: 0.0.0.0:50052
-redis_address: 127.0.0.1:6379
-health_check_port: 8081
-whitelisted_auth_tokens: ["PUT YOUR TOKEN 1", "PUT YOUR TOKEN 2"]
-file_store:
-    file_store_type: GcsFileStore
-    gcs_file_store_bucket_name: indexer-grpc-file-store-testnet
+health_check_port: 8083
+server_config:
+    data_service_grpc_listen_address: 0.0.0.0:50052
+    whitelisted_auth_tokens: 
+      - "token1"
+      - "token2"
+    file_store_config:
+      file_store_type: GcsFileStore
+      gcs_file_store_bucket_name: indexer-grpc-file-store-bucketname
+    data_service_grpc_tls_config:
+      cert_path: /path/to/cert.cert
+      key_path: /path/to/key.pem
+    redis_read_replica_address: 127.0.0.1:6379
 ```
 
 ## How to use grpc web UI

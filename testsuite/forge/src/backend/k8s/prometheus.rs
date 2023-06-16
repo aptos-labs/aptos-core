@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{create_k8s_client, Get, K8sApi, Result};
+use crate::{create_k8s_client, K8sApi, ReadWrite, Result};
 use anyhow::bail;
 use aptos_logger::info;
 use k8s_openapi::api::core::v1::Secret;
@@ -11,7 +11,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 pub async fn get_prometheus_client() -> Result<PrometheusClient> {
     // read from the environment
-    let kube_client = create_k8s_client().await;
+    let kube_client = create_k8s_client().await?;
     let secrets_api = Arc::new(K8sApi::<Secret>::from_client(
         kube_client,
         Some("default".to_string()),
@@ -20,7 +20,7 @@ pub async fn get_prometheus_client() -> Result<PrometheusClient> {
 }
 
 async fn create_prometheus_client_from_environment(
-    secrets_api: Arc<dyn Get<Secret>>,
+    secrets_api: Arc<dyn ReadWrite<Secret>>,
 ) -> Result<PrometheusClient> {
     let prom_url_env = std::env::var("PROMETHEUS_URL");
     let prom_token_env = std::env::var("PROMETHEUS_TOKEN");
@@ -135,39 +135,14 @@ pub async fn query_with_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
+    use crate::MockSecretApi;
     use k8s_openapi::ByteString;
-    use kube::{api::ObjectMeta, error::ErrorResponse, Error as KubeError};
+    use kube::api::ObjectMeta;
     use prometheus_http_query::Error as PrometheusError;
     use std::{
         env,
         time::{SystemTime, UNIX_EPOCH},
     };
-
-    struct MockSecretApi {
-        secret: Option<Secret>,
-    }
-
-    impl MockSecretApi {
-        fn from_secret(secret: Option<Secret>) -> Self {
-            MockSecretApi { secret }
-        }
-    }
-
-    #[async_trait]
-    impl Get<Secret> for MockSecretApi {
-        async fn get(&self, _name: &str) -> Result<Secret, KubeError> {
-            match self.secret {
-                Some(ref s) => Ok(s.clone()),
-                None => Err(KubeError::Api(ErrorResponse {
-                    status: "status".to_string(),
-                    message: "message".to_string(),
-                    reason: "reason".to_string(),
-                    code: 404,
-                })),
-            }
-        }
-    }
 
     #[tokio::test]
     async fn test_create_client_secret() {
@@ -230,7 +205,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_prometheus() {
-        let client = get_prometheus_client().await.unwrap();
+        let client_result = get_prometheus_client().await;
+
+        // Currently this test tries to connect to the internet... and doesnt
+        // require success so it is likely to be skipped
+        // We should come back with some abstractions to make this more testable
+        let client = if let Ok(client) = client_result {
+            client
+        } else {
+            println!("Skipping test. Failed to create prometheus client");
+            return;
+        };
 
         // try a simple instant query
         // if it fails to connect to a prometheus instance, skip the test

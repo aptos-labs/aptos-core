@@ -21,7 +21,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
-    test_helpers::transaction_test_helpers::block,
+    test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
         Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
         WriteSetPayload,
@@ -160,10 +160,14 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             txn_factory.transfer(account3.address(), 10 * B),
         )));
     }
-    let block3 = block(block3, executor.get_block_gas_limit()); // append state checkpoint txn
+    let block3 = block(block3, BLOCK_GAS_LIMIT); // append state checkpoint txn
 
     let output1 = executor
-        .execute_block((block1_id, block1.clone()), parent_block_id)
+        .execute_block(
+            (block1_id, block1.clone()).into(),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
     let epoch2_genesis_id = Block::make_genesis_block_from_ledger_info(li1.ledger_info()).id();
@@ -371,7 +375,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Execute block 2, 3, 4
     let output2 = executor
-        .execute_block((block2_id, block2), epoch2_genesis_id)
+        .execute_block(
+            (block2_id, block2).into(),
+            epoch2_genesis_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, &[signer.clone()]);
     let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
@@ -386,7 +394,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     assert_eq!(current_version, 13);
 
     let output3 = executor
-        .execute_block((block3_id, block3.clone()), epoch3_genesis_id)
+        .execute_block(
+            (block3_id, block3.clone()).into(),
+            epoch3_genesis_id,
+            BLOCK_GAS_LIMIT,
+        )
         .unwrap();
     let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, &[signer]);
     executor.commit_blocks(vec![block3_id], li3).unwrap();
@@ -430,7 +442,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     .unwrap();
 
     // With block gas limit, StateCheckpoint txn is inserted to block after execution.
-    let diff = executor.get_block_gas_limit().map(|_| 0).unwrap_or(1);
+    let diff = BLOCK_GAS_LIMIT.map(|_| 0).unwrap_or(1);
 
     let transaction_list_with_proof = db
         .reader
@@ -509,7 +521,7 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<AptosVM, Transaction>,
+    BlockExecutor<AptosVM>,
     Waypoint,
 ) {
     let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));

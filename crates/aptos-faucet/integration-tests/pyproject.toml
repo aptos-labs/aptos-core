@@ -7,7 +7,7 @@ license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = ">=3.7 <4"
-requests = "^2.28.2"
+requests = "^2.31.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"

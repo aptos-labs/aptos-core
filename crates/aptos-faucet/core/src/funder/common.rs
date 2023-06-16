@@ -140,6 +140,10 @@ pub struct TransactionSubmissionConfig {
     #[serde(default = "TransactionSubmissionConfig::default_transaction_expiration_secs")]
     pub transaction_expiration_secs: u64,
 
+    /// Amount of time we'll wait for the seqnum to catch up before resetting it.
+    #[serde(default = "TransactionSubmissionConfig::default_wait_for_outstanding_txns_secs")]
+    pub wait_for_outstanding_txns_secs: u64,
+
     /// Whether to wait for the transaction before returning.
     #[serde(default)]
     pub wait_for_transactions: bool,
@@ -152,6 +156,7 @@ impl TransactionSubmissionConfig {
         gas_unit_price_override: Option<u64>,
         max_gas_amount: u64,
         transaction_expiration_secs: u64,
+        wait_for_outstanding_txns_secs: u64,
         wait_for_transactions: bool,
     ) -> Self {
         Self {
@@ -160,6 +165,7 @@ impl TransactionSubmissionConfig {
             gas_unit_price_override,
             max_gas_amount,
             transaction_expiration_secs,
+            wait_for_outstanding_txns_secs,
             wait_for_transactions,
         }
     }
@@ -173,6 +179,10 @@ impl TransactionSubmissionConfig {
     }
 
     fn default_transaction_expiration_secs() -> u64 {
+        25
+    }
+
+    fn default_wait_for_outstanding_txns_secs() -> u64 {
         30
     }
 
@@ -198,6 +208,7 @@ pub async fn update_sequence_numbers(
     outstanding_requests: &RwLock<Vec<(AccountAddress, u64)>>,
     receiver_address: AccountAddress,
     amount: u64,
+    wait_for_outstanding_txns_secs: u64,
 ) -> Result<(u64, Option<u64>), AptosTapError> {
     let (mut funder_seq, mut receiver_seq) =
         get_sequence_numbers(client, funder_account, receiver_address).await?;
@@ -216,7 +227,7 @@ pub async fn update_sequence_numbers(
 
     let mut set_outstanding = false;
     // We shouldn't have too many outstanding txns
-    for _ in 0..60 {
+    for _ in 0..(wait_for_outstanding_txns_secs * 2) {
         if our_funder_seq < funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
             // Enforce a stronger ordering of priorities based upon the MintParams that arrived
             // first. Then put the other folks to sleep to try again until the queue fills up.
@@ -353,7 +364,7 @@ pub async fn submit_transaction(
         Ok(_) => {
             info!(
                 hash = signed_transaction.clone().committed_hash().to_hex_literal(),
-                receiver_address = receiver_address,
+                address = receiver_address,
                 event = event_on_success,
             );
             Ok(signed_transaction)

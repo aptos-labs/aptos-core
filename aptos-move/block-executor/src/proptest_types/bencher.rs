@@ -9,6 +9,9 @@ use crate::{
         TransactionGenParams, ValueType,
     },
 };
+use aptos_types::{
+    block_executor::partitioner::ExecutableTransactions, executable::ExecutableTestType,
+};
 use criterion::{BatchSize, Bencher as CBencher};
 use num_cpus;
 use proptest::{
@@ -33,7 +36,7 @@ pub(crate) struct BencherState<
 > where
     Vec<u8>: From<V>,
 {
-    transactions: Vec<Transaction<KeyType<K>, ValueType<V>>>,
+    transactions: ExecutableTransactions<Transaction<KeyType<K>, ValueType<V>>>,
     expected_output: ExpectedOutput<ValueType<V>>,
 }
 
@@ -103,7 +106,7 @@ where
         let expected_output = ExpectedOutput::generate_baseline(&transactions, None, None);
 
         Self {
-            transactions,
+            transactions: ExecutableTransactions::Unsharded(transactions),
             expected_output,
         }
     }
@@ -124,6 +127,7 @@ where
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
             EmptyDataView<KeyType<K>, ValueType<V>>,
+            ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 

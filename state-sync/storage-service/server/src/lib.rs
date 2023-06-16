@@ -23,9 +23,9 @@ use futures::stream::StreamExt;
 use handler::Handler;
 use lru::LruCache;
 use moderator::RequestModerator;
+use optimistic_fetch::OptimisticFetchRequest;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use storage::StorageReaderInterface;
-use subscription::DataSubscriptionRequest;
 use thiserror::Error;
 use tokio::runtime::Handle;
 
@@ -35,8 +35,8 @@ mod logging;
 pub mod metrics;
 mod moderator;
 pub mod network;
+mod optimistic_fetch;
 pub mod storage;
-mod subscription;
 
 #[cfg(test)]
 mod tests;
@@ -54,13 +54,13 @@ pub struct StorageServiceServer<T> {
     // request. This is refreshed periodically.
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 
-    // A set of active subscriptions for peers waiting for new data
-    data_subscriptions: Arc<Mutex<HashMap<PeerNetworkId, DataSubscriptionRequest>>>,
-
     // An LRU cache for commonly requested data items.
     // Note: This is not just a database cache because it contains
     // responses that have already been serialized and compressed.
     lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+
+    // A set of active optimistic fetches for peers waiting for new data
+    optimistic_fetches: Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>>,
 
     // A moderator for incoming peer requests
     request_moderator: Arc<RequestModerator>,
@@ -78,7 +78,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
-        let data_subscriptions = Arc::new(Mutex::new(HashMap::new()));
+        let optimistic_fetches = Arc::new(Mutex::new(HashMap::new()));
         let lru_response_cache = Arc::new(Mutex::new(LruCache::new(
             config.max_lru_cache_size as usize,
         )));
@@ -96,8 +96,8 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             network_requests,
             time_service,
             cached_storage_server_summary,
-            data_subscriptions,
             lru_response_cache,
+            optimistic_fetches,
             request_moderator,
         }
     }
@@ -136,11 +136,11 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             .await;
     }
 
-    /// Spawns a non-terminating task that handles subscriptions
-    async fn spawn_subscription_handler(&mut self) {
+    /// Spawns a non-terminating task that handles optimistic fetches
+    async fn spawn_optimistic_fetch_handler(&mut self) {
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
-        let data_subscriptions = self.data_subscriptions.clone();
+        let optimistic_fetches = self.optimistic_fetches.clone();
         let lru_response_cache = self.lru_response_cache.clone();
         let request_moderator = self.request_moderator.clone();
         let storage = self.storage.clone();
@@ -154,23 +154,23 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                 let ticker = time_service.interval(duration);
                 futures::pin_mut!(ticker);
 
-                // Periodically check the data subscriptions
+                // Periodically check the optimistic fetches
                 loop {
                     ticker.next().await;
 
-                    // Check and handle the active subscriptions
-                    if let Err(error) = subscription::handle_active_data_subscriptions(
+                    // Check and handle the active optimistic fetches
+                    if let Err(error) = optimistic_fetch::handle_active_optimistic_fetches(
                         cached_storage_server_summary.clone(),
                         config,
-                        data_subscriptions.clone(),
+                        optimistic_fetches.clone(),
                         lru_response_cache.clone(),
                         request_moderator.clone(),
                         storage.clone(),
                         time_service.clone(),
                     ) {
-                        error!(LogSchema::new(LogEntry::SubscriptionRefresh)
+                        error!(LogSchema::new(LogEntry::OptimisticFetchRefresh)
                             .error(&error)
-                            .message("Failed to handle active data subscriptions!"));
+                            .message("Failed to handle active optimistic fetches!"));
                     }
                 }
             })
@@ -212,8 +212,8 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         // Spawn the refresher for the storage summary cache
         self.spawn_storage_summary_refresher().await;
 
-        // Spawn the subscription handler
-        self.spawn_subscription_handler().await;
+        // Spawn the optimistic fetch handler
+        self.spawn_optimistic_fetch_handler().await;
 
         // Spawn the refresher for the request moderator
         self.spawn_moderator_peer_refresher().await;
@@ -236,7 +236,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
-            let data_subscriptions = self.data_subscriptions.clone();
+            let optimistic_fetches = self.optimistic_fetches.clone();
             let lru_response_cache = self.lru_response_cache.clone();
             let request_moderator = self.request_moderator.clone();
             let time_service = self.time_service.clone();
@@ -244,7 +244,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                 .spawn_blocking(move || {
                     Handler::new(
                         cached_storage_server_summary,
-                        data_subscriptions,
+                        optimistic_fetches,
                         lru_response_cache,
                         request_moderator,
                         storage,
@@ -252,7 +252,6 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
                     )
                     .process_request_and_respond(
                         peer_network_id,
-                        protocol_id,
                         storage_service_request,
                         network_request.response_sender,
                     );
@@ -265,6 +264,14 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     /// Returns a copy of the request moderator for test purposes
     pub(crate) fn get_request_moderator(&self) -> Arc<RequestModerator> {
         self.request_moderator.clone()
+    }
+
+    #[cfg(test)]
+    /// Returns a copy of the active optimistic fetches for test purposes
+    pub(crate) fn get_optimistic_fetches(
+        &self,
+    ) -> Arc<Mutex<HashMap<PeerNetworkId, OptimisticFetchRequest>>> {
+        self.optimistic_fetches.clone()
     }
 }
 

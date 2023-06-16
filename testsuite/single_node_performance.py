@@ -7,7 +7,7 @@ import re
 import os
 import tempfile
 import json
-from typing import Callable, Optional, Tuple, Mapping, Sequence
+from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass
@@ -21,15 +21,15 @@ EXPECTED_TPS = {
     ("coin-transfer", False, 1): (12600.0, True),
     ("coin-transfer", True, 1): (22100.0, True),
     ("account-generation", False, 1): (11000.0, True),
-    ("account-generation", True, 1): (17600.0, True),
+    ("account-generation", True, 1): (20000.0, True),
     # changed to not use account_pool. either recalibrate or add here to use account pool.
-    ("account-resource32-b", False, 1): (13000.0, False),
+    ("account-resource32-b", False, 1): (15000.0, False),
     ("modify-global-resource", False, 1): (3700.0, True),
     ("modify-global-resource", False, 10): (10800.0, True),
     # seems to have changed, disabling as land_blocking, until recalibrated
     ("publish-package", False, 1): (159.0, False),
     ("batch100-transfer", False, 1): (350, True),
-    ("batch100-transfer", True, 1): (553, True),
+    ("batch100-transfer", True, 1): (630, True),
     ("token-v1ft-mint-and-transfer", False, 1): (1650.0, True),
     ("token-v1ft-mint-and-transfer", False, 20): (7100.0, True),
     ("token-v1nft-mint-and-transfer-sequential", False, 1): (1100.0, True),
@@ -91,15 +91,22 @@ def execute_command(command):
         universal_newlines=True,
     ) as p:
         # stream to output while command is executing
-        for line in p.stdout:
-            print(line, end="")
-            result.append(line)
+        if p.stdout is not None:
+            for line in p.stdout:
+                print(line, end="")
+                result.append(line)
 
     if p.returncode != 0:
         raise CalledProcessError(p.returncode, p.args)
 
     # return the full output in the end for postprocessing
-    return "\n".join(result)
+    full_result = "\n".join(result)
+
+    if " ERROR " in full_result:
+        print("ERROR log line in execution")
+        exit(1)
+
+    return full_result
 
 
 @dataclass
@@ -153,7 +160,7 @@ def extract_run_results(output: str, execution_only: bool) -> RunResults:
 def print_table(
     results: Sequence[RunGroupInstance],
     by_levels: bool,
-    single_field: Optional[Tuple[str, Callable[[RunResults], any]]],
+    single_field: Optional[Tuple[str, Callable[[RunResults], Any]]],
     concurrency_levels=EXECUTION_ONLY_CONCURRENCY_LEVELS,
 ):
     headers = [
@@ -188,11 +195,14 @@ def print_table(
             result.expected_tps,
         ]
         if by_levels:
-            _, field_getter = single_field
-            for concurrency_level in concurrency_levels:
-                row.append(
-                    field_getter(result.concurrency_level_results[concurrency_level])
-                )
+            if single_field is not None:
+                _, field_getter = single_field
+                for concurrency_level in concurrency_levels:
+                    row.append(
+                        field_getter(
+                            result.concurrency_level_results[concurrency_level]
+                        )
+                    )
 
         if single_field is not None:
             _, field_getter = single_field
@@ -212,7 +222,7 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --use-state-kv-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {BLOCK_SIZE} --concurrency-level {CONCURRENCY_LEVEL} --split-ledger-db --use-sharded-state-merkle-db create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -227,7 +237,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         executor_type = "native" if use_native_executor else "VM"
 
         use_native_executor_str = "--use-native-executor" if use_native_executor else ""
-        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --use-state-kv-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{use_native_executor_str} --generate-then-execute --transactions-per-sender 1 --block-size {cur_block_size} --split-ledger-db --use-sharded-state-merkle-db run-executor --transaction-type {transaction_type} --module-working-set-size {module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {ADDITIONAL_DST_POOL_ACCOUNTS} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         concurrency_level_results = {}
 

@@ -57,7 +57,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         config.base.role,
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state);
+    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
 }
 
 proptest! {

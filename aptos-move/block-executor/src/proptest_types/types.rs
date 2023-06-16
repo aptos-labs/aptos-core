@@ -16,6 +16,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     executable::ModulePath,
+    fee_statement::FeeStatement,
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
     write_set::{TransactionWrite, WriteOp},
 };
@@ -516,6 +517,10 @@ where
     fn gas_used(&self) -> u64 {
         1
     }
+
+    fn fee_statement(&self) -> FeeStatement {
+        FeeStatement::new(1, 1, 0, 0, 0)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -536,7 +541,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     pub fn generate_baseline<K: Hash + Clone + Eq>(
         txns: &[Transaction<K, V>],
         resolved_deltas: Option<Vec<Vec<(K, WriteOp)>>>,
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         let mut current_world = HashMap::new();
         // Delta world stores the latest u128 value of delta aggregator. When empty, the
@@ -640,7 +645,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
 
                     // In unit tests, the gas_used of any txn is set to be 1.
                     accumulated_gas += 1;
-                    if let Some(block_gas_limit) = maybe_gas_limit {
+                    if let Some(block_gas_limit) = maybe_block_gas_limit {
                         if accumulated_gas >= block_gas_limit {
                             return Self::ExceedBlockGasLimit(idx, result_vec);
                         }

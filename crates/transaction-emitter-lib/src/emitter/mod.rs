@@ -10,13 +10,13 @@ use crate::emitter::{
     account_minter::AccountMinter,
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
-    transaction_executor::RestApiTransactionExecutor,
+    transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -68,7 +68,7 @@ pub struct EmitModeParams {
     pub worker_offset_mode: WorkerOffsetMode,
     pub wait_millis: u64,
     pub check_account_sequence_only_once_fraction: f32,
-    pub check_account_sequence_sleep_millis: u64,
+    pub check_account_sequence_sleep: Duration,
 }
 
 #[derive(Clone, Debug)]
@@ -140,6 +140,8 @@ pub struct EmitJobRequest {
     prompt_before_spending: bool,
 
     coordination_delay_between_instances: Duration,
+
+    latency_polling_interval: Duration,
 }
 
 impl Default for EmitJobRequest {
@@ -163,6 +165,7 @@ impl Default for EmitJobRequest {
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
+            latency_polling_interval: Duration::from_millis(300),
         }
     }
 }
@@ -257,6 +260,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn latency_polling_interval(mut self, latency_polling_interval: Duration) -> Self {
+        self.latency_polling_interval = latency_polling_interval;
+        self
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 
@@ -294,7 +302,7 @@ impl EmitJobRequest {
                     workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 0.0,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep: self.latency_polling_interval,
                 }
             },
             EmitJobMode::ConstTps { tps }
@@ -382,7 +390,7 @@ impl EmitJobRequest {
                     workers_per_endpoint: num_workers_per_endpoint,
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
-                    check_account_sequence_sleep_millis: 300,
+                    check_account_sequence_sleep: self.latency_polling_interval,
                 }
             },
         }
@@ -558,7 +566,7 @@ impl TxnEmitter {
             init_retries,
             req.init_retry_interval.as_secs_f32()
         );
-        let txn_executor = RestApiTransactionExecutor {
+        let txn_executor = RestApiReliableTransactionSubmitter {
             rest_clients: req.rest_clients.clone(),
             max_retries: init_retries,
             retry_after: req.init_retry_interval,
@@ -908,32 +916,45 @@ pub async fn query_sequence_numbers<'a, I>(
 where
     I: Iterator<Item = &'a AccountAddress>,
 {
-    let (addresses, futures): (Vec<_>, Vec<_>) = addresses
-        .map(|address| {
-            (
-                *address,
-                RETRY_POLICY.retry(move || client.get_account_bcs(*address)),
-            )
-        })
-        .unzip();
+    let futures = addresses
+        .map(|address| RETRY_POLICY.retry(move || get_account_if_exists(client, *address)));
 
     let (seq_nums, timestamps): (Vec<_>, Vec<_>) = try_join_all(futures)
         .await
         .map_err(|e| format_err!("Get accounts failed: {:?}", e))?
         .into_iter()
-        .zip(addresses.iter())
-        .map(|(resp, address)| {
-            let (account, state) = resp.into_parts();
-            (
-                (*address, account.sequence_number()),
-                Duration::from_micros(state.timestamp_usecs).as_secs(),
-            )
-        })
         .unzip();
 
     // return min for the timestamp, to make sure
     // all sequence numbers were <= to return values at that timestamp
     Ok((seq_nums, timestamps.into_iter().min().unwrap()))
+}
+
+async fn get_account_if_exists(
+    client: &RestClient,
+    address: AccountAddress,
+) -> Result<((AccountAddress, u64), u64)> {
+    let result = client.get_account_bcs(address).await;
+    match &result {
+        Ok(resp) => Ok((
+            (address, resp.inner().sequence_number()),
+            Duration::from_micros(resp.state().timestamp_usecs).as_secs(),
+        )),
+        Err(e) => {
+            // if account is not present, that is equivalent to sequence_number = 0
+            if let RestError::Api(api_error) = e {
+                if let AptosErrorCode::AccountNotFound = api_error.error.error_code {
+                    return Ok((
+                        (address, 0),
+                        Duration::from_micros(api_error.state.as_ref().unwrap().timestamp_usecs)
+                            .as_secs(),
+                    ));
+                }
+            }
+            result?;
+            unreachable!()
+        },
+    }
 }
 
 pub fn gen_transfer_txn_request(

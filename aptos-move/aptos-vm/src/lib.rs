@@ -113,7 +113,6 @@ mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
-mod delta_state_view;
 mod errors;
 pub mod move_vm_ext;
 pub mod natives;
@@ -153,14 +152,7 @@ pub trait VMExecutor: Send + Sync {
     fn execute_block(
         transactions: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
-
-    /// Executes a block of transactions with per_block_gas_limit
-    /// and returns output for each one of them.
-    fn execute_block_with_gas_limit(
-        transactions: Vec<Transaction>,
-        state_view: &(impl StateView + Sync),
-        maybe_gas_limit: Option<u64>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
@@ -168,6 +160,7 @@ pub trait VMExecutor: Send + Sync {
         sharded_block_executor: &ShardedBlockExecutor<S>,
         transactions: Vec<Transaction>,
         state_view: Arc<S>,
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 

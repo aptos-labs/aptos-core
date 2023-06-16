@@ -1,2 +1,2 @@
 // hardcoded for now, we would want to have it injected dynamically
-export const VERSION = "1.9.0";
+export const VERSION = "1.10.0";

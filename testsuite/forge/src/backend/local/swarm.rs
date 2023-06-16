@@ -456,7 +456,7 @@ impl LocalSwarm {
 impl Drop for LocalSwarm {
     fn drop(&mut self) {
         // If panicking, persist logs
-        if std::thread::panicking() {
+        if std::env::var("LOCAL_SWARM_SAVE_LOGS").is_ok() || std::thread::panicking() {
             eprintln!("Logs located at {}", self.logs_location());
         }
     }
@@ -548,7 +548,7 @@ impl Swarm for LocalSwarm {
         self.add_validator_fullnode(version, template, id)
     }
 
-    fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
         self.add_fullnode(version, template)
     }
 
@@ -648,6 +648,10 @@ impl Swarm for LocalSwarm {
             inspection_service_url,
             self.chain_id,
         )
+    }
+
+    fn get_default_pfn_node_config(&self) -> NodeConfig {
+        todo!()
     }
 }
 

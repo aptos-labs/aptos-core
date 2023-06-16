@@ -138,12 +138,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let cs1 = session.finish(&mut (), &configs).unwrap();
 
     // Publish the framework, using a different session id, in case both scripts creates tables
     let state_view = GenesisStateView::new();
@@ -154,15 +150,10 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
-    let cs2 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
-    let change_set_ext = cs1.squash(cs2).unwrap();
+    let cs2 = session.finish(&mut (), &configs).unwrap();
+    let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -172,11 +163,9 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
-        .iter()
-        .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
+    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(&events);
+    let change_set = ChangeSet::new(write_set, events);
     Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set))
 }
 
@@ -257,12 +246,8 @@ pub fn encode_genesis_change_set(
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
 
-    let cs1 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let configs = ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION);
+    let cs1 = session.finish(&mut (), &configs).unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = state_view.as_move_resolver();
@@ -273,16 +258,10 @@ pub fn encode_genesis_change_set(
     let id2 = HashValue::new(id2_arr);
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), true);
     publish_framework(&mut session, framework);
-    let cs2 = session
-        .finish(
-            &mut (),
-            &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-        )
-        .unwrap();
+    let cs2 = session.finish(&mut (), &configs).unwrap();
+    let change_set = cs1.squash(cs2, &configs).unwrap();
 
-    let change_set_ext = cs1.squash(cs2).unwrap();
-
-    let (delta_change_set, change_set) = change_set_ext.into_inner();
+    let (write_set, delta_change_set, events) = change_set.unpack();
 
     // Publishing stdlib should not produce any deltas around aggregators and map to write ops and
     // not deltas. The second session only publishes the framework module bundle, which should not
@@ -292,12 +271,9 @@ pub fn encode_genesis_change_set(
         "non-empty delta change set in genesis"
     );
 
-    assert!(!change_set
-        .write_set()
-        .iter()
-        .any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(change_set.events());
-    change_set
+    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(&events);
+    ChangeSet::new(write_set, events)
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
@@ -433,7 +409,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
-        FeatureFlag::STORAGE_SLOT_METADATA,
+        FeatureFlag::CHARGE_INVARIANT_VIOLATION,
     ]
 }
 

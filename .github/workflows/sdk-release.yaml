@@ -8,11 +8,9 @@
 ## this within an in-review PR.
 
 ## If the above approach is too slow (since you have to wait for the rust images
-## to build), you can cut the iteration time dramatically by adding a push trigger
-## and replacing inputs.GITHUB_SHA with a specific commit from the main branch for
-## which you know the rust images step has completed. So to be clear:
-##   - Replace ${{ inputs.GIT_SHA }} for the checkout step with ${{ github.sha }}
-##   - Replace all other instances of ${{ inputs.GIT_SHA }} with the said specific commit.
+## to build), you can cut the iteration time dramatically by changing the envs
+##   - Replace env.IMAGE_TAG for a known image tag
+##   - env.GIT_SHA will resolve to that of your PR branch
 
 name: "API + TS SDK CI"
 on:
@@ -24,6 +22,15 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag to release the SDK from
+  pull_request:
+    paths:
+      - .github/workflows/sdk-release.yaml
+
+env:
+  # This is the docker image tag that will be used for the SDK release.
+  # It is also used to pull the docker images for the CI.
+  IMAGE_TAG: ${{ inputs.GIT_SHA || 'devnet' }} # default to "devnet" tag when not running on workflow_call
+  GIT_SHA: ${{ inputs.GIT_SHA || github.event.pull_request.head.sha || github.sha }} # default to PR branch sha when not running on workflow_call
 
 jobs:
   # Confirm that the generated client within the TS SDK has been re-generated
@@ -43,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
         with:
-          ref: ${{ inputs.GIT_SHA }}
+          ref: ${{ env.GIT_SHA }}
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:
@@ -61,7 +68,7 @@ jobs:
 
       # Self hosted runners don't have pnpm preinstalled.
       # https://github.com/actions/setup-node/issues/182
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
 
       # When using high-perf-docker, the CI is actually run with two containers
       # in a k8s pod, one for docker commands run in the CI steps (docker), and
@@ -76,13 +83,13 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
       - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
         name: generate-json-spec
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --rm --mount=type=bind,source=${{ runner.temp }}/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
@@ -100,7 +107,7 @@ jobs:
 
       # These two have to be defined here and not in the env section because the runner
       # context is only available here.
-      - run: echo "APTOS_INVOCATION='docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos'" >> ./ecosystem/typescript/sdk/.env
+      - run: echo "APTOS_INVOCATION='docker run -v ${{ runner.temp }}/ans:/tmp/ans --network host ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos'" >> ./ecosystem/typescript/sdk/.env
       - run: echo "ANS_REPO_LOCATION=${{ runner.temp }}/ans" >> ./ecosystem/typescript/sdk/.env
 
       - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
@@ -117,7 +124,7 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
-      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
+      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${IMAGE_TAG} aptos node run-local-testnet --with-faucet
 
       # Wait for the API and faucet to startup.
       - run: npm install -g wait-on
@@ -130,7 +137,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: cd ./ecosystem/typescript/sdk && pnpm test
+          command: cd ./ecosystem/typescript/sdk && pnpm run test:ci
       - run: cd ./ecosystem/typescript/sdk && pnpm build
 
       # Confirm the Rust API client examples pass.
@@ -141,3 +148,31 @@ jobs:
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs local-testnet
+
+  # Run the TS SDK indexer tests. Note: indexer service can be flaky and we
+  # dont want those tests to be land blocking for any PR on the aptos repo.
+  # This is why we run those tests separate from
+  # test-sdk-confirm-client-generated-publish.
+  run-indexer-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+        with:
+          ref: ${{ env.GIT_SHA }}
+      - uses: actions/setup-node@969bd2663942d722d85b6a8626225850c2f7be4b # pin@v3
+        with:
+          node-version-file: .node-version
+          registry-url: "https://registry.npmjs.org"
+      - uses: pnpm/action-setup@537643d491d20c2712d11533497cb47b2d0eb9d5 # pin https://github.com/pnpm/action-setup/releases/tag/v2.2.3
+
+      # Run package install. If install fails, it probably means the lockfile
+      # was not included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && pnpm install --frozen-lockfile
+
+      # Run indexer tests.
+      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+        name: ts-sdk-indexer-test
+        with:
+          max_attempts: 3
+          timeout_minutes: 20
+          command: cd ./ecosystem/typescript/sdk && pnpm run test:indexer

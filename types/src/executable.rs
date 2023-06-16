@@ -37,7 +37,7 @@ impl ModulePath for StateKey {
 /// For the executor to manage memory consumption, executables should provide size.
 /// Note: explore finer-grained eviction mechanisms, e.g. LRU-based, or having
 /// different ownership for the arena / memory.
-pub trait Executable: Clone {
+pub trait Executable: Clone + Send + Sync {
     fn size_bytes(&self) -> usize;
 }
 
@@ -50,9 +50,12 @@ impl Executable for ExecutableTestType {
     }
 }
 
+// TODO: variant for a compiled module when available to avoid deserialization.
 pub enum FetchedModule<X: Executable> {
     Blob(Option<Vec<u8>>),
-    // TODO: compiled module when available to avoid deserialization.
+    // Note: We could use Weak / & for parallel and sequential modes, respectively
+    // but rely on Arc for a simple and unified treatment for the time being.
+    // TODO: change Arc<X> to custom reference when we have memory manager / arena.
     Executable(Arc<X>),
 }
 

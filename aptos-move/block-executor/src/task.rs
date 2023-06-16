@@ -7,6 +7,7 @@ use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::TStateView;
 use aptos_types::{
     executable::ModulePath,
+    fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use std::{fmt::Debug, hash::Hash};
@@ -24,7 +25,7 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
-/// Trait that defines a transaction that could be parallel executed by the scheduler. Each
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
@@ -95,4 +96,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Return the amount of gas consumed by the transaction.
     fn gas_used(&self) -> u64;
+
+    /// Return the fee statement of the transaction.
+    fn fee_statement(&self) -> FeeStatement;
 }

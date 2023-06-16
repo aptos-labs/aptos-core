@@ -47,7 +47,7 @@ pub struct Cmd {
     opt_out_backup_checkpoint: bool,
 
     #[clap(long)]
-    use_state_kv_db: bool,
+    split_ledger_db: bool,
 }
 
 impl Cmd {
@@ -61,14 +61,19 @@ impl Cmd {
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
             // TODO(grao): Support sharded state merkle db here.
-            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir, false)?;
+            AptosDB::create_checkpoint(
+                &self.db_dir,
+                backup_checkpoint_dir,
+                self.split_ledger_db,
+                false,
+            )?;
             println!("Done!");
         } else {
             println!("Opted out backup creation!.");
         }
 
         let rocksdb_config = RocksdbConfigs {
-            use_state_kv_db: self.use_state_kv_db,
+            split_ledger_db: self.split_ledger_db,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -81,9 +86,9 @@ impl Cmd {
         let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
-        let overall_version =
-            get_overall_commit_progress(&ledger_db)?.expect("Overall commit progress must exist.");
-        let ledger_db_version = get_ledger_commit_progress(&ledger_db)?
+        let overall_version = get_overall_commit_progress(ledger_db.metadata_db())?
+            .expect("Overall commit progress must exist.");
+        let ledger_db_version = get_ledger_commit_progress(ledger_db.metadata_db())?
             .expect("Current version of ledger db must exist.");
         let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?
             .expect("Current version of state kv db must exist.");
@@ -104,7 +109,7 @@ impl Cmd {
         // it faster, since our data is append only.
         if self.target_version < state_merkle_db_version {
             let state_merkle_target_version = Self::find_tree_root_at_or_before(
-                &ledger_db,
+                ledger_db.metadata_db(),
                 &state_merkle_db,
                 self.target_version,
             )?
@@ -124,7 +129,7 @@ impl Cmd {
         }
 
         println!("Starting ledger db and state kv db truncation...");
-        ledger_db.put::<DbMetadataSchema>(
+        ledger_db.metadata_db().put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(self.target_version),
         )?;
@@ -155,7 +160,7 @@ impl Cmd {
     }
 
     fn find_tree_root_at_or_before(
-        ledger_db: &DB,
+        ledger_metadata_db: &DB,
         state_merkle_db: &StateMerkleDb,
         version: Version,
     ) -> Result<Option<Version>> {
@@ -164,7 +169,8 @@ impl Cmd {
                 if Self::root_exists_at_version(state_merkle_db, closest_version)? {
                     return Ok(Some(closest_version));
                 }
-                let mut iter = ledger_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
+                let mut iter =
+                    ledger_metadata_db.iter::<EpochByVersionSchema>(ReadOptions::default())?;
                 iter.seek_for_prev(&version)?;
                 match iter.next().transpose()? {
                     Some((closest_epoch_version, _)) => {
@@ -215,6 +221,7 @@ mod test {
 
         #[test]
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
+            aptos_logger::Logger::new().init();
             let tmp_dir = TempPath::new();
             let db = AptosDB::new_for_test(&tmp_dir);
             let mut in_memory_state = db.state_store.buffered_state().lock().current_state().clone();
@@ -240,7 +247,7 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
-                use_state_kv_db: false,
+                split_ledger_db: false,
             };
 
             cmd.run().unwrap();
@@ -264,7 +271,7 @@ mod test {
 
             drop(db);
 
-            let (ledger_db, state_merkle_db, _) = AptosDB::open_dbs(
+            let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 tmp_dir.path().to_path_buf(),
                 RocksdbConfigs::default(),
                 /*readonly=*/ false,
@@ -272,44 +279,46 @@ mod test {
             ).unwrap();
 
             let num_frozen_nodes = num_frozen_nodes_in_accumulator(target_version + 1);
-            let mut iter = ledger_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_accumulator_db().iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             let position = iter.next().transpose().unwrap().unwrap().0;
             prop_assert_eq!(position.to_postorder_index() + 1, num_frozen_nodes);
 
-            let mut iter = ledger_db.iter::<TransactionInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_info_db().iter::<TransactionInfoSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.iter::<TransactionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_db().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.metadata_db().iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.iter::<WriteSetSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.write_set_db().iter::<WriteSetSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.iter::<EpochByVersionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.metadata_db().iter::<EpochByVersionSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             let (version, epoch) = iter.next().transpose().unwrap().unwrap();
             prop_assert!(version <= target_version);
 
-            let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.metadata_db().iter::<LedgerInfoSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 
-            let mut iter = ledger_db.iter::<StateValueSchema>(ReadOptions::default()).unwrap();
+            // TODO(grao): Support sharding here.
+            let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let ((_, version), _) = item.unwrap();
                 prop_assert!(version <= target_version);
             }
 
-            let mut iter = ledger_db.iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
+            // TODO(grao): Support sharding here.
+            let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_first();
             for item in iter {
                 let version = item.unwrap().0.stale_since_version;

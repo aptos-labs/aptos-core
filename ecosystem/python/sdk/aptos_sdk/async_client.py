@@ -1,6 +1,8 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +13,7 @@ from .account import Account
 from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
+from .metadata import Metadata
 from .transactions import (
     EntryFunction,
     MultiAgentRawTransaction,
@@ -19,7 +22,6 @@ from .transactions import (
     TransactionArgument,
     TransactionPayload,
 )
-from .type_tag import StructTag, TypeTag
 
 U64_MAX = 18446744073709551615
 
@@ -49,8 +51,13 @@ class RestClient:
         # Default timeouts but do not set a pool timeout, since the idea is that jobs will wait as
         # long as progress is being made.
         timeout = httpx.Timeout(60.0, pool=None)
+        # Default headers
+        headers = {Metadata.APTOS_HEADER: Metadata.get_aptos_header_val()}
         self.client = httpx.AsyncClient(
-            http2=client_config.http2, limits=limits, timeout=timeout
+            http2=client_config.http2,
+            limits=limits,
+            timeout=timeout,
+            headers=headers,
         )
         self.client_config = client_config
         self._chain_id = None
@@ -92,7 +99,7 @@ class RestClient:
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
             ledger_version,
         )
-        return resource["data"]["coin"]["value"]
+        return int(resource["data"]["coin"]["value"])
 
     async def account_sequence_number(
         self, account_address: AccountAddress, ledger_version: int = None
@@ -136,6 +143,10 @@ class RestClient:
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
         return response.json()
+
+    async def current_timestamp(self) -> float:
+        info = await self.info()
+        return float(info["ledger_timestamp"]) / 1_000_000
 
     async def get_table_item(
         self,
@@ -320,7 +331,7 @@ class RestClient:
             assert (
                 count < self.client_config.transaction_wait_in_seconds
             ), f"transaction {txn_hash} timed out"
-            time.sleep(1)
+            await asyncio.sleep(1)
             count += 1
         response = await self.client.get(
             f"{self.base_url}/transactions/by_hash/{txn_hash}"
@@ -328,6 +339,20 @@ class RestClient:
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
+
+    async def account_transaction_sequence_number_status(
+        self, address: AccountAddress, sequence_number: int
+    ) -> bool:
+        """Retrieve the state of a transaction by account and sequence number."""
+
+        response = await self.client.get(
+            f"{self.base_url}/accounts/{address}/transactions?limit=1&start={sequence_number}"
+        )
+        if response.status_code >= 400:
+            logging.info(f"k {response}")
+            raise ApiError(response.text, response.status_code)
+        data = response.json()
+        return len(data) == 1 and data[0]["type"] != "pending_transaction"
 
     #
     # Transaction helpers
@@ -374,11 +399,19 @@ class RestClient:
         return SignedTransaction(raw_transaction.inner(), authenticator)
 
     async def create_bcs_transaction(
-        self, sender: Account, payload: TransactionPayload
+        self,
+        sender: Account,
+        payload: TransactionPayload,
+        sequence_number: Optional[int] = None,
     ) -> RawTransaction:
+        sequence_number = (
+            sequence_number
+            if sequence_number is not None
+            else await self.account_sequence_number(sender.address())
+        )
         return RawTransaction(
             sender.address(),
-            await self.account_sequence_number(sender.address()),
+            sequence_number,
             payload,
             self.client_config.max_gas_amount,
             self.client_config.gas_unit_price,
@@ -387,9 +420,14 @@ class RestClient:
         )
 
     async def create_bcs_signed_transaction(
-        self, sender: Account, payload: TransactionPayload
+        self,
+        sender: Account,
+        payload: TransactionPayload,
+        sequence_number: Optional[int] = None,
     ) -> SignedTransaction:
-        raw_transaction = await self.create_bcs_transaction(sender, payload)
+        raw_transaction = await self.create_bcs_transaction(
+            sender, payload, sequence_number
+        )
         signature = sender.sign(raw_transaction.keyed())
         authenticator = Authenticator(
             Ed25519Authenticator(sender.public_key(), signature)
@@ -408,8 +446,8 @@ class RestClient:
 
         payload = {
             "type": "entry_function_payload",
-            "function": "0x1::coin::transfer",
-            "type_arguments": ["0x1::aptos_coin::AptosCoin"],
+            "function": "0x1::aptos_account::transfer",
+            "type_arguments": [],
             "arguments": [
                 f"{recipient}",
                 str(amount),
@@ -419,7 +457,11 @@ class RestClient:
 
     # :!:>bcs_transfer
     async def bcs_transfer(
-        self, sender: Account, recipient: AccountAddress, amount: int
+        self,
+        sender: Account,
+        recipient: AccountAddress,
+        amount: int,
+        sequence_number: Optional[int] = None,
     ) -> str:
         transaction_arguments = [
             TransactionArgument(recipient, Serializer.struct),
@@ -427,14 +469,14 @@ class RestClient:
         ]
 
         payload = EntryFunction.natural(
-            "0x1::coin",
+            "0x1::aptos_account",
             "transfer",
-            [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
+            [],
             transaction_arguments,
         )
 
         signed_transaction = await self.create_bcs_signed_transaction(
-            sender, TransactionPayload(payload)
+            sender, TransactionPayload(payload), sequence_number=sequence_number
         )
         return await self.submit_bcs_transaction(signed_transaction)
 

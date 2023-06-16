@@ -3,7 +3,6 @@
 
 use crate::{
     new_sharded_kv_schema_batch,
-    pruner::{state_merkle_pruner_worker::StateMerklePrunerWorker, *},
     stale_node_index::StaleNodeIndexSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
     state_merkle_db::StateMerkleDb,
@@ -64,7 +63,11 @@ fn put_value_set(
             &sharded_state_kv_batches,
         )
         .unwrap();
-    state_store.ledger_db.write_schemas(ledger_batch).unwrap();
+    state_store
+        .ledger_db
+        .metadata_db()
+        .write_schemas(ledger_batch)
+        .unwrap();
     state_store
         .state_kv_db
         .commit(version, sharded_state_kv_batches)
@@ -320,54 +323,6 @@ fn test_state_store_pruner_disabled() {
                 i as u64,
             );
         }
-    }
-}
-
-#[test]
-fn test_worker_quit_eagerly() {
-    let key = StateKey::raw(String::from("test_key1").into_bytes());
-
-    let value0 = StateValue::from(String::from("test_val1").into_bytes());
-    let value1 = StateValue::from(String::from("test_val2").into_bytes());
-    let value2 = StateValue::from(String::from("test_val3").into_bytes());
-
-    let tmp_dir = TempPath::new();
-    let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_store = &aptos_db.state_store;
-
-    let _root0 = put_value_set(
-        state_store,
-        vec![(key.clone(), value0.clone())],
-        0, /* version */
-    );
-    let _root1 = put_value_set(
-        state_store,
-        vec![(key.clone(), value1.clone())],
-        1, /* version */
-    );
-    let _root2 = put_value_set(
-        state_store,
-        vec![(key.clone(), value2.clone())],
-        2, /* version */
-    );
-
-    {
-        let state_merkle_pruner = pruner_utils::create_state_merkle_pruner::<StaleNodeIndexSchema>(
-            Arc::clone(&aptos_db.state_merkle_db),
-        );
-        let worker = StateMerklePrunerWorker::new(state_merkle_pruner, StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 1,
-            batch_size: 100,
-        });
-        worker.set_target_db_version(/*target_db_version=*/ 1);
-        worker.set_target_db_version(/*target_db_version=*/ 2);
-        // Worker quits immediately.
-        worker.stop_pruning();
-        worker.work();
-        verify_state_in_store(state_store, key.clone(), Some(&value0), 0);
-        verify_state_in_store(state_store, key.clone(), Some(&value1), 1);
-        verify_state_in_store(state_store, key, Some(&value2), 2);
     }
 }
 

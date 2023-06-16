@@ -19,6 +19,7 @@ members = [
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
+    "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -92,15 +93,18 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-parser",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
-     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
+    "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
+    "execution/block-partitioner",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
+    "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
     "mempool",
@@ -145,6 +149,8 @@ members = [
     "testsuite/dos/sender",
     "testsuite/forge",
     "testsuite/forge-cli",
+    "testsuite/fuzzer",
+    "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
     "testsuite/module-publish",
     "testsuite/smoke-test",
@@ -270,6 +276,8 @@ aptos-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
+aptos-block-partitioner = { path = "execution/block-partitioner" }
+aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
@@ -280,6 +288,7 @@ aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
+fuzzer = { path = "testsuite/fuzzer" }
 aptos-gas = { path = "aptos-move/aptos-gas" }
 aptos-gas-algebra-ext = { path = "aptos-move/gas-algebra-ext" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
@@ -370,6 +379,7 @@ aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
 aptos-vm-genesis = { path = "aptos-move/vm-genesis" }
+aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
@@ -422,8 +432,14 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.0.4", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
-diesel_migrations = { version = "2.0.0", features = ["postgres"] }
+diesel = { version = "2.1.0", features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
+diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "4.0.0"
@@ -485,6 +501,7 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -509,16 +526,22 @@ quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
+random_word = "0.3.0"
 rayon = "1.5.2"
 redis = { version = "0.22.3", features = ["tokio-comp", "script"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.5.5"
-reqwest = { version = "0.11.11", features = ["blocking", "cookies", "json", "stream"] }
+reqwest = { version = "0.11.11", features = [
+    "blocking",
+    "cookies",
+    "json",
+    "stream",
+] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
-rocksdb = { version = "0.20.1", features = ["lz4"] }
+rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 sha-1 = "0.10.0"
@@ -609,9 +632,13 @@ move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
-move-unit-test = { path = "third_party/move/tools/move-unit-test", features = ["table-extension"] }
+move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
+    "table-extension",
+] }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
-move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = ["table-extension"] }
+move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
+    "table-extension",
+] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 # Econia
@@ -629,14 +656,14 @@ inherits = "release"
 opt-level = 3
 debug = true
 overflow-checks = true
-lto = true
+lto = "thin"
 codegen-units = 1
 
 [profile.cli]
 inherits = "release"
 debug = false
 opt-level = "z"
-lto = true
+lto = "thin"
 strip = true
 codegen-units = 1
 

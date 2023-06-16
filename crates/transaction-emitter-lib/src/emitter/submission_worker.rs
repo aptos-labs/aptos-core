@@ -98,74 +98,73 @@ impl SubmissionWorker {
             wait_until += wait_duration;
 
             let requests = self.gen_requests();
+            if !requests.is_empty() {
+                let mut account_to_start_and_end_seq_num = HashMap::new();
+                for req in requests.iter() {
+                    let cur = req.sequence_number();
+                    let _ = *account_to_start_and_end_seq_num
+                        .entry(req.sender())
+                        .and_modify(|(start, end)| {
+                            if *start > cur {
+                                *start = cur;
+                            }
+                            if *end < cur + 1 {
+                                *end = cur + 1;
+                            }
+                        })
+                        .or_insert((cur, cur + 1));
+                }
 
-            let mut account_to_start_and_end_seq_num = HashMap::new();
-            for req in requests.iter() {
-                let cur = req.sequence_number();
-                let _ = *account_to_start_and_end_seq_num
-                    .entry(req.sender())
-                    .and_modify(|(start, end)| {
-                        if *start > cur {
-                            *start = cur;
-                        }
-                        if *end < cur + 1 {
-                            *end = cur + 1;
-                        }
-                    })
-                    .or_insert((cur, cur + 1));
-            }
+                let txn_expiration_time = requests
+                    .iter()
+                    .map(|txn| txn.expiration_timestamp_secs())
+                    .max()
+                    .unwrap_or(0);
 
-            let txn_expiration_time = requests
-                .iter()
-                .map(|txn| txn.expiration_timestamp_secs())
-                .max()
-                .unwrap_or(0);
+                let txn_offset_time = Arc::new(AtomicU64::new(0));
 
-            let txn_offset_time = Arc::new(AtomicU64::new(0));
+                join_all(
+                    requests
+                        .chunks(self.params.max_submit_batch_size)
+                        .map(|reqs| {
+                            submit_transactions(
+                                &self.client,
+                                reqs,
+                                loop_start_time.clone(),
+                                txn_offset_time.clone(),
+                                loop_stats,
+                            )
+                        }),
+                )
+                .await;
 
-            join_all(
-                requests
-                    .chunks(self.params.max_submit_batch_size)
-                    .map(|reqs| {
-                        submit_transactions(
-                            &self.client,
-                            reqs,
-                            loop_start_time.clone(),
-                            txn_offset_time.clone(),
-                            loop_stats,
-                        )
-                    }),
-            )
-            .await;
+                if self.skip_latency_stats {
+                    // we also don't want to be stuck waiting for txn_expiration_time_secs
+                    // after stop is called, so we sleep until time or stop is set.
+                    self.sleep_check_done(Duration::from_secs(
+                        self.params.txn_expiration_time_secs + 20,
+                    ))
+                    .await
+                }
 
-            if self.skip_latency_stats {
-                // we also don't want to be stuck waiting for txn_expiration_time_secs
-                // after stop is called, so we sleep until time or stop is set.
-                self.sleep_check_done(Duration::from_secs(
-                    self.params.txn_expiration_time_secs + 20,
-                ))
-                .await
-            }
-
-            self.wait_and_update_stats(
-                *loop_start_time,
-                txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
-                account_to_start_and_end_seq_num,
-                // skip latency if asked to check seq_num only once
-                // even if we check more often due to stop (to not affect sampling)
-                self.skip_latency_stats,
-                txn_expiration_time,
-                // if we don't care about latency, we can recheck less often.
-                // generally, we should never need to recheck, as we wait enough time
-                // before calling here, but in case of shutdown/or client we are talking
-                // to being stale (having stale transaction_version), we might need to wait.
-                Duration::from_millis(
+                self.wait_and_update_stats(
+                    *loop_start_time,
+                    txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
+                    account_to_start_and_end_seq_num,
+                    // skip latency if asked to check seq_num only once
+                    // even if we check more often due to stop (to not affect sampling)
+                    self.skip_latency_stats,
+                    txn_expiration_time,
+                    // if we don't care about latency, we can recheck less often.
+                    // generally, we should never need to recheck, as we wait enough time
+                    // before calling here, but in case of shutdown/or client we are talking
+                    // to being stale (having stale transaction_version), we might need to wait.
                     if self.skip_latency_stats { 10 } else { 1 }
-                        * self.params.check_account_sequence_sleep_millis,
-                ),
-                loop_stats,
-            )
-            .await;
+                        * self.params.check_account_sequence_sleep,
+                    loop_stats,
+                )
+                .await;
+            }
 
             let now = Instant::now();
             if wait_until > now {
@@ -356,11 +355,12 @@ pub async fn submit_transactions(
                         .map_or(-1, |v| v.into_inner().get() as i64);
 
                     warn!(
-                        "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
+                        "[{:?}] Failed to submit {} txns in a batch, first failure due to {:?}, for account {}, chain id: {:?}, first asked: {}, failed seq nums: {:?}, failed error codes: {:?}, balance of {} and last transaction for account: {:?}",
                         client.path_prefix_string(),
                         failures.len(),
                         failure,
                         sender,
+                        txns[0].chain_id(),
                         txns[0].sequence_number(),
                         failures.iter().map(|f| txns[f.transaction_index].sequence_number()).collect::<Vec<_>>(),
                         by_error,

@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     let tests = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_initial_version(InitialVersion::Newest)
-        .with_network_tests(vec![&PerformanceBenchmark])
+        .add_network_test(PerformanceBenchmark)
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 30 })
