@@ -26,15 +26,17 @@ module tic_tac_toe::ttt {
     /// An address trying to claim a player that is already taken
     const EPLAYER_TAKEN: u64 = 1;
     /// Trying to destroy game before game has been finished
-    const EGAME_NOT_DONE: u64 = 3;
+    const EGAME_NOT_DONE: u64 = 2;
     /// An address can only join as one player, not two
-    const ECANNOT_JOIN_AS_TWO_PLAYERS: u64 = 4;
+    const ECANNOT_JOIN_AS_TWO_PLAYERS: u64 = 3;
     /// A (x,y) move is out of bounds of the 3x3 grid
-    const EOUT_OF_BOUNDS_MOVE: u64 = 5;
+    const EOUT_OF_BOUNDS_MOVE: u64 = 4;
     /// Address doesn't exist in the current Game
-    const EPLAYER_NOT_IN_GAME: u64 = 6;
+    const EPLAYER_NOT_IN_GAME: u64 = 5;
     /// An attempt to place moves even though a Game is over
-    const EGAME_HAS_ALREADY_FINISHED: u64 = 7;
+    const EGAME_HAS_ALREADY_FINISHED: u64 = 6;
+    /// User tries to make two games
+    const EGAME_ALREADY_EXISTS_FOR_USER: u64 = 7;
 
 
     struct GameOverEvent has drop, store {
@@ -66,6 +68,8 @@ module tic_tac_toe::ttt {
      * @dev stores the Game into global storage
      */
     public entry fun start_game(creator: &signer) {
+        // check game doesn't already exist under creator address
+        assert!(!exists<Game>(signer::address_of(creator)), error::already_exists(EGAME_ALREADY_EXISTS_FOR_USER));
         let game = initalize_game(creator);
         let creator_addr = signer::address_of(creator);
         choose_player_x(&mut game, creator_addr);
