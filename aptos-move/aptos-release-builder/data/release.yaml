@@ -6,7 +6,6 @@ proposals:
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.5.0"
       description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.5.0. bls12381, crytography algebra natives, and charging for invariant violations will be enabled in separate proposals."
-      source_code_url: ""
       discussion_url: "https://github.com/aptos-labs/aptos-core/issues/8574"
     execution_mode: MultiStep
     update_sequence:
@@ -18,7 +17,6 @@ proposals:
     metadata:
       title: "Enable bls12381"
       description: "AIP-20: Support of generic cryptography algebra operations in Aptos standard library."
-      source_code_url: ""
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/94"
     execution_mode: MultiStep
     update_sequence:
@@ -30,7 +28,6 @@ proposals:
     metadata:
       title: "Enable charge_invariant_violation"
       description: "AIP-35: Charge transactions that triggered invariant violation error instead of discarding them."
-      source_code_url: ""
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/144"
     execution_mode: MultiStep
     update_sequence:
