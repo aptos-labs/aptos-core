@@ -39,6 +39,8 @@ module tic_tac_toe::ttt {
     const EGAME_ALREADY_EXISTS_FOR_USER: u64 = 7;
     /// Game doesn't exist under address
     const EGAME_DOESNT_EXIST: u64 = 8;
+    /// Out of turn move or player not in game
+    const EOUT_OF_TURN_MOVE: u64 = 9;
 
 
     struct GameOverEvent has drop, store {
@@ -210,9 +212,9 @@ module tic_tac_toe::ttt {
         // validate player move
         let player_type = player.type;
         if (game.is_player_x_turn) {
-            assert!(player_type == PLAYER_X_TYPE, 0);
+            assert!(player_type == PLAYER_X_TYPE, error::unauthenticated(EOUT_OF_TURN_MOVE));
         } else {
-            assert!(player_type == PLAYER_O_TYPE, 0);
+            assert!(player_type == PLAYER_O_TYPE, error::unauthenticated(EOUT_OF_TURN_MOVE));
         };
         
         let position = WIDTH_AND_HEIGHT * x + y;
