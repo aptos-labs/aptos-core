@@ -345,17 +345,17 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::chain_status;
 
         requires chain_status::is_operating();
-        include Schema_add_approved_script_hash;
+        include AddApprovedScriptHash;
     }
 
     spec add_approved_script_hash_script(proposal_id: u64) {
         use aptos_framework::chain_status;
 
         requires chain_status::is_operating();
-        include Schema_add_approved_script_hash;
+        include AddApprovedScriptHash;
     }
 
-    spec schema Schema_add_approved_script_hash {
+    spec schema AddApprovedScriptHash {
         proposal_id: u64;
         aborts_if !exists<ApprovedExecutionHashes>(@aptos_framework);
 
@@ -384,7 +384,7 @@ spec aptos_framework::aptos_governance {
         requires chain_status::is_operating();
 
         // verify voting::resolve
-        include Voting_Is_proposal_resolvable_Abortsif;
+        include VotingIsProposalResolvableAbortsif;
 
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
@@ -435,7 +435,6 @@ spec aptos_framework::aptos_governance {
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_operating();
-        // requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
@@ -469,7 +468,7 @@ spec aptos_framework::aptos_governance {
         };
     }
 
-    spec schema GetVotingPowerAbortsIf {
+    spec schema     GetVotingPowerAbortsIf {
         pool_address: address;
 
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
@@ -525,7 +524,7 @@ spec aptos_framework::aptos_governance {
         requires chain_status::is_operating();
 
         // verify voting::resolve_proposal_v2
-        include Voting_Is_proposal_resolvable_Abortsif;
+        include VotingIsProposalResolvableAbortsif;
 
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
@@ -535,7 +534,6 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let multi_step_in_execution_key = utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         let post is_multi_step_proposal_in_execution_value = simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key);
-        // aborts_if simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) && !aptos_std::from_bcs::deserializable<vector<u8>>(b"true");
         ensures simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) ==>
             is_multi_step_proposal_in_execution_value == std::bcs::serialize(true);
 
@@ -574,7 +572,7 @@ spec aptos_framework::aptos_governance {
         ensures signer::address_of(result) == addr;
     }
 
-    spec schema Voting_Is_proposal_resolvable_Abortsif {
+    spec schema VotingIsProposalResolvableAbortsif {
         proposal_id: u64;
 
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
@@ -587,9 +585,9 @@ spec aptos_framework::aptos_governance {
                                     (proposal.yes_votes >= early_resolution_threshold ||
                                      proposal.no_votes >= early_resolution_threshold);
         let voting_closed = voting_period_over || be_resolved_early;
-        // Failed
+        // If Voting Failed
         aborts_if voting_closed && (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
-        // Pending
+        // If Voting Pending
         aborts_if !voting_closed;
 
         aborts_if proposal.is_resolved;
