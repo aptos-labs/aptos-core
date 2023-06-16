@@ -11,7 +11,7 @@ use aptos_logger::trace;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::block_executor::partitioner::{ShardId, SubBlock, TransactionWithDependencies};
-use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
+use aptos_types::transaction::Transaction;
 use std::sync::{
     mpsc::{Receiver, Sender},
     Arc,
@@ -93,8 +93,10 @@ impl PartitioningShard {
         let accepted_txns_with_dependencies = accepted_txns
             .into_iter()
             .zip(accepted_cross_shard_dependencies.into_iter())
-            .map(|(txn, dependencies)| TransactionWithDependencies::new(txn, dependencies))
-            .collect::<Vec<TransactionWithDependencies<AnalyzedTransaction>>>();
+            .map(|(txn, dependencies)| {
+                TransactionWithDependencies::new(txn.into_txn(), dependencies)
+            })
+            .collect::<Vec<TransactionWithDependencies<Transaction>>>();
 
         let mut frozen_sub_blocks = dependent_edge_creator.into_frozen_sub_blocks();
         let current_frozen_sub_block = SubBlock::new(index_offset, accepted_txns_with_dependencies);
