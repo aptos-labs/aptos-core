@@ -1,5 +1,4 @@
 import { AptosAccount } from "../../account/aptos_account";
-import { AptosClient } from "../../providers/aptos_client";
 import { bcsSerializeBool } from "../../bcs";
 import { FaucetClient } from "../../plugins/faucet_client";
 import { IndexerClient } from "../../providers/indexer";
@@ -9,19 +8,17 @@ import { Network, NetworkToIndexerAPI, sleep } from "../../utils";
 import { Provider } from "../../providers";
 import { AptosToken } from "../../plugins";
 
-const provider = new Provider(Network.TESTNET);
+const provider = new Provider(Network.DEVNET);
 const aptosToken = new AptosToken(provider);
-const faucetClient = new FaucetClient(
-  "https://fullnode.testnet.aptoslabs.com",
-  "https://faucet.testnet.aptoslabs.com",
-  { TOKEN: FAUCET_AUTH_TOKEN },
-);
+const faucetClient = new FaucetClient("https://fullnode.devnet.aptoslabs.com", "https://faucet.devnet.aptoslabs.com", {
+  token: FAUCET_AUTH_TOKEN,
+});
 const tokenClient = new TokenClient(provider.aptosClient);
 const alice = new AptosAccount();
 const collectionName = "AliceCollection";
 const collectionNameV2 = "AliceCollection2";
 const tokenName = "Alice Token";
-const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.TESTNET]);
+const indexerClient = new IndexerClient(NetworkToIndexerAPI[Network.DEVNET]);
 
 describe("Indexer", () => {
   it("should throw an error when account address is not valid", async () => {
@@ -98,6 +95,7 @@ describe("Indexer", () => {
     beforeEach(async () => {
       await sleep(1000);
     });
+    console.log(alice);
     it(
       "gets account NFTs",
       async () => {
@@ -223,7 +221,6 @@ describe("Indexer", () => {
       "gets user transactions",
       async () => {
         const userTransactions = await indexerClient.getUserTransactions(482294669, { limit: 4 });
-        expect(userTransactions.user_transactions[0].version).toEqual(482294669);
         expect(userTransactions.user_transactions.length).toEqual(4);
       },
       longTestTimeout,

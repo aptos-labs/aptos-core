@@ -1,8 +1,8 @@
 import { AptosClient } from "./aptos_client";
 import { IndexerClient } from "./indexer";
 
-import * as Gen from "../generated/index";
 import { CustomEndpoints, Network, NetworkToIndexerAPI, NetworkToNodeAPI } from "../utils";
+import { ClientConfig } from "../client/core";
 
 type NetworkWithCustom = Network | "CUSTOM";
 /**
@@ -31,11 +31,7 @@ export class Provider {
 
   network: NetworkWithCustom;
 
-  constructor(
-    network: Network | CustomEndpoints,
-    config?: Partial<Gen.OpenAPIConfig>,
-    doNotFixNodeUrl: boolean = false,
-  ) {
+  constructor(network: Network | CustomEndpoints, config?: ClientConfig, doNotFixNodeUrl: boolean = false) {
     let fullNodeUrl = null;
     let indexerUrl = null;
 

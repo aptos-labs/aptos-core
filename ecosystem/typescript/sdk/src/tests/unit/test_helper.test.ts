@@ -1,5 +1,5 @@
+import { ClientConfig } from "../../client";
 import { FaucetClient } from "../../plugins/faucet_client";
-import { OpenAPIConfig } from "../../generated";
 import { CustomEndpoints } from "../../utils/api-endpoints";
 
 export const NODE_URL = process.env.APTOS_NODE_URL!;
@@ -18,9 +18,9 @@ export const ANS_OWNER_PK = "0x37368b46ce665362562c6d1d4ec01a08c8644c488690df5a1
  * pass that along in the header in the format the faucet expects.
  */
 export function getFaucetClient(): FaucetClient {
-  const config: Partial<OpenAPIConfig> = {};
+  const config: ClientConfig = {};
   if (process.env.FAUCET_AUTH_TOKEN) {
-    config.HEADERS = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
+    config.headers = { Authorization: `Bearer ${process.env.FAUCET_AUTH_TOKEN}` };
   }
   return new FaucetClient(NODE_URL, FAUCET_URL, config);
 }
