@@ -456,8 +456,6 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        block_size: usize,
-        txn_indices: Vec<TxnIndex>,
         signature_verified_block: &ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
@@ -468,6 +466,8 @@ where
         // w. concurrency_level = 1 for some reason.
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
+        let txn_indices = signature_verified_block.txn_indices();
+        let positions_by_txn_idx = IndexMapping::inverse(signature_verified_block.block_size(), &txn_indices);
         let signature_verified_block = match signature_verified_block {
             ExecutableTransactions::Unsharded(txns) => txns,
             ExecutableTransactions::Sharded(_, _) => {
@@ -482,7 +482,6 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        let positions_by_txn_idx = IndexMapping::inverse(block_size, &txn_indices);
         let last_input_output = TxnLastInputOutput::new(num_txns, positions_by_txn_idx.clone());
         let scheduler = Scheduler::new(IndexMapping::wrap(txn_indices.clone(), positions_by_txn_idx));
 
@@ -528,7 +527,7 @@ where
         } else {
             let mut ret = None;
             for &idx in txn_indices.iter() {
-                match last_input_output.take_output(idx) {
+                match last_input_output.take_output(idx as aptos_mvhashmap::types::TxnIndex) {
                     ExecutionStatus::Success(t) => final_results.push(t),
                     ExecutionStatus::SkipRest(t) => {
                         final_results.push(t);
@@ -644,16 +643,12 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        block_size: usize,
-        txn_indices: Vec<TxnIndex>,
         signature_verified_block: ExecutableTransactions<T>,
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                block_size,
-                txn_indices,
                 &signature_verified_block,
                 base_view,
             )

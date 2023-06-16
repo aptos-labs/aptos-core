@@ -1505,14 +1505,12 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let index_mapping = IndexMapping::new_unsharded(transactions.len());
         let ret = BlockAptosVM::execute_block(
             Arc::clone(&RAYON_EXEC_POOL),
             ExecutableTransactions::Unsharded(transactions),
             state_view,
             Self::get_concurrency_level(),
             maybe_block_gas_limit,
-            index_mapping,
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

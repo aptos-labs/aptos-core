@@ -43,7 +43,6 @@ where
     );
 
     let executable_transactions = ExecutableTransactions::Unsharded(transactions);
-    let num_txns = executable_transactions.num_transactions();
     let output = BlockExecutor::<
         Transaction<K, V>,
         Task<K, V>,
@@ -52,8 +51,6 @@ where
     >::new(num_cpus::get(), executor_thread_pool, None)
     .execute_transactions_parallel(
         (),
-        num_txns,
-        (0..num_txns).map(|x|x as TxnIndex).collect(),
         &executable_transactions,
         &data_view,
     );
@@ -183,8 +180,8 @@ const NUM_BLOCKS: u64 = 10;
 const TXN_PER_BLOCK: u64 = 100;
 
 /// Make a list of indices of pattern `[5, 15, 25, ...]`.
-fn make_non_contiguous_indices(num: usize) -> Vec<TxnIndex> {
-    (0..num as TxnIndex).map(|i| i * 10 + 5).collect()
+fn make_non_contiguous_indices(num: usize) -> Vec<usize> {
+    (0..num).map(|i| i * 10 + 5).collect()
 }
 
 /// Make an IndexMapping of a sub-block, assuming there are `num_txns*10` txns in the block,
@@ -303,7 +300,7 @@ fn scheduler_tasks_with_non_contiguous_indices() {
 fn scheduler_tasks_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         // No validation tasks.
         assert!(matches!(
             s.next_task(false),
@@ -311,7 +308,7 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
         ));
     }
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         // Validation index is at 0, so transactions will be validated and no
         // need to return a validation task to the caller.
         assert!(matches!(
@@ -320,7 +317,7 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
         ));
     }
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         assert!(matches!(
             s.next_task(false),
             SchedulerTask::ValidationTask((j, 0), 0) if i == j
@@ -328,63 +325,63 @@ fn scheduler_tasks_main(index_mapping: IndexMapping) {
     }
 
     // successful aborts.
-    assert!(s.try_abort(index_mapping.indices[3], 0));
-    s.finish_validation(index_mapping.indices[4], 0);
-    assert!(s.try_abort(index_mapping.indices[4], 0)); // can abort even after successful validation
-    assert!(s.try_abort(index_mapping.indices[1], 0));
+    assert!(s.try_abort(index_mapping.index(3), 0));
+    s.finish_validation(index_mapping.index(4), 0);
+    assert!(s.try_abort(index_mapping.index(4), 0)); // can abort even after successful validation
+    assert!(s.try_abort(index_mapping.index(1), 0));
 
     // unsuccessful aborts
-    assert!(!s.try_abort(index_mapping.indices[1], 0));
-    assert!(!s.try_abort(index_mapping.indices[3], 0));
+    assert!(!s.try_abort(index_mapping.index(1), 0));
+    assert!(!s.try_abort(index_mapping.index(3), 0));
 
     assert!(matches!(
-        s.finish_abort(index_mapping.indices[4], 0),
-        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.indices[4]
+        s.finish_abort(index_mapping.index(4), 0),
+        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.index(4)
     ));
     assert!(matches!(
-        s.finish_abort(index_mapping.indices[1], 0),
-        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.indices[1]
+        s.finish_abort(index_mapping.index(1), 0),
+        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.index(1)
     ));
     // Validation index = 2, wave = 1.
     assert!(matches!(
-        s.finish_abort(index_mapping.indices[3], 0),
-        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.indices[3]
+        s.finish_abort(index_mapping.index(3), 0),
+        SchedulerTask::ExecutionTask((index, 1), None) if index == index_mapping.index(3)
     ));
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[4], 1, true),
+        s.finish_execution(index_mapping.index(4), 1, true),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, false),
-        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.indices[1]
+        s.finish_execution(index_mapping.index(1), 1, false),
+        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.index(1)
     ));
 
     // Another validation task for (2, 0).
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((index, 0), 1) if index == index_mapping.indices[2]
+        SchedulerTask::ValidationTask((index, 0), 1) if index == index_mapping.index(2)
     ));
     // Now skip over txn 3 (status is Executing), and validate 4.
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.indices[4]
+        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.index(4)
     ));
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[3], 1, false),
-        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.indices[3]
+        s.finish_execution(index_mapping.index(3), 1, false),
+        SchedulerTask::ValidationTask((index, 1), 1) if index == index_mapping.index(3)
     ));
 
-    s.finish_validation(index_mapping.indices[0], 0);
-    s.finish_validation(index_mapping.indices[1], 2);
+    s.finish_validation(index_mapping.index(0), 0);
+    s.finish_validation(index_mapping.index(1), 2);
     for i in 2..5 {
-        s.finish_validation(index_mapping.indices[i], 2)
+        s.finish_validation(index_mapping.index(i), 2)
     }
 
     // Make sure everything can be committed.
     for i in 0..5 {
-        assert_some_eq!(s.try_commit(), index_mapping.indices[i]);
+        assert_some_eq!(s.try_commit(), index_mapping.index(i));
     }
 
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
@@ -404,10 +401,7 @@ fn scheduler_first_wave_with_non_contiguous_indices() {
 fn scheduler_first_wave_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping
-        .indices
-        .iter()
-        .take(index_mapping.num_txns() - 1)
+    for i in index_mapping.iter_txn_indices().take(index_mapping.num_txns() - 1)
     {
         // Nothing to validate.
         assert!(matches!(
@@ -419,26 +413,26 @@ fn scheduler_first_wave_main(index_mapping: IndexMapping) {
     // validation index will not increase for the first execution wave
     // until the status becomes executed.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 0, false),
+        s.finish_execution(index_mapping.index(0), 0, false),
         SchedulerTask::NoTask
     ));
 
     // Now we can validate version (0, 0).
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((index, 0), 0) if index == index_mapping.indices[0]
+        SchedulerTask::ValidationTask((index, 0), 0) if index == index_mapping.index(0)
     ));
     let x = s.next_task(false);
     assert!(matches!(
         x,
-        SchedulerTask::ExecutionTask((index, 0), None) if index == index_mapping.indices[5]
+        SchedulerTask::ExecutionTask((index, 0), None) if index == index_mapping.index(5)
     ));
     // Since (1, 0) is not EXECUTED, no validation tasks, and execution index
     // is already at the limit, so no tasks immediately available.
     assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 0, false),
+        s.finish_execution(index_mapping.index(2), 0, false),
         SchedulerTask::NoTask
     ));
     // There should be no tasks, but finishing (1,0) should enable validating
@@ -446,16 +440,16 @@ fn scheduler_first_wave_main(index_mapping: IndexMapping) {
     assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 0, false),
+        s.finish_execution(index_mapping.index(1), 0, false),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[1]
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(1)
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[2]
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(2)
     ));
     assert!(matches!(s.next_task(false), SchedulerTask::NoTask));
 }
@@ -474,7 +468,7 @@ fn scheduler_dependency_with_non_contiguous_indices() {
 fn scheduler_dependency_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -485,34 +479,34 @@ fn scheduler_dependency_main(index_mapping: IndexMapping) {
     // validation index will not increase for the first execution wave
     // until the status becomes executed.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 0, false),
+        s.finish_execution(index_mapping.index(0), 0, false),
         SchedulerTask::NoTask
     ));
     // Now we can validate version (0, 0).
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[0]
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(0)
     ));
     // Current status of 0 is executed - hence, no dependency added.
     assert!(matches!(
-        s.wait_for_dependency(index_mapping.indices[3], index_mapping.indices[0]),
+        s.wait_for_dependency(index_mapping.index(3), index_mapping.index(0)),
         DependencyResult::Resolved
     ));
     // Dependency added for transaction 4 on transaction 2.
     assert!(matches!(
-        s.wait_for_dependency(index_mapping.indices[4], index_mapping.indices[2]),
+        s.wait_for_dependency(index_mapping.index(4), index_mapping.index(2)),
         DependencyResult::Dependency(_)
     ));
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 0, false),
+        s.finish_execution(index_mapping.index(2), 0, false),
         SchedulerTask::NoTask
     ));
 
     // resumed task doesn't bump incarnation
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ExecutionTask((i, 0), Some(_)) if i == index_mapping.indices[4]
+        SchedulerTask::ExecutionTask((i, 0), Some(_)) if i == index_mapping.index(4)
     ));
 }
 
@@ -521,7 +515,8 @@ fn scheduler_dependency_main(index_mapping: IndexMapping) {
 fn incarnation_one_scheduler(index_mapping: &IndexMapping) -> Scheduler {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
+        let i = i as TxnIndex;
         // Get the first executions out of the way.
         assert!(matches!(
             s.next_task(false),
@@ -559,11 +554,11 @@ fn scheduler_incarnation_main(index_mapping: IndexMapping) {
 
     // execution/validation index = 5, wave = 0.
     assert!(matches!(
-        s.wait_for_dependency(index_mapping.indices[1], index_mapping.indices[0]),
+        s.wait_for_dependency(index_mapping.index(1), index_mapping.index(0)),
         DependencyResult::Dependency(_)
     ));
     assert!(matches!(
-        s.wait_for_dependency(index_mapping.indices[3], index_mapping.indices[0]),
+        s.wait_for_dependency(index_mapping.index(3), index_mapping.index(0)),
         DependencyResult::Dependency(_)
     ));
 
@@ -571,75 +566,75 @@ fn scheduler_incarnation_main(index_mapping: IndexMapping) {
     // revalidate_suffix = true) - because now we always decrease validation idx to txn_idx + 1
     // here validation wave increases to 1, and index is reduced to 3.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 1, true),
-        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.indices[2]
+        s.finish_execution(index_mapping.index(2), 1, true),
+        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.index(2)
     ));
     // Here since validation index is lower, wave doesn't increase and no task returned.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[4], 1, true),
+        s.finish_execution(index_mapping.index(4), 1, true),
         SchedulerTask::NoTask
     ));
 
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.indices[4],
+        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.index(4),
     ));
 
-    assert!(s.try_abort(index_mapping.indices[2], 1));
-    assert!(s.try_abort(index_mapping.indices[4], 1));
-    assert!(!s.try_abort(index_mapping.indices[2], 1));
+    assert!(s.try_abort(index_mapping.index(2), 1));
+    assert!(s.try_abort(index_mapping.index(4), 1));
+    assert!(!s.try_abort(index_mapping.index(2), 1));
 
     assert!(matches!(
-        s.finish_abort(index_mapping.indices[2], 1),
-        SchedulerTask::ExecutionTask((i, 2), None) if i == index_mapping.indices[2]
+        s.finish_abort(index_mapping.index(2), 1),
+        SchedulerTask::ExecutionTask((i, 2), None) if i == index_mapping.index(2)
     ));
     // wave = 2, validation index = 2.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 1, false),
-        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.indices[0]
+        s.finish_execution(index_mapping.index(0), 1, false),
+        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.index(0)
     ));
     // execution index =  1
 
     assert!(matches!(
-        s.finish_abort(index_mapping.indices[4], 1),
+        s.finish_abort(index_mapping.index(4), 1),
         SchedulerTask::NoTask
     ));
 
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ExecutionTask((i, 1), Some(_)) if i == index_mapping.indices[1]
+        SchedulerTask::ExecutionTask((i, 1), Some(_)) if i == index_mapping.index(1)
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ExecutionTask((i, 1), Some(_)) if i == index_mapping.indices[3]
+        SchedulerTask::ExecutionTask((i, 1), Some(_)) if i == index_mapping.index(3)
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ExecutionTask((i, 2), None) if i == index_mapping.indices[4]
+        SchedulerTask::ExecutionTask((i, 2), None) if i == index_mapping.index(4)
     ));
     // execution index = 5
 
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, false),
-        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.indices[1]
+        s.finish_execution(index_mapping.index(1), 1, false),
+        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.index(1)
     ));
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 2, false),
-        SchedulerTask::ValidationTask((i, 2), 2) if i == index_mapping.indices[2]
+        s.finish_execution(index_mapping.index(2), 2, false),
+        SchedulerTask::ValidationTask((i, 2), 2) if i == index_mapping.index(2)
     ));
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[3], 1, false),
-        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.indices[3]
+        s.finish_execution(index_mapping.index(3), 1, false),
+        SchedulerTask::ValidationTask((i, 1), 2) if i == index_mapping.index(3)
     ));
 
     // validation index is 4, so finish execution doesn't return validation task, next task does.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[4], 2, false),
+        s.finish_execution(index_mapping.index(4), 2, false),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 2), 2) if i == index_mapping.indices[4]
+        SchedulerTask::ValidationTask((i, 2), 2) if i == index_mapping.index(4)
     ));
 }
 
@@ -656,7 +651,7 @@ fn scheduler_basic_with_non_contiguous_indices() {
 fn scheduler_basic_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -666,36 +661,36 @@ fn scheduler_basic_main(index_mapping: IndexMapping) {
 
     // Finish executions & dispatch validation tasks.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 0, true),
+        s.finish_execution(index_mapping.index(0), 0, true),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 0, true),
-        SchedulerTask::NoTask
-    ));
-    assert!(matches!(
-        s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.indices[0] == i
-    ));
-    assert!(matches!(
-        s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.indices[1] == i
-    ));
-    assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 0, true),
+        s.finish_execution(index_mapping.index(1), 0, true),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.indices[2] == i
+        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.index(0) == i
+    ));
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.index(1) == i
+    ));
+    assert!(matches!(
+        s.finish_execution(index_mapping.index(2), 0, true),
+        SchedulerTask::NoTask
+    ));
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ValidationTask((i, 0), 0) if index_mapping.index(2) == i
     ));
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         s.finish_validation(i, 1)
     }
 
     // make sure everything can be committed.
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         assert_some_eq!(s.try_commit(), i);
     }
 
@@ -715,7 +710,7 @@ fn scheduler_drain_idx_with_non_contiguous_indices() {
 fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
     let s = Scheduler::new(index_mapping.clone());
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         // Nothing to validate.
         assert!(matches!(
             s.next_task(false),
@@ -725,36 +720,36 @@ fn scheduler_drain_idx_main(index_mapping: IndexMapping) {
 
     // Finish executions & dispatch validation tasks.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 0, true),
+        s.finish_execution(index_mapping.index(0), 0, true),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 0, true),
-        SchedulerTask::NoTask
-    ));
-    assert!(matches!(
-        s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[0]
-    ));
-    assert!(matches!(
-        s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[1]
-    ));
-    assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 0, true),
+        s.finish_execution(index_mapping.index(1), 0, true),
         SchedulerTask::NoTask
     ));
     assert!(matches!(
         s.next_task(false),
-        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.indices[2]
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(0)
+    ));
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(1)
+    ));
+    assert!(matches!(
+        s.finish_execution(index_mapping.index(2), 0, true),
+        SchedulerTask::NoTask
+    ));
+    assert!(matches!(
+        s.next_task(false),
+        SchedulerTask::ValidationTask((i, 0), 0) if i == index_mapping.index(2)
     ));
 
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         s.finish_validation(i, 1)
     }
 
     // make sure everything can be committed.
-    for &i in index_mapping.iter() {
+    for i in index_mapping.iter_txn_indices() {
         assert_some_eq!(s.try_commit(), i);
     }
 
@@ -796,24 +791,24 @@ fn finish_execution_wave_with_non_contiguous_indices() {
     let index_mapping = make_non_contiguous_index_mapping(2);
     let s = incarnation_one_scheduler(&index_mapping);
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, true),
-        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.indices[1],
+        s.finish_execution(index_mapping.index(1), 1, true),
+        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.index(1),
     ));
 
     // Here wave will increase, because validation index is reduced from 3 to 2.
     let index_mapping = make_non_contiguous_index_mapping(3);
     let s = incarnation_one_scheduler(&index_mapping);
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, true),
-        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.indices[1],
+        s.finish_execution(index_mapping.index(1), 1, true),
+        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.index(1),
     ));
 
     // Here wave won't be increased, because we pass revalidate_suffix = false.
     let index_mapping = make_non_contiguous_index_mapping(3);
     let s = incarnation_one_scheduler(&index_mapping);
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, false),
-        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.indices[1],
+        s.finish_execution(index_mapping.index(1), 1, false),
+        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.index(1),
     ));
 }
 
@@ -833,47 +828,47 @@ fn rolling_commit_wave_main(index_mapping: IndexMapping) {
     // Finish execution for txn 0 without validate_suffix and because
     // validation index is higher will return validation task to the caller.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[0], 1, false),
-        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.indices[0]
+        s.finish_execution(index_mapping.index(0), 1, false),
+        SchedulerTask::ValidationTask((i, 1), 0) if i == index_mapping.index(0)
     ));
     // finish validating txn 0 with proper wave
-    s.finish_validation(index_mapping.indices[0], 1);
+    s.finish_validation(index_mapping.index(0), 1);
     // txn 0 can be committed
-    assert_some_eq!(s.try_commit(), index_mapping.indices[0]);
-    assert_eq!(s.commit_state(), (index_mapping.indices[1], 0));
+    assert_some_eq!(s.try_commit(), index_mapping.index(0));
+    assert_eq!(s.commit_state(), (index_mapping.index(1), 0));
 
     // This increases the wave, but only sets max_triggered_wave for transaction 2.
     // sets validation_index to 2.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[1], 1, true),
-        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.indices[1],
+        s.finish_execution(index_mapping.index(1), 1, true),
+        SchedulerTask::ValidationTask((i, 1), 1) if i == index_mapping.index(1),
     ));
 
     // finish validating txn 1 with lower wave
-    s.finish_validation(index_mapping.indices[1], 0);
+    s.finish_validation(index_mapping.index(1), 0);
     // txn 1 cannot be committed
     assert!(s.try_commit().is_none());
-    assert_eq!(s.commit_state(), (index_mapping.indices[1], 0));
+    assert_eq!(s.commit_state(), (index_mapping.index(1), 0));
 
     // finish validating txn 1 with proper wave
-    s.finish_validation(index_mapping.indices[1], 1);
+    s.finish_validation(index_mapping.index(1), 1);
     // txn 1 can be committed
-    assert_some_eq!(s.try_commit(), index_mapping.indices[1]);
-    assert_eq!(s.commit_state(), (index_mapping.indices[2], 0));
+    assert_some_eq!(s.try_commit(), index_mapping.index(1));
+    assert_eq!(s.commit_state(), (index_mapping.index(2), 0));
 
     // No validation task because index is already 2.
     assert!(matches!(
-        s.finish_execution(index_mapping.indices[2], 1, false),
+        s.finish_execution(index_mapping.index(2), 1, false),
         SchedulerTask::NoTask,
     ));
     // finish validating with a lower wave.
-    s.finish_validation(index_mapping.indices[2], 0);
+    s.finish_validation(index_mapping.index(2), 0);
     assert!(s.try_commit().is_none());
-    assert_eq!(s.commit_state(), (index_mapping.indices[2], 1));
+    assert_eq!(s.commit_state(), (index_mapping.index(2), 1));
     // Finish validation with appropriate wave.
-    s.finish_validation(index_mapping.indices[2], 1);
-    assert_some_eq!(s.try_commit(), index_mapping.indices[2]);
-    assert_eq!(s.commit_state(), (index_mapping.end_index, 1));
+    s.finish_validation(index_mapping.index(2), 1);
+    assert_some_eq!(s.try_commit(), index_mapping.index(2));
+    assert_eq!(s.commit_state(), (index_mapping.end_index(), 1));
 
     // All txns have been committed.
     assert!(matches!(s.next_task(false), SchedulerTask::Done));
@@ -964,10 +959,10 @@ fn no_conflict_task_count() {
             assert_eq!(num_exec_tasks, num_txns);
             assert_eq!(num_val_tasks, num_txns);
 
-            for &i in index_mapping.iter() {
+            for i in index_mapping.iter_txn_indices() {
                 assert_some_eq!(s.try_commit(), i);
-                let expected = if i == index_mapping.indices[index_mapping.num_txns() - 1] {
-                    index_mapping.end_index
+                let expected = if i == index_mapping.index(index_mapping.num_txns() - 1) {
+                    index_mapping.end_index()
                 } else {
                     index_mapping.next_index(i)
                 };

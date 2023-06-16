@@ -233,7 +233,7 @@ impl Scheduler {
         let num_txns = index_mapping.indices.len();
         // Empty block should early return and not create a scheduler.
         assert!(num_txns > 0, "No scheduler needed for 0 transactions");
-        let first_index = index_mapping.indices[0];
+        let first_index = index_mapping.indices[0] as TxnIndex;
         Self {
             index_mapping,
             txn_dependency: (0..num_txns)
@@ -255,8 +255,8 @@ impl Scheduler {
     }
 
     pub fn is_last_index(&self, index: TxnIndex) -> bool {
-        index != self.index_mapping.end_index
-            && self.index_mapping.next_index(index) == self.index_mapping.end_index
+        index != self.index_mapping.end_index()
+            && self.index_mapping.next_index(index) == self.index_mapping.end_index()
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
@@ -292,7 +292,7 @@ impl Scheduler {
 
                             let ret = *commit_idx;
                             *commit_idx = self.index_mapping.next_index(*commit_idx);
-                            if *commit_idx == self.index_mapping.end_index {
+                            if *commit_idx == self.index_mapping.end_index() {
                                 // All txns have been committed, the parallel execution can finish.
                                 self.done_marker.store(true, Ordering::SeqCst);
                             }
@@ -346,10 +346,10 @@ impl Scheduler {
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
             let prefer_validate = idx_to_validate
-                < min(idx_to_execute, self.index_mapping.end_index)
+                < min(idx_to_execute, self.index_mapping.end_index as TxnIndex)
                 && !self.never_executed(idx_to_validate);
 
-            if !prefer_validate && idx_to_execute >= self.index_mapping.end_index {
+            if !prefer_validate && idx_to_execute >= self.index_mapping.end_index as TxnIndex {
                 return if self.done() {
                     // Check again to avoid commit delay due to a race.
                     SchedulerTask::Done
@@ -566,7 +566,7 @@ impl Scheduler {
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
         if !self.done_marker.swap(true, Ordering::SeqCst) {
-            for &txn_idx in self.index_mapping.iter() {
+            for txn_idx in self.index_mapping.iter_txn_indices() {
                 self.resolve_condvar(txn_idx);
             }
         }
@@ -610,8 +610,8 @@ impl Scheduler {
     /// Decreases the validation index, adjusting the wave and validation status as needed.
     fn decrease_validation_idx(&self, target_idx: TxnIndex) -> Option<Wave> {
         // We only call with the next txn_idx, so it can equal num_txns, but not be strictly larger.
-        debug_assert!(target_idx <= self.index_mapping.end_index);
-        if target_idx >= self.index_mapping.end_index {
+        debug_assert!(target_idx <= self.index_mapping.end_index());
+        if target_idx >= self.index_mapping.end_index() {
             return None;
         }
 
@@ -650,7 +650,7 @@ impl Scheduler {
     /// An unsuccessful incarnation returns None. Since incarnation numbers never decrease
     /// for each transaction, incarnate function may not succeed more than once per version.
     fn try_incarnate(&self, txn_idx: TxnIndex) -> Option<(Incarnation, Option<DependencyCondvar>)> {
-        if txn_idx >= self.index_mapping.end_index {
+        if txn_idx >= self.index_mapping.end_index() {
             return None;
         }
 
@@ -677,7 +677,7 @@ impl Scheduler {
     /// and a committed (in between) txn does not need to be scheduled for validation -
     /// so can return None.
     fn is_executed(&self, txn_idx: TxnIndex, include_committed: bool) -> Option<Incarnation> {
-        debug_assert!(txn_idx < self.index_mapping.end_index);
+        debug_assert!(txn_idx < self.index_mapping.end_index());
 
         let status = self.txn_status_by_index(txn_idx).0.read();
         match *status {
@@ -763,7 +763,7 @@ impl Scheduler {
             })
             .unwrap();
 
-        if idx_to_execute >= self.index_mapping.end_index {
+        if idx_to_execute >= self.index_mapping.end_index() {
             return None;
         }
 

@@ -24,7 +24,6 @@ use proptest::{
 };
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
-use aptos_mvhashmap::types::TxnIndex;
 
 fn run_transactions<K, V>(
     key_universe: &[K],
@@ -64,7 +63,6 @@ fn run_transactions<K, V>(
     );
 
     let executable_txns = ExecutableTransactions::Unsharded(transactions);
-    let num_txns = executable_txns.num_transactions();
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
@@ -78,8 +76,6 @@ fn run_transactions<K, V>(
         )
         .execute_transactions_parallel(
             (),
-            num_txns,
-            (0..(num_txns as u32)).collect(),
             &executable_txns,
             &data_view,
         );
@@ -212,7 +208,6 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
     );
 
     for _ in 0..20 {
-        let num_txns= executable_txns.num_transactions();
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
@@ -225,8 +220,6 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         )
         .execute_transactions_parallel(
             (),
-            num_txns,
-            (0..(num_txns as u32)).collect(),
             &executable_txns,
             &data_view,
         );
@@ -275,7 +268,6 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
     );
 
     for _ in 0..20 {
-        let num_txns = executable_txns.num_transactions();
         let output = BlockExecutor::<
             Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
             Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
@@ -288,8 +280,6 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         )
         .execute_transactions_parallel(
             (),
-            num_txns,
-            (0..num_txns).map(|x|x as TxnIndex).collect(),
             &executable_txns,
             &data_view,
         );
@@ -466,8 +456,6 @@ fn publishing_fixed_params_with_block_gas_limit(
     >::new(num_cpus::get(), executor_thread_pool, maybe_block_gas_limit)
     .execute_transactions_parallel(
         (),
-        num_txns,
-        (0..(num_txns as TxnIndex)).collect(),
         &executable_txns,
         &data_view,
     );
@@ -522,8 +510,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         ) // Ensure enough gas limit to commit the module txns
         .execute_transactions_parallel(
             (),
-            num_txns,
-            (0..num_txns).map(|x|x as TxnIndex).collect(),
             &executable_txns,
             &data_view,
         );

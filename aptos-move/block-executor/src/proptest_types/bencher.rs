@@ -123,7 +123,6 @@ where
                 .unwrap(),
         );
 
-        let num_txns = self.transactions.num_transactions();
         let output = BlockExecutor::<
             Transaction<KeyType<K>, ValueType<V>>,
             Task<KeyType<K>, ValueType<V>>,
@@ -132,8 +131,6 @@ where
         >::new(num_cpus::get(), executor_thread_pool, None)
         .execute_transactions_parallel(
             (),
-            num_txns,
-            (0..(num_txns as u32)).collect(),
             &self.transactions,
             &data_view,
         );

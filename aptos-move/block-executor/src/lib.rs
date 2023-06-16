@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::slice::Iter;
 use aptos_mvhashmap::types::TxnIndex;
 
 /**
@@ -157,35 +156,35 @@ pub mod view;
 /// an index mapping is need as an additional input to our existing BlockSTM implementation.
 #[derive(Clone)]
 pub struct IndexMapping {
-    pub indices: Vec<TxnIndex>,
+    indices: Vec<usize>,
     /// A TxnIndex -> local position mapping.
     /// Currently implemented as a `Vec` of size equal to the block size, assuming it's not too large.
-    pub positions_by_index: Vec<usize>,
+    positions_by_index: Vec<usize>,
     /// A fake index representing the end of the transaction list.
-    pub end_index: TxnIndex,
+    end_index: usize,
 }
 
 impl IndexMapping {
     /// Create Positions by TxnIndex mapping from the TxnIndex list.
-    pub fn inverse(block_size: usize, indices: &Vec<TxnIndex>) -> Vec<usize> {
+    pub fn inverse(block_size: usize, indices: &Vec<usize>) -> Vec<usize> {
         let mut ret = vec![usize::MAX; block_size];
         for (pos, &index) in indices.iter().enumerate() {
-            ret[index as usize] = pos;
+            ret[index] = pos;
         }
         ret
     }
 
-    pub fn new(indices: Vec<TxnIndex>, block_size: usize) -> Self {
+    pub fn new(indices: Vec<usize>, block_size: usize) -> Self {
         let positions_by_index = Self::inverse(block_size, &indices);
         Self {
             indices,
             positions_by_index,
-            end_index: TxnIndex::MAX,
+            end_index: block_size,
         }
     }
 
-    pub fn wrap(indices: Vec<TxnIndex>, positions_by_idx: Vec<usize>) -> Self {
-        let end_index = TxnIndex::MAX;
+    pub fn wrap(indices: Vec<usize>, positions_by_idx: Vec<usize>) -> Self {
+        let end_index = positions_by_idx.len();
         Self {
             indices,
             positions_by_index: positions_by_idx,
@@ -195,14 +194,15 @@ impl IndexMapping {
 
     pub fn new_unsharded(block_size: usize) -> Self {
         Self {
-            indices: (0..(block_size as TxnIndex)).collect(),
+            indices: (0..block_size).collect(),
             positions_by_index: (0..block_size).collect(),
-            end_index: block_size as TxnIndex,
+            end_index: block_size,
         }
     }
 
     pub fn next_index(&self, index: TxnIndex) -> TxnIndex {
-        if index == self.end_index {
+        let index = index as usize;
+        let ret = if index == self.end_index {
             self.end_index
         } else {
             let pos = self.positions_by_index[index as usize];
@@ -211,15 +211,16 @@ impl IndexMapping {
             } else {
                 self.indices[pos + 1]
             }
-        }
+        };
+        ret as TxnIndex
     }
 
     pub fn num_txns(&self) -> usize {
         self.indices.len()
     }
 
-    pub fn iter(&self) -> Iter<TxnIndex> {
-        self.indices.iter()
+    pub fn iter_txn_indices(&self) -> Box<dyn Iterator<Item = TxnIndex> + '_> {
+        Box::new(self.indices.iter().map(|&i|i as TxnIndex))
     }
 
     pub fn position_by_index(&self, index: TxnIndex) -> Option<usize> {
@@ -229,5 +230,13 @@ impl IndexMapping {
         } else {
             Some(self.positions_by_index[index])
         }
+    }
+
+    pub fn end_index(&self) -> TxnIndex {
+        self.end_index as TxnIndex
+    }
+
+    pub fn index(&self, i: usize) -> TxnIndex {
+        self.indices[i] as TxnIndex
     }
 }

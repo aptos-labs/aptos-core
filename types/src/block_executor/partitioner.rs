@@ -344,6 +344,24 @@ impl<T> ExecutableTransactions<T> {
             ExecutableTransactions::Sharded(_, _) => None,
         }
     }
+
+    pub fn txn_indices(&self) -> Vec<TxnIndex> {
+        match self {
+            ExecutableTransactions::Unsharded(txns) => {
+                (0..txns.len()).map(|i|i as TxnIndex).collect()
+            }
+            ExecutableTransactions::Sharded(_, sub_blocks) => {
+                sub_blocks.iter().flat_map(|sub_block|sub_block.start_index..(sub_block.start_index + sub_block.transactions.len())).collect()
+            }
+        }
+    }
+
+    pub fn block_size(&self) -> usize {
+        match self {
+            ExecutableTransactions::Unsharded(txns) => txns.len(),
+            ExecutableTransactions::Sharded(block_size, _) => *block_size,
+        }
+    }
 }
 
 impl From<Vec<Transaction>> for ExecutableTransactions<Transaction> {

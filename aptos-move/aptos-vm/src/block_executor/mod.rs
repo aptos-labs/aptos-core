@@ -21,7 +21,6 @@ use aptos_block_executor::{
         Transaction as BlockExecutorTransaction,
         TransactionOutput as BlockExecutorTransactionOutput,
     },
-    IndexMapping,
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -178,8 +177,6 @@ impl BlockAptosVM {
 
     pub fn execute_block<S: StateView + Sync>(
         executor_thread_pool: Arc<ThreadPool>,
-        block_size: usize,
-        txn_indices: Vec<TxnIndex>,
         transactions: ExecutableTransactions<Transaction>,
         state_view: &S,
         concurrency_level: usize,
@@ -217,8 +214,6 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(
             state_view,
-            block_size,
-            txn_indices,
             signature_verified_block,
             state_view,
         );
