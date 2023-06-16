@@ -3183,6 +3183,7 @@ name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
  "aptos-bitvec",
+ "aptos-block-partitioner",
  "aptos-crypto",
  "aptos-executor-service",
  "aptos-gas",
@@ -3196,7 +3197,9 @@ dependencies = [
  "criterion",
  "criterion-cpu-time",
  "num_cpus",
+ "once_cell",
  "proptest",
+ "rayon",
 ]
 
 [[package]]

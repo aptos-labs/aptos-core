@@ -9,7 +9,7 @@ use aptos_types::{
         CrossShardDependencies, CrossShardEdges, ShardId, SubBlocksForShard, TxnIdxWithShardId,
         TxnIndex,
     },
-    transaction::analyzed_transaction::AnalyzedTransaction,
+    transaction::Transaction,
 };
 use itertools::Itertools;
 use std::{collections::HashMap, sync::Arc};
@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 pub struct DependentEdgeCreator {
     shard_id: ShardId,
     cross_shard_client: Arc<dyn CrossShardClientInterface>,
-    froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
+    froze_sub_blocks: SubBlocksForShard<Transaction>,
     num_shards: usize,
 }
 
@@ -33,7 +33,7 @@ impl DependentEdgeCreator {
     pub fn new(
         shard_id: ShardId,
         cross_shard_client: Arc<dyn CrossShardClientInterface>,
-        froze_sub_blocks: SubBlocksForShard<AnalyzedTransaction>,
+        froze_sub_blocks: SubBlocksForShard<Transaction>,
         num_shards: usize,
     ) -> Self {
         Self {
@@ -156,7 +156,7 @@ impl DependentEdgeCreator {
         }
     }
 
-    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard<AnalyzedTransaction> {
+    pub fn into_frozen_sub_blocks(self) -> SubBlocksForShard<Transaction> {
         self.froze_sub_blocks
     }
 }
@@ -177,6 +177,7 @@ mod tests {
         },
         transaction::analyzed_transaction::StorageLocation,
     };
+    use itertools::Itertools;
     use std::sync::Arc;
 
     #[test]
@@ -244,7 +245,18 @@ mod tests {
         });
 
         let mut sub_blocks = SubBlocksForShard::empty(shard_id);
-        let sub_block = SubBlock::new(start_index, transactions_with_deps.clone());
+        let sub_block = SubBlock::new(
+            start_index,
+            transactions_with_deps
+                .iter()
+                .map(|txn_with_deps| {
+                    TransactionWithDependencies::new(
+                        txn_with_deps.txn.transaction().clone(),
+                        txn_with_deps.cross_shard_dependencies.clone(),
+                    )
+                })
+                .collect_vec(),
+        );
         sub_blocks.add_sub_block(sub_block);
 
         let mut dependent_edge_creator =
