@@ -6,7 +6,6 @@ use aptos_consensus_types::common::Author;
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::{future::Future, sync::Arc, time::Duration};
-use tokio::sync::oneshot;
 
 pub trait DAGMessage: Sized + Clone {
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self>;
@@ -50,9 +49,7 @@ impl ReliableBroadcast {
     pub fn broadcast<S: BroadcastStatus>(
         &self,
         message: S::Message,
-        return_tx: oneshot::Sender<S::Aggregated>,
-        mut cancel_rx: oneshot::Receiver<()>,
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = S::Aggregated> {
         let receivers: Vec<_> = self.validators.clone();
         let network_message = message.into_network_message();
         let network_sender = self.network_sender.clone();
@@ -73,26 +70,19 @@ impl ReliableBroadcast {
             for receiver in receivers {
                 fut.push(send_message(receiver, network_message.clone()));
             }
-            loop {
-                tokio::select! {
-                    Some((receiver, result)) = fut.next() => {
-                        match result {
-                            Ok(msg) =>  {
-                                if let Ok(ack) = S::Ack::from_network_message(msg) {
-                                    if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
-                                        let _ = return_tx.send(aggregated);
-                                        return;
-                                    }
-                                }
-                            },
-                            Err(_) => fut.push(send_message(receiver, network_message.clone())),
+            while let Some((receiver, result)) = fut.next().await {
+                match result {
+                    Ok(msg) => {
+                        if let Ok(ack) = S::Ack::from_network_message(msg) {
+                            if let Ok(Some(aggregated)) = aggregating.add(receiver, ack) {
+                                return aggregated;
+                            }
                         }
-                    }
-                    _ = &mut cancel_rx => {
-                        return;
-                    }
+                    },
+                    Err(_) => fut.push(send_message(receiver, network_message.clone())),
                 }
             }
+            unreachable!("Should aggregate with all responses");
         }
     }
 }
