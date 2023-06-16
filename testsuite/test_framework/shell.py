@@ -13,6 +13,7 @@ from typing import Sequence, Union
 
 from test_framework.logging import log
 
+
 @dataclass
 class RunResult:
     exit_code: int
@@ -130,6 +131,7 @@ class FakeCommand:
 
 class SpyShell(FakeShell):
     logger: logging.Logger = log
+
     def __init__(
         self,
         expected_command_list: Sequence[FakeCommand],
@@ -160,11 +162,13 @@ class SpyShell(FakeShell):
                     i
                     for i, fakecommand in enumerate(self.expected_command_list)
                     if fakecommand.command == rendered_command
-                ][times_called_before - 1]
+                ][times_called_before]
             except IndexError:
-                pretty_fake_cmds = "\n".join(self.get_fake_commands())
+                pretty_fake_cmds = "\n".join(
+                    [f"$ {c}" for c in self.get_fake_commands()]
+                )
                 raise Exception(
-                    f"Did not find command {times_called_before} times in expected command list: {rendered_command}\n{pretty_fake_cmds}"
+                    f"Did not find command {times_called_before + 1} times in expected command list: $ {rendered_command}\n\nExpected command list:\n{pretty_fake_cmds}"
                 )
             result = self.expected_command_list[command_index].result_or_exception
         else:

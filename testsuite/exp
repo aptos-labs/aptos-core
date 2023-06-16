@@ -166,7 +166,7 @@ def workflow_dispatch_docker_build(
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
     # XXX: wait a while for GH API to update
-    time.sleep(5)
+    time.sleep(10)
     return gh_workflow_run_cmd_ret.succeeded()
 
 
@@ -202,7 +202,7 @@ def workflow_dispatch_forge(
         return True
     gh_workflow_run_cmd_ret = shell.run(gh_workflow_run_cmd, stream_output=True)
     # XXX: wait a while for GH API to update
-    time.sleep(5)
+    time.sleep(10)
     return gh_workflow_run_cmd_ret.succeeded()
 
 
